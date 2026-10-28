@@ -10,8 +10,10 @@
  */
 import {
   type Attributes,
+  context,
   INVALID_SPAN_CONTEXT,
   type Span,
+  SpanKind,
   SpanStatusCode,
   trace,
 } from '@opentelemetry/api'
@@ -29,7 +31,6 @@ interface CallStats {
   ms: Record<CallKind, number>
   slowest: Record<CallKind, number>
   errors: number
-  events: number
 }
 
 const newStats = (): CallStats => ({
@@ -37,16 +38,14 @@ const newStats = (): CallStats => ({
   ms: { drive: 0, worker: 0 },
   slowest: { drive: 0, worker: 0 },
   errors: 0,
-  events: 0,
 })
 
-/** A call slower than this, or one that failed, is an event on the span (up to MAX_CALL_EVENTS) */
-const SLOW_CALL_MS = 2000
-const MAX_CALL_EVENTS = 10
+/** At most this many calls of one sync are spans of their own: a first sync can make hundreds, and they are still counted on the sync's span */
+const MAX_CALL_SPANS = 200
 /** Errors reported in one visit: a loop of them is one problem, and spans are what Honeycomb bills */
 const MAX_ERROR_SPANS = 20
 
-let tracked: { span: Span; stats: CallStats } | null = null
+let tracked: { span: Span; stats: CallStats; callSpans: number } | null = null
 let errorSpans = 0
 
 const tracer = () => trace.getTracer(NAME)
@@ -74,7 +73,7 @@ export async function traced<T>(
   if (!getTelemetryPreference()) return fn(NO_SPAN)
   const span = tracer().startSpan(name, { attributes })
   const outer = tracked
-  const mine = trackCalls ? { span, stats: newStats() } : null
+  const mine = trackCalls ? { span, stats: newStats(), callSpans: 0 } : null
   if (mine) tracked = mine
   try {
     const result = await fn(span)
@@ -111,55 +110,99 @@ export function recordSpan(name: string, attributes: Attributes): void {
 }
 
 /**
- * A call to Drive or the Worker, counted on the sync running now, if one is. A failure or a slow
- * one is also an event, so the few that matter are told apart without a span for every request.
- * `status` is the HTTP status, or 0 when there was no answer.
+ * A call to Drive or the Worker, counted on the sync running now, if one is. `status` is the HTTP
+ * status, or 0 when there was no answer. (The totals stay on the sync's span, so that they are there
+ * even if the calls' own spans are one day sampled.)
  */
 export function countCall(kind: CallKind, ms: number, status: number): void {
   if (!tracked) return
-  const { span, stats } = tracked
+  const { stats } = tracked
   stats.calls[kind]++
   stats.ms[kind] += ms
   stats.slowest[kind] = Math.max(stats.slowest[kind], ms)
-  const failed = status === 0 || status >= 400
-  if (failed) stats.errors++
-  if ((failed || ms >= SLOW_CALL_MS) && stats.events < MAX_CALL_EVENTS) {
-    stats.events++
-    span.addEvent('chordless.call', {
-      'chordless.call.kind': kind,
-      'chordless.call.ms': Math.round(ms),
-      'chordless.call.status': status,
-    })
-  }
+  if (failed(status)) stats.errors++
 }
 
-/** `fetch`, counting each call as one of `kind` (see `countCall`) */
+/** A call that did not work: no answer, or a refusal (a 404 is Drive's way of saying there is no such file) */
+const failed = (status: number): boolean => status === 0 || (status >= 400 && status !== 404)
+
+/** A header set on a request init, whatever form its headers are in */
+function withHeader(init: RequestInit | undefined, name: string, value: string): RequestInit {
+  const headers = new Headers(init?.headers)
+  headers.set(name, value)
+  return { ...init, headers }
+}
+
+const urlOf = (input: RequestInfo | URL): URL =>
+  new URL(input instanceof Request ? input.url : String(input), location.href)
+
+/**
+ * `fetch`, with a span for each call (the client side of a boundary: a span is what the other side's
+ * can be a child of) and the call counted on the sync running now (`countCall`). The span is a child
+ * of the sync, or of `parent` where there is none (a token refresh); and with neither, a trace of its
+ * own. A call to our Worker carries the span's own `traceparent`, so the Worker's span can be its
+ * child: never to Google, which would need a CORS preflight and be told our trace ids.
+ */
 export function timedFetch(
   kind: CallKind,
-  base: typeof fetch = (input, init) => fetch(input, init)
+  base: typeof fetch = (input, init) => fetch(input, init),
+  parent?: () => Span | undefined
 ) {
   return (async (input, init) => {
     const started = performance.now()
+    const owner = tracked?.span ?? parent?.()
+    let span: Span | null = null
+    if (getTelemetryPreference() && (!tracked || tracked.callSpans < MAX_CALL_SPANS)) {
+      if (tracked) tracked.callSpans++
+      const url = urlOf(input)
+      span = tracer().startSpan(
+        `chordless.${kind}.request`,
+        {
+          kind: SpanKind.CLIENT,
+          attributes: {
+            'http.request.method': (
+              init?.method ?? (input instanceof Request ? input.method : 'GET')
+            ).toUpperCase(),
+            'server.address': url.hostname,
+            'url.path': url.pathname,
+          },
+        },
+        owner ? trace.setSpan(context.active(), owner) : undefined
+      )
+    }
+    let request = init
+    if (span && kind === 'worker') {
+      const { traceId, spanId, traceFlags } = span.spanContext()
+      request = withHeader(
+        init,
+        'traceparent',
+        `00-${traceId}-${spanId}-${traceFlags.toString(16).padStart(2, '0')}`
+      )
+    }
     try {
-      const response = await base(input, init)
-      countCall(kind, performance.now() - started, response.status)
+      const response = await base(input, request)
+      const ms = performance.now() - started
+      countCall(kind, ms, response.status)
+      finishCall(span, response.status)
       return response
     } catch (error) {
       countCall(kind, performance.now() - started, 0)
+      if (span) recordFailure(span, error)
+      span?.end()
       throw error
     }
   }) as typeof fetch
 }
 
-/**
- * The `traceparent` to send a call to our Worker with, so that its span is in the sync's trace; null
- * when no sync is running or reports are off. Never for any other server: it would start a CORS
- * preflight, and tell a third party our trace ids.
- */
-export function traceparent(): string | null {
-  if (!tracked || !getTelemetryPreference()) return null
-  const { traceId, spanId, traceFlags } = tracked.span.spanContext()
-  return `00-${traceId}-${spanId}-${traceFlags.toString(16).padStart(2, '0')}`
+/** The call is over: its status on the span, and an error if it failed */
+function finishCall(span: Span | null, status: number): void {
+  if (!span) return
+  span.setAttribute('http.response.status_code', status)
+  if (failed(status)) {
+    span.setAttribute('chordless.error', true)
+    span.setStatus({ code: SpanStatusCode.ERROR })
+  }
+  span.end()
 }
 
 /**

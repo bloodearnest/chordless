@@ -21,7 +21,6 @@ import {
   resetTelemetryState,
   timedFetch,
   traced,
-  traceparent,
 } from '../src/js/telemetry/telemetry.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -209,57 +208,29 @@ describe('the calls made during a sync', () => {
     expect(attributes['chordless.sync.drive_ms_max']).to.equal(480)
     expect(attributes['chordless.sync.worker_calls']).to.equal(1)
     expect(attributes['chordless.sync.errors']).to.equal(0)
-    expect(finished()[0].events).to.have.length(0)
   })
 
-  it('make an event when one fails or is slow, a few at most, and an error is counted', async () => {
+  it('count as errors when they got no answer or were refused, and not for a 404', async () => {
     await traced(
       'chordless.sync.run',
       {},
       () => {
         countCall('drive', 50, 500)
         countCall('drive', 50, 0)
-        countCall('worker', 2500, 200)
-        for (let i = 0; i < 30; i++) countCall('drive', 10, 403)
+        countCall('drive', 50, 403)
+        countCall('drive', 50, 404)
+        countCall('worker', 50, 429)
+        countCall('worker', 50, 304)
       },
       { trackCalls: true }
     )
-    const [span] = finished()
-    expect(span.attributes['chordless.sync.errors']).to.equal(32)
-    expect(span.events).to.have.length(10)
-    expect(span.events[0].name).to.equal('chordless.call')
-    expect(span.events[0].attributes).to.include({
-      'chordless.call.kind': 'drive',
-      'chordless.call.status': 500,
-    })
+    expect(finished()[0].attributes['chordless.sync.errors']).to.equal(4)
   })
 
   it('are not counted when no sync is running, or on a span that does not ask', async () => {
     countCall('drive', 10, 200)
     await traced('chordless.other', {}, () => countCall('drive', 10, 200))
     expect(finished()[0].attributes).to.not.have.property('chordless.sync.drive_calls')
-  })
-
-  it('give the Worker a traceparent of the sync, and nothing otherwise', async () => {
-    expect(traceparent()).to.equal(null)
-    let header: string | null = null
-    let traceId = ''
-    await traced(
-      'chordless.sync.run',
-      {},
-      span => {
-        header = traceparent()
-        traceId = span.spanContext().traceId
-      },
-      { trackCalls: true }
-    )
-    expect(header).to.match(/^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$/)
-    expect(String(header).split('-')[1]).to.equal(traceId)
-    expect(traceparent()).to.equal(null)
-
-    setTelemetryPreference(false)
-    await traced('chordless.sync.run', {}, () => {}, { trackCalls: true })
-    expect(traceparent()).to.equal(null)
   })
 
   it('end with the sync: the next one starts from nothing', async () => {
@@ -270,41 +241,151 @@ describe('the calls made during a sync', () => {
 })
 
 describe('timedFetch', () => {
-  it('counts a call by its status, and returns the response untouched', async () => {
-    const response = new Response('{}', { status: 502 })
-    const fetcher = timedFetch('drive', async () => response)
+  const ok = async () => new Response('{}', { status: 200 })
+
+  it('makes a span for a call, a child of the sync, with what the call was', async () => {
+    const fetcher = timedFetch('drive', ok)
+    let syncId = ''
     await traced(
       'chordless.sync.run',
       {},
-      async () => {
-        expect(await fetcher('https://x.test/')).to.equal(response)
+      async span => {
+        syncId = span.spanContext().spanId
+        await fetcher('https://www.googleapis.com/drive/v3/files/f1?alt=media', { method: 'get' })
       },
       { trackCalls: true }
     )
-    expect(finished()[0].attributes['chordless.sync.drive_calls']).to.equal(1)
-    expect(finished()[0].attributes['chordless.sync.errors']).to.equal(1)
+    const call = finished().find(span => span.name === 'chordless.drive.request')
+    expect(call?.kind).to.equal(2)
+    expect(call?.parentSpanContext?.spanId).to.equal(syncId)
+    expect(call?.attributes).to.include({
+      'http.request.method': 'GET',
+      'server.address': 'www.googleapis.com',
+      'url.path': '/drive/v3/files/f1',
+      'http.response.status_code': 200,
+    })
+    expect(call?.attributes).to.not.have.property('chordless.error')
+    expect(finished().find(span => span.name === 'chordless.sync.run')?.attributes).to.include({
+      'chordless.sync.drive_calls': 1,
+    })
   })
 
-  it('counts a call with no answer as a failure, and throws it again', async () => {
+  it('has a trace of its own when no sync is running, and takes the method from a Request', async () => {
+    await timedFetch('drive', ok)(new Request('https://x.test/a', { method: 'POST' }))
+    const [call] = finished()
+    expect(call.parentSpanContext).to.equal(undefined)
+    expect(call.attributes['http.request.method']).to.equal('POST')
+  })
+
+  it('is a child of the span it is given where there is no sync (a token refresh)', async () => {
+    let parentId = ''
+    await traced('chordless.auth.refresh', {}, async span => {
+      parentId = span.spanContext().spanId
+      await timedFetch('worker', ok, () => span)('/session/refresh', { method: 'POST' })
+    })
+    const call = finished().find(span => span.name === 'chordless.worker.request')
+    expect(call?.parentSpanContext?.spanId).to.equal(parentId)
+    expect(call?.attributes['url.path']).to.equal('/session/refresh')
+  })
+
+  it('sends a call to our Worker with its own traceparent, so the Worker’s span is its child', async () => {
+    const sent: Headers[] = []
+    const fetcher = timedFetch('worker', async (_input, init) => {
+      sent.push(new Headers(init?.headers))
+      return new Response('{}')
+    })
+    await fetcher('/api/spaces', { headers: { Authorization: 'Bearer t' } })
+    const [call] = finished()
+    const { traceId, spanId } = call.spanContext()
+    expect(sent[0].get('traceparent')).to.equal(`00-${traceId}-${spanId}-01`)
+    expect(sent[0].get('authorization')).to.equal('Bearer t')
+    // (headers given as a list, or a Headers object, are kept too)
+    await fetcher('/api/spaces', { headers: [['X-One', '1']] })
+    await fetcher('/api/spaces', { headers: new Headers({ 'X-Two': '2' }) })
+    expect(sent[1].get('x-one')).to.equal('1')
+    expect(sent[2].get('x-two')).to.equal('2')
+    expect(sent[2].get('traceparent')).to.match(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
+  })
+
+  it('never sends a traceparent to Google', async () => {
+    const sent: Headers[] = []
+    await timedFetch('drive', async (_input, init) => {
+      sent.push(new Headers(init?.headers))
+      return new Response('{}')
+    })('https://www.googleapis.com/drive/v3/files')
+    expect(sent[0].get('traceparent')).to.equal(null)
+  })
+
+  it('marks a refusal or a server error as one, and a 404 as no error', async () => {
+    for (const status of [404, 500, 403, 429]) {
+      await timedFetch('drive', async () => new Response('', { status }))('https://x.test/')
+    }
+    const byStatus = Object.fromEntries(
+      finished().map(span => [span.attributes['http.response.status_code'], span])
+    )
+    expect(byStatus[404].status.code).to.equal(0)
+    expect(byStatus[404].attributes).to.not.have.property('chordless.error')
+    for (const status of [500, 403, 429]) {
+      expect(byStatus[status].status.code, String(status)).to.equal(2)
+      expect(byStatus[status].attributes['chordless.error']).to.equal(true)
+    }
+  })
+
+  it('records a call with no answer as an exception, and throws it again', async () => {
     const fetcher = timedFetch('worker', async () => {
       throw new TypeError('Failed to fetch')
     })
+    let thrown: unknown
     await traced(
       'chordless.sync.run',
       {},
       async () => {
-        let thrown: unknown
         try {
-          await fetcher('https://x.test/')
+          await fetcher('/api/spaces')
         } catch (error) {
           thrown = error
         }
-        expect(thrown).to.be.instanceOf(TypeError)
       },
       { trackCalls: true }
     )
-    expect(finished()[0].attributes['chordless.sync.worker_calls']).to.equal(1)
-    expect(finished()[0].events[0].attributes?.['chordless.call.status']).to.equal(0)
+    expect(thrown).to.be.instanceOf(TypeError)
+    const call = finished().find(span => span.name === 'chordless.worker.request')
+    expect(call?.status.code).to.equal(2)
+    expect(call?.events[0].attributes?.['exception.message']).to.equal('Failed to fetch')
+    expect(finished().find(span => span.name === 'chordless.sync.run')?.attributes).to.include({
+      'chordless.sync.worker_calls': 1,
+      'chordless.sync.errors': 1,
+    })
+  })
+
+  it('makes spans for only the first calls of a sync, and counts them all', async () => {
+    const fetcher = timedFetch('drive', ok)
+    await traced(
+      'chordless.sync.run',
+      {},
+      async () => {
+        for (let i = 0; i < 250; i++) await fetcher('https://x.test/')
+      },
+      { trackCalls: true }
+    )
+    expect(finished().filter(span => span.name === 'chordless.drive.request')).to.have.length(200)
+    expect(
+      finished().find(span => span.name === 'chordless.sync.run')?.attributes[
+        'chordless.sync.drive_calls'
+      ]
+    ).to.equal(250)
+  })
+
+  it('makes no span while reports are off, and still makes the call', async () => {
+    setTelemetryPreference(false)
+    const sent: Headers[] = []
+    const response = await timedFetch('worker', async (_input, init) => {
+      sent.push(new Headers(init?.headers))
+      return new Response('{}')
+    })('/api/spaces')
+    expect(response.status).to.equal(200)
+    expect(finished()).to.have.length(0)
+    expect(sent[0].get('traceparent')).to.equal(null)
   })
 
   it('is the real fetch unless it is given another', async () => {

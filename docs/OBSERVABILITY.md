@@ -57,7 +57,7 @@ team ids kept in synced data, and the live-update latency.
 
 | Span | Where | Attributes |
 |---|---|---|
-| `chordless.sync.run` | `SyncOrchestrator.#execute` | operation, space kind, pulled and pushed counts, pull and push ms, Drive and Worker call counts, total and max Drive ms, error count, outcome. A span *event* for each failed or slow request (a cap on volume), not a span per request |
+| `chordless.sync.run` | `SyncOrchestrator.#execute` | operation, space kind, pulled and pushed counts, pull and push ms, Drive and Worker call counts, total and max Drive ms, error count, outcome. Each Drive and Worker call is a child span, `chordless.drive.request` or `chordless.worker.request` (below) |
 | `chordless.setlist.open` | `SetlistPage` start | open ms (load time, from navigation timing), songs, CCLI numbers (a comma-joined string, queried with `contains`: Honeycomb does not query array elements), source (library or share) |
 | `chordless.setlist.leave` | `dispose()` and `pagehide` | songs viewed, song changes, transposes, edit-mode entries |
 | `chordless.live.receive` | a follower receiving `changed` | see "Live update latency" |
@@ -160,9 +160,20 @@ path with care. The privacy text says all of this. (No client address is exporte
 
 ## Context propagation
 
-`traceparent` goes to the same-origin Worker only, never to Google (a CORS preflight, and trace ids
-leaked to a third party), so browser and Worker spans are one trace and Drive calls are leaves.
-Honeycomb's trace-level filters (parent, child, root) join them.
+Every network call through `timedFetch` (the page's Drive API, `callWorker`, the token refresh) is a
+`CLIENT` span of its own, `chordless.drive.request` or `chordless.worker.request`, with the method,
+`server.address`, `url.path` (no query) and `http.response.status_code`: across a boundary there has
+to be a span, for the other side's to be its child. It is a child of the sync running, or of the span
+it was given (the token refresh), else a trace of its own. A call to **our Worker** carries that call
+span's own `traceparent`, so the Worker's span can be its child; never to Google (a CORS preflight, and
+trace ids leaked to a third party). A failure is a call with no answer, a 429, or any 4xx but 404
+(Drive's way of saying there is no such file). At most 200 calls of one sync are spans: a first
+sync can make hundreds, and the totals on the sync's span count them all.
+
+Volume (estimated 2026-10-28): the app syncs every minute while on screen, about 3 Drive calls each,
+so the call spans make the sync's events about 4 times as many (60 to 240 an hour on screen): about
+125,000 events a month for 6 weekly users on two devices each, against 20 million on Honeycomb's
+free tier. The totals stay on the sync span for the day the call spans are sampled.
 
 The browser has no async context: there is no `AsyncLocalStorage`, and the default context manager
 loses the *active* span across `await` (the TC39 AsyncContext proposal is not available). A span can
@@ -170,9 +181,9 @@ live across any number of awaits, but a span or auto-instrumented fetch started 
 implicit parent and becomes a root. zone.js is the usual answer and cannot follow native
 `async`/`await` (it needs code down-compiled to ES2015, against our Safari 17.4 floor). So parents are
 passed explicitly where we want children: the follow-up fetches of a live update (five at most) are
-child spans of `chordless.live.receive`, which we hold in a variable. The requests inside a sync are
-many, so they are aggregates and events on `chordless.sync.run`. Fetch child spans under a sync are
-a later option, if the data shows the aggregates are not enough.
+child spans of `chordless.live.receive`, which we hold in a variable. The calls of a sync are children
+of it by the same means: the sync runs one at a time, under a lock, so its span is a module variable
+that `timedFetch` reads (`telemetry.ts`).
 
 ## Live update latency
 
@@ -257,14 +268,14 @@ idle, only if reports are on, and again when they are turned on.
 - `traced(name, attributes, fn, { trackCalls })`: a span that records how it ended (`chordless.outcome`,
   an exception on error). With `trackCalls` it also counts the Drive and Worker calls made while it
   runs (`timedFetch('drive')` on the page's Drive API, `timedFetch('worker')` in `callWorker`):
-  `chordless.sync.drive_calls`, `drive_ms_total`, `drive_ms_max`, `worker_calls`, `errors`, and a span
-  event (`chordless.call`) for each of the first ten calls that failed or took over two seconds.
-  Only one sync runs at a time (the sync lock), so the one "tracked" span is a module variable, not
-  async context. A call to our Worker made during a sync carries its `traceparent`; one to Google never.
+  `chordless.sync.drive_calls`, `drive_ms_total`, `drive_ms_max`, `worker_calls`, `errors`. Each call
+  is also a span (see Context propagation). Only one sync runs at a time (the sync lock), so the one
+  "tracked" span is a module variable, not async context.
 - Spans made so far: `chordless.sync.run` (`SyncOrchestrator`), `chordless.auth.refresh` (a span of its
   own, not an attribute: how long the Worker took is its duration, and a sign-in that has expired
   is its error), and `chordless.error` (an unhandled error, an unhandled rejection, or a `toast()` error:
-  at most 20 a visit). No auto-instrumentation: no fetch, document-load or interaction spans.
+  at most 20 a visit). No auto-instrumentation (`instrumentation-fetch`, document-load, interaction):
+  the call spans are our own wrapper, so that they are the calls we choose.
 - Every span gets `baselineAttributes()` as it starts: the device id, the page's name, live, online,
   the display mode, and what `context.ts` knows (nothing yet: step 4 sets the session, setlist, song and
   account ids there). Resource: `service.name` `chordless-web`, `service.version` (the service
