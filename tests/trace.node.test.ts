@@ -9,7 +9,7 @@ import type { Env } from '../worker/src/env.ts'
 import { handleRequest } from '../worker/src/router.ts'
 import type { ShareCache } from '../worker/src/share.ts'
 import type { TelemetryDeps } from '../worker/src/telemetry.ts'
-import { parseTraceparent, routeOf } from '../worker/src/trace.ts'
+import { routeOf } from '../worker/src/trace.ts'
 
 const ORIGIN = 'https://chordless.test'
 const TRACE = 'a'.repeat(32)
@@ -124,6 +124,7 @@ test('no span without trace context, with an unsampled or broken one, or with no
   await send('/api/config')
   await send('/api/config', { traceparent: `00-${TRACE}-${PARENT}-00` })
   await send('/api/config', { traceparent: 'garbage' })
+  await send('/api/config', { traceparent: `ff-${TRACE}-${PARENT}-01` })
   await send('/api/config', { traceparent: `00-${'0'.repeat(32)}-${PARENT}-01` })
   assert.equal(sent.length, 0)
 
@@ -138,16 +139,6 @@ test('a sender over the limit gets its answer and no span', async () => {
   const response = await send('/api/config', { traceparent: TRACEPARENT })
   assert.equal(response.status, 200)
   assert.equal(sent.length, 0)
-})
-
-test('the traceparent is read strictly', () => {
-  assert.deepEqual(parseTraceparent(` 00-${TRACE.toUpperCase()}-${PARENT}-01 `), {
-    traceId: TRACE,
-    parentId: PARENT,
-  })
-  assert.equal(parseTraceparent(null), null)
-  assert.equal(parseTraceparent(`01-${TRACE}-${PARENT}-01`), null)
-  assert.equal(parseTraceparent(`00-${TRACE}-${'0'.repeat(16)}-01`), null)
 })
 
 test('the route is the path with its ids replaced', () => {

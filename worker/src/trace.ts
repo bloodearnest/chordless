@@ -1,13 +1,20 @@
 /**
  * The Worker's own span for a call that carries the page's `traceparent` (docs/OBSERVABILITY.md).
  * Cloudflare's native spans ignore the header and are roots of their own, so for the page's calls
- * the Worker makes one that is a real child of the page's call span: the caller's trace id, its span
- * id as parent, and the facts the runtime gives us. It goes to the same destination as the page's
- * traces (the OTel SDK, with an exporter that is `forward`), after the response is made, and never changes it.
+ * the Worker makes one that is a real child of the page's call span: the context is read by the W3C
+ * propagator, and the span is made by the OTel SDK with it as parent, with the facts the runtime gives
+ * us. It goes to the same destination as the page's traces (an exporter that is `forward`), after the
+ * response is made, and never changes it.
  */
 
-import { ROOT_CONTEXT, SpanKind, SpanStatusCode, TraceFlags, trace } from '@opentelemetry/api'
-import { type ExportResult, ExportResultCode } from '@opentelemetry/core'
+import {
+  ROOT_CONTEXT,
+  SpanKind,
+  SpanStatusCode,
+  type TextMapGetter,
+  trace,
+} from '@opentelemetry/api'
+import { type ExportResult, ExportResultCode, W3CTraceContextPropagator } from '@opentelemetry/core'
 import { JsonTraceSerializer } from '@opentelemetry/otlp-transformer'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import {
@@ -22,7 +29,6 @@ import { forward, parseHeaders, type TelemetryDeps, withinLimit } from './teleme
 /** Where our spans are found in Honeycomb: a dataset of their own, apart from the native `chordless` */
 export const SERVICE_NAME = 'chordless-worker'
 
-const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/
 /** A path segment that is an id (a Drive id, a UUID, a share id), not a name */
 const ID_SEGMENT = /^[A-Za-z0-9_-]{16,}$|^[0-9a-f]{8}-[0-9a-f-]{27}$/
 
@@ -36,18 +42,13 @@ interface CloudflareProperties {
   timezone?: string
 }
 
-/** The caller's trace and span, if it sent a valid `traceparent` for a trace that is sampled */
-export function parseTraceparent(
-  header: string | null
-): { traceId: string; parentId: string } | null {
-  const match = header ? TRACEPARENT.exec(header.trim().toLowerCase()) : null
-  if (!match) return null
-  const [, traceId, parentId, flags] = match
-  // (all zeros are not ids; an unsampled trace is not one the page chose to report)
-  if (/^0+$/.test(traceId) || /^0+$/.test(parentId) || !(Number.parseInt(flags, 16) & 1))
-    return null
-  return { traceId, parentId }
+/** Reads a header of a request for the propagator */
+const headerGetter: TextMapGetter<Headers> = {
+  keys: headers => [...headers.keys()],
+  get: (headers, key) => headers.get(key) ?? undefined,
 }
+
+const propagator = new W3CTraceContextPropagator()
 
 /** The path as a template, ids replaced: what the route was, not which file or space it was for */
 export function routeOf(path: string): string {
@@ -98,8 +99,10 @@ export async function withWorkerSpan(
   deps: TelemetryDeps | undefined,
   run: () => Promise<Response>
 ): Promise<Response> {
-  const parent = parseTraceparent(request.headers.get('traceparent'))
-  if (!parent || !env.OTLP_ENDPOINT?.startsWith('https://') || !env.OTLP_HEADERS) return run()
+  // The caller's trace context, as the W3C propagator reads it (an unsampled trace is not recorded: the sampler follows the parent)
+  const parent = propagator.extract(ROOT_CONTEXT, request.headers, headerGetter)
+  const parentSpan = trace.getSpanContext(parent)
+  if (!parentSpan || !env.OTLP_ENDPOINT?.startsWith('https://') || !env.OTLP_HEADERS) return run()
 
   const endpoint = env.OTLP_ENDPOINT
   const headers = env.OTLP_HEADERS
@@ -152,12 +155,7 @@ export async function withWorkerSpan(
             Object.entries(attributes).filter(([, value]) => value !== undefined && value !== '')
           ),
         },
-        trace.setSpanContext(ROOT_CONTEXT, {
-          traceId: parent.traceId,
-          spanId: parent.parentId,
-          traceFlags: TraceFlags.SAMPLED,
-          isRemote: true,
-        })
+        parent
       )
       if (status >= 500) span.setStatus({ code: SpanStatusCode.ERROR })
       span.end(endMs)
