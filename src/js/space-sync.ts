@@ -19,6 +19,7 @@ export async function syncSpaceNow(
 ): Promise<string> {
   await nameSpaceBeforeSync(space)
   const orchestrator = await createSyncOrchestrator(space.name, space.id)
-  await orchestrator.sync(onProgress)
+  // (the Sync button of a space's card)
+  await orchestrator.sync(onProgress, 'manual')
   return recordSync(space.id)
 }

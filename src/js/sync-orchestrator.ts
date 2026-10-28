@@ -92,6 +92,17 @@ interface Messages {
 /**
  * Main sync orchestrator
  */
+/**
+ * What started a sync, as the reports tell it (docs/OBSERVABILITY.md): the person (`manual`, the Sync
+ * button), the timer (`tick`), the app opening or coming back (`resume`), the device coming back
+ * online (`online`), an edit made here (`edit`), another device saying it changed something (`live`),
+ * or anything else (`other`).
+ */
+export type SyncTrigger = 'manual' | 'tick' | 'resume' | 'online' | 'edit' | 'live' | 'other'
+
+/** One in this many `tick` syncs is reported: they are the many, and mostly find nothing */
+export const TICK_SAMPLE = 10
+
 export class SyncOrchestrator {
   spaceName: string
   spaceId: string | null
@@ -121,9 +132,10 @@ export class SyncOrchestrator {
     operation: (
       syncManager: SyncManager,
       progress: (progress: SyncProgress) => void
-    ) => Promise<unknown>
+    ) => Promise<unknown>,
+    trigger: SyncTrigger = 'other'
   ): Promise<{ success: true }> {
-    await withSyncLock(() => this.#execute(name, messages, progressCallback, operation))
+    await withSyncLock(() => this.#execute(name, messages, progressCallback, operation, trigger))
     return { success: true }
   }
 
@@ -138,13 +150,14 @@ export class SyncOrchestrator {
     operation: (
       syncManager: SyncManager,
       progress: (progress: SyncProgress) => void
-    ) => Promise<unknown>
+    ) => Promise<unknown>,
+    trigger: SyncTrigger
   ): Promise<{ success: true }> {
     // One span for the whole operation: how long, what it was, how it ended, and the calls made
     // to Drive and the Worker meanwhile, counted on it (docs/OBSERVABILITY.md)
     return traced(
       'chordless.sync.run',
-      { 'chordless.sync.operation': name },
+      { 'chordless.sync.operation': name, 'chordless.sync.trigger': trigger },
       async () => {
         if (!this.syncManager) await this.init()
         const syncManager = this.syncManager as SyncManager
@@ -167,22 +180,28 @@ export class SyncOrchestrator {
           throw error
         }
       },
-      { trackCalls: true }
+      // (the timer's syncs are the many, and mostly find nothing: one in TICK_SAMPLE is reported)
+      { trackCalls: true, sample: trigger === 'tick' ? TICK_SAMPLE : 1 }
     )
   }
 
   /**
    * Perform full sync with progress reporting
    * @param progressCallback - Optional callback
+   * @param trigger - What started it, for the reports: `manual` for the Sync button
    */
-  sync(progressCallback: BroadcastCallback | null = null): Promise<{ success: true }> {
+  sync(
+    progressCallback: BroadcastCallback | null = null,
+    trigger: SyncTrigger = 'other'
+  ): Promise<{ success: true }> {
     return this.#run(
       'Sync',
       { starting: 'Starting sync...', complete: 'Sync complete!' },
       progressCallback,
       async (manager, progress) => {
         await tellOfReset(manager, await manager.sync(progress))
-      }
+      },
+      trigger
     )
   }
 
@@ -193,13 +212,23 @@ export class SyncOrchestrator {
    */
   async incrementalSync(
     progressCallback: BroadcastCallback | null = null,
-    { push = true, skipIfBusy = false }: { push?: boolean; skipIfBusy?: boolean } = {}
+    {
+      push = true,
+      skipIfBusy = false,
+      trigger = 'other',
+    }: { push?: boolean; skipIfBusy?: boolean; trigger?: SyncTrigger } = {}
   ): Promise<boolean> {
     const result = await withSyncLock(
       () =>
-        this.#execute('Incremental sync', {}, progressCallback, async (manager, progress) => {
-          await tellOfReset(manager, await manager.incrementalSync(progress, { push }))
-        }),
+        this.#execute(
+          'Incremental sync',
+          {},
+          progressCallback,
+          async (manager, progress) => {
+            await tellOfReset(manager, await manager.incrementalSync(progress, { push }))
+          },
+          trigger
+        ),
       { skipIfBusy }
     )
     return result.ran

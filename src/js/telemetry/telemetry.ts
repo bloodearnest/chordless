@@ -45,7 +45,7 @@ const MAX_CALL_SPANS = 200
 /** Errors reported in one visit: a loop of them is one problem, and spans are what Honeycomb bills */
 const MAX_ERROR_SPANS = 20
 
-let tracked: { span: Span; stats: CallStats; callSpans: number } | null = null
+let tracked: { span: Span; stats: CallStats; callSpans: number; sample: number } | null = null
 let errorSpans = 0
 
 const tracer = () => trace.getTracer(NAME)
@@ -68,12 +68,26 @@ export async function traced<T>(
   name: string,
   attributes: Attributes,
   fn: (span: Span) => Promise<T> | T,
-  { trackCalls = false }: { trackCalls?: boolean } = {}
+  { trackCalls = false, sample = 1 }: { trackCalls?: boolean; sample?: number } = {}
 ): Promise<T> {
   if (!getTelemetryPreference()) return fn(NO_SPAN)
-  const span = tracer().startSpan(name, { attributes })
+  // Head sampling: one in `sample` is kept, with `SampleRate` so that Honeycomb counts it that many
+  // times. One that is not kept is no span, and the calls it makes are no spans either (a call with
+  // no sync to belong to would be a trace of its own)
+  if (sample > 1 && Math.random() * sample >= 1) {
+    const outer = tracked
+    tracked = { span: NO_SPAN, stats: newStats(), callSpans: MAX_CALL_SPANS, sample }
+    try {
+      return await fn(NO_SPAN)
+    } finally {
+      tracked = outer
+    }
+  }
+  const span = tracer().startSpan(name, {
+    attributes: sample > 1 ? { ...attributes, SampleRate: sample } : attributes,
+  })
   const outer = tracked
-  const mine = trackCalls ? { span, stats: newStats(), callSpans: 0 } : null
+  const mine = trackCalls ? { span, stats: newStats(), callSpans: 0, sample } : null
   if (mine) tracked = mine
   try {
     const result = await fn(span)
@@ -165,6 +179,8 @@ export function timedFetch(
             ).toUpperCase(),
             'server.address': url.hostname,
             'url.path': url.pathname,
+            // (a call of a sampled sync is counted as often as the sync is)
+            ...(tracked && tracked.sample > 1 ? { SampleRate: tracked.sample } : {}),
           },
         },
         owner ? trace.setSpan(context.active(), owner) : undefined

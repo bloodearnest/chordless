@@ -57,7 +57,7 @@ team ids kept in synced data, and the live-update latency.
 
 | Span | Where | Attributes |
 |---|---|---|
-| `chordless.sync.run` | `SyncOrchestrator.#execute` | operation, space kind, pulled and pushed counts, pull and push ms, Drive and Worker call counts, total and max Drive ms, error count, outcome. Each Drive and Worker call is a child span, `chordless.drive.request` or `chordless.worker.request` (below) |
+| `chordless.sync.run` | `SyncOrchestrator.#execute` | operation, **trigger**, space kind, pulled and pushed counts, pull and push ms, Drive and Worker call counts, total and max Drive ms, error count, outcome. Each Drive and Worker call is a child span, `chordless.drive.request` or `chordless.worker.request` (below) |
 | `chordless.setlist.open` | `SetlistPage` start | open ms (load time, from navigation timing), songs, CCLI numbers (a comma-joined string, queried with `contains`: Honeycomb does not query array elements), source (library or share) |
 | `chordless.setlist.leave` | `dispose()` and `pagehide` | songs viewed, song changes, transposes, edit-mode entries |
 | `chordless.live.receive` | a follower receiving `changed` | see "Live update latency" |
@@ -169,6 +169,19 @@ span's own `traceparent`, so the Worker's span can be its child; never to Google
 trace ids leaked to a third party). A failure is a call with no answer, a 429, or any 4xx but 404
 (Drive's way of saying there is no such file). At most 200 calls of one sync are spans: a first
 sync can make hundreds, and the totals on the sync's span count them all.
+
+**What started a sync**, `chordless.sync.trigger`: `manual` (the Sync button on a space's card),
+`tick` (the one-minute timer), `resume` (the app opened or came back), `online` (the device came back
+online), `edit` (a change made here, 2 s after it), `live` (another device said it changed
+something), `other` (anything else: a start over, a reset, a push or pull). The operation says which
+sync it was (`Sync`, the full one, or `Incremental sync`); the trigger says why.
+
+**Sampling.** The `tick` syncs are the many (a device left awake on a charger makes 1,440 a day) and
+mostly find nothing, so one in ten is reported (`TICK_SAMPLE`, head sampling at the start of the
+sync: a sampled sync and its calls carry `SampleRate = 10`, which Honeycomb counts as ten). One that
+is not sampled is no span, and its calls are none either. Every other trigger is reported in full.
+The cost: an unsampled tick that fails is not reported (its failure is on the console only). A
+failure could be reported afterwards as a plain span, if it matters.
 
 Volume (estimated 2026-10-28): the app syncs every minute while on screen, about 3 Drive calls each,
 so the call spans make the sync's events about 4 times as many (60 to 240 an hour on screen): about
