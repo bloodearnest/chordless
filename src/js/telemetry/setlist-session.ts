@@ -23,11 +23,14 @@ export interface SetlistOpened {
   source: 'library' | 'share'
   /** How long the setlist took to show, in ms */
   openMs: number
+  /** Whether changes made here have not been sent to the storage yet (see AutoSync.hasUnsent) */
+  hasUnsent: () => boolean
 }
 
 interface Session {
   setlistId: string
   date: string
+  hasUnsent: () => boolean
   startedAt: number
   viewed: Set<string>
   songChanges: number
@@ -53,6 +56,7 @@ export function startSetlistSession(opened: SetlistOpened): void {
   session = {
     setlistId: opened.setlistId,
     date: opened.date,
+    hasUnsent: opened.hasUnsent,
     startedAt: performance.now(),
     viewed: new Set(),
     songChanges: 0,
@@ -63,7 +67,7 @@ export function startSetlistSession(opened: SetlistOpened): void {
   setAmbient({ sessionId: newSessionId() })
   // (the tab being closed or the page reloaded is leaving too)
   // (capturing, so that it comes before the SDK's own flush on pagehide: the leave span goes with it)
-  window.addEventListener('pagehide', endSetlistSession, { capture: true })
+  window.addEventListener('pagehide', endOnPageHide, { capture: true })
   recordSpan('chordless.setlist.open', {
     'chordless.setlist.id': opened.setlistId,
     'chordless.setlist.date': opened.date,
@@ -102,9 +106,18 @@ export function editModeEntered(): void {
   if (session) session.editEntries++
 }
 
-/** The setlist was left: its session ends, with what happened in it */
-export function endSetlistSession(): void {
-  window.removeEventListener('pagehide', endSetlistSession, { capture: true })
+function endOnPageHide(): void {
+  endSetlistSession('page')
+}
+
+/**
+ * The setlist was left: its session ends, with what happened in it. `left` says how: the page went
+ * (the tab closed, the app put away, a reload), or the app moved to another page and carries on.
+ * Changes still unsent when the page goes may wait for the next time it is opened; when the app
+ * carries on, they are sent in a moment.
+ */
+export function endSetlistSession(left: 'page' | 'navigation' = 'navigation'): void {
+  window.removeEventListener('pagehide', endOnPageHide, { capture: true })
   if (!session) return
   const ended = session
   session = null
@@ -112,6 +125,8 @@ export function endSetlistSession(): void {
     'chordless.setlist.id': ended.setlistId,
     'chordless.setlist.date': ended.date,
     'chordless.setlist.session_ms': Math.round(performance.now() - ended.startedAt),
+    'chordless.setlist.left': left,
+    'chordless.setlist.unsent_on_leave': ended.hasUnsent(),
     'chordless.setlist.songs_viewed': ended.viewed.size,
     'chordless.setlist.song_changes': ended.songChanges,
     'chordless.setlist.transposes': ended.transposes,

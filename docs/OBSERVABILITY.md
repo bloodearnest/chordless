@@ -314,8 +314,14 @@ every span gets it (`context.ts`), and records `chordless.setlist.open`: `chordl
 `.date`, `.songs`, `.ccli` (comma-joined), `.source` (`library` or `share`) and `.open_ms`.
 `dispose()` and `pagehide` end it with `chordless.setlist.leave`: the setlist's id and date again,
 `.session_ms`, `.songs_viewed`, `.song_changes` (a different song or the overview, not a re-render
-of the same one), `.transposes` and `.edit_entries`. The song in view is only counted, for those:
-no span carries it. The `pagehide` listener is a capturing one, so the leave span is made before the SDK's own flush on pagehide sends it.
+of the same one), `.transposes` and `.edit_entries`, and two that tell whether changes were lost:
+`.left` (`page` when the page went, as the tab closed or the app was put away; `navigation` when the
+app moved to another page and carries on) and `.unsent_on_leave` (whether changes made in this tab
+had not reached the storage yet: `AutoSync.hasUnsent`, which counts a save waiting for the quiet, one
+in the sync running, and one a sync left behind). `unsent_on_leave` with `left = page` is the
+sync-on-close problem (TODO), and the way to see how often it happens; with `navigation` it is just a
+moment's wait. It sees this tab's edits only: what an earlier visit left is the next sync's to find.
+The song in view is only counted, for those totals: no span carries it. The `pagehide` listener is a capturing one, so the leave span is made before the SDK's own flush on pagehide sends it.
 Both spans are made and ended at once: a span held open for the length of a setlist would be
 invisible until it ended, and lost with the tab.
 

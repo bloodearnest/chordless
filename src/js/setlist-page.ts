@@ -27,6 +27,7 @@ import {
   type SongSettingsPopover,
 } from '../components/song-settings-popover.ts'
 import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
+import { hasUnsentChanges } from './auto-sync.ts'
 import { DataChangeEvent, touches } from './data-changes.ts'
 import type { Setlist, SetlistEntry, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB, NO_CHANGE } from './db.ts'
@@ -267,6 +268,7 @@ export class SetlistPage {
       ccli: this.songs.flatMap(song => song._canonicalSong?.ccliNumber ?? []),
       source: this._readOnly ? 'share' : 'library',
       openMs: performance.now() - this._createdAt,
+      hasUnsent: hasUnsentChanges,
     })
     // (the page may already show a song: it was made with the route)
     this._reportSong()
