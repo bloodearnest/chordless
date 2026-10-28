@@ -34,7 +34,11 @@ its pull request (`"#42"`), and `docs/stats.jsonl` records each run's tree as we
 | End to end | macOS, WebKit | `just test-e2e webkit` | - |
 | End to end | Windows, Edge | `just test-e2e msedge` | - |
 | Terraform | Linux | `just lint-infra` | only when `infra/` changed |
+| Changes | Linux | `scripts/ci/changes.sh` | - |
 | `ci-ok` | | every job above passed or was skipped | all |
+
+A pull request that changes only prose (any `*.md`, and `TODO`) skips every job but `Changes` and `ci-ok`:
+nothing in them is read by a build, a test or a check. (`docs/*.jsonl` and `docs/coverage-floor.json` are data the scripts read, so they run CI.) Runs with no base to compare, as on `main` before a deploy, always run everything.
 
 `ci-ok` is the one required check, so jobs can be renamed, split or skipped without touching the
 ruleset. The macOS and Windows end-to-end jobs are required too (they are in `ci-ok`'s `needs`): they are

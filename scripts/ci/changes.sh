@@ -8,11 +8,19 @@ set -euo pipefail
 
 base=${1:-}
 if [ -z "$base" ]; then
+  echo "code=true"
   echo "infra=true"
   exit 0
 fi
 
 files=$(git diff --name-only "$base"...HEAD)
+# Anything but prose: Markdown anywhere, and TODO. Nothing in them is read by a build, a test or a
+# check (docs/*.jsonl and docs/coverage-floor.json are data the scripts read, so they count as code).
+if grep -qvE '(\.md|^TODO)$' <<<"$files"; then
+  echo "code=true"
+else
+  echo "code=false"
+fi
 # The Terraform stacks, and what checks them
 if grep -qE '^(infra/|scripts/infra-check\.sh$|mise\.toml$)' <<<"$files"; then
   echo "infra=true"

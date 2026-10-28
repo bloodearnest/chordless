@@ -31,6 +31,7 @@ jobs:
     permissions:
       contents: read
     outputs:
+      code: ${{ steps.changes.outputs.code }}
       infra: ${{ steps.changes.outputs.infra }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,6 +45,8 @@ jobs:
 
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -67,6 +70,8 @@ jobs:
 
   node:
     name: Node tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -87,6 +92,8 @@ jobs:
 
   unit:
     name: Unit tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -114,6 +121,7 @@ jobs:
 
   coverage:
     name: Coverage
+    # Skipped with the two it waits for
     needs: [node, unit]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -140,6 +148,8 @@ jobs:
 
   e2e-linux:
     name: End to end (Linux, Chromium)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -171,6 +181,8 @@ jobs:
 
   e2e:
     name: End to end (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:
@@ -239,7 +251,8 @@ jobs:
           npm: "false"
       - run: just lint-infra
 
-  # The one required check: every job above passed, or was skipped as not needed
+  # The one required check: every job above passed, or was skipped as not needed (a change of
+  # prose only, or nothing in infra/)
   ci-ok:
     name: ci-ok
     if: always()
