@@ -15,7 +15,7 @@ import { lastSyncOf, recordSync } from './last-sync.ts'
 import { getLive } from './live.ts'
 import { getCurrentSpace, getCurrentSpaceFull } from './space.ts'
 import { isTeamMember, storageFor } from './storage/space-storage.ts'
-import { createSyncOrchestrator } from './sync-orchestrator.ts'
+import { createSyncOrchestrator, type SyncTrigger } from './sync-orchestrator.ts'
 
 /** How often the app syncs while it is on screen */
 export const TICK_MS = 60_000
@@ -67,7 +67,7 @@ export interface AutoSyncDeps {
   live(): boolean
   state(): Promise<SyncState>
   /** The sync itself, for the space in use; false if it was skipped because another is running, and throws if it fails */
-  run(): Promise<boolean>
+  run(trigger: SyncTrigger): Promise<boolean>
   /** Call `fn` every `ms` until the returned function is called */
   every(ms: number, fn: () => void): () => void
   /** Call `fn` once after `ms`, unless the returned function is called first */
@@ -99,7 +99,7 @@ export class AutoSync {
     win.addEventListener('online', this.#onOnline)
     win.addEventListener('offline', this.#onOffline)
     win.addEventListener(DataChangeEvent.type, this.#onDataChange)
-    const stopTimer = every(TICK_MS, () => void this.#sync(false))
+    const stopTimer = every(TICK_MS, () => void this.#sync(false, 'tick'))
     this.#stop = () => {
       doc.removeEventListener('visibilitychange', this.#onVisibility)
       win.removeEventListener('online', this.#onOnline)
@@ -124,7 +124,7 @@ export class AutoSync {
 
   /** The app opened or came back: a sync that does all it can if the last was long ago, else a tick */
   async #catchUp(): Promise<void> {
-    await this.#sync(this.#stale())
+    await this.#sync(this.#stale(), 'resume')
   }
 
   #onVisibility = (): void => {
@@ -149,7 +149,7 @@ export class AutoSync {
     this.#cancelNudge?.()
     this.#cancelNudge = this.#deps.later(this.#deps.live() ? LIVE_NUDGE_MS : NUDGE_MS, () => {
       this.#cancelNudge = null
-      void this.#sync(false)
+      void this.#sync(false, 'edit')
     })
   }
 
@@ -161,14 +161,14 @@ export class AutoSync {
     const since = this.#offlineSince
     this.#offlineSince = null
     const long = since !== null && this.#deps.now() - since > OFFLINE_LONG_MS
-    void this.#sync(long || this.#stale())
+    void this.#sync(long || this.#stale(), 'online')
   }
 
   /**
    * Sync once if it can be done now. `everything` is for the app opening or coming back after a
    * while: a storage with no feed is synced then too, not on a tick.
    */
-  async #sync(everything: boolean): Promise<void> {
+  async #sync(everything: boolean, trigger: SyncTrigger): Promise<void> {
     if (!this.#deps.visible() || !this.#deps.online()) return
     // (what this sync carries: put back if it does not finish, so the next one tells of it)
     const carrying = this.#unsent
@@ -180,7 +180,7 @@ export class AutoSync {
       this.#running = true
       this.#changedWhileRunning = false
       this.#unsent = false
-      const ran = await this.#deps.run()
+      const ran = await this.#deps.run(trigger)
       sent = ran && carrying
       if (!ran) this.#unsent ||= carrying
     } catch (error) {
@@ -198,7 +198,7 @@ export class AutoSync {
     }
     if (this.#pullAgain) {
       this.#pullAgain = false
-      await this.#sync(true)
+      await this.#sync(true, 'live')
     }
   }
 
@@ -211,7 +211,7 @@ export class AutoSync {
       this.#pullAgain = true
       return
     }
-    await this.#sync(true)
+    await this.#sync(true, 'live')
   }
 }
 
@@ -225,10 +225,10 @@ async function currentState(): Promise<SyncState> {
   return storageFor(space).space(space.rootRef).changes ? 'feed' : 'no-feed'
 }
 
-async function runSync(): Promise<boolean> {
+async function runSync(trigger: SyncTrigger): Promise<boolean> {
   const space = await getCurrentSpaceFull()
   const orchestrator = await createSyncOrchestrator(space.name, space.id)
-  const ran = await orchestrator.incrementalSync(null, { skipIfBusy: true })
+  const ran = await orchestrator.incrementalSync(null, { skipIfBusy: true, trigger })
   if (ran) recordSync(space.id)
   return ran
 }

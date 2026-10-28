@@ -11,6 +11,7 @@ import {
   TICK_MS,
 } from '../src/js/auto-sync.ts'
 import { type DataChange, DataChangeEvent } from '../src/js/data-changes.ts'
+import type { SyncTrigger } from '../src/js/sync-orchestrator.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 /** A write the user made on this page */
@@ -44,6 +45,8 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
     state: (initial.state ?? 'feed') as SyncState,
     lastSyncAgo: initial.lastSync === undefined ? 0 : initial.lastSync,
     runs: 0,
+    /** What started each sync, in turn */
+    triggers: [] as SyncTrigger[],
     failNext: false,
     /** The next sync is skipped, as one is when another is running */
     skipNext: false,
@@ -65,8 +68,9 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
       world.lastSyncAgo === null ? null : new Date(world.now - world.lastSyncAgo).toISOString(),
     live: () => world.live,
     state: async () => world.state,
-    run: async () => {
+    run: async trigger => {
       world.runs++
+      world.triggers.push(trigger)
       if (world.hold) await new Promise<void>(resolve => (world.release = resolve))
       if (world.failNext) {
         world.failNext = false
@@ -492,5 +496,68 @@ describe('Syncing by itself while the app is open', () => {
     win.dispatchEvent(new Event('online'))
     await settle()
     expect(world.runs).to.equal(1)
+  })
+})
+
+describe('what started a sync, for the reports', () => {
+  /** The nudge that is waiting goes off */
+  const fire = (nudges: { fn: () => void; cancelled: boolean }[]) => {
+    for (const nudge of nudges.filter(n => !n.cancelled)) nudge.fn()
+  }
+
+  it('is the app opening, then the timer, then the app shown again', async () => {
+    const { auto, world, doc } = rig({ state: 'feed', lastSync: 0 })
+    auto.start()
+    await settle()
+    world.tick?.()
+    await settle()
+    world.now += TICK_MS
+    doc.dispatchEvent(new Event('visibilitychange'))
+    await settle()
+    expect(world.triggers).to.deep.equal(['resume', 'tick', 'resume'])
+  })
+
+  it('is the device coming back online', async () => {
+    const { auto, world, win } = rig({ state: 'feed' })
+    auto.start()
+    await settle()
+    world.online = false
+    win.dispatchEvent(new Event('offline'))
+    world.now += OFFLINE_LONG_MS + 1
+    world.online = true
+    win.dispatchEvent(new Event('online'))
+    await settle()
+    expect(world.triggers).to.deep.equal(['resume', 'online'])
+  })
+
+  it('is an edit made here, also one made while a sync ran', async () => {
+    const { auto, world, win } = rig({ state: 'feed' })
+    world.hold = true
+    auto.start()
+    await settle()
+    win.dispatchEvent(savedHere())
+    world.hold = false
+    world.release?.()
+    await settle()
+    fire(world.nudges)
+    await settle()
+    fire(world.nudges)
+    await settle()
+    expect(world.triggers[0]).to.equal('resume')
+    expect(world.triggers.slice(1)).to.not.be.empty
+    for (const trigger of world.triggers.slice(1)) expect(trigger).to.equal('edit')
+  })
+
+  it('is another device saying it changed something, and the sync that follows one that was running', async () => {
+    const { auto, world } = rig({ state: 'feed' })
+    world.hold = true
+    auto.start()
+    await settle()
+    await auto.syncSoon()
+    world.hold = false
+    world.release?.()
+    await settle()
+    await auto.syncSoon()
+    expect(world.triggers).to.deep.equal(['resume', 'live', 'live'])
   })
 })

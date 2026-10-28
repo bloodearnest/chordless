@@ -240,6 +240,60 @@ describe('the calls made during a sync', () => {
   })
 })
 
+describe('traced, sampled', () => {
+  const realRandom = Math.random
+  afterEach(() => {
+    Math.random = realRandom
+  })
+
+  it('keeps one in N, counted N times, with its calls', async () => {
+    Math.random = () => 0
+    await traced(
+      'chordless.sync.run',
+      {},
+      async () => {
+        await timedFetch('drive', async () => new Response('{}'))('https://x.test/')
+      },
+      { trackCalls: true, sample: 10 }
+    )
+    expect(finished()).to.have.length(2)
+    for (const span of finished()) expect(span.attributes.SampleRate).to.equal(10)
+  })
+
+  it('drops the rest, and the calls they make, but still runs them', async () => {
+    Math.random = () => 0.5
+    let ran = false
+    let calls = 0
+    const result = await traced(
+      'chordless.sync.run',
+      {},
+      async () => {
+        ran = true
+        await timedFetch('drive', async () => {
+          calls++
+          return new Response('{}')
+        })('https://x.test/')
+        return 'done'
+      },
+      { trackCalls: true, sample: 10 }
+    )
+    expect(result).to.equal('done')
+    expect([ran, calls]).to.deep.equal([true, 1])
+    expect(finished()).to.have.length(0)
+    // (and what follows is not left thinking there is a sync running)
+    await timedFetch('drive', async () => new Response('{}'))('https://x.test/')
+    expect(finished()).to.have.length(1)
+    expect(finished()[0].attributes).to.not.have.property('SampleRate')
+  })
+
+  it('keeps every one when there is no sampling', async () => {
+    Math.random = () => 0.99
+    await traced('chordless.sync.run', {}, () => {}, { sample: 1 })
+    expect(finished()).to.have.length(1)
+    expect(finished()[0].attributes).to.not.have.property('SampleRate')
+  })
+})
+
 describe('timedFetch', () => {
   const ok = async () => new Response('{}', { status: 200 })
 

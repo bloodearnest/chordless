@@ -1,4 +1,10 @@
 import { expect, waitUntil } from '@open-wc/testing'
+import { trace } from '@opentelemetry/api'
+import {
+  BasicTracerProvider,
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-web'
 import { ChordlessDB } from '../src/js/db.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import type { ResetSetlist } from '../src/js/sync/session.ts'
@@ -7,7 +13,9 @@ import {
   createSyncOrchestrator,
   type SyncBroadcast,
   SyncOrchestrator,
+  TICK_SAMPLE,
 } from '../src/js/sync-orchestrator.ts'
+import { resetTelemetryState } from '../src/js/telemetry/telemetry.ts'
 import { setlistTitle } from '../src/js/utils/date-utils.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
@@ -324,6 +332,74 @@ describe('SyncOrchestrator', () => {
       }
       expect(thrown).to.equal(failure)
     })
+  })
+})
+
+describe('what a sync reports of itself', () => {
+  suppressConsoleLogs()
+  const exporter = new InMemorySpanExporter()
+  const realRandom = Math.random
+
+  beforeEach(() => {
+    trace.disable()
+    exporter.reset()
+    trace.setGlobalTracerProvider(
+      new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
+    )
+    resetTelemetryState()
+  })
+  afterEach(() => {
+    Math.random = realRandom
+    trace.disable()
+  })
+
+  const report = { heldBack: 0, resetSetlists: [], readOnly: null, downloadsFailed: false }
+  const orchestrator = () => {
+    const made = new SyncOrchestrator('Test Church', null)
+    made.syncManager = {
+      sync: async () => report,
+      incrementalSync: async () => report,
+    } as unknown as SyncManager
+    return made
+  }
+  const spans = () => exporter.getFinishedSpans().filter(span => span.name === 'chordless.sync.run')
+
+  it('says what started it: the button, or what the caller says, or nothing in particular', async () => {
+    const made = orchestrator()
+    await made.sync(null, 'manual')
+    await made.sync()
+    await made.incrementalSync(null, { trigger: 'edit' })
+    await made.incrementalSync()
+    expect(spans().map(span => span.attributes['chordless.sync.trigger'])).to.deep.equal([
+      'manual',
+      'other',
+      'edit',
+      'other',
+    ])
+    expect(spans().map(span => span.attributes['chordless.sync.operation'])).to.deep.equal([
+      'Sync',
+      'Sync',
+      'Incremental sync',
+      'Incremental sync',
+    ])
+  })
+
+  it('reports one timer sync in TICK_SAMPLE, counted that many times, and every other kind', async () => {
+    const made = orchestrator()
+    Math.random = () => 0
+    await made.incrementalSync(null, { trigger: 'tick' })
+    expect(spans()).to.have.length(1)
+    expect(spans()[0].attributes.SampleRate).to.equal(TICK_SAMPLE)
+
+    Math.random = () => 0.5
+    await made.incrementalSync(null, { trigger: 'tick' })
+    expect(spans(), 'a tick that is not kept is no span, and still runs').to.have.length(1)
+
+    for (const trigger of ['manual', 'resume', 'online', 'edit', 'live', 'other'] as const) {
+      await made.incrementalSync(null, { trigger })
+    }
+    expect(spans()).to.have.length(7)
+    for (const span of spans().slice(1)) expect(span.attributes).to.not.have.property('SampleRate')
   })
 })
 
