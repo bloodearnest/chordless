@@ -29,6 +29,8 @@ export interface Env extends GoogleEnv, ShareEnv {
   OTLP_ENDPOINT?: string
   /** The headers to send with them, `name=value,name=value` (Honeycomb: `x-honeycomb-team=<ingest key>`). Without it, the page's traces are taken and dropped */
   OTLP_HEADERS?: string
+  /** The running version of the Worker (wrangler.toml `[version_metadata]`): on its own spans; unset in tests */
+  CF_VERSION_METADATA?: { id: string }
   /** The address links in email replies point to; chordless.app when unset */
   APP_ORIGIN?: string
   /**

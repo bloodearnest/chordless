@@ -250,7 +250,7 @@ async function readCapped(request: Request): Promise<string | null> {
 }
 
 /** Whether this sender may send now; a limit that cannot be asked is no reason to refuse */
-async function withinLimit(request: Request, env: Env): Promise<boolean> {
+export async function withinLimit(request: Request, env: Env): Promise<boolean> {
   if (!env.TELEMETRY) return true
   try {
     const key = request.headers.get('CF-Connecting-IP') ?? 'unknown'
@@ -261,11 +261,11 @@ async function withinLimit(request: Request, env: Env): Promise<boolean> {
 }
 
 /** Passes the cleaned traces on; whatever happens upstream is for the logs, not for the page */
-async function forward(
+export async function forward(
   clean: Json,
   endpoint: string,
   headers: Headers,
-  deps: TelemetryDeps
+  deps: TelemetryDeps = defaultDeps
 ): Promise<void> {
   try {
     headers.set('Content-Type', 'application/json')
