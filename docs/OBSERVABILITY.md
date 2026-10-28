@@ -7,8 +7,9 @@ environments and keys are Terraform (`infra/honeycomb/`); the Worker's secret is
 (`infra/README.md`).
 
 **Status:** designed, being built in steps (below). Built so far: the Worker's own traces to Honeycomb
-(step 1, live since 2026-10-27) and the Worker's telemetry route (step 2). The page does not send
-anything yet.
+(step 1, live since 2026-10-27), the Worker's telemetry route (step 2, live 2026-10-28) and the page's
+SDK (step 3, below). Still to do: the setlist session and its two spans, the identity ids and the
+Support ID in the app, and the live-update latency (step 4).
 
 ## Decisions
 
@@ -242,6 +243,40 @@ Honeycomb bills by event, and we do not sample. If that has to change, in this o
    export's format and a change to CLAUDE.md's list of what a Durable Object may hold.
 3. Honeycomb Refinery or an OTel Collector, in a Cloudflare Container or a VM. The Collector cannot run
    as a Worker.
+
+## The page (built, step 3)
+
+`src/js/telemetry/`. The facade, `telemetry.ts`, is only the small `@opentelemetry/api` package, so any
+file may use it: until the SDK is loaded, and whenever the preference is off, every call does nothing.
+The SDK (`start.ts`: `sdk-trace-web`, the OTLP/HTTP exporter, `resources`) is loaded when the page is
+idle, only if reports are on, and again when they are turned on.
+
+- `traced(name, attributes, fn, { trackCalls })`: a span that records how it ended (`chordless.outcome`,
+  an exception on error). With `trackCalls` it also counts the Drive and Worker calls made while it
+  runs (`timedFetch('drive')` on the page's Drive API, `timedFetch('worker')` in `callWorker`):
+  `chordless.sync.drive_calls`, `drive_ms_total`, `drive_ms_max`, `worker_calls`, `errors`, and a span
+  event (`chordless.call`) for each of the first ten calls that failed or took over two seconds.
+  Only one sync runs at a time (the sync lock), so the one "tracked" span is a module variable, not
+  async context. A call to our Worker made during a sync carries its `traceparent`; one to Google never.
+- Spans made so far: `chordless.sync.run` (`SyncOrchestrator`), `chordless.auth.refresh` (a span of its
+  own, not an attribute: how long the Worker took is its duration, and a sign-in that has expired
+  is its error), and `chordless.error` (an unhandled error, an unhandled rejection, or a `toast()` error:
+  at most 20 a visit). No auto-instrumentation: no fetch, document-load or interaction spans.
+- Every span gets `baselineAttributes()` as it starts: the device id, the page's name, live, online,
+  the display mode, and what `context.ts` knows (nothing yet: step 4 sets the session, setlist, song and
+  account ids there). Resource: `service.name` `chordless-web`, `service.version` (the service
+  worker's), `deployment.environment.name`, `user_agent.original`.
+- Batches go every five seconds, and when the page is hidden or left, through `GatedExporter`, which
+  drops a batch while offline or when reports are off (nothing is queued across page loads).
+- Preference `telemetry` (Preferences, "Usage reports"; on unless `false`; off where storage cannot be
+  read). Turning it off deletes the device id.
+- To see spans without Honeycomb: `localStorage.setItem('telemetry-console', '1')` and reload.
+- Deferred to step 4: the space kind and the team and account ids (the sync span has no
+  `chordless.sync.space_kind` yet), the Support ID, the setlist spans.
+- Tests: `tests/telemetry.test.ts` (unit, with an in-memory exporter), `tests/telemetry.playwright.ts`
+  (the page's real batch, with the service worker blocked so that Playwright can see the request).
+  The unit tests resolve packages as a browser does (`web-test-runner.config.js`): OpenTelemetry has
+  a Node and a browser build of some files.
 
 ## Steps
 
