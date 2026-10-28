@@ -89,3 +89,61 @@ test('turning the reports off in Preferences forgets this device’s id', async 
     .poll(() => page.evaluate(() => localStorage.getItem('telemetry-device-id')))
     .toBeNull()
 })
+
+test('a setlist session: opened, then left, with the same session id on both and what happened between', async ({
+  page,
+}) => {
+  const spans: { name: string; attributes: Record<string, Record<string, unknown>> }[] = []
+  await page.route('**/api/otlp/v1/traces', async route => {
+    const batch = route.request().postDataJSON() as Batch
+    for (const { scopeSpans } of batch.resourceSpans) {
+      for (const span of scopeSpans.flatMap(scope => scope.spans)) {
+        spans.push({
+          name: span.name,
+          attributes: Object.fromEntries(span.attributes.map(a => [a.key, a.value])),
+        })
+      }
+    }
+    await route.fulfill({ status: 204 })
+  })
+  await page.goto('/')
+  await page.waitForFunction(() => document.querySelector('nav-menu'))
+
+  // (a setlist opened before the reports have started is not reported: wait for them with an error)
+  await expect
+    .poll(
+      async () => {
+        await throwAndLeave(page)
+        return spans.length
+      },
+      { timeout: 30_000, intervals: [500] }
+    )
+    .toBeGreaterThan(0)
+
+  await page.locator('welcome-card').getByRole('button', { name: 'Add a sample setlist' }).click()
+  await expect(page.locator('setlist-overview song-card')).toHaveCount(4)
+  await page.locator('setlist-overview song-card').nth(1).click()
+  await expect(page).toHaveURL(/\/song\/1$/)
+
+  // The tab closed: the session ends, and what is waiting is sent
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')))
+  await expect
+    .poll(() => spans.filter(span => span.name.startsWith('chordless.setlist.')).length, {
+      timeout: 15_000,
+    })
+    .toBe(2)
+
+  const open = spans.find(span => span.name === 'chordless.setlist.open')
+  const leave = spans.find(span => span.name === 'chordless.setlist.leave')
+  expect(open?.attributes['chordless.setlist.songs']).toEqual({ intValue: 4 })
+  expect(open?.attributes['chordless.setlist.source']).toEqual({ stringValue: 'library' })
+  expect(leave?.attributes['chordless.setlist.songs_viewed']).toEqual({ intValue: 1 })
+  expect(leave?.attributes['chordless.setlist.song_changes']).toEqual({ intValue: 1 })
+  // (the id is on every span of the session, and the open span began it)
+  const session = open?.attributes['session.id']
+  expect(session).toEqual({ stringValue: expect.any(String) })
+  expect(leave?.attributes['session.id']).toEqual(session)
+  expect(leave?.attributes['chordless.setlist.id']).toEqual(
+    open?.attributes['chordless.setlist.id']
+  )
+})
