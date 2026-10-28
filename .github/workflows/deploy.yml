@@ -10,7 +10,7 @@
 #
 # On every push to main (a merge), and by hand (Actions, Deploy, Run workflow). This is also where
 # main's own checks run after a merge (ci.yml has no push trigger), which is what a pull request not
-# having to be up to date relies on (docs/CI.md). A merge of only docs/**.md and TODO starts no
+# having to be up to date relies on (docs/CI.md). A merge of only docs/ and TODO starts no
 # run. One that changes anything else runs the checks and the plan (deploying nothing, if nothing
 # shipped changed).
 name: Deploy
@@ -21,7 +21,7 @@ on:
     # A push of only these (notes, nothing shipped or checked) starts no run; one that also changes
     # anything else does. Keep in step with scripts/ci/changes.sh
     paths-ignore:
-      - "docs/**.md"
+      - "docs/**"
       - TODO
   # Every morning but Sunday, to deploy what a push did not: a merge made with a workflow's token
   # (Dependabot's auto-merge) starts no workflow, so its change, and the checks on it, wait for the
