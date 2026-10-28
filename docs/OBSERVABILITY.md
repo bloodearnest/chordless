@@ -183,7 +183,7 @@ the caller's trace id either: parent-child wiring is automatic only.
 **So the Worker makes its own span** (`worker/src/trace.ts`, `chordless.worker.handle`, service
 `chordless-worker`, its own dataset). For a request that carries a valid, sampled `traceparent` (only the
 page's calls to the Worker do), it takes the caller's trace id and its span id as parent, and sends one
-OTLP/JSON span to the same destination as the page's traces, after the response, in `waitUntil`: it
+span (made with the OTel SDK) to the same destination as the page's traces, after the response, in `waitUntil`: it
 never changes the answer, and is not made without a destination or from a sender over the `TELEMETRY`
 limit. Attributes: method, `http.route` (the path with its ids as `:id`), status, `server.address`,
 `user_agent.original`, `cloudflare.ray_id`, from `request.cf` the colo, ASN and where it came from (country,
