@@ -116,6 +116,14 @@ describe('the setlist page: header, menu and keys', () => {
       await new Promise(resolve => setTimeout(resolve, 50))
     })
 
+    it('has no session to report when there is no such setlist', async () => {
+      const { SetlistPage } = await import('../src/js/setlist-page.ts')
+      const { baselineAttributes } = await import('../src/js/telemetry/baseline.ts')
+      rig.page = new SetlistPage({ root: rig.root, setlistId: 'no-such', db: rig.db })
+      await rig.page.start()
+      expect(baselineAttributes()).to.not.have.property('session.id')
+    })
+
     it('says so when there is no such setlist, or it cannot be read', async () => {
       const { SetlistPage } = await import('../src/js/setlist-page.ts')
       rig.page = new SetlistPage({ root: rig.root, setlistId: 'no-such', db: rig.db })

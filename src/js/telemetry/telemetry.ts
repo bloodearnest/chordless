@@ -101,6 +101,16 @@ export async function traced<T>(
 }
 
 /**
+ * A span for something that happened, with its facts as attributes, made and ended at once (a setlist
+ * opened or left): a span held open for as long as the person is in a setlist would be one nobody
+ * can see until it ends, and lost with the tab.
+ */
+export function recordSpan(name: string, attributes: Attributes): void {
+  if (!getTelemetryPreference()) return
+  tracer().startSpan(name, { attributes }).end()
+}
+
+/**
  * A call to Drive or the Worker, counted on the sync running now, if one is. A failure or a slow
  * one is also an event, so the few that matter are told apart without a span for every request.
  * `status` is the HTTP status, or 0 when there was no answer.

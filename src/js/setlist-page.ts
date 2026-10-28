@@ -56,6 +56,13 @@ import { SetlistHeader } from './setlist/setlist-header.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
+import {
+  editModeEntered,
+  endSetlistSession,
+  songShown,
+  songTransposed,
+  startSetlistSession,
+} from './telemetry/setlist-session.ts'
 import { toast } from './toast.ts'
 import { transposeSong } from './transpose.ts'
 import { normalizeCapo } from './utils/capo.ts'
@@ -114,6 +121,8 @@ export class SetlistPage {
   /** The song the route names, until the setlist has been shown (then the page follows the route) */
   _initialSongIndex: number
   _starting = true
+  /** When the page was made, to say how long the setlist took to show */
+  _createdAt = performance.now()
   _abort: AbortController
   _disposed: boolean
   db: ChordlessDB | null
@@ -222,6 +231,7 @@ export class SetlistPage {
     await this.renderSetlist(this._setlistId, this._initialSongIndex)
     this._starting = false
     if (this._disposed) return
+    this._startSession()
 
     this.setupKeyboardNavigation()
     const header = this.root.querySelector<AppHeader>('#app-header')
@@ -244,6 +254,35 @@ export class SetlistPage {
     window.addEventListener(CapoPreferenceEvent.type, this._onCapoPreferenceChange, { signal })
     window.addEventListener(LiveChangeEvent.type, this._onLiveChange, { signal })
     window.addEventListener(LiveSyncStatusEvent.type, this._onLiveChange, { signal })
+  }
+
+  /** The setlist is shown: its session begins (docs/OBSERVABILITY.md) */
+  _startSession() {
+    const setlist = this.currentSetlist
+    if (!setlist) return
+    startSetlistSession({
+      setlistId: setlist.id,
+      date: setlist.date,
+      songs: this.songs.length,
+      ccli: this.songs.flatMap(song => song._canonicalSong?.ccliNumber ?? []),
+      source: this._readOnly ? 'share' : 'library',
+      openMs: performance.now() - this._createdAt,
+    })
+    // (the page may already show a song: it was made with the route)
+    this._reportSong()
+  }
+
+  /** What song is in view, for the session's reports (docs/OBSERVABILITY.md) */
+  _reportSong() {
+    const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
+    songShown(
+      song && {
+        songId: song.songId,
+        ccli: song._canonicalSong?.ccliNumber ?? null,
+        index: song.songIndex,
+        key: song.currentKey,
+      }
+    )
   }
 
   /** How far each song (and the overview) is scrolled, to put back if the user returns */
@@ -316,6 +355,7 @@ export class SetlistPage {
 
     // Nothing is current any more (what is playing carries on)
     this.dispatchSongChange(null)
+    endSetlistSession()
   }
 
   /**
@@ -641,6 +681,7 @@ export class SetlistPage {
   }
 
   dispatchSongChange(song: RuntimeSong | null) {
+    this._reportSong()
     // Dispatch custom event for media player to listen to
     const prefs = song ? getSongUserPrefs(song.songId, this._database().spaceId) : null
     const event = new SongChangeEvent(song, {
@@ -948,6 +989,7 @@ export class SetlistPage {
 
         // We're on song view - handle song edit mode
         if (!isEditMode()) {
+          editModeEntered()
           enterEditMode(this.root, appHeader, {
             capoEnabled: this._capoEnabled,
           })
@@ -1089,6 +1131,7 @@ export class SetlistPage {
     const song = this.songs[this.currentSongIndex]
     song.currentKey = newKey
     const index = this.currentSongIndex
+    songTransposed(newKey)
     await this._saveSongSetting(song, model => model.setKey(newKey), { keyValue: newKey })
 
     // Re-render the song with transposition
