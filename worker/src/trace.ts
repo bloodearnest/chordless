@@ -55,21 +55,14 @@ const randomSpanId = (): string => {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
-type Value = string | number | boolean | undefined
+type Value = string | number | undefined
 const attribute = (key: string, value: Value) =>
   value === undefined || value === ''
     ? []
     : [
         {
           key,
-          value:
-            typeof value === 'string'
-              ? { stringValue: value }
-              : typeof value === 'boolean'
-                ? { boolValue: value }
-                : Number.isInteger(value)
-                  ? { intValue: String(value) }
-                  : { doubleValue: value },
+          value: typeof value === 'string' ? { stringValue: value } : { intValue: String(value) },
         },
       ]
 
