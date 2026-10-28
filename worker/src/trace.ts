@@ -3,9 +3,19 @@
  * Cloudflare's native spans ignore the header and are roots of their own, so for the page's calls
  * the Worker makes one that is a real child of the page's call span: the caller's trace id, its span
  * id as parent, and the facts the runtime gives us. It goes to the same destination as the page's
- * traces (hand-written OTLP/JSON: no SDK), after the response is made, and never changes it.
+ * traces (the OTel SDK, with an exporter that is `forward`), after the response is made, and never changes it.
  */
 
+import { ROOT_CONTEXT, SpanKind, SpanStatusCode, TraceFlags, trace } from '@opentelemetry/api'
+import { type ExportResult, ExportResultCode } from '@opentelemetry/core'
+import { JsonTraceSerializer } from '@opentelemetry/otlp-transformer'
+import { resourceFromAttributes } from '@opentelemetry/resources'
+import {
+  BasicTracerProvider,
+  type ReadableSpan,
+  SimpleSpanProcessor,
+  type SpanExporter,
+} from '@opentelemetry/sdk-trace-base'
 import type { Env } from './env.ts'
 import { forward, parseHeaders, type TelemetryDeps, withinLimit } from './telemetry.ts'
 
@@ -15,9 +25,6 @@ export const SERVICE_NAME = 'chordless-worker'
 const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/
 /** A path segment that is an id (a Drive id, a UUID, a share id), not a name */
 const ID_SEGMENT = /^[A-Za-z0-9_-]{16,}$|^[0-9a-f]{8}-[0-9a-f-]{27}$/
-const SERVER = 2
-const STATUS_OK = 1
-const STATUS_ERROR = 2
 
 interface CloudflareProperties {
   colo?: string
@@ -50,61 +57,34 @@ export function routeOf(path: string): string {
     .join('/')
 }
 
-const randomSpanId = (): string => {
-  const bytes = crypto.getRandomValues(new Uint8Array(8))
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+/** Sends the spans of the one request to the destination, as OTLP/JSON, the way the page's traces go */
+class ForwardingExporter implements SpanExporter {
+  #endpoint: string
+  #headers: string
+  #deps: TelemetryDeps | undefined
+
+  constructor(endpoint: string, headers: string, deps: TelemetryDeps | undefined) {
+    this.#endpoint = endpoint
+    this.#headers = headers
+    this.#deps = deps
+  }
+
+  export(spans: ReadableSpan[], done: (result: ExportResult) => void): void {
+    const body = JsonTraceSerializer.serializeRequest(spans)
+    forward(
+      JSON.parse(new TextDecoder().decode(body)),
+      this.#endpoint,
+      parseHeaders(this.#headers),
+      this.#deps
+    ).then(() => done({ code: ExportResultCode.SUCCESS }))
+  }
+
+  shutdown(): Promise<void> {
+    return Promise.resolve()
+  }
 }
 
 type Value = string | number | undefined
-const attribute = (key: string, value: Value) =>
-  value === undefined || value === ''
-    ? []
-    : [
-        {
-          key,
-          value: typeof value === 'string' ? { stringValue: value } : { intValue: String(value) },
-        },
-      ]
-
-/** The span, as an OTLP/JSON batch */
-export function buildSpan(
-  parent: { traceId: string; parentId: string },
-  facts: { startMs: number; endMs: number; attributes: Record<string, Value>; failed: boolean },
-  version: string | undefined
-): unknown {
-  return {
-    resourceSpans: [
-      {
-        resource: {
-          attributes: [
-            ...attribute('service.name', SERVICE_NAME),
-            ...attribute('service.version', version),
-          ],
-        },
-        scopeSpans: [
-          {
-            scope: { name: SERVICE_NAME },
-            spans: [
-              {
-                traceId: parent.traceId,
-                spanId: randomSpanId(),
-                parentSpanId: parent.parentId,
-                name: 'chordless.worker.handle',
-                kind: SERVER,
-                startTimeUnixNano: `${Math.round(facts.startMs)}000000`,
-                endTimeUnixNano: `${Math.round(facts.endMs)}000000`,
-                attributes: Object.entries(facts.attributes).flatMap(([key, value]) =>
-                  attribute(key, value)
-                ),
-                status: { code: facts.failed ? STATUS_ERROR : STATUS_OK },
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  }
-}
 
 /**
  * Run the request, and if it carried the page's trace context, send our span for it afterwards.
@@ -121,6 +101,8 @@ export async function withWorkerSpan(
   const parent = parseTraceparent(request.headers.get('traceparent'))
   if (!parent || !env.OTLP_ENDPOINT?.startsWith('https://') || !env.OTLP_HEADERS) return run()
 
+  const endpoint = env.OTLP_ENDPOINT
+  const headers = env.OTLP_HEADERS
   const startMs = Date.now()
   let response: Response | undefined
   let thrown: unknown
@@ -136,38 +118,50 @@ export async function withWorkerSpan(
       if (!(await withinLimit(request, env))) return
       const cf = (request as { cf?: CloudflareProperties }).cf
       const version = env.CF_VERSION_METADATA?.id
-      const body = buildSpan(
-        parent,
+      const attributes: Record<string, Value> = {
+        'http.request.method': request.method,
+        'http.route': routeOf(new URL(request.url).pathname),
+        'http.response.status_code': status,
+        'server.address': new URL(request.url).hostname,
+        'user_agent.original': request.headers.get('User-Agent') ?? undefined,
+        'cloudflare.ray_id': request.headers.get('cf-ray')?.split('-')[0],
+        'cloudflare.colo': cf?.colo,
+        'cloudflare.asn': cf?.asn,
+        'geo.country.code': cf?.country,
+        'geo.continent.code': cf?.continent,
+        'geo.locality.region': cf?.region,
+        'geo.locality.name': cf?.city,
+        'geo.timezone': cf?.timezone,
+        'cloudflare.script_version.id': version,
+        'chordless.outcome': status >= 500 ? 'error' : 'ok',
+      }
+      // (a provider for the one span: these are few, and nothing is held between them)
+      const provider = new BasicTracerProvider({
+        resource: resourceFromAttributes({
+          'service.name': SERVICE_NAME,
+          ...(version ? { 'service.version': version } : {}),
+        }),
+        spanProcessors: [new SimpleSpanProcessor(new ForwardingExporter(endpoint, headers, deps))],
+      })
+      const span = provider.getTracer(SERVICE_NAME).startSpan(
+        'chordless.worker.handle',
         {
-          startMs,
-          endMs,
-          failed: status >= 500,
-          attributes: {
-            'http.request.method': request.method,
-            'http.route': routeOf(new URL(request.url).pathname),
-            'http.response.status_code': status,
-            'server.address': new URL(request.url).hostname,
-            'user_agent.original': request.headers.get('User-Agent') ?? undefined,
-            'cloudflare.ray_id': request.headers.get('cf-ray')?.split('-')[0],
-            'cloudflare.colo': cf?.colo,
-            'cloudflare.asn': cf?.asn,
-            'geo.country.code': cf?.country,
-            'geo.continent.code': cf?.continent,
-            'geo.locality.region': cf?.region,
-            'geo.locality.name': cf?.city,
-            'geo.timezone': cf?.timezone,
-            'cloudflare.script_version.id': version,
-            'chordless.outcome': status >= 500 ? 'error' : 'ok',
-          },
+          kind: SpanKind.SERVER,
+          startTime: startMs,
+          attributes: Object.fromEntries(
+            Object.entries(attributes).filter(([, value]) => value !== undefined && value !== '')
+          ),
         },
-        version
+        trace.setSpanContext(ROOT_CONTEXT, {
+          traceId: parent.traceId,
+          spanId: parent.parentId,
+          traceFlags: TraceFlags.SAMPLED,
+          isRemote: true,
+        })
       )
-      await forward(
-        body as Record<string, unknown>,
-        env.OTLP_ENDPOINT as string,
-        parseHeaders(env.OTLP_HEADERS as string),
-        deps
-      )
+      if (status >= 500) span.setStatus({ code: SpanStatusCode.ERROR })
+      span.end(endMs)
+      await provider.shutdown()
     })()
   )
   if (!response) throw thrown

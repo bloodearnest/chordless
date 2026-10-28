@@ -67,7 +67,7 @@ test('a call with the page’s trace context gets a span that is a child of the 
   assert.notEqual(span.spanId, PARENT)
   assert.equal(span.name, 'chordless.worker.handle')
   assert.equal(span.kind, 2)
-  assert.deepEqual(span.status, { code: 1 })
+  assert.deepEqual(span.status, { code: 0 })
   assert.ok(BigInt(span.endTimeUnixNano) >= BigInt(span.startTimeUnixNano))
   const resource = sent[0].resourceSpans[0].resource.attributes
   assert.deepEqual(resource[0], { key: 'service.name', value: { stringValue: 'chordless-worker' } })
@@ -92,12 +92,12 @@ test('it records the route, the status, the ray and what the runtime knows of wh
   assert.deepEqual(attributes(theSpan(sent[0])), {
     'http.request.method': 'GET',
     'http.route': '/api/config',
-    'http.response.status_code': '200',
+    'http.response.status_code': 200,
     'server.address': 'chordless.test',
     'user_agent.original': 'Browser/1',
     'cloudflare.ray_id': 'a51c89e75a0635ca',
     'cloudflare.colo': 'LHR',
-    'cloudflare.asn': '20712',
+    'cloudflare.asn': 20712,
     'geo.country.code': 'GB',
     'geo.continent.code': 'EU',
     'geo.locality.region': 'England',
