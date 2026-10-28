@@ -14,11 +14,12 @@ import { withSharePreview } from './share-page.ts'
 import type { TeamDeps } from './team-context.ts'
 import { handleTeamRoutes, isTeamPath } from './team-routes.ts'
 import { handleTelemetry, TELEMETRY_PATH, type TelemetryDeps } from './telemetry.ts'
+import { withWorkerSpan } from './trace.ts'
 
 /** The Worker's API, which only the app's own pages may call */
 const API_PATHS = /^\/(oauth|session|api)(\/|$)/
 
-export async function handleRequest(
+async function route(
   request: Request,
   env: Env,
   ctx: { waitUntil(promise: Promise<unknown>): void },
@@ -108,4 +109,19 @@ export async function handleRequest(
     console.error('Worker error:', message(error), error)
     return jsonResponse({ error: 'Internal server error', message: message(error) }, 500)
   }
+}
+
+/** The Worker's response to a request, with its own span if the page sent its trace context (trace.ts) */
+export function handleRequest(
+  request: Request,
+  env: Env,
+  ctx: { waitUntil(promise: Promise<unknown>): void },
+  cache: ShareCache,
+  google?: GoogleApi,
+  team?: TeamDeps,
+  telemetry?: TelemetryDeps
+): Promise<Response> {
+  return withWorkerSpan(request, env, ctx, telemetry, () =>
+    route(request, env, ctx, cache, google, team, telemetry)
+  )
 }

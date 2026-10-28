@@ -180,6 +180,19 @@ and Cloudflare's own support says it is a platform gap they are working on); the
 https://github.com/cloudflare/workers-sdk/discussions/11062. A custom span in the Worker cannot take
 the caller's trace id either: parent-child wiring is automatic only.
 
+**So the Worker makes its own span** (`worker/src/trace.ts`, `chordless.worker.handle`, service
+`chordless-worker`, its own dataset). For a request that carries a valid, sampled `traceparent` (only the
+page's calls to the Worker do), it takes the caller's trace id and its span id as parent, and sends one
+OTLP/JSON span to the same destination as the page's traces, after the response, in `waitUntil`: it
+never changes the answer, and is not made without a destination or from a sender over the `TELEMETRY`
+limit. Attributes: method, `http.route` (the path with its ids as `:id`), status, `server.address`,
+`user_agent.original`, `cloudflare.ray_id`, from `request.cf` the colo, ASN and where it came from (country,
+continent, region, city, timezone), the Worker's version (the `[version_metadata]` binding, also
+`service.version`), and `chordless.outcome`. Not available to us: `cpu_time_ms`, time to first byte and the
+spans of bindings (Durable Objects, the rate limiter, subrequests), which only Cloudflare's native
+export has. So the native export stays on for now, until a few days of both show whether it is missed;
+then it is one line in `wrangler.toml` to turn off.
+
 **Steps of a sync.** `phase()` (`telemetry.ts`) makes a step of the sync running a span of its own, the
 parent of the calls it makes, so a trace says which step each call belonged to: `chordless.sync.init`,
 `.feed`, `.feed_position`, `.members`, `.access`, `.inventory`, `.pull`, `.push`. It holds the one
