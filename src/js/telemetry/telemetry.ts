@@ -42,6 +42,8 @@ const newStats = (): CallStats => ({
 
 /** At most this many calls of one sync are spans of their own: a first sync can make hundreds, and they are still counted on the sync's span */
 const MAX_CALL_SPANS = 200
+/** How much of a call's query string is kept on its span */
+const MAX_QUERY = 300
 /** Errors reported in one visit: a loop of them is one problem, and spans are what Honeycomb bills */
 const MAX_ERROR_SPANS = 20
 
@@ -114,6 +116,40 @@ export async function traced<T>(
 }
 
 /**
+ * A step of the sync running now (reading the feed, checking access) as a span of its own, the
+ * parent of the calls it makes: so a trace says which step each call belonged to. It is a child of
+ * the sync, or of the step that holds it. Outside a sync, or in one that is not reported (not
+ * sampled), it is no span and `fn` just runs.
+ */
+export async function phase<T>(
+  name: string,
+  attributes: Attributes,
+  fn: (span: Span) => Promise<T> | T
+): Promise<T> {
+  const owner = tracked?.span
+  if (!tracked || !owner || owner === NO_SPAN || !getTelemetryPreference()) return fn(NO_SPAN)
+  const span = tracer().startSpan(
+    name,
+    { attributes: tracked.sample > 1 ? { ...attributes, SampleRate: tracked.sample } : attributes },
+    trace.setSpan(context.active(), owner)
+  )
+  const state = tracked
+  state.span = span
+  try {
+    const result = await fn(span)
+    span.setAttribute('chordless.outcome', 'ok')
+    return result
+  } catch (error) {
+    span.setAttribute('chordless.outcome', 'error')
+    recordFailure(span, error)
+    throw error
+  } finally {
+    state.span = owner
+    span.end()
+  }
+}
+
+/**
  * A span for something that happened, with its facts as attributes, made and ended at once (a setlist
  * opened or left): a span held open for as long as the person is in a setlist would be one nobody
  * can see until it ends, and lost with the tab.
@@ -179,6 +215,8 @@ export function timedFetch(
             ).toUpperCase(),
             'server.address': url.hostname,
             'url.path': url.pathname,
+            // (what a Drive listing asked for, the `q` of it, says why it was made)
+            'url.query': url.search.slice(0, MAX_QUERY),
             // (a call of a sampled sync is counted as often as the sync is)
             ...(tracked && tracked.sample > 1 ? { SampleRate: tracked.sample } : {}),
           },

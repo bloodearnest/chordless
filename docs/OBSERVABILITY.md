@@ -162,13 +162,20 @@ path with care. The privacy text says all of this. (No client address is exporte
 
 Every network call through `timedFetch` (the page's Drive API, `callWorker`, the token refresh) is a
 `CLIENT` span of its own, `chordless.drive.request` or `chordless.worker.request`, with the method,
-`server.address`, `url.path` (no query) and `http.response.status_code`: across a boundary there has
+`server.address`, `url.path`, `url.query` (the first 300 characters: what a Drive listing asked for says why it was made) and `http.response.status_code`: across a boundary there has
 to be a span, for the other side's to be its child. It is a child of the sync running, or of the span
 it was given (the token refresh), else a trace of its own. A call to **our Worker** carries that call
 span's own `traceparent`, so the Worker's span can be its child; never to Google (a CORS preflight, and
 trace ids leaked to a third party). A failure is a call with no answer, a 429, or any 4xx but 404
 (Drive's way of saying there is no such file). At most 200 calls of one sync are spans: a first
 sync can make hundreds, and the totals on the sync's span count them all.
+
+**Steps of a sync.** `phase()` (`telemetry.ts`) makes a step of the sync running a span of its own, the
+parent of the calls it makes, so a trace says which step each call belonged to: `chordless.sync.init`,
+`.feed`, `.feed_position`, `.members`, `.access`, `.inventory`, `.pull`, `.push`. It holds the one
+sync's "current span" the same way the calls do, and does nothing outside a sync or in an unsampled
+one. A call made while a sync runs but from other code (a pad loading) is still a child of whichever
+step is current: the module variable cannot tell them apart. Calls with no sync are root traces.
 
 **What started a sync**, `chordless.sync.trigger`: `manual` (the Sync button on a space's card),
 `tick` (the one-minute timer), `resume` (the app opened or came back), `online` (the device came back

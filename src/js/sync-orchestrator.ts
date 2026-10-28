@@ -16,7 +16,7 @@ import {
   isSyncAvailable,
   SyncManager,
 } from './sync-manager.ts'
-import { traced } from './telemetry/telemetry.ts'
+import { phase, traced } from './telemetry/telemetry.ts'
 import { toast } from './toast.ts'
 import { setlistTitle } from './utils/date-utils.ts'
 import { errorMessage } from './utils/errors.ts'
@@ -159,7 +159,7 @@ export class SyncOrchestrator {
       'chordless.sync.run',
       { 'chordless.sync.operation': name, 'chordless.sync.trigger': trigger },
       async () => {
-        if (!this.syncManager) await this.init()
+        if (!this.syncManager) await phase('chordless.sync.init', {}, () => this.init())
         const syncManager = this.syncManager as SyncManager
         const send = (progress: SyncProgress) =>
           progressCallback?.({ ...progress, timestamp: new Date().toISOString() })

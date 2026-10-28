@@ -30,6 +30,7 @@ export type { ProgressCallback, SyncProgress } from './sync/session.ts'
 
 import { ChangeTokenLost } from './storage/types.ts'
 import { type ProgressCallback, type SyncReport, SyncRun } from './sync/session.ts'
+import { phase } from './telemetry/telemetry.ts'
 import { errorMessage } from './utils/errors.ts'
 
 /** A local setlist or song with changes that are not in Drive */
@@ -434,14 +435,16 @@ export class SyncManager {
       const run = this.newRun()
       // Where the feed of changes stands before anything is read: what changes during this sync
       // is seen by the next incremental one
-      const feedPosition = await this.#feedPosition()
+      const feedPosition = await phase('chordless.sync.feed_position', {}, () =>
+        this.#feedPosition()
+      )
       // Who the space's folder is shared with, for choosing leaders
-      await this.refreshMembers()
-      await this.refreshAccess(run)
+      await phase('chordless.sync.members', {}, () => this.refreshMembers())
+      await phase('chordless.sync.access', {}, () => this.refreshAccess(run))
 
       // Before changing anything, check local records belong to this folder
       progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
-      await this.buildDriveInventory(run)
+      await phase('chordless.sync.inventory', {}, () => this.buildDriveInventory(run))
       // (without the listing the removals below are skipped, and the feed would not name them again)
       const listed = run.inventory !== null
       await this.assertRecordsInThisFolder(run)
@@ -457,7 +460,7 @@ export class SyncManager {
 
       // First, pull changes from Drive
       progressCallback?.({ stage: 'pulling', message: 'Downloading from Drive...' })
-      await this.pullFromDrive(progressCallback, run)
+      await phase('chordless.sync.pull', {}, () => this.pullFromDrive(progressCallback, run))
 
       // The pull has adopted the live files it could. A setlist whose file is still gone and
       // that wasn't edited here was removed from Drive: remove it here too
@@ -486,7 +489,7 @@ export class SyncManager {
         if (!run.readOnly) await this.syncShares(run)
         if (!run.readOnly) {
           progressCallback?.({ stage: 'pushing', message: 'Checking for changes to upload...' })
-          await this.pushToDrive(progressCallback, run)
+          await phase('chordless.sync.push', {}, () => this.pushToDrive(progressCallback, run))
         }
       } catch (error) {
         if (!(await this.foundToBeReadOnly(run))) throw error
@@ -557,14 +560,14 @@ export class SyncManager {
 
     let changes: Awaited<ReturnType<typeof feed.since>>
     try {
-      changes = await feed.since(token)
+      changes = await phase('chordless.sync.feed', {}, () => feed.since(token))
     } catch (error) {
       if (!(error instanceof ChangeTokenLost)) throw error
       await this.changeToken.clear()
       return { ...(await this.sync(progressCallback)), full: true }
     }
     // (who the folder is shared with changes rarely: read it again now and then, not at every sync)
-    await this.#refreshMembersIfOld()
+    await phase('chordless.sync.members', {}, () => this.#refreshMembersIfOld())
     const run = this.newRun(new Set(changes.gone))
     try {
       if (!push && changes.changed.length === 0 && changes.gone.length === 0) {
@@ -576,7 +579,7 @@ export class SyncManager {
       const setlists = changes.changed.filter(c => c.collection === 'setlists').map(c => c.file)
 
       progressCallback?.({ stage: 'starting', message: 'Starting sync...' })
-      await this.refreshAccess(run)
+      await phase('chordless.sync.access', {}, () => this.refreshAccess(run))
       await this.trashPendingDeletions(run)
 
       if (setlists.length > 0) await pullSetlists(run, progressCallback, setlists)
@@ -595,7 +598,7 @@ export class SyncManager {
         // A share whose setlist changed here is updated with the push, so a live one is at once
         // (a full sync also ends and cleans up shares; this one lists nothing)
         if (!run.readOnly) await this.syncShares(run, { light: true })
-        await this.pushToDrive(progressCallback, run)
+        await phase('chordless.sync.push', {}, () => this.pushToDrive(progressCallback, run))
       }
 
       if (!run.downloadsFailed) await this.changeToken.set(changes.token)
