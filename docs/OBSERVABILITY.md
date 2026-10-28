@@ -174,7 +174,11 @@ sync can make hundreds, and the totals on the sync's span count them all.
 Worker's `/session/refresh` span is a root in a trace of its own (checked 2026-10-28). So the page's
 call span carries the response's `cf-ray` as `cloudflare.ray_id`, the same value as on the Worker's span
 (in the `chordless` dataset): find one from the other by the ray id. The `traceparent` header is still
-sent, in case Cloudflare honours it one day.
+sent, in case Cloudflare honours it one day. There is no setting for it (checked 2026-10-28: the
+zone-level "incoming trace context" option of Cloudflare Traces is not in the dashboard for a Worker,
+and Cloudflare's own support says it is a platform gap they are working on); the request to follow is
+https://github.com/cloudflare/workers-sdk/discussions/11062. A custom span in the Worker cannot take
+the caller's trace id either: parent-child wiring is automatic only.
 
 **Steps of a sync.** `phase()` (`telemetry.ts`) makes a step of the sync running a span of its own, the
 parent of the calls it makes, so a trace says which step each call belonged to: `chordless.sync.init`,
