@@ -1,0 +1,92 @@
+/* v8 ignore start -- start-up wiring of the SDK, which a unit test cannot load (it needs the page and the network): the Playwright tests run it, and what it is made of (baseline.ts, gated-exporter.ts, telemetry.ts) is unit tested */
+/**
+ * Start sending the page's reports (docs/OBSERVABILITY.md): to our own Worker, which holds the key
+ * and passes them to Honeycomb. The SDK is bigger than the rest of this, so it is loaded when the
+ * page is idle, only if reports are on, and again the first time they are turned on.
+ *
+ * `localStorage.setItem('telemetry-console', '1')` also prints each span in the console, to see what
+ * a change reports without Honeycomb.
+ */
+import { trace } from '@opentelemetry/api'
+import type { SpanProcessor } from '@opentelemetry/sdk-trace-web'
+import { appUpdate } from '../app-update.ts'
+import { getTelemetryPreference, TelemetryPreferenceEvent } from '../preferences.ts'
+import { baselineAttributes } from './baseline.ts'
+import { resetDeviceId } from './ids.ts'
+import { reportError } from './telemetry.ts'
+
+const TELEMETRY_URL = '/api/otlp/v1/traces'
+
+let started = false
+
+async function start(): Promise<void> {
+  const [sdk, { OTLPTraceExporter }, { resourceFromAttributes }, { GatedExporter }] =
+    await Promise.all([
+      import('@opentelemetry/sdk-trace-web'),
+      import('@opentelemetry/exporter-trace-otlp-http'),
+      import('@opentelemetry/resources'),
+      import('./gated-exporter.ts'),
+    ])
+  const { WebTracerProvider, BatchSpanProcessor, SimpleSpanProcessor, ConsoleSpanExporter } = sdk
+  const running = await appUpdate.runningVersion().catch(() => null)
+
+  const exporter = new GatedExporter(new OTLPTraceExporter({ url: TELEMETRY_URL }))
+  const spanProcessors: SpanProcessor[] = [
+    // Every span gets what is true of the page as it starts
+    {
+      onStart: span => span.setAttributes(baselineAttributes()),
+      onEnd: () => undefined,
+      forceFlush: () => Promise.resolve(),
+      shutdown: () => Promise.resolve(),
+    },
+    new BatchSpanProcessor(exporter, {
+      scheduledDelayMillis: 5000,
+      maxQueueSize: 256,
+      maxExportBatchSize: 64,
+    }),
+  ]
+  try {
+    if (localStorage.getItem('telemetry-console') === '1') {
+      spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()))
+    }
+  } catch {
+    // (storage is blocked: no console reports)
+  }
+
+  const provider = new WebTracerProvider({
+    resource: resourceFromAttributes({
+      'service.name': 'chordless-web',
+      'service.version': running?.version ?? 'unknown',
+      'deployment.environment.name': import.meta.env?.MODE ?? 'unknown',
+      'user_agent.original': navigator.userAgent,
+    }),
+    spanProcessors,
+  })
+  trace.setGlobalTracerProvider(provider)
+
+  // What has not gone yet goes when the page is left (a tab put away may not come back)
+  const flush = () => void provider.forceFlush().catch(() => undefined)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush()
+  })
+  window.addEventListener('pagehide', flush)
+  window.addEventListener('error', event => reportError(event.error ?? event.message))
+  window.addEventListener('unhandledrejection', event => reportError(event.reason))
+}
+
+/** Begin, once: now if reports are on, and when they are turned on if they are not */
+export function initTelemetry(): void {
+  const begin = () => {
+    if (started) return
+    started = true
+    start().catch(error => {
+      console.warn('[telemetry] could not start', error)
+    })
+  }
+  if (getTelemetryPreference()) begin()
+  window.addEventListener(TelemetryPreferenceEvent.type, event => {
+    if (event.enabled) begin()
+    // (turning them off forgets this device's id: a new one is made if they are turned on again)
+    else resetDeviceId()
+  })
+}

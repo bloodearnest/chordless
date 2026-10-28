@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_GOOGLE_CLIENT_ID?: string
   readonly VITE_PICKER_APP_ID?: string
   readonly VITE_DRIVE_ROOT_FOLDER?: string
+  /** 'development' for `npm run dev`, 'production' for a build */
+  readonly MODE?: string
 }
 interface ImportMeta {
   readonly env?: ImportMetaEnv

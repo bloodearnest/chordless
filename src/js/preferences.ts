@@ -58,6 +58,15 @@ export class KeepAwakePreferenceEvent extends Event {
     this.enabled = enabled
   }
 }
+/** The anonymous usage reports preference changed (sent on window) */
+export class TelemetryPreferenceEvent extends Event {
+  static readonly type = 'preferences:telemetry-changed'
+  readonly enabled: boolean
+  constructor(enabled: boolean) {
+    super(TelemetryPreferenceEvent.type)
+    this.enabled = enabled
+  }
+}
 /** The longest the screen is kept awake with no touch changed (sent on window) */
 export class KeepAwakeLimitEvent extends Event {
   static readonly type = 'preferences:keep-awake-limit-changed'
@@ -164,6 +173,16 @@ const keepAwake = definePreference<boolean>({
   changed: on => new KeepAwakePreferenceEvent(on),
 })
 
+// On unless turned off (docs/OBSERVABILITY.md). Where storage cannot be read it is off: nothing is
+// sent that the person might have refused, and the id the reports carry could not be kept anyway.
+const telemetry = definePreference<boolean>({
+  keys: ['telemetry'],
+  read: ([stored]) => stored !== 'false' && stored !== '0',
+  write: on => (on ? 'true' : 'false'),
+  blocked: false,
+  changed: on => new TelemetryPreferenceEvent(on),
+})
+
 const isKeepAwakeLimit = (minutes: number) =>
   (KEEP_AWAKE_LIMITS as readonly number[]).includes(minutes)
 const keepAwakeMinutes = definePreference<number>({
@@ -216,6 +235,10 @@ export const setCapoPreference = (value: boolean) => capo.set(!!value)
 export const getKeepAwakePreference = (): boolean => keepAwake.get()
 export const setKeepAwakePreference = (value: boolean) => keepAwake.set(!!value)
 
+/** Whether anonymous usage and error reports are sent (docs/OBSERVABILITY.md): on unless the user turned it off */
+export const getTelemetryPreference = (): boolean => telemetry.get()
+export const setTelemetryPreference = (value: boolean) => telemetry.set(!!value)
+
 export const getKeepAwakeMinutes = (): number => keepAwakeMinutes.get()
 export function setKeepAwakeMinutes(minutes: number) {
   keepAwakeMinutes.set(isKeepAwakeLimit(minutes) ? minutes : DEFAULT_KEEP_AWAKE_MINUTES)
@@ -228,6 +251,7 @@ export function keepAwakeLimitMs(minutes = getKeepAwakeMinutes()): number {
 
 declare global {
   interface GlobalEventHandlersEventMap {
+    [TelemetryPreferenceEvent.type]: TelemetryPreferenceEvent
     [KeepAwakeLimitEvent.type]: KeepAwakeLimitEvent
     [KeepAwakePreferenceEvent.type]: KeepAwakePreferenceEvent
     [NashvillePreferenceEvent.type]: NashvillePreferenceEvent

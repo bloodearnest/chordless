@@ -32,7 +32,8 @@ export default {
   // A page at a time for every two processors the machine lets this have (one a core, where each
   // runs two threads; a CI runner's share), as the Playwright tests beside it (`just test`) have
   concurrency: Math.max(1, Math.floor(availableParallelism() / 2)),
-  nodeResolve: true,
+  // (as a browser resolves: OpenTelemetry's packages have a node and a browser build of some files)
+  nodeResolve: { browser: true, exportConditions: ['browser'] },
   // Types are erased, nothing else: the browser gets the same code it would from Vite
   plugins: [
     esbuildPlugin({

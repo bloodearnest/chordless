@@ -18,6 +18,11 @@
   "dependencies": {
     "@lit/context": "^1.1.6",
     "@lit/task": "^1.0.3",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/core": "^2.12.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.223.0",
+    "@opentelemetry/resources": "^2.12.0",
+    "@opentelemetry/sdk-trace-web": "^2.12.0",
     "jose": "^6.2.13",
     "lit": "^3.3.3",
     "minisearch": "^7.2.0",
