@@ -17,6 +17,7 @@ import { GatedExporter } from '../src/js/telemetry/gated-exporter.ts'
 import { getDeviceId, resetDeviceId } from '../src/js/telemetry/ids.ts'
 import {
   countCall,
+  phase,
   reportError,
   resetTelemetryState,
   timedFetch,
@@ -294,6 +295,79 @@ describe('traced, sampled', () => {
   })
 })
 
+describe('phase', () => {
+  const ok = async () => new Response('{}')
+
+  it('is a child of the sync and the parent of the calls it makes', async () => {
+    let syncId = ''
+    await traced(
+      'chordless.sync.run',
+      {},
+      async span => {
+        syncId = span.spanContext().spanId
+        await phase('chordless.sync.feed', {}, () => timedFetch('drive', ok)('https://x.test/a'))
+        await timedFetch('drive', ok)('https://x.test/b')
+      },
+      { trackCalls: true }
+    )
+    const step = finished().find(span => span.name === 'chordless.sync.feed')
+    const [inside, after] = finished().filter(span => span.name === 'chordless.drive.request')
+    expect(step?.parentSpanContext?.spanId).to.equal(syncId)
+    expect(step?.attributes['chordless.outcome']).to.equal('ok')
+    expect(inside.parentSpanContext?.spanId).to.equal(step?.spanContext().spanId)
+    // (and it hands the sync back when it ends)
+    expect(after.parentSpanContext?.spanId).to.equal(syncId)
+  })
+
+  it('nests, records an error and throws it again', async () => {
+    let thrown: unknown
+    await traced(
+      'chordless.sync.run',
+      {},
+      async () => {
+        try {
+          await phase('chordless.sync.outer', {}, () =>
+            phase('chordless.sync.inner', {}, () => {
+              throw new Error('nope')
+            })
+          )
+        } catch (error) {
+          thrown = error
+        }
+      },
+      { trackCalls: true }
+    )
+    const outer = finished().find(span => span.name === 'chordless.sync.outer')
+    const inner = finished().find(span => span.name === 'chordless.sync.inner')
+    expect((thrown as Error).message).to.equal('nope')
+    expect(inner?.parentSpanContext?.spanId).to.equal(outer?.spanContext().spanId)
+    expect(inner?.attributes['chordless.outcome']).to.equal('error')
+  })
+
+  it('is no span outside a sync, or in one that is not reported, but still runs', async () => {
+    expect(await phase('chordless.sync.feed', {}, () => 'ran')).to.equal('ran')
+    const random = Math.random
+    Math.random = () => 0.5
+    try {
+      await traced('chordless.sync.run', {}, () => phase('chordless.sync.feed', {}, () => {}), {
+        trackCalls: true,
+        sample: 10,
+      })
+    } finally {
+      Math.random = random
+    }
+    expect(finished()).to.have.length(0)
+  })
+
+  it('does nothing but run the function when reports are off', async () => {
+    setTelemetryPreference(false)
+    await traced('chordless.sync.run', {}, () => phase('chordless.sync.feed', {}, () => {}), {
+      trackCalls: true,
+    })
+    expect(finished()).to.have.length(0)
+  })
+})
+
 describe('timedFetch', () => {
   const ok = async () => new Response('{}', { status: 200 })
 
@@ -316,6 +390,7 @@ describe('timedFetch', () => {
       'http.request.method': 'GET',
       'server.address': 'www.googleapis.com',
       'url.path': '/drive/v3/files/f1',
+      'url.query': '?alt=media',
       'http.response.status_code': 200,
     })
     expect(call?.attributes).to.not.have.property('chordless.error')
