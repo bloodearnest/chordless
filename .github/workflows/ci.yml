@@ -214,9 +214,16 @@ jobs:
           tools: node just
           browser: ${{ matrix.browser }}
       - run: scripts/ci/fake-dev-vars.sh
-      # Not the tests tagged @logic: they do not depend on the browser or the platform, and Linux runs them
-      - run: just test-e2e "$BROWSER" --grep-invert @logic
+      # Not the tests tagged @logic: they do not depend on the browser or the platform, and Linux runs
+      # them. The weekly run, and a run by hand, run them here too
+      - run: |
+          if [ "$EVENT" = schedule ] || [ "$EVENT" = workflow_dispatch ]; then
+            just test-e2e "$BROWSER"
+          else
+            just test-e2e "$BROWSER" --grep-invert @logic
+          fi
         env:
+          EVENT: ${{ github.event_name }}
           BROWSER: ${{ matrix.browser }}
           CHORDLESS_WORKERS: ${{ matrix.workers }}
       - if: always()
