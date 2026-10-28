@@ -103,6 +103,10 @@ app-modal:not(:defined) {
   --font-ui: calc(var(--font-base) * 0.8);
   --font-ui-small: calc(var(--font-base) * 0.7);
   --font-icon: var(--font-ui); /* Icon/symbol text (buttons, etc.) */
+
+  /* The margin round the song display: scales with the text, so it is the same proportion on a
+     phone as on a tablet (a fixed rem was hairline next to a phone's 16pt text) */
+  --song-margin: calc(var(--font-base) * 0.5);
 }
 
 /* The frame is for a desktop: a primary input that can hover and point finely (a mouse or
@@ -1075,7 +1079,7 @@ body.edit-mode .key-selector:focus {
   scroll-snap-stop: always;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0;
+  padding: var(--song-margin);
   padding-bottom: 2rem;
   box-sizing: border-box;
   scrollbar-width: none; /* Firefox */
@@ -1090,7 +1094,7 @@ body.edit-mode .key-selector:focus {
 /* Larger padding on tablet/desktop */
 @media (min-width: 48rem) {
   .section {
-    padding: 0 0.5rem 3rem 0.5rem;
+    padding-bottom: 3rem;
   }
 
   .section > * {
