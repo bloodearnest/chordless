@@ -12,7 +12,7 @@ import {
 } from '@opentelemetry/sdk-trace-web'
 import { setTelemetryPreference } from '../src/js/preferences.ts'
 import { baselineAttributes } from '../src/js/telemetry/baseline.ts'
-import { clearSetlist, getAmbient, setAmbient } from '../src/js/telemetry/context.ts'
+import { getAmbient, setAmbient } from '../src/js/telemetry/context.ts'
 import { GatedExporter } from '../src/js/telemetry/gated-exporter.ts'
 import { getDeviceId, resetDeviceId } from '../src/js/telemetry/ids.ts'
 import {
@@ -39,8 +39,7 @@ beforeEach(() => {
     new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
   )
   resetTelemetryState()
-  setAmbient({ accountId: undefined })
-  clearSetlist()
+  setAmbient({ accountId: undefined, sessionId: undefined, teamPseudoId: undefined })
 })
 
 afterEach(() => {
@@ -114,34 +113,21 @@ describe('what every span carries', () => {
     }
   })
 
-  it('has the setlist and song in view, and loses them when the setlist is left, keeping the ids', () => {
-    setAmbient({
-      accountId: 'account-1',
-      sessionId: 'session-1',
-      setlistId: 'setlist-1',
-      setlistDate: '2026-11-01',
-      songId: 'song-1',
-      songCcli: '22025',
-      songIndex: 2,
-      songKey: 'G',
-    })
+  it('has the session and the ids, and never the setlist or the song: those are on the spans about them', () => {
+    setAmbient({ accountId: 'account-1', sessionId: 'session-1', teamPseudoId: 'team-1' })
     const attributes = baselineAttributes()
     expect(attributes).to.include({
       'enduser.pseudo.id': 'account-1',
       'session.id': 'session-1',
-      'chordless.setlist.id': 'setlist-1',
-      'chordless.setlist.date': '2026-11-01',
-      'chordless.song.id': 'song-1',
-      'chordless.song.ccli': '22025',
-      'chordless.song.index': 2,
-      'chordless.song.key': 'G',
+      'chordless.team.pseudo_id': 'team-1',
     })
-    clearSetlist()
-    const after = baselineAttributes()
-    expect(after['enduser.pseudo.id']).to.equal('account-1')
-    for (const key of ['session.id', 'chordless.setlist.id', 'chordless.song.id']) {
-      expect(after).to.not.have.property(key)
+    for (const key of Object.keys(attributes)) {
+      expect(key, 'a background span would seem to be about it').to.not.match(
+        /^chordless\.(setlist|song)\./
+      )
     }
+    setAmbient({ sessionId: undefined })
+    expect(baselineAttributes()).to.not.have.property('session.id')
     expect(getAmbient().sessionId).to.equal(undefined)
   })
 

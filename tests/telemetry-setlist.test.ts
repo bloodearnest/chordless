@@ -13,7 +13,7 @@ import {
 import { goLive } from '../src/js/live.ts'
 import { setTelemetryPreference } from '../src/js/preferences.ts'
 import { baselineAttributes } from '../src/js/telemetry/baseline.ts'
-import { clearSetlist } from '../src/js/telemetry/context.ts'
+import { setAmbient } from '../src/js/telemetry/context.ts'
 import {
   editModeEntered,
   endSetlistSession,
@@ -39,13 +39,13 @@ beforeEach(() => {
     new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
   )
   endSetlistSession()
-  clearSetlist()
+  setAmbient({ sessionId: undefined })
   exporter.reset()
 })
 
 afterEach(() => {
   endSetlistSession()
-  clearSetlist()
+  setAmbient({ sessionId: undefined })
   trace.disable()
   localStorage.clear()
 })
@@ -60,13 +60,7 @@ const opened = (overrides: Partial<SetlistOpened> = {}): SetlistOpened => ({
   ...overrides,
 })
 
-const song = (index: number, overrides: Partial<SongInView> = {}): SongInView => ({
-  songId: `song-${index}`,
-  ccli: `ccli-${index}`,
-  index,
-  key: 'G',
-  ...overrides,
-})
+const song = (index: number): SongInView => ({ songId: `song-${index}`, index })
 
 const spans = () => exporter.getFinishedSpans()
 const named = (name: string) => spans().filter(span => span.name === name)
@@ -76,15 +70,17 @@ describe('opening a setlist', () => {
     startSetlistSession(opened())
     const [span] = named('chordless.setlist.open')
     expect(span.attributes).to.include({
+      'chordless.setlist.id': 'setlist-1',
+      'chordless.setlist.date': '2026-11-01',
       'chordless.setlist.songs': 3,
       'chordless.setlist.ccli': '22025,7062207',
       'chordless.setlist.source': 'library',
       'chordless.setlist.open_ms': 123,
     })
+    // (the session is on every span after, the setlist is not: a background sync is not about it)
     const attributes = baselineAttributes()
     expect(attributes['session.id']).to.match(/^[0-9a-f-]{36}$/)
-    expect(attributes['chordless.setlist.id']).to.equal('setlist-1')
-    expect(attributes['chordless.setlist.date']).to.equal('2026-11-01')
+    expect(attributes).to.not.have.property('chordless.setlist.id')
   })
 
   it('is a new session each time, and says so of one received by link', () => {
@@ -120,40 +116,27 @@ describe('opening a setlist', () => {
 })
 
 describe('the song in view', () => {
-  it('is on every span, and goes when the overview is shown', () => {
+  it('is on no span: only counted, for the setlist’s leave span', () => {
     startSetlistSession(opened())
-    songShown(song(1, { key: 'A' }))
-    expect(baselineAttributes()).to.include({
-      'chordless.song.id': 'song-1',
-      'chordless.song.ccli': 'ccli-1',
-      'chordless.song.index': 1,
-      'chordless.song.key': 'A',
-    })
-    songShown(null)
-    for (const key of ['chordless.song.id', 'chordless.song.ccli', 'chordless.song.key']) {
-      expect(baselineAttributes()).to.not.have.property(key)
-    }
-    expect(baselineAttributes()['session.id']).to.be.a('string')
-  })
-
-  it('has no ccli when the song has none, and the key it is transposed to', () => {
-    startSetlistSession(opened())
-    songShown(song(0, { ccli: null }))
-    expect(baselineAttributes()).to.not.have.property('chordless.song.ccli')
-    songTransposed('D')
-    expect(baselineAttributes()['chordless.song.key']).to.equal('D')
+    songShown(song(1))
+    const attributes = baselineAttributes()
+    expect(attributes).to.not.have.property('chordless.song.id')
+    expect(attributes).to.not.have.property('chordless.song.key')
   })
 
   it('is not told of before there is a session, or after it', () => {
     songShown(song(0))
-    songTransposed('E')
+    songTransposed()
     editModeEntered()
-    expect(baselineAttributes()).to.not.have.property('chordless.song.id')
     startSetlistSession(opened())
     songShown(song(0))
     endSetlistSession()
-    expect(baselineAttributes()).to.not.have.property('chordless.song.id')
     expect(baselineAttributes()).to.not.have.property('session.id')
+    // (nothing was counted into a session that was not there)
+    const [leave] = named('chordless.setlist.leave')
+    expect(leave.attributes['chordless.setlist.songs_viewed']).to.equal(1)
+    expect(leave.attributes['chordless.setlist.transposes']).to.equal(0)
+    expect(leave.attributes['chordless.setlist.edit_entries']).to.equal(0)
   })
 })
 
@@ -166,8 +149,8 @@ describe('leaving a setlist', () => {
     songShown(null)
     songShown(song(1))
     songShown(song(2))
-    songTransposed('F')
-    songTransposed('G')
+    songTransposed()
+    songTransposed()
     editModeEntered()
     endSetlistSession()
     const [leave] = named('chordless.setlist.leave')
@@ -178,6 +161,11 @@ describe('leaving a setlist', () => {
       'chordless.setlist.edit_entries': 1,
     })
     expect(leave.attributes['chordless.setlist.session_ms']).to.be.a('number')
+    // (the setlist is named on the leave span, which is about it)
+    expect(leave.attributes).to.include({
+      'chordless.setlist.id': 'setlist-1',
+      'chordless.setlist.date': '2026-11-01',
+    })
   })
 
   it('happens when the page is closed, once', () => {

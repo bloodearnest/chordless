@@ -275,14 +275,7 @@ export class SetlistPage {
   /** What song is in view, for the session's reports (docs/OBSERVABILITY.md) */
   _reportSong() {
     const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
-    songShown(
-      song && {
-        songId: song.songId,
-        ccli: song._canonicalSong?.ccliNumber ?? null,
-        index: song.songIndex,
-        key: song.currentKey,
-      }
-    )
+    songShown(song && { songId: song.songId, index: song.songIndex })
   }
 
   /** How far each song (and the overview) is scrolled, to put back if the user returns */
@@ -1131,7 +1124,7 @@ export class SetlistPage {
     const song = this.songs[this.currentSongIndex]
     song.currentKey = newKey
     const index = this.currentSongIndex
-    songTransposed(newKey)
+    songTransposed()
     await this._saveSongSetting(song, model => model.setKey(newKey), { keyValue: newKey })
 
     // Re-render the song with transposition

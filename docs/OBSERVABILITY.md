@@ -8,8 +8,8 @@ environments and keys are Terraform (`infra/honeycomb/`); the Worker's secret is
 
 **Status:** designed, being built in steps (below). Built so far: the Worker's own traces to Honeycomb
 (step 1, live since 2026-10-27), the Worker's telemetry route (step 2, live 2026-10-28) and the page's
-SDK (step 3, live 2026-10-28), then the setlist session with its two spans, the song in view on every
-span, and the Support ID in Preferences (step 4a, below). Still to do (step 4b and c): the account and
+SDK (step 3, live 2026-10-28), then the setlist session with its two spans and the Support ID in
+Preferences (step 4a, below). Still to do (step 4b and c): the account and
 team ids kept in synced data, and the live-update latency.
 
 ## Decisions
@@ -70,10 +70,12 @@ on whichever of those spans encloses it.
 **On every browser span**, stamped when it starts by one span processor from a small in-memory store
 (not as resource attributes, because they change: sign-in, a reset, switching space): `device.id`,
 `enduser.pseudo.id` (signed in), `chordless.team.pseudo_id` (a team space), `chordless.space_kind`;
-in a setlist, `session.id`, `chordless.setlist.id` and `chordless.setlist.date`; for the current
-song, `chordless.song.id`, `.ccli`, `.index` and `.key` (the displayed key); and
+in a setlist, `session.id` (so a sync or an error during it joins it); and
 `chordless.route` (the template, not the URL), `chordless.live`, `chordless.online`,
-`chordless.display_mode`. Resource attributes: `service.name` (`chordless-web`), `service.version`,
+`chordless.display_mode`. **Not the setlist or the song in view** (decided 2026-10-28): they would
+make a background sync look as if it were about the song on screen. A span that is about them names
+them itself (`chordless.setlist.id`, `.date` on the open and leave spans); a song-specific span,
+when there is one, adds `chordless.song.*` itself. Resource attributes: `service.name` (`chordless-web`), `service.version`,
 `deployment.environment.name`, `user_agent.original` (the browser and device mix: the app targets
 older devices).
 
@@ -283,14 +285,13 @@ idle, only if reports are on, and again when they are turned on.
 
 `src/js/telemetry/setlist-session.ts`, called from `SetlistPage`. When a setlist has loaded
 (`start()`), `startSetlistSession` makes the session id (a UUID, or while live
-`<device>-live-<startedAt>`, so a reload mid-service stays one session), puts it and the setlist's
-id and date where every span gets them (`context.ts`), and records `chordless.setlist.open`:
-`chordless.setlist.songs`, `.ccli` (comma-joined), `.source` (`library` or `share`) and `.open_ms`.
-`dispose()` and `pagehide` end it with `chordless.setlist.leave`: `.session_ms`, `.songs_viewed`,
-`.song_changes` (a different song or the overview, not a re-render of the same one), `.transposes`
-and `.edit_entries`. The song in view (`chordless.song.id`, `.ccli`, `.index`, `.key` after
-transposing) is on every span until another is shown or the overview is. The `pagehide` listener is
-a capturing one, so the leave span is made before the SDK's own flush on pagehide sends it.
+`<device>-live-<startedAt>`, so a reload mid-service stays one session), puts it where
+every span gets it (`context.ts`), and records `chordless.setlist.open`: `chordless.setlist.id` and
+`.date`, `.songs`, `.ccli` (comma-joined), `.source` (`library` or `share`) and `.open_ms`.
+`dispose()` and `pagehide` end it with `chordless.setlist.leave`: the setlist's id and date again,
+`.session_ms`, `.songs_viewed`, `.song_changes` (a different song or the overview, not a re-render
+of the same one), `.transposes` and `.edit_entries`. The song in view is only counted, for those:
+no span carries it. The `pagehide` listener is a capturing one, so the leave span is made before the SDK's own flush on pagehide sends it.
 Both spans are made and ended at once: a span held open for the length of a setlist would be
 invisible until it ended, and lost with the tab.
 
