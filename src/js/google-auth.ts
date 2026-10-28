@@ -37,7 +37,7 @@ import {
   answerAuthMessage,
 } from './auth-messages.ts'
 import { jwtClaims } from './base64url.ts'
-import { traced } from './telemetry/telemetry.ts'
+import { timedFetch, traced } from './telemetry/telemetry.ts'
 import { errorMessage } from './utils/errors.ts'
 
 /** The signed-in user, as the UI shows them */
@@ -399,15 +399,23 @@ function refreshTokens(
   existingMetadata: AuthMetadata
 ): Promise<AuthMetadata & { access_token: string }> {
   // (a span of its own, for how long the Worker takes and whether a sign-in has expired)
-  return traced('chordless.auth.refresh', {}, () => requestNewTokens(blob, existingMetadata))
+  return traced('chordless.auth.refresh', {}, span =>
+    requestNewTokens(
+      blob,
+      existingMetadata,
+      // (the request is a child of this span, and sends its traceparent: the Worker's is its child)
+      timedFetch('worker', undefined, () => span)
+    )
+  )
 }
 
 async function requestNewTokens(
   blob: string,
-  existingMetadata: AuthMetadata
+  existingMetadata: AuthMetadata,
+  send: typeof fetch
 ): Promise<AuthMetadata & { access_token: string }> {
   // Call auth proxy to refresh (no ID token needed - blob proves ownership)
-  const response = await fetch(`${AUTH_PROXY_URL}/session/refresh`, {
+  const response = await send(`${AUTH_PROXY_URL}/session/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ blob }),
