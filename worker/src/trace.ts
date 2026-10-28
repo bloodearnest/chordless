@@ -8,10 +8,10 @@
  */
 
 import {
+  defaultTextMapGetter,
   ROOT_CONTEXT,
   SpanKind,
   SpanStatusCode,
-  type TextMapGetter,
   trace,
 } from '@opentelemetry/api'
 import { type ExportResult, ExportResultCode, W3CTraceContextPropagator } from '@opentelemetry/core'
@@ -40,12 +40,6 @@ interface CloudflareProperties {
   region?: string
   city?: string
   timezone?: string
-}
-
-/** Reads a header of a request for the propagator */
-const headerGetter: TextMapGetter<Headers> = {
-  keys: headers => [...headers.keys()],
-  get: (headers, key) => headers.get(key) ?? undefined,
 }
 
 const propagator = new W3CTraceContextPropagator()
@@ -100,7 +94,14 @@ export async function withWorkerSpan(
   run: () => Promise<Response>
 ): Promise<Response> {
   // The caller's trace context, as the W3C propagator reads it (an unsampled trace is not recorded: the sampler follows the parent)
-  const parent = propagator.extract(ROOT_CONTEXT, request.headers, headerGetter)
+  const parent = propagator.extract(
+    ROOT_CONTEXT,
+    {
+      traceparent: request.headers.get('traceparent') ?? undefined,
+      tracestate: request.headers.get('tracestate') ?? undefined,
+    },
+    defaultTextMapGetter
+  )
   const parentSpan = trace.getSpanContext(parent)
   if (!parentSpan || !env.OTLP_ENDPOINT?.startsWith('https://') || !env.OTLP_HEADERS) return run()
 
