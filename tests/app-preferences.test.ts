@@ -1,6 +1,10 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import type { AppPreferences } from '../src/components/app-preferences.ts'
-import { KeepAwakeLimitEvent, KeepAwakePreferenceEvent } from '../src/js/preferences.ts'
+import {
+  KeepAwakeLimitEvent,
+  KeepAwakePreferenceEvent,
+  TelemetryPreferenceEvent,
+} from '../src/js/preferences.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../src/js/wake-lock.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import '../src/components/app-preferences.ts'
@@ -18,6 +22,7 @@ const KEYS = [
   'enabled_capo',
   'keep_screen_awake',
   'keep_awake_minutes',
+  'telemetry',
 ]
 
 describe('app-preferences', () => {
@@ -72,6 +77,7 @@ describe('app-preferences', () => {
         ['#toggle-use-nashville', 'use-nashville', '1'],
         ['#toggle-unicode-accidentals', 'use-unicode-accidentals', '1'],
         ['#toggle-keep-awake', 'keep_screen_awake', 'false'],
+        ['#toggle-telemetry', 'telemetry', 'false'],
       ] as const) {
         control<HTMLInputElement>(el, id).click()
         expect(localStorage.getItem(key), id).to.equal(value)
@@ -99,6 +105,17 @@ describe('app-preferences', () => {
       el.remove()
       window.dispatchEvent(new KeepAwakePreferenceEvent(true))
       expect(el.keepAwake).to.equal(false)
+    })
+
+    it('shows the usage reports as on until turned off, and follows a change made elsewhere', async () => {
+      const el = await show()
+      expect(control<HTMLInputElement>(el, '#toggle-telemetry').checked).to.equal(true)
+      window.dispatchEvent(new TelemetryPreferenceEvent(false))
+      await el.updateComplete
+      expect(control<HTMLInputElement>(el, '#toggle-telemetry').checked).to.equal(false)
+      el.remove()
+      window.dispatchEvent(new TelemetryPreferenceEvent(true))
+      expect(el.telemetry).to.equal(false)
     })
 
     it('draws again when the wake lock changes', async () => {

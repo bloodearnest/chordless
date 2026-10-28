@@ -249,3 +249,37 @@ describe('preferences', () => {
     })
   })
 })
+
+describe('the usage reports preference', () => {
+  beforeEach(() => localStorage.removeItem('telemetry'))
+  afterEach(() => localStorage.removeItem('telemetry'))
+
+  it('is on until it is turned off', async () => {
+    const { getTelemetryPreference, setTelemetryPreference } = await import(
+      '../src/js/preferences.ts'
+    )
+    expect(getTelemetryPreference()).to.equal(true)
+    setTelemetryPreference(false)
+    expect(getTelemetryPreference()).to.equal(false)
+    expect(localStorage.getItem('telemetry')).to.equal('false')
+    setTelemetryPreference(true)
+    expect(getTelemetryPreference()).to.equal(true)
+  })
+
+  it('says when it changes, on the window', async () => {
+    const { setTelemetryPreference, TelemetryPreferenceEvent } = await import(
+      '../src/js/preferences.ts'
+    )
+    const seen: boolean[] = []
+    const listener = (event: Event) =>
+      seen.push((event as InstanceType<typeof TelemetryPreferenceEvent>).enabled)
+    window.addEventListener(TelemetryPreferenceEvent.type, listener)
+    try {
+      setTelemetryPreference(false)
+      setTelemetryPreference(true)
+    } finally {
+      window.removeEventListener(TelemetryPreferenceEvent.type, listener)
+    }
+    expect(seen).to.deep.equal([false, true])
+  })
+})

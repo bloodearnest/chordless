@@ -5,6 +5,7 @@ import {
   getKeepAwakeMinutes,
   getKeepAwakePreference,
   getMusicianType,
+  getTelemetryPreference,
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
   KEEP_AWAKE_LIMITS,
@@ -15,8 +16,10 @@ import {
   setKeepAwakeMinutes,
   setKeepAwakePreference,
   setMusicianType,
+  setTelemetryPreference,
   setUseNashvilleNumbers,
   setUseUnicodeAccidentals,
+  TelemetryPreferenceEvent,
 } from '../js/preferences.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../js/wake-lock.ts'
 import './theme-settings.ts'
@@ -39,6 +42,7 @@ export class AppPreferences extends LitElement {
     capoEnabled: { type: Boolean, attribute: false },
     keepAwake: { type: Boolean, attribute: false },
     keepAwakeMinutes: { type: Number, attribute: false },
+    telemetry: { type: Boolean, attribute: false },
   }
 
   declare useNashville: boolean
@@ -47,6 +51,7 @@ export class AppPreferences extends LitElement {
   declare capoEnabled: boolean
   declare keepAwake: boolean
   declare keepAwakeMinutes: number
+  declare telemetry: boolean
 
   static override styles = [
     panelStyles,
@@ -149,6 +154,7 @@ export class AppPreferences extends LitElement {
     this.capoEnabled = getCapoPreference()
     this.keepAwake = getKeepAwakePreference()
     this.keepAwakeMinutes = getKeepAwakeMinutes()
+    this.telemetry = getTelemetryPreference()
   }
 
   override connectedCallback() {
@@ -157,14 +163,17 @@ export class AppPreferences extends LitElement {
     // The menu's modal outlives each visit, and the setting can change elsewhere meanwhile
     window.addEventListener(KeepAwakePreferenceEvent.type, this._onKeepAwakeChanged)
     window.addEventListener(KeepAwakeLimitEvent.type, this._onKeepAwakeLimitChanged)
+    window.addEventListener(TelemetryPreferenceEvent.type, this._onTelemetryChanged)
     this.keepAwake = getKeepAwakePreference()
     this.keepAwakeMinutes = getKeepAwakeMinutes()
+    this.telemetry = getTelemetryPreference()
   }
 
   override disconnectedCallback() {
     window.removeEventListener(WakeLockStateEvent.type, this._onWakeLockState)
     window.removeEventListener(KeepAwakePreferenceEvent.type, this._onKeepAwakeChanged)
     window.removeEventListener(KeepAwakeLimitEvent.type, this._onKeepAwakeLimitChanged)
+    window.removeEventListener(TelemetryPreferenceEvent.type, this._onTelemetryChanged)
     super.disconnectedCallback()
   }
 
@@ -176,6 +185,10 @@ export class AppPreferences extends LitElement {
 
   _onKeepAwakeLimitChanged = (event: KeepAwakeLimitEvent): void => {
     this.keepAwakeMinutes = event.minutes
+  }
+
+  _onTelemetryChanged = (event: TelemetryPreferenceEvent): void => {
+    this.telemetry = event.enabled
   }
 
   /** A limit in words: "15 minutes", "1 hour", "2 hours" */
@@ -348,6 +361,26 @@ export class AppPreferences extends LitElement {
         </div>
 
         <div class="panel">
+          <h3>Usage reports</h3>
+          <p>
+            Chordless sends anonymous reports of how it runs (how long a sync took, what failed) so
+            problems can be found and fixed. They carry a random id for this device, never your
+            name or email, and are kept for 60 days.
+            <a href="/privacy.html#reports" rel="external">What is sent</a>
+          </p>
+          <label class="toggle" for="toggle-telemetry">
+            <input
+              type="checkbox"
+              id="toggle-telemetry"
+              name="usage-reports"
+              ?checked=${this.telemetry}
+              @change=${this._onTelemetryToggle}
+            />
+            <span>Send anonymous usage reports</span>
+          </label>
+        </div>
+
+        <div class="panel">
           <h3>Screen and live mode</h3>
           <p>
             Keep the screen from turning off while a setlist is open, and on any page while you
@@ -438,6 +471,12 @@ export class AppPreferences extends LitElement {
     const value = (event.currentTarget as HTMLInputElement).checked
     this.useUnicodeAccidentals = value
     setUseUnicodeAccidentals(value)
+  }
+
+  _onTelemetryToggle(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).checked
+    this.telemetry = value
+    setTelemetryPreference(value)
   }
 
   _onKeepAwakeToggle(event: Event): void {
