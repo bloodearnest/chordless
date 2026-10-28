@@ -16,6 +16,7 @@ import {
   isSyncAvailable,
   SyncManager,
 } from './sync-manager.ts'
+import { traced } from './telemetry/telemetry.ts'
 import { toast } from './toast.ts'
 import { setlistTitle } from './utils/date-utils.ts'
 import { errorMessage } from './utils/errors.ts'
@@ -139,26 +140,35 @@ export class SyncOrchestrator {
       progress: (progress: SyncProgress) => void
     ) => Promise<unknown>
   ): Promise<{ success: true }> {
-    if (!this.syncManager) await this.init()
-    const syncManager = this.syncManager as SyncManager
-    const send = (progress: SyncProgress) =>
-      progressCallback?.({ ...progress, timestamp: new Date().toISOString() })
+    // One span for the whole operation: how long, what it was, how it ended, and the calls made
+    // to Drive and the Worker meanwhile, counted on it (docs/OBSERVABILITY.md)
+    return traced(
+      'chordless.sync.run',
+      { 'chordless.sync.operation': name },
+      async () => {
+        if (!this.syncManager) await this.init()
+        const syncManager = this.syncManager as SyncManager
+        const send = (progress: SyncProgress) =>
+          progressCallback?.({ ...progress, timestamp: new Date().toISOString() })
 
-    try {
-      if (messages.starting) send({ stage: 'starting', message: messages.starting })
-      await operation(syncManager, send)
-      if (messages.complete) send({ stage: 'complete', message: messages.complete })
-      return { success: true }
-    } catch (error) {
-      console.error(`[SyncOrchestrator] ${name} failed:`, error)
-      progressCallback?.({
-        stage: 'error',
-        message: errorMessage(error),
-        error: errorMessage(error),
-        timestamp: new Date().toISOString(),
-      })
-      throw error
-    }
+        try {
+          if (messages.starting) send({ stage: 'starting', message: messages.starting })
+          await operation(syncManager, send)
+          if (messages.complete) send({ stage: 'complete', message: messages.complete })
+          return { success: true } as const
+        } catch (error) {
+          console.error(`[SyncOrchestrator] ${name} failed:`, error)
+          progressCallback?.({
+            stage: 'error',
+            message: errorMessage(error),
+            error: errorMessage(error),
+            timestamp: new Date().toISOString(),
+          })
+          throw error
+        }
+      },
+      { trackCalls: true }
+    )
   }
 
   /**

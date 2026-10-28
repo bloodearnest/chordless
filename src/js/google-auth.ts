@@ -37,6 +37,7 @@ import {
   answerAuthMessage,
 } from './auth-messages.ts'
 import { jwtClaims } from './base64url.ts'
+import { traced } from './telemetry/telemetry.ts'
 import { errorMessage } from './utils/errors.ts'
 
 /** The signed-in user, as the UI shows them */
@@ -393,7 +394,15 @@ function idTokenEnd(idToken: string): number {
  * @param blob - Encrypted JWE blob containing refresh token
  * @returns The stored metadata, with the new tokens
  */
-async function refreshTokens(
+function refreshTokens(
+  blob: string,
+  existingMetadata: AuthMetadata
+): Promise<AuthMetadata & { access_token: string }> {
+  // (a span of its own, for how long the Worker takes and whether a sign-in has expired)
+  return traced('chordless.auth.refresh', {}, () => requestNewTokens(blob, existingMetadata))
+}
+
+async function requestNewTokens(
   blob: string,
   existingMetadata: AuthMetadata
 ): Promise<AuthMetadata & { access_token: string }> {
