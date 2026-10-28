@@ -1,20 +1,16 @@
 /**
- * What the app knows of where it is, for the reports to carry (docs/OBSERVABILITY.md, "On every
- * browser span"): the setlist and song in view, the session, and the ids. Kept in memory and read
- * as each span starts, so no call site has to remember to add them. It is not trace context: a
- * browser has no async context, and these are the app's state, not a span's parent.
+ * What the app knows of itself, for every report to carry (docs/OBSERVABILITY.md, "On every
+ * browser span"): the session a report happened in, and the ids. Kept in memory and read as each
+ * span starts, so no call site has to remember to add them. It is not trace context: a browser has
+ * no async context, and these are the app's state, not a span's parent.
+ *
+ * The setlist and the song in view are not here: a background sync would seem to be about the song
+ * on screen. A span that is about them says so itself (setlist-session.ts).
  */
 
 export interface Ambient {
   /** A setlist session: made when a setlist opens, gone when it is left */
   sessionId?: string
-  setlistId?: string
-  setlistDate?: string
-  songId?: string
-  songCcli?: string
-  songIndex?: number
-  /** The key the song is shown in, after transposing: never its title */
-  songKey?: string
   spaceKind?: string
   /** Random ids kept in the person's own synced data, never derived from who they are */
   accountId?: string
@@ -31,20 +27,4 @@ export function setAmbient(patch: Ambient): void {
   for (const key of Object.keys(ambient) as (keyof Ambient)[]) {
     if (ambient[key] === undefined) delete ambient[key]
   }
-}
-
-const SETLIST_KEYS = [
-  'sessionId',
-  'setlistId',
-  'setlistDate',
-  'songId',
-  'songCcli',
-  'songIndex',
-  'songKey',
-] as const satisfies (keyof Ambient)[]
-
-/** Forget what is known of a setlist and its song (it was left), keeping the rest */
-export function clearSetlist(): void {
-  ambient = { ...ambient }
-  for (const key of SETLIST_KEYS) delete ambient[key]
 }
