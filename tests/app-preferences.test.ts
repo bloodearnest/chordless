@@ -23,6 +23,7 @@ const KEYS = [
   'keep_screen_awake',
   'keep_awake_minutes',
   'telemetry',
+  'telemetry-device-id',
 ]
 
 describe('app-preferences', () => {
@@ -116,6 +117,51 @@ describe('app-preferences', () => {
       el.remove()
       window.dispatchEvent(new TelemetryPreferenceEvent(true))
       expect(el.telemetry).to.equal(false)
+    })
+
+    it('shows the start of this device’s report id, which Reset replaces, and not while reports are off', async () => {
+      const el = await show()
+      const id = el.shadowRoot?.querySelector('#support-id')?.textContent ?? ''
+      expect(id).to.match(/^[0-9a-f]{8}$/)
+      expect(localStorage.getItem('telemetry-device-id')?.startsWith(id)).to.equal(true)
+
+      control<HTMLButtonElement>(el, '#reset-support-id').click()
+      await el.updateComplete
+      const after = el.shadowRoot?.querySelector('#support-id')?.textContent ?? ''
+      expect(after).to.match(/^[0-9a-f]{8}$/)
+      expect(after).to.not.equal(id)
+
+      control<HTMLInputElement>(el, '#toggle-telemetry').click()
+      await el.updateComplete
+      expect(el.shadowRoot?.querySelector('#support-id')).to.equal(null)
+    })
+
+    it('copies the id, and carries on if the browser will not', async () => {
+      const el = await show()
+      const written: string[] = []
+      const real = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: async (text: string) => void written.push(text) },
+      })
+      try {
+        control<HTMLButtonElement>(el, '#copy-support-id').click()
+        await el.updateComplete
+        expect(written).to.deep.equal([el.supportId])
+        Object.defineProperty(navigator, 'clipboard', {
+          configurable: true,
+          value: {
+            writeText: async () => {
+              throw new Error('refused')
+            },
+          },
+        })
+        control<HTMLButtonElement>(el, '#copy-support-id').click()
+        await el.updateComplete
+      } finally {
+        if (real) Object.defineProperty(navigator, 'clipboard', real)
+        else delete (navigator as unknown as Record<string, unknown>).clipboard
+      }
     })
 
     it('draws again when the wake lock changes', async () => {

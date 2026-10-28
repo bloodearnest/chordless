@@ -21,6 +21,7 @@ import {
   setUseUnicodeAccidentals,
   TelemetryPreferenceEvent,
 } from '../js/preferences.ts'
+import { getDeviceId, resetDeviceId } from '../js/telemetry/ids.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../js/wake-lock.ts'
 import './theme-settings.ts'
 import { buttonStyles, panelStyles, statusStyles } from './shared-styles.ts'
@@ -43,6 +44,7 @@ export class AppPreferences extends LitElement {
     keepAwake: { type: Boolean, attribute: false },
     keepAwakeMinutes: { type: Number, attribute: false },
     telemetry: { type: Boolean, attribute: false },
+    supportId: { type: String, attribute: false },
   }
 
   declare useNashville: boolean
@@ -52,6 +54,8 @@ export class AppPreferences extends LitElement {
   declare keepAwake: boolean
   declare keepAwakeMinutes: number
   declare telemetry: boolean
+  /** The start of this device's id for the usage reports, to read out to whoever is helping; '' when they are off */
+  declare supportId: string
 
   static override styles = [
     panelStyles,
@@ -155,6 +159,7 @@ export class AppPreferences extends LitElement {
     this.keepAwake = getKeepAwakePreference()
     this.keepAwakeMinutes = getKeepAwakeMinutes()
     this.telemetry = getTelemetryPreference()
+    this.supportId = this._supportIdNow()
   }
 
   override connectedCallback() {
@@ -167,6 +172,7 @@ export class AppPreferences extends LitElement {
     this.keepAwake = getKeepAwakePreference()
     this.keepAwakeMinutes = getKeepAwakeMinutes()
     this.telemetry = getTelemetryPreference()
+    this.supportId = this._supportIdNow()
   }
 
   override disconnectedCallback() {
@@ -189,6 +195,26 @@ export class AppPreferences extends LitElement {
 
   _onTelemetryChanged = (event: TelemetryPreferenceEvent): void => {
     this.telemetry = event.enabled
+    this.supportId = this._supportIdNow()
+  }
+
+  /** The first part of this device's report id: enough to find its reports, and short to say */
+  _supportIdNow(): string {
+    return getTelemetryPreference() ? (getDeviceId()?.slice(0, 8) ?? '') : ''
+  }
+
+  async _copySupportId(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.supportId)
+    } catch {
+      // (the id is on screen to read out: copying is a convenience)
+    }
+  }
+
+  /** A new id, which nothing links to the old one */
+  _resetSupportId(): void {
+    resetDeviceId()
+    this.supportId = this._supportIdNow()
   }
 
   /** A limit in words: "15 minutes", "1 hour", "2 hours" */
@@ -378,6 +404,22 @@ export class AppPreferences extends LitElement {
             />
             <span>Send anonymous usage reports</span>
           </label>
+          ${
+            this.supportId
+              ? html`<p class="support-id">
+                  Support ID: <code id="support-id">${this.supportId}</code>
+                  <button type="button" id="copy-support-id" @click=${this._copySupportId}>
+                    Copy
+                  </button>
+                  <button type="button" id="reset-support-id" @click=${this._resetSupportId}>
+                    Reset
+                  </button>
+                </p>
+                <p>
+                  If you ask for help, this is how your reports are found. Reset makes a new one.
+                </p>`
+              : ''
+          }
         </div>
 
         <div class="panel">
