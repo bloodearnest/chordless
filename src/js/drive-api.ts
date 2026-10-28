@@ -4,6 +4,7 @@
  */
 import { createDriveApi } from './drive-client.ts'
 import * as GoogleAuth from './google-auth.ts'
+import { timedFetch } from './telemetry/telemetry.ts'
 
 export { allDrivesUrl } from './drive-client.ts'
 
@@ -18,7 +19,11 @@ export function setAccessTokenProvider(provider?: AccessTokenProvider | null) {
 }
 
 /** The operations, read through `getAccessToken` at each call so a replaced provider is used */
-export const driveApi = createDriveApi({ getAccessToken: () => getAccessToken() })
+// (its calls are counted on the sync running, if there is one: docs/OBSERVABILITY.md)
+export const driveApi = createDriveApi({
+  getAccessToken: () => getAccessToken(),
+  fetch: timedFetch('drive'),
+})
 
 export const {
   countWriteRefusals,

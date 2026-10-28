@@ -9,10 +9,17 @@
  */
 import type { AppToast, ToastOptions } from '../components/app-toast.ts'
 import '../components/app-toast.ts'
+import { reportError } from './telemetry/telemetry.ts'
 
 let element: AppToast | null = null
 
 export function toast(message: string, options: ToastOptions = {}): void {
+  // (a failure the page had no place for: told to the person, and reported)
+  if (options.kind === 'error') {
+    reportError(options.details ? `${message}: ${options.details}` : message, {
+      'chordless.error.toast': true,
+    })
+  }
   if (!element?.isConnected) {
     element = document.createElement('app-toast')
     document.body.append(element)

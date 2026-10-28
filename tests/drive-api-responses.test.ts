@@ -33,6 +33,7 @@ import {
   unpublishFile,
   updateFile,
 } from '../src/js/drive-api.ts'
+import { createDriveApi } from '../src/js/drive-client.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -411,5 +412,24 @@ describe('drive-api, given what Drive answers', () => {
       setAccessTokenProvider(() => Promise.reject('no token'))
       expect(await checkDriveAccess()).to.equal(false)
     })
+  })
+})
+
+describe('a Drive API made without a fetch of its own (the real-Drive tests make one)', () => {
+  it('uses the global fetch, read at each call, so a test can replace it', async () => {
+    const real = window.fetch
+    const asked: string[] = []
+    window.fetch = (async (input: RequestInfo | URL) => {
+      asked.push(String(input))
+      return new Response(JSON.stringify({ id: 'f1', name: 'file' }), { status: 200 })
+    }) as typeof fetch
+    try {
+      const api = createDriveApi({ getAccessToken: async () => 'token' })
+      const file = await api.getFile('f1')
+      expect(file?.id).to.equal('f1')
+      expect(asked[0]).to.contain('/files/f1')
+    } finally {
+      window.fetch = real
+    }
   })
 })

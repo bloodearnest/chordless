@@ -42,6 +42,8 @@ void maybeShowFirstUseSetup()
 if ('requestIdleCallback' in window)
   requestIdleCallback(() => startMediaPlayer(), { timeout: 3000 })
 else setTimeout(startMediaPlayer, 1000)
+// Anonymous usage reports, if they are on (docs/OBSERVABILITY.md): the SDK loads now the page is idle
+import('./telemetry/start.ts').then(({ initTelemetry }) => initTelemetry())
 // Setlists shared by link are kept only until they end (their songs stay)
 import('./share-receiver.ts').then(({ tidySharedWithMe }) => tidySharedWithMe())
 // Whether the user can write to the space's Drive folder (a sync asks too)

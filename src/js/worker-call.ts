@@ -15,6 +15,8 @@ export class TeamError extends Error {
   }
 }
 
+import { timedFetch, traceparent } from './telemetry/telemetry.ts'
+
 export interface WorkerCall {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   /** From the origin: `/api/...` */
@@ -56,7 +58,10 @@ export async function callWorker(
   const token = await connection.token()
   const headers: Record<string, string> = { Authorization: `Bearer ${token}` }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
-  const response = await connection.fetch(url, {
+  // (so the Worker's span is in the trace of the sync this call is part of, if there is one)
+  const parent = traceparent()
+  if (parent) headers.traceparent = parent
+  const response = await timedFetch('worker', connection.fetch)(url, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
