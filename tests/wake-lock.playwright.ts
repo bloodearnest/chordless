@@ -64,7 +64,9 @@ test('a setlist keeps the screen awake, and leaving it lets go', async ({ page }
   await expect.poll(() => log(page)).toMatchObject({ released: 1 })
 })
 
-test('the library and the home page do not ask for the screen', async ({ page }) => {
+test('the library and the home page do not ask for the screen', { tag: '@logic' }, async ({
+  page,
+}) => {
   await openApp(page, '/')
   await openApp(page, '/songs')
   expect(await log(page)).toMatchObject({ requested: 0 })
@@ -147,7 +149,9 @@ test('there is no time limit on mains power', async ({ page }) => {
   await expect(status).not.toContainText('no touch for')
 })
 
-test('turning it off in Preferences stops a setlist from asking', async ({ page }) => {
+test('turning it off in Preferences stops a setlist from asking', { tag: '@logic' }, async ({
+  page,
+}) => {
   await seedSetlist(page)
   await page.goto('/preferences')
   await page
@@ -159,7 +163,9 @@ test('turning it off in Preferences stops a setlist from asking', async ({ page 
   expect(await log(page)).toMatchObject({ requested: 0 })
 })
 
-test("the menu's Preferences modal shows the state of the page under it", async ({ page }) => {
+test("the menu's Preferences modal shows the state of the page under it", {
+  tag: '@logic',
+}, async ({ page }) => {
   await seedSetlist(page)
   await page.goto('/setlist/seeded-setlist')
   await expect.poll(() => log(page)).toMatchObject({ requested: 1 })

@@ -214,7 +214,8 @@ jobs:
           tools: node just
           browser: ${{ matrix.browser }}
       - run: scripts/ci/fake-dev-vars.sh
-      - run: just test-e2e "$BROWSER"
+      # Not the tests tagged @logic: they do not depend on the browser or the platform, and Linux runs them
+      - run: just test-e2e "$BROWSER" --grep-invert @logic
         env:
           BROWSER: ${{ matrix.browser }}
           CHORDLESS_WORKERS: ${{ matrix.workers }}

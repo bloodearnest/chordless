@@ -1,7 +1,9 @@
 // The title of a setlist's page (the window's, in an installed app): its date, and its name
 import { expect, fromDB, seedSetlist, test } from './fixtures.ts'
 
-test("a setlist's title is its date, and its name when it has one", async ({ page }) => {
+test("a setlist's title is its date, and its name when it has one", { tag: '@logic' }, async ({
+  page,
+}) => {
   await seedSetlist(page)
   await page.goto('/setlist/seeded-setlist')
   await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
@@ -25,9 +27,9 @@ test("a setlist's title is its date, and its name when it has one", async ({ pag
   expect((await fromDB(page, 'getSetlist', 'seeded-setlist')).name).toBe('Easter Sunday')
 })
 
-test('other pages have their own titles, and leaving a setlist drops its title', async ({
-  page,
-}) => {
+test('other pages have their own titles, and leaving a setlist drops its title', {
+  tag: '@logic',
+}, async ({ page }) => {
   await seedSetlist(page)
   await page.goto('/setlist/seeded-setlist')
   await expect(page).toHaveTitle(/^Sun,? 11 Oct - Chordless$/)

@@ -6,7 +6,9 @@ import { expect, openApp, seedSetlist, test } from './fixtures.ts'
 const READ_ONLY_KEY = 'current-space-read-only'
 
 test.describe('A space the user can only read', () => {
-  test('still creates, imports and edits, and offers no share link', async ({ page }) => {
+  test('still creates, imports and edits, and offers no share link', { tag: '@logic' }, async ({
+    page,
+  }) => {
     const url = await seedSetlist(page)
     await openApp(page, '/')
     await page.evaluate(key => localStorage.setItem(key, '1'), READ_ONLY_KEY)

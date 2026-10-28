@@ -251,10 +251,9 @@ storage/sync
   moves them to the Drive trash after confirmation. Would need songs covered too.
 
 ci/cd (docs/CI.md; the infrastructure and deploy tasks are in infra/TODO)
-- the macOS/WebKit and Windows/Edge end-to-end jobs are required now (2026-10-27) and slow (4 to 6
-  minutes, against Linux's 2): run fewer of the tests on them by default (the ones that depend on the
-  browser or the platform: layout, touch, the service worker, storage; not the logic ones), the rest
-  on the weekly run; and fold e2e-linux into the same matrix (it is apart only because a matrix had
+- the macOS/WebKit and Windows/Edge end-to-end jobs skip the tests tagged @logic now (about half; docs/CI.md):
+  run those on the weekly run too (the weekly routine: a macOS and a Windows job with no filter), and fold
+  e2e-linux into the same matrix (it is apart only because a matrix had
   one result for ci-ok, and now they are all required)
 - what ZAP's first baseline found (2026-10-25): no Strict-Transport-Security (HSTS, in infra/TODO),
   then make rule 10035 FAIL in .zap/rules.tsv; no

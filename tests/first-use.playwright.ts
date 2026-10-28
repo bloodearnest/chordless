@@ -59,14 +59,16 @@ test('Escape closes it, as a skip', async ({ page }) => {
   await expect.poll(async () => (await stored(page)).done).toBe('1')
 })
 
-test('a user who already has songs is not asked', async ({ page }) => {
+test('a user who already has songs is not asked', { tag: '@logic' }, async ({ page }) => {
   await seedSong(page)
   await page.reload()
   await expect.poll(async () => (await stored(page)).done).toBe('1')
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
-test('a user who already chose a musician type is not asked', async ({ page }) => {
+test('a user who already chose a musician type is not asked', { tag: '@logic' }, async ({
+  page,
+}) => {
   await page.addInitScript(() => localStorage.setItem('musician_type', 'singer'))
   await openApp(page, '/')
   await expect.poll(async () => (await stored(page)).done).toBe('1')

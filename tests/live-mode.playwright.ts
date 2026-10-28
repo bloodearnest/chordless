@@ -65,7 +65,9 @@ test('Go live from the header: live, kept across pages, and left from the overvi
   expect(await page.evaluate(() => localStorage.getItem('live_state'))).toBeNull()
 })
 
-test('still live after the page is reloaded: the screen is held again', async ({ page }) => {
+test('still live after the page is reloaded: the screen is held again', { tag: '@logic' }, async ({
+  page,
+}) => {
   await seedSetlist(page)
   await page.goto('/setlist/seeded-setlist')
   await page.locator('#live-button').click()
@@ -75,7 +77,7 @@ test('still live after the page is reloaded: the screen is held again', async ({
   await expect.poll(() => log(page)).toMatchObject({ locks: 1 })
 })
 
-test('taking over from another setlist', async ({ page }) => {
+test('taking over from another setlist', { tag: '@logic' }, async ({ page }) => {
   await seedSetlist(page)
   await page.evaluate(() =>
     localStorage.setItem(

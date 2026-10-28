@@ -6,7 +6,10 @@ import { expect, test } from '@playwright/test'
 const DEV_DIR = new URL('../src/dev/', import.meta.url)
 const pages = readdirSync(DEV_DIR).filter(f => f.endsWith('.html') && f !== 'index.html')
 
-test('dev index links to every dev page', () => {
+// The pages that draw, play or measure things run everywhere; the rest only wire up data
+const LOGIC_PAGES = ['db-init.html', 'drive-audit.html', 'info-dialogs.html', 'library-repair.html']
+
+test('dev index links to every dev page', { tag: '@logic' }, () => {
   const index = readFileSync(new URL('index.html', DEV_DIR), 'utf8')
   for (const page of pages) {
     expect(index, `src/dev/index.html should link to ${page}`).toContain(`href="/dev/${page}"`)
@@ -14,7 +17,9 @@ test('dev index links to every dev page', () => {
 })
 
 for (const page of pages) {
-  test(`dev page loads cleanly: ${page}`, async ({ page: browserPage }) => {
+  test(`dev page loads cleanly: ${page}`, {
+    tag: LOGIC_PAGES.includes(page) ? '@logic' : [],
+  }, async ({ page: browserPage }) => {
     const problems: string[] = []
     browserPage.on('pageerror', e => problems.push(`page error: ${e.message}`))
     browserPage.on('console', msg => {

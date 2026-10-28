@@ -60,7 +60,7 @@ test.describe('Help', () => {
     await expect(help).toBeHidden()
   })
 
-  test('a song has its own help', async ({ page }) => {
+  test('a song has its own help', { tag: '@logic' }, async ({ page }) => {
     await page.goto(await seedSetlist(page))
     await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
     await page.keyboard.press('ArrowRight')
@@ -69,7 +69,7 @@ test.describe('Help', () => {
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/help-song.png` })
   })
 
-  test('the library explains finding a song and gesture', async ({ page }) => {
+  test('the library explains finding a song and gesture', { tag: '@logic' }, async ({ page }) => {
     await page.goto('/songs')
     await openHelp(page, 'Help: Song Library')
     const help = page.locator('app-help')
@@ -78,7 +78,7 @@ test.describe('Help', () => {
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/help-library.png` })
   })
 
-  test('a page with no help has no Help item', async ({ page }) => {
+  test('a page with no help has no Help item', { tag: '@logic' }, async ({ page }) => {
     await page.goto('/about')
     await page
       .getByRole('button', { name: /Navigation menu/ })
