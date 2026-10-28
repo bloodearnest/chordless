@@ -45,6 +45,7 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
     live: false,
     state: (initial.state ?? 'feed') as SyncState,
     tickMs: TICK_MS,
+    rejectTickMs: false,
     lastSyncAgo: initial.lastSync === undefined ? 0 : initial.lastSync,
     runs: 0,
     /** What started each sync, in turn */
@@ -70,7 +71,10 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
       world.lastSyncAgo === null ? null : new Date(world.now - world.lastSyncAgo).toISOString(),
     live: () => world.live,
     state: async () => world.state,
-    tickMs: async () => world.tickMs,
+    tickMs: async () => {
+      if (world.rejectTickMs) throw new Error('no space')
+      return world.tickMs
+    },
     run: async trigger => {
       world.runs++
       world.triggers.push(trigger)
@@ -126,6 +130,16 @@ describe('Syncing by itself while the app is open', () => {
     team.world.tick?.()
     await settle()
     expect(team.world.runs).to.equal(2)
+  })
+
+  it('ticks every minute when the space cannot be read for how often to', async () => {
+    const { auto, world } = rig({ state: 'feed' })
+    auto.start()
+    await settle()
+    world.rejectTickMs = true
+    world.tick?.()
+    await settle()
+    expect(world.runs).to.equal(2)
   })
 
   describe('as the page is left', () => {
