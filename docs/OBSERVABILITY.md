@@ -8,8 +8,9 @@ environments and keys are Terraform (`infra/honeycomb/`); the Worker's secret is
 
 **Status:** designed, being built in steps (below). Built so far: the Worker's own traces to Honeycomb
 (step 1, live since 2026-10-27), the Worker's telemetry route (step 2, live 2026-10-28) and the page's
-SDK (step 3, below). Still to do: the setlist session and its two spans, the identity ids and the
-Support ID in the app, and the live-update latency (step 4).
+SDK (step 3, live 2026-10-28), then the setlist session with its two spans, the song in view on every
+span, and the Support ID in Preferences (step 4a, below). Still to do (step 4b and c): the account and
+team ids kept in synced data, and the live-update latency.
 
 ## Decisions
 
@@ -271,12 +272,35 @@ idle, only if reports are on, and again when they are turned on.
 - Preference `telemetry` (Preferences, "Usage reports"; on unless `false`; off where storage cannot be
   read). Turning it off deletes the device id.
 - To see spans without Honeycomb: `localStorage.setItem('telemetry-console', '1')` and reload.
-- Deferred to step 4: the space kind and the team and account ids (the sync span has no
-  `chordless.sync.space_kind` yet), the Support ID, the setlist spans.
+- Deferred: the space kind and the team and account ids (the sync span has no
+  `chordless.sync.space_kind` yet), which come with the ids in synced data.
 - Tests: `tests/telemetry.test.ts` (unit, with an in-memory exporter), `tests/telemetry.playwright.ts`
   (the page's real batch, with the service worker blocked so that Playwright can see the request).
   The unit tests resolve packages as a browser does (`web-test-runner.config.js`): OpenTelemetry has
   a Node and a browser build of some files.
+
+## The setlist session (built, step 4a)
+
+`src/js/telemetry/setlist-session.ts`, called from `SetlistPage`. When a setlist has loaded
+(`start()`), `startSetlistSession` makes the session id (a UUID, or while live
+`<device>-live-<startedAt>`, so a reload mid-service stays one session), puts it and the setlist's
+id and date where every span gets them (`context.ts`), and records `chordless.setlist.open`:
+`chordless.setlist.songs`, `.ccli` (comma-joined), `.source` (`library` or `share`) and `.open_ms`.
+`dispose()` and `pagehide` end it with `chordless.setlist.leave`: `.session_ms`, `.songs_viewed`,
+`.song_changes` (a different song or the overview, not a re-render of the same one), `.transposes`
+and `.edit_entries`. The song in view (`chordless.song.id`, `.ccli`, `.index`, `.key` after
+transposing) is on every span until another is shown or the overview is. The `pagehide` listener is
+a capturing one, so the leave span is made before the SDK's own flush on pagehide sends it.
+Both spans are made and ended at once: a span held open for the length of a setlist would be
+invisible until it ended, and lost with the tab.
+
+The **Support ID** is in Preferences, "Usage reports": the first eight characters of the device
+id, with Copy and Reset (Reset forgets the id; a new one is made at once). It is not shown while
+reports are off. There is no contact form yet to put it in.
+
+Not done, on purpose: the share, import and pad attributes (they would be on a span that encloses them,
+and the setlist spans no longer enclose anything; each becomes a span of its own when the data says it
+is worth one).
 
 ## Steps
 
