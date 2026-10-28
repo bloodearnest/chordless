@@ -39,9 +39,9 @@ const songsList = page =>
   page.getByRole('list', { name: 'Songs', exact: true }).getByRole('listitem')
 const createButton = page => page.getByRole('button', { name: 'Create setlist' })
 
-test('a song the library lacks must be imported from SongSelect first, then the setlist is made', async ({
-  page,
-}) => {
+test('a song the library lacks must be imported from SongSelect first, then the setlist is made', {
+  tag: '@logic',
+}, async ({ page }) => {
   await seedSetlist(page)
   await choose(page, email('Sunday 25th October', LIST, [NEW_PDF]))
 
@@ -108,9 +108,9 @@ test('a song the library lacks must be imported from SongSelect first, then the 
   })
 })
 
-test('the setlist’s details come first, then the songs, with Create below them', async ({
-  page,
-}) => {
+test('the setlist’s details come first, then the songs, with Create below them', {
+  tag: '@logic',
+}, async ({ page }) => {
   await seedSetlist(page)
   await choose(page, email('Sunday 25th October', LIST, [NEW_PDF]))
   await expect(songsList(page)).toHaveCount(4)

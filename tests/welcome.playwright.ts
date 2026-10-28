@@ -2,7 +2,7 @@
 // (the setup modal is answered in first-use.playwright.ts)
 import { expect, openApp, test } from './fixtures.ts'
 
-test('a new user sees the welcome card, not an empty list', async ({ page }) => {
+test('a new user sees the welcome card, not an empty list', { tag: '@logic' }, async ({ page }) => {
   await openApp(page, '/')
   const card = page.locator('welcome-card')
   await expect(card).toBeVisible()
@@ -28,7 +28,7 @@ test('the sample setlist has the four hymns, and the card goes once there is a s
   await expect(page.locator('setlist-group')).toBeVisible()
 })
 
-test('adding the sample twice does not copy its songs', async ({ page }) => {
+test('adding the sample twice does not copy its songs', { tag: '@logic' }, async ({ page }) => {
   await openApp(page, '/')
   await page.locator('welcome-card').getByRole('button', { name: 'Add a sample setlist' }).click()
   await expect(page.locator('setlist-overview song-card')).toHaveCount(4)

@@ -48,7 +48,7 @@ test('after one visit, every view opens with no network', async ({ page, context
   }
 })
 
-test('the files it caches are the files the build made', async ({ page }) => {
+test('the files it caches are the files the build made', { tag: '@logic' }, async ({ page }) => {
   await page.goto('/')
   await waitForServiceWorker(page)
   const { cached, shell } = await page.evaluate(async () => {
@@ -71,9 +71,9 @@ test('the files it caches are the files the build made', async ({ page }) => {
   expect(cached.filter(path => path.startsWith('/help/'))).toEqual([])
 })
 
-test('the security headers are on the page, its deep links and the service worker', async ({
-  request,
-}) => {
+test('the security headers are on the page, its deep links and the service worker', {
+  tag: '@logic',
+}, async ({ request }) => {
   for (const path of ['/', '/songs', '/service-worker.js', '/boot.js', '/floor.js']) {
     const headers = (await request.get(path)).headers()
     expect(headers['content-security-policy'], path).toContain("default-src 'self'")
@@ -96,7 +96,9 @@ async function collectViolations(page) {
   return violations
 }
 
-test('the page has something to paint before any script runs', async ({ request }) => {
+test('the page has something to paint before any script runs', { tag: '@logic' }, async ({
+  request,
+}) => {
   const html = await (await request.get('/')).text()
   expect(html).toContain('class="boot-shell"')
 })
@@ -113,9 +115,9 @@ test('the first visit is controlled by the service worker without a reload, wher
   expect(loads).toBe(1)
 })
 
-test('hashed files can be cached for good, the page and the worker are revalidated', async ({
-  request,
-}) => {
+test('hashed files can be cached for good, the page and the worker are revalidated', {
+  tag: '@logic',
+}, async ({ request }) => {
   const html = await (await request.get('/')).text()
   const asset = must(html.match(/\/assets\/index-[\w-]+\.js/))[0]
   expect((await request.get(asset)).headers()['cache-control']).toContain('immutable')
@@ -124,7 +126,7 @@ test('hashed files can be cached for good, the page and the worker are revalidat
   )
 })
 
-test('robots.txt is a text file, not the app shell', async ({ request }) => {
+test('robots.txt is a text file, not the app shell', { tag: '@logic' }, async ({ request }) => {
   const response = await request.get('/robots.txt')
   expect(response.headers()['content-type']).toContain('text/plain')
   expect(await response.text()).toContain('Disallow: /')
@@ -141,7 +143,9 @@ test('every view runs with no Content-Security-Policy violations', async ({ page
   expect(violations).toEqual([])
 })
 
-test('the real app is named Chordless, not the dev name', async ({ request }) => {
+test('the real app is named Chordless, not the dev name', { tag: '@logic' }, async ({
+  request,
+}) => {
   const manifest = await (await request.get('/manifest.webmanifest')).json()
   expect(manifest.name).toBe('Chordless')
   expect(manifest.short_name).toBe('Chordless')
@@ -174,7 +178,9 @@ test('opening a setlist link works under the Content-Security-Policy', async ({ 
   expect(violations).toEqual([])
 })
 
-test('the build is for the production Google project, and carries nothing of the development one', () => {
+test('the build is for the production Google project, and carries nothing of the development one', {
+  tag: '@logic',
+}, () => {
   const ids = (file: string) =>
     Object.fromEntries(
       readFileSync(file, 'utf8')

@@ -38,7 +38,9 @@ const installNewVersion = page =>
     worker.dispatchEvent(new Event('statechange'))
   })
 
-test('there is no dot or update item until a new version is ready', async ({ page }) => {
+test('there is no dot or update item until a new version is ready', { tag: '@logic' }, async ({
+  page,
+}) => {
   await openApp(page, '/')
   const header = page.locator('app-header').first()
   await expect(header.locator('.update-dot')).toHaveCount(0)
@@ -48,9 +50,9 @@ test('there is no dot or update item until a new version is ready', async ({ pag
   )
 })
 
-test('a ready update puts a dot on the menu button and the first item in the menu', async ({
-  page,
-}) => {
+test('a ready update puts a dot on the menu button and the first item in the menu', {
+  tag: '@logic',
+}, async ({ page }) => {
   await openApp(page, '/')
   await installNewVersion(page)
 

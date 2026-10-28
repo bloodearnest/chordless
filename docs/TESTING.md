@@ -186,6 +186,15 @@ none of them `built`, skips the build. A failure keeps its trace: in a whole run
 console and network (the page's DOM at each step costs a fifth of the run), and with the DOM in a
 run that names files, so run a failing file again to look into it.
 
+**`@logic`.** CI's macOS (WebKit) and Windows (Edge) jobs skip the tests tagged `@logic`
+(`test('...', { tag: '@logic' }, async ...)`, or on a `test.describe`), about half, to save their time
+and the flakiness of their runners; Linux runs them all. Tag a test `@logic` when it would behave the same in any
+browser on any platform: app logic, what is saved, what a dialog says, a request's answer. Leave it untagged
+when it leans on the browser or the platform: layout and themes, scrolling and touch, drag, the service
+worker and offline, the keyboard and focus, files and sharing, audio, the screen wake lock, storage. A
+new test is untagged, so it runs everywhere until someone judges it. See what a platform runs with
+`npx playwright test --list --grep-invert @logic`.
+
 Import `test` and `expect` from `tests/fixtures.js`, not `@playwright/test`. Its `test`
 fails any test whose page throws an uncaught error, starts with the first-use modal answered
 (`test.use({ firstUse: true })` opts out), and pins the date to 14 October 2026 (the clock still

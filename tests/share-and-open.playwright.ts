@@ -70,7 +70,7 @@ test('something shared to the app opens the import page with the song', async ({
   await expect(page.locator('song-import')).not.toContainText('Shared Song')
 })
 
-test('text shared to the app is imported as a song', async ({ page }) => {
+test('text shared to the app is imported as a song', { tag: '@logic' }, async ({ page }) => {
   await openApp(page, '/')
   await shareToApp(page, { text: '{title: Words From Notes}\n[D]Some words' })
   await expect(page.locator('song-import')).toContainText('Words From Notes')
@@ -128,7 +128,9 @@ test('a PDF chart shared to the app finds its song in the library', async ({ pag
   expect(keys).toEqual(['G'])
 })
 
-test('a PDF chart whose song is not in the library links to SongSelect', async ({ page }) => {
+test('a PDF chart whose song is not in the library links to SongSelect', { tag: '@logic' }, async ({
+  page,
+}) => {
   await openApp(page, '/')
   await sharePdf(page, 'Unheard Of Anthem - D.pdf', [
     'Unheard Of Anthem',

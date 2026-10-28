@@ -67,7 +67,9 @@ test('an error in the page is reported, with the device and the page it was on',
   expect(await page.evaluate(() => localStorage.getItem('telemetry-device-id'))).toBe(device)
 })
 
-test('turning the reports off in Preferences forgets this device’s id', async ({ page }) => {
+test('turning the reports off in Preferences forgets this device’s id', { tag: '@logic' }, async ({
+  page,
+}) => {
   await page.route('**/api/otlp/v1/traces', route => route.fulfill({ status: 204 }))
   await page.goto('/')
   await page.waitForFunction(() => document.querySelector('nav-menu'))

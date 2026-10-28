@@ -6,7 +6,9 @@ const CHART = (key: string, c1: string, c2: string, bumph = '') =>
   `{title: Amazing}\n{key: ${key}}\n{comment: Verse 1}\n[${c1}]Amazing [${c2}]grace\n${bumph}`
 const BUMPH = '{ccli_license: 1}\n{footer: For use solely with the SongSelect Terms of Use}'
 
-test('previews, then applies, a repair of a library with a song twice', async ({ page }) => {
+test('previews, then applies, a repair of a library with a song twice', { tag: '@logic' }, async ({
+  page,
+}) => {
   await page.goto('/dev/library-repair.html')
   const spaceId = await page.evaluate(
     async ([inG, inA]) => {
@@ -107,9 +109,9 @@ test('previews, then applies, a repair of a library with a song twice', async ({
   ])
 })
 
-test('lets a Team’s member repair its library, without merging, and its admin merge, and shows the console handle', async ({
-  page,
-}) => {
+test('lets a Team’s member repair its library, without merging, and its admin merge, and shows the console handle', {
+  tag: '@logic',
+}, async ({ page }) => {
   await page.goto('/dev/library-repair.html')
   await page.evaluate(async () => {
     const { createSpace, updateSpace } = await import('/js/space.ts')
