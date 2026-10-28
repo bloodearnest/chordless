@@ -23,10 +23,16 @@ anything yet.
   short drops. A telemetry failure never reaches the UI and is never a `toast()`.
 - **On by default, with a preference to turn it off** (changes without a reload).
 - **No sampling** for now. See "If volume grows".
-- **No song content, ever, in a span.** Setlist uuids, service dates and CCLI numbers are fine; titles,
-  lyrics, charts and share-link keys are not. The Worker route enforces it with an allow-list.
-- Chordless stores no copyrighted content (CLAUDE.md): the route parses a small body in memory and
-  forwards it. Nothing is written to KV, R2, a Durable Object or the cache.
+- **What may be in a span (decided 2026-10-28):** setlist uuids, service dates, CCLI numbers, URLs, and
+  fragments of lyrics or titles where they help (an error that names a song). Honeycomb keeps events for
+  60 days, so this is a limited, third-party copy of fragments, and the privacy text says so. **Never an
+  email address**: the Worker route blanks every one it finds (`[email]`), in any text, and that is the
+  only content rule it enforces. Not a reason to send whole charts or lyrics: spans are for what the
+  app did, and each attribute is sized (2 KB at most).
+- Chordless's own servers store no copyrighted content (CLAUDE.md): the route parses a small body in
+  memory and forwards it. Nothing is written to KV, R2, a Durable Object or the cache. (CLAUDE.md's
+  headline rule says Chordless never stores copyrighted content: Honeycomb's 60 days of fragments is
+  an exception to it, so the wording there and in `public/privacy.html` needs to say so.)
 
 ## Conventions
 
@@ -63,7 +69,7 @@ on whichever of those spans encloses it.
 (not as resource attributes, because they change: sign-in, a reset, switching space): `device.id`,
 `enduser.pseudo.id` (signed in), `chordless.team.pseudo_id` (a team space), `chordless.space_kind`;
 in a setlist, `session.id`, `chordless.setlist.id` and `chordless.setlist.date`; for the current
-song, `chordless.song.id`, `.ccli`, `.index` and `.key` (the displayed key, never the title); and
+song, `chordless.song.id`, `.ccli`, `.index` and `.key` (the displayed key); and
 `chordless.route` (the template, not the URL), `chordless.live`, `chordless.online`,
 `chordless.display_mode`. Resource attributes: `service.name` (`chordless-web`), `service.version`,
 `deployment.environment.name`, `user_agent.original` (the browser and device mix: the app targets
@@ -113,15 +119,17 @@ the small collector: authentication and abuse limits, redaction, forwarding.
   binding by address (`TELEMETRY`, 600 a minute: a band shares one wifi address; repeated in
   `[env.dev]`). A refusal is 403 (another origin), 405, 413, 415, 400 (not JSON, or no span left) or 429;
   a limit that cannot be asked about lets the batch through.
-- **Redaction:** the capped body is parsed in memory and **rebuilt field by field** from what we know
-  of OTLP/JSON: an unknown field does not pass, and an attribute passes only if its name is in
-  `ALLOWED_ATTRIBUTES` (the `chordless.*` names here and the standard ones above, exact names, not a
-  prefix), with a plain value (no list or map) of at most 512 characters (200 for an exception message), at
-  most 64 attributes a span, 500 spans a batch. A span's status keeps its code and loses its message, and a
-  scope keeps its name and version. A bug in the page cannot ship a title or a lyric: **a new
-  attribute is a change to that list and its test**, which also fails if a name looks like a title,
-  lyric, URL or email. Never stored, never logged. The sample-rate attribute is on the list from the
-  start (see "If volume grows").
+- **Rebuilt, and emails blanked:** the capped body is parsed in memory and **rebuilt field by field**
+  from what we know of OTLP/JSON: an unknown field does not pass, an attribute passes with a name that
+  looks like one (lower-case words and dots, at most 100 characters, or `SampleRate`: not an id or a
+  sentence, which would make a column of each) and a plain value (no list or map) of at most 2048
+  characters, at most 64 attributes a span, 500 spans a batch. A scope keeps its name and version and
+  loses its attributes. **Every email address in any text** (values, names, events, resource, status
+  message; also percent-encoded in a URL) is replaced with `[email]`. Nothing else is judged: lyrics
+  fragments and URLs pass. Never stored, never logged.
+  A sender that is not our page (anyone can POST here, as `curl` sends no `Origin`) can still make
+  columns in the dataset with names of that shape, and spend events: the rate limit is the bound, and
+  Honeycomb's column limit is the one to watch (see "Open questions").
 - Forwards, after answering, to `OTLP_ENDPOINT` (a variable in `wrangler.toml`, repeated in
   `[env.dev.vars]`, https only) with `OTLP_HEADERS` (`name=value,name=value`, as
   `OTEL_EXPORTER_OTLP_HEADERS` has it; an optional secret). No headers or endpoint (local development
@@ -239,7 +247,7 @@ Honeycomb bills by event, and we do not sample. If that has to change, in this o
 
 1. This page; `infra/honeycomb/`; the native export of the Worker's traces. **Built:** this page and
    `infra/honeycomb/` (not yet in CI: `infra/README.md`).
-2. The route, its limits and its allow-list.
+2. The route, its limits and its email blanking.
 3. The page's SDK, `session.id`, the preference, `traced()` around a sync, baseline attributes.
 4. `setlist.open` and `leave`, the attributes on other work, the identity ids and the Support ID in
    the app, error recording, the live-latency measurement, the privacy text (in or before the release
@@ -250,5 +258,5 @@ Honeycomb bills by event, and we do not sample. If that has to change, in this o
 - `[observability.traces]` as above, and whether the native export honours an incoming `traceparent`.
 - Where the account and team ids live in the synced data, and how the sync engine merges a new small file.
 - Whether `live-relay.ts` relays `changed` as it came or parses it (`relayedAt` needs it to parse).
-- Honeycomb's limits on columns per dataset and event size, to size the allow-list.
+- Honeycomb's limits on columns per dataset and event size: attribute names are no longer a fixed list, so junk names from a non-browser sender could fill a dataset's columns.
 - Whether Honeycomb bills span events like spans (the sync's slow-request events are capped for that).

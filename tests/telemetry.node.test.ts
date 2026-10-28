@@ -10,11 +10,11 @@ import type { Env } from '../worker/src/env.ts'
 import { handleRequest } from '../worker/src/router.ts'
 import type { ShareCache } from '../worker/src/share.ts'
 import {
-  ALLOWED_ATTRIBUTES,
   parseHeaders,
   redact,
   TELEMETRY_PATH,
   type TelemetryDeps,
+  withoutEmails,
 } from '../worker/src/telemetry.ts'
 
 const ORIGIN = 'https://chordless.test'
@@ -107,29 +107,40 @@ test('a batch from the page is answered 204 and passed on, with the key the page
   assert.deepEqual(spans[0].status, { code: 1 })
 })
 
-test('an attribute that is not on the list never leaves: titles, lyrics, anything new', () => {
+test('lyrics and URLs go on to Honeycomb, which keeps them a while: an email address never does', () => {
   const clean = redact(
     batch(
       [
         span({
+          name: 'chordless.share.open for ann@example.org',
           attributes: [
-            str('chordless.song.id', 'song-1'),
-            str('chordless.song.title', 'Amazing Grace'),
-            str('lyrics', 'Amazing grace, how sweet the sound'),
-            str('chordless.setlist.title', 'Sunday'),
-            str('url.full', 'https://chordless.app/api/share/FILEID'),
+            str('chordless.song.lyrics', 'Amazing grace, how sweet the sound'),
+            str('url.full', 'https://chordless.app/api/share/FILEID?from=bob%40example.com'),
+            str('chordless.song.contact', 'write to leader.name+band@church.example.co.uk today'),
             str('chordless.song.ccli', '22025'),
           ],
+          events: [{ name: 'sent to cat@example.com', timeUnixNano: '1793142294832999936' }],
         }),
       ],
-      [str('service.name', 'chordless-web'), str('host.name', 'my-laptop')]
+      [str('service.name', 'chordless-web'), str('host.name', 'dan@laptop.example')]
     )
   ) as any
-  const resourceKeys = clean.resourceSpans[0].resource.attributes.map((a: any) => a.key)
-  assert.deepEqual(resourceKeys, ['service.name'])
-  const keys = clean.resourceSpans[0].scopeSpans[0].spans[0].attributes.map((a: any) => a.key)
-  assert.deepEqual(keys, ['chordless.song.id', 'chordless.song.ccli'])
-  assert.doesNotMatch(JSON.stringify(clean), /Amazing|Sunday|FILEID|my-laptop/)
+  const rebuilt = clean.resourceSpans[0].scopeSpans[0].spans[0]
+  const values = Object.fromEntries(
+    rebuilt.attributes.map((a: any) => [a.key, a.value.stringValue])
+  )
+  assert.equal(values['chordless.song.lyrics'], 'Amazing grace, how sweet the sound')
+  assert.equal(values['url.full'], 'https://chordless.app/api/share/FILEID?from=[email]')
+  assert.equal(values['chordless.song.contact'], 'write to [email] today')
+  assert.equal(values['chordless.song.ccli'], '22025')
+  assert.equal(rebuilt.name, 'chordless.share.open for [email]')
+  assert.equal(rebuilt.events[0].name, 'sent to [email]')
+  const resource = clean.resourceSpans[0].resource.attributes
+  assert.deepEqual(
+    resource.map((a: any) => a.value.stringValue),
+    ['chordless-web', '[email]']
+  )
+  assert.doesNotMatch(JSON.stringify(clean), /@|%40|example\.(org|com)/)
 })
 
 test('values are plain and bounded: a list, a map or a long text does not pass whole', () => {
@@ -161,22 +172,54 @@ test('values are plain and bounded: a list, a map or a long text does not pass w
       'chordless.sync.pull_ms',
     ]
   )
-  assert.equal(attributes[0].value.stringValue.length, 512)
+  assert.equal(attributes[0].value.stringValue.length, 2048)
 })
 
-test('an error message is cut short, and the span status keeps its code and loses its text', () => {
+test('an attribute name has to look like one: words and dots, not a sentence, an id or a flood', () => {
+  const names = [
+    'chordless.sync.pull_ms',
+    'http.response.status_code',
+    'SampleRate',
+    'Not A Name',
+    'Chordless.Upper',
+    'chordless.',
+    '.chordless',
+    '',
+    `chordless.${'a'.repeat(120)}`,
+    'chordless.song-title',
+    '9lives',
+    'a b',
+  ]
+  const clean = redact(batch([span({ attributes: names.map(name => str(name, 'v')) })])) as any
+  const kept = clean.resourceSpans[0].scopeSpans[0].spans[0].attributes.map((a: any) => a.key)
+  assert.deepEqual(kept, ['chordless.sync.pull_ms', 'http.response.status_code', 'SampleRate'])
+})
+
+test('email addresses are found in the forms they come in, and ordinary text is left alone', () => {
+  assert.equal(withoutEmails('a@b.co'), '[email]')
+  assert.equal(withoutEmails('x first.last+tag@sub.example.com y'), 'x [email] y')
+  assert.equal(withoutEmails('?to=a%40b.com&n=1'), '?to=[email]&n=1')
+  assert.equal(withoutEmails('two a@b.com and c@d.org'), 'two [email] and [email]')
+  assert.equal(
+    withoutEmails('Amazing grace @ 4pm, 100% sure, see example.com'),
+    'Amazing grace @ 4pm, 100% sure, see example.com'
+  )
+  assert.equal(withoutEmails('https://chordless.app/s/abc#key'), 'https://chordless.app/s/abc#key')
+})
+
+test('an error keeps its type, message and status text, with emails blanked and a bound on the length', () => {
   const clean = redact(
     batch([
       span({
-        status: { code: 2, message: 'Failed to load "Amazing Grace"' },
+        status: { code: 2, message: 'Failed to load for ann@example.org' },
         events: [
           {
             name: 'exception',
             timeUnixNano: '1793142294832999936',
             attributes: [
               str('exception.type', 'TypeError'),
-              str('exception.message', 'm'.repeat(1000)),
-              str('exception.stacktrace', 'at song-title.ts:1'),
+              str('exception.message', `m${'x'.repeat(3000)}`),
+              str('exception.stacktrace', 'at song.ts:1 (bob@example.com)'),
             ],
           },
         ],
@@ -184,14 +227,14 @@ test('an error message is cut short, and the span status keeps its code and lose
     ])
   ) as any
   const rebuilt = clean.resourceSpans[0].scopeSpans[0].spans[0]
-  assert.deepEqual(rebuilt.status, { code: 2 })
+  assert.deepEqual(rebuilt.status, { code: 2, message: 'Failed to load for [email]' })
   const [event] = rebuilt.events
   assert.deepEqual(
     event.attributes.map((a: any) => a.key),
-    ['exception.type', 'exception.message']
+    ['exception.type', 'exception.message', 'exception.stacktrace']
   )
-  assert.equal(event.attributes[1].value.stringValue.length, 200)
-  assert.doesNotMatch(JSON.stringify(clean), /Amazing|song-title/)
+  assert.equal(event.attributes[1].value.stringValue.length, 2048)
+  assert.equal(event.attributes[2].value.stringValue, 'at song.ts:1 ([email])')
 })
 
 test('fields we do not know are not passed on, nor is a scope’s own data', () => {
@@ -357,15 +400,6 @@ test('the headers are read as OTEL_EXPORTER_OTLP_HEADERS has them', () => {
   assert.equal([...headers.keys()].length, 2)
 })
 
-test('every name allowed is a standard one we use, or ours, with no title or lyric among them', () => {
-  for (const name of ALLOWED_ATTRIBUTES) {
-    assert.match(name, /^(chordless(\.[a-z_]+)+|[a-z_]+(\.[a-z_]+)+|SampleRate)$/, name)
-    assert.doesNotMatch(name, /title|lyric|chart|text|url|email|content/i, name)
-  }
-  assert.ok(ALLOWED_ATTRIBUTES.has('chordless.setlist.ccli'))
-  assert.ok(!ALLOWED_ATTRIBUTES.has('chordless.song.title'))
-})
-
 test('links and events are rebuilt too: ids checked, attributes by name, and a limit on how many of each are looked at', () => {
   const clean = redact(
     batch([
@@ -376,7 +410,7 @@ test('links and events are rebuilt too: ids checked, attributes by name, and a l
           {
             traceId: 'd'.repeat(32),
             spanId: 'e'.repeat(16),
-            attributes: [str('chordless.song.id', 's'), str('lyrics', 'Amazing grace')],
+            attributes: [str('chordless.song.id', 's'), str('Not A Name', 'dropped')],
           },
           { traceId: 'short', spanId: 'e'.repeat(16) },
           null,
@@ -408,7 +442,7 @@ test('links and events are rebuilt too: ids checked, attributes by name, and a l
   )
   // (16 looked at, three of which are not events)
   assert.equal(rebuilt.events.length, 13)
-  assert.doesNotMatch(JSON.stringify(clean), /Amazing/)
+  assert.doesNotMatch(JSON.stringify(clean), /dropped/)
 })
 
 test('a batch of the wrong shape inside is cleaned down to what is a span', () => {
@@ -471,7 +505,6 @@ test('upstream is the network unless the test says otherwise, and anything throw
     throw 'a plain string, not an Error'
   }) as typeof fetch
   try {
-    const full = setup()
     const pending: Promise<unknown>[] = []
     const response = await handleRequest(
       new Request(`${ORIGIN}${TELEMETRY_PATH}`, {
@@ -494,7 +527,6 @@ test('upstream is the network unless the test says otherwise, and anything throw
     assert.equal(response.status, 204)
     assert.deepEqual(urls, [ENDPOINT])
     assert.deepEqual(logged, ['[telemetry] upstream failed: error'])
-    assert.equal(full.forwarded.length, 0)
   } finally {
     globalThis.fetch = real
     console.error = error
