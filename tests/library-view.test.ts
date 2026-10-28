@@ -356,7 +356,11 @@ describe('the library view, with a song open', () => {
           )?.parsed.metadata.key === 'G',
         'the song to be shown in G again'
       )
-      expect(control<KeySelector>('library-key-selector').value).to.equal('G')
+      // (the selector is drawn from its own update: waiting for the song does not wait for it)
+      await until(
+        () => control<KeySelector>('library-key-selector').value === 'G',
+        'the key selector to show G again'
+      )
     })
 
     it('puts the sections back to how they start, in the page and as saved', async () => {
