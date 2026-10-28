@@ -34,7 +34,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
-    "@cloudflare/vite-plugin": "^1.63.1",
+    "@cloudflare/vite-plugin": "^1.66.0",
     "@open-wc/testing": "^5.0.0",
     "@playwright/test": "^1.64.0",
     "@types/google.accounts": "^0.0.18",
@@ -48,7 +48,7 @@
     "semver": "^7.8.5",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
-    "wrangler": "^4.151.3"
+    "wrangler": "^4.154.0"
   },
   "keywords": [],
   "author": "",
