@@ -37,8 +37,8 @@ its pull request (`"#42"`), and `docs/stats.jsonl` records each run's tree as we
 | Changes | Linux | `scripts/ci/changes.sh` | - |
 | `ci-ok` | | every job above passed or was skipped | all |
 
-A pull request that changes only prose (any `*.md`, and `TODO`) skips every job but `Changes` and `ci-ok`:
-nothing in them is read by a build, a test or a check. (`docs/*.jsonl` and `docs/coverage-floor.json` are data the scripts read, so they run CI.) Runs with no base to compare, as on `main` before a deploy, always run everything.
+A pull request that changes only notes (`docs/**.md` and `TODO`) skips every job but `Changes` and `ci-ok`:
+nothing in them is read by a build, a test or a check. (Other Markdown, such as the READMEs, may ship; `docs/*.jsonl` and `docs/coverage-floor.json` are data the scripts read. Both run CI.) Runs with no base to compare, as on `main` before a deploy, always run everything.
 
 `ci-ok` is the one required check, so jobs can be renamed, split or skipped without touching the
 ruleset. The macOS and Windows end-to-end jobs are required too (they are in `ci-ok`'s `needs`): they are
@@ -226,8 +226,9 @@ Deployments.
 Deploys run in a `deploy` concurrency group, none cancelled; a run waiting is replaced by a newer one.
 It is also the only place `main`'s own checks run after a
 merge (`ci.yml` has no push trigger): a pull request need not be up to date with `main`, and this is what
-catches two that were each fine and are not together. A merge that changes nothing shipped (docs, TODO) runs
-the checks and the plan, and deploys nothing. `terraform.yml` has the nightly drift check and a manual run;
+catches two that were each fine and are not together. A merge of only `docs/**.md` and `TODO` starts no
+run (`paths-ignore`, in step with `scripts/ci/changes.sh`); one that changes anything else runs the
+checks and the plan, and deploys nothing if nothing shipped changed. `terraform.yml` has the nightly drift check and a manual run;
 a change to `infra/` is planned and applied here, before the deploy. `just deploy` from a laptop still
 checks for drift first.
 

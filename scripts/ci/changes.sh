@@ -14,9 +14,10 @@ if [ -z "$base" ]; then
 fi
 
 files=$(git diff --name-only "$base"...HEAD)
-# Anything but prose: Markdown anywhere, and TODO. Nothing in them is read by a build, a test or a
-# check (docs/*.jsonl and docs/coverage-floor.json are data the scripts read, so they count as code).
-if grep -qvE '(\.md|^TODO)$' <<<"$files"; then
+# Anything but notes: Markdown under docs/, and TODO. Nothing in them is read by a build, a test or a
+# check (docs/*.jsonl and docs/coverage-floor.json are data the scripts read, so they count as code;
+# other Markdown, such as the READMEs, may ship). Keep in step with `paths-ignore` in deploy.yml
+if grep -qvE '^(docs/.*\.md|TODO)$' <<<"$files"; then
   echo "code=true"
 else
   echo "code=false"
