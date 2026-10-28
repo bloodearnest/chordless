@@ -237,7 +237,7 @@ export function timedFetch(
       const response = await base(input, request)
       const ms = performance.now() - started
       countCall(kind, ms, response.status)
-      finishCall(span, response.status)
+      finishCall(span, response.status, response.headers.get('cf-ray'))
       return response
     } catch (error) {
       countCall(kind, performance.now() - started, 0)
@@ -249,9 +249,12 @@ export function timedFetch(
 }
 
 /** The call is over: its status on the span, and an error if it failed */
-function finishCall(span: Span | null, status: number): void {
+function finishCall(span: Span | null, status: number, ray: string | null = null): void {
   if (!span) return
   span.setAttribute('http.response.status_code', status)
+  // Cloudflare's Worker spans do not join our trace (they ignore `traceparent`): the ray id is the
+  // join, the same value as `cloudflare.ray_id` on the Worker's span (the header is `<id>-<colo>`)
+  if (ray) span.setAttribute('cloudflare.ray_id', ray.split('-')[0])
   if (failed(status)) {
     span.setAttribute('chordless.error', true)
     span.setStatus({ code: SpanStatusCode.ERROR })

@@ -170,6 +170,12 @@ trace ids leaked to a third party). A failure is a call with no answer, a 429, o
 (Drive's way of saying there is no such file). At most 200 calls of one sync are spans: a first
 sync can make hundreds, and the totals on the sync's span count them all.
 
+**The Worker's spans do not join.** Cloudflare's native export ignores an incoming `traceparent`: the
+Worker's `/session/refresh` span is a root in a trace of its own (checked 2026-10-28). So the page's
+call span carries the response's `cf-ray` as `cloudflare.ray_id`, the same value as on the Worker's span
+(in the `chordless` dataset): find one from the other by the ray id. The `traceparent` header is still
+sent, in case Cloudflare honours it one day.
+
 **Steps of a sync.** `phase()` (`telemetry.ts`) makes a step of the sync running a span of its own, the
 parent of the calls it makes, so a trace says which step each call belonged to: `chordless.sync.init`,
 `.feed`, `.feed_position`, `.members`, `.access`, `.inventory`, `.pull`, `.push`. It holds the one
