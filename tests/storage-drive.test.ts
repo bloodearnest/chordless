@@ -362,6 +362,73 @@ describe('Google Drive (on FakeDrive): the feed of changes', () => {
     expect(lists).to.have.length(1)
   })
 
+  describe('after the inventory, which listed the whole space', () => {
+    type Request = { path: string; params: URLSearchParams }
+    const queries = (fake: { requests: Request[] }) =>
+      fake.requests.filter(request => request.path.endsWith('/files') && request.params.has('q'))
+
+    it('lists the collections from it, as a listing of their own would, and asks Drive nothing', async () => {
+      const { fake, space } = await openSpace()
+      await space.create('songs', { ...song, name: 'a.txt' }, 'x')
+      await space.create('songs', { ...song, name: 'b.txt' }, 'x')
+      await space.create('setlists', { ...setlist, name: 'old.json' }, '{}')
+      await space.create('setlists', { ...setlist, name: 'new.json' }, '{}')
+      const songs = await space.list('songs')
+      const setlists = await space.list('setlists')
+      const shares = await space.list('shares')
+
+      await space.inventory()
+      fake.requests.length = 0
+
+      expect(await space.list('songs')).to.deep.equal(songs)
+      expect(await space.list('setlists')).to.deep.equal(setlists)
+      expect(await space.list('shares'), 'no shares folder: nothing to list').to.deep.equal(shares)
+      expect(fake.requests).to.have.length(0)
+    })
+
+    it('finds the collections’ folders in it, without looking for them by name', async () => {
+      const { fake, space } = await openSpace()
+      await space.create('songs', song, 'x')
+      await space.create('setlists', setlist, '{}')
+      // (a space that has not been touched since: its folders are found, as a new sync finds them)
+      const fresh = driveStorage.space((await driveStorage.ensureRoot('Grace Church', 's')).ref)
+      await fresh.inventory()
+      fake.requests.length = 0
+
+      await fresh.create('songs', { ...song, name: 'more.txt' }, 'x')
+
+      expect(fake.requests.filter(request => request.params.has('q'))).to.have.length(0)
+    })
+
+    it('forgets what it listed when something is written, so a list shows the write', async () => {
+      const { space } = await openSpace()
+      const first = await space.create('songs', { ...song, name: 'a.txt' }, 'x')
+      await space.inventory()
+      expect(await space.list('songs')).to.have.length(1)
+
+      await space.create('songs', { ...song, name: 'b.txt' }, 'x')
+      expect(await space.list('songs')).to.have.length(2)
+
+      await space.inventory()
+      await space.trash(first.file.ref)
+      expect((await space.list('songs')).map(file => file.name)).to.deep.equal(['b.txt'])
+    })
+
+    it('looks for a folder itself when the space has two of the name', async () => {
+      const { fake, space } = await openSpace()
+      await space.create('songs', song, 'x')
+      const songs = [...fake.files.values()].find(file => file.name === 'songs')
+      fake.files.set('twin', { ...songs, id: 'twin' })
+      const fresh = driveStorage.space((await driveStorage.ensureRoot('Grace Church', 's')).ref)
+      await fresh.inventory()
+      fake.requests.length = 0
+
+      await fresh.create('songs', { ...song, name: 'more.txt' }, 'x')
+
+      expect(queries(fake).length, 'which of two is it: Drive is asked').to.be.greaterThan(0)
+    })
+  })
+
   it('reads every page of changes', async () => {
     const { fake, space, feed } = await openSpace()
     const start = await feed.start()
