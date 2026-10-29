@@ -16,6 +16,7 @@ import {
   phase,
   reportError,
   resetTelemetryState,
+  setSizeWait,
   timedFetch,
   traced,
 } from '../src/js/telemetry/telemetry.ts'
@@ -35,6 +36,8 @@ beforeEach(() => {
     new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] })
   )
   resetTelemetryState()
+  // (a call to the Worker ends as soon as it is answered, unless a test is about its sizes)
+  setSizeWait(0)
   setAmbient({ accountId: undefined, sessionId: undefined, teamPseudoId: undefined })
 })
 
@@ -42,6 +45,12 @@ afterEach(() => {
   trace.disable()
   localStorage.clear()
 })
+
+const expectEventually = async (check: () => boolean, ms = 2000) => {
+  const until = Date.now() + ms
+  while (!check() && Date.now() < until) await new Promise(resolve => setTimeout(resolve, 10))
+  expect(check()).to.equal(true)
+}
 
 const finished = () => exporter.getFinishedSpans()
 const names = () => finished().map(span => span.name)
@@ -488,6 +497,39 @@ describe('timedFetch', () => {
     expect(noSize.attributes).to.not.have.property('http.request.body.size')
     expect(offline.attributes['error.type']).to.equal('TypeError')
     expect(odd.attributes['error.type']).to.equal('_OTHER')
+  })
+
+  it('takes the size of the answer to a call to the Worker from the browser, for a call that has no Content-Length too', async () => {
+    setSizeWait(500)
+    // (our own server: a script of the test page, as a page's call to its Worker is)
+    const fetcher = timedFetch('worker')
+    const first = await fetcher('/tests/shims/node-builtins.js')
+    await first.text()
+    const second = await fetcher('/tests/shims/node-builtins.js')
+    await second.text()
+    await expectEventually(() => finished().length === 2)
+    for (const call of finished()) {
+      expect(call.attributes['http.response.body.size'], 'wire').to.be.greaterThan(0)
+      expect(
+        call.attributes['chordless.http.response.decoded_body_size'],
+        'decoded'
+      ).to.be.greaterThan(0)
+    }
+    // (the second may come from the cache, which has nothing on the wire)
+    expect(finished()[0].attributes['http.response.size'], 'with headers').to.be.greaterThan(0)
+  })
+
+  it('ends a call to the Worker without sizes when the browser has none for it, at the time it was answered', async () => {
+    setSizeWait(60)
+    const before = Date.now()
+    await timedFetch('worker', ok)('/api/nothing-fetched')
+    expect(finished()).to.have.length(0)
+    await expectEventually(() => finished().length === 1)
+    const [call] = finished()
+    expect(call.attributes).to.not.have.property('chordless.http.response.decoded_body_size')
+    // (its end is when it was answered, not when the wait gave up)
+    const [seconds, nanos] = call.endTime
+    expect(seconds * 1000 + nanos / 1e6 - before).to.be.lessThan(40)
   })
 
   it('never sends a traceparent to Google', async () => {

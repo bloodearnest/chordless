@@ -210,10 +210,20 @@ failure, or the error's class; `_OTHER` for something thrown that is not an Erro
 `http.request.body.size` and `http.response.body.size`, come from `Content-Length` or from a body held in
 memory (a string, bytes, a Blob); a streamed or chunked body has no size, and is not read or counted to
 find one (wrapping a stream in JavaScript costs CPU, which the pad audio passing through would pay). So a
-response's size is often missing, and the sizes are the bytes on the wire when the body is compressed. Left
+response's size is often missing on the Worker's side, and the sizes are the bytes on the wire when the body is compressed. Left
 out: `client.address` (an IP address), the request and response headers (opt-in in the conventions, and
 their names have hyphens, which the telemetry route drops), `url.query` on the Worker's side (the page's call
-spans keep a truncated one), `http.request.method_original` and the TLS attributes. No trace context
+spans keep a truncated one), `http.request.method_original` and the TLS attributes.
+
+**The page knows the size of the answers it gets from the Worker.** A call to our Worker is to the page's
+own address, so the browser's resource entry for it (`PerformanceResourceTiming`) has the sizes of the
+answer even when it is streamed or chunked: `http.response.body.size` (the bytes on the wire, as
+compressed), `chordless.http.response.decoded_body_size` (what they came to) and `http.response.size`
+(with the headers; none from the cache). The entry exists once the whole body is in, so the call's span
+waits for it, up to 300 ms, polling, and then ends as of the moment it was answered (so its duration is
+unchanged); if no entry comes (a body nobody reads) it ends without the sizes. Drive's calls are
+cross-origin, whose entries have no sizes without a `Timing-Allow-Origin`, so they keep the `Content-Length`
+only. No trace context
 is sent on, to Google or to the objects. At most 50 calls of a request are spans. No existing OTel fetch
 instrumentation fits: `instrumentation-fetch` clones and reads the whole response (a stream would be
 buffered in memory: Drive and pad audio go through here), `instrumentation-undici` and `-http` hook

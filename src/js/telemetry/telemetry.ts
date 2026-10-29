@@ -213,9 +213,11 @@ export function timedFetch(
     const started = performance.now()
     const owner = tracked?.span ?? parent?.()
     let span: Span | null = null
+    let href = ''
     if (getTelemetryPreference() && (!tracked || tracked.callSpans < MAX_CALL_SPANS)) {
       if (tracked) tracked.callSpans++
       const url = urlOf(input)
+      href = url.href
       span = tracer().startSpan(
         `chordless.${kind}.request`,
         {
@@ -254,6 +256,9 @@ export function timedFetch(
       const ms = performance.now() - started
       countCall(kind, ms, response.status)
       finishCall(span, response.status, response.headers)
+      // (a call to our own Worker is the page's own address: the browser says how big the answer was)
+      if (span && kind === 'worker') endWhenSized(span, href, started)
+      else span?.end()
       return response
     } catch (error) {
       countCall(kind, performance.now() - started, 0)
@@ -267,7 +272,64 @@ export function timedFetch(
   }) as typeof fetch
 }
 
-/** The call is over: its status on the span, and an error if it failed */
+/** How long `endWhenSized` waits for the browser's entry of a call: it has one once the whole body is in */
+let sizeWaitMs = 300
+const SIZE_POLL_MS = 25
+const claimedEntries = new WeakSet<PerformanceEntry>()
+
+/** For tests: how long a call to the Worker waits for its sizes (none: it ends as soon as it is answered) */
+export function setSizeWait(ms: number): void {
+  sizeWaitMs = ms
+}
+
+/** The browser's resource entry of the call to `href` that began at `started` (`performance.now()`), not yet given to another */
+function resourceEntryOf(href: string, started: number): PerformanceResourceTiming | undefined {
+  let found: PerformanceResourceTiming | undefined
+  let gap = 50
+  for (const entry of performance.getEntriesByName(
+    href,
+    'resource'
+  ) as PerformanceResourceTiming[]) {
+    const wait = entry.startTime - started
+    if (wait >= -1 && wait < gap && !claimedEntries.has(entry)) {
+      found = entry
+      gap = wait
+    }
+  }
+  if (found) claimedEntries.add(found)
+  return found
+}
+
+/**
+ * End a call's span as of now, with what the browser knows of the answer's size once it has it: the
+ * bytes on the wire (`http.response.body.size`, as compressed), what they came to (`chordless.http.response.decoded_body_size`) and with
+ * the headers (`http.response.size`). Streamed or chunked answers have these too, which no header says.
+ * If the entry does not come in a moment (a body nobody reads), the span ends without them.
+ */
+function endWhenSized(span: Span, href: string, started: number): void {
+  const answered = Date.now()
+  if (sizeWaitMs <= 0) {
+    span.end(answered)
+    return
+  }
+  const deadline = performance.now() + sizeWaitMs
+  const look = () => {
+    const entry = resourceEntryOf(href, started)
+    if (entry) {
+      if (entry.encodedBodySize > 0)
+        span.setAttribute('http.response.body.size', entry.encodedBodySize)
+      if (entry.decodedBodySize > 0) {
+        span.setAttribute('chordless.http.response.decoded_body_size', entry.decodedBodySize)
+      }
+      if (entry.transferSize > 0) span.setAttribute('http.response.size', entry.transferSize)
+      span.end(answered)
+    } else if (performance.now() >= deadline) span.end(answered)
+    else setTimeout(look, SIZE_POLL_MS)
+  }
+  look()
+}
+
+/** The call is over: its status on the span, and an error if it failed (the caller ends it) */
 function finishCall(span: Span | null, status: number, headers: Headers): void {
   if (!span) return
   span.setAttribute('http.response.status_code', status)
@@ -285,7 +347,6 @@ function finishCall(span: Span | null, status: number, headers: Headers): void {
     span.setAttribute('chordless.error', true)
     span.setStatus({ code: SpanStatusCode.ERROR })
   }
-  span.end()
 }
 
 /**
