@@ -4,9 +4,10 @@
  * the finger, the same distance as the page, and stops once it is away or fully back. On a tablet
  * or desktop it never moves.
  *
- * The header goes by a negative top margin, which also moves the page up under it; to keep the
- * text moving at the finger's pace, not twice it, the page gets that much padding on top (the
- * `--tuck` property, used by `.section`) so the text stays where the scrolling puts it.
+ * To be smooth it is moved by a transform, which lays nothing out again as it goes: on a phone it
+ * floats over the page (the `floating` attribute), and the pages leave room for it at the top
+ * with a padding of its height (`--header-height`, used by `.section`), so the text starts just
+ * under it and scrolls at the finger's own pace.
  */
 import type { AppHeader } from '../../components/app-header.ts'
 
@@ -24,15 +25,26 @@ export function autohideHeader({ header, root, songShown, signal }: HeaderAutohi
   const tops = new WeakMap<Element, number>()
   /** How far the header has gone up, in px: 0 shown, its height away */
   let offset = 0
+  /** The header's height, to the fraction of a pixel: a rounded one leaves a hairline of it showing */
+  const height = () => header.getBoundingClientRect().height
 
   const place = (to: number) => {
-    const height = header.offsetHeight
-    to = Math.min(Math.max(0, to), height)
+    const full = height()
+    to = Math.min(Math.max(0, to), full)
     if (to === offset) return
     offset = to
-    header.style.marginTop = offset ? `${-offset}px` : ''
-    root.style.setProperty('--tuck', offset ? `${offset}px` : '0px')
-    header.tucked = offset > 0 && offset >= height
+    header.style.transform = offset ? `translateY(${-offset}px)` : ''
+    header.tucked = offset > 0 && offset >= full
+  }
+
+  /** Floats the header over the page on a phone, and leaves room for it; on a wider screen, not */
+  const float = () => {
+    header.toggleAttribute('floating', phone.matches)
+    if (phone.matches) root.style.setProperty('--header-height', `${height()}px`)
+    else {
+      root.style.removeProperty('--header-height')
+      place(0)
+    }
   }
 
   const onScroll = (event: Event) => {
@@ -49,13 +61,21 @@ export function autohideHeader({ header, root, songShown, signal }: HeaderAutohi
     const last = tops.get(target) ?? 0
     tops.set(target, top)
     // (never further away than the page is scrolled: at its top the header is all there)
-    const limit = Math.min(top, header.offsetHeight)
+    const limit = Math.min(top, height())
     place(Math.min(offset + top - last, limit))
   }
 
+  float()
+  // (its height changes with the title, which can run to a second row)
+  const resized = new ResizeObserver(float)
+  resized.observe(header)
   // (scroll events don't bubble, but they can be caught on the way down)
   root.addEventListener('scroll', onScroll, { capture: true, passive: true, signal })
-  // Back to a wider screen: the header is shown again
-  phone.addEventListener('change', () => place(0), { signal })
-  signal.addEventListener('abort', () => place(0))
+  phone.addEventListener('change', float, { signal })
+  signal.addEventListener('abort', () => {
+    resized.disconnect()
+    place(0)
+    header.removeAttribute('floating')
+    root.style.removeProperty('--header-height')
+  })
 }

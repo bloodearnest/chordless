@@ -65,27 +65,36 @@ describe('autohideHeader', () => {
 
   it('moves the header away with the scrolling, and back as it scrolls up', () => {
     scrollTo(20)
-    expect(header.style.marginTop).to.equal('-20px')
-    expect(root.style.getPropertyValue('--tuck')).to.equal('20px')
+    expect(header.style.transform).to.equal('translateY(-20px)')
+    expect(root.style.getPropertyValue('--header-height')).to.equal('50px')
     expect(header.tucked).to.equal(false)
     scrollTo(50)
-    expect(header.style.marginTop).to.equal('-50px')
+    expect(header.style.transform).to.equal('translateY(-50px)')
     expect(header.tucked).to.equal(true)
     // (no further than its own height)
     scrollTo(200)
-    expect(header.style.marginTop).to.equal('-50px')
+    expect(header.style.transform).to.equal('translateY(-50px)')
     scrollTo(180)
-    expect(header.style.marginTop).to.equal('-30px')
+    expect(header.style.transform).to.equal('translateY(-30px)')
     expect(header.tucked).to.equal(false)
     scrollTo(160)
-    expect(header.style.marginTop).to.equal('-10px')
+    expect(header.style.transform).to.equal('translateY(-10px)')
+  })
+
+  it('floats the header over the page on a phone only, and leaves room for it', () => {
+    expect(header.hasAttribute('floating')).to.equal(true)
+    expect(root.style.getPropertyValue('--header-height')).to.equal('50px')
+    phone = false
+    onMediaChange?.()
+    expect(header.hasAttribute('floating')).to.equal(false)
+    expect(root.style.getPropertyValue('--header-height')).to.equal('')
   })
 
   it('has the header all there at the top of the page', () => {
     scrollTo(200)
     scrollTo(0)
-    expect(header.style.marginTop).to.equal('')
-    expect(root.style.getPropertyValue('--tuck')).to.equal('0px')
+    expect(header.style.transform).to.equal('')
+    expect(root.style.getPropertyValue('--header-height')).to.equal('50px')
   })
 
   it('shows the header again for a swipe to another song', () => {
@@ -110,6 +119,7 @@ describe('autohideHeader', () => {
   it('shows the header when the screen widens', () => {
     scrollTo(200)
     expect(header.tucked).to.equal(true)
+    phone = false
     onMediaChange?.()
     expect(header.tucked).to.equal(false)
   })
