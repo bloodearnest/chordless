@@ -232,7 +232,7 @@ export function mergedPerson(have: Person | undefined, remote: Person, file: Sto
     lastSyncedAt: new Date().toISOString(),
     syncedContentHash: remoteHash,
   }
-  const theirs: Person = { ...personContent(remote), emails: remote.emails ?? [], ...link }
+  const theirs: Person = { ...personContent(remote), ...link }
   if (!have || personContentHash(have) === remoteHash || !personHasLocalChanges(have)) {
     return theirs
   }
@@ -294,13 +294,13 @@ export async function pullPeople(
       item => item.file.ref,
       async (item, text) => {
         const remote = JSON.parse(text) as Person
-        return mergedPerson(item.have, { ...remote, id: remote.id || item.id }, item.file)
+        return mergedPerson(item.have, { ...remote, id: item.id }, item.file)
       },
       results => {
         for (const result of results) {
           if (result.status === 'fulfilled') toSave.push(result.value)
           else {
-            run.pullIncomplete = true
+            run.peoplePullIncomplete = true
             run.downloadsFailed = true
             console.error('[DriveSync] Failed to download a person:', result.reason)
           }

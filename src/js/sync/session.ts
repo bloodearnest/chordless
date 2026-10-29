@@ -105,6 +105,8 @@ export class SyncRun {
   heldBack = 0
   /** The setlists a pull replaced with Drive's although they had local changes (read-only) */
   resetSetlists: ResetSetlist[] = []
+  /** Whether the pull of people failed to read some file, so it may not know them all */
+  peoplePullIncomplete = false
   /** Whether the pull of setlists failed to read some file, so it may not know them all */
   pullIncomplete = false
   /** Whether a file the pull meant to download could not be (a setlist or a song) */

@@ -87,8 +87,10 @@ export async function settleLeader<T extends { leaderId: string; newLeader?: str
 ): Promise<Omit<T, 'newLeader'>> {
   const { newLeader, ...rest } = details
   if (!newLeader?.trim()) return rest
-  const made = personFor(await db.getAllPeople(), { name: newLeader })
-  if (!made) return rest
+  // (a name was typed, so there is a person for it)
+  const made = personFor(await db.getAllPeople(), { name: newLeader }) as NonNullable<
+    ReturnType<typeof personFor>
+  >
   await db.savePeople(made.changed)
   return { ...rest, leaderId: made.person.id }
 }

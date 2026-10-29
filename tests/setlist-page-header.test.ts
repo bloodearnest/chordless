@@ -27,6 +27,7 @@ import {
 } from '../src/components/setlist-overview.ts'
 import { SetlistShareChangeEvent } from '../src/components/setlist-share.ts'
 import { SongChangeEvent } from '../src/js/app-events.ts'
+import type { Setlist } from '../src/js/data-types.ts'
 import { setCapoPreference } from '../src/js/preferences.ts'
 import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
@@ -503,11 +504,32 @@ describe('the setlist page: header, menu and keys', () => {
         shown++
       }
       button.click()
-      await waitUntil(() => shown === 1, 'the share dialog to open')
+      expect(shown).to.equal(1)
       expect((dialog.setlist as { id: string }).id).to.equal(rig.page.currentSetlistId)
       dialog.setlist = { ...(rig.page.currentSetlist as object), share: null }
       dialog.dispatchEvent(new SetlistShareChangeEvent())
       expect(button.classList.contains('shared')).to.equal(false)
+    })
+
+    it('opens at once, and gives the dialog the leader’s name when it has been read', async () => {
+      await rig.open()
+      const ann = { id: 'ann', name: 'Ann Smith', emails: [], modifiedDate: 'then' }
+      // (the rig's database is shared by the tests: this one does not leave a person in it)
+      const real = rig.db.getAllPeople
+      rig.db.getAllPeople = async () => [ann]
+      try {
+        rig.page.currentSetlist = { ...(rig.page.currentSetlist as Setlist), leaderId: 'ann' }
+        const dialog = must($('#setlist-share')) as unknown as { show(): void; leader: string }
+        let shown = 0
+        dialog.show = () => {
+          shown++
+        }
+        must($<HTMLElement>('#share-button')).click()
+        expect(shown).to.equal(1)
+        await waitUntil(() => dialog.leader === 'Ann Smith', 'the leader’s name')
+      } finally {
+        rig.db.getAllPeople = real
+      }
     })
 
     it('is not set up again when the setlist is shown again', async () => {
@@ -519,8 +541,6 @@ describe('the setlist page: header, menu and keys', () => {
         shown++
       }
       must($<HTMLElement>('#share-button')).click()
-      await waitUntil(() => shown === 1, 'the share dialog to open')
-      await wait(30)
       expect(shown).to.equal(1)
     })
   })
@@ -547,7 +567,7 @@ describe('the setlist page: header, menu and keys', () => {
         shown++
       }
       button.click()
-      await waitUntil(() => shown === 1, 'the share dialog to open')
+      expect(shown).to.equal(1)
       expect((dialog.setlist as { id: string }).id).to.equal(rig.page.currentSetlistId)
 
       const rendered: string[] = []

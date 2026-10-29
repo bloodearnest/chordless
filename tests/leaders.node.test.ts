@@ -162,6 +162,24 @@ describe('planPeople', () => {
   })
 })
 
+describe('a leader known only by email', () => {
+  it('is named by the email, in the plan and for a setlist from before people', () => {
+    const { people, leaderIds } = planPeople(
+      [{ ownerId: 'Cat@Example.com' }, { owner: ' ', ownerId: 'cat@example.com' }],
+      NOW
+    )
+    assert.equal(people.length, 1)
+    assert.equal(people[0].name, 'cat@example.com')
+    assert.equal(leaderIds[0], leaderIds[1])
+    const leaders = { known: [] as Person[], added: [] as Person[] }
+    adoptLegacyLeader(
+      { id: 's', ownerId: 'dan@example.com', songs: [] } as unknown as Setlist,
+      leaders
+    )
+    assert.equal(leaders.added[0].name, 'dan@example.com')
+  })
+})
+
 describe('adoptLegacyLeader', () => {
   const setlist = (over: object) => ({ id: 's', songs: [], ...over }) as unknown as Setlist
 
@@ -189,6 +207,15 @@ describe('adoptLegacyLeader', () => {
     const two = adoptLegacyLeader(setlist({ owner: 'vic' }), leaders)
     assert.equal(leaders.added.length, 1)
     assert.equal(one.leaderId, two.leaderId)
+  })
+
+  it('drops the old fields of a setlist that has a leader already', () => {
+    const adopted = adoptLegacyLeader(setlist({ owner: 'Vic', leaderId: 'v' }), {
+      known: [],
+      added: [],
+    })
+    assert.equal(adopted.leaderId, 'v')
+    assert.equal('owner' in adopted, false)
   })
 
   it('has no leader for an empty owner', () => {
