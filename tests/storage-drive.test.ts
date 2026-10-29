@@ -1,6 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { ROOT_FOLDER_NAME } from '../src/js/drive-client.ts'
 import { driveStorage } from '../src/js/storage/browser-drive.ts'
+import { forgetKnownFolders } from '../src/js/storage/drive-storage.ts'
 import { ChangeTokenLost } from '../src/js/storage/types.ts'
 import { type FakeDrive, installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
@@ -274,6 +275,7 @@ describe('Google Drive (on FakeDrive): the feed of changes', () => {
   }
 
   async function openSpace() {
+    forgetKnownFolders()
     const fake = installFakeDrive()
     drive = fake
     const space = driveStorage.space((await driveStorage.ensureRoot('Grace Church', 's')).ref)
@@ -398,6 +400,64 @@ describe('Google Drive (on FakeDrive): the feed of changes', () => {
       await fresh.create('songs', { ...song, name: 'more.txt' }, 'x')
 
       expect(fake.requests.filter(request => request.params.has('q'))).to.have.length(0)
+    })
+
+    describe('the next inventory', () => {
+      /** Make the listing of the space's own folder slow, and note when each listing was asked for */
+      function slowRoot(root: string) {
+        const asked: { folder: string; at: number }[] = []
+        const inner = globalThis.fetch
+        globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+          const q = new URL(String(input)).searchParams.get('q') ?? ''
+          const folder = /'([^']+)' in parents/.exec(q)?.[1]
+          if (folder) asked.push({ folder, at: performance.now() })
+          if (folder === root) await new Promise(resolve => setTimeout(resolve, 60))
+          return inner(input, init)
+        }) as typeof fetch
+        return {
+          asked,
+          /** How long after the space's own folder the others were asked for */
+          lag: () =>
+            Math.max(...asked.filter(listing => listing.folder !== root).map(l => l.at)) -
+            (asked.find(l => l.folder === root)?.at ?? 0),
+          reset: () => {
+            asked.length = 0
+          },
+        }
+      }
+
+      it('lists the folders it found last time with the space’s own, not after it', async () => {
+        const { space } = await openSpace()
+        await space.create('songs', song, 'x')
+        await space.create('setlists', setlist, '{}')
+        const root = (await driveStorage.ensureRoot('Grace Church', 's')).ref
+        const slow = slowRoot(root)
+
+        const first = await driveStorage.space(root).inventory()
+        expect(slow.lag(), 'the first waits for the folder to say what is in it').to.be.greaterThan(
+          50
+        )
+        slow.reset()
+
+        const second = await driveStorage.space(root).inventory()
+        expect(slow.lag(), 'the next does not').to.be.lessThan(30)
+        expect(second).to.deep.equal(first)
+      })
+
+      it('lists a folder that is new as it always did, and takes no notice of one that has gone', async () => {
+        const { fake, space } = await openSpace()
+        await space.create('songs', song, 'x')
+        const root = (await driveStorage.ensureRoot('Grace Church', 's')).ref
+        await driveStorage.space(root).inventory()
+        const songs = [...fake.files.values()].find(file => file.name === 'songs')
+        fake.files.delete(songs.id)
+        const extra = await space.create('shares', { ...song, name: 'share.json' }, 'x')
+
+        const after = await driveStorage.space(root).inventory()
+
+        expect(after.has(extra.file.ref)).to.equal(true)
+        expect(after.has(songs.id)).to.equal(false)
+      })
     })
 
     it('finds the shares folder in it too, where the space has one', async () => {
