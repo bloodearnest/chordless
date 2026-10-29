@@ -1,10 +1,6 @@
 import { expect, waitUntil } from '@open-wc/testing'
 import { trace } from '@opentelemetry/api'
-import {
-  BasicTracerProvider,
-  InMemorySpanExporter,
-  SimpleSpanProcessor,
-} from '@opentelemetry/sdk-trace-web'
+import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace'
 import { ChordlessDB } from '../src/js/db.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import type { ResetSetlist } from '../src/js/sync/session.ts'
@@ -344,7 +340,7 @@ describe('what a sync reports of itself', () => {
     trace.disable()
     exporter.reset()
     trace.setGlobalTracerProvider(
-      new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
+      new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] })
     )
     resetTelemetryState()
   })

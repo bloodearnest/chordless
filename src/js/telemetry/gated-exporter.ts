@@ -4,7 +4,7 @@
  * telemetry queue that outlives the page is more than that is worth (docs/OBSERVABILITY.md).
  */
 import { ExportResultCode } from '@opentelemetry/core'
-import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-web'
+import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace'
 import { getTelemetryPreference } from '../preferences.ts'
 
 type Done = Parameters<SpanExporter['export']>[1]

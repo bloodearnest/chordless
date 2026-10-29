@@ -8,7 +8,7 @@
  * a change reports without Honeycomb.
  */
 import { trace } from '@opentelemetry/api'
-import type { SpanProcessor } from '@opentelemetry/sdk-trace-web'
+import type { SpanProcessor } from '@opentelemetry/sdk-trace'
 import { appUpdate } from '../app-update.ts'
 import { getTelemetryPreference, TelemetryPreferenceEvent } from '../preferences.ts'
 import { baselineAttributes } from './baseline.ts'
@@ -22,12 +22,12 @@ let started = false
 async function start(): Promise<void> {
   const [sdk, { OTLPTraceExporter }, { resourceFromAttributes }, { GatedExporter }] =
     await Promise.all([
-      import('@opentelemetry/sdk-trace-web'),
+      import('@opentelemetry/sdk-trace'),
       import('@opentelemetry/exporter-trace-otlp-http'),
       import('@opentelemetry/resources'),
       import('./gated-exporter.ts'),
     ])
-  const { WebTracerProvider, BatchSpanProcessor, SimpleSpanProcessor, ConsoleSpanExporter } = sdk
+  const { TracerProvider, BatchSpanProcessor, SimpleSpanProcessor, ConsoleSpanExporter } = sdk
   const running = await appUpdate.runningVersion().catch(() => null)
 
   const exporter = new GatedExporter(new OTLPTraceExporter({ url: TELEMETRY_URL }))
@@ -39,7 +39,8 @@ async function start(): Promise<void> {
       forceFlush: () => Promise.resolve(),
       shutdown: () => Promise.resolve(),
     },
-    new BatchSpanProcessor(exporter, {
+    new BatchSpanProcessor({
+      exporter,
       scheduledDelayMillis: 5000,
       maxQueueSize: 256,
       maxExportBatchSize: 64,
@@ -47,13 +48,13 @@ async function start(): Promise<void> {
   ]
   try {
     if (localStorage.getItem('telemetry-console') === '1') {
-      spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()))
+      spanProcessors.push(new SimpleSpanProcessor({ exporter: new ConsoleSpanExporter() }))
     }
   } catch {
     // (storage is blocked: no console reports)
   }
 
-  const provider = new WebTracerProvider({
+  const provider = new TracerProvider({
     resource: resourceFromAttributes({
       'service.name': 'chordless-web',
       'service.version': running?.version ?? 'unknown',
