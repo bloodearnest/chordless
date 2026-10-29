@@ -5,13 +5,13 @@ const { describe, it } = window
 
 suppressConsoleLogs()
 
-import { lyricsOf } from '../src/js/utils/song-filter.ts'
 import {
   formatHiddenLyricsText,
   normalizeSegmentsForHiddenChords,
   segmentHasVisibleLyrics,
   splitChordDisplaySegments,
 } from '../src/js/utils/lyrics-normalizer.ts'
+import { lyricsOf } from '../src/js/utils/song-filter.ts'
 
 describe('lyrics-normalizer utilities', () => {
   it('detects visible lyrics and normalizes glue markers', () => {
