@@ -2,7 +2,10 @@
 import { expect } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import type { SetlistDetailsForm } from '../src/components/setlist-details-form.ts'
-import { SetlistDetailsSaveEvent } from '../src/components/setlist-details-form.ts'
+import {
+  SetlistDetailsIdentifyEvent,
+  SetlistDetailsSaveEvent,
+} from '../src/components/setlist-details-form.ts'
 import { announceDataChange } from '../src/js/data-changes.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
@@ -225,6 +228,49 @@ describe('the home view', () => {
         expect(saved.leaderId).to.equal(ann.id)
       } finally {
         auth.uninstall()
+      }
+    })
+
+    it('asks which of the people the user is when it cannot tell, and leads by the answer', async () => {
+      const auth = installFakeAuthWorker(new FakeAuthWorker())
+      auth.worker.stored = {
+        blob: 'blob',
+        metadata: {
+          user: {
+            name: 'Dee Question',
+            email: 'dee@home.org',
+            picture: null,
+            given_name: null,
+            family_name: null,
+            sub: 's',
+          },
+        },
+        updated_at: 'now',
+      }
+      await db.savePeople([
+        {
+          id: 'dee-at-work',
+          name: 'Dee Question',
+          emails: ['dee@work.org'],
+          modifiedDate: new Date().toISOString(),
+        },
+      ])
+      try {
+        await open()
+        view.querySelector<HTMLButtonElement>('#create-setlist-button')?.click()
+        await wait(150)
+        expect(form().askWho).to.equal(true)
+        expect(form().setlist?.leaderId).to.equal('')
+
+        form().dispatchEvent(new SetlistDetailsIdentifyEvent('dee-at-work'))
+        await wait(150)
+
+        expect(form().askWho).to.equal(false)
+        expect(form().meId).to.equal('dee-at-work')
+        expect(form().setlist?.leaderId).to.equal('dee-at-work')
+      } finally {
+        auth.uninstall()
+        localStorage.removeItem(`chordless:me:${spaceId}`)
       }
     })
 

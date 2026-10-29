@@ -1,6 +1,6 @@
 # IDENTITIES
 
-> **Status (2026-10-29): step 1 is built (people store, upgrade to version 10, `leaderId`, people synced as a `people` collection: docs/SYNC_ARCHITECTURE.md, "People"). Steps 2 to 4 are not.** Replaces a setlist's `owner` (a name) and
+> **Status (2026-10-29): step 1 is built (people store, upgrade to version 10, `leaderId`, people synced as a `people` collection: docs/SYNC_ARCHITECTURE.md, "People"). Step 2 is built (matching in the email import, and which person is "me"). Steps 3 and 4 are not.** Replaces a setlist's `owner` (a name) and
 > `ownerId` (an email) with a link to a person in the space's own list of people.
 
 ## Why
@@ -56,9 +56,29 @@ A setlist whose `leaderId` finds no person (not yet synced) shows no leader rath
 2. a name equal (ignoring case, accents, punctuation, extra spaces) to a person's `name`;
 3. a fuzzy candidate: the same words in another order, a unique first name, or initials ("Tom S.").
 
-1 and 2 are used silently. 3 and "no match" are shown in the import's review step as **Leader: Tom S.
-→ [Tom Smith ▾ | New person]**. Choosing an existing person offers to add the email to them ("add
-tom@church.org to Tom Smith"), so the next import matches by 1.
+1 is used silently. 2, 3 and "no match" are shown in the import's review step, above the setlist's
+details, as a note and a menu: "The email's leader, “Tom S.”, might be one of your people. Who is it?"
+[Tom Smith ▾ | A new person: Tom S. | …]. The best candidate is chosen; choosing a person adds the
+email to them when the setlist is made ("tom@church.org is added to them, so the next email from it
+is matched by its address"), and a new person is stored then too. (Built: `suggestPeople` and
+`resolveLeader` in `leaders.ts`, `_renderLeaderMatch` in `setlist-email-import.ts`.) A candidate is a
+person whose name has each typed word as a whole word or its start, in any order, ranked whole words
+first; a person the typed name is exactly is a match, not a suggestion.
+
+## Which person is me
+
+The person using the app is worked out per space and device (`getSpacePeople`, `me`), in order:
+
+1. the person **chosen on this device** (`chordless:me:<space id>` in local storage: it differs by
+   device, so it is not synced). Choosing adds the signed-in account's address to that person, so any
+   device finds them by it from then on;
+2. the person with the **signed-in account's address**;
+3. a person of the **same name who has no address yet** (who gains it), else a **new person** made
+   from the account.
+
+Where the account's name is that of a person who has other addresses it is not guessed, and the
+form asks "Which of these is you?" (the people, "Not sure yet", "None of these: add me"): an answer
+is `identifyMe`. The Leader menu marks the person "(you)", and a new setlist is led by them.
 
 ## Migration (database version 10, once per space)
 
@@ -105,9 +125,9 @@ same emails. Consequences:
 
 1. The store, the migration, `leaderId`, and every display and file-name use of `owner`; the form's
    menu from the store.
-2. `resolveLeader` in the email import and its review control.
+2. `resolveLeader` in the email import and its review control (built), and which person is me (built).
 3. The People page (rename, emails, merge).
-4. Team link: people from the Worker's members, roles shown.
+4. Team link: people from the Worker's members, roles shown, and "me" matched by `teamMember` before the address.
 
 ## Who may edit people
 

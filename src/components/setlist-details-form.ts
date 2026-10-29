@@ -4,7 +4,7 @@ import { live } from 'lit/directives/live.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Person, Setlist } from '../js/data-types.ts'
 import { determineSetlistType, SETLIST_TYPES } from '../js/db.ts'
-import { resolvePerson } from '../js/leaders.ts'
+import { NEW_PERSON, resolvePerson } from '../js/leaders.ts'
 
 /** What the form collects (and a setlist keeps) */
 export interface SetlistDetails {
@@ -31,6 +31,16 @@ export class SetlistDetailsSaveEvent extends Event {
   constructor(details: SetlistDetails) {
     super(SetlistDetailsSaveEvent.type, { bubbles: true, composed: true })
     this.details = details
+  }
+}
+
+/** The person said which of the people they are: a person's id, or NEW_PERSON for none of them */
+export class SetlistDetailsIdentifyEvent extends Event {
+  static readonly type = 'setlist-details-form:identify'
+  readonly personId: string
+  constructor(personId: string) {
+    super(SetlistDetailsIdentifyEvent.type, { bubbles: true, composed: true })
+    this.personId = personId
   }
 }
 
@@ -88,6 +98,8 @@ export class SetlistDetailsForm extends LitElement {
     hideActions: { type: Boolean, attribute: 'hide-actions' },
     autoType: { type: Boolean, attribute: 'auto-type' },
     people: { attribute: false },
+    meId: { attribute: false },
+    askWho: { type: Boolean },
     _otherLeader: { state: true },
   }
 
@@ -96,6 +108,10 @@ export class SetlistDetailsForm extends LitElement {
   declare hideActions: boolean
   declare autoType: boolean
   declare people: Person[]
+  /** The person using the app, marked "(you)" in the menu */
+  declare meId: string | null
+  /** The person using the app is not known: ask which of the people they are */
+  declare askWho: boolean
   declare _otherLeader: boolean
 
   _dateField: Ref<HTMLInputElement>
@@ -188,6 +204,8 @@ export class SetlistDetailsForm extends LitElement {
     this.submitLabel = 'Save'
     this.autoType = false
     this.people = []
+    this.meId = null
+    this.askWho = false
     this._otherLeader = false
     this._leaders = leaderChoices()
   }
@@ -217,6 +235,12 @@ export class SetlistDetailsForm extends LitElement {
       if (typeField) typeField.value = this.setlist.type || SETLIST_TYPE_NAMES[0]
       if (leaderField) leaderField.value = this._leaders.selected
     }
+  }
+
+  /** The person says which of the people they are: the page records it and gives the form the people again */
+  _identify(event: Event): void {
+    const select = event.target as HTMLSelectElement
+    if (select.value) this.dispatchEvent(new SetlistDetailsIdentifyEvent(select.value))
   }
 
   _leaderChanged(event: Event): void {
@@ -305,7 +329,8 @@ export class SetlistDetailsForm extends LitElement {
           <select id="leader" name="leader" ${ref(this._leaderField)} @change=${this._leaderChanged}>
             <option value="">No leader</option>
             ${this._leaders.options.map(
-              o => html`<option value=${o.value}>${o.person.name}</option>`
+              o =>
+                html`<option value=${o.value}>${o.person.name}${o.person.id === this.meId ? ' (you)' : ''}</option>`
             )}
             <option value=${OTHER_LEADER}>Other…</option>
           </select>
@@ -321,6 +346,18 @@ export class SetlistDetailsForm extends LitElement {
                   placeholder="Leader's name"
                   required
                 />
+              `
+              : ''
+          }
+          ${
+            this.askWho
+              ? html`
+                <label for="who" class="who">Which of these is you?</label>
+                <select id="who" @change=${this._identify}>
+                  <option value="">Not sure yet</option>
+                  ${this._leaders.options.map(o => html`<option value=${o.value}>${o.person.name}</option>`)}
+                  <option value=${NEW_PERSON}>None of these: add me</option>
+                </select>
               `
               : ''
           }
@@ -350,5 +387,6 @@ declare global {
   interface GlobalEventHandlersEventMap {
     [SetlistDetailsSaveEvent.type]: SetlistDetailsSaveEvent
     [SetlistDetailsCancelEvent.type]: SetlistDetailsCancelEvent
+    [SetlistDetailsIdentifyEvent.type]: SetlistDetailsIdentifyEvent
   }
 }

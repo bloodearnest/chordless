@@ -11,6 +11,7 @@ import {
   SongSettingsClickEvent,
 } from '../components/musical-metadata-display.ts'
 import { MenuOverviewClickEvent, MenuSongClickEvent, type NavMenu } from '../components/nav-menu.ts'
+import { SetlistDetailsIdentifyEvent } from '../components/setlist-details-form.ts'
 import { type SetlistDiffers, SetlistRevertedEvent } from '../components/setlist-differs.ts'
 import {
   SetlistInfoDeleteEvent,
@@ -37,7 +38,7 @@ import { LiveSyncStatusEvent } from './live-sync-status.ts'
 import { goTo, setPageTitle } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
-import { getSpacePeople, settleLeader } from './people.ts'
+import { getSpacePeople, identifyMe, settleLeader } from './people.ts'
 import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
@@ -143,6 +144,7 @@ export class SetlistPage {
   _capoEnabled: boolean
   _setlistDetailsSaveHandler?: (event: SetlistInfoSaveEvent) => void
   _setlistDeleteHandler?: (event: SetlistInfoDeleteEvent) => void
+  _identifyHandler?: (event: SetlistDetailsIdentifyEvent) => void
   _lastVisibleSection?: string | null
   _isProgrammaticScroll?: boolean
   _programmaticScrollTimeout?: ReturnType<typeof setTimeout>
@@ -714,12 +716,33 @@ export class SetlistPage {
       this._setlistDeleteHandler = () => this.deleteSetlist()
       dialog.addEventListener(SetlistInfoDeleteEvent.type, this._setlistDeleteHandler)
     }
+    if (!this._identifyHandler) {
+      this._identifyHandler = async event => {
+        await identifyMe(this._database(), event.personId)
+        await this._loadDialogPeople(dialog)
+      }
+      dialog.addEventListener(SetlistDetailsIdentifyEvent.type, this._identifyHandler)
+    }
     dialog.readonly = this._readOnly
-    // (to read, the people there are; to edit, those the space's members and you would be as well)
-    dialog.people = dialog.readonly
-      ? await this._database().getAllPeople()
-      : (await getSpacePeople(this._database())).people
+    await this._loadDialogPeople(dialog)
     await dialog.show(this.currentSetlist)
+  }
+
+  /**
+   * Give the info dialog the people: to read, the people there are; to edit, those the space's
+   * members and you would be as well, and who of them is you (or that the person should say)
+   */
+  async _loadDialogPeople(dialog: SetlistInfoDialog) {
+    if (dialog.readonly) {
+      dialog.people = await this._database().getAllPeople()
+      dialog.meId = null
+      dialog.askWho = false
+      return
+    }
+    const { people, me, askWho } = await getSpacePeople(this._database())
+    dialog.people = people
+    dialog.meId = me?.id ?? null
+    dialog.askWho = askWho
   }
 
   /**
@@ -797,7 +820,7 @@ export class SetlistPage {
     // The menu's heading and the window's title say the setlist's date and name
     this.updateNavigationMenu()
     // (a leader typed in with "Other…" is a person made by this save)
-    if (dialog) dialog.people = (await getSpacePeople(this._database())).people
+    if (dialog) await this._loadDialogPeople(dialog)
     await dialog?.show(setlist)
   }
 

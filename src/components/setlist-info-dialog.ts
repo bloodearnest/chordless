@@ -56,6 +56,9 @@ export class SetlistInfoDialog extends LitElement {
   static override properties = {
     /** The space's people: who can be chosen as leader when editing, and who leads the setlist shown */
     people: { attribute: false },
+    /** The person using the app (marked in the menu), and whether to ask which of the people they are */
+    meId: { attribute: false },
+    askWho: { type: Boolean },
     /** A setlist received by link: no editing or deleting */
     readonly: { type: Boolean },
     _setlist: { state: true },
@@ -81,6 +84,8 @@ export class SetlistInfoDialog extends LitElement {
   ]
 
   declare people: Person[]
+  declare meId: string | null
+  declare askWho: boolean
   declare readonly: boolean
   declare _setlist: Setlist | null
   declare _editing: boolean
@@ -91,6 +96,8 @@ export class SetlistInfoDialog extends LitElement {
     super()
     this._modalRef = createRef()
     this.people = []
+    this.meId = null
+    this.askWho = false
     this.readonly = false
     this._setlist = null
     this._editing = false
@@ -175,6 +182,8 @@ export class SetlistInfoDialog extends LitElement {
               <setlist-details-form
                 .setlist=${this._setlist}
                 .people=${this.people}
+                .meId=${this.meId}
+                .askWho=${this.askWho}
                 submit-label="Save"
                 @setlist-details-form:save=${this._save}
                 @setlist-details-form:cancel=${this._cancel}

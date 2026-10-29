@@ -8,7 +8,9 @@ import {
   leaderName,
   normalizeName,
   planPeople,
+  resolveLeader,
   resolvePerson,
+  suggestPeople,
 } from '../src/js/leaders.ts'
 
 const NOW = '2026-10-29T10:00:00.000Z'
@@ -177,6 +179,71 @@ describe('a leader known only by email', () => {
       leaders
     )
     assert.equal(leaders.added[0].name, 'dan@example.com')
+  })
+})
+
+describe('suggestPeople', () => {
+  const tom = person({ id: 'tom', name: 'Tom Smith' })
+  const tim = person({ id: 'tim', name: 'Tim Smithers' })
+  const ann = person({ id: 'ann', name: 'Ann Lee' })
+  const gone = person({ id: 'gone', name: 'Tom Smith', mergedInto: 'tom' })
+  const people = [ann, tim, tom, gone]
+
+  it('suggests the person whose name a typed one abbreviates', () => {
+    assert.deepEqual(suggestPeople(people, 'Tom S.'), [tom])
+    // (Tim Smithers fits too, but less well)
+    assert.deepEqual(suggestPeople(people, 'T Smith'), [tom, tim])
+  })
+
+  it('suggests a person for a first name or surname alone, and in any order', () => {
+    assert.deepEqual(suggestPeople(people, 'Tom'), [tom])
+    assert.deepEqual(suggestPeople(people, 'Smith, Tom'), [tom])
+  })
+
+  it('prefers whole words to abbreviations, and lists every candidate', () => {
+    assert.deepEqual(suggestPeople(people, 'Smith'), [tom, tim])
+    assert.deepEqual(suggestPeople(people, 'T'), [tim, tom])
+  })
+
+  it('suggests nobody for an exact name (that is a match), an unknown one, or none', () => {
+    assert.deepEqual(suggestPeople(people, 'Tom Smith'), [])
+    assert.deepEqual(suggestPeople(people, 'Zed'), [])
+    assert.deepEqual(suggestPeople(people, ''), [])
+    assert.deepEqual(suggestPeople(people, null), [])
+  })
+
+  it('uses each word of the name once', () => {
+    assert.deepEqual(suggestPeople(people, 'Smith Smith'), [])
+  })
+})
+
+describe('resolveLeader', () => {
+  const tom = person({ id: 'tom', name: 'Tom Smith', emails: ['tom@example.com'] })
+  const ann = person({ id: 'ann', name: 'Ann Lee' })
+
+  it('is the person with the email, whatever the name', () => {
+    assert.deepEqual(resolveLeader([ann, tom], { name: 'Thomas', email: 'TOM@example.com' }), {
+      kind: 'match',
+      person: tom,
+      by: 'email',
+    })
+  })
+
+  it('is the person of that name when the email is not any person’s', () => {
+    assert.deepEqual(resolveLeader([ann, tom], { name: 'ann lee', email: 'new@example.com' }), {
+      kind: 'match',
+      person: ann,
+      by: 'name',
+    })
+  })
+
+  it('suggests people to ask about, or knows nobody', () => {
+    assert.deepEqual(resolveLeader([ann, tom], { name: 'Tom S.', email: 'x@y.org' }), {
+      kind: 'suggest',
+      candidates: [tom],
+    })
+    assert.deepEqual(resolveLeader([ann, tom], { name: 'Zed', email: '' }), { kind: 'none' })
+    assert.deepEqual(resolveLeader([], {}), { kind: 'none' })
   })
 })
 

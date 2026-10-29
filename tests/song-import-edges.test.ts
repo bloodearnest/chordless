@@ -245,6 +245,95 @@ describe('song-import: corners', () => {
     })
   })
 
+  describe('when it is not known which person is the one using the app', () => {
+    let auth: ReturnType<typeof installFakeAuthWorker>
+    afterEach(() => auth?.uninstall())
+
+    it('asks, and leads the new setlist by the one they say', async () => {
+      auth = installFakeAuthWorker()
+      auth.worker.stored = {
+        blob: 'blob',
+        metadata: {
+          access_token: 'token',
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          user: {
+            picture: null,
+            given_name: null,
+            family_name: null,
+            sub: '1',
+            name: 'Dee Question',
+            email: 'dee@home.org',
+          },
+        },
+        updated_at: new Date().toISOString(),
+      } as never
+      const db = await getCurrentDB()
+      await db.savePeople([
+        {
+          id: 'dee-at-work',
+          name: 'Dee Question',
+          emails: ['dee@work.org'],
+          modifiedDate: new Date().toISOString(),
+        },
+      ])
+      const element = await importer()
+      await element.receiveAll([
+        { name: 'a', chordproText: chart(unique('Ask A')), source: 'paste' },
+      ])
+      await element._openNewSetlist()
+      expect(element._askWho).to.equal(true)
+      expect(element._newSetlist.leaderId).to.equal('')
+
+      await element._identify(Object.assign(new Event('x'), { personId: 'dee-at-work' }))
+
+      expect(element._askWho).to.equal(false)
+      expect(element._meId).to.equal('dee-at-work')
+      expect(element._newSetlist.leaderId).to.equal('dee-at-work')
+      // (an answer that is none of the people leaves it as it was)
+      await element._identify(Object.assign(new Event('x'), { personId: 'nobody' }))
+      expect(element._meId).to.equal('dee-at-work')
+      localStorage.removeItem(`chordless:me:${db.spaceId}`)
+    })
+
+    it('stays unsure when the answer is none of the people', async () => {
+      auth = installFakeAuthWorker()
+      auth.worker.stored = {
+        blob: 'blob',
+        metadata: {
+          access_token: 'token',
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          user: {
+            picture: null,
+            given_name: null,
+            family_name: null,
+            sub: '1',
+            name: 'Eve Question',
+            email: 'eve@home.org',
+          },
+        },
+        updated_at: new Date().toISOString(),
+      } as never
+      const db = await getCurrentDB()
+      await db.savePeople([
+        {
+          id: 'eve-at-work',
+          name: 'Eve Question',
+          emails: ['eve@work.org'],
+          modifiedDate: new Date().toISOString(),
+        },
+      ])
+      const element = await importer()
+      await element.receiveAll([
+        { name: 'a', chordproText: chart(unique('Eve A')), source: 'paste' },
+      ])
+      await element._openNewSetlist()
+      await element._identify(Object.assign(new Event('x'), { personId: 'nobody' }))
+      expect(element._askWho).to.equal(true)
+      expect(element._meId).to.equal(null)
+      expect(element._newSetlist.leaderId).to.equal('')
+    })
+  })
+
   it('goes to the library when several songs were imported to it only', async () => {
     const element = await importer()
     await element.receiveAll([
