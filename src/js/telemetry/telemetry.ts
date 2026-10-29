@@ -5,16 +5,18 @@
  * turned off, every call here does nothing.
  *
  * A browser has no async context: after an `await` there is no "active" span. So a span is held
- * where it is wanted, and `traced` with `trackCalls` keeps the one sync that runs at a time (sync
- * runs under a lock) for the calls made during it to be counted on.
+ * where it is wanted: `traced` with `trackCalls` keeps the one sync that runs at a time (sync runs
+ * under a lock), and the calls it makes (`timedFetch`) are made with it as their parent, which the
+ * fetch instrumentation (fetch.ts) then makes spans of. Which syncs are reported is the sampler's
+ * (sampler.ts), by the trace, so a call below a sync that is not reported is not either.
  */
 import {
   type Attributes,
   context,
   INVALID_SPAN_CONTEXT,
   type Span,
-  SpanKind,
   SpanStatusCode,
+  TraceFlags,
   trace,
 } from '@opentelemetry/api'
 import { getTelemetryPreference } from '../preferences.ts'
@@ -42,12 +44,12 @@ const newStats = (): CallStats => ({
 
 /** At most this many calls of one sync are spans of their own: a first sync can make hundreds, and they are still counted on the sync's span */
 const MAX_CALL_SPANS = 200
-/** How much of a call's query string is kept on its span */
-const MAX_QUERY = 300
+/** One in this many `tick` syncs is reported: they are the many, and mostly find nothing (the sampler, sampler.ts) */
+export const TICK_SAMPLE = 10
 /** Errors reported in one visit: a loop of them is one problem, and spans are what Honeycomb bills */
 const MAX_ERROR_SPANS = 20
 
-let tracked: { span: Span; stats: CallStats; callSpans: number; sample: number } | null = null
+let tracked: { span: Span; stats: CallStats; callSpans: number } | null = null
 let errorSpans = 0
 
 const tracer = () => trace.getTracer(NAME)
@@ -70,26 +72,14 @@ export async function traced<T>(
   name: string,
   attributes: Attributes,
   fn: (span: Span) => Promise<T> | T,
-  { trackCalls = false, sample = 1 }: { trackCalls?: boolean; sample?: number } = {}
+  { trackCalls = false }: { trackCalls?: boolean } = {}
 ): Promise<T> {
   if (!getTelemetryPreference()) return fn(NO_SPAN)
-  // Head sampling: one in `sample` is kept, with `SampleRate` so that Honeycomb counts it that many
-  // times. One that is not kept is no span, and the calls it makes are no spans either (a call with
-  // no sync to belong to would be a trace of its own)
-  if (sample > 1 && Math.random() * sample >= 1) {
-    const outer = tracked
-    tracked = { span: NO_SPAN, stats: newStats(), callSpans: MAX_CALL_SPANS, sample }
-    try {
-      return await fn(NO_SPAN)
-    } finally {
-      tracked = outer
-    }
-  }
-  const span = tracer().startSpan(name, {
-    attributes: sample > 1 ? { ...attributes, SampleRate: sample } : attributes,
-  })
+  // (whether it is reported is the sampler's, by what it is given here: a span it does not report
+  // is still one, and what is made below it is not reported either)
+  const span = tracer().startSpan(name, { attributes })
   const outer = tracked
-  const mine = trackCalls ? { span, stats: newStats(), callSpans: 0, sample } : null
+  const mine = trackCalls ? { span, stats: newStats(), callSpans: 0 } : null
   if (mine) tracked = mine
   try {
     const result = await fn(span)
@@ -118,8 +108,8 @@ export async function traced<T>(
 /**
  * A step of the sync running now (reading the feed, checking access) as a span of its own, the
  * parent of the calls it makes: so a trace says which step each call belonged to. It is a child of
- * the sync, or of the step that holds it. Outside a sync, or in one that is not reported (not
- * sampled), it is no span and `fn` just runs.
+ * the sync, or of the step that holds it. Outside a sync it is no span and `fn` just runs. (In a sync
+ * that is not reported it is a span the sampler does not report.)
  */
 export async function phase<T>(
   name: string,
@@ -127,12 +117,8 @@ export async function phase<T>(
   fn: (span: Span) => Promise<T> | T
 ): Promise<T> {
   const owner = tracked?.span
-  if (!tracked || !owner || owner === NO_SPAN || !getTelemetryPreference()) return fn(NO_SPAN)
-  const span = tracer().startSpan(
-    name,
-    { attributes: tracked.sample > 1 ? { ...attributes, SampleRate: tracked.sample } : attributes },
-    trace.setSpan(context.active(), owner)
-  )
+  if (!tracked || !owner || !getTelemetryPreference()) return fn(NO_SPAN)
+  const span = tracer().startSpan(name, { attributes }, trace.setSpan(context.active(), owner))
   const state = tracked
   state.span = span
   try {
@@ -176,33 +162,12 @@ export function countCall(kind: CallKind, ms: number, status: number): void {
 /** A call that did not work: no answer, or a refusal (a 404 is Drive's way of saying there is no such file) */
 const failed = (status: number): boolean => status === 0 || (status >= 400 && status !== 404)
 
-/** A header set on a request init, whatever form its headers are in */
-function withHeader(init: RequestInit | undefined, name: string, value: string): RequestInit {
-  const headers = new Headers(init?.headers)
-  headers.set(name, value)
-  return { ...init, headers }
-}
-
-/** The size of a request body we hold (a stream is not read to find out) */
-const bodySize = (body: BodyInit | null | undefined): number | undefined => {
-  if (typeof body === 'string') return new TextEncoder().encode(body).byteLength
-  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) return body.byteLength
-  if (body instanceof Blob) return body.size
-  return undefined
-}
-
-const portOf = (url: URL): number =>
-  url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80
-
-const urlOf = (input: RequestInfo | URL): URL =>
-  new URL(input instanceof Request ? input.url : String(input), location.href)
-
 /**
- * `fetch`, with a span for each call (the client side of a boundary: a span is what the other side's
- * can be a child of) and the call counted on the sync running now (`countCall`). The span is a child
- * of the sync, or of `parent` where there is none (a token refresh); and with neither, a trace of its
- * own. A call to our Worker carries the span's own `traceparent`, so the Worker's span can be its
- * child: never to Google, which would need a CORS preflight and be told our trace ids.
+ * `fetch`, for the Drive and Worker calls of the sync, the token refresh and the pages: the call is
+ * counted on the sync running now (`countCall`), and made with the sync (or `parent`, where there is
+ * none: a token refresh) as the active span, which the fetch instrumentation (fetch.ts) makes the
+ * parent of the call's span. Past the budget of a sync the calls are made as if the sync were not
+ * reported, so they are not either.
  */
 export function timedFetch(
   kind: CallKind,
@@ -212,141 +177,24 @@ export function timedFetch(
   return (async (input, init) => {
     const started = performance.now()
     const owner = tracked?.span ?? parent?.()
-    let span: Span | null = null
-    let href = ''
-    if (getTelemetryPreference() && (!tracked || tracked.callSpans < MAX_CALL_SPANS)) {
-      if (tracked) tracked.callSpans++
-      const url = urlOf(input)
-      href = url.href
-      span = tracer().startSpan(
-        `chordless.${kind}.request`,
-        {
-          kind: SpanKind.CLIENT,
-          attributes: {
-            'http.request.method': (
-              init?.method ?? (input instanceof Request ? input.method : 'GET')
-            ).toUpperCase(),
-            'url.scheme': url.protocol.slice(0, -1),
-            'server.address': url.hostname,
-            'server.port': portOf(url),
-            'url.path': url.pathname,
-            ...(bodySize(init?.body) !== undefined
-              ? { 'http.request.body.size': bodySize(init?.body) }
-              : {}),
-            // (what a Drive listing asked for, the `q` of it, says why it was made)
-            'url.query': url.search.slice(0, MAX_QUERY),
-            // (a call of a sampled sync is counted as often as the sync is)
-            ...(tracked && tracked.sample > 1 ? { SampleRate: tracked.sample } : {}),
-          },
-        },
-        owner ? trace.setSpan(context.active(), owner) : undefined
-      )
-    }
-    let request = init
-    if (span && kind === 'worker') {
-      const { traceId, spanId, traceFlags } = span.spanContext()
-      request = withHeader(
-        init,
-        'traceparent',
-        `00-${traceId}-${spanId}-${traceFlags.toString(16).padStart(2, '0')}`
-      )
+    let parentContext = owner ? trace.setSpan(context.active(), owner) : context.active()
+    if (owner && tracked) {
+      if (tracked.callSpans >= MAX_CALL_SPANS) {
+        parentContext = trace.setSpanContext(context.active(), {
+          ...owner.spanContext(),
+          traceFlags: TraceFlags.NONE,
+        })
+      } else tracked.callSpans++
     }
     try {
-      const response = await base(input, request)
-      const ms = performance.now() - started
-      countCall(kind, ms, response.status)
-      finishCall(span, response.status, response.headers)
-      // (a call to our own Worker is the page's own address: the browser says how big the answer was)
-      if (span && kind === 'worker') endWhenSized(span, href, started)
-      else span?.end()
+      const response = await context.with(parentContext, () => base(input, init))
+      countCall(kind, performance.now() - started, response.status)
       return response
     } catch (error) {
       countCall(kind, performance.now() - started, 0)
-      if (span) {
-        span.setAttribute('error.type', error instanceof Error ? error.name : '_OTHER')
-        recordFailure(span, error)
-      }
-      span?.end()
       throw error
     }
   }) as typeof fetch
-}
-
-/** How long `endWhenSized` waits for the browser's entry of a call: it has one once the whole body is in */
-let sizeWaitMs = 300
-const SIZE_POLL_MS = 25
-const claimedEntries = new WeakSet<PerformanceEntry>()
-
-/** For tests: how long a call to the Worker waits for its sizes (none: it ends as soon as it is answered) */
-export function setSizeWait(ms: number): void {
-  sizeWaitMs = ms
-}
-
-/** The browser's resource entry of the call to `href` that began at `started` (`performance.now()`), not yet given to another */
-function resourceEntryOf(href: string, started: number): PerformanceResourceTiming | undefined {
-  let found: PerformanceResourceTiming | undefined
-  let gap = 50
-  for (const entry of performance.getEntriesByName(
-    href,
-    'resource'
-  ) as PerformanceResourceTiming[]) {
-    const wait = entry.startTime - started
-    if (wait >= -1 && wait < gap && !claimedEntries.has(entry)) {
-      found = entry
-      gap = wait
-    }
-  }
-  if (found) claimedEntries.add(found)
-  return found
-}
-
-/**
- * End a call's span as of now, with what the browser knows of the answer's size once it has it: the
- * bytes on the wire (`http.response.body.size`, as compressed), what they came to (`chordless.http.response.decoded_body_size`) and with
- * the headers (`http.response.size`). Streamed or chunked answers have these too, which no header says.
- * If the entry does not come in a moment (a body nobody reads), the span ends without them.
- */
-function endWhenSized(span: Span, href: string, started: number): void {
-  const answered = Date.now()
-  if (sizeWaitMs <= 0) {
-    span.end(answered)
-    return
-  }
-  const deadline = performance.now() + sizeWaitMs
-  const look = () => {
-    const entry = resourceEntryOf(href, started)
-    if (entry) {
-      if (entry.encodedBodySize > 0)
-        span.setAttribute('http.response.body.size', entry.encodedBodySize)
-      if (entry.decodedBodySize > 0) {
-        span.setAttribute('chordless.http.response.decoded_body_size', entry.decodedBodySize)
-      }
-      if (entry.transferSize > 0) span.setAttribute('http.response.size', entry.transferSize)
-      span.end(answered)
-    } else if (performance.now() >= deadline) span.end(answered)
-    else setTimeout(look, SIZE_POLL_MS)
-  }
-  look()
-}
-
-/** The call is over: its status on the span, and an error if it failed (the caller ends it) */
-function finishCall(span: Span | null, status: number, headers: Headers): void {
-  if (!span) return
-  span.setAttribute('http.response.status_code', status)
-  // (a response with no Content-Length, or none that a cross-origin page may read, has no size)
-  const length = headers.get('Content-Length')
-  if (length !== null && Number.isFinite(Number(length))) {
-    span.setAttribute('http.response.body.size', Number(length))
-  }
-  // Cloudflare's Worker spans do not join our trace (they ignore `traceparent`): the ray id is the
-  // join, the same value as `cloudflare.ray_id` on the Worker's span (the header is `<id>-<colo>`)
-  const ray = headers.get('cf-ray')
-  if (ray) span.setAttribute('cloudflare.ray_id', ray.split('-')[0])
-  if (failed(status)) {
-    span.setAttribute('error.type', String(status))
-    span.setAttribute('chordless.error', true)
-    span.setStatus({ code: SpanStatusCode.ERROR })
-  }
 }
 
 /**
