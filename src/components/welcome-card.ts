@@ -199,7 +199,6 @@ export class WelcomeCard extends LitElement {
             </p>
             <div class="actions">
               <a class="btn" href="/import-song">Import songs</a>
-              <a class="btn" href="/bookmarklet">SongSelect bookmarklet</a>
             </div>
           </li>
           <li id="welcome-sign-in">

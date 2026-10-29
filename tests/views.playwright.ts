@@ -64,7 +64,6 @@ test.describe('Moving between views', () => {
     ['/account', 'account-view', 'Account and Teams - Chordless'],
     ['/preferences', 'preferences-view', 'Preferences - Chordless'],
     ['/import-song', 'import-song-view', 'Import Songs - Chordless'],
-    ['/bookmarklet', 'bookmarklet-view', 'Bookmarklet - Chordless'],
     ['/songs', 'library-view', 'Song Library - Chordless'],
     ['/about', 'about-view', 'About - Chordless'],
   ]) {
@@ -79,7 +78,6 @@ test.describe('Moving between views', () => {
 
   for (const [from, link, tag, title] of [
     ['/', 'Import Songs', 'import-song-view', 'Import Songs - Chordless'],
-    ['/', 'SongSelect Import', 'bookmarklet-view', 'Bookmarklet - Chordless'],
     ['/', 'Song Library', 'library-view', 'Song Library - Chordless'],
     ['/account', 'Setlists', 'home-view', 'Chordless'],
   ]) {

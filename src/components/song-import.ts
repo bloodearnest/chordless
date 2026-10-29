@@ -23,6 +23,7 @@ import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './chart-diff.ts'
+import './songselect-help.ts'
 import type { ChartLabel } from './chart-diff.ts'
 import type { SetlistDetailsSaveEvent } from './setlist-details-form.ts'
 import './setlist-details-form.ts'
@@ -282,6 +283,20 @@ export class SongImport extends LitElement {
     .duplicate-actions .btn {
       flex: 1;
       font-size: var(--font-ui-small);
+    }
+
+    details.songselect {
+      margin-top: 1.5rem;
+    }
+
+    details.songselect summary {
+      cursor: pointer;
+      font-size: var(--font-ui);
+      color: var(--text-color);
+    }
+
+    details.songselect songselect-help {
+      margin-top: 1rem;
     }
 
     .choices {
@@ -951,13 +966,6 @@ export class SongImport extends LitElement {
             <button class="btn primary add" @click=${this._importPasted}>Import</button>
           </div>
         </div>
-        <a class="choice" href="/bookmarklet">
-          <span class="icon">🔖</span>
-          <span class="content">
-            <span class="title">Import from SongSelect</span>
-            <span class="subtitle">Bookmarklet, best on desktop</span>
-          </span>
-        </a>
         <a class="choice" href="/import-setlist">
           <span class="icon">✉️</span>
           <span class="content">
@@ -966,6 +974,10 @@ export class SongImport extends LitElement {
           </span>
         </a>
       </div>
+      <details class="songselect">
+        <summary>Import from SongSelect (CCLI) with a bookmarklet</summary>
+        <songselect-help></songselect-help>
+      </details>
     `
   }
 
