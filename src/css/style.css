@@ -1092,6 +1092,14 @@ body.edit-mode .key-selector:focus {
   margin-left: 0 !important;
 }
 
+/* Phone: the header goes with the scrolling (header-autohide.ts), and the page moves up under it;
+   this padding on top keeps the text moving at the pace of the scroll, not twice it */
+@media (max-width: 47.99rem) {
+  .section {
+    padding-top: var(--tuck, 0px);
+  }
+}
+
 /* Tablet/desktop: the header stays, so the song has a margin on every side. The top and bottom
    are on the page, not the scrolling section, so they stay put and the lyrics are cut at them
    rather than running under the header */
