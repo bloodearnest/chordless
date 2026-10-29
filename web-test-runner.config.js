@@ -36,6 +36,14 @@ export default {
   nodeResolve: { browser: true, exportConditions: ['browser'] },
   // Types are erased, nothing else: the browser gets the same code it would from Vite
   plugins: [
+    // Node's own modules, which the Worker's code (loaded by some of these tests) imports
+    {
+      name: 'node-builtins',
+      resolveImport: ({ source }) =>
+        source === 'async_hooks' || source === 'events'
+          ? '/tests/shims/node-builtins.js'
+          : undefined,
+    },
     esbuildPlugin({
       ts: true,
       target: 'auto',
