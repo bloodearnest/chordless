@@ -9,6 +9,7 @@
 
 import * as jose from 'jose'
 import * as oauth from 'oauth4webapi'
+import { tracedFetch } from './trace.ts'
 
 const ISSUER = 'https://accounts.google.com'
 // Google also issues ID tokens with the issuer written without the scheme
@@ -43,7 +44,7 @@ export interface GoogleTestHooks {
 
 const requestOptions = ({ fetch }: GoogleTestHooks) => ({
   signal: AbortSignal.timeout(TIMEOUT_MS),
-  ...(fetch && { [oauth.customFetch]: fetch }),
+  [oauth.customFetch]: tracedFetch(fetch),
 })
 
 /**

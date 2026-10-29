@@ -13,6 +13,7 @@ import type { AdminContext } from './team-admin.ts'
 import type { TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'
 import { notingRefs } from './team-refs.ts'
+import { tracedFetch, tracedStub } from './trace.ts'
 
 /** What a test replaces; the real ones are the defaults */
 export interface TeamDeps {
@@ -34,7 +35,7 @@ function resolve(env: Env, deps: TeamDeps) {
 
 /** A space's Durable Object, by the space's id */
 const roomsOf = (teamSpaces: NonNullable<Env['TEAM_SPACE']>) => (spaceId: string) =>
-  teamSpaces.get(teamSpaces.idFromName(spaceId))
+  tracedStub(teamSpaces.get(teamSpaces.idFromName(spaceId)), 'TeamSpace')
 
 export function createTeamContext(
   env: Env,
@@ -50,7 +51,7 @@ export function createTeamContext(
     const info = await room(spaceId).info()
     if (!info) return null
     const token = ownerAccessToken({ room: room(spaceId), info, env, google, now })
-    return { info, backend: teamDrive(token, deps.fetch) }
+    return { info, backend: teamDrive(token, tracedFetch(deps.fetch)) }
   }
   const drive = (spaceId: string) => {
     const found = drives.get(spaceId) ?? open(spaceId)
@@ -93,7 +94,7 @@ export function createAdminContext(
         google,
         now,
       })
-      const root = await teamDrive(token, deps.fetch).inspectRoot(rootRef)
+      const root = await teamDrive(token, tracedFetch(deps.fetch)).inspectRoot(rootRef)
       return root && { trashed: root.trashed, canWrite: root.canWrite }
     },
     openBlob: blob => decryptBlob(blob, env),

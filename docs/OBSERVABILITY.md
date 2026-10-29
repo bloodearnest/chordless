@@ -193,6 +193,20 @@ spans of bindings (Durable Objects, the rate limiter, subrequests), which only C
 export has. So the native export stays on for now, until a few days of both show whether it is missed;
 then it is one line in `wrangler.toml` to turn off.
 
+**The Worker's calls are spans below it** (`tracedFetch` and `tracedStub` in `trace.ts`). The Worker has
+async context (`AsyncLocalStorage`, from `nodejs_compat`; the OTel context manager is
+`@opentelemetry/context-async-hooks`), so `chordless.worker.handle` is the active span while the request
+runs and what it awaits is below it, with no explicit parenting. `tracedFetch` wraps the Drive calls of a
+team space, a share's download and the token endpoint: `chordless.worker.fetch`, with the method, host,
+path (never the query) and status, ended when the response's headers arrive; the body is never read or
+cloned, so a stream goes through as it was. `tracedStub` wraps a Durable Object's stub:
+`chordless.worker.do`, with the method and class, ended when the call is answered. No trace context
+is sent on, to Google or to the objects. At most 50 calls of a request are spans. No existing OTel fetch
+instrumentation fits: `instrumentation-fetch` clones and reads the whole response (a stream would be
+buffered in memory: Drive and pad audio go through here), `instrumentation-undici` and `-http` hook
+Node's own clients, which workerd does not have, and `otel-cf-workers` is an older release candidate that
+pins the 2.x packages and wants to wrap the whole Worker.
+
 **Steps of a sync.** `phase()` (`telemetry.ts`) makes a step of the sync running a span of its own, the
 parent of the calls it makes, so a trace says which step each call belonged to: `chordless.sync.init`,
 `.feed`, `.feed_position`, `.members`, `.access`, `.inventory`, `.pull`, `.push`. It holds the one

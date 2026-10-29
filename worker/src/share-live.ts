@@ -10,6 +10,7 @@ import type { Env } from './env.ts'
 import { jsonResponse } from './http.ts'
 import { shareSecretFromProtocol } from './live-relay.ts'
 import { isShareFileId } from './share.ts'
+import { tracedStub } from './trace.ts'
 
 /** The id from /api/share/<id>/live, or null if this isn't a share's live path */
 export function shareLiveId(pathname: string): string | null {
@@ -43,7 +44,6 @@ export async function handleShareLive(
   // (fresh headers: only these reach the room, and a browser's request has no way to set them)
   const headers: Record<string, string> = { Upgrade: 'websocket' }
   if (asked.secret) headers['X-Share-Publisher'] = await hashOf(asked.secret)
-  return env.SHARE_ROOM.get(env.SHARE_ROOM.idFromName(fileId)).fetch(
-    new Request(request.url, { headers })
-  )
+  const room = tracedStub(env.SHARE_ROOM.get(env.SHARE_ROOM.idFromName(fileId)), 'ShareRoom')
+  return room.fetch(new Request(request.url, { headers }))
 }
