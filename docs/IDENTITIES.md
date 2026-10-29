@@ -20,10 +20,8 @@ like setlists (one record each).
 Person {
   id: string            // uuid, never changes
   name: string          // as shown
-  aliases: string[]     // other spellings that mean this person ("Tom", "Tom S.")
   emails: string[]      // lower-cased; a person may have several
   teamMember?: string   // "provider:sub" (identityKey, docs/SPACES.md), only in a team space
-  nameSetBy?: string    // teamMember key, when the person set their own name (kept by later syncs)
   mergedInto?: string   // set when merged into another person; the record stays so that a
                         // device that has not synced yet can still resolve the id
   modifiedDate: string
@@ -55,19 +53,18 @@ A setlist whose `leaderId` finds no person (not yet synced) shows no leader rath
 `resolveLeader({name, email})`, in order:
 
 1. an email equal to one of a person's `emails`;
-2. a name equal (ignoring case, accents, punctuation, extra spaces) to a person's `name` or `aliases`;
+2. a name equal (ignoring case, accents, punctuation, extra spaces) to a person's `name`;
 3. a fuzzy candidate: the same words in another order, a unique first name, or initials ("Tom S.").
 
 1 and 2 are used silently. 3 and "no match" are shown in the import's review step as **Leader: Tom S.
-→ [Tom Smith ▾ | New person]**. Choosing an existing person offers to remember the typed name as an
-alias (and the email as one of theirs), so the next import matches by 2.
+→ [Tom Smith ▾ | New person]**. Choosing an existing person offers to add the email to them ("add
+tom@church.org to Tom Smith"), so the next import matches by 1.
 
 ## Migration (database version 10, once per space)
 
 For each setlist: group by `ownerId` when it has one, else by case-insensitive trimmed `owner`; create
-a person per group (the most common spelling is the name, the others are aliases, the emails are
-emails), set `leaderId`, delete `owner` and `ownerId`. A name-only group whose name matches an email
-group's name or alias joins it. Saved with a new `modifiedDate` so it syncs. The person records are
+a person per group (the most common spelling is the name, the emails are emails), set `leaderId`, delete `owner` and `ownerId`. A name-only group whose name matches an email
+group's name joins it. Saved with a new `modifiedDate` so it syncs. The person records are
 created with a uuid derived from the group's key, so two devices that migrate separately agree.
 
 Because there is one user for now, no compatibility with older clients is kept: a setlist file with
@@ -76,9 +73,9 @@ new one.
 
 ## People page
 
-A list in Account and Teams (docs/ACCOUNT.md): each person with their emails, aliases and how many
-setlists they lead; rename, add or remove an alias or email, **Merge into…** (sets `mergedInto`,
-rewrites `leaderId` on their setlists, moves the names and emails across), and Delete (only for a
+A list in Account and Teams (docs/ACCOUNT.md): each person with their emails and how many
+setlists they lead; rename, add or remove an email, **Merge into…** (sets `mergedInto`,
+rewrites `leaderId` on their setlists, moves the emails across), and Delete (only for a
 person who leads nothing). This is also where today's bad names get cleaned up.
 
 ## Team spaces
@@ -90,12 +87,26 @@ person who leads nothing). This is also where today's bad names get cleaned up.
 - Inviting from a setlist's leaders (`team-invite-step.ts`) uses a person's emails (the first, or a
   choice if there are several), not `ownerId`.
 
+## One person in several teams
+
+Each space has its own list of people, because spaces are self-contained (docs/SPACES.md). The same
+human in two teams, or in a team and your personal space, is **one person record in each**, with no
+link between the spaces except what identifies them: the same `teamMember` (`provider:sub`) and the
+same emails. Consequences:
+
+- Names and emails may differ per space (a nickname in one team); nothing reconciles them.
+- Their role is per team, read from each team's Durable Object by that space's `teamMember`.
+- "Me" in a space is the person whose `teamMember` is mine, else whose email is mine.
+- Copying or moving a setlist to another space remaps `leaderId` there: by `teamMember`, then email,
+  then name, else a new person is made. The id is never carried across.
+- Shares carry the name only (above), so nothing links across spaces that way either.
+
 ## Steps
 
 1. The store, the migration, `leaderId`, and every display and file-name use of `owner`; the form's
    menu from the store.
 2. `resolveLeader` in the email import and its review control.
-3. The People page (rename, aliases, emails, merge).
+3. The People page (rename, emails, merge).
 4. Team link: people from the Worker's members, roles shown.
 
 ## Who may edit people
@@ -104,13 +115,13 @@ Decided 2026-10-29.
 
 - **Personal space:** you, of course.
 - **Team space:** worship leaders (the `writer` role) and above may add, rename, merge and delete
-  people, and edit their aliases and emails. A team member (`reader`) may edit only **their own
+  people, and edit their emails. A team member (`reader`) may edit only **their own
   name** (the person whose `teamMember` is theirs).
 - The Worker already refuses writes to the space's files from a team member, so their own-name edit
   needs a route of its own: it accepts a change to the one person record whose `teamMember` is the
   caller's, and only its `name`. Until that route exists a team member's edit stays on their device
-  (read-only only stops writing back to sync, never local edits: CLAUDE.md), and the next writer's
-  sync does not overwrite a name a person set for themselves: `nameSetBy` records it.
+  (read-only only stops writing back to sync, never local edits: CLAUDE.md); a later sync may
+  replace it with the name the space has, which is acceptable until then.
 
 ## Decided
 
