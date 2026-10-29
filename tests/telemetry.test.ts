@@ -5,11 +5,7 @@
  */
 import { expect } from '@open-wc/testing'
 import { trace } from '@opentelemetry/api'
-import {
-  BasicTracerProvider,
-  InMemorySpanExporter,
-  SimpleSpanProcessor,
-} from '@opentelemetry/sdk-trace-web'
+import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace'
 import { setTelemetryPreference } from '../src/js/preferences.ts'
 import { baselineAttributes } from '../src/js/telemetry/baseline.ts'
 import { getAmbient, setAmbient } from '../src/js/telemetry/context.ts'
@@ -36,7 +32,7 @@ beforeEach(() => {
   trace.disable()
   exporter.reset()
   trace.setGlobalTracerProvider(
-    new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
+    new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] })
   )
   resetTelemetryState()
   setAmbient({ accountId: undefined, sessionId: undefined, teamPseudoId: undefined })

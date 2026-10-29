@@ -18,11 +18,11 @@ import { type ExportResult, ExportResultCode, W3CTraceContextPropagator } from '
 import { JsonTraceSerializer } from '@opentelemetry/otlp-transformer'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import {
-  BasicTracerProvider,
   type ReadableSpan,
   SimpleSpanProcessor,
   type SpanExporter,
-} from '@opentelemetry/sdk-trace-base'
+  TracerProvider,
+} from '@opentelemetry/sdk-trace'
 import type { Env } from './env.ts'
 import { forward, parseHeaders, type TelemetryDeps, withinLimit } from './telemetry.ts'
 
@@ -140,12 +140,14 @@ export async function withWorkerSpan(
         'chordless.outcome': status >= 500 ? 'error' : 'ok',
       }
       // (a provider for the one span: these are few, and nothing is held between them)
-      const provider = new BasicTracerProvider({
+      const provider = new TracerProvider({
         resource: resourceFromAttributes({
           'service.name': SERVICE_NAME,
           ...(version ? { 'service.version': version } : {}),
         }),
-        spanProcessors: [new SimpleSpanProcessor(new ForwardingExporter(endpoint, headers, deps))],
+        spanProcessors: [
+          new SimpleSpanProcessor({ exporter: new ForwardingExporter(endpoint, headers, deps) }),
+        ],
       })
       const span = provider.getTracer(SERVICE_NAME).startSpan(
         'chordless.worker.handle',
