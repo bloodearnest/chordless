@@ -11,6 +11,7 @@
  */
 
 import { toHex } from '../../src/js/utils/bytes.ts'
+import { tracedFetch } from './trace.ts'
 
 /** A file id as Drive makes them, and nothing that could change the URL we fetch */
 const FILE_ID = /^[\w-]{10,100}$/
@@ -107,7 +108,7 @@ export async function handleShareDownload(
   request: Request,
   fileId: string,
   env: ShareEnv,
-  { fetchDrive = fetch, cache, waitUntil }: ShareDeps = {}
+  { fetchDrive = tracedFetch(), cache, waitUntil }: ShareDeps = {}
 ) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return text('Method not allowed', 405, { Allow: 'GET, HEAD' })
