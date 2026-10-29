@@ -81,6 +81,19 @@ function writeMetadata(input: FileInput) {
   return { name: input.name, appProperties: input.props }
 }
 
+/**
+ * The folders each space's folder had when its inventory last listed it, by the space's id: the
+ * next inventory lists them together with the space's folder, not after it (a folder's folders are
+ * only known from its listing, which made every inventory two calls deep). A folder that has gone
+ * since is a listing nothing uses; one that is new is listed as before.
+ */
+const knownFolders = new Map<string, string[]>()
+
+/** Forget them (tests: a new fake Drive reuses the ids of the last one) */
+export function forgetKnownFolders(): void {
+  knownFolders.clear()
+}
+
 class DriveSpace implements SpaceStorage {
   #api: DriveApi
   #rootRef: string
@@ -222,9 +235,18 @@ class DriveSpace implements SpaceStorage {
     const listings = new Map<string, DriveFile[]>()
     const refs = new Set<string>()
     // (the folders of a folder are listed together: the listing of each does not wait for the others)
+    const list = (folderId: string) =>
+      this.#api.listDriveFiles(`'${folderId}' in parents and trashed=false`)
+    // (started now, with the first: one that is not a folder of this one is never read)
+    const ahead = new Map<string, Promise<DriveFile[]>>()
+    for (const folderId of knownFolders.get(this.#rootRef) ?? []) {
+      const listing = list(folderId)
+      listing.catch(() => undefined)
+      ahead.set(folderId, listing)
+    }
     const add = async (folderId: string): Promise<void> => {
       const folders: string[] = []
-      const files = await this.#api.listDriveFiles(`'${folderId}' in parents and trashed=false`)
+      const files = await (ahead.get(folderId) ?? list(folderId))
       listings.set(folderId, files)
       for (const file of files) {
         refs.add(file.id)
@@ -241,6 +263,12 @@ class DriveSpace implements SpaceStorage {
       rootFolders.set(file.name, [...(rootFolders.get(file.name) ?? []), file.id])
     }
     this.#rootFolders = rootFolders
+    knownFolders.set(
+      this.#rootRef,
+      (listings.get(this.#rootRef) ?? [])
+        .filter(file => file.mimeType === 'application/vnd.google-apps.folder')
+        .map(file => file.id)
+    )
     return refs
   }
 

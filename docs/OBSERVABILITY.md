@@ -447,6 +447,14 @@ is worth one).
   only `Content-Length` gives a size (`http.response.body.size`; Drive's gzipped answers have one, our
   Worker's answers mostly do not).
 
+- **Where the time of a full sync goes** (2026-10-29, a manual sync is 2.0 s; a resume that finds nothing 0.9 s):
+  `prepare` 0.4 s and the inventory 1.3 s, which is two calls deep (the space's folder, then the folders in it).
+  The inventory now lists the folders it found last time together with the space's own (`knownFolders`
+  in `drive-storage.ts`; the first one after a page load is still two deep). A sync's `push` step spent 0.3 s
+  on a phone with no call at all: it read each song's chart in a transaction of its own, one after another, to
+  hash it (`pushSongs`); `getChordPros` reads them together (400 charts: 35 ms to 6 ms on a desktop). Check the
+  next traces for both.
+
 ## Open questions
 
 - `[observability.traces]` as above, and whether the native export honours an incoming `traceparent`.

@@ -320,10 +320,12 @@ export async function pushSongs(
 ): Promise<void> {
   const created: SongUpload[] = []
   const updated: SongUpload[] = []
-  for (const song of await run.db.getAllSongs()) {
-    if (!song.chordproFileId) continue
-
-    const chordproFile = await run.db.getChordPro(song.chordproFileId)
+  // (all the charts in one transaction: a read each, one after another, made every sync of a
+  // library of a few hundred songs wait for hundreds of them, on a phone a third of a second)
+  const withChart = (await run.db.getAllSongs()).filter(song => song.chordproFileId)
+  const charts = await run.db.getChordPros(withChart.map(song => song.chordproFileId))
+  for (const [i, song] of withChart.entries()) {
+    const chordproFile = charts[i]
     if (!chordproFile) {
       console.warn(`[DriveSync] ChordPro file not found: ${song.chordproFileId}`)
       continue

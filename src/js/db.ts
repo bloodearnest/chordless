@@ -512,6 +512,13 @@ export class ChordlessDB {
     return requestResult(request)
   }
 
+  /** The charts with these ids, in this order (undefined for one that is not there), in one transaction */
+  async getChordPros(ids: string[]): Promise<(ChordProRecord | undefined)[]> {
+    const tx = this.#transaction(['chordpro'], 'readonly')
+    const store = tx.objectStore('chordpro')
+    return Promise.all(ids.map(id => requestResult(store.get(id))))
+  }
+
   // Local state operations (per-setlist, per-user)
   async getLocalState(setlistId: string): Promise<SetlistLocalState> {
     const tx = this.#transaction(['setlist_local'], 'readonly')
