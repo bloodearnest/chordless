@@ -200,7 +200,20 @@ runs and what it awaits is below it, with no explicit parenting. `tracedFetch` w
 team space, a share's download and the token endpoint: `chordless.worker.fetch`, with the method, host,
 path (never the query) and status, ended when the response's headers arrive; the body is never read or
 cloned, so a stream goes through as it was. `tracedStub` wraps a Durable Object's stub:
-`chordless.worker.do`, with the method and class, ended when the call is answered. No trace context
+`chordless.worker.do`, with the method and class, ended when the call is answered.
+
+**The standard HTTP attributes** are on the Worker's span and on the call spans, page and Worker, wherever
+the value is known without reading a body: `http.request.method`, `http.route` (the Worker's), `url.path`,
+`url.scheme`, `server.address`, `server.port`, `http.response.status_code`, `error.type` (the status of a
+failure, or the error's class; `_OTHER` for something thrown that is not an Error), and on the Worker's span
+`network.protocol.name` and `.version` (from `request.cf.httpProtocol`) and `user_agent.original`. The sizes,
+`http.request.body.size` and `http.response.body.size`, come from `Content-Length` or from a body held in
+memory (a string, bytes, a Blob); a streamed or chunked body has no size, and is not read or counted to
+find one (wrapping a stream in JavaScript costs CPU, which the pad audio passing through would pay). So a
+response's size is often missing, and the sizes are the bytes on the wire when the body is compressed. Left
+out: `client.address` (an IP address), the request and response headers (opt-in in the conventions, and
+their names have hyphens, which the telemetry route drops), `url.query` on the Worker's side (the page's call
+spans keep a truncated one), `http.request.method_original` and the TLS attributes. No trace context
 is sent on, to Google or to the objects. At most 50 calls of a request are spans. No existing OTel fetch
 instrumentation fits: `instrumentation-fetch` clones and reads the whole response (a stream would be
 buffered in memory: Drive and pad audio go through here), `instrumentation-undici` and `-http` hook

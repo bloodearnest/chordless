@@ -75,10 +75,18 @@ test('a call with the page’s trace context gets a span that is a child of the 
 })
 
 test('it records the route, the status, the ray and what the runtime knows of where it came from', async () => {
-  const { send, sent } = setup()
+  const { send, sent } = setup(
+    {},
+    () => new Response('page', { headers: { 'Content-Length': '4' } })
+  )
   await send(
-    '/api/config',
-    { traceparent: TRACEPARENT, 'cf-ray': 'a51c89e75a0635ca-LHR', 'user-agent': 'Browser/1' },
+    '/files/3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+    {
+      traceparent: TRACEPARENT,
+      'cf-ray': 'a51c89e75a0635ca-LHR',
+      'user-agent': 'Browser/1',
+      'Content-Length': '12',
+    },
     {
       colo: 'LHR',
       asn: 20712,
@@ -87,13 +95,21 @@ test('it records the route, the status, the ray and what the runtime knows of wh
       region: 'England',
       city: 'Bracknell',
       timezone: 'Europe/London',
+      httpProtocol: 'HTTP/2',
     }
   )
   assert.deepEqual(attributes(theSpan(sent[0])), {
     'http.request.method': 'GET',
-    'http.route': '/api/config',
+    'http.route': '/files/:id',
+    'url.path': '/files/3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+    'url.scheme': 'https',
+    'http.request.body.size': 12,
     'http.response.status_code': 200,
+    'http.response.body.size': 4,
     'server.address': 'chordless.test',
+    'server.port': 443,
+    'network.protocol.name': 'http',
+    'network.protocol.version': '2',
     'user_agent.original': 'Browser/1',
     'cloudflare.ray_id': 'a51c89e75a0635ca',
     'cloudflare.colo': 'LHR',
@@ -216,7 +232,9 @@ test('a call made while a request is traced is a span below ours, with no query 
   assert.equal(call?.kind, 3)
   assert.deepEqual(attributes(call as Record<string, any>), {
     'http.request.method': 'GET',
+    'url.scheme': 'https',
     'server.address': 'www.googleapis.com',
+    'server.port': 443,
     'url.path': '/drive/v3/files/abc',
     'http.response.status_code': 200,
   })
@@ -248,6 +266,10 @@ test('a call is an error when it is refused or does not answer, and a 404 is not
     [0, 2, 2, 2]
   )
   assert.equal(attributes(calls[1])['http.request.method'], 'POST')
+  assert.deepEqual(
+    calls.map(s => attributes(s)['error.type']),
+    [undefined, '503', 'Error', '_OTHER']
+  )
   assert.equal(calls[2].events[0].name, 'exception')
 })
 
@@ -315,4 +337,45 @@ test('the calls of two requests at once are each below their own', async () => {
   const calls = spans.filter(s => s.name === 'chordless.worker.fetch')
   assert.equal(calls.length, 2)
   for (const call of calls) assert.equal(call.parentSpanId, handle?.spanId)
+})
+
+test('the sizes of what is sent and what comes back are kept when they are known', async () => {
+  const { spans } = await traceCalls(async () => {
+    const answer = () => new Response('x'.repeat(7), { headers: { 'Content-Length': '7' } })
+    const fetcher = tracedFetch(async () => answer())
+    await fetcher('http://x.test:8080/a', { method: 'POST', body: 'héllo' })
+    await fetcher('https://x.test/b', { method: 'PUT', body: new Uint8Array(3) })
+    await fetcher('https://x.test/c', { method: 'PUT', body: new ArrayBuffer(5) })
+    await fetcher('https://x.test/d', { method: 'PUT', body: new Blob(['abcd']) })
+    await fetcher('https://x.test/e', { headers: { 'Content-Length': '9' } })
+    await fetcher(new Request('https://x.test/f', { headers: { 'Content-Length': '11' } }))
+    // (a stream, or a header that is no number, has no size: nothing is read to find out)
+    await fetcher('https://x.test/g', { method: 'POST', body: new URLSearchParams({ a: '1' }) })
+    await tracedFetch(async () => new Response('', { headers: { 'Content-Length': 'many' } }))(
+      'https://x.test/h'
+    )
+  })
+  const calls = spans.filter(s => s.name === 'chordless.worker.fetch')
+  assert.deepEqual(
+    calls.map(s => attributes(s)['http.request.body.size']),
+    [6, 3, 5, 4, 9, 11, undefined, undefined]
+  )
+  assert.deepEqual(
+    calls.map(s => attributes(s)['http.response.body.size']),
+    [7, 7, 7, 7, 7, 7, 7, undefined]
+  )
+  assert.equal(attributes(calls[0])['server.port'], 8080)
+  assert.equal(attributes(calls[0])['url.scheme'], 'http')
+})
+
+test('a request that fails, or ends in a server error, says what kind', async () => {
+  const failing = setup({}, () => new Response('', { status: 502 }))
+  await failing.send('/somewhere', { traceparent: TRACEPARENT })
+  assert.equal(attributes(theSpan(failing.sent[0]))['error.type'], '502')
+
+  const thrown = setup({}, () => {
+    throw new TypeError('boom')
+  })
+  await assert.rejects(thrown.send('/somewhere', { traceparent: TRACEPARENT }))
+  assert.equal(attributes(theSpan(thrown.sent[0]))['error.type'], 'TypeError')
 })
