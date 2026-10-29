@@ -2,7 +2,7 @@
  * A span for every `fetch` of the page, by OpenTelemetry's own instrumentation of it (the method, the
  * address, the status and the error; the request's size; `traceparent` to our own Worker, and never
  * to Google, which would need a CORS preflight and be told our trace ids). What is ours is in
- * the config: the span's name (`chordless.drive.request`, `chordless.worker.request`), the path, the
+ * the config: the path, the
  * Cloudflare ray id (which finds the Worker's span, which cannot join our trace) and the size of the
  * answer, from the browser's own record of it. Which span is the parent is not the instrumentation's
  * to know, with no async context: `timedFetch` (telemetry.ts) makes the call with it active.
@@ -50,12 +50,9 @@ export const fetchConfig: FetchInstrumentationConfig = {
   ignoreUrls: [TELEMETRY_URL],
   measureRequestSize: true,
   sanitizeUrl: url => url.slice(0, MAX_URL),
+  // (the span is named as the conventions have it, by its method; where it went is `server.address`)
   requestHook: span => {
-    const url = urlOf(span)
-    span.updateName(
-      `chordless.${url.origin === location.origin ? 'worker' : url.hostname.endsWith('googleapis.com') ? 'drive' : 'http'}.request`
-    )
-    span.setAttribute('url.path', url.pathname)
+    span.setAttribute('url.path', urlOf(span).pathname)
   },
   applyCustomAttributesOnSpan: (span, _request, result) => {
     if (!(result instanceof Response)) return
