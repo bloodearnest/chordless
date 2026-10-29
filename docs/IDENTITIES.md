@@ -1,6 +1,6 @@
 # IDENTITIES
 
-> **Status (2026-10-29): step 1 is built (people store, upgrade to version 10, `leaderId`, people synced as a `people` collection: docs/SYNC_ARCHITECTURE.md, "People"). Step 2 is built (matching in the email import, and which person is "me"). Step 3 is built (the page that lists, merges and deletes them). Step 4 is not.** Replaces a setlist's `owner` (a name) and
+> **Status (2026-10-29): step 1 is built (people store, upgrade to version 10, `leaderId`, people synced as a `people` collection: docs/SYNC_ARCHITECTURE.md, "People"). Step 2 is built (matching in the email import, and which person is "me"). Step 3 is built (the page that lists, merges and deletes them). Step 4 is built (roles beside people, and a team member naming themselves through the Worker), with one change to the design: the link is the verified email, not `provider:sub` (below).** Replaces a setlist's `owner` (a name) and
 > `ownerId` (an email) with a link to a person in the space's own list of people.
 
 ## Why
@@ -21,7 +21,7 @@ Person {
   id: string            // uuid, never changes
   name: string          // as shown
   emails: string[]      // lower-cased; a person may have several
-  teamMember?: string   // "provider:sub" (identityKey, docs/SPACES.md), only in a team space
+  teamMember?: string   // reserved, not set by anything: people are linked to team members by email ("Team spaces")
   deleted?: boolean     // set when deleted: the record stays, so another device's copy does not bring them back
   mergedInto?: string   // set when merged into another person; the record stays so that a
                         // device that has not synced yet can still resolve the id
@@ -119,10 +119,19 @@ people as they are.
 
 ## Team spaces
 
-- The member list the Worker returns (provider:sub, email, name, role) becomes people: matched by
-  email to an existing person, which gains `teamMember`; otherwise a new person.
-- Roles shown beside a person come from the member list. A person without `teamMember` is a leader
-  who has no Chordless account, which is fine: no role, can still lead.
+- **The link to a team member is the email**, not `provider:sub` as first designed (changed 2026-10-30).
+  The page never sees a member's `sub`, and handing teammates each other's Google account ids would
+  be a new thing for the Worker to give out; the Worker already has each caller's *verified* email,
+  which is what an invite is bound to, and a person has the addresses. So a person is the member
+  whose email is among theirs. (`teamMember` stays in the type, unused, for a provider whose emails
+  cannot be trusted.)
+- The Team's members (the Durable Object's, with their roles, cached in `space.members` at each sync)
+  already become people, by email (`getSpacePeople`). **The role is shown beside the person** in the
+  Leaders list ("Worship leader", "Team member", "Admin", "Owner": `roleLabel`), by the address the
+  Team knows them by. A person with no member (a visiting leader typed in by name, or one with no
+  Chordless account) has no role and can still lead.
+- **A team member names themselves** through the Worker (below), so their name in the Team is theirs
+  to put right even though they cannot change files.
 - Inviting from a setlist's leaders (`team-invite-step.ts`) uses a person's emails (the first, or a
   choice if there are several), not `ownerId`.
 
@@ -134,9 +143,9 @@ link between the spaces except what identifies them: the same `teamMember` (`pro
 same emails. Consequences:
 
 - Names and emails may differ per space (a nickname in one team); nothing reconciles them.
-- Their role is per team, read from each team's Durable Object by that space's `teamMember`.
-- "Me" in a space is the person whose `teamMember` is mine, else whose email is mine.
-- Copying or moving a setlist to another space remaps `leaderId` there: by `teamMember`, then email,
+- Their role is per team, read from each team's Durable Object by the address that team knows them by.
+- "Me" in a space is the one chosen on this device, else the person whose email is mine.
+- Copying or moving a setlist to another space remaps `leaderId` there: by email,
   then name, else a new person is made. The id is never carried across.
 - Shares carry the name only (above), so nothing links across spaces that way either.
 
@@ -146,7 +155,8 @@ same emails. Consequences:
    menu from the store.
 2. `resolveLeader` in the email import and its review control (built), and which person is me (built).
 3. The People page (rename, emails, merge).
-4. Team link: people from the Worker's members, roles shown, and "me" matched by `teamMember` before the address.
+4. Team link (built): roles shown beside people, and a Worker route for a team member's own name. People
+   from the Worker's members and "me" by address were already so.
 
 ## Who may edit people
 
@@ -155,12 +165,17 @@ Decided 2026-10-29.
 - **Personal space:** you, of course.
 - **Team space:** worship leaders (the `writer` role) and above may add, rename, merge and delete
   people, and edit their emails. A team member (`reader`) may edit only **their own
-  name** (the person whose `teamMember` is theirs).
-- The Worker already refuses writes to the space's files from a team member, so their own-name edit
-  needs a route of its own: it accepts a change to the one person record whose `teamMember` is the
-  caller's, and only its `name`. Until that route exists a team member's edit stays on their device
-  (read-only only stops writing back to sync, never local edits: CLAUDE.md); a later sync may
-  replace it with the name the space has, which is acceptable until then.
+  name** (the person whose addresses include their verified email).
+- The Worker refuses writes to the space's files from a team member, so their own-name edit has a route
+  of its own, **`PUT /api/space/<id>/people/<person id>/name {name}`** (`renamePerson` in
+  `worker/src/team-api.ts`), open to every member. It lists the space's people files, finds the one for
+  that id, reads it, and refuses (403 "That person is not you") unless its `emails` include the
+  caller's verified email; a person who is deleted or merged is 404. It changes the **name** (one line,
+  1 to 100 characters, else 400) and when it was saved, and nothing else; the file keeps its name and
+  properties. Nothing is kept by the Worker: the file is read and written through, as every file is.
+  It answers with the file as written and the person as stored; the page keeps that as already
+  sent (no link of its own to send), so a reader has nothing to push. Race: it reads then writes with
+  no lock, so a writer's save in the same moment can win; the next sync shows which.
 
 ## Decided
 
@@ -169,4 +184,5 @@ Decided 2026-10-29.
 
 ## Open
 
-- The Worker route for a team member's own name (step 4).
+- Nothing is designed and unbuilt. Not done, and not needed yet: showing the role in the Leader menu
+  (it is in the Leaders list), and an admin's choice of who may name themselves.

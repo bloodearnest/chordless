@@ -3,7 +3,10 @@
  * space, joining one with an invite, and looking after its people. Each call carries the signed-in
  * person's Google ID token (`getIdentityToken`); the files themselves go through `TeamStorage`.
  */
+
+import type { Person } from './data-types.ts'
 import { getIdentityToken } from './google-auth.ts'
+import type { StoredFile } from './storage/types.ts'
 import type { InviteInfo, MemberRole, TeamMember, TeamRole } from './team-roles.ts'
 import { callWorker, type WorkerCall } from './worker-call.ts'
 
@@ -41,6 +44,17 @@ export const teamApi = {
     call<void>('PUT', `${space(id)}/members/${encodeURIComponent(email)}`, { role }),
   removeMember: (id: string, email: string) =>
     call<void>('DELETE', `${space(id)}/members/${encodeURIComponent(email)}`),
+  /**
+   * The name of the person who is you in a space, whatever your role (a team member cannot change
+   * files, but may name themselves): the Worker checks the person has your verified email. It
+   * answers with the file as written and the person as now stored.
+   */
+  nameSelf: (id: string, personId: string, name: string) =>
+    call<{ file: StoredFile; person: Person }>(
+      'PUT',
+      `${space(id)}/people/${encodeURIComponent(personId)}/name`,
+      { name }
+    ),
   leave: (id: string) => call<void>('POST', `${space(id)}/leave`),
 
   /** The owner's new sign-in, when Google no longer honours the one the space holds */

@@ -8,10 +8,11 @@ import type { SpacePeople } from '../src/components/space-people.ts'
 import type { Person } from '../src/js/data-types.ts'
 import { type ChordlessDB, openSpace } from '../src/js/db.ts'
 import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
+import { personHasLocalChanges } from '../src/js/sync/person-hash.ts'
 import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { shownToast, suppressConsoleLogs } from './test-helpers.ts'
 import '../src/components/space-people.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -274,6 +275,141 @@ describe('space-people', () => {
       card('Tom Smith').querySelector<HTMLButtonElement>('.actions button')?.click()
       await answer(false)
       expect((await stored('tom-smith')).deleted).to.equal(undefined)
+    })
+  })
+
+  describe('in a Team, a team member naming themselves', () => {
+    const encode = (value: object) =>
+      btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    const ID_TOKEN = `${encode({ alg: 'RS256' })}.${encode({ exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`
+    const realFetch = window.fetch
+    let calls: { path: string; method?: string; body: { name: string } }[]
+    let answer: () => Response
+
+    beforeEach(async () => {
+      calls = []
+      answer = () =>
+        Response.json({
+          file: {
+            ref: 'file-ann',
+            name: 'ann.json',
+            props: {},
+            rev: 'rev-2',
+            modified: 'm',
+            created: 'c',
+          },
+          person: { ...ann, name: 'Anne Lee', modifiedDate: '2026-11-01T00:00:00.000Z' },
+        })
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const path = new URL(String(input), window.location.origin).pathname
+        if (!path.includes('/people/'))
+          return Response.json({ error: 'no such route' }, { status: 404 })
+        calls.push({ path, method: init?.method, body: JSON.parse(String(init?.body)) })
+        return answer()
+      }) as typeof fetch
+      auth.worker.stored = {
+        blob: 'blob',
+        metadata: {
+          id_token: ID_TOKEN,
+          access_token: 'token',
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          user: {
+            picture: null,
+            given_name: null,
+            family_name: null,
+            sub: '1',
+            name: 'Ann',
+            email: 'ann@example.com',
+          },
+        },
+        updated_at: new Date().toISOString(),
+      } as never
+      await updateSpace(spaceId, {
+        team: { id: 'team-1', role: 'reader' },
+        members: [
+          { email: 'ann@example.com', role: 'reader' },
+          { email: 'tom@example.com', role: 'writer' },
+          { email: 'hal@example.com', role: 'admin' },
+        ],
+      })
+      await db.savePeople([
+        ann,
+        person({ id: 'tom', name: 'Tom Ray', emails: ['tom@example.com'] }),
+      ])
+    })
+
+    afterEach(() => {
+      window.fetch = realFetch
+    })
+
+    it('may change the name of the person they are, and no one else’s', async () => {
+      await open()
+      const own = card('Ann Lee').querySelector<HTMLInputElement>('.name') as HTMLInputElement
+      const other = card('Tom Ray').querySelector<HTMLInputElement>('.name') as HTMLInputElement
+      expect(own.disabled).to.equal(false)
+      expect(other.disabled).to.equal(true)
+      expect(card('Ann Lee').querySelector('form.add')).to.equal(null)
+      expect(text()).to.contain('you can change your own name')
+    })
+
+    it('asks the Worker, and keeps its answer as already sent', async () => {
+      await open()
+      const own = card('Ann Lee').querySelector<HTMLInputElement>('.name') as HTMLInputElement
+      own.value = '  Anne Lee '
+      own.dispatchEvent(new Event('change'))
+      await settled()
+
+      expect(calls).to.have.length(1)
+      expect(calls[0].path).to.equal('/api/space/team-1/people/ann/name')
+      expect(calls[0].method).to.equal('PUT')
+      expect(calls[0].body).to.deep.equal({ name: 'Anne Lee' })
+      const now = await stored('ann')
+      expect(now.name).to.equal('Anne Lee')
+      expect(now.fileRef).to.equal('file-ann')
+      expect(personHasLocalChanges(now)).to.equal(false)
+      expect(card('Anne Lee')).to.exist
+    })
+
+    it('says so, and leaves the name as it was, when the Worker refuses', async () => {
+      answer = () => Response.json({ error: 'That person is not you' }, { status: 403 })
+      await open()
+      const own = card('Ann Lee').querySelector<HTMLInputElement>('.name') as HTMLInputElement
+      own.value = 'Somebody Else'
+      own.dispatchEvent(new Event('change'))
+      await settled()
+
+      expect((await stored('ann')).name).to.equal('Ann Lee')
+      expect(shownToast()?.message).to.contain("Couldn't change your name")
+      expect(own.value).to.equal('Ann Lee')
+    })
+
+    it('does not ask the Worker for an empty name', async () => {
+      await open()
+      const own = card('Ann Lee').querySelector<HTMLInputElement>('.name') as HTMLInputElement
+      own.value = ' '
+      own.dispatchEvent(new Event('change'))
+      await settled()
+      expect(calls).to.deep.equal([])
+      expect(own.value).to.equal('Ann Lee')
+    })
+
+    it('shows what each person is in the Team, by the address the Team knows them by', async () => {
+      await db.savePeople([person({ id: 'hal', name: 'Hal', emails: ['hal@example.com'] })])
+      await open()
+      const role = (name: string) => card(name).querySelector('.role')?.textContent?.trim()
+      expect(role('Ann Lee')).to.equal('team member')
+      expect(role('Tom Ray')).to.equal('worship leader')
+      expect(role('Hal')).to.equal('admin')
+    })
+
+    it('shows no role for a person the Team has no member for, or in a space of one’s own', async () => {
+      await db.savePeople([person({ id: 'vic', name: 'Visiting Vic' })])
+      await open()
+      expect(Boolean(card('Visiting Vic').querySelector('.role'))).to.equal(false)
+      await updateSpace(spaceId, { team: undefined })
+      await element.load()
+      await element.updateComplete
+      expect(Boolean(card('Ann Lee').querySelector('.role'))).to.equal(false)
     })
   })
 

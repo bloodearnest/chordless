@@ -20,6 +20,8 @@ export interface TeamRig {
   spaces: { id: string; root: string }[]
   /** The role each token has in every space; a token not here is not signed in */
   roles: Map<string, TeamRole | 'none'>
+  /** The verified email each token has (`<token>@example.com` for a token not here) */
+  emails: Map<string, string>
   context: TeamContext
   /** What the Worker answers: the `fetch` of a TeamStorage */
   fetch: typeof fetch
@@ -32,6 +34,7 @@ export async function makeTeamRig(): Promise<TeamRig> {
     spaces.push({ id, root: (await storage.ensureRoot(`Team ${id}`, id)).ref })
   }
   const roles = new Map<string, TeamRole | 'none'>([['writer-token', 'writer']])
+  const emails = new Map<string, string>()
   const rootOf = (id: string) => spaces.find(space => space.id === id)?.root
 
   const context: TeamContext = {
@@ -65,8 +68,13 @@ export async function makeTeamRig(): Promise<TeamRig> {
     const role = roles.get(token)
     if (role === undefined) return refusal('unauthenticated')
     if (role === 'none') return refusal('not-a-member')
-    return handleTeamRequest(request, path, context, role)
+    const identity = {
+      provider: 'google',
+      sub: token,
+      email: emails.get(token) ?? `${token}@example.com`,
+    }
+    return handleTeamRequest(request, path, context, role, identity)
   }) as typeof fetch
 
-  return { storage, spaces, roles, context, fetch: fetchTeam }
+  return { storage, spaces, roles, emails, context, fetch: fetchTeam }
 }
