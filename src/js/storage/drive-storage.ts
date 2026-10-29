@@ -85,6 +85,14 @@ class DriveSpace implements SpaceStorage {
   #api: DriveApi
   #rootRef: string
   #folders = new Map<Collection, string>()
+  /**
+   * What the last `inventory()` listed: the files of each folder of the space, and which folders
+   * the space's own folder has (a name's ids). It serves `list()` and the lookup of the collections'
+   * folders for the rest of the run, until a write: this object is the run's (the sync manager drops it
+   * when the run ends), and a listing made a moment ago is the one a pull would make.
+   */
+  #listed = new Map<string, DriveFile[]>()
+  #rootFolders: Map<string, string[]> | null = null
 
   constructor(api: DriveApi, rootRef: string) {
     this.#api = api
@@ -95,6 +103,9 @@ class DriveSpace implements SpaceStorage {
   async #folder(collection: Collection): Promise<string> {
     let id = this.#folders.get(collection)
     if (id === undefined) {
+      id = this.#listedFolder(collection) ?? undefined
+    }
+    if (id === undefined) {
       id =
         collection === 'songs'
           ? await this.#api.getSongsFolder(this.#rootRef)
@@ -104,6 +115,20 @@ class DriveSpace implements SpaceStorage {
       this.#folders.set(collection, id)
     }
     return id
+  }
+
+  /** The collection's folder as the last inventory found it, if it found exactly one by that name */
+  #listedFolder(collection: Collection): string | null {
+    const ids = this.#rootFolders?.get(collection)
+    return ids?.length === 1 ? ids[0] : null
+  }
+
+  /**
+   * A write was made: the files the inventory listed are no longer what Drive has. (Which folders
+   * the space has stand: a write makes one that was missing, and `#folders` knows it then.)
+   */
+  #forgetListings(): void {
+    this.#listed.clear()
   }
 
   members() {
@@ -156,10 +181,21 @@ class DriveSpace implements SpaceStorage {
   async list(collection: Collection): Promise<StoredFile[]> {
     // (a space nothing was ever shared from has no shares folder, and listing does not make one)
     const folder =
-      collection === 'shares'
-        ? await this.#api.findSharesFolder(this.#rootRef)
-        : await this.#folder(collection)
+      collection === 'shares' ? await this.#sharesFolder() : await this.#folder(collection)
     if (!folder) return []
+    // (the inventory has listed it, with the fields a listing has: this is what a listing would say)
+    const listed = this.#listed.get(folder)
+    if (listed) {
+      const files =
+        collection === 'shares'
+          ? listed
+          : collection === 'setlists'
+            ? listed
+                .filter(file => file.name?.includes('.json'))
+                .sort((a, b) => (b.modifiedTime ?? '').localeCompare(a.modifiedTime ?? ''))
+            : listed.filter(file => file.mimeType === 'text/plain')
+      return files.map(toStored)
+    }
     const live = `'${folder}' in parents and trashed=false`
     const files =
       collection === 'shares'
@@ -170,20 +206,41 @@ class DriveSpace implements SpaceStorage {
     return files.map(toStored)
   }
 
+  /** The shares folder, or null where there is none: from what is known of it, or asked of Drive (which does not make it) */
+  async #sharesFolder(): Promise<string | null> {
+    const known = this.#folders.get('shares')
+    if (known) return known
+    const ids = this.#rootFolders?.get('shares') ?? []
+    if (this.#rootFolders && ids.length === 0) return null
+    if (ids.length === 1) return ids[0]
+    return this.#api.findSharesFolder(this.#rootRef)
+  }
+
   async inventory(): Promise<Set<string>> {
+    this.#forgetListings()
+    this.#rootFolders = null
+    const listings = new Map<string, DriveFile[]>()
     const refs = new Set<string>()
     // (the folders of a folder are listed together: the listing of each does not wait for the others)
     const add = async (folderId: string): Promise<void> => {
       const folders: string[] = []
-      for (const file of await this.#api.listDriveFiles(
-        `'${folderId}' in parents and trashed=false`
-      )) {
+      const files = await this.#api.listDriveFiles(`'${folderId}' in parents and trashed=false`)
+      listings.set(folderId, files)
+      for (const file of files) {
         refs.add(file.id)
         if (file.mimeType === 'application/vnd.google-apps.folder') folders.push(file.id)
       }
       await Promise.all(folders.map(add))
     }
     await add(this.#rootRef)
+    // (kept only once the whole of it is: a listing that failed leaves nothing half-known)
+    this.#listed = listings
+    const rootFolders = new Map<string, string[]>()
+    for (const file of listings.get(this.#rootRef) ?? []) {
+      if (file.mimeType !== 'application/vnd.google-apps.folder' || !file.name) continue
+      rootFolders.set(file.name, [...(rootFolders.get(file.name) ?? []), file.id])
+    }
+    this.#rootFolders = rootFolders
     return refs
   }
 
@@ -209,6 +266,7 @@ class DriveSpace implements SpaceStorage {
     body: FileBody,
     options?: { publicLink?: boolean }
   ): Promise<WriteResult> {
+    this.#forgetListings()
     const folder = await this.#folder(collection)
     const file = await this.#api.createFile(
       { ...writeMetadata(input), mimeType: input.type, parents: [folder] },
@@ -224,6 +282,7 @@ class DriveSpace implements SpaceStorage {
     items: { input: FileInput; body: string }[]
   ): Promise<(WriteResult | null)[]> {
     if (items.length === 0) return []
+    this.#forgetListings()
     const folder = await this.#folder(collection)
     const files = await this.#api.batchUploadFiles(
       items.map(({ input, body }) => ({
@@ -240,6 +299,7 @@ class DriveSpace implements SpaceStorage {
   }
 
   async update(ref: string, input: FileInput, body: FileBody): Promise<WriteResult> {
+    this.#forgetListings()
     // (the type of a file does not change, so it is not sent in the metadata)
     const file = await this.#api.updateFile(
       ref,
@@ -257,10 +317,12 @@ class DriveSpace implements SpaceStorage {
   }
 
   unpublish(ref: string): Promise<void> {
+    this.#forgetListings()
     return this.#api.unpublishFile(ref)
   }
 
   trash(ref: string): Promise<void> {
+    this.#forgetListings()
     return this.#api.trashFile(ref)
   }
 }
