@@ -23,6 +23,7 @@ Person {
   aliases: string[]     // other spellings that mean this person ("Tom", "Tom S.")
   emails: string[]      // lower-cased; a person may have several
   teamMember?: string   // "provider:sub" (identityKey, docs/SPACES.md), only in a team space
+  nameSetBy?: string    // teamMember key, when the person set their own name (kept by later syncs)
   mergedInto?: string   // set when merged into another person; the record stays so that a
                         // device that has not synced yet can still resolve the id
   modifiedDate: string
@@ -97,9 +98,25 @@ person who leads nothing). This is also where today's bad names get cleaned up.
 3. The People page (rename, aliases, emails, merge).
 4. Team link: people from the Worker's members, roles shown.
 
+## Who may edit people
+
+Decided 2026-10-29.
+
+- **Personal space:** you, of course.
+- **Team space:** worship leaders (the `writer` role) and above may add, rename, merge and delete
+  people, and edit their aliases and emails. A team member (`reader`) may edit only **their own
+  name** (the person whose `teamMember` is theirs).
+- The Worker already refuses writes to the space's files from a team member, so their own-name edit
+  needs a route of its own: it accepts a change to the one person record whose `teamMember` is the
+  caller's, and only its `name`. Until that route exists a team member's edit stays on their device
+  (read-only only stops writing back to sync, never local edits: CLAUDE.md), and the next writer's
+  sync does not overwrite a name a person set for themselves: `nameSetBy` records it.
+
+## Decided
+
+- People are synced with the space, one record each (not a single file, which would conflict
+  whenever two devices add someone).
+
 ## Open
 
-- Sync granularity: one file per person (like setlists) is assumed; a single `people.json` would
-  conflict whenever two devices add someone.
-- Who may edit people in a team space: anyone for now; a team member's edit of the list is not a
-  destructive change.
+- The Worker route for a team member's own name (step 4).
