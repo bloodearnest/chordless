@@ -95,6 +95,8 @@ export class SyncRun {
   inventory: Set<string> | null = null
   /** The space's people, as the push read them: the leaders' names go in the setlist files' names */
   people: Person[] = []
+  /** The ids of the people that have a live file, as listed by the pull (null: not listed) */
+  livePeopleIds: Set<string> | null = null
   /** The setlist files in Drive, as listed by the pull */
   liveSetlistFiles: StoredFile[] | null = null
   /** Whether the user can only read the folder (null: not asked yet) */

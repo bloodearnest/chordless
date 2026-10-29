@@ -11,6 +11,7 @@ import type {
 } from './data-types.ts'
 import { leaderName, planPeople } from './leaders.ts'
 import { songSource } from './song-source.ts'
+import { PERSON_SYNC_FIELDS } from './sync/person-hash.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
 import { requestResult, transactionDone } from './utils/idb.ts'
@@ -149,7 +150,7 @@ export class ChordlessDB {
 
   /** Everything of each kind was written or cleared */
   #changedAll(): void {
-    for (const kind of ['setlist', 'song', 'chart'] as const) this.#changed(kind, null)
+    for (const kind of ['setlist', 'song', 'chart', 'person'] as const) this.#changed(kind, null)
   }
 
   /** A transaction on some stores; the database must have been opened with init() */
@@ -369,16 +370,57 @@ export class ChordlessDB {
     return requestResult(tx.objectStore('people').get(id))
   }
 
-  /** Save people, each as given (a person already stored is replaced) */
+  /**
+   * Save people, each as given (a person already stored is replaced). A page's copy of a person
+   * that was not in storage yet has no link to its file: if a sync sent it meanwhile, the link
+   * is kept (as saveSetlist does), or the next sync would send the person again as a second file.
+   */
   async savePeople(people: Person[]): Promise<void> {
     if (people.length === 0) return
     const tx = this.#transaction(['people'], 'readwrite')
     const store = tx.objectStore('people')
-    for (const person of people) store.put(cloneForStorage(person))
+    for (const person of people) {
+      const stored = cloneForStorage(person) as Person
+      if (this.origin === 'local' && !stored.fileRef) {
+        const current = (await requestResult(store.get(stored.id))) as Person | undefined
+        if (current?.fileRef) {
+          for (const field of PERSON_SYNC_FIELDS) {
+            if (current[field] !== undefined)
+              (stored as unknown as Record<string, unknown>)[field] = current[field]
+          }
+        }
+      }
+      store.put(stored)
+    }
     await transactionDone(tx)
     this.#changed(
       'person',
       people.map(person => person.id)
+    )
+  }
+
+  /**
+   * Record that people were sent to storage: what each keeps of its file is put on the person as
+   * stored now, not on the copy that was sent, so an edit saved while it was being sent is not
+   * undone (it is a change the next sync sends).
+   */
+  async savePeopleSent(sent: Person[]): Promise<void> {
+    if (sent.length === 0) return
+    const tx = this.#transaction(['people'], 'readwrite')
+    const store = tx.objectStore('people')
+    for (const person of sent) {
+      const current = (await requestResult(store.get(person.id))) as Person | undefined
+      if (!current) continue
+      const updated = { ...current }
+      for (const field of PERSON_SYNC_FIELDS) {
+        if (person[field] !== undefined) (updated as Record<string, unknown>)[field] = person[field]
+      }
+      store.put(cloneForStorage(updated))
+    }
+    await transactionDone(tx)
+    this.#changed(
+      'person',
+      sent.map(person => person.id)
     )
   }
 
@@ -637,8 +679,8 @@ export class ChordlessDB {
   // Clear setlists, songs and charts, keeping per-setlist device state
   // (setlist_local). Used to reset from Drive.
   async clearSyncedData(): Promise<void> {
-    const tx = this.#transaction(['setlists', 'songs', 'chordpro'], 'readwrite')
-    for (const name of ['setlists', 'songs', 'chordpro']) {
+    const tx = this.#transaction(['setlists', 'songs', 'chordpro', 'people'], 'readwrite')
+    for (const name of ['setlists', 'songs', 'chordpro', 'people']) {
       tx.objectStore(name).clear()
     }
     await transactionDone(tx)
@@ -651,7 +693,7 @@ export class ChordlessDB {
    * its file was in the folder that is let go. Used to start over in a new Drive folder.
    */
   async clearFileLinks(): Promise<void> {
-    const tx = this.#transaction(['setlists', 'songs'], 'readwrite')
+    const tx = this.#transaction(['setlists', 'songs', 'people'], 'readwrite')
     const unlinked = {
       fileRef: null,
       fileModified: null,
@@ -673,9 +715,17 @@ export class ChordlessDB {
         songs.put({ ...song, ...unlinked, fileProps: null })
       }
     }
+    const people = tx.objectStore('people')
+    const peopleRequest = people.getAll()
+    peopleRequest.onsuccess = () => {
+      for (const person of peopleRequest.result as Person[]) {
+        people.put({ ...person, ...unlinked })
+      }
+    }
     await transactionDone(tx)
     this.#changed('setlist', null)
     this.#changed('song', null)
+    this.#changed('person', null)
   }
 
   /**
@@ -768,7 +818,7 @@ export class ChordlessDB {
   // Clear all data (for re-import)
   async clearAll(): Promise<void> {
     const tx = this.#transaction(
-      ['setlists', 'songs', 'chordpro', 'setlist_local', 'pending_deletions'],
+      ['setlists', 'songs', 'chordpro', 'setlist_local', 'pending_deletions', 'people'],
       'readwrite'
     )
 
@@ -782,6 +832,7 @@ export class ChordlessDB {
     await songStore.clear()
     await chordproStore.clear()
     await localStore.clear()
+    await tx.objectStore('people').clear()
 
     await transactionDone(tx)
     this.#changedAll()

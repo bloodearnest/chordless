@@ -6,7 +6,7 @@
  * docs/SPACES.md, "Read-only: local edits are never blocked".
  */
 
-import type { Setlist, SongInput, SongRecord } from '../data-types.ts'
+import type { Person, Setlist, SongInput, SongRecord } from '../data-types.ts'
 import { withNumericTempos } from '../db.ts'
 import { adoptLegacyLeader, type Leaders } from '../leaders.ts'
 import { songSource } from '../song-source.ts'
@@ -19,6 +19,7 @@ import {
   setlistIdOf,
   songHasLocalChanges,
 } from './changes.ts'
+import { personContent, personContentHash, personHasLocalChanges } from './person-hash.ts'
 import { inBatches, type ProgressCallback, type SyncRun } from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
 import { metadataOfProps, remoteMetadataChanges } from './song-metadata.ts'
@@ -209,6 +210,124 @@ export async function pullSetlists(
       const before = resetting.get(after.id)
       if (before) run.resetSetlists.push({ before, after })
     }
+  }
+}
+
+/** The id of the person a file holds: from its properties */
+export function personIdOf(file: Pick<StoredFile, 'props'>): string {
+  return file.props.personId || ''
+}
+
+/**
+ * The person to keep for a downloaded file, with its local record (if any) in mind. Where both
+ * changed since they were last the same, the newer one's name wins, the emails of both are kept,
+ * and what is not in the file is sent by the next push.
+ */
+export function mergedPerson(have: Person | undefined, remote: Person, file: StoredFile): Person {
+  const remoteHash = personContentHash(remote)
+  const link = {
+    fileRef: file.ref,
+    fileModified: file.modified,
+    fileRev: file.rev,
+    lastSyncedAt: new Date().toISOString(),
+    syncedContentHash: remoteHash,
+  }
+  const theirs: Person = { ...personContent(remote), emails: remote.emails ?? [], ...link }
+  if (!have || personContentHash(have) === remoteHash || !personHasLocalChanges(have)) {
+    return theirs
+  }
+  // Changed here and elsewhere
+  const mine = remote.modifiedDate > have.modifiedDate ? theirs : { ...personContent(have) }
+  return {
+    ...mine,
+    emails: [...new Set([...have.emails, ...theirs.emails])],
+    modifiedDate: remote.modifiedDate > have.modifiedDate ? remote.modifiedDate : have.modifiedDate,
+    ...link,
+  }
+}
+
+/**
+ * Pull the people from storage: those it has that this device doesn't, and those changed there.
+ * A person is never deleted by a pull; one whose file is gone is sent again by the next push.
+ */
+export async function pullPeople(
+  run: SyncRun,
+  progressCallback: ProgressCallback | null = null,
+  files?: StoredFile[]
+): Promise<void> {
+  const listed = files ?? (await run.space.list('people'))
+  if (!files) run.livePeopleIds = new Set()
+  const local = new Map((await run.db.getAllPeople()).map(person => [person.id, person]))
+
+  const queue: { file: StoredFile; id: string; have?: Person }[] = []
+  const adopted = new Set<string>()
+  for (const file of listed) {
+    const id = personIdOf(file)
+    if (!id) continue
+    run.livePeopleIds?.add(id)
+    const have = local.get(id)
+    if (!have) {
+      if (!adopted.has(id)) {
+        adopted.add(id)
+        queue.push({ file, id })
+      }
+    } else if (have.fileRef === file.ref) {
+      if (file.rev !== have.fileRev) queue.push({ file, id, have })
+    } else if (!adopted.has(id) && run.isOrphaned(have)) {
+      // The file this device knew is gone (or it never had one), yet another holds the person
+      adopted.add(id)
+      queue.push({ file, id, have })
+    }
+  }
+
+  if (queue.length > 0) {
+    progressCallback?.({
+      stage: 'pulling',
+      message: `Downloading ${queue.length} people...`,
+      current: 0,
+      total: queue.length,
+    })
+    const toSave: Person[] = []
+    await inBatches(
+      run.space,
+      queue,
+      item => item.file.ref,
+      async (item, text) => {
+        const remote = JSON.parse(text) as Person
+        return mergedPerson(item.have, { ...remote, id: remote.id || item.id }, item.file)
+      },
+      results => {
+        for (const result of results) {
+          if (result.status === 'fulfilled') toSave.push(result.value)
+          else {
+            run.pullIncomplete = true
+            run.downloadsFailed = true
+            console.error('[DriveSync] Failed to download a person:', result.reason)
+          }
+        }
+      }
+    )
+    await run.db.savePeople(toSave)
+  }
+
+  // A person whose file is gone is no longer linked to it, so the push makes a new one
+  if (run.knowsWhatIsGone) {
+    const unlink = (await run.db.getAllPeople()).filter(
+      person =>
+        person.fileRef &&
+        !run.fileExistsInDrive(person.fileRef) &&
+        !run.livePeopleIds?.has(person.id)
+    )
+    await run.db.savePeople(
+      unlink.map(person => ({
+        ...person,
+        fileRef: null,
+        fileModified: null,
+        fileRev: null,
+        lastSyncedAt: null,
+        syncedContentHash: null,
+      }))
+    )
   }
 }
 

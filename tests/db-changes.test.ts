@@ -85,12 +85,14 @@ describe('Telling of what is written (the change bus)', () => {
       'setlist:all:local',
       'song:all:local',
       'chart:all:local',
+      'person:all:local',
     ])
     expect(await announced(d => d.clearFileLinks())).to.deep.equal([
       'setlist:all:local',
       'song:all:local',
+      'person:all:local',
     ])
-    expect(await announced(d => d.clearAll())).to.have.length(3)
+    expect(await announced(d => d.clearAll())).to.have.length(4)
   })
 
   it('tells of the records whose files were let go, and of nothing when there were none', async () => {

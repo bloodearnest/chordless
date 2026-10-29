@@ -315,6 +315,13 @@ export interface Person {
   /** Set when merged into another person: the record stays so an id not yet replaced still resolves */
   mergedInto?: string
   modifiedDate: string
+
+  /** What the person keeps of its file in the space's storage (as a setlist does) */
+  fileRef?: string | null
+  fileModified?: string | null
+  fileRev?: string | null
+  lastSyncedAt?: string | null
+  syncedContentHash?: string | null
 }
 
 /**

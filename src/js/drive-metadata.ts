@@ -9,7 +9,7 @@
  * it can't go stale here.
  */
 
-import type { ChordProRecord, ParsedChart, Setlist, SongRecord } from './data-types.ts'
+import type { ChordProRecord, ParsedChart, Person, Setlist, SongRecord } from './data-types.ts'
 import { ChordProParser } from './parser.ts'
 import { songSource } from './song-source.ts'
 import type { FileInput } from './storage/types.ts'
@@ -83,6 +83,32 @@ export function setlistFilename(
     if (s) parts.push(s)
   }
   return `${parts.join('-')}.json`
+}
+
+/**
+ * Person filename: name-id.json, e.g. "tom-smith-3f9a1c2e.json". The id is what tells the files
+ * apart, and what the file is known by (appProperties); the name is for whoever looks in Drive.
+ */
+export function personFilename(person: Pick<Person, 'id' | 'name'>): string {
+  const name = slug(person.name, { collapseDashes: true })
+  const id = person.id.replace(/-/g, '').slice(0, 8)
+  return `${name ? `${name}-` : ''}${id}.json`
+}
+
+/** Metadata for a person's file (docs/IDENTITIES.md) */
+export function personFileMetadata(
+  person: Pick<Person, 'id' | 'name'>,
+  { spaceId }: FileMetadataOptions
+): DriveFileMetadata {
+  return {
+    name: personFilename(person),
+    mimeType: 'application/json',
+    appProperties: {
+      spaceId: spaceId || '',
+      personId: person.id,
+      appVersion: APP_VERSION,
+    },
+  }
 }
 
 /** Chord chart filename: title[-ccli].txt, e.g. "amazing-grace-4779.txt" */

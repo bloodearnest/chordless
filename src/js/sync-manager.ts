@@ -23,8 +23,8 @@ import { driveStorage } from './storage/browser-drive.ts'
 import { storageFor } from './storage/space-storage.ts'
 import type { RootInfo, SpaceStorage, StorageBackend } from './storage/types.ts'
 import { setlistHasLocalChanges, songHasLocalChanges, songUuidOf } from './sync/changes.ts'
-import { pullSetlists, pullSongs } from './sync/pull.ts'
-import { pushSetlists, pushSongs } from './sync/push.ts'
+import { pullPeople, pullSetlists, pullSongs } from './sync/pull.ts'
+import { pushPeople, pushSetlists, pushSongs } from './sync/push.ts'
 
 export type { ProgressCallback, SyncProgress } from './sync/session.ts'
 
@@ -580,11 +580,15 @@ export class SyncManager {
       }
       const songs = changes.changed.filter(c => c.collection === 'songs').map(c => c.file)
       const setlists = changes.changed.filter(c => c.collection === 'setlists').map(c => c.file)
+      const people = changes.changed.filter(c => c.collection === 'people').map(c => c.file)
 
       progressCallback?.({ stage: 'starting', message: 'Starting sync...' })
       await phase('chordless.sync.access', {}, () => this.#refreshAccessIfOld(run))
       await this.trashPendingDeletions(run)
 
+      // (the people first: a setlist whose leader is not stored shows none)
+      if (people.length > 0 || changes.gone.length > 0)
+        await pullPeople(run, progressCallback, people)
       if (setlists.length > 0) await pullSetlists(run, progressCallback, setlists)
       if (songs.length > 0) await pullSongs(run, progressCallback, songs)
       else run.liveSongUuids = new Set()
@@ -944,6 +948,9 @@ export class SyncManager {
     run?: SyncRun
   ): Promise<SyncReport> {
     return this.#within(run, async run => {
+      // Pull people first: a setlist whose leader is not stored shows none
+      await pullPeople(run, progressCallback)
+
       // Pull setlists
       progressCallback?.({
         stage: 'pulling',
@@ -989,6 +996,9 @@ export class SyncManager {
       progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
       await this.buildDriveInventory(run)
     }
+
+    // Push people first: the setlists' file names say their leaders
+    await pushPeople(run, progressCallback)
 
     // Push setlists
     progressCallback?.({

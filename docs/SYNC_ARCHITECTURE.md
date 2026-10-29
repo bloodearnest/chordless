@@ -377,7 +377,9 @@ Drive is already removed from devices that haven't edited it; see step 5 of a fu
 Decided 2026-10-22 (replacing the owner-only rule this section had, which guarded against
 mistakes and not abuse, since anyone could make themselves the leader first):
 
-- **Team space: a writer may delete a setlist they lead** (`ownerId` is their email), **an admin or
+- **Team space: a writer may delete a setlist they lead** (designed when a leader was an email,
+  `ownerId`; the leader is now a person, `leaderId`, matched to the writer by the person's emails,
+  which the Worker will read from the `people` collection), **an admin or
   the owner any setlist.** A writer cannot delete one someone else leads; the button is shown but
   says why. Deleting songs is admin and up. The Worker checks it on the server from the file's
   `ownerId` property and collection (docs/SPACES.md, "Roles"), so the rule does not depend on the
@@ -631,3 +633,21 @@ backstop.
   `drive.file`; the design (the Worker acts with the owner's access) is in SPACES.md.
 - **Songs:** deletion and the "deletion wins over an unchanged copy" rule for songs.
 - **Real Drive integration tests** (see Tests above).
+
+## People (added 2026-10-29)
+
+The space's people (`docs/IDENTITIES.md`) are a third collection, `people`: one JSON file each,
+named `<name>-<first 8 of the id>.json`, with the person's id in the file's `personId` property.
+They sync as setlists do, with these differences:
+
+- **Order:** a pull reads the people before the setlists, and a push sends them before the setlists,
+  so a setlist is never stored without the person it names, and the setlist's file name (which has
+  the leader's name) is made from the people as they now are.
+- **Conflicts:** a person changed on two devices keeps the emails of both and the name of the one saved
+  later (`mergedPerson`), and the merge is sent by the next push.
+- **Identity:** a person made for an email or name (`idFromKey`) has the same id on every device, so
+  two devices that made the same person each find the other's file and keep one. A person with no file
+  of its own waits for a pull while the storage has a file for its id.
+- **Deletion:** a pull never deletes a person. One whose file is gone is sent again.
+- **Reset:** "reset from Drive" clears the people with the rest and pulls them back; "start over in a
+  new folder" lets go of their files too.

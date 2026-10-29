@@ -2,9 +2,10 @@
  * The push of a Drive sync: what is new or changed on this device goes up to Drive, new files
  * and changed ones each in batches (the storage decides how a batch is sent).
  */
-import type { ChordProRecord, Setlist, SongFileProps, SongRecord } from '../data-types.ts'
+import type { ChordProRecord, Person, Setlist, SongFileProps, SongRecord } from '../data-types.ts'
 import {
   fileInput,
+  personFileMetadata,
   setlistFileMetadata,
   songFileDetails,
   songFileMetadata,
@@ -20,6 +21,7 @@ import {
   songHasLocalChanges,
   songUuidOf,
 } from './changes.ts'
+import { personContent, personContentHash, personHasLocalChanges } from './person-hash.ts'
 import { BATCH_SIZE, type ProgressCallback, type SyncRun } from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
 import { metadataOfSong } from './song-metadata.ts'
@@ -198,6 +200,104 @@ function setlistsToCreate(run: SyncRun, created: Setlist[], localSetlists: Setli
         `(${setlist.date} ${setlist.type}). Reset this device from Google Drive to fix it.`
     )
     return false
+  })
+}
+
+/** A person's file content in storage */
+function personJson(person: Person): string {
+  return JSON.stringify(personContent(person), null, 2)
+}
+
+/** Record on a person that storage now holds this content in this file (if it stored it intact) */
+function recordPersonUpload(person: Person, { file, intact }: WriteResult) {
+  person.fileRef = file.ref
+  Object.assign(person, driveMarkers(file))
+  if (intact) {
+    person.lastSyncedAt = new Date().toISOString()
+    person.syncedContentHash = personContentHash(person)
+  }
+}
+
+/** Push people to storage: new ones, and those changed here (in batches, as setlists are) */
+export async function pushPeople(
+  run: SyncRun,
+  progressCallback: ProgressCallback | null = null
+): Promise<void> {
+  const metadata = (person: Person) =>
+    fileInput(personFileMetadata(person, { spaceId: run.spaceId }))
+  const toSync = (await run.db.getAllPeople()).filter(
+    person =>
+      !person.fileRef || !run.fileExistsInDrive(person.fileRef) || personHasLocalChanges(person)
+  )
+  if (toSync.length === 0) return
+  const updated = toSync.filter(person => person.fileRef && run.fileExistsInDrive(person.fileRef))
+  let created = toSync.filter(person => !updated.includes(person))
+  for (const person of created) {
+    person.fileRef = null
+    person.fileModified = null
+    person.fileRev = null
+  }
+  // A person with no file of its own while storage has a live file for their id waits for a pull
+  // to adopt it, or the person would be stored twice. And after a pull that could not read every
+  // file, a person may have a file this device does not know of.
+  if (run.pullIncomplete) created = []
+  created = created.filter(person => !run.livePeopleIds?.has(person.id))
+
+  const report = (uploaded: number) =>
+    progressCallback?.({
+      stage: 'pushing',
+      message: `Uploaded ${uploaded}/${toSync.length} people`,
+      current: uploaded,
+      total: toSync.length,
+    })
+  const recordBatch = async (batch: Person[], results: (WriteResult | null)[]) => {
+    const saved: Person[] = []
+    batch.forEach((person, j) => {
+      const result = results[j]
+      if (!result) return
+      recordPersonUpload(person, result)
+      saved.push(person)
+    })
+    await run.db.savePeopleSent(saved)
+    return saved.length
+  }
+  const uploadOne = async (person: Person) => {
+    const result = person.fileRef
+      ? await run.space.update(person.fileRef, metadata(person), personJson(person))
+      : await run.space.create('people', metadata(person), personJson(person))
+    recordPersonUpload(person, result)
+    await run.db.savePeopleSent([person])
+  }
+  const describe = (person: Person) => `person ${person.id}`
+
+  const uploaded = await uploadInBatches(created, BATCH_SIZE, {
+    uploadBatch: async batch =>
+      recordBatch(
+        batch,
+        await run.space.createMany(
+          'people',
+          batch.map(person => ({ input: metadata(person), body: personJson(person) }))
+        )
+      ),
+    uploadOne,
+    describe,
+    onProgress: report,
+  })
+  await uploadInBatches(updated, BATCH_SIZE, {
+    uploadBatch: async batch =>
+      recordBatch(
+        batch,
+        await run.space.updateMany(
+          batch.map(person => ({
+            ref: person.fileRef as string,
+            input: metadata(person),
+            body: personJson(person),
+          }))
+        )
+      ),
+    uploadOne,
+    describe,
+    onProgress: count => report(uploaded + count),
   })
 }
 
