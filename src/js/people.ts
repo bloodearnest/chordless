@@ -6,7 +6,16 @@
 import type { Person } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { getCurrentUserInfo } from './google-auth.ts'
-import { findPerson, idFromKey, NEW_PERSON, normalizeEmail, resolvePerson } from './leaders.ts'
+import {
+  findPerson,
+  idFromKey,
+  isLive,
+  leaderCounts,
+  mergePlan,
+  NEW_PERSON,
+  normalizeEmail,
+  resolvePerson,
+} from './leaders.ts'
 import { getCurrentSpaceFull } from './space.ts'
 
 /** The signed-in Google account, or null if not signed in */
@@ -159,9 +168,51 @@ export async function identifyMe(db: ChordlessDB, answer: string): Promise<void>
   await chooseMe(db, made.id)
 }
 
+/**
+ * Merge one person into another (docs/IDENTITIES.md, "People page"): the other gains their
+ * addresses, the setlists they led are led by the other, and they are marked as merged. Resolves
+ * with whether it was done (not if either is not one of the people).
+ */
+export async function mergePersonInto(
+  db: ChordlessDB,
+  fromId: string,
+  intoId: string
+): Promise<boolean> {
+  const people = await db.getAllPeople()
+  const plan = mergePlan(people, fromId, intoId)
+  if (!plan) return false
+  await db.savePeople(plan)
+  const was = new Set([
+    fromId,
+    ...people.filter(each => each.mergedInto === fromId).map(each => each.id),
+  ])
+  const now = new Date().toISOString()
+  for (const setlist of await db.getAllSetlists()) {
+    if (!setlist.leaderId || !was.has(setlist.leaderId)) continue
+    await db.updateSetlist(setlist.id, stored => {
+      stored.leaderId = intoId
+      stored.modifiedDate = now
+    })
+  }
+  return true
+}
+
+/**
+ * Delete a person who leads no setlist. The record stays, marked, or another device's copy would
+ * bring them back; a person who is a member of a team, or the one signed in, is made again
+ * (`getSpacePeople`). Resolves with whether it was done.
+ */
+export async function deletePerson(db: ChordlessDB, id: string): Promise<boolean> {
+  const people = await db.getAllPeople()
+  const person = people.find(each => each.id === id && isLive(each))
+  if (!person || leaderCounts(people, await db.getAllSetlists()).get(id)) return false
+  await db.savePeople([{ ...person, deleted: true, modifiedDate: new Date().toISOString() }])
+  return true
+}
+
 /** The people not merged into another, sorted by name */
 export function livePeople(people: Person[]): Person[] {
-  return people.filter(person => !person.mergedInto).sort((a, b) => a.name.localeCompare(b.name))
+  return people.filter(isLive).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /**

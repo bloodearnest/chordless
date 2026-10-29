@@ -9,6 +9,7 @@ import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 import {
+  SpaceLeadersEvent,
   SpaceManageEvent,
   SpaceSwitchEvent,
   SpaceSyncedEvent,
@@ -20,6 +21,7 @@ import './space-manager.ts'
 import './storage-summary.ts'
 import { TeamShareLeftEvent } from './team-share-panel.ts'
 import './team-share-panel.ts'
+import './space-people.ts'
 
 /**
  * Account and Teams (docs/ACCOUNT.md): who is signed in, then the Personal space and the Teams on
@@ -35,6 +37,7 @@ export class AccountPage extends LitElement {
     _signIn: { state: true },
     _managing: { state: true },
     _users: { state: true },
+    _leaders: { state: true },
   }
 
   declare _spaces: Space[]
@@ -44,9 +47,11 @@ export class AccountPage extends LitElement {
   declare _managing: Space | null
   /** The Team whose people are shown, while their modal is open */
   declare _users: Space | null
+  declare _leaders: Space | null
 
   _modal: Ref<AppModal> = createRef()
   _usersModal: Ref<AppModal> = createRef()
+  _leadersModal: Ref<AppModal> = createRef()
 
   /** Shows the space once it is the one in use (a test gives its own; by default the home page, afresh) */
   show: (() => unknown) | undefined = undefined
@@ -95,6 +100,7 @@ export class AccountPage extends LitElement {
     this._signIn = null
     this._managing = null
     this._users = null
+    this._leaders = null
   }
 
   override connectedCallback(): void {
@@ -104,6 +110,7 @@ export class AccountPage extends LitElement {
     this.addEventListener(SpaceSwitchEvent.type, this._onSwitch)
     this.addEventListener(SpaceManageEvent.type, this._onManage)
     this.addEventListener(SpaceUsersEvent.type, this._onUsers)
+    this.addEventListener(SpaceLeadersEvent.type, this._onLeaders)
     this.addEventListener(TeamShareLeftEvent.type, this._onLeft)
     this.addEventListener(SpaceGoneEvent.type, this._onGone)
     void this.load()
@@ -115,6 +122,7 @@ export class AccountPage extends LitElement {
     this.removeEventListener(SpaceSwitchEvent.type, this._onSwitch)
     this.removeEventListener(SpaceManageEvent.type, this._onManage)
     this.removeEventListener(SpaceUsersEvent.type, this._onUsers)
+    this.removeEventListener(SpaceLeadersEvent.type, this._onLeaders)
     this.removeEventListener(TeamShareLeftEvent.type, this._onLeft)
     this.removeEventListener(SpaceGoneEvent.type, this._onGone)
     super.disconnectedCallback()
@@ -151,6 +159,21 @@ export class AccountPage extends LitElement {
     this._users = space
     await this.updateComplete
     this._usersModal.value?.show()
+  }
+
+  /** Show who leads a space's setlists in a modal */
+  _onLeaders = async (event: Event): Promise<void> => {
+    const id = (event as SpaceLeadersEvent).spaceId
+    const space = this._spaces.find(each => each.id === id)
+    if (!space) return
+    this._leaders = space
+    await this.updateComplete
+    this._leadersModal.value?.show()
+  }
+
+  _onLeadersClosed = (event: Event): void => {
+    if (event.target !== this._leadersModal.value) return
+    this._leaders = null
   }
 
   /** The person left the Team, which is gone from this device: close the modal, and read the list again */
@@ -238,6 +261,14 @@ export class AccountPage extends LitElement {
             </div>`
             : nothing
         }
+      </app-modal>
+      <app-modal
+        ${ref(this._leadersModal)}
+        size="large"
+        heading=${this._leaders ? `${this._leaders.name}: leaders` : ''}
+        @app-modal:close=${this._onLeadersClosed}
+      >
+        ${this._leaders ? html`<space-people .spaceId=${this._leaders.id}></space-people>` : nothing}
       </app-modal>
     `
   }

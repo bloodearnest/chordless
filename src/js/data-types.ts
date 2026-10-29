@@ -314,6 +314,8 @@ export interface Person {
   teamMember?: string
   /** Set when merged into another person: the record stays so an id not yet replaced still resolves */
   mergedInto?: string
+  /** Set when the person was deleted: the record stays, or another device's copy would bring them back */
+  deleted?: boolean
   modifiedDate: string
 
   /** What the person keeps of its file in the space's storage (as a setlist does) */

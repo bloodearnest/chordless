@@ -4,15 +4,18 @@ import { ChordlessDB } from '../src/js/db.ts'
 import { NEW_PERSON } from '../src/js/leaders.ts'
 import {
   chosenMeId,
+  deletePerson,
   getSignedInUser,
   getSpacePeople,
   identifyMe,
+  mergePersonInto,
   newPerson,
   personFor,
   settleLeader,
 } from '../src/js/people.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
+import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 
@@ -183,6 +186,74 @@ describe('the signed-in user and the space’s people', () => {
     const { people, me } = await getSpacePeople(db)
     expect(me).to.equal(null)
     expect(people.map(each => each.name)).to.deep.equal(['Ben'])
+  })
+
+  describe('merging and deleting people', () => {
+    const tom = person({ id: 'tom', name: 'Tom S.', emails: ['tom@home.org'] })
+    const tomSmith = person({ id: 'tom-smith', name: 'Tom Smith', emails: ['tom@work.org'] })
+    const earlier = person({ id: 'earlier', name: 'T. Smith', mergedInto: 'tom' })
+
+    it('merges one person into another: the addresses, the setlists and earlier merges follow', async () => {
+      await db.savePeople([tom, tomSmith, earlier])
+      await db.saveSetlist(makeSetlist({ id: 'a', leaderId: 'tom' }))
+      await db.saveSetlist(makeSetlist({ id: 'b', leaderId: 'earlier' }))
+      await db.saveSetlist(makeSetlist({ id: 'c', leaderId: 'tom-smith' }))
+      await db.saveSetlist(makeSetlist({ id: 'd' }))
+
+      expect(await mergePersonInto(db, 'tom', 'tom-smith')).to.equal(true)
+
+      const leaders = Object.fromEntries(
+        (await db.getAllSetlists()).map(each => [each.id, each.leaderId])
+      )
+      expect(leaders).to.deep.equal({
+        a: 'tom-smith',
+        b: 'tom-smith',
+        c: 'tom-smith',
+        d: undefined,
+      })
+      expect(must(await db.getPerson('tom-smith')).emails).to.deep.equal([
+        'tom@work.org',
+        'tom@home.org',
+      ])
+      expect(must(await db.getPerson('tom')).mergedInto).to.equal('tom-smith')
+      expect(must(await db.getPerson('earlier')).mergedInto).to.equal('tom-smith')
+    })
+
+    it('does not merge a person into themselves, or one who is not there', async () => {
+      await db.savePeople([tom])
+      expect(await mergePersonInto(db, 'tom', 'tom')).to.equal(false)
+      expect(await mergePersonInto(db, 'tom', 'nobody')).to.equal(false)
+    })
+
+    it('deletes a person who leads nothing, who is then neither listed nor found', async () => {
+      await db.savePeople([tom, tomSmith])
+      await db.saveSetlist(makeSetlist({ id: 'a', leaderId: 'tom-smith' }))
+
+      expect(await deletePerson(db, 'tom')).to.equal(true)
+
+      expect(must(await db.getPerson('tom')).deleted).to.equal(true)
+      expect((await getSpacePeople(db)).people.map(each => each.name)).to.deep.equal(['Tom Smith'])
+      expect(await deletePerson(db, 'tom')).to.equal(false)
+    })
+
+    it('does not delete a person who leads a setlist, or one who is not there', async () => {
+      await db.savePeople([tom])
+      await db.saveSetlist(makeSetlist({ id: 'a', leaderId: 'tom' }))
+      expect(await deletePerson(db, 'tom')).to.equal(false)
+      expect(await deletePerson(db, 'nobody')).to.equal(false)
+      expect(must(await db.getPerson('tom')).deleted).to.equal(undefined)
+    })
+
+    it('makes a deleted person again when they are a member of the space', async () => {
+      await withMembers([{ email: 'ben@example.com', name: 'Ben' }])
+      const first = await getSpacePeople(db)
+      const ben = must(first.people.find(each => each.name === 'Ben'))
+      expect(await deletePerson(db, ben.id)).to.equal(true)
+
+      const again = await getSpacePeople(db)
+
+      expect(again.people.map(each => each.name)).to.deep.equal(['Ben'])
+    })
   })
 
   describe('which person is the one using the app', () => {

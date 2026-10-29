@@ -648,6 +648,8 @@ They sync as setlists do, with these differences:
 - **Identity:** a person made for an email or name (`idFromKey`) has the same id on every device, so
   two devices that made the same person each find the other's file and keep one. A person with no file
   of its own waits for a pull while the storage has a file for its id.
-- **Deletion:** a pull never deletes a person. One whose file is gone is sent again.
+- **Deletion:** a pull never deletes a person. One whose file is gone is sent again. A person deleted
+  in the app is marked `deleted` (as a merged one is marked `mergedInto`) and the mark syncs like any
+  other change, so no device brings them back.
 - **Reset:** "reset from Drive" clears the people with the rest and pulls them back; "start over in a
   new folder" lets go of their files too.

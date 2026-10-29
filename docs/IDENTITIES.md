@@ -1,6 +1,6 @@
 # IDENTITIES
 
-> **Status (2026-10-29): step 1 is built (people store, upgrade to version 10, `leaderId`, people synced as a `people` collection: docs/SYNC_ARCHITECTURE.md, "People"). Step 2 is built (matching in the email import, and which person is "me"). Steps 3 and 4 are not.** Replaces a setlist's `owner` (a name) and
+> **Status (2026-10-29): step 1 is built (people store, upgrade to version 10, `leaderId`, people synced as a `people` collection: docs/SYNC_ARCHITECTURE.md, "People"). Step 2 is built (matching in the email import, and which person is "me"). Step 3 is built (the page that lists, merges and deletes them). Step 4 is not.** Replaces a setlist's `owner` (a name) and
 > `ownerId` (an email) with a link to a person in the space's own list of people.
 
 ## Why
@@ -22,6 +22,7 @@ Person {
   name: string          // as shown
   emails: string[]      // lower-cased; a person may have several
   teamMember?: string   // "provider:sub" (identityKey, docs/SPACES.md), only in a team space
+  deleted?: boolean     // set when deleted: the record stays, so another device's copy does not bring them back
   mergedInto?: string   // set when merged into another person; the record stays so that a
                         // device that has not synced yet can still resolve the id
   modifiedDate: string
@@ -93,10 +94,28 @@ new one.
 
 ## People page
 
-A list in Account and Teams (docs/ACCOUNT.md): each person with their emails and how many
-setlists they lead; rename, add or remove an email, **Merge into…** (sets `mergedInto`,
-rewrites `leaderId` on their setlists, moves the emails across), and Delete (only for a
-person who leads nothing). This is also where today's bad names get cleaned up.
+**Built.** On the Account and Teams page (docs/ACCOUNT.md) every space's card has a **Leaders** button
+(the page says "Leaders", not "People": a Team's *Users* are its members and their roles, a different
+list) that opens `space-people.ts` in a modal, for any space on the device, not only the one in use.
+Each person has:
+
+- their **name**, to rename (an empty name puts the old one back);
+- their **email addresses**, each with an ×, and a field to add one. An address that is not one, or
+  is another person's ("Ann has that address already: merge them to join the two"), is refused with
+  the browser's own validation message; addresses are lower-cased;
+- how many setlists they **lead**, and "you" for the person using the app;
+- **Merge into…** and **Delete**, each after a question. A merge gives the other person the addresses
+  (and the team link, if they had none), repoints the setlists (`leaderId`), and marks the person
+  `mergedInto`, as do the people merged into them earlier. A delete is only for a person who leads
+  nothing and is not you, and marks the person `deleted`: the record stays, or another device's copy
+  would bring them back (a pull never deletes). A deleted person is not listed, found, suggested or
+  named; a person who is a member of a Team, or the one signed in, is made again by the next
+  `getSpacePeople`, so deleting them does nothing lasting.
+
+This is where the bad name an earlier import made is cleaned up: merge it into the right person. In a
+Team only worship leaders (`writer` and above) change anything; a team member sees the list. (A team
+member's own name waits for the Worker route in step 4.) Failures are toasts, and the page shows the
+people as they are.
 
 ## Team spaces
 

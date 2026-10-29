@@ -4,6 +4,7 @@
  */
 import { expect } from '@open-wc/testing'
 import type { Person } from '../src/js/data-types.ts'
+import { deletePerson, mergePersonInto } from '../src/js/people.ts'
 import { personHasLocalChanges } from '../src/js/sync/person-hash.ts'
 import { useFakeDriveRig, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
@@ -161,6 +162,31 @@ describe('people in sync (against the memory backend)', () => {
 
     expect(peopleFiles()).to.have.length(1)
     expect((await stored(phone, 'ann')).fileRef).to.equal(peopleFiles()[0].ref)
+  })
+
+  it('carries a merge and a deletion to another device, where the deleted person does not come back', async () => {
+    const phone = await makeDevice('phone')
+    const tablet = await makeDevice('tablet')
+    await phone.db.savePeople([
+      person({ id: 'tom', name: 'Tom S.' }),
+      person({ id: 'tom-smith', name: 'Tom Smith', emails: ['tom@example.com'] }),
+      person({ id: 'vic', name: 'Visiting Vic' }),
+    ])
+    const setlist = await addSetlist(phone, { name: 'Harvest', leaderId: 'tom' })
+    await syncDevice(phone)
+    await syncDevice(tablet)
+
+    await mergePersonInto(phone.db, 'tom', 'tom-smith')
+    await deletePerson(phone.db, 'vic')
+    await syncDevice(phone)
+    await syncDevice(tablet)
+    await syncDevice(phone)
+
+    expect((await stored(tablet, 'tom')).mergedInto).to.equal('tom-smith')
+    expect((await stored(tablet, 'vic')).deleted).to.equal(true)
+    expect(must(await tablet.db.getSetlist(setlist.id)).leaderId).to.equal('tom-smith')
+    expect((await stored(phone, 'vic')).deleted).to.equal(true)
+    expect(peopleFiles()).to.have.length(3)
   })
 
   it('ignores a file in the people collection that is not a person’s', async () => {

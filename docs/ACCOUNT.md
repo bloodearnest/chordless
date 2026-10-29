@@ -98,7 +98,8 @@ that database, and the people and invite calls need only the team id. Every dest
 first (CLAUDE.md: friction, not prohibition). Deleting a space closes the modal (`SpaceGoneEvent`)
 and the list is read again; closing it any other way reads the list again too.
 
-A Team's people are in a second modal, from a **Users** button on a Team's card (after Data): who is in
+Who leads a space's setlists is under **Leaders**, on every space's card (after Data): `space-people.ts`
+in a modal (docs/IDENTITIES.md, "People page"). A Team's members are in a second modal, from a **Users** button on a Team's card (after Data): who is in
 it and their roles, invite someone, invites waiting, stop sharing, and leave. Every member gets the
 button, not only those who may manage people, because leaving is there and a member can see who is
 in the Team. The controls inside follow the role. Leaving, or closing the modal, reads the list again.
