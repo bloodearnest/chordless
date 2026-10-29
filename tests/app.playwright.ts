@@ -14,7 +14,7 @@ test.describe('Themes', () => {
     }
     await openApp(page, '/songs')
     const dark = await background('/songs')
-    for (const url of ['/import-song', '/bookmarklet', '/storage']) {
+    for (const url of ['/import-song', '/storage']) {
       expect(await background(url), url).toBe(dark)
     }
   })
@@ -175,7 +175,6 @@ test.describe('Navigation menu', () => {
       '/setlist/menu-test-setlist',
       '/preferences',
       '/storage',
-      '/bookmarklet',
       '/import-song',
     ]
     for (const path of pages) {

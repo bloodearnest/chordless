@@ -9,7 +9,6 @@ import '../src/components/nav-menu.ts'
 import { getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import type { Route } from '../src/js/router.ts'
-import '../src/js/views/bookmarklet-view.ts'
 import '../src/js/views/home-view.ts'
 import '../src/js/views/import-song-view.ts'
 import '../src/js/views/library-view.ts'
@@ -193,7 +192,6 @@ describe('views leave nothing behind', () => {
     ['account-view', { name: 'account' }],
     ['preferences-view', { name: 'preferences' }],
     ['import-song-view', { name: 'import-song' }],
-    ['bookmarklet-view', { name: 'bookmarklet' }],
     ['not-found-view', { name: 'not-found', path: '/nope' }],
     ['library-view', { name: 'songs' }],
   ]

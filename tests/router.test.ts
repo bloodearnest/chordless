@@ -31,7 +31,7 @@ describe('normalizePath', () => {
 })
 
 describe('matchRoute', () => {
-  const pages = ['songs', 'preferences', 'account', 'import-song', 'bookmarklet', 'join'] as const
+  const pages = ['songs', 'preferences', 'account', 'import-song', 'join'] as const
   const setlist = (setlistId: string, songIndex: number) =>
     ({ name: 'setlist', setlistId, songIndex }) as const satisfies Route
   const notFound = (path: string) => ({ name: 'not-found', path }) as const satisfies Route
@@ -119,7 +119,6 @@ describe('buildUrl', () => {
     [{ name: 'preferences' }, '/preferences'],
     [{ name: 'account' }, '/account'],
     [{ name: 'import-song' }, '/import-song'],
-    [{ name: 'bookmarklet' }, '/bookmarklet'],
     [{ name: 'join' }, '/join'],
     [{ name: 'new-team-space' }, '/account/new'],
     [{ name: 'media' }, '/media'],

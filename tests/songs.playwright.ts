@@ -1,4 +1,5 @@
-// Songs: the library, song info, importing, and the bookmarklet page
+// Songs: the library, song info, importing, and the SongSelect bookmarklet help
+import type { Page } from '@playwright/test'
 import { expect, fromDB, openApp, seedSong, test } from './fixtures.ts'
 import { must } from './must.ts'
 
@@ -356,9 +357,14 @@ test.describe('Song import', () => {
   })
 })
 
-test.describe('Bookmarklet page', () => {
+test.describe('SongSelect bookmarklet help on the import page', () => {
+  const open = async (page: Page) => {
+    await page.goto('/import-song')
+    await page.getByText('Import from SongSelect (CCLI) with a bookmarklet').click()
+  }
+
   test('hides the phone and tablet tip on a computer', async ({ page }) => {
-    await page.goto('/bookmarklet')
+    await open(page)
     await expect(page.locator('.touch-tip')).toBeHidden()
     await expect(page.getByText('Ctrl+D or Cmd+D')).toBeVisible()
   })
@@ -367,20 +373,16 @@ test.describe('Bookmarklet page', () => {
     test.use({ isMobile: true, hasTouch: true, viewport: { width: 412, height: 900 } })
 
     test('hides the instructions that need a keyboard or bookmarks bar', async ({ page }) => {
-      await page.goto('/bookmarklet')
+      await open(page)
       await expect(page.getByText('Ctrl+D or Cmd+D')).toBeHidden()
       await expect(page.getByText('Drag this button to your bookmarks bar')).toBeHidden()
       await expect(page.getByText('of any page, then edit it')).toBeVisible()
     })
 
     test('suggests importing the ChordPro file instead', async ({ page }) => {
-      await page.goto('/bookmarklet')
-      const tip = page.locator('.touch-tip')
-      await expect(tip).toBeVisible()
-      await expect(tip.getByRole('link', { name: 'Import Songs' })).toHaveAttribute(
-        'href',
-        '/import-song'
-      )
+      await open(page)
+      await expect(page.locator('.touch-tip')).toBeVisible()
+      await expect(page.locator('.touch-tip')).toContainText('Import ChordPro Files')
     })
   })
 })

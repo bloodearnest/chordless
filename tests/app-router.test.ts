@@ -106,7 +106,7 @@ describe('AppRouter', () => {
     })
 
     it('does nothing for a URL with no view', async () => {
-      window.history.replaceState(null, '', '/bookmarklet')
+      window.history.replaceState(null, '', '/about')
       expect(await makeRouter().start()).to.equal(false)
       expect(outlet.children).to.have.length(0)
       expect(router.route).to.equal(null)
@@ -138,7 +138,7 @@ describe('AppRouter', () => {
 
     it('returns false, and changes nothing, for a route with no view', async () => {
       const before = window.history.length
-      expect(await router.navigate('/bookmarklet')).to.equal(false)
+      expect(await router.navigate('/about')).to.equal(false)
       expect(window.location.pathname).to.equal('/account')
       expect(window.history.length).to.equal(before)
       expect(router.route).to.deep.equal({ name: 'account' })
@@ -427,7 +427,7 @@ describe('AppRouter', () => {
     })
 
     it('leaves a link to a route with no view to the browser', () => {
-      expect(click('href="/bookmarklet"')).to.equal(false)
+      expect(click('href="/about"')).to.equal(false)
       expect(router.route.name).to.equal('account')
     })
 

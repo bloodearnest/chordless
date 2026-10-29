@@ -505,7 +505,7 @@ export class SetlistEmailImport extends LitElement {
           ? html`<p class="notice" role="status">
             ${missing.length} ${missing.length === 1 ? 'song is' : 'songs are'} not in your library yet.
             Open ${missing.length === 1 ? 'it' : 'each'} on SongSelect and import it with the
-            <a href="/bookmarklet" target="_blank" rel="noopener">bookmarklet</a> (when asked where to put it, keep it in the
+            <a href="/import-song" target="_blank" rel="noopener">SongSelect bookmarklet</a> (when asked where to put it, keep it in the
             library), then come back here: this page looks again when you return. Or leave
             ${missing.length === 1 ? 'it' : 'a song'} out.
           </p>`

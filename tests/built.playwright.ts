@@ -13,7 +13,6 @@ const VIEWS = [
   ['/preferences', 'preferences-view'],
   ['/import-song', 'import-song-view'],
   ['/import-setlist', 'import-setlist-view'],
-  ['/bookmarklet', 'bookmarklet-view'],
   ['/about', 'about-view'],
   ['/join', 'join-view'],
   ['/account/new', 'new-team-space-view'],

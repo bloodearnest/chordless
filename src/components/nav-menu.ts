@@ -399,11 +399,6 @@ export class NavMenu extends LitElement {
                 <span>Import Songs</span>
               </a>
 
-              <a href="/bookmarklet" class="nav-menu-item" part="nav-item">
-                <app-icon name="bookmark" size="20" class="nav-icon"></app-icon>
-                <span>SongSelect Import</span>
-              </a>
-
           <a href="/about" class="nav-menu-item" part="nav-item">
             <app-icon name="info" size="20" class="nav-icon"></app-icon>
             <span>About</span>
