@@ -47,7 +47,10 @@ export function idFromKey(key: string): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`
 }
 
-/** The person an id means: the one it was merged into, if it was */
+/** Whether a person is one of the people: not merged into another, and not deleted */
+export const isLive = (person: Person): boolean => !person.mergedInto && !person.deleted
+
+/** The person an id means: the one it was merged into, if it was; nobody for a deleted person */
 export function resolvePerson(people: Person[], id: string | null | undefined): Person | undefined {
   const byId = new Map(people.map(person => [person.id, person]))
   let person = id ? byId.get(id) : undefined
@@ -56,7 +59,7 @@ export function resolvePerson(people: Person[], id: string | null | undefined): 
     if (!next) break
     person = next
   }
-  return person
+  return person?.deleted ? undefined : person
 }
 
 /** A leader's name for showing; empty if the setlist has none, or the person is not known (yet) */
@@ -73,7 +76,7 @@ export function findPerson(
   people: Person[],
   who: { name?: string | null; email?: string | null }
 ): Person | undefined {
-  const live = people.filter(person => !person.mergedInto)
+  const live = people.filter(isLive)
   const email = normalizeEmail(who.email)
   if (email) {
     const byEmail = live.find(person => person.emails.includes(email))
@@ -218,7 +221,7 @@ export function suggestPeople(people: Person[], name: string | null | undefined)
   if (typed.length === 0) return []
   const scored: { person: Person; score: number }[] = []
   for (const person of people) {
-    if (person.mergedInto) continue
+    if (!isLive(person)) continue
     const words = normalizeName(person.name).split(' ').filter(Boolean)
     if (words.join(' ') === typed.join(' ')) continue
     // Each typed word is a whole word of the person's name (2 points) or the start of one (1),
@@ -260,10 +263,84 @@ export function resolveLeader(
   who: { name?: string | null; email?: string | null }
 ): LeaderMatch {
   const email = normalizeEmail(who.email)
-  const byEmail = email ? people.find(p => !p.mergedInto && p.emails.includes(email)) : undefined
+  const byEmail = email ? people.find(p => isLive(p) && p.emails.includes(email)) : undefined
   if (byEmail) return { kind: 'match', person: byEmail, by: 'email' }
   const byName = findPerson(people, { name: who.name })
   if (byName) return { kind: 'match', person: byName, by: 'name' }
   const candidates = suggestPeople(people, who.name)
   return candidates.length > 0 ? { kind: 'suggest', candidates } : { kind: 'none' }
+}
+
+/** Why an email cannot be added to a person (null if it can): not an address, theirs already, or another's */
+export function emailProblem(people: Person[], person: Person, email: string): string | null {
+  const address = normalizeEmail(email)
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address))
+    return 'That does not look like an email address.'
+  if (person.emails.includes(address)) return 'They have that address already.'
+  const owner = people.find(
+    each => isLive(each) && each.id !== person.id && each.emails.includes(address)
+  )
+  return owner ? `${owner.name} has that address already: merge them to join the two.` : null
+}
+
+/** The person with a new name (trimmed), or unchanged if it is empty or the same */
+export function renamed(person: Person, name: string, now = new Date().toISOString()): Person {
+  const trimmed = name.trim()
+  return trimmed && trimmed !== person.name
+    ? { ...person, name: trimmed, modifiedDate: now }
+    : person
+}
+
+/** The person with an address more or less (lower-cased), or unchanged if there is nothing to do */
+export function withEmail(
+  person: Person,
+  email: string,
+  add: boolean,
+  now = new Date().toISOString()
+): Person {
+  const address = normalizeEmail(email)
+  if (person.emails.includes(address) === add) return person
+  const emails = add ? [...person.emails, address] : person.emails.filter(each => each !== address)
+  return { ...person, emails, modifiedDate: now }
+}
+
+/**
+ * What merging a person into another changes (the people to save): the other gains the first one's
+ * addresses (and their team link, if it had none), the first is marked as merged into it, and
+ * anyone who was merged into the first is merged into the other directly. Null if either is not
+ * one of the people, or they are the same.
+ */
+export function mergePlan(
+  people: Person[],
+  fromId: string,
+  intoId: string,
+  now = new Date().toISOString()
+): Person[] | null {
+  const from = people.find(each => each.id === fromId && isLive(each))
+  const into = people.find(each => each.id === intoId && isLive(each))
+  if (!from || !into || from.id === into.id) return null
+  const joined: Person = {
+    ...into,
+    emails: [...new Set([...into.emails, ...from.emails])],
+    ...(into.teamMember || !from.teamMember ? {} : { teamMember: from.teamMember }),
+    modifiedDate: now,
+  }
+  const absorbed: Person = { ...from, mergedInto: into.id, modifiedDate: now }
+  const earlier = people
+    .filter(each => each.mergedInto === from.id)
+    .map(each => ({ ...each, mergedInto: into.id, modifiedDate: now }))
+  return [joined, absorbed, ...earlier]
+}
+
+/** How many setlists each person leads (a leader merged into another counts for the other) */
+export function leaderCounts(
+  people: Person[],
+  setlists: { leaderId?: string | null }[]
+): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const setlist of setlists) {
+    const leader = resolvePerson(people, setlist.leaderId)
+    if (leader) counts.set(leader.id, (counts.get(leader.id) ?? 0) + 1)
+  }
+  return counts
 }

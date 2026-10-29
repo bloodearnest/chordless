@@ -6,6 +6,7 @@ import { expect, fixture, html } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import {
   type SpaceCard,
+  SpaceLeadersEvent,
   SpaceManageEvent,
   SpaceSwitchEvent,
   SpaceSyncedEvent,
@@ -131,6 +132,17 @@ describe('space-card', () => {
     expect(asked).to.deep.equal([space.id])
   })
 
+  it('has a Leaders button for every space, which asks the page to show who leads its setlists', async () => {
+    const el = await card('signed-in')
+    const asked: string[] = []
+    el.addEventListener(SpaceLeadersEvent.type, event =>
+      asked.push((event as SpaceLeadersEvent).spaceId)
+    )
+    expect(must(button(el, 'leaders')).textContent?.trim()).to.equal('Leaders')
+    must(button(el, 'leaders')).click()
+    expect(asked).to.deep.equal([space.id])
+  })
+
   it('has a Users button for a Team only, which asks the page to show its people', async () => {
     const own = await card('signed-in')
     expect(button(own, 'users')).to.equal(null)
@@ -144,7 +156,7 @@ describe('space-card', () => {
     )
     must(button(el, 'users')).click()
     expect(asked).to.deep.equal([team.id])
-    expect(order(el)).to.deep.equal(['sync', 'manage', 'users', 'switch'])
+    expect(order(el)).to.deep.equal(['sync', 'manage', 'leaders', 'users', 'switch'])
   })
 
   it('calls the button for a space’s data Data', async () => {
@@ -160,7 +172,7 @@ describe('space-card', () => {
     const order = Array.from(el.shadowRoot?.querySelectorAll('.actions button') ?? []).map(
       each => each.id
     )
-    expect(order).to.deep.equal(['sync', 'manage', 'switch'])
+    expect(order).to.deep.equal(['sync', 'manage', 'leaders', 'switch'])
     const switchButton = must(button(el, 'switch'))
     const row = must(el.shadowRoot?.querySelector('.actions')).getBoundingClientRect()
     expect(Math.round(switchButton.getBoundingClientRect().right)).to.equal(Math.round(row.right))

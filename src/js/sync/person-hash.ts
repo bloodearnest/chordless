@@ -35,6 +35,7 @@ export function personContentHash(person: Person): string {
       [...content.emails].sort(),
       content.teamMember ?? null,
       content.mergedInto ?? null,
+      content.deleted ?? false,
     ])
   )
 }

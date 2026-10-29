@@ -9,6 +9,7 @@ import { type AppModal, ModalCloseEvent } from '../src/components/app-modal.ts'
 import '../src/components/account-page.ts'
 import type { SpaceCard } from '../src/components/space-card.ts'
 import {
+  SpaceLeadersEvent,
   SpaceManageEvent,
   SpaceSwitchEvent,
   SpaceSyncedEvent,
@@ -210,6 +211,46 @@ describe('account-page', () => {
       el.dispatchEvent(new SpaceManageEvent('no-such-space'))
       await wait(50)
       expect(modal(el).open).to.equal(false)
+    })
+  })
+
+  describe('who leads a space’s setlists', () => {
+    const modal = (el: AccountPage) =>
+      must(el.shadowRoot?.querySelectorAll<AppModal>('app-modal')[2])
+    const people = (el: AccountPage) => el.shadowRoot?.querySelector('space-people') ?? null
+
+    async function showLeaders(el: AccountPage, id: string) {
+      must(cards(el).find(each => each.space.id === id)).dispatchEvent(new SpaceLeadersEvent(id))
+      for (let i = 0; i < 50 && !modal(el).open; i++) await wait(20)
+      await el.updateComplete
+    }
+
+    it('opens in a modal named for the space, and goes when closed', async () => {
+      const first = await space('Band')
+      const el = await page()
+      expect(people(el)).to.equal(null)
+      await showLeaders(el, first.id)
+      expect(modal(el).open).to.equal(true)
+      expect(modal(el).heading).to.equal(`${first.name}: leaders`)
+      expect(people(el)?.spaceId).to.equal(first.id)
+      modal(el).close()
+      for (let i = 0; i < 50 && people(el); i++) await wait(20)
+      expect(people(el)).to.equal(null)
+    })
+
+    it('does nothing for a space that is not on the list', async () => {
+      const el = await page()
+      el.dispatchEvent(new SpaceLeadersEvent('no-such-space'))
+      await wait(50)
+      expect(modal(el).open).to.equal(false)
+    })
+
+    it('ignores another modal closing', async () => {
+      const first = await space('Band')
+      const el = await page()
+      await showLeaders(el, first.id)
+      el._onLeadersClosed(Object.assign(new Event('x'), {}))
+      expect(people(el)?.spaceId).to.equal(first.id)
     })
   })
 

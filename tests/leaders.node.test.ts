@@ -3,14 +3,19 @@ import { describe, it } from 'node:test'
 import type { Person, Setlist } from '../src/js/data-types.ts'
 import {
   adoptLegacyLeader,
+  emailProblem,
   findPerson,
   idFromKey,
+  leaderCounts,
   leaderName,
+  mergePlan,
   normalizeName,
   planPeople,
+  renamed,
   resolveLeader,
   resolvePerson,
   suggestPeople,
+  withEmail,
 } from '../src/js/leaders.ts'
 
 const NOW = '2026-10-29T10:00:00.000Z'
@@ -244,6 +249,98 @@ describe('resolveLeader', () => {
     })
     assert.deepEqual(resolveLeader([ann, tom], { name: 'Zed', email: '' }), { kind: 'none' })
     assert.deepEqual(resolveLeader([], {}), { kind: 'none' })
+  })
+})
+
+describe('changing a person', () => {
+  const ann = person({ id: 'ann', name: 'Ann', emails: ['ann@example.com'] })
+  const ben = person({ id: 'ben', name: 'Ben', emails: ['ben@example.com'] })
+
+  it('is renamed with the name trimmed, and not for an empty or the same name', () => {
+    assert.equal(renamed(ann, '  Anne  ', 'now').name, 'Anne')
+    assert.equal(renamed(ann, '  Anne  ', 'now').modifiedDate, 'now')
+    assert.equal(renamed(ann, '   '), ann)
+    assert.equal(renamed(ann, 'Ann'), ann)
+  })
+
+  it('gains and loses addresses, lower-cased, and is unchanged when there is nothing to do', () => {
+    assert.deepEqual(withEmail(ann, 'ANN@work.org', true, 'now').emails, [
+      'ann@example.com',
+      'ann@work.org',
+    ])
+    assert.deepEqual(withEmail(ann, 'Ann@Example.com', false, 'now').emails, [])
+    assert.equal(withEmail(ann, 'ann@example.com', true), ann)
+    assert.equal(withEmail(ann, 'x@y.org', false), ann)
+  })
+
+  it('says why an address cannot be added', () => {
+    const people = [
+      ann,
+      ben,
+      { ...person({ id: 'old', name: 'Old', emails: ['old@x.org'] }), mergedInto: 'ann' },
+    ]
+    assert.match(emailProblem(people, ann, 'nonsense') ?? '', /does not look like/)
+    assert.match(emailProblem(people, ann, ' ANN@example.com ') ?? '', /already/)
+    assert.match(emailProblem(people, ann, 'ben@example.com') ?? '', /Ben has that address/)
+    assert.equal(emailProblem(people, ann, 'old@x.org'), null)
+    assert.equal(emailProblem(people, ann, 'new@x.org'), null)
+  })
+})
+
+describe('mergePlan', () => {
+  const ann = person({ id: 'ann', name: 'Ann', emails: ['ann@example.com'] })
+  const ben = person({
+    id: 'ben',
+    name: 'Ben',
+    emails: ['ben@example.com'],
+    teamMember: 'google:1',
+  })
+  const old = person({ id: 'old', name: 'Old Ben', mergedInto: 'ben' })
+
+  it('joins the addresses, keeps a team link, marks the merged and repoints the earlier merges', () => {
+    const plan = mergePlan([ann, ben, old], 'ben', 'ann', 'now') as Person[]
+    const byId = Object.fromEntries(plan.map(p => [p.id, p]))
+    assert.deepEqual(byId.ann.emails, ['ann@example.com', 'ben@example.com'])
+    assert.equal(byId.ann.teamMember, 'google:1')
+    assert.equal(byId.ben.mergedInto, 'ann')
+    assert.equal(byId.old.mergedInto, 'ann')
+    assert.equal(plan.length, 3)
+  })
+
+  it('keeps the team link the other person has', () => {
+    const linked = { ...ann, teamMember: 'google:2' }
+    const plan = mergePlan([linked, ben], 'ben', 'ann') as Person[]
+    assert.equal(plan.find(p => p.id === 'ann')?.teamMember, 'google:2')
+  })
+
+  it('is nothing for the same person, or one that is not there or already merged', () => {
+    assert.equal(mergePlan([ann, ben], 'ann', 'ann'), null)
+    assert.equal(mergePlan([ann, ben], 'ann', 'zed'), null)
+    assert.equal(mergePlan([ann, ben, old], 'old', 'ann'), null)
+  })
+})
+
+describe('leaderCounts and deleted people', () => {
+  const ann = person({ id: 'ann', name: 'Ann' })
+  const old = person({ id: 'old', name: 'Old', mergedInto: 'ann' })
+  const gone = person({ id: 'gone', name: 'Gone', deleted: true })
+
+  it('counts the setlists each leads, a merged person’s for the one they became', () => {
+    const counts = leaderCounts(
+      [ann, old, gone],
+      [{ leaderId: 'ann' }, { leaderId: 'old' }, { leaderId: 'gone' }, { leaderId: null }, {}]
+    )
+    assert.deepEqual([...counts], [['ann', 2]])
+  })
+
+  it('does not find, suggest or name a deleted person', () => {
+    assert.equal(findPerson([gone], { name: 'Gone' }), undefined)
+    assert.deepEqual(suggestPeople([{ ...gone, name: 'Gone Fishing' }], 'Gone'), [])
+    assert.equal(leaderName([gone], 'gone'), '')
+    assert.equal(
+      resolveLeader([{ ...gone, emails: ['g@x.org'] }], { email: 'g@x.org' }).kind,
+      'none'
+    )
   })
 })
 
