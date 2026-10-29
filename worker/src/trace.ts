@@ -147,20 +147,21 @@ export function tracedFetch(
       'url.path': url.pathname,
     })
     if (!span) return base(input, init)
+    let response: Response
     try {
-      const response = await base(input, init)
-      span.setAttribute('http.response.status_code', response.status)
-      // (a 404 is how Drive says there is no such file)
-      if (response.status >= 400 && response.status !== 404) {
-        span.setStatus({ code: SpanStatusCode.ERROR })
-      }
-      return response
+      response = await base(input, init)
     } catch (error) {
       failed(span, error)
-      throw error
-    } finally {
       span.end()
+      throw error
     }
+    span.setAttribute('http.response.status_code', response.status)
+    // (a 404 is how Drive says there is no such file)
+    if (response.status >= 400 && response.status !== 404) {
+      span.setStatus({ code: SpanStatusCode.ERROR })
+    }
+    span.end()
+    return response
   }) as typeof fetch
 }
 

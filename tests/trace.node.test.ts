@@ -235,11 +235,17 @@ test('a call is an error when it is refused or does not answer, and a 404 is not
       })('https://x.test/c'),
       /no route/
     )
+    // (what is thrown need not be an Error)
+    await assert.rejects(
+      tracedFetch(async () => {
+        throw 'refused'
+      })('https://x.test/d')
+    )
   })
   const calls = spans.filter(s => s.name === 'chordless.worker.fetch')
   assert.deepEqual(
     calls.map(s => s.status.code),
-    [0, 2, 2]
+    [0, 2, 2, 2]
   )
   assert.equal(attributes(calls[1])['http.request.method'], 'POST')
   assert.equal(calls[2].events[0].name, 'exception')
