@@ -46,6 +46,7 @@ interface CloudflareProperties {
   region?: string
   city?: string
   timezone?: string
+  httpProtocol?: string
 }
 
 const propagator = new W3CTraceContextPropagator()
@@ -116,6 +117,26 @@ const MAX_CHILD_SPANS = 50
 /** Async context in the Worker (nodejs_compat's AsyncLocalStorage): the span of a request is the active one for what it awaits */
 context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable())
 
+/** A size from a `Content-Length`, when the message has one (a streamed or chunked body has not, and is never read to find out) */
+const contentLength = (headers: Headers): number | undefined => {
+  const value = headers.get('Content-Length')
+  return value === null || !Number.isFinite(Number(value)) ? undefined : Number(value)
+}
+
+/** The size of a request body we hold (not a stream: it is not read to find out) */
+const bodySize = (body: BodyInit | null | undefined): number | undefined => {
+  if (typeof body === 'string') return new TextEncoder().encode(body).byteLength
+  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) return body.byteLength
+  if (body instanceof Blob) return body.size
+  return undefined
+}
+
+const portOf = (url: URL): number =>
+  url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80
+
+/** The class of an error for `error.type`: its name, or `_OTHER` for something thrown that is not one */
+const errorType = (error: unknown): string => (error instanceof Error ? error.name : '_OTHER')
+
 /** A span for a call made while a request is traced, or null when none is (then nothing is done) */
 function startCall(name: string, attributes: Attributes): Span | null {
   const tracing = context.active().getValue(TRACING) as Tracing | undefined
@@ -143,21 +164,32 @@ export function tracedFetch(
       'http.request.method': (
         init?.method ?? (input instanceof Request ? input.method : 'GET')
       ).toUpperCase(),
+      'url.scheme': url.protocol.slice(0, -1),
       'server.address': url.hostname,
+      'server.port': portOf(url),
       'url.path': url.pathname,
+      'http.request.body.size':
+        bodySize(init?.body) ??
+        contentLength(
+          new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
+        ),
     })
     if (!span) return base(input, init)
     let response: Response
     try {
       response = await base(input, init)
     } catch (error) {
+      span.setAttribute('error.type', errorType(error))
       failed(span, error)
       span.end()
       throw error
     }
     span.setAttribute('http.response.status_code', response.status)
+    const size = contentLength(response.headers)
+    if (size !== undefined) span.setAttribute('http.response.body.size', size)
     // (a 404 is how Drive says there is no such file)
     if (response.status >= 400 && response.status !== 404) {
+      span.setAttribute('error.type', String(response.status))
       span.setStatus({ code: SpanStatusCode.ERROR })
     }
     span.end()
@@ -276,8 +308,16 @@ export async function withWorkerSpan(
   const attributes: Record<string, Value> = {
     'http.request.method': request.method,
     'http.route': routeOf(new URL(request.url).pathname),
+    'url.path': new URL(request.url).pathname,
+    'url.scheme': new URL(request.url).protocol.slice(0, -1),
     'http.response.status_code': status,
+    'http.request.body.size': contentLength(request.headers),
+    'http.response.body.size': response ? contentLength(response.headers) : undefined,
     'server.address': new URL(request.url).hostname,
+    'server.port': portOf(new URL(request.url)),
+    'network.protocol.name': 'http',
+    'network.protocol.version': cf?.httpProtocol?.split('/')[1],
+    'error.type': response ? (status >= 500 ? String(status) : undefined) : errorType(thrown),
     'user_agent.original': request.headers.get('User-Agent') ?? undefined,
     'cloudflare.ray_id': request.headers.get('cf-ray')?.split('-')[0],
     'cloudflare.colo': cf?.colo,

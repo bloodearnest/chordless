@@ -444,6 +444,52 @@ describe('timedFetch', () => {
     expect(drive.attributes).to.not.have.property('cloudflare.ray_id')
   })
 
+  it('keeps the scheme and port, the size of a body sent and of one that came back, and what failed', async () => {
+    const answer = () => new Response('abc', { headers: { 'Content-Length': '3' } })
+    await timedFetch('worker', async () => answer())('/api/x', { method: 'POST', body: 'héllo' })
+    await timedFetch('drive', async () => answer())('http://x.test:8080/a', {
+      method: 'PUT',
+      body: new Uint8Array(4),
+    })
+    await timedFetch('drive', async () => answer())('https://x.test/b', { body: new Blob(['ab']) })
+    await timedFetch('drive', async () => new Response('', { status: 503 }))('https://x.test/c', {
+      body: new ArrayBuffer(1),
+    })
+    await timedFetch(
+      'drive',
+      async () => new Response('', { headers: { 'Content-Length': 'many' } })
+    )('https://x.test/d', { body: new URLSearchParams({ a: '1' }) })
+    await timedFetch('drive', async () => {
+      throw new TypeError('offline')
+    })('https://x.test/e').catch(() => undefined)
+    await timedFetch('drive', async () => {
+      throw 'refused'
+    })('https://x.test/f').catch(() => undefined)
+    const [worker, put, blob, refused, noSize, offline, odd] = finished()
+    expect(worker.attributes).to.include({
+      // (a path is the page's own address)
+      'url.scheme': location.protocol.slice(0, -1),
+      'server.port': Number(location.port),
+      'http.request.body.size': 6,
+      'http.response.body.size': 3,
+    })
+    expect(put.attributes).to.include({
+      'url.scheme': 'http',
+      'server.port': 8080,
+      'http.request.body.size': 4,
+    })
+    expect(blob.attributes).to.include({
+      'url.scheme': 'https',
+      'server.port': 443,
+      'http.request.body.size': 2,
+    })
+    expect(refused.attributes).to.include({ 'http.request.body.size': 1, 'error.type': '503' })
+    expect(noSize.attributes).to.not.have.property('http.response.body.size')
+    expect(noSize.attributes).to.not.have.property('http.request.body.size')
+    expect(offline.attributes['error.type']).to.equal('TypeError')
+    expect(odd.attributes['error.type']).to.equal('_OTHER')
+  })
+
   it('never sends a traceparent to Google', async () => {
     const sent: Headers[] = []
     await timedFetch('drive', async (_input, init) => {

@@ -183,6 +183,17 @@ function withHeader(init: RequestInit | undefined, name: string, value: string):
   return { ...init, headers }
 }
 
+/** The size of a request body we hold (a stream is not read to find out) */
+const bodySize = (body: BodyInit | null | undefined): number | undefined => {
+  if (typeof body === 'string') return new TextEncoder().encode(body).byteLength
+  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) return body.byteLength
+  if (body instanceof Blob) return body.size
+  return undefined
+}
+
+const portOf = (url: URL): number =>
+  url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80
+
 const urlOf = (input: RequestInfo | URL): URL =>
   new URL(input instanceof Request ? input.url : String(input), location.href)
 
@@ -213,8 +224,13 @@ export function timedFetch(
             'http.request.method': (
               init?.method ?? (input instanceof Request ? input.method : 'GET')
             ).toUpperCase(),
+            'url.scheme': url.protocol.slice(0, -1),
             'server.address': url.hostname,
+            'server.port': portOf(url),
             'url.path': url.pathname,
+            ...(bodySize(init?.body) !== undefined
+              ? { 'http.request.body.size': bodySize(init?.body) }
+              : {}),
             // (what a Drive listing asked for, the `q` of it, says why it was made)
             'url.query': url.search.slice(0, MAX_QUERY),
             // (a call of a sampled sync is counted as often as the sync is)
@@ -237,11 +253,14 @@ export function timedFetch(
       const response = await base(input, request)
       const ms = performance.now() - started
       countCall(kind, ms, response.status)
-      finishCall(span, response.status, response.headers.get('cf-ray'))
+      finishCall(span, response.status, response.headers)
       return response
     } catch (error) {
       countCall(kind, performance.now() - started, 0)
-      if (span) recordFailure(span, error)
+      if (span) {
+        span.setAttribute('error.type', error instanceof Error ? error.name : '_OTHER')
+        recordFailure(span, error)
+      }
       span?.end()
       throw error
     }
@@ -249,13 +268,20 @@ export function timedFetch(
 }
 
 /** The call is over: its status on the span, and an error if it failed */
-function finishCall(span: Span | null, status: number, ray: string | null = null): void {
+function finishCall(span: Span | null, status: number, headers: Headers): void {
   if (!span) return
   span.setAttribute('http.response.status_code', status)
+  // (a response with no Content-Length, or none that a cross-origin page may read, has no size)
+  const length = headers.get('Content-Length')
+  if (length !== null && Number.isFinite(Number(length))) {
+    span.setAttribute('http.response.body.size', Number(length))
+  }
   // Cloudflare's Worker spans do not join our trace (they ignore `traceparent`): the ray id is the
   // join, the same value as `cloudflare.ray_id` on the Worker's span (the header is `<id>-<colo>`)
+  const ray = headers.get('cf-ray')
   if (ray) span.setAttribute('cloudflare.ray_id', ray.split('-')[0])
   if (failed(status)) {
+    span.setAttribute('error.type', String(status))
     span.setAttribute('chordless.error', true)
     span.setStatus({ code: SpanStatusCode.ERROR })
   }
