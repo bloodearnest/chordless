@@ -2,9 +2,11 @@ import { expect } from '@open-wc/testing'
 import {
   leaderChoices,
   SetlistDetailsCancelEvent,
+  SetlistDetailsIdentifyEvent,
   SetlistDetailsSaveEvent,
 } from '../src/components/setlist-details-form.ts'
 import type { Person } from '../src/js/data-types.ts'
+import { NEW_PERSON } from '../src/js/leaders.ts'
 import { must } from './must.ts'
 import { A11Y } from './test-helpers.ts'
 
@@ -178,6 +180,42 @@ describe('setlist-details-form', () => {
     const detail = await save()
     expect(detail.leaderId).to.equal('')
     expect(detail.newLeader).to.equal(undefined)
+  })
+
+  it('marks the person using the app in the menu', async () => {
+    await makeForm(setlist)
+    form.meId = 'ben-id'
+    await form.updateComplete
+    expect([...field('leader').options].map(o => o.text)).to.include.members([
+      'Ann Smith',
+      'Ben Jones (you)',
+    ])
+  })
+
+  it('asks which of the people is the one using the app only when it does not know', async () => {
+    await makeForm(setlist)
+    expect(field('who')).to.equal(null)
+    form.askWho = true
+    await form.updateComplete
+    expect([...field('who').options].map(o => o.text)).to.deep.equal([
+      'Not sure yet',
+      'Ann Smith',
+      'Ben Jones',
+      'None of these: add me',
+    ])
+  })
+
+  it('says which is the answer, not for “not sure”, and does not save it as a field', async () => {
+    await makeForm(setlist)
+    form.askWho = true
+    await form.updateComplete
+    const answers: string[] = []
+    form.addEventListener(SetlistDetailsIdentifyEvent.type, e => answers.push(e.personId))
+    await choose('who', '')
+    await choose('who', 'ben-id')
+    await choose('who', NEW_PERSON)
+    expect(answers).to.deep.equal(['ben-id', NEW_PERSON])
+    expect(Object.keys(await save())).to.not.include('who')
   })
 
   it('fires cancel', async () => {

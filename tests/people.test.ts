@@ -1,7 +1,16 @@
 import { expect } from '@open-wc/testing'
 import type { Person } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
-import { getSignedInUser, getSpacePeople, personFor, settleLeader } from '../src/js/people.ts'
+import { NEW_PERSON } from '../src/js/leaders.ts'
+import {
+  chosenMeId,
+  getSignedInUser,
+  getSpacePeople,
+  identifyMe,
+  newPerson,
+  personFor,
+  settleLeader,
+} from '../src/js/people.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
@@ -14,6 +23,20 @@ const person = (over: Partial<Person> & { id: string; name: string }): Person =>
   emails: [],
   modifiedDate: NOW,
   ...over,
+})
+
+describe('newPerson', () => {
+  it('is named by the name, or by the address when it has none, and is nobody for neither', () => {
+    expect(newPerson({ name: ' Nat ', email: 'NAT@example.com' }, NOW)).to.deep.equal({
+      id: newPerson({ email: 'nat@example.com' })?.id,
+      name: 'Nat',
+      emails: ['nat@example.com'],
+      modifiedDate: NOW,
+    })
+    expect(newPerson({ email: 'nat@example.com' })?.name).to.equal('nat@example.com')
+    expect(newPerson({ name: 'Visiting Vic' })?.emails).to.deep.equal([])
+    expect(newPerson({})).to.equal(null)
+  })
 })
 
 describe('personFor', () => {
@@ -160,6 +183,118 @@ describe('the signed-in user and the space’s people', () => {
     const { people, me } = await getSpacePeople(db)
     expect(me).to.equal(null)
     expect(people.map(each => each.name)).to.deep.equal(['Ben'])
+  })
+
+  describe('which person is the one using the app', () => {
+    const key = () => `chordless:me:${spaceId}`
+    afterEach(() => localStorage.removeItem(key()))
+    const ann = person({ id: 'ann', name: 'Ann Singer', emails: ['ann@work.org'] })
+
+    it('is made for the signed-in account when nobody has its address or name', async () => {
+      await db.savePeople([person({ id: 'ben', name: 'Ben', emails: ['ben@example.com'] })])
+      signIn({ name: 'Cat Jones', email: 'cat@example.com' })
+
+      const { me, askWho, people } = await getSpacePeople(db)
+
+      expect(me?.name).to.equal('Cat Jones')
+      expect(me?.emails).to.deep.equal(['cat@example.com'])
+      expect(askWho).to.equal(false)
+      expect(people).to.have.length(2)
+    })
+
+    it('is asked, and no other person made, when a person of that name has other addresses', async () => {
+      await db.savePeople([ann])
+      signIn({ name: 'Ann Singer', email: 'ann@home.org' })
+
+      const { me, askWho, people } = await getSpacePeople(db)
+
+      expect(me).to.equal(null)
+      expect(askWho).to.equal(true)
+      expect(people).to.have.length(1)
+    })
+
+    it('is the person chosen, who gains the address, and is found by it from then on', async () => {
+      await db.savePeople([ann])
+      signIn({ name: 'Ann Singer', email: 'ann@home.org' })
+
+      await identifyMe(db, 'ann')
+
+      expect(chosenMeId(spaceId)).to.equal('ann')
+      expect((await must(await db.getPerson('ann'))).emails).to.deep.equal([
+        'ann@work.org',
+        'ann@home.org',
+      ])
+      const { me, askWho } = await getSpacePeople(db)
+      expect(me?.id).to.equal('ann')
+      expect(askWho).to.equal(false)
+      localStorage.removeItem(key())
+      expect((await getSpacePeople(db)).me?.id).to.equal('ann')
+    })
+
+    it('is the person chosen even when a later sign-in is with another address', async () => {
+      await db.savePeople([ann])
+      localStorage.setItem(key(), 'ann')
+      signIn({ name: 'Somebody Else', email: 'else@example.com' })
+
+      const { me } = await getSpacePeople(db)
+
+      expect(me?.id).to.equal('ann')
+      expect(must(await db.getPerson('ann')).emails).to.include('else@example.com')
+    })
+
+    it('is the person a chosen one was merged into', async () => {
+      await db.savePeople([
+        { ...ann, mergedInto: 'ann2' },
+        person({ id: 'ann2', name: 'Ann S', emails: ['ann@home.org'] }),
+      ])
+      localStorage.setItem(key(), 'ann')
+      signIn({ name: 'Ann S', email: 'ann@home.org' })
+
+      expect((await getSpacePeople(db)).me?.id).to.equal('ann2')
+    })
+
+    it('is made from the account when none of the people is them', async () => {
+      await db.savePeople([ann])
+      signIn({ name: 'Ann Singer', email: 'ann@home.org' })
+
+      await identifyMe(db, NEW_PERSON)
+
+      const { me, people } = await getSpacePeople(db)
+      expect(me?.emails).to.deep.equal(['ann@home.org'])
+      expect(me?.id).to.not.equal('ann')
+      expect(people).to.have.length(2)
+    })
+
+    it('is nobody to choose when nobody is signed in', async () => {
+      await identifyMe(db, NEW_PERSON)
+      expect(await db.getAllPeople()).to.deep.equal([])
+      await identifyMe(db, 'nobody')
+      expect(await db.getAllPeople()).to.deep.equal([])
+    })
+
+    it('is worked out from the account when the device cannot keep it', async () => {
+      const getItem = Storage.prototype.getItem
+      const setItem = Storage.prototype.setItem
+      // (only the place that is kept: the rest of the app reads storage too)
+      Storage.prototype.getItem = function (name: string) {
+        if (name.startsWith('chordless:me:')) throw new Error('blocked')
+        return getItem.call(this, name)
+      }
+      Storage.prototype.setItem = function (name: string, value: string) {
+        if (name.startsWith('chordless:me:')) throw new Error('blocked')
+        return setItem.call(this, name, value)
+      }
+      try {
+        await db.savePeople([ann])
+        signIn({ name: 'Ann Singer', email: 'ann@work.org' })
+        await identifyMe(db, 'ann')
+        expect(chosenMeId(spaceId)).to.equal(null)
+        expect((await getSpacePeople(db)).me?.id).to.equal('ann')
+      } finally {
+        Storage.prototype.getItem = getItem
+        Storage.prototype.setItem = setItem
+      }
+    })
   })
 
   it('has no person for a member with no address and no name', async () => {

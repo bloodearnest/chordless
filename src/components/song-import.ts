@@ -9,7 +9,7 @@ import { libraryForMatching } from '../js/import-setlist.ts'
 import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
 import { type ChartComparison, compareCharts } from '../js/library-repair.ts'
 import { ChordProParser } from '../js/parser.ts'
-import { getSignedInUser, getSpacePeople, settleLeader } from '../js/people.ts'
+import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../js/people.ts'
 import {
   createSong,
   findExistingSong,
@@ -25,7 +25,10 @@ import './app-modal.ts'
 import './chart-diff.ts'
 import './songselect-help.ts'
 import type { ChartLabel } from './chart-diff.ts'
-import type { SetlistDetailsSaveEvent } from './setlist-details-form.ts'
+import type {
+  SetlistDetailsIdentifyEvent,
+  SetlistDetailsSaveEvent,
+} from './setlist-details-form.ts'
 import './setlist-details-form.ts'
 import { goTo, loadPage } from '../js/navigation.ts'
 import { describeOrigin } from '../js/song-source.ts'
@@ -132,6 +135,8 @@ export class SongImport extends LitElement {
     _unmatched: { state: true }, // shared PDFs the library has no song for
     _setlists: { state: true },
     _people: { state: true },
+    _meId: { state: true },
+    _askWho: { state: true },
     _spaces: { state: true }, // the spaces an import can go to
     _spaceId: { state: true }, // the one it goes to
     _newSetlist: { state: true },
@@ -144,6 +149,8 @@ export class SongImport extends LitElement {
   declare _unmatched: UnmatchedChart[]
   declare _setlists: Setlist[]
   declare _people: Person[]
+  declare _meId: string | null
+  declare _askWho: boolean
   declare _spaces: Space[]
   declare _spaceId: string
   /** The space the app is in, which may not be the one importing into */
@@ -506,6 +513,8 @@ export class SongImport extends LitElement {
     this._unmatched = []
     this._setlists = []
     this._people = []
+    this._meId = null
+    this._askWho = false
     this._spaces = []
     this._spaceId = ''
     this._newSetlist = null
@@ -839,9 +848,11 @@ export class SongImport extends LitElement {
 
   /** Open the new setlist form with defaults: next Sunday morning, led by you */
   async _openNewSetlist(): Promise<void> {
-    const { people, me } = await getSpacePeople(this._database())
+    const { people, me, askWho } = await getSpacePeople(this._database())
     const date = toLocalDateString(getNextSunday())
     this._people = people
+    this._meId = me?.id ?? null
+    this._askWho = askWho
     this._newSetlist = {
       date,
       time: '10:30',
@@ -851,6 +862,19 @@ export class SongImport extends LitElement {
     }
     await this.updateComplete
     this._newSetlistModal()?.show()
+  }
+
+  /** The person said which of the people they are: it is kept, and they become the default leader if none is chosen */
+  async _identify(event: SetlistDetailsIdentifyEvent): Promise<void> {
+    event.stopPropagation()
+    await identifyMe(this._database(), event.personId)
+    const { people, me, askWho } = await getSpacePeople(this._database())
+    this._people = people
+    this._meId = me?.id ?? null
+    this._askWho = askWho
+    if (me && this._newSetlist && !this._newSetlist.leaderId) {
+      this._newSetlist = { ...this._newSetlist, leaderId: me.id }
+    }
   }
 
   async _createSetlist(event: SetlistDetailsSaveEvent): Promise<void> {
@@ -908,8 +932,11 @@ export class SongImport extends LitElement {
               <setlist-details-form
                 .setlist=${this._newSetlist}
                 .people=${this._people}
+                .meId=${this._meId}
+                .askWho=${this._askWho}
                 submit-label=${several ? 'Create & Add Songs' : 'Create & Add Song'}
                 auto-type
+                @setlist-details-form:identify=${this._identify}
                 @setlist-details-form:save=${this._createSetlist}
                 @setlist-details-form:cancel=${() => this._newSetlistModal()?.close()}
               ></setlist-details-form>

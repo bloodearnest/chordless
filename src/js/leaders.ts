@@ -11,6 +11,9 @@ export interface LegacyLeader {
   ownerId?: string | null
 }
 
+/** The answer to "which of these is you?" when it is none of them */
+export const NEW_PERSON = 'new'
+
 /** A name for comparing: no case, accents or punctuation, one space between words */
 export function normalizeName(name: string): string {
   return name
@@ -201,4 +204,66 @@ export function adoptLegacyLeader<T extends Setlist>(setlist: T, leaders: Leader
     }
   }
   return (person ? { ...rest, leaderId: person.id } : rest) as T
+}
+
+/**
+ * The people a typed name might mean, best first: those with all of its words in their name, in
+ * any order ("Smith Tom"), or whose words it abbreviates ("Tom S.", "T Smith"). Not those it
+ * names exactly (that is `findPerson`'s), and not the ones merged into another.
+ */
+export function suggestPeople(people: Person[], name: string | null | undefined): Person[] {
+  const typed = normalizeName(name ?? '')
+    .split(' ')
+    .filter(Boolean)
+  if (typed.length === 0) return []
+  const scored: { person: Person; score: number }[] = []
+  for (const person of people) {
+    if (person.mergedInto) continue
+    const words = normalizeName(person.name).split(' ').filter(Boolean)
+    if (words.join(' ') === typed.join(' ')) continue
+    // Each typed word is a whole word of the person's name (2 points) or the start of one (1),
+    // each of their words used once
+    const free = [...words]
+    let score = 0
+    const matched = typed.every(word => {
+      const whole = free.indexOf(word)
+      if (whole !== -1) {
+        free.splice(whole, 1)
+        score += 2
+        return true
+      }
+      const start = free.findIndex(each => word.length < each.length && each.startsWith(word))
+      if (start === -1) return false
+      free.splice(start, 1)
+      score += 1
+      return true
+    })
+    if (matched) scored.push({ person, score })
+  }
+  return scored
+    .sort((a, b) => b.score - a.score || a.person.name.localeCompare(b.person.name))
+    .map(each => each.person)
+}
+
+/** What a name and email in an email stand for among the people: see `resolveLeader` */
+export type LeaderMatch =
+  | { kind: 'match'; person: Person; by: 'email' | 'name' }
+  | { kind: 'suggest'; candidates: Person[] }
+  | { kind: 'none' }
+
+/**
+ * Who a leader named in an email is: the person with that email, else that name (used without
+ * asking), else the people the name might mean (to ask about), else nobody known.
+ */
+export function resolveLeader(
+  people: Person[],
+  who: { name?: string | null; email?: string | null }
+): LeaderMatch {
+  const email = normalizeEmail(who.email)
+  const byEmail = email ? people.find(p => !p.mergedInto && p.emails.includes(email)) : undefined
+  if (byEmail) return { kind: 'match', person: byEmail, by: 'email' }
+  const byName = findPerson(people, { name: who.name })
+  if (byName) return { kind: 'match', person: byName, by: 'name' }
+  const candidates = suggestPeople(people, who.name)
+  return candidates.length > 0 ? { kind: 'suggest', candidates } : { kind: 'none' }
 }

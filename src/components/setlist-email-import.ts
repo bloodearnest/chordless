@@ -15,14 +15,20 @@ import {
   updateImportedSetlist,
 } from '../js/import-setlist.ts'
 import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
-import { leaderName } from '../js/leaders.ts'
+import {
+  type LeaderMatch,
+  leaderName,
+  NEW_PERSON,
+  normalizeEmail,
+  resolveLeader,
+} from '../js/leaders.ts'
 import { goTo } from '../js/navigation.ts'
 import { getSongsElsewhere } from '../js/other-songs.ts'
 import {
   getSignedInUser,
   getSpacePeople,
   livePeople,
-  personFor,
+  newPerson,
   settleLeader,
 } from '../js/people.ts'
 import { isCcliNumber, songSelectLink } from '../js/songselect-link.ts'
@@ -109,6 +115,10 @@ export class SetlistEmailImport extends LitElement {
   declare _keepIds: Set<string>
 
   _db: ChordlessDB | null = null
+  /** The people there were when the email was opened, and who its leader is among them */
+  _stored: Person[] = []
+  _who: { name: string; email: string } = { name: '', email: '' }
+  _match: LeaderMatch = { kind: 'none' }
   /** People the email's leader needs that are not stored yet: saved with the setlist, if they lead it */
   _pendingPeople: Person[] = []
   _library: LibrarySong[] = []
@@ -325,20 +335,27 @@ export class SetlistEmailImport extends LitElement {
     this._rows = make(email.songs, true, rows)
     this._unlisted = make(email.unlisted, false, unlisted)
     const { people, me } = await getSpacePeople(db)
-    const made = personFor(people, { name: email.leader.name, email: email.leader.email })
-    this._pendingPeople = made?.changed ?? []
-    this._people = livePeople([
-      ...people.filter(person => !this._pendingPeople.some(each => each.id === person.id)),
-      ...this._pendingPeople,
-    ])
+    this._stored = people
+    this._who = { name: email.leader.name.trim(), email: normalizeEmail(email.leader.email) }
+    this._match = resolveLeader(people, this._who)
     const date = email.date || nearestSunday()
     this._setlist = {
       date,
       time: '10:30',
       type: determineSetlistType(date, email.name),
       name: email.name,
-      leaderId: made?.person.id ?? me?.id ?? '',
     }
+    // A leader the email names who is known is used; one it might mean is suggested, to be
+    // confirmed; one nobody knows is a new person; an email with none is led by you
+    const first =
+      this._match.kind === 'match'
+        ? this._match.person.id
+        : this._match.kind === 'suggest'
+          ? this._match.candidates[0].id
+          : newPerson(this._who)
+            ? NEW_PERSON
+            : (me?.id ?? '')
+    this._chooseLeader(first)
     this._sameDate = (await db.getAllSetlists()).filter(have => have.date === date)
     this._keepIds = new Set()
     // The same leader's setlist for that day is most likely the one this email is about
@@ -346,6 +363,38 @@ export class SetlistEmailImport extends LitElement {
     this._target = mine.length === 1 ? mine[0].id : 'new'
     this._state = 'review'
     this._keep()
+  }
+
+  /**
+   * Choose who leads the setlist: a person's id, NEW_PERSON for one made from the email's leader,
+   * or '' for none. The email's address is added to the person chosen, if they have not got it, when
+   * the setlist is made; a new person is stored then too.
+   */
+  _chooseLeader(choice: string): void {
+    let pending: Person[] = []
+    let leaderId = choice
+    if (choice === NEW_PERSON) {
+      const made = newPerson(this._who) as Person
+      leaderId = made.id
+      if (!this._stored.some(each => each.id === made.id)) pending = [made]
+    } else {
+      const chosen = this._stored.find(each => each.id === choice)
+      if (chosen && this._who.email && !chosen.emails.includes(this._who.email)) {
+        pending = [
+          {
+            ...chosen,
+            emails: [...chosen.emails, this._who.email],
+            modifiedDate: new Date().toISOString(),
+          },
+        ]
+      }
+    }
+    this._pendingPeople = pending
+    this._people = livePeople([
+      ...this._stored.filter(person => !pending.some(each => each.id === person.id)),
+      ...pending,
+    ])
+    this._setlist = { ...this._setlist, leaderId }
   }
 
   /** The setlist being updated, if the person chose that */
@@ -451,7 +500,7 @@ export class SetlistEmailImport extends LitElement {
           ...(details ?? this._setlist),
           leaderId: (details ?? this._setlist).leaderId ?? '',
         })
-        await this._db.addPeople(this._pendingPeople.filter(each => each.id === fields.leaderId))
+        await this._db.savePeople(this._pendingPeople.filter(each => each.id === fields.leaderId))
         setlist = await createImportedSetlist(
           this._db,
           { ...fields, createdBy: (await getSignedInUser())?.email },
@@ -503,6 +552,7 @@ export class SetlistEmailImport extends LitElement {
       ${this._sameDate.length ? this._renderSameDate() : nothing}
       <div ?hidden=${Boolean(updating)}>
         <h3>Setlist</h3>
+        ${this._renderLeaderMatch()}
         <setlist-details-form
           .setlist=${this._setlist}
           .people=${this._people}
@@ -534,6 +584,48 @@ export class SetlistEmailImport extends LitElement {
           ?disabled=${missing.length > 0 || included === 0 || this._state === 'saving'}
           @click=${() => (updating ? this._save() : this.shadowRoot?.querySelector('setlist-details-form')?.submit())}
         >${this._state === 'saving' ? 'Saving…' : updating ? 'Update setlist' : 'Create setlist'}</button>
+      </div>
+    `
+  }
+
+  /**
+   * What the email said of its leader, when that is not settled by their address: who they are
+   * among the people, or that they are new. Choosing changes the leader below and what is stored.
+   */
+  _renderLeaderMatch() {
+    const { name, email } = this._who
+    const match = this._match
+    if ((!name && !email) || (match.kind === 'match' && match.by === 'email')) return nothing
+    const label = name || email
+    const isNew = newPerson(this._who)?.id
+    const hasNew = isNew && !this._stored.some(each => each.id === isNew)
+    const chosen = this._setlist.leaderId === isNew && hasNew ? NEW_PERSON : this._setlist.leaderId
+    const learns =
+      email && chosen !== NEW_PERSON
+        ? html` ${email} is added to them, so the next email from it is matched by its address.`
+        : nothing
+    return html`
+      <div class="notice leader-match" role="group" aria-label="Who leads">
+        <label for="leader-match">
+          ${
+            match.kind === 'match'
+              ? html`The email's leader, “${label}”, is <strong>${match.person.name}</strong> by name.`
+              : match.kind === 'suggest'
+                ? html`The email's leader, “${label}”, might be one of your people. Who is it?`
+                : html`The email's leader, “${label}”, is not one of your people yet.`
+          }${learns}
+        </label>
+        <select
+          id="leader-match"
+          @change=${(event: Event) => this._chooseLeader((event.target as HTMLSelectElement).value)}
+        >
+          ${
+            hasNew
+              ? html`<option value=${NEW_PERSON} ?selected=${chosen === NEW_PERSON}>A new person: ${label}</option>`
+              : nothing
+          }
+          ${this._stored.map(each => html`<option value=${each.id} ?selected=${chosen === each.id}>${each.name}</option>`)}
+        </select>
       </div>
     `
   }

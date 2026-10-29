@@ -12,6 +12,7 @@ import {
   MenuSongClickEvent,
   type NavMenu,
 } from '../src/components/nav-menu.ts'
+import { SetlistDetailsIdentifyEvent } from '../src/components/setlist-details-form.ts'
 import { SetlistRevertedEvent } from '../src/components/setlist-differs.ts'
 import {
   SetlistInfoDeleteEvent,
@@ -27,9 +28,10 @@ import {
 } from '../src/components/setlist-overview.ts'
 import { SetlistShareChangeEvent } from '../src/components/setlist-share.ts'
 import { SongChangeEvent } from '../src/js/app-events.ts'
-import type { Setlist } from '../src/js/data-types.ts'
+import type { Person, Setlist } from '../src/js/data-types.ts'
 import { setCapoPreference } from '../src/js/preferences.ts'
 import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
+import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
 import { shownToast, wait } from './test-helpers.ts'
 
@@ -643,6 +645,62 @@ describe('the setlist page: header, menu and keys', () => {
       await rig.page.showSetlistInfo()
       expect(dialog.readonly).to.equal(false)
       expect(rig.page._setlistDetailsSaveHandler).to.be.a('function')
+    })
+  })
+
+  describe('which of the people the user is', () => {
+    it('is asked in the info dialog when it cannot be told, and the answer is given back to it', async () => {
+      await rig.open()
+      const auth = installFakeAuthWorker()
+      auth.worker.stored = {
+        blob: 'blob',
+        metadata: {
+          access_token: 'token',
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          user: {
+            picture: null,
+            given_name: null,
+            family_name: null,
+            sub: '1',
+            name: 'Dee Question',
+            email: 'dee@home.org',
+          },
+        },
+        updated_at: new Date().toISOString(),
+      } as never
+      // (the rig's database is shared by the tests: these people are not left in it)
+      const people: Person[] = [
+        { id: 'dee-at-work', name: 'Dee Question', emails: ['dee@work.org'], modifiedDate: 'then' },
+      ]
+      const db = rig.db
+      const real = { all: db.getAllPeople, one: db.getPerson, save: db.savePeople }
+      db.getAllPeople = async () => people.map(each => ({ ...each }))
+      db.getPerson = async id => people.find(each => each.id === id)
+      db.savePeople = async saved => {
+        for (const each of saved) {
+          const at = people.findIndex(have => have.id === each.id)
+          if (at === -1) people.push(each)
+          else people[at] = each
+        }
+      }
+      try {
+        const dialog = must($<SetlistInfoDialog>('#setlist-info-dialog'))
+        dialog.show = async () => {}
+        await rig.page.showSetlistInfo()
+        expect(dialog.askWho).to.equal(true)
+        expect(dialog.meId).to.equal(null)
+
+        dialog.dispatchEvent(new SetlistDetailsIdentifyEvent('dee-at-work'))
+        await waitUntil(() => dialog.askWho === false, 'the answer to be taken')
+
+        expect(dialog.meId).to.equal('dee-at-work')
+      } finally {
+        db.getAllPeople = real.all
+        db.getPerson = real.one
+        db.savePeople = real.save
+        auth.uninstall()
+        localStorage.removeItem(`chordless:me:${db.spaceId}`)
+      }
     })
   })
 

@@ -8,6 +8,7 @@ import '../../components/app-modal.ts'
 import '../../components/icon.ts'
 import type {
   SetlistDetailsForm,
+  SetlistDetailsIdentifyEvent,
   SetlistDetailsSaveEvent,
 } from '../../components/setlist-details-form.ts'
 import '../../components/setlist-details-form.ts'
@@ -19,7 +20,7 @@ import type { Setlist } from '../data-types.ts'
 import { watchData } from '../data-watcher.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
 import { goTo } from '../navigation.ts'
-import { getSignedInUser, getSpacePeople, settleLeader } from '../people.ts'
+import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
 import { toast } from '../toast.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
@@ -124,12 +125,28 @@ export class HomeView extends PageView {
     })
   }
 
+  /** Give the form the people there are now, and who is using the app among them */
+  async #fillPeople(form: SetlistDetailsForm) {
+    const { people, me, askWho } = await getSpacePeople(await getCurrentDB())
+    form.people = people
+    form.meId = me?.id ?? null
+    form.askWho = askWho
+    return me
+  }
+
+  /** The person said which of the people they are: it is kept, and they become the default leader if none is chosen */
+  async #identify(event: SetlistDetailsIdentifyEvent): Promise<void> {
+    const form = this.#form.value as SetlistDetailsForm
+    await identifyMe(await getCurrentDB(), event.personId)
+    const me = await this.#fillPeople(form)
+    if (me && !form.setlist.leaderId) form.setlist = { ...form.setlist, leaderId: me.id }
+  }
+
   async #openCreate(): Promise<void> {
-    const { people, me } = await getSpacePeople(await getCurrentDB())
+    const form = this.#form.value as SetlistDetailsForm
+    const me = await this.#fillPeople(form)
     const date = toLocalDateString(getNextSunday())
     // Defaults: next Sunday, a Sunday morning service, led by you
-    const form = this.#form.value as SetlistDetailsForm
-    form.people = people
     form.setlist = {
       date,
       time: '10:30',
@@ -232,6 +249,7 @@ export class HomeView extends PageView {
           submit-label="Create Setlist"
           auto-type
           ${ref(this.#form)}
+          @setlist-details-form:identify=${this.#identify}
           @setlist-details-form:save=${this.#create}
           @setlist-details-form:cancel=${() => this.#modal.value?.close()}
         ></setlist-details-form>

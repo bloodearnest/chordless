@@ -12,6 +12,7 @@ import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { encodeImport } from '../src/js/email-link.ts'
 import type { ImportedSetlist } from '../src/js/email-setlist.ts'
 import { offerLink, takeLink } from '../src/js/incoming-link.ts'
+import { NEW_PERSON } from '../src/js/leaders.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import { personFor } from '../src/js/people.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
@@ -437,6 +438,93 @@ describe('setlist-email-import', () => {
       expect(saved.leaderId).to.equal(id)
       const stored = must((await db.getAllPeople()).find(each => each.id === id))
       expect(stored.emails).to.deep.equal(['one@example.com'])
+    })
+
+    const control = () => $('#leader-match') as HTMLSelectElement | null
+    const choose = async (value: string) => {
+      must(control()).value = value
+      must(control()).dispatchEvent(new Event('change'))
+      await importer.updateComplete
+    }
+    const make = async () => {
+      button(/Create setlist/)?.click()
+      await waitUntil(() => visited.length === 1, 'the page to go to the setlist')
+      return must((await db.getAllSetlists())[0])
+    }
+    const withSong = () => email({ songs: [makeImportedSong('Alpha Song', { ccli: '111' })] })
+
+    it('asks nothing of a leader known by their address', async () => {
+      await addPerson('Leader One', 'one@example.com')
+      await review(email())
+      expect(control()).to.equal(null)
+    })
+
+    it('says a leader is known by name, and adds the new address to them with the setlist', async () => {
+      await createSong(chart('Alpha Song', '111'), {})
+      const known = await addPerson('Leader One', 'old@example.com')
+      await review(withSong())
+      expect(text()).to.contain('is Leader One by name')
+      expect(text()).to.contain('one@example.com is added to them')
+      expect(control()?.value).to.equal(known.id)
+      expect(must(await db.getPerson(known.id)).emails).to.deep.equal(['old@example.com'])
+
+      expect((await make()).leaderId).to.equal(known.id)
+
+      expect(must(await db.getPerson(known.id)).emails).to.deep.equal([
+        'old@example.com',
+        'one@example.com',
+      ])
+    })
+
+    it('suggests the person a short name might be, and offers the others and a new person', async () => {
+      await createSong(chart('Alpha Song', '111'), {})
+      const tom = await addPerson('Tom Smith', 'tom@example.com')
+      await addPerson('Ann Lee', 'ann@example.com')
+      await review({
+        ...withSong(),
+        leader: { name: 'Tom S.', email: 'tom@other.org' },
+      })
+      expect(text()).to.contain('might be one of your people')
+      expect(control()?.value).to.equal(tom.id)
+      expect([...(control()?.options ?? [])].map(o => o.text)).to.deep.equal([
+        'A new person: Tom S.',
+        'Ann Lee',
+        'Tom Smith',
+      ])
+
+      expect((await make()).leaderId).to.equal(tom.id)
+      expect(must(await db.getPerson(tom.id)).emails).to.include('tom@other.org')
+    })
+
+    it('makes a new person of a leader nobody knows, or lets the person say who they are', async () => {
+      await createSong(chart('Alpha Song', '111'), {})
+      const ann = await addPerson('Ann Lee', 'ann@example.com')
+      await review(withSong())
+      expect(text()).to.contain('is not one of your people yet')
+      expect(control()?.value).to.equal(NEW_PERSON)
+      expect(text()).to.not.contain('is added to them')
+
+      await choose(ann.id)
+      expect(importer._setlist.leaderId).to.equal(ann.id)
+      expect(text()).to.contain('one@example.com is added to them')
+      await choose(NEW_PERSON)
+      expect(importer._setlist.leaderId).to.not.equal(ann.id)
+
+      const saved = await make()
+      const leader = must((await db.getAllPeople()).find(each => each.id === saved.leaderId))
+      expect(leader.name).to.equal('Leader One')
+      expect(must(await db.getPerson(ann.id)).emails).to.deep.equal(['ann@example.com'])
+    })
+
+    it('has no one to ask about when the email names no leader', async () => {
+      await review(email({ leader: { name: '', email: '' } }))
+      expect(control()).to.equal(null)
+    })
+
+    it('shows a leader known only by address by it', async () => {
+      await review(email({ leader: { name: '', email: 'x@example.com' } }))
+      expect(text()).to.contain('x@example.com')
+      expect(control()?.value).to.equal(NEW_PERSON)
     })
 
     it('is not stored when another leader is chosen for the setlist', async () => {
