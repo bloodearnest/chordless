@@ -10,8 +10,6 @@ describe('autohideHeader', () => {
   let phone: boolean
   let shown: boolean
   let realMatchMedia: typeof window.matchMedia
-  let realNow: typeof performance.now
-  let now: number
   let onMediaChange: (() => void) | undefined
 
   /** Scroll the section to a place, and let the page see it */
@@ -39,11 +37,8 @@ describe('autohideHeader', () => {
 
     phone = true
     shown = true
-    now = 1000
     onMediaChange = undefined
     realMatchMedia = window.matchMedia
-    realNow = performance.now
-    performance.now = () => now
     window.matchMedia = (() => ({
       get matches() {
         return phone
@@ -66,43 +61,34 @@ describe('autohideHeader', () => {
     abort.abort()
     root.remove()
     window.matchMedia = realMatchMedia
-    performance.now = realNow
   })
 
-  it('tucks the header away scrolling down, and brings it back scrolling up', () => {
-    scrollTo(100)
-    scrollTo(200)
-    expect(header.tucked).to.equal(true)
+  it('moves the header away with the scrolling, and back as it scrolls up', () => {
+    scrollTo(20)
+    expect(header.style.marginTop).to.equal('-20px')
+    expect(root.style.getPropertyValue('--tuck')).to.equal('20px')
+    expect(header.tucked).to.equal(false)
+    scrollTo(50)
     expect(header.style.marginTop).to.equal('-50px')
-    now += 400
-    scrollTo(150)
+    expect(header.tucked).to.equal(true)
+    // (no further than its own height)
+    scrollTo(200)
+    expect(header.style.marginTop).to.equal('-50px')
+    scrollTo(180)
+    expect(header.style.marginTop).to.equal('-30px')
     expect(header.tucked).to.equal(false)
+    scrollTo(160)
+    expect(header.style.marginTop).to.equal('-10px')
+  })
+
+  it('has the header all there at the top of the page', () => {
+    scrollTo(200)
+    scrollTo(0)
     expect(header.style.marginTop).to.equal('')
-  })
-
-  it('ignores a small movement', () => {
-    scrollTo(200)
-    scrollTo(206)
-    expect(header.tucked).to.equal(false)
-  })
-
-  it('keeps the header while the page is still within its height', () => {
-    scrollTo(10)
-    scrollTo(40)
-    expect(header.tucked).to.equal(false)
-  })
-
-  it('leaves the scrolling alone while the header is moving', () => {
-    scrollTo(100)
-    scrollTo(200)
-    expect(header.tucked).to.equal(true)
-    // (the page's end moving under it: the pretend scroll up of the last moment)
-    scrollTo(120)
-    expect(header.tucked).to.equal(true)
+    expect(root.style.getPropertyValue('--tuck')).to.equal('0px')
   })
 
   it('shows the header again for a swipe to another song', () => {
-    scrollTo(100)
     scrollTo(200)
     expect(header.tucked).to.equal(true)
     container.dispatchEvent(new Event('scroll'))
@@ -111,20 +97,17 @@ describe('autohideHeader', () => {
 
   it('does not tuck the header away on the overview', () => {
     shown = false
-    scrollTo(100)
     scrollTo(200)
     expect(header.tucked).to.equal(false)
   })
 
   it('does not tuck the header away on a wider screen', () => {
     phone = false
-    scrollTo(100)
     scrollTo(200)
     expect(header.tucked).to.equal(false)
   })
 
   it('shows the header when the screen widens', () => {
-    scrollTo(100)
     scrollTo(200)
     expect(header.tucked).to.equal(true)
     onMediaChange?.()
@@ -132,7 +115,6 @@ describe('autohideHeader', () => {
   })
 
   it('shows the header when the page goes', () => {
-    scrollTo(100)
     scrollTo(200)
     abort.abort()
     expect(header.tucked).to.equal(false)
