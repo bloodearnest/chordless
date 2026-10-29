@@ -400,6 +400,17 @@ describe('Google Drive (on FakeDrive): the feed of changes', () => {
       expect(fake.requests.filter(request => request.params.has('q'))).to.have.length(0)
     })
 
+    it('finds the shares folder in it too, where the space has one', async () => {
+      const { fake, space } = await openSpace()
+      const share = await space.create('shares', { ...song, name: 'share.json' }, 'x')
+      const fresh = driveStorage.space((await driveStorage.ensureRoot('Grace Church', 's')).ref)
+      await fresh.inventory()
+      fake.requests.length = 0
+
+      expect((await fresh.list('shares')).map(file => file.ref)).to.deep.equal([share.file.ref])
+      expect(fake.requests).to.have.length(0)
+    })
+
     it('forgets what it listed when something is written, so a list shows the write', async () => {
       const { space } = await openSpace()
       const first = await space.create('songs', { ...song, name: 'a.txt' }, 'x')
