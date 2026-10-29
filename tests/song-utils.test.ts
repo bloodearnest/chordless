@@ -264,11 +264,19 @@ describe('getLibrarySongs', () => {
       makeSetlist({
         id: crypto.randomUUID(),
         date: songDate,
-        owner: `Leader ${songDate}`,
+        leaderId: `leader-${songDate}`,
         songs: [makeEntry({ songId: song.id, key: 'C' })],
       })
     await db.saveSetlist(setlist('2026-01-04'))
     await db.saveSetlist(setlist('2026-03-01'))
+    await db.savePeople(
+      ['2026-01-04', '2026-03-01'].map(songDate => ({
+        id: `leader-${songDate}`,
+        name: `Leader ${songDate}`,
+        emails: [],
+        modifiedDate: new Date().toISOString(),
+      }))
+    )
 
     const withUsage = must(
       (await getLibrarySongs(db, { withLastUsage: true })).find(entry => entry.id === song.id)

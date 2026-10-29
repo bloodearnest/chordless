@@ -15,9 +15,16 @@ import {
   updateImportedSetlist,
 } from '../js/import-setlist.ts'
 import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
+import { leaderName } from '../js/leaders.ts'
 import { goTo } from '../js/navigation.ts'
 import { getSongsElsewhere } from '../js/other-songs.ts'
-import { getCurrentPerson, getSpacePeople } from '../js/people.ts'
+import {
+  getSignedInUser,
+  getSpacePeople,
+  livePeople,
+  personFor,
+  settleLeader,
+} from '../js/people.ts'
 import { isCcliNumber, songSelectLink } from '../js/songselect-link.ts'
 import { formatSetlistDate } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
@@ -102,6 +109,8 @@ export class SetlistEmailImport extends LitElement {
   declare _keepIds: Set<string>
 
   _db: ChordlessDB | null = null
+  /** People the email's leader needs that are not stored yet: saved with the setlist, if they lead it */
+  _pendingPeople: Person[] = []
   _library: LibrarySong[] = []
   /** The songs of the other databases, which a setlist may use (copied in when it is made) */
   _elsewhere: SongWithContent[] = []
@@ -315,30 +324,28 @@ export class SetlistEmailImport extends LitElement {
       })
     this._rows = make(email.songs, true, rows)
     this._unlisted = make(email.unlisted, false, unlisted)
-    const { people, me } = await getSpacePeople()
-    this._people = people
+    const { people, me } = await getSpacePeople(db)
+    const made = personFor(people, { name: email.leader.name, email: email.leader.email })
+    this._pendingPeople = made?.changed ?? []
+    this._people = livePeople([
+      ...people.filter(person => !this._pendingPeople.some(each => each.id === person.id)),
+      ...this._pendingPeople,
+    ])
     const date = email.date || nearestSunday()
     this._setlist = {
       date,
       time: '10:30',
       type: determineSetlistType(date, email.name),
       name: email.name,
-      owner: email.leader.name || me?.name || '',
-      ownerId: email.leader.email || me?.id || '',
+      leaderId: made?.person.id ?? me?.id ?? '',
     }
     this._sameDate = (await db.getAllSetlists()).filter(have => have.date === date)
     this._keepIds = new Set()
     // The same leader's setlist for that day is most likely the one this email is about
-    const mine = this._sameDate.filter(have => this._isLeader(have, email.leader))
+    const mine = this._sameDate.filter(have => have.leaderId === this._setlist.leaderId)
     this._target = mine.length === 1 ? mine[0].id : 'new'
     this._state = 'review'
     this._keep()
-  }
-
-  /** Is the setlist the leader's? By their email, else by their name */
-  _isLeader(setlist: Setlist, leader: { name: string; email: string }): boolean {
-    if (leader.email && setlist.ownerId) return setlist.ownerId.toLowerCase() === leader.email
-    return Boolean(leader.name) && setlist.owner.toLowerCase() === leader.name.toLowerCase()
   }
 
   /** The setlist being updated, if the person chose that */
@@ -436,13 +443,21 @@ export class SetlistEmailImport extends LitElement {
       const chosen = this._chosen()
       const reviewed = await copyFromElsewhere(this._db, chosen, this._elsewhere)
       const existing = this._updating()
-      const setlist = existing
-        ? await updateImportedSetlist(this._db, existing, reviewed, this._keepIds)
-        : await createImportedSetlist(
-            this._db,
-            { ...(details ?? this._setlist), createdBy: (await getCurrentPerson())?.id },
-            reviewed
-          )
+      let setlist: Setlist
+      if (existing) {
+        setlist = await updateImportedSetlist(this._db, existing, reviewed, this._keepIds)
+      } else {
+        const fields = await settleLeader(this._db, {
+          ...(details ?? this._setlist),
+          leaderId: (details ?? this._setlist).leaderId ?? '',
+        })
+        await this._db.addPeople(this._pendingPeople.filter(each => each.id === fields.leaderId))
+        setlist = await createImportedSetlist(
+          this._db,
+          { ...fields, createdBy: (await getSignedInUser())?.email },
+          reviewed
+        )
+      }
       this._forget()
       const url = `/setlist/${setlist.id}`
       if (this.dispatchEvent(new SetlistEmailImportedEvent(url))) goTo(url)
@@ -534,7 +549,7 @@ export class SetlistEmailImport extends LitElement {
           have =>
             html`<label>
               <input type="radio" name="target" .checked=${this._target === have.id} @change=${() => this._chooseTarget(have.id)} />
-              Update <a href="/setlist/${have.id}" target="_blank" rel="noopener">${have.name || have.type}</a>${have.owner ? html` (${have.owner})` : nothing}
+              Update <a href="/setlist/${have.id}" target="_blank" rel="noopener">${have.name || have.type}</a>${leaderName(this._people, have.leaderId) ? html` (${leaderName(this._people, have.leaderId)})` : nothing}
             </label>`
         )}
         <label>

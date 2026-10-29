@@ -31,12 +31,13 @@ import { hasUnsentChanges } from './auto-sync.ts'
 import { DataChangeEvent, touches } from './data-changes.ts'
 import type { Setlist, SetlistEntry, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB, NO_CHANGE } from './db.ts'
+import { leaderName } from './leaders.ts'
 import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
 import { LiveSyncStatusEvent } from './live-sync-status.ts'
 import { goTo, setPageTitle } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
-import { getSpacePeople } from './people.ts'
+import { getSpacePeople, settleLeader } from './people.ts'
 import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
@@ -624,11 +625,13 @@ export class SetlistPage {
     if (share && shareDialog) {
       share.addEventListener(
         'click',
-        () => {
-          if (!this.currentSetlist) return
+        async () => {
+          const setlist = this.currentSetlist
+          if (!setlist) return
           // The page may have a newer copy of the setlist (after its details were edited)
-          shareDialog.setlist = this.currentSetlist
+          shareDialog.setlist = setlist
           shareDialog.songs = this.songs
+          shareDialog.leader = leaderName(await this._database().getAllPeople(), setlist.leaderId)
           shareDialog.show()
         },
         { signal }
@@ -706,7 +709,7 @@ export class SetlistPage {
       dialog.addEventListener(SetlistInfoDeleteEvent.type, this._setlistDeleteHandler)
     }
     dialog.readonly = this._readOnly
-    dialog.people = dialog.readonly ? [] : (await getSpacePeople()).people
+    dialog.people = (await getSpacePeople(this._database())).people
     await dialog.show(this.currentSetlist)
   }
 
@@ -763,7 +766,12 @@ export class SetlistPage {
     if (!this.currentSetlist) return
     let setlist: Setlist | undefined
     try {
-      setlist = await this.editSetlist(stored => void Object.assign(stored, changes))
+      const { leaderId, ...fields } = await settleLeader(this._database(), changes)
+      setlist = await this.editSetlist(stored => {
+        Object.assign(stored, fields)
+        if (leaderId) stored.leaderId = leaderId
+        else delete stored.leaderId
+      })
     } catch (error) {
       console.error('[SetlistInfo] Failed to save setlist details:', error)
       toast("Couldn't save the setlist details. They are as they were.", {
@@ -779,6 +787,8 @@ export class SetlistPage {
     this.header.show(song, true)
     // The menu's heading and the window's title say the setlist's date and name
     this.updateNavigationMenu()
+    // (a leader typed in with "Other…" is a person made by this save)
+    if (dialog) dialog.people = (await getSpacePeople(this._database())).people
     await dialog?.show(setlist)
   }
 

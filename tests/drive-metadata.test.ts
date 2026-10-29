@@ -16,18 +16,17 @@ describe('Drive file metadata', () => {
   const setlist = {
     id: 'setlist-1',
     date: '2026-06-22',
-    owner: 'Simon Davy',
     type: 'Event',
     name: 'Devoted Leaders - Tue Am',
   }
 
   it('names setlist files as before (existing files keep their names)', () => {
-    expect(setlistFilename(setlist)).to.equal(
+    expect(setlistFilename(setlist, 'Simon Davy')).to.equal(
       '2026-06-22-simon-davy-event-devoted-leaders---tue-am.json'
     )
     expect(
       setlistFilename(
-        makeSetlist({ id: 'x', date: '2026-09-27', type: 'Church Service', owner: '', name: '' })
+        makeSetlist({ id: 'x', date: '2026-09-27', type: 'Church Service', name: '' })
       )
     ).to.equal('2026-09-27-church-service.json')
   })
@@ -95,14 +94,14 @@ describe('Drive file metadata', () => {
 
 describe('Drive file metadata, with less recorded', () => {
   it('names a setlist file by its id when it has no date', () => {
-    expect(setlistFilename({ id: 'setlist-9', date: '', owner: '', type: '', name: '' })).to.equal(
+    expect(setlistFilename({ id: 'setlist-9', date: '', type: '', name: '' })).to.equal(
       'setlist-9.json'
     )
   })
 
   it('has no space in a file’s details when there is none', () => {
     const metadata = setlistFileMetadata(
-      { id: 'x', date: '2026-06-22', owner: '', type: '', name: '' },
+      { id: 'x', date: '2026-06-22', type: '', name: '' },
       { spaceId: null }
     )
     expect(metadata.appProperties.spaceId).to.equal('')

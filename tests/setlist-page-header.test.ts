@@ -3,7 +3,7 @@
  * dialogs, sharing, the menu and the keyboard. (Reordering, adding and removing songs are in
  * setlist-page.test.ts; sections, keys and tempo in setlist-page-songs.test.ts.)
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import type { AppHeader } from '../src/components/app-header.ts'
 import { EditModeToggleEvent, HeaderInfoClickEvent } from '../src/components/app-header.ts'
 import type { AppModal } from '../src/components/app-modal.ts'
@@ -503,7 +503,7 @@ describe('the setlist page: header, menu and keys', () => {
         shown++
       }
       button.click()
-      expect(shown).to.equal(1)
+      await waitUntil(() => shown === 1, 'the share dialog to open')
       expect((dialog.setlist as { id: string }).id).to.equal(rig.page.currentSetlistId)
       dialog.setlist = { ...(rig.page.currentSetlist as object), share: null }
       dialog.dispatchEvent(new SetlistShareChangeEvent())
@@ -519,6 +519,8 @@ describe('the setlist page: header, menu and keys', () => {
         shown++
       }
       must($<HTMLElement>('#share-button')).click()
+      await waitUntil(() => shown === 1, 'the share dialog to open')
+      await wait(30)
       expect(shown).to.equal(1)
     })
   })
@@ -545,7 +547,7 @@ describe('the setlist page: header, menu and keys', () => {
         shown++
       }
       button.click()
-      expect(shown).to.equal(1)
+      await waitUntil(() => shown === 1, 'the share dialog to open')
       expect((dialog.setlist as { id: string }).id).to.equal(rig.page.currentSetlistId)
 
       const rendered: string[] = []
@@ -630,8 +632,7 @@ describe('the setlist page: header, menu and keys', () => {
       time: '09:00',
       type: 'Event',
       name,
-      owner: 'Ann',
-      ownerId: 'ann@example.com',
+      leaderId: '',
     })
 
     it('are saved, and shown in the header, the menu and the dialog', async () => {
@@ -653,6 +654,22 @@ describe('the setlist page: header, menu and keys', () => {
       rig.page.showSong(0, true)
       await rig.page.saveSetlistDetails(changes('Again'))
       expect(header().heading).to.equal('Alpha')
+    })
+
+    it('make a person of a leader typed in with Other…, and the dialog shows them', async () => {
+      await rig.open()
+      const dialog = must($<SetlistInfoDialog>('#setlist-info-dialog'))
+      await rig.page.showSetlistInfo()
+      await rig.page.saveSetlistDetails({
+        ...changes('Visiting'),
+        leaderId: '',
+        newLeader: 'Visiting Vic',
+      })
+      const vic = must(dialog.people.find(person => person.name === 'Visiting Vic'))
+      expect(must(await rig.db.getSetlist(rig.page.currentSetlistId as string)).leaderId).to.equal(
+        vic.id
+      )
+      expect(dialog.shadowRoot?.querySelector('setlist-info')).to.exist
     })
 
     it('are left as they were, and said so, when they cannot be saved', async () => {
@@ -776,8 +793,7 @@ describe('the setlist page: header, menu and keys', () => {
         time: '',
         type: '',
         name: '',
-        owner: '',
-        ownerId: '',
+        leaderId: '',
       })
       expect(element.setlistTitle).to.not.contain(' - ')
     })

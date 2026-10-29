@@ -4,6 +4,7 @@ import { live } from 'lit/directives/live.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Person, Setlist } from '../js/data-types.ts'
 import { determineSetlistType, SETLIST_TYPES } from '../js/db.ts'
+import { resolvePerson } from '../js/leaders.ts'
 
 /** What the form collects (and a setlist keeps) */
 export interface SetlistDetails {
@@ -11,8 +12,10 @@ export interface SetlistDetails {
   time: string
   type: string
   name: string
-  owner: string
-  ownerId: string
+  /** The chosen person's id; empty for no leader */
+  leaderId: string
+  /** A leader typed in with "Other…": a person to find or make (see settleLeader in people.ts) */
+  newLeader?: string
 }
 
 /** One leader to choose: the select's value for them, and who they are */
@@ -21,7 +24,7 @@ export interface LeaderChoice {
   person: Person
 }
 
-/** The form was submitted; details is {date, time, type, name, owner, ownerId} */
+/** The form was submitted; details is {date, time, type, name, leaderId, newLeader} */
 export class SetlistDetailsSaveEvent extends Event {
   static readonly type = 'setlist-details-form:save'
   readonly details: SetlistDetails
@@ -45,35 +48,16 @@ const NO_LEADER = ''
 const OTHER_LEADER = 'other'
 
 /**
- * The leader choices for a setlist: the space's people, plus its current
- * leader if they aren't one of them.
- *
- * A leader recorded by name only (before leaders had ids) is matched to a
- * person with that name, so saving the form adds their id.
- *
- * @param setlist - with owner (name) and ownerId (email)
+ * The leader choices for a setlist: the space's people, with its leader selected. A leader
+ * who is not one of the people (not synced here yet) shows as no leader.
  */
 export function leaderChoices(
-  setlist: { owner?: string; ownerId?: string } = {},
+  setlist: { leaderId?: string | null } = {},
   people: Person[] = []
 ): { options: LeaderChoice[]; selected: string } {
-  const options: LeaderChoice[] = people.map(person => ({ value: `id:${person.id}`, person }))
-  const owner = setlist.owner?.trim() || ''
-  const ownerId = setlist.ownerId || ''
-  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
-
-  if (!owner && !ownerId) return { options, selected: NO_LEADER }
-
-  const match = ownerId
-    ? options.find(o => same(o.person.id, ownerId))
-    : options.find(o => same(o.person.name, owner))
-  if (match) return { options, selected: match.value }
-
-  // Not one of the people: keep them as a choice rather than lose them
-  const extra: LeaderChoice = ownerId
-    ? { value: `id:${ownerId}`, person: { id: ownerId, name: owner || ownerId } }
-    : { value: `name:${owner}`, person: { id: '', name: owner } }
-  return { options: [...options, extra], selected: extra.value }
+  const options: LeaderChoice[] = people.map(person => ({ value: person.id, person }))
+  const leader = resolvePerson(people, setlist.leaderId)
+  return { options, selected: leader?.id ?? NO_LEADER }
 }
 
 /**
@@ -83,8 +67,8 @@ export function leaderChoices(
  * both to create a setlist and to edit one, so the two can't drift apart.
  *
  * Properties:
- * @property {Object} setlist - Initial values ({date, time, type, name, owner, ownerId})
- * @property {Array} people - Who can be chosen as leader: [{id, name}] (see people.js)
+ * @property {Object} setlist - Initial values ({date, time, type, name, leaderId})
+ * @property {Array} people - Who can be chosen as leader (see people.ts)
  * @property {string} submitLabel - Label for the submit button
  * @property {boolean} hideActions - Leave out the Cancel and submit buttons: the page has its own,
  *   and calls submit() to save
@@ -92,9 +76,9 @@ export function leaderChoices(
  *   change (for new setlists)
  *
  * Events:
- * @fires SetlistDetailsSaveEvent - details: {date, time, type, name, owner, ownerId}. The leader's
- *   name is `owner` and their id (Google account email) is `ownerId`, which is
- *   empty for a leader typed in with "Other…".
+ * @fires SetlistDetailsSaveEvent - details: {date, time, type, name, leaderId, newLeader}. The leader
+ *   is a person's id, or empty; for a leader typed in with "Other…" it is empty and `newLeader`
+ *   is the name typed.
  * @fires SetlistDetailsCancelEvent - Cancel was pressed
  */
 export class SetlistDetailsForm extends LitElement {
@@ -239,15 +223,14 @@ export class SetlistDetailsForm extends LitElement {
     this._otherLeader = (event.target as HTMLSelectElement).value === OTHER_LEADER
   }
 
-  /** The chosen leader as { owner, ownerId } */
-  _leader(data: FormData): { owner: string; ownerId: string } {
+  /** The chosen leader: a person's id, or the name typed in with "Other…" */
+  _leader(data: FormData): { leaderId: string; newLeader?: string } {
     const value = data.get('leader')
     if (value === OTHER_LEADER) {
       // (a typed-in name, when "Other…" is chosen; the field is there then)
-      return { owner: (data.get('leaderOther') as string).trim(), ownerId: '' }
+      return { leaderId: '', newLeader: (data.get('leaderOther') as string).trim() }
     }
-    const person = this._leaders.options.find(o => o.value === value)?.person
-    return { owner: person?.name || '', ownerId: person?.id || '' }
+    return { leaderId: (value as string) || '' }
   }
 
   /** Save, as the submit button does: the browser checks the fields first, and says what is wrong */

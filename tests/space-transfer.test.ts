@@ -269,6 +269,7 @@ describe('Copying and moving between spaces', () => {
         getAllSongs: () => source.getAllSongs(),
         getChordPro: async () => undefined,
         getAllSetlists: async () => [],
+        getAllPeople: async () => [],
       }
       expect(alpha.title).to.equal('Alpha')
       expect((await contentsOf(sparse)).songs.count).to.equal(0)

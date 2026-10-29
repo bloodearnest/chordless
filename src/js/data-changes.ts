@@ -7,7 +7,7 @@
  */
 
 /** The kinds of stored record a change is about */
-export type DataKind = 'setlist' | 'song' | 'chart'
+export type DataKind = 'setlist' | 'song' | 'chart' | 'person'
 
 /** Where a change came from: made here by the user (so it may need sending), or by a sync (it came from storage) */
 export type DataOrigin = 'local' | 'sync'

@@ -9,7 +9,7 @@ import type { Setlist } from '../js/data-types.ts'
  *
  * Properties:
  * @property {Object} setlist - Setlist data object
- * @property {string} [leader] - Leader name. Defaults to the setlist's owner.
+ * @property {string} [leader] - Leader name. Defaults to the leader of a setlist received by link.
  */
 export class SetlistInfo extends LitElement {
   static override properties = {
@@ -97,7 +97,7 @@ export class SetlistInfo extends LitElement {
 
     // The date and name are the dialog's heading, so not repeated here
     const songCount = this.setlist.songs ? this.setlist.songs.length : 0
-    const leader = this.leader || this.setlist.owner?.trim()
+    const leader = this.leader || this.setlist.received?.leaderName?.trim()
 
     return html`
       <div class="setlist-info-container">

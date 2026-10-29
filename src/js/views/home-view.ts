@@ -19,7 +19,7 @@ import type { Setlist } from '../data-types.ts'
 import { watchData } from '../data-watcher.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
 import { goTo } from '../navigation.ts'
-import { claimSetlistsOnce, getCurrentPerson, getSpacePeople } from '../people.ts'
+import { getSignedInUser, getSpacePeople, settleLeader } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
 import { toast } from '../toast.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
@@ -83,7 +83,7 @@ export function sharedGroup(setlists: Setlist[]): SetlistYear[] {
       setlists: setlists.map(setlist => ({
         id: setlist.id,
         url: `/s/${encodeURIComponent(setlist.received?.fileId ?? '')}`,
-        displayName: `${setlistTitle(setlist, 'short')}${setlist.owner ? ` · ${setlist.owner}` : ''}`,
+        displayName: `${setlistTitle(setlist, 'short')}${setlist.received?.leaderName ? ` · ${setlist.received.leaderName}` : ''}`,
         songCount: Array.isArray(setlist.songs) ? setlist.songs.length : 0,
       })),
     },
@@ -108,8 +108,6 @@ export class HomeView extends PageView {
         return { groups: [], shared: sharedGroup(await listSharedWithMe().catch(() => [])) }
       }
       const db = await getCurrentDB()
-      // One-off: record leader ids on setlists from before they existed
-      await claimSetlistsOnce(db, db.spaceId)
       return {
         groups: groupSetlistsByYear(await db.getAllSetlists()),
         shared: sharedGroup(await listSharedWithMe().catch(() => [])),
@@ -127,7 +125,7 @@ export class HomeView extends PageView {
   }
 
   async #openCreate(): Promise<void> {
-    const { people, me } = await getSpacePeople()
+    const { people, me } = await getSpacePeople(await getCurrentDB())
     const date = toLocalDateString(getNextSunday())
     // Defaults: next Sunday, a Sunday morning service, led by you
     const form = this.#form.value as SetlistDetailsForm
@@ -137,20 +135,20 @@ export class HomeView extends PageView {
       time: '10:30',
       type: determineSetlistType(date, ''),
       name: '',
-      owner: me?.name || '',
-      ownerId: me?.id || '',
+      leaderId: me?.id || '',
     }
     this.#modal.value?.show()
   }
 
   async #create(event: SetlistDetailsSaveEvent): Promise<void> {
     try {
+      const db = await getCurrentDB()
       const newSetlist = createSetlist({
-        ...event.details,
-        createdBy: (await getCurrentPerson())?.id,
+        ...(await settleLeader(db, event.details)),
+        createdBy: (await getSignedInUser())?.email,
       })
       // biome-ignore lint/plugin: a new setlist, with no stored one to write over
-      await (await getCurrentDB()).saveSetlist(newSetlist)
+      await db.saveSetlist(newSetlist)
       this.#modal.value?.close()
       await goTo(`/setlist/${newSetlist.id}`)
     } catch (error) {

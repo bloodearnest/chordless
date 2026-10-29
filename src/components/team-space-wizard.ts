@@ -302,7 +302,11 @@ export class TeamSpaceWizard extends LitElement {
           bringAcross(source, destination, this._wanted)
         )
         const own = (await getCurrentUserInfo())?.email
-        this._leaders = leadersOf(await destination.getAllSetlists(), own)
+        this._leaders = leadersOf(
+          await destination.getAllSetlists(),
+          await destination.getAllPeople(),
+          own
+        )
         this._brought = true
       } finally {
         destination.db?.close()

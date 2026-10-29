@@ -126,10 +126,10 @@ a re-pointing of the folder.
 
 ### Setlist leaders
 
-A setlist's leader is `owner` (name) + `ownerId` (Google account email; empty for a leader typed in
-by name with "Other…"). The Leader dropdown lists the folder's members (cached at sync, from Drive
-permissions) plus the signed-in user, who is the default for new setlists. With the team service, the
-member list comes from the Worker instead.
+A setlist's leader is `leaderId`, a person of the space (`docs/IDENTITIES.md`). The Leader dropdown
+lists the space's people: the folder's members (cached at sync, from Drive permissions) and the
+signed-in user each have one made for them, who is the default for new setlists, and "Other…" makes
+another. With the team service, the member list comes from the Worker instead.
 
 ### Sign-in model
 
@@ -296,8 +296,8 @@ Steps, each on the one page:
    - **Pads are not in this step yet.** They are the account's, not a space's (item 6), and need
      Drive calls. When they are, the checkbox is hidden if there are none.
 4. **Invite people** (built 2026-10-22; `team-invite-step.ts`, on the result page once the space
-   exists, since an invite needs its id). The setlists brought across have leaders (`owner` and
-   `ownerId`, an email). Leaders with an email are listed once each (`leadersOf`), ticked, with a
+   exists, since an invite needs its id). The setlists brought across have leaders (people,
+   with emails). Leaders with an email are listed once each (`leadersOf`), ticked, with a
    role to choose (writer by default), and an email can be added by hand; the person making the
    space is left out. Nothing is sent without being ticked, and Chordless sends nothing itself:
    each invite is a link, shown once, to copy and pass on. A leader typed by name alone has no

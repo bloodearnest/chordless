@@ -208,6 +208,8 @@ export async function resetToExport(exported: SpaceExport, db: ChordlessDB): Pro
     })
   }
 
+  // (the people first: a setlist whose leader is not stored shows none)
+  await db.addPeople(exported.people)
   const replacingSetlists = new Set(plan.setlistsReplaced.map(item => item.id))
   const addingSetlists = new Set(plan.setlistsAdded.map(item => item.id))
   for (const there of exported.setlists) {

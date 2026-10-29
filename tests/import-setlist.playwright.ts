@@ -81,11 +81,11 @@ test('a song the library lacks must be imported from SongSelect first, then the 
       const song = await db.getSong(entry.songUuid)
       entries.push({ title: song?.title, key: entry.key, tempo: entry.tempo })
     }
+    const leader = (await db.getAllPeople()).find(person => person.id === setlist.leaderId)
     return {
       date: setlist.date,
       name: setlist.name,
-      owner: setlist.owner,
-      ownerId: setlist.ownerId,
+      leader: leader && { name: leader.name, emails: leader.emails },
       type: setlist.type,
       entries,
       songCount: (await db.getAllSongs()).length,
@@ -95,8 +95,7 @@ test('a song the library lacks must be imported from SongSelect first, then the 
     date: '2026-10-25',
     // (a subject that is only the date is no name, so the setlist is that Sunday's service)
     name: '',
-    owner: 'Leader One',
-    ownerId: 'one@example.com',
+    leader: { name: 'Leader One', emails: ['one@example.com'] },
     type: 'Church Service',
     entries: [
       { title: 'Alpha Song', key: 'G', tempo: null },

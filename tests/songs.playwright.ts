@@ -224,14 +224,17 @@ test.describe('Song info', () => {
     await page.reload()
     const saved = await page.evaluate(async () => {
       const { getCurrentDB } = await import('/js/db.ts')
-      return (await getCurrentDB()).getSetlist('edit-test-setlist')
+      const db = await getCurrentDB()
+      const setlist = await db.getSetlist('edit-test-setlist')
+      const leader = (await db.getAllPeople()).find(person => person.id === setlist?.leaderId)
+      return { ...setlist, leaderName: leader?.name }
     })
     expect(saved).toMatchObject({
-      owner: 'Ben Smi-th',
-      ownerId: '',
+      leaderName: 'Ben Smi-th',
       date: '2026-10-18',
       name: 'Harvest',
     })
+    expect(saved.leaderId).not.toBe('ann-leader')
   })
 
   test('a setlist that is not in Drive can be deleted from its info dialog', {
@@ -299,7 +302,7 @@ test.describe('Song info', () => {
         return (await getCurrentDB()).getSetlist('cancel-test-setlist')
       })
     )
-    expect(saved.owner).toBe('Ann')
+    expect(saved.leaderId).toBe('ann-leader')
   })
 })
 

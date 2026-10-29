@@ -137,7 +137,6 @@ async function test() {
       date: '2025-01-01',
       time: '10:00',
       type: 'Church Service',
-      owner: 'test@example.com',
       name: 'Test Setlist',
       songs: [
         {

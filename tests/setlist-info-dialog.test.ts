@@ -102,8 +102,7 @@ describe('setlist-info-dialog', () => {
       time: '',
       type: 'Event',
       name: 'New',
-      owner: '',
-      ownerId: '',
+      leaderId: '',
     }
     form(el)?.dispatchEvent(new SetlistDetailsSaveEvent(details))
     expect(seen).to.have.length(1)

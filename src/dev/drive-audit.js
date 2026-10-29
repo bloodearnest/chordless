@@ -67,7 +67,7 @@ async function auditSpace(space) {
           contentId: content?.id ?? null,
           date: content?.date ?? null,
           setlistName: content?.name ?? null,
-          owner: content?.owner ?? null,
+          owner: content?.leaderId ?? content?.owner ?? null,
           setlistType: content?.type ?? null,
           time: content?.time ?? null,
           songCount: content?.songs?.length ?? null,

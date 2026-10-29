@@ -210,6 +210,8 @@ export interface ReceivedShare {
   expires: string
   /** The sharer's setlist id: this setlist, if the user later joins its space */
   setlistId?: string
+  /** The leader's name as the sharer sent it: the receiver has no people list to find them in */
+  leaderName?: string
 }
 
 export interface Setlist {
@@ -220,12 +222,14 @@ export interface Setlist {
   time: string
   type: string
   name: string
-  owner: string
-  /** The leader's Google account email (empty for a leader known only by name) */
+  /** The leader: a person of the space (docs/IDENTITIES.md); none if empty */
+  leaderId?: string | null
+  /** Before leaders were people: the leader's name and Google account email. Read once, by the upgrade */
+  owner?: string
   ownerId?: string
   /**
    * Who made the setlist in Chordless (their Google account email), where known. It is not the
-   * leader: an imported setlist's owner is the leader named in the email, and this is whoever
+   * leader: an imported setlist's leader is the one named in the email, and this is whoever
    * imported it. Kept so that a setlist can be traced to its maker; nothing decides by it yet.
    */
   createdBy?: string
@@ -296,10 +300,21 @@ export interface Space {
   team?: TeamLink
 }
 
-/** A person who can lead setlists: id is their Google account email (empty if only a name) */
+/**
+ * A person of a space, who can lead setlists (docs/IDENTITIES.md). Each space has its own list;
+ * the same human in two spaces is two records.
+ */
 export interface Person {
+  /** A uuid, never changed */
   id: string
   name: string
+  /** Lower-cased Google accounts and other addresses the person writes from */
+  emails: string[]
+  /** In a team space, who they are there (`provider:sub`) */
+  teamMember?: string
+  /** Set when merged into another person: the record stays so an id not yet replaced still resolves */
+  mergedInto?: string
+  modifiedDate: string
 }
 
 /**

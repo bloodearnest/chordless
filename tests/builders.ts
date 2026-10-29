@@ -34,7 +34,6 @@ export const makeSetlist = (overrides: Partial<Setlist> = {}): Setlist => ({
   time: '10:30',
   type: 'Church Service',
   name: '',
-  owner: 'Ann',
   songs: [],
   createdDate: NOW,
   modifiedDate: NOW,

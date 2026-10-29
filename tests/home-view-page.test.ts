@@ -34,10 +34,9 @@ describe('sharedGroup', () => {
       makeSetlist({
         id: 'a',
         date: '2026-10-25',
-        owner: 'Ann',
-        received: { fileId: 'file/1' },
+        received: { fileId: 'file/1', leaderName: 'Ann' },
       } as never),
-      makeSetlist({ id: 'b', date: '2026-10-18', owner: '', songs: undefined } as never),
+      makeSetlist({ id: 'b', date: '2026-10-18', songs: undefined } as never),
     ])
     expect(group.expanded).to.equal(true)
     expect(group.setlists[0].url).to.equal('/s/file%2F1')
@@ -208,21 +207,22 @@ describe('the home view', () => {
         await open()
         view.querySelector<HTMLButtonElement>('#create-setlist-button')?.click()
         await wait(150)
-        expect(form().setlist?.owner).to.equal('Ann Smith')
-        expect(form().setlist?.ownerId).to.equal('ann@example.com')
+        const ann = must(form().people.find(person => person.emails.includes('ann@example.com')))
+        expect(ann.name).to.equal('Ann Smith')
+        expect(form().setlist?.leaderId).to.equal(ann.id)
         form().dispatchEvent(
           new SetlistDetailsSaveEvent({
             date: '2026-11-08',
             time: '',
             type: 'Other',
             name: 'By Ann',
-            owner: 'Ann Smith',
-            ownerId: 'ann@example.com',
+            leaderId: ann.id,
           })
         )
         await wait(150)
         const [saved] = await db.getAllSetlists()
         expect(saved.createdBy).to.equal('ann@example.com')
+        expect(saved.leaderId).to.equal(ann.id)
       } finally {
         auth.uninstall()
       }
@@ -238,8 +238,7 @@ describe('the home view', () => {
           time: '10:30',
           type: 'Church Service',
           name: 'Created',
-          owner: '',
-          ownerId: '',
+          leaderId: '',
         })
       )
       await wait(100)
@@ -259,8 +258,7 @@ describe('the home view', () => {
             time: '',
             type: 'Other',
             name: '',
-            owner: '',
-            ownerId: '',
+            leaderId: '',
           })
         )
         await wait(100)
@@ -286,8 +284,7 @@ describe('the home view', () => {
             time: '',
             type: 'Other',
             name: '',
-            owner: '',
-            ownerId: '',
+            leaderId: '',
           })
         )
         await wait(100)

@@ -2,12 +2,14 @@ import { announceDataChange, type DataKind, type DataOrigin } from './data-chang
 import type {
   ChordProRecord,
   PendingDeletion,
+  Person,
   Setlist,
   SetlistLocalState,
   SongInput,
   SongRecord,
   TempoInput,
 } from './data-types.ts'
+import { leaderName, planPeople } from './leaders.ts'
 import { songSource } from './song-source.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
@@ -20,7 +22,7 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 // NOTE: This now stores ALL space data in one database per space.
 // Space metadata is stored separately in the 'spaces' database.
 
-const DB_VERSION = 9
+const DB_VERSION = 10
 
 // Setlist types
 export const SETLIST_TYPES: Readonly<Record<string, string>> = {
@@ -206,13 +208,10 @@ export class ChordlessDB {
           const setlistStore = db.createObjectStore('setlists', { keyPath: 'id' })
           setlistStore.createIndex('date', 'date', { unique: false })
           setlistStore.createIndex('type', 'type', { unique: false })
-          setlistStore.createIndex('owner', 'owner', { unique: false })
         } else {
-          // Add owner index if upgrading from old version
+          // The owner index went with the owner field (v10)
           const setlistStore = (request.transaction as IDBTransaction).objectStore('setlists')
-          if (!setlistStore.indexNames.contains('owner')) {
-            setlistStore.createIndex('owner', 'owner', { unique: false })
-          }
+          if (setlistStore.indexNames.contains('owner')) setlistStore.deleteIndex('owner')
         }
 
         // Create setlist_local store (new in v5)
@@ -223,6 +222,11 @@ export class ChordlessDB {
         // Files whose records were deleted here and are to go in the Drive trash (new in v9)
         if (!db.objectStoreNames.contains('pending_deletions')) {
           db.createObjectStore('pending_deletions', { keyPath: 'ref' })
+        }
+
+        // The space's people, who lead setlists (new in v10)
+        if (!db.objectStoreNames.contains('people')) {
+          db.createObjectStore('people', { keyPath: 'id' })
         }
 
         if (oldVersion > 0 && oldVersion < DB_VERSION) {
@@ -351,6 +355,55 @@ export class ChordlessDB {
     await store.delete(id)
     await transactionDone(tx)
     this.#changed('setlist', [id])
+  }
+
+  // People (docs/IDENTITIES.md)
+
+  async getAllPeople(): Promise<Person[]> {
+    const tx = this.#transaction(['people'], 'readonly')
+    return requestResult(tx.objectStore('people').getAll())
+  }
+
+  async getPerson(id: string): Promise<Person | undefined> {
+    const tx = this.#transaction(['people'], 'readonly')
+    return requestResult(tx.objectStore('people').get(id))
+  }
+
+  /** Save people, each as given (a person already stored is replaced) */
+  async savePeople(people: Person[]): Promise<void> {
+    if (people.length === 0) return
+    const tx = this.#transaction(['people'], 'readwrite')
+    const store = tx.objectStore('people')
+    for (const person of people) store.put(cloneForStorage(person))
+    await transactionDone(tx)
+    this.#changed(
+      'person',
+      people.map(person => person.id)
+    )
+  }
+
+  /**
+   * Add people who are not stored yet; one that is, is left as it is (it may have been changed
+   * since the caller read the list). Resolves with those added.
+   */
+  async addPeople(people: Person[]): Promise<Person[]> {
+    if (people.length === 0) return []
+    const tx = this.#transaction(['people'], 'readwrite')
+    const store = tx.objectStore('people')
+    const added: Person[] = []
+    for (const person of people) {
+      if (await requestResult(store.getKey(person.id))) continue
+      store.put(cloneForStorage(person))
+      added.push(person)
+    }
+    await transactionDone(tx)
+    if (added.length) {
+      this.#changed(
+        'person',
+        added.map(person => person.id)
+      )
+    }
+    return added
   }
 
   /**
@@ -556,11 +609,9 @@ export class ChordlessDB {
   async getSongUsageFromSetlists(songId: string): Promise<SongUsage[]> {
     if (!songId) return []
 
-    const tx = this.#transaction(['setlists'], 'readonly')
-    const store = tx.objectStore('setlists')
-    const request = store.getAll()
-
-    const setlists: Setlist[] = await requestResult(request)
+    const tx = this.#transaction(['setlists', 'people'], 'readonly')
+    const setlists: Setlist[] = await requestResult(tx.objectStore('setlists').getAll())
+    const people: Person[] = await requestResult(tx.objectStore('people').getAll())
     const appearances: SongUsage[] = []
     for (const setlist of setlists) {
       if (!Array.isArray(setlist.songs)) continue
@@ -572,7 +623,7 @@ export class ChordlessDB {
           setlistId: setlist.id,
           setlistDate: setlist.date,
           setlistName: setlist.name,
-          leader: setlist.owner,
+          leader: leaderName(people, setlist.leaderId),
           type: setlist.type,
           playedInKey: song.key,
           order: index,
@@ -913,6 +964,32 @@ function migrateRecords(transaction: IDBTransaction, oldVersion: number) {
     if (setlist !== before) cursor.update(setlist)
     cursor.continue()
   }
+  if (oldVersion < 10) migrateLeaders(transaction)
+}
+
+/**
+ * Version 10: a setlist's `owner` and `ownerId` become a person of the space, and `leaderId`.
+ * Read in its own pass, after the others have written, so it sees the records as they are now.
+ */
+function migrateLeaders(transaction: IDBTransaction) {
+  const setlists = transaction.objectStore('setlists')
+  const read = setlists.getAll()
+  read.onsuccess = () => {
+    const all: Setlist[] = read.result
+    const now = new Date().toISOString()
+    const { people, leaderIds } = planPeople(all, now)
+    const store = transaction.objectStore('people')
+    for (const person of people) store.put(person)
+    all.forEach((setlist, i) => {
+      const { owner, ownerId, ...rest } = setlist
+      if (owner === undefined && ownerId === undefined) return
+      const leaderId = leaderIds[i]
+      const migrated: Setlist = { ...rest, ...(leaderId ? { leaderId } : {}) }
+      // The leader is content: a setlist the upgrade changed is one to send
+      migrated.modifiedDate = now
+      setlists.put(migrated)
+    })
+  }
 }
 
 /**
@@ -981,16 +1058,14 @@ export function createSetlist({
   time,
   type,
   name,
-  owner,
-  ownerId,
+  leaderId,
   createdBy,
 }: {
   date?: string | Date
   time?: string
   type?: string
   name?: string
-  owner?: string
-  ownerId?: string
+  leaderId?: string | null
   /** Who made it (see Setlist.createdBy) */
   createdBy?: string
 } = {}): Setlist {
@@ -1003,9 +1078,7 @@ export function createSetlist({
     time: time || '10:30',
     type: type || determineSetlistType(dateString, name),
     name: name || '',
-    owner: owner || '',
-    // Leader's Google account email (empty for a leader known only by name)
-    ownerId: ownerId || '',
+    ...(leaderId ? { leaderId } : {}),
     ...(createdBy ? { createdBy } : {}),
     songs: [],
     createdDate: new Date().toISOString(),

@@ -21,16 +21,27 @@ const encode = (value: object) =>
 const ID_TOKEN = `${encode({ alg: 'RS256' })}.${encode({ exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`
 
 describe('leadersOf', () => {
-  const led = (owner: string, ownerId?: string) => makeSetlist({ owner, ownerId })
+  const person = (id: string, name: string, ...emails: string[]) => ({
+    id,
+    name,
+    emails,
+    modifiedDate: '2026-10-29T10:00:00.000Z',
+  })
+  const people = [
+    person('sam', 'Sam'),
+    person('ann', 'Ann', 'ann@example.com', 'ann@work.org'),
+    person('bob', 'Bob', 'bob@example.com'),
+    person('me', 'Me', 'me@example.com'),
+    person('old-bob', 'Old Bob', 'oldbob@example.com'),
+  ]
+  people[4] = { ...people[4], mergedInto: 'bob' } as (typeof people)[number]
+  const led = (leaderId?: string) => makeSetlist({ leaderId })
 
-  it('names each leader once, those with an email first, in any case', () => {
-    const leaders = leadersOf([
-      led('Sam', undefined),
-      led('Ann', 'Ann@Example.com'),
-      led('Ann Smith', 'ann@example.com'),
-      led('Sam', undefined),
-      led('Bob', 'bob@example.com'),
-    ])
+  it('names each leader once, those with an email first, with their first email', () => {
+    const leaders = leadersOf(
+      [led('sam'), led('ann'), led('ann'), led('sam'), led('old-bob')],
+      people
+    )
     expect(leaders).to.deep.equal([
       { name: 'Ann', email: 'ann@example.com' },
       { name: 'Bob', email: 'bob@example.com' },
@@ -38,12 +49,13 @@ describe('leadersOf', () => {
     ])
   })
 
-  it('leaves out the person making the space, and setlists nobody leads', () => {
+  it('leaves out the person making the space, by any of their emails, and setlists nobody leads', () => {
     const leaders = leadersOf(
-      [led('Me', 'ME@example.com'), led('', undefined), led('', 'x@example.com')],
-      'me@example.com'
+      [led('me'), led(), led('not-a-person'), led('bob')],
+      people,
+      'ME@example.com'
     )
-    expect(leaders).to.deep.equal([{ name: 'x@example.com', email: 'x@example.com' }])
+    expect(leaders).to.deep.equal([{ name: 'Bob', email: 'bob@example.com' }])
   })
 })
 

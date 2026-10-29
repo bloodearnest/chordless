@@ -74,10 +74,11 @@ function slug(text: string, { collapseDashes }: { collapseDashes: boolean }): st
  * e.g. "2025-11-10-john-smith-church-service.json"
  */
 export function setlistFilename(
-  setlist: Pick<Setlist, 'id' | 'date' | 'owner' | 'type' | 'name'>
+  setlist: Pick<Setlist, 'id' | 'date' | 'type' | 'name'>,
+  leader = ''
 ): string {
   const parts = [setlist.date || setlist.id]
-  for (const part of [setlist.owner, setlist.type, setlist.name]) {
+  for (const part of [leader, setlist.type, setlist.name]) {
     const s = part ? slug(part, { collapseDashes: false }) : ''
     if (s) parts.push(s)
   }
@@ -94,11 +95,11 @@ export function chordproFilename(title: string, ccliNumber?: string | null): str
  * Metadata for a setlist's Drive file.
  */
 export function setlistFileMetadata(
-  setlist: Pick<Setlist, 'id' | 'date' | 'owner' | 'type' | 'name'>,
-  { spaceId }: FileMetadataOptions
+  setlist: Pick<Setlist, 'id' | 'date' | 'type' | 'name'>,
+  { spaceId, leader }: FileMetadataOptions & { leader?: string }
 ): DriveFileMetadata {
   return {
-    name: setlistFilename(setlist),
+    name: setlistFilename(setlist, leader),
     mimeType: 'application/json',
     appProperties: {
       spaceId: spaceId || '',

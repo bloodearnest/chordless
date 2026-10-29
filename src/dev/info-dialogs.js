@@ -37,7 +37,7 @@ const setlists = {
     time: '10:30',
     type: 'Church Service',
     name: 'Harvest',
-    owner: 'Ann',
+    received: { leaderName: 'Ann' },
     songs: [{}, {}, {}, {}, {}],
     createdDate: '2026-09-30T19:12:00Z',
     modifiedDate: '2026-10-07T08:45:00Z',

@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Person, Setlist } from '../js/data-types.ts'
+import { leaderName } from '../js/leaders.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './icon.ts'
@@ -47,13 +48,13 @@ export class SetlistInfoDeleteEvent extends Event {
  *   dialog.show(setlist)
  *
  * Events:
- * @fires SetlistInfoSaveEvent - setlistId, and changes: {date, time, type, name, owner}
+ * @fires SetlistInfoSaveEvent - setlistId, and changes: {date, time, type, name, leaderId, newLeader}
  * @fires SetlistInfoDeleteEvent - setlistId; only offered, while editing, for a setlist that is
  *   not in Google Drive
  */
 export class SetlistInfoDialog extends LitElement {
   static override properties = {
-    /** Who can be chosen as leader when editing: [{id, name}] (see people.js) */
+    /** The space's people: who can be chosen as leader when editing, and who leads the setlist shown */
     people: { attribute: false },
     /** A setlist received by link: no editing or deleting */
     readonly: { type: Boolean },
@@ -187,7 +188,10 @@ export class SetlistInfoDialog extends LitElement {
               </div>
             `
             : html`
-              <setlist-info .setlist=${this._setlist}></setlist-info>
+              <setlist-info
+                .setlist=${this._setlist}
+                .leader=${leaderName(this.people, this._setlist?.leaderId)}
+              ></setlist-info>
             `
         }
       </app-modal>

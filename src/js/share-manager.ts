@@ -7,6 +7,7 @@
 import type { Setlist, SetlistShare } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { fileInput, shareFileMetadata, updateInput } from './drive-metadata.ts'
+import { leaderName } from './leaders.ts'
 import {
   buildShareBundle,
   bundleHash,
@@ -86,7 +87,8 @@ async function loadShareSources(setlist: Setlist, db: ChordlessDB): Promise<Shar
 
 /** The bundle for a setlist as it is now, its hash, and the file to upload for a key */
 async function prepare(setlist: Setlist, key: string, expires: string, ctx: ShareContext) {
-  const bundle = buildShareBundle(setlist, await loadShareSources(setlist, ctx.db), {
+  const leader = leaderName(await ctx.db.getAllPeople(), setlist.leaderId)
+  const bundle = buildShareBundle(setlist, leader, await loadShareSources(setlist, ctx.db), {
     expires,
     setlistId: setlist.id,
   })
