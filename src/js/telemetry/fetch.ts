@@ -14,6 +14,11 @@ import {
   type FetchInstrumentationConfig,
 } from '@opentelemetry/browser-instrumentation/experimental/fetch'
 import type { ReadableSpan } from '@opentelemetry/sdk-trace'
+import { ATTR_URL_FULL, ATTR_URL_PATH } from '@opentelemetry/semantic-conventions'
+import {
+  ATTR_HTTP_RESPONSE_BODY_SIZE,
+  ATTR_HTTP_RESPONSE_SIZE,
+} from '@opentelemetry/semantic-conventions/incubating'
 
 export const TELEMETRY_URL = '/api/otlp/v1/traces'
 
@@ -26,7 +31,7 @@ const claimed = new WeakSet<PerformanceEntry>()
 
 /** The address a span is for (truncated, so a relative parse: it is whatever the instrumentation made of it) */
 const urlOf = (span: Span): URL =>
-  new URL(String((span as unknown as ReadableSpan).attributes['url.full']), location.href)
+  new URL(String((span as unknown as ReadableSpan).attributes[ATTR_URL_FULL]), location.href)
 
 /** The browser's record of the call to `url` that began at `startedMs` (epoch), not yet given to another call */
 function resourceEntryOf(url: string, startedMs: number): PerformanceResourceTiming | undefined {
@@ -52,7 +57,7 @@ export const fetchConfig: FetchInstrumentationConfig = {
   sanitizeUrl: url => url.slice(0, MAX_URL),
   // (the span is named as the conventions have it, by its method; where it went is `server.address`)
   requestHook: span => {
-    span.setAttribute('url.path', urlOf(span).pathname)
+    span.setAttribute(ATTR_URL_PATH, urlOf(span).pathname)
   },
   applyCustomAttributesOnSpan: (span, _request, result) => {
     if (!(result instanceof Response)) return
@@ -61,17 +66,17 @@ export const fetchConfig: FetchInstrumentationConfig = {
     // (the bytes on the wire, as compressed; a call to another origin has none unless it allows it)
     const length = result.headers.get('Content-Length')
     if (length !== null && Number.isFinite(Number(length))) {
-      span.setAttribute('http.response.body.size', Number(length))
+      span.setAttribute(ATTR_HTTP_RESPONSE_BODY_SIZE, Number(length))
     }
     const started = (span as unknown as ReadableSpan).startTime
     const entry = resourceEntryOf(urlOf(span).href, started[0] * 1000 + started[1] / 1e6)
     if (!entry) return
     if (entry.encodedBodySize > 0)
-      span.setAttribute('http.response.body.size', entry.encodedBodySize)
+      span.setAttribute(ATTR_HTTP_RESPONSE_BODY_SIZE, entry.encodedBodySize)
     if (entry.decodedBodySize > 0) {
       span.setAttribute('chordless.http.response.decoded_body_size', entry.decodedBodySize)
     }
-    if (entry.transferSize > 0) span.setAttribute('http.response.size', entry.transferSize)
+    if (entry.transferSize > 0) span.setAttribute(ATTR_HTTP_RESPONSE_SIZE, entry.transferSize)
   },
 }
 
