@@ -253,7 +253,8 @@ it starts, so the steps and the calls below a sync carry them too.
 
 **Steps of a sync.** `phase()` (`telemetry.ts`) makes a step of the sync running a span of its own, the
 parent of the calls it makes, so a trace says which step each call belonged to: `chordless.sync.init`,
-`.feed`, `.feed_position`, `.members`, `.access`, `.inventory`, `.pull`, `.push`. It holds the one
+`.feed`, `.prepare` (a full sync's feed position, members and access, asked together), `.members`, `.access`,
+`.inventory`, `.pull`, `.push`. It holds the one
 sync's "current span" the same way the calls do, and does nothing outside a sync. A call by other code
 while a sync runs (a pad loading) is a trace of its own, as no `timedFetch` made it.
 

@@ -203,6 +203,17 @@ storage/sync
   Nothing here is reliable on a page being torn down: 1 lowers the risk, and looking for "synced" before
   closing removes it. To learn how often it happens: `chordless.setlist.unsent_on_leave` with
   `chordless.setlist.left = page` on the leave span (built: docs/OBSERVABILITY.md)
+- fewer Drive calls in a full sync (what the traces showed, 2026-10-29: a manual sync made 17; the feed's
+  no-op, the repeated inventory and the serial listings are fixed: docs/OBSERVABILITY.md). Left, in order of value:
+  1. the pull lists `songs/` and `setlists/` again (`SpaceStorage.list`) although the inventory listed
+     them a moment before with the same fields: keep the listings in the `DriveSpace` for the run and
+     serve `list()` from them, dropping them on any write (the trash of a pending deletion must show). 2 calls
+  2. the folders of the space (`songs`, `setlists`, `shares`) are found by name in every full sync
+     (`getSongsFolder` and the like, which also make them): the inventory's listing of the root has their
+     ids, so seed `#folders` from it (only where exactly one folder has the name). 3 calls
+  3. `syncShares` looks up the `shares` folder and lists it, outside any step: part of the same
+  4. the pulls and pushes of an incremental sync that finds changes: the `access` read could also wait
+     for a write that needs it
 - richer PWA install UI (Chrome's devtools manifest tab warns): add "screenshots" to
   public/manifest.webmanifest, at least one with form_factor "wide" (desktop) and one without it
   or "narrow" (mobile). Generate them with Playwright from seeded data, using a public-domain

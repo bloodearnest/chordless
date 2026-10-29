@@ -2,7 +2,7 @@ import { expect } from '@open-wc/testing'
 import { DataChangeEvent } from '../src/js/data-changes.ts'
 import { createSpace, deleteSpace } from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
-import { MEMBERS_REFRESH_MS, SyncManager } from '../src/js/sync-manager.ts'
+import { ACCESS_REFRESH_MS, MEMBERS_REFRESH_MS, SyncManager } from '../src/js/sync-manager.ts'
 import { makeSetlist } from './builders.ts'
 import { addSong, editSong, memoryChangeToken, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
@@ -19,6 +19,17 @@ describe('Drive sync: from the feed of changes', () => {
   /** The calls that list or read the whole space (an incremental sync makes none) */
   const listings = () =>
     rig.storage.calls.filter(call => ['list', 'inventory', 'members'].includes(call.op))
+
+  /** Run `work` as if `ms` had passed (what is kept for a while is old) */
+  async function later<T>(ms: number, work: () => Promise<T>): Promise<T> {
+    const now = Date.now
+    Date.now = () => now() + ms
+    try {
+      return await work()
+    } finally {
+      Date.now = now
+    }
+  }
 
   /** Two devices that have synced the same space, and a place in the feed on each */
   async function twoDevices() {
@@ -43,6 +54,17 @@ describe('Drive sync: from the feed of changes', () => {
     const second = await phone.sync.incrementalSync()
     expect(second.full).to.equal(false)
     expect(listings()).to.deep.equal([])
+  })
+
+  it('lists the whole space once in a full sync, for the pull and for the push alike', async () => {
+    const phone = await makeDevice('phone')
+    await addSetlist(phone, { name: 'Sunday' })
+    rig.storage.clearCalls()
+
+    await phone.sync.sync()
+
+    expect(rig.storage.calls.filter(call => call.op === 'inventory')).to.have.length(1)
+    expect(rig.driveSetlistFiles(), 'and it still sent what was local').to.have.length(1)
   })
 
   it('asks nothing but the feed when nothing changed and nothing is to be pushed', async () => {
@@ -176,10 +198,43 @@ describe('Drive sync: from the feed of changes', () => {
     rig.storage.readOnly = true
 
     rig.storage.clearCalls()
-    await phone.sync.incrementalSync()
+    await later(ACCESS_REFRESH_MS + 1000, () => phone.sync.incrementalSync())
 
     expect(rig.storage.writes()).to.deep.equal([])
     expect(must(await phone.db.getSetlist(fromTablet.id)).name).to.equal('Leader’s')
+  })
+
+  describe('the access to the space’s folder', () => {
+    const checks = () => rig.storage.calls.filter(call => call.op === 'inspectRoot').length
+
+    it('is asked of the storage once for the syncs of a few minutes, and again after', async () => {
+      const { phone } = await twoDevices()
+      rig.storage.clearCalls()
+      await phone.sync.incrementalSync()
+      expect(checks(), 'the full sync of twoDevices has just asked').to.equal(0)
+
+      await later(ACCESS_REFRESH_MS + 1000, () => phone.sync.incrementalSync())
+      expect(checks()).to.equal(1)
+      await later(ACCESS_REFRESH_MS + 2000, () => phone.sync.incrementalSync())
+      expect(checks(), 'no later than it was asked, a few seconds ago').to.equal(1)
+    })
+
+    it('stands for a user who can write, and a refused upload is how a change is found out: asked again then', async () => {
+      const { phone } = await twoDevices()
+      await addSetlist(phone, { name: 'Local' })
+      rig.storage.readOnly = true
+      rig.storage.clearCalls()
+
+      await phone.sync.incrementalSync()
+      // (one upload tried and refused, then the user is found to be a reader, and asked about)
+      expect(checks()).to.equal(1)
+      expect(phone.memberCache.readOnly).to.equal(true)
+      rig.storage.clearCalls()
+
+      await addSetlist(phone, { name: 'Another' })
+      await phone.sync.incrementalSync()
+      expect(rig.storage.writes(), 'now it is known').to.deep.equal([])
+    })
   })
 
   it('does a full sync, and a new place, when the feed has forgotten the old one', async () => {
