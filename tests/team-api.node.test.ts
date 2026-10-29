@@ -4,7 +4,7 @@
  * (the client) is tested against it in storage-team.test.ts, with the conformance suite.
  */
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { describe, test } from 'node:test'
 import { atLeast } from '../src/js/team-roles.ts'
 import { teamSpacePath } from '../worker/src/team-api.ts'
 import { makeTeamRig, ORIGIN } from './team-context.ts'
@@ -277,4 +277,108 @@ test('says a space has no feed when its storage has none', async () => {
   }
   assert.equal((await call(rig, 'GET', '/changes/start')).status, 404)
   assert.equal((await call(rig, 'GET', '/changes?token=1')).status, 404)
+})
+
+describe('naming yourself: PUT /people/<id>/name', () => {
+  const personFile = { name: 'ann-1234.json', props: { personId: 'ann' }, type: 'application/json' }
+  const ann = {
+    id: 'ann',
+    name: 'Ann',
+    emails: ['Ann@Example.com', 'ann@work.org'],
+    teamMember: 'someone',
+    modifiedDate: '2026-01-01T00:00:00.000Z',
+  }
+
+  async function withAnn(extra: Record<string, unknown> = {}) {
+    const rig = await makeTeamRig()
+    rig.roles.set('ann-token', 'reader')
+    rig.emails.set('ann-token', 'ann@example.com')
+    const made = await rig.storage
+      .space(rig.spaces[0].root)
+      .create('people', personFile, JSON.stringify({ ...ann, ...extra }))
+    const rename = (name: unknown, token = 'ann-token', id = 'ann') =>
+      call(rig, 'PUT', `/people/${id}/name`, { token, body: { name } })
+    const stored = () => JSON.parse(rig.storage.file(made.file.ref).content)
+    return { rig, made, rename, stored }
+  }
+
+  test('lets a member of any role, even a reader, change the name of the person they are', async () => {
+    const { rename, stored, rig } = await withAnn()
+    const answer = await rename('  Anne Smith ')
+    assert.equal(answer.status, 200)
+    assert.equal(stored().name, 'Anne Smith')
+    assert.notEqual(stored().modifiedDate, ann.modifiedDate)
+    // (nothing else changes, and the file keeps its name and properties)
+    assert.deepEqual({ ...stored(), name: 'Ann', modifiedDate: ann.modifiedDate }, ann)
+    const file = rig.storage.list(f => f.props.personId === 'ann')[0]
+    assert.equal(file.name, personFile.name)
+    const { person, file: written } = answer.json()
+    assert.equal(person.name, 'Anne Smith')
+    assert.equal(written.name, personFile.name)
+  })
+
+  test('is for the person the verified email belongs to, and no one else', async () => {
+    const { rig, rename, stored } = await withAnn()
+    rig.roles.set('bob-token', 'writer')
+    // (a writer, who may change files, may still not rename a person who is not them)
+    assert.equal((await rename('Bob', 'bob-token')).status, 403)
+    assert.equal((await rename('Bob', 'writer-token')).status, 403)
+    assert.equal(stored().name, 'Ann')
+    // (their own, by another of their addresses)
+    rig.emails.set('bob-token', 'ann@work.org')
+    assert.equal((await rename('Ann at work', 'bob-token')).status, 200)
+    assert.equal(stored().name, 'Ann at work')
+  })
+
+  test('says nothing of a person who is not there, or was deleted or merged', async () => {
+    const deleted = await withAnn({ deleted: true })
+    assert.equal((await deleted.rename('x')).status, 404)
+    const merged = await withAnn({ mergedInto: 'other' })
+    assert.equal((await merged.rename('x')).status, 404)
+    assert.equal((await merged.rename('x', 'ann-token', 'nobody')).status, 404)
+  })
+
+  test('keeps to the space: a person of another space is not renamed', async () => {
+    const { rig, rename } = await withAnn()
+    const there = await rig.storage
+      .space(rig.spaces[1].root)
+      .create(
+        'people',
+        { ...personFile, props: { personId: 'cat' } },
+        JSON.stringify({ ...ann, id: 'cat' })
+      )
+    assert.equal((await rename('x', 'ann-token', 'cat')).status, 404)
+    assert.equal(JSON.parse(rig.storage.file(there.file.ref).content).name, 'Ann')
+  })
+
+  test('takes one line of text up to 100 characters for a name', async () => {
+    const { rename, stored } = await withAnn()
+    for (const bad of ['', '   ', 'a'.repeat(101), 'two\nlines', 'tab\there', 5, null, undefined]) {
+      assert.equal((await rename(bad)).status, 400, String(bad))
+    }
+    assert.equal(stored().name, 'Ann')
+    assert.equal((await rename('a'.repeat(100))).status, 200)
+  })
+
+  test('is refused to someone who is not in the space or not signed in, and for a file that is not a person', async () => {
+    const { rig, rename, stored } = await withAnn()
+    rig.roles.set('stranger', 'none')
+    assert.equal((await rename('x', 'stranger')).status, 403)
+    const anonymous = await call(rig, 'PUT', '/people/ann/name', {
+      token: null,
+      body: { name: 'x' },
+    })
+    assert.equal(anonymous.status, 401)
+    assert.equal(stored().name, 'Ann')
+    await rig.storage
+      .space(rig.spaces[0].root)
+      .create('people', { ...personFile, name: 'odd.json', props: { personId: 'odd' } }, '[1, 2]')
+    assert.equal((await rename('x', 'ann-token', 'odd')).status, 404)
+  })
+
+  test('does not change a person whose file has no list of addresses', async () => {
+    const { rename, stored } = await withAnn({ emails: 'ann@example.com' })
+    assert.equal((await rename('x')).status, 403)
+    assert.equal(stored().name, 'Ann')
+  })
 })

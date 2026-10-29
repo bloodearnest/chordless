@@ -421,18 +421,22 @@ The Worker serves the storage API (docs/STORAGE_API.md) to members.
 owner (implicitly admin) > admin > writer > reader. Worker enforcement:
 - **Read** songs/setlists/pads: all members.
 - **Write** songs/setlists: writer and up.
+- **Name yourself: any member**, readers included (built 2026-10-30): the name of the person whose
+  addresses include the member's verified email, by one route that changes nothing else
+  (`PUT /people/<id>/name`; docs/IDENTITIES.md, "Who may edit people"). Every other change to the
+  space's people is a write: writer and up.
 - **Upload pads: any member**, readers included (create-only, `pads/` folder only).
 - **Delete pads: admin and up.**
 - **Delete setlists** (decided 2026-10-22): a **writer may delete a setlist they lead** (its
-  `ownerId` is their verified email); **only an admin (or the owner) may delete one someone else
+  the person who leads it has their verified email among their addresses: docs/IDENTITIES.md); **only an admin (or the owner) may delete one someone else
   leads.** A reader never.
 - **Delete songs: admin and up.** A song is shared by every setlist that uses it.
 - **In a personal space the person is implicitly an admin** and may delete anything: they are a
   grown-up, and the backup (export) feature is there. **Every delete asks for confirmation, in every
   case**, danger-styled, naming the effect (CLAUDE.md: friction, not prohibition).
 - How a deletion works is in SYNC_ARCHITECTURE.md, "Deleting setlists". The Worker checks the role
-  on the server. To know who leads a setlist without reading its body, the setlist's file carries
-  `ownerId` as a file property (kept current on every push), and the storage API's `status` returns
+  on the server. To know who leads a setlist without reading its body, the setlist's file would carry
+  the leader's person id (`leaderId`) as a file property (kept current on every push; not built), and the storage API's `status` returns
   a file's collection and its properties. Until restrictions on editing others' setlists exist
   (SYNC_ARCHITECTURE.md), a writer can make themselves the leader first, so the rule guards against
   mistakes, not a determined writer.

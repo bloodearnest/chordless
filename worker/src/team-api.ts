@@ -21,6 +21,7 @@
  *   POST /update-many       {items}         {results}
  *   POST /files/<ref>/unpublish             writers; ends a share link
  *   POST /files/<ref>/trash                 writers
+ *   PUT  /people/<id>/name  {name}          any member: the name of the person who is them
  *
  * Bodies are text. Share links and pad audio are not served yet.
  */
@@ -33,6 +34,7 @@ import {
 } from '../../src/js/storage/types.ts'
 import { atLeast, type TeamRole } from '../../src/js/team-roles.ts'
 import { answering, isRecord, jsonResponse, Refusal, readJson } from './http.ts'
+import type { Identity } from './identity.ts'
 
 /** Why a request may do nothing in a space */
 export type NoAccess = 'unauthenticated' | 'not-a-member'
@@ -98,6 +100,44 @@ function collectionOf(url: URL): Collection {
   return known
 }
 
+/** The longest name a person is given */
+const MAX_NAME = 100
+
+/**
+ * Change the name of a person of the space, for the member that person is (docs/IDENTITIES.md,
+ * "Who may edit people"). The files are the space's and only writers change them, but a member of
+ * any role may name themselves: the person must have the verified email of whoever is asking
+ * among their addresses, and nothing but the name (and when it was saved) changes. The file is
+ * read and written through, and nothing of it is kept here.
+ */
+async function renamePerson(
+  space: SpaceStorage,
+  personId: string,
+  body: Record<string, unknown>,
+  identity: Identity
+): Promise<Response> {
+  const name = typeof body.name === 'string' ? body.name.trim() : ''
+  if (!name || name.length > MAX_NAME || /[\u0000-\u001f\u007f]/.test(name)) {
+    throw new Refusal(400, 'A name is one line of text, up to 100 characters')
+  }
+  const target = (await space.list('people')).find(each => each.props.personId === personId)
+  const person: unknown = target ? JSON.parse(await space.readText(target.ref)) : null
+  if (!target || !isRecord(person) || person.deleted === true || person.mergedInto) {
+    return jsonResponse({ error: 'No such person' }, 404)
+  }
+  const emails = Array.isArray(person.emails) ? person.emails : []
+  if (!emails.some(each => typeof each === 'string' && each.toLowerCase() === identity.email)) {
+    throw new Refusal(403, 'That person is not you')
+  }
+  const renamed = { ...person, name, modifiedDate: new Date().toISOString() }
+  const { file } = await space.update(
+    target.ref,
+    { name: target.name, type: 'application/json', props: target.props },
+    JSON.stringify(renamed, null, 2)
+  )
+  return jsonResponse({ file, person: renamed })
+}
+
 /** The answer for a request that may do nothing in the space */
 export function refusal(why: NoAccess): Response {
   return why === 'unauthenticated'
@@ -113,7 +153,8 @@ export async function handleTeamRequest(
   request: Request,
   { spaceId, rest }: { spaceId: string; rest: string },
   context: TeamContext,
-  role: TeamRole
+  role: TeamRole,
+  identity: Identity
 ): Promise<Response> {
   return answering('Team space', async () => {
     const space = await context.space(spaceId)
@@ -197,6 +238,11 @@ export async function handleTeamRequest(
       return jsonResponse({
         results: items.map(item => (here.has(item.ref) ? results[next++] : null)),
       })
+    }
+
+    const rename = /^\/people\/([^/]+)\/name$/.exec(rest)
+    if (method === 'PUT' && rename) {
+      return renamePerson(space, decodeURIComponent(rename[1]), await readJson(request), identity)
     }
 
     const file = /^\/files\/([^/]+)(\/text|\/unpublish|\/trash)?$/.exec(rest)

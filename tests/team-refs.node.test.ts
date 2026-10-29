@@ -163,7 +163,8 @@ describe('a member of the team, with the owner syncing straight to Drive', () =>
         new Request(`https://chordless.test/api/space/space-1${path}`, init),
         { spaceId: 'space-1', rest: path.split('?')[0] },
         context,
-        'reader'
+        'reader',
+        { provider: 'google', sub: 'reader', email: 'reader@example.com' }
       )
     return { ...rig, call }
   }

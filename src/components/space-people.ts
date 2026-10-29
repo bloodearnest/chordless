@@ -19,7 +19,10 @@ import {
   mergePersonInto,
 } from '../js/people.ts'
 import { getSpaceById } from '../js/space.ts'
-import { atLeast } from '../js/team-roles.ts'
+import { personContentHash } from '../js/sync/person-hash.ts'
+import { teamApi } from '../js/team-client.ts'
+import { atLeast, type TeamRole } from '../js/team-roles.ts'
+import { roleLabel } from '../js/team-spaces.ts'
 import { toast } from '../js/toast.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -40,6 +43,7 @@ export class SpacePeople extends LitElement {
     _people: { state: true },
     _counts: { state: true },
     _meId: { state: true },
+    _email: { state: true },
     _loaded: { state: true },
   }
 
@@ -51,6 +55,8 @@ export class SpacePeople extends LitElement {
   declare _counts: Map<string, number>
   /** Who is the one using the app, if known */
   declare _meId: string | null
+  /** The signed-in account's address, if signed in */
+  declare _email: string | null
   declare _loaded: boolean
 
   _confirm: Ref<AppModal> = createRef()
@@ -170,6 +176,7 @@ export class SpacePeople extends LitElement {
     this._people = []
     this._counts = new Map()
     this._meId = null
+    this._email = null
     this._loaded = false
   }
 
@@ -186,6 +193,23 @@ export class SpacePeople extends LitElement {
   get _canEdit(): boolean {
     const team = this._space?.team
     return !team || atLeast(team.role, 'writer')
+  }
+
+  /**
+   * Whether this person is the one using the app in a Team: a team member who cannot change the
+   * people may still name themselves (the Worker checks it is them)
+   */
+  _isSelfInTeam(person: Person): boolean {
+    return Boolean(this._space?.team && this._email && person.emails.includes(this._email))
+  }
+
+  /** What the person is in the Team ("Worship leader"), by the address the Team knows them by */
+  _roleOf(person: Person): string | null {
+    if (!this._space?.team) return null
+    const member = (this._space?.members ?? []).find(
+      each => each.role && person.emails.includes(each.email.toLowerCase())
+    )
+    return member?.role ? roleLabel(member.role as TeamRole) : null
   }
 
   /** Read the space's people, and how many setlists each leads */
@@ -205,6 +229,7 @@ export class SpacePeople extends LitElement {
         getSignedInUser(),
       ])
       this._people = livePeople(people)
+      this._email = user?.email ?? null
       this._counts = leaderCounts(people, setlists)
       this._meId =
         resolvePerson(people, chosenMeId(this.spaceId))?.id ??
@@ -243,7 +268,32 @@ export class SpacePeople extends LitElement {
       input.value = person.name
       return
     }
+    const team = this._space?.team
+    if (team && !this._canEdit) {
+      void this._nameSelf(team.id, person, changed.name)
+      return
+    }
     void this._change('rename them', db => db.savePeople([changed]))
+  }
+
+  /**
+   * A team member names themselves: the Worker changes the person's file, as they may not, and
+   * what it answers with is kept here as already sent, so nothing is left to send
+   */
+  async _nameSelf(teamId: string, person: Person, name: string): Promise<void> {
+    await this._change('change your name', async db => {
+      const { file, person: stored } = await teamApi.nameSelf(teamId, person.id, name)
+      await db.savePeople([
+        {
+          ...stored,
+          fileRef: file.ref,
+          fileModified: file.modified,
+          fileRev: file.rev,
+          lastSyncedAt: new Date().toISOString(),
+          syncedContentHash: personContentHash(stored),
+        },
+      ])
+    })
   }
 
   _addEmail(person: Person, event: Event): void {
@@ -297,6 +347,7 @@ export class SpacePeople extends LitElement {
     const isMe = person.id === this._meId
     const others = this._people.filter(each => each.id !== person.id)
     const editable = this._canEdit
+    const role = this._roleOf(person)
     return html`
       <li class="person">
         <div class="row">
@@ -304,10 +355,11 @@ export class SpacePeople extends LitElement {
             class="name"
             aria-label="Name"
             .value=${live(person.name)}
-            ?disabled=${!editable}
+            ?disabled=${!editable && !this._isSelfInTeam(person)}
             @change=${(event: Event) => this._rename(person, event)}
           />
           ${isMe ? html`<span class="chip">you</span>` : nothing}
+          ${role ? html`<span class="chip role">${role}</span>` : nothing}
           <span class="chip">${count === 0 ? 'leads none' : `leads ${count}`}</span>
         </div>
         <ul class="emails" aria-label="Email addresses of ${person.name}">
@@ -378,7 +430,7 @@ export class SpacePeople extends LitElement {
         <p class="hint">
           The people who lead this space's setlists. Two spellings of one person are put right by
           merging one into the other.
-          ${this._canEdit ? nothing : ' Only worship leaders can change them.'}
+          ${this._canEdit ? nothing : ' Only worship leaders can change them, and you can change your own name.'}
         </p>
         ${
           this._people.length === 0

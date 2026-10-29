@@ -62,7 +62,7 @@ export async function handleTeamRoutes(
     if (!role) return refusal('not-a-member')
 
     if (isAdminRoute(team.rest)) return handleSpaceAdmin(request, team, admin, { identity, role })
-    return handleTeamRequest(request, team, createTeamContext(env, spaces, deps), role)
+    return handleTeamRequest(request, team, createTeamContext(env, spaces, deps), role, identity)
   })()
 
   // (a member's files, and the codes of invites, are not kept by anything on the way)
