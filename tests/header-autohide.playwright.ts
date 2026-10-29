@@ -30,6 +30,25 @@ test.describe('The header on a phone', () => {
     await expect(header).toBeVisible()
   })
 
+  test('floats over the page, with the song starting just under it', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 600 })
+    const box = (selector: string) =>
+      page.evaluate(selector => {
+        const rect = document.querySelector(selector)?.getBoundingClientRect()
+        const { top, bottom } = rect ?? { top: Number.NaN, bottom: Number.NaN }
+        return { top, bottom }
+      }, selector)
+    const header = await box('#app-header')
+    expect(header.top).toBe(0)
+    const section = await box('#song-0 .song-content')
+    expect(section.top).toBeGreaterThanOrEqual(header.bottom - 1)
+    // Scrolled until the header is away, the text is at the top of the screen
+    await scrollTo(page, 150)
+    await scrollTo(page, 400)
+    expect((await box('#app-header')).bottom).toBeLessThanOrEqual(0)
+    await expect(page.locator('#app-header')).toHaveAttribute('tucked', '')
+  })
+
   test('stays on a tablet', async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 700 })
     await scrollTo(page, 150)

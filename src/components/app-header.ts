@@ -43,7 +43,7 @@ export class HeaderInfoClickEvent extends Event {
  * @property {Boolean} editMode - Current edit mode state (for styling the toggle button)
  * @property {String} phoneHeading - The title on a phone, if shorter than `heading` (the top row has little room)
  * @property {String} subheading - On a phone, a row of its own under the top row (not shown wider)
- * @property {Boolean} tucked - On phones, the header is slid right out of the way (by a negative top margin the page sets)
+ * @property {Boolean} tucked - On phones, the header is slid right out of the way (by a transform the page sets)
  *
  * Slots:
  * @slot controls - Page-specific controls (the song's key, capo and tempo). On phones they are a
@@ -259,8 +259,14 @@ export class AppHeader extends LitElement {
         --edge: calc(0.5rem + 6px);
       }
 
-      /* Slid up out of the way, following the scrolling, so no transition on its margin (set by
-         the page that tucks it: see header-autohide.ts) */
+      /* Floating over the page, and slid up out of the way by a transform following the scrolling
+         (set by the page: see header-autohide.ts) */
+      :host([floating]) {
+        position: absolute;
+        inset: 0 0 auto;
+        z-index: 10;
+      }
+
       :host([tucked]) {
         visibility: hidden;
       }
