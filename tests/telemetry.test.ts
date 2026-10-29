@@ -384,6 +384,24 @@ describe('the sampler', () => {
   })
 })
 
+describe('what every span gets as it starts', () => {
+  it('is the page’s baseline, and the sample rate of the span above it, and has nothing to flush or end', async () => {
+    pageProvider(SAMPLED_ID)
+    await traced(
+      'chordless.sync.run',
+      { 'chordless.sync.trigger': 'tick' },
+      () => phase('chordless.sync.feed', {}, () => {}),
+      { trackCalls: true }
+    )
+    const step = finished().find(span => span.name === 'chordless.sync.feed')
+    expect(step?.attributes.SampleRate).to.equal(TICK_SAMPLE)
+    expect(step?.attributes['chordless.online']).to.equal(navigator.onLine)
+    // (the processor is the provider's: these are what it does when asked)
+    await stampSpans.forceFlush()
+    await stampSpans.shutdown()
+  })
+})
+
 describe('phase', () => {
   it('is a child of the sync and the parent of the calls it makes', async () => {
     let syncId = ''

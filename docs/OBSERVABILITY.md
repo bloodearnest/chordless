@@ -160,15 +160,24 @@ path with care. The privacy text says all of this. (No client address is exporte
 
 ## Context propagation
 
-Every network call through `timedFetch` (the page's Drive API, `callWorker`, the token refresh) is a
-`CLIENT` span of its own, `chordless.drive.request` or `chordless.worker.request`, with the method,
-`server.address`, `url.path`, `url.query` (the first 300 characters: what a Drive listing asked for says why it was made) and `http.response.status_code`: across a boundary there has
-to be a span, for the other side's to be its child. It is a child of the sync running, or of the span
-it was given (the token refresh), else a trace of its own. A call to **our Worker** carries that call
-span's own `traceparent`, so the Worker's span can be its child; never to Google (a CORS preflight, and
-trace ids leaked to a third party). A failure is a call with no answer, a 429, or any 4xx but 404
-(Drive's way of saying there is no such file). At most 200 calls of one sync are spans: a first
-sync can make hundreds, and the totals on the sync's span count them all.
+Every `fetch` of the page is a `CLIENT` span, made by OpenTelemetry's own instrumentation of it
+(`@opentelemetry/browser-instrumentation`'s `FetchInstrumentation`, experimental, started with the SDK:
+`fetch.ts`): the method, `url.full`, `server.address` and `server.port`, `http.response.status_code`,
+`error.type` and the request's size, and `traceparent` for our own Worker, which the Worker's span is a
+child of; never to Google (a CORS preflight, and trace ids leaked to a third party). `fetch.ts` renames it
+`chordless.drive.request`, `chordless.worker.request` or `chordless.http.request` by where it goes, keeps the
+first 500 characters of the URL (a Drive listing's `q` says why it was made) and adds `url.path`, the
+Cloudflare ray id and the answer's size. Its span ends once the instrumentation has read its copy of the
+body, so after the sync that made it may be over. A refusal or a failure is an error to it, a 404 too
+(Drive's way of saying there is no such file); the sync's error count (below) does not count a 404.
+
+What the instrumentation cannot know is which span is the parent, there being no async context in a
+browser: `timedFetch` (`telemetry.ts`), what the Drive client and `callWorker` are given as their
+`fetch`, makes the call with the sync running (it holds the one that runs, under the lock), or the span it
+was told of (the token refresh), as the *active* span for the moment the instrumentation reads it
+(`StackContextManager`, which tracks the call stack and nothing across an `await`), and counts the call on
+the sync's span. A call by any other code is a trace of its own. At most 200 calls of one sync are spans: past
+that they are made as if the sync were not reported, and the totals on the sync's span count them all.
 
 **The Worker's spans do not join.** Cloudflare's native export ignores an incoming `traceparent`: the
 Worker's `/session/refresh` span is a root in a trace of its own (checked 2026-10-28). So the page's
@@ -200,7 +209,12 @@ runs and what it awaits is below it, with no explicit parenting. `tracedFetch` w
 team space, a share's download and the token endpoint: `chordless.worker.fetch`, with the method, host,
 path (never the query) and status, ended when the response's headers arrive; the body is never read or
 cloned, so a stream goes through as it was. `tracedStub` wraps a Durable Object's stub:
-`chordless.worker.do`, with the method and class, ended when the call is answered.
+`chordless.worker.do`, with the method and class, ended when the call is answered. No trace context
+is sent on, to Google or to the objects. At most 50 calls of a request are spans. No existing OTel fetch
+instrumentation fits: `instrumentation-fetch` clones and reads the whole response (a stream would be
+buffered in memory: Drive and pad audio go through here), `instrumentation-undici` and `-http` hook
+Node's own clients, which workerd does not have, and `otel-cf-workers` is an older release candidate that
+pins the 2.x packages and wants to wrap the whole Worker.
 
 **The standard HTTP attributes** are on the Worker's span and on the call spans, page and Worker, wherever
 the value is known without reading a body: `http.request.method`, `http.route` (the Worker's), `url.path`,
@@ -212,30 +226,22 @@ memory (a string, bytes, a Blob); a streamed or chunked body has no size, and is
 find one (wrapping a stream in JavaScript costs CPU, which the pad audio passing through would pay). So a
 response's size is often missing on the Worker's side, and the sizes are the bytes on the wire when the body is compressed. Left
 out: `client.address` (an IP address), the request and response headers (opt-in in the conventions, and
-their names have hyphens, which the telemetry route drops), `url.query` on the Worker's side (the page's call
-spans keep a truncated one), `http.request.method_original` and the TLS attributes.
+their names have hyphens, which the telemetry route drops), the query on the Worker's side (the page's call
+spans keep a truncated URL), `http.request.method_original` and the TLS attributes.
 
 **The page knows the size of the answers it gets from the Worker.** A call to our Worker is to the page's
 own address, so the browser's resource entry for it (`PerformanceResourceTiming`) has the sizes of the
 answer even when it is streamed or chunked: `http.response.body.size` (the bytes on the wire, as
 compressed), `chordless.http.response.decoded_body_size` (what they came to) and `http.response.size`
-(with the headers; none from the cache). The entry exists once the whole body is in, so the call's span
-waits for it, up to 300 ms, polling, and then ends as of the moment it was answered (so its duration is
-unchanged); if no entry comes (a body nobody reads) it ends without the sizes. Drive's calls are
-cross-origin, whose entries have no sizes without a `Timing-Allow-Origin`, so they keep the `Content-Length`
-only. No trace context
-is sent on, to Google or to the objects. At most 50 calls of a request are spans. No existing OTel fetch
-instrumentation fits: `instrumentation-fetch` clones and reads the whole response (a stream would be
-buffered in memory: Drive and pad audio go through here), `instrumentation-undici` and `-http` hook
-Node's own clients, which workerd does not have, and `otel-cf-workers` is an older release candidate that
-pins the 2.x packages and wants to wrap the whole Worker.
+(with the headers; none from the cache). `fetch.ts` reads it as the span ends, when the whole body is in. Drive's
+calls are cross-origin, whose entries have no sizes without a `Timing-Allow-Origin`, so they keep the
+`Content-Length` only.
 
 **Steps of a sync.** `phase()` (`telemetry.ts`) makes a step of the sync running a span of its own, the
 parent of the calls it makes, so a trace says which step each call belonged to: `chordless.sync.init`,
 `.feed`, `.feed_position`, `.members`, `.access`, `.inventory`, `.pull`, `.push`. It holds the one
-sync's "current span" the same way the calls do, and does nothing outside a sync or in an unsampled
-one. A call made while a sync runs but from other code (a pad loading) is still a child of whichever
-step is current: the module variable cannot tell them apart. Calls with no sync are root traces.
+sync's "current span" the same way the calls do, and does nothing outside a sync. A call by other code
+while a sync runs (a pad loading) is a trace of its own, as no `timedFetch` made it.
 
 **What started a sync**, `chordless.sync.trigger`: `manual` (the Sync button on a space's card),
 `tick` (the one-minute timer), `resume` (the app opened or came back), `online` (the device came back
@@ -244,11 +250,14 @@ something), `other` (anything else: a start over, a reset, a push or pull). The 
 sync it was (`Sync`, the full one, or `Incremental sync`); the trigger says why.
 
 **Sampling.** The `tick` syncs are the many (a device left awake on a charger makes 1,440 a day) and
-mostly find nothing, so one in ten is reported (`TICK_SAMPLE`, head sampling at the start of the
-sync: a sampled sync and its calls carry `SampleRate = 10`, which Honeycomb counts as ten). One that
-is not sampled is no span, and its calls are none either. Every other trigger is reported in full.
-The cost: an unsampled tick that fails is not reported (its failure is on the console only). A
-failure could be reported afterwards as a plain span, if it matters.
+mostly find nothing, so one in ten is reported. That is a `Sampler` on the provider (`sampler.ts`): for a trace
+that starts with a span whose `chordless.sync.trigger` is `tick` it keeps one in `TICK_SAMPLE` (by the trace
+id, `TraceIdRatioBased`) and says so with `SampleRate = 10`, which Honeycomb counts as ten; every other
+trace is kept. It is `ParentBased`, so a trace is kept or not as a whole: what is made below a span that is
+not kept is not either, and the sampled flag of `traceparent` says so to our Worker, whose span then is not
+made. The span processor (`span-processor.ts`) copies `SampleRate` to the spans below a kept one. The cost:
+an unsampled tick that fails is not reported (its failure is on the console only). A failure could be
+reported afterwards as a plain span, if it matters.
 
 Volume (estimated 2026-10-28): the app syncs every minute while on screen, about 3 Drive calls each,
 so the call spans make the sync's events about 4 times as many (60 to 240 an hour on screen): about
@@ -263,7 +272,7 @@ implicit parent and becomes a root. zone.js is the usual answer and cannot follo
 passed explicitly where we want children: the follow-up fetches of a live update (five at most) are
 child spans of `chordless.live.receive`, which we hold in a variable. The calls of a sync are children
 of it by the same means: the sync runs one at a time, under a lock, so its span is a module variable
-that `timedFetch` reads (`telemetry.ts`).
+that `timedFetch` reads (`telemetry.ts`), and makes active for the call.
 
 ## Live update latency
 
