@@ -433,6 +433,19 @@ is worth one).
    the app, error recording, the live-latency measurement, the privacy text (in or before the release
    of step 3).
 
+## To do
+
+- **The answer's size from the browser's resource entry is not arriving** (checked 2026-10-29, build
+  `873416986e37`): `chordless.http.response.decoded_body_size` and `http.response.size` have no column in
+  `chordless-web`, so `fetch.ts` never found an entry for a call, while its unit test does (a same-origin
+  script of the test page). Suspects: the browser's resource-timing buffer (250 entries by default) is full by
+  then and drops new ones; the entry is not in the timeline yet when the instrumentation's hook runs (it
+  runs as the body's last read finishes); the service worker. The fix to try: a `PerformanceObserver` on
+  `resource` entries started with the SDK, keeping the recent ones by URL, instead of reading the buffer
+  afterwards; and `chordless.http.entry_found` on the span until it works, to see how often. Until then
+  only `Content-Length` gives a size (`http.response.body.size`; Drive's gzipped answers have one, our
+  Worker's answers mostly do not).
+
 ## Open questions
 
 - `[observability.traces]` as above, and whether the native export honours an incoming `traceparent`.
