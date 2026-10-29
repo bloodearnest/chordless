@@ -379,3 +379,11 @@ test('a request that fails, or ends in a server error, says what kind', async ()
   await assert.rejects(thrown.send('/somewhere', { traceparent: TRACEPARENT }))
   assert.equal(attributes(theSpan(thrown.sent[0]))['error.type'], 'TypeError')
 })
+
+test('the port is the scheme’s when the address names none', async () => {
+  const { spans } = await traceCalls(async () => {
+    await tracedFetch(async () => new Response(''))('http://x.test/plain')
+  })
+  const call = spans.find(s => s.name === 'chordless.worker.fetch')
+  assert.equal(attributes(call as Record<string, any>)['server.port'], 80)
+})
