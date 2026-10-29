@@ -343,11 +343,7 @@ describe('the sampler', () => {
       () => phase('chordless.sync.feed', {}, () => timedFetch('drive')(DRIVE)),
       { trackCalls: true }
     )
-    expect(names()).to.have.members([
-      'chordless.drive.request',
-      'chordless.sync.feed',
-      'chordless.sync.run',
-    ])
+    expect(names()).to.have.members(['GET', 'chordless.sync.feed', 'chordless.sync.run'])
     for (const span of finished()) expect(span.attributes.SampleRate, span.name).to.equal(10)
   })
 
@@ -380,22 +376,33 @@ describe('the sampler', () => {
     // (this is not the sync's: a call of its own is a trace of its own, kept)
     pageProvider(SAMPLED_ID)
     await timedFetch('drive')(`${DRIVE}other`)
-    expect(names()).to.deep.equal(['chordless.drive.request'])
+    expect(names()).to.deep.equal(['GET'])
   })
 })
 
 describe('what every span gets as it starts', () => {
-  it('is the page’s baseline, and the sample rate of the span above it, and has nothing to flush or end', async () => {
+  it('is the page’s baseline, and from the span above it the sync it is part of and its sample rate, and has nothing to flush or end', async () => {
     pageProvider(SAMPLED_ID)
     await traced(
       'chordless.sync.run',
-      { 'chordless.sync.trigger': 'tick' },
-      () => phase('chordless.sync.feed', {}, () => {}),
+      { 'chordless.sync.trigger': 'tick', 'chordless.sync.operation': 'Incremental sync' },
+      () => phase('chordless.sync.feed', {}, () => timedFetch('drive')(DRIVE)),
       { trackCalls: true }
     )
-    const step = finished().find(span => span.name === 'chordless.sync.feed')
-    expect(step?.attributes.SampleRate).to.equal(TICK_SAMPLE)
-    expect(step?.attributes['chordless.online']).to.equal(navigator.onLine)
+    // (the step is below the sync, and the call below the step: it is passed down)
+    for (const name of ['chordless.sync.feed', 'GET']) {
+      const span = finished().find(found => found.name === name)
+      expect(span?.attributes, name).to.include({
+        SampleRate: TICK_SAMPLE,
+        'chordless.sync.trigger': 'tick',
+        'chordless.sync.operation': 'Incremental sync',
+        'chordless.online': navigator.onLine,
+      })
+    }
+    // (a span of its own, outside a sync, has none of it)
+    exporter.reset()
+    await timedFetch('drive')(DRIVE)
+    expect(finished()[0].attributes).to.not.have.property('chordless.sync.trigger')
     // (the processor is the provider's: these are what it does when asked)
     await stampSpans.forceFlush()
     await stampSpans.shutdown()
@@ -418,7 +425,7 @@ describe('phase', () => {
       { trackCalls: true }
     )
     const step = finished().find(span => span.name === 'chordless.sync.feed')
-    const [inside, after] = finished().filter(span => span.name === 'chordless.drive.request')
+    const [inside, after] = finished().filter(span => span.kind === SpanKind.CLIENT)
     expect(step?.parentSpanContext?.spanId).to.equal(syncId)
     expect(step?.attributes['chordless.outcome']).to.equal('ok')
     expect(inside.parentSpanContext?.spanId).to.equal(step?.spanContext().spanId)
@@ -479,7 +486,7 @@ describe('timedFetch', () => {
       },
       { trackCalls: true }
     )
-    const call = finished().find(span => span.name === 'chordless.drive.request')
+    const call = finished().find(span => span.kind === SpanKind.CLIENT)
     expect(call?.kind).to.equal(2)
     expect(call?.parentSpanContext?.spanId).to.equal(syncId)
     expect(call?.attributes).to.include({
@@ -502,7 +509,7 @@ describe('timedFetch', () => {
     await traced('chordless.auth.refresh', {}, async span => {
       await timedFetch('worker', undefined, () => span)('/session/refresh', { method: 'POST' })
     })
-    const call = finished().find(span => span.name === 'chordless.worker.request')
+    const call = finished().find(span => span.kind === SpanKind.CLIENT)
     const refresh = finished().find(span => span.name === 'chordless.auth.refresh')
     expect(call?.parentSpanContext?.spanId).to.equal(refresh?.spanContext().spanId)
     expect(call?.spanContext().traceId).to.equal(refresh?.spanContext().traceId)
@@ -518,16 +525,11 @@ describe('timedFetch', () => {
     await timedFetch('drive')('https://www.googleapis.com/drive/v3/files')
     const [worker, drive] = finished()
     const { traceId, spanId } = worker.spanContext()
-    expect(worker.name).to.equal('chordless.worker.request')
+    expect(worker.attributes['server.address']).to.equal(location.hostname)
     expect(sent[0].get('traceparent')).to.equal(`00-${traceId}-${spanId}-01`)
     expect(sent[0].get('authorization')).to.equal('Bearer t')
-    expect(drive.name).to.equal('chordless.drive.request')
+    expect(drive.attributes['server.address']).to.equal('www.googleapis.com')
     expect(sent[1].get('traceparent')).to.equal(null)
-  })
-
-  it('names a call to anywhere else after what it is', async () => {
-    await timedFetch('drive')('https://x.test/elsewhere')
-    expect(finished()[0].name).to.equal('chordless.http.request')
   })
 
   it('keeps the Cloudflare ray id of an answer, the way to find the Worker’s span', async () => {
@@ -587,7 +589,7 @@ describe('timedFetch', () => {
       },
       { trackCalls: true }
     )
-    const [refused] = finished().filter(span => span.name === 'chordless.drive.request')
+    const [refused] = finished().filter(span => span.kind === SpanKind.CLIENT)
     expect(refused.attributes).to.include({ 'http.response.status_code': 503, 'error.type': '503' })
     expect(refused.status.code).to.equal(2)
     expect(
@@ -613,7 +615,7 @@ describe('timedFetch', () => {
       { trackCalls: true }
     )
     expect((thrown as Error).message).to.equal('Failed to fetch')
-    const call = finished().find(span => span.name === 'chordless.worker.request')
+    const call = finished().find(span => span.kind === SpanKind.CLIENT)
     expect(call?.attributes['error.type']).to.equal('TypeError')
     expect(call?.status.code).to.equal(2)
     expect(
@@ -633,7 +635,7 @@ describe('timedFetch', () => {
       },
       { trackCalls: true }
     )
-    expect(finished().filter(span => span.name === 'chordless.drive.request')).to.have.length(200)
+    expect(finished().filter(span => span.kind === SpanKind.CLIENT)).to.have.length(200)
     expect(
       finished().find(span => span.name === 'chordless.sync.run')?.attributes[
         'chordless.sync.drive_calls'

@@ -57,7 +57,7 @@ team ids kept in synced data, and the live-update latency.
 
 | Span | Where | Attributes |
 |---|---|---|
-| `chordless.sync.run` | `SyncOrchestrator.#execute` | operation, **trigger**, space kind, pulled and pushed counts, pull and push ms, Drive and Worker call counts, total and max Drive ms, error count, outcome. Each Drive and Worker call is a child span, `chordless.drive.request` or `chordless.worker.request` (below) |
+| `chordless.sync.run` | `SyncOrchestrator.#execute` | operation, **trigger**, space kind, pulled and pushed counts, pull and push ms, Drive and Worker call counts, total and max Drive ms, error count, outcome. Each Drive and Worker call is a child span, named by its method (`GET`), as the conventions have it (below) |
 | `chordless.setlist.open` | `SetlistPage` start | open ms (load time, from navigation timing), songs, CCLI numbers (a comma-joined string, queried with `contains`: Honeycomb does not query array elements), source (library or share) |
 | `chordless.setlist.leave` | `dispose()` and `pagehide` | songs viewed, song changes, transposes, edit-mode entries |
 | `chordless.live.receive` | a follower receiving `changed` | see "Live update latency" |
@@ -164,8 +164,9 @@ Every `fetch` of the page is a `CLIENT` span, made by OpenTelemetry's own instru
 (`@opentelemetry/browser-instrumentation`'s `FetchInstrumentation`, experimental, started with the SDK:
 `fetch.ts`): the method, `url.full`, `server.address` and `server.port`, `http.response.status_code`,
 `error.type` and the request's size, and `traceparent` for our own Worker, which the Worker's span is a
-child of; never to Google (a CORS preflight, and trace ids leaked to a third party). `fetch.ts` renames it
-`chordless.drive.request`, `chordless.worker.request` or `chordless.http.request` by where it goes, keeps the
+child of; never to Google (a CORS preflight, and trace ids leaked to a third party). It is named by its
+method (`GET`, `POST`), as the conventions have it, and where it went is `server.address` (the span's
+name is not ours to change, and the `chordless.` prefix is for what we invent). `fetch.ts` keeps the
 first 500 characters of the URL (a Drive listing's `q` says why it was made) and adds `url.path`, the
 Cloudflare ray id and the answer's size. Its span ends once the instrumentation has read its copy of the
 body, so after the sync that made it may be over. A refusal or a failure is an error to it, a 404 too
@@ -236,6 +237,12 @@ compressed), `chordless.http.response.decoded_body_size` (what they came to) and
 (with the headers; none from the cache). `fetch.ts` reads it as the span ends, when the whole body is in. Drive's
 calls are cross-origin, whose entries have no sizes without a `Timing-Allow-Origin`, so they keep the
 `Content-Length` only.
+
+**What a call knows of its sync.** A span's parent is the step or the sync, and Honeycomb's `root.` filters reach
+the trigger from any span of the trace. Because a query by a call's own columns is the common one (how slow are
+the Drive calls of a manual sync?), the span processor (`span-processor.ts`) also copies
+`chordless.sync.trigger` and `chordless.sync.operation`, and `SampleRate`, from the span above a span to it as
+it starts, so the steps and the calls below a sync carry them too.
 
 **Steps of a sync.** `phase()` (`telemetry.ts`) makes a step of the sync running a span of its own, the
 parent of the calls it makes, so a trace says which step each call belonged to: `chordless.sync.init`,
