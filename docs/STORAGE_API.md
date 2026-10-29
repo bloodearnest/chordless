@@ -15,7 +15,8 @@ see "Still on drive-api.ts".
 ## The shape
 
 A **backend** finds, makes and opens **roots**; a **space storage** (`backend.space(rootRef)`) holds
-one space's files in two **collections**, `songs` and `setlists`.
+one space's files in three **collections**, `songs`, `setlists` and `people` (the space's list of
+people who lead setlists, one JSON file each: `docs/IDENTITIES.md`), and the `shares` folder.
 
 | Call | What it is for |
 |---|---|

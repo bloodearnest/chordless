@@ -9,7 +9,7 @@
 import type { SpaceMember } from '../data-types.ts'
 
 /** The folders of a space that sync keeps files in */
-export type Collection = 'songs' | 'setlists' | 'shares'
+export type Collection = 'songs' | 'setlists' | 'people' | 'shares'
 
 /** A file as the backend lists it */
 export interface StoredFile {
@@ -71,7 +71,7 @@ export interface SpaceChanges {
   /** Where the next call starts from: kept only once these changes are applied */
   token: string
   /** Files now live in a collection (new, changed or moved in) */
-  changed: { collection: 'songs' | 'setlists'; file: StoredFile }[]
+  changed: { collection: Exclude<Collection, 'shares'>; file: StoredFile }[]
   /** Files that are not live in the space's collections: deleted, in the bin, or moved out */
   gone: string[]
 }

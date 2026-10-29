@@ -20,6 +20,7 @@ import { adoptLegacyLeader } from './leaders.ts'
 import { PAD_FILE_KEYS } from './pad-keys.ts'
 import { type PadSet, readPadSetAudio, uploadPadSet } from './pad-set-service.ts'
 import { type TransferReport, type TransferSource, transferSpace } from './space-transfer.ts'
+import { personContent } from './sync/person-hash.ts'
 import { setlistContent } from './sync/setlist-hash.ts'
 import { hashText } from './utils/hash.ts'
 import { readZip, writeZip, type ZipFile } from './utils/zip.ts'
@@ -184,7 +185,10 @@ export async function createExport(
     [
       { name: 'manifest.json', data: JSON.stringify(manifest, null, 2) },
       { name: 'songs.json', data: JSON.stringify(songs, null, 2) },
-      { name: 'people.json', data: JSON.stringify(await db.getAllPeople(), null, 2) },
+      {
+        name: 'people.json',
+        data: JSON.stringify((await db.getAllPeople()).map(personContent), null, 2),
+      },
       ...files,
     ],
     now

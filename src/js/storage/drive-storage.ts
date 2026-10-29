@@ -124,7 +124,9 @@ class DriveSpace implements SpaceStorage {
           ? await this.#api.getSongsFolder(this.#rootRef)
           : collection === 'setlists'
             ? await this.#api.getSetlistsFolder(this.#rootRef)
-            : await this.#api.getSharesFolder(this.#rootRef)
+            : collection === 'people'
+              ? await this.#api.getPeopleFolder(this.#rootRef)
+              : await this.#api.getSharesFolder(this.#rootRef)
       this.#folders.set(collection, id)
     }
     return id
@@ -171,6 +173,7 @@ class DriveSpace implements SpaceStorage {
             )
       const songs = folders.find(folder => folder.name === 'songs')?.id
       const setlists = folders.find(folder => folder.name === 'setlists')?.id
+      const people = folders.find(folder => folder.name === 'people')?.id
       const inFolder = (parents: string[], folder: string | undefined) =>
         folder !== undefined && parents.includes(folder)
       const changed: SpaceChanges['changed'] = []
@@ -182,6 +185,8 @@ class DriveSpace implements SpaceStorage {
           changed.push({ collection: 'songs', file: toStored(file) })
         } else if (inFolder(parents, setlists) && file.name?.includes('.json')) {
           changed.push({ collection: 'setlists', file: toStored(file) })
+        } else if (inFolder(parents, people) && file.name?.includes('.json')) {
+          changed.push({ collection: 'people', file: toStored(file) })
         } else {
           // (not live in a collection of this space: a file of another space, or one moved out)
           gone.push(fileId)
@@ -206,7 +211,9 @@ class DriveSpace implements SpaceStorage {
             ? listed
                 .filter(file => file.name?.includes('.json'))
                 .sort((a, b) => (b.modifiedTime ?? '').localeCompare(a.modifiedTime ?? ''))
-            : listed.filter(file => file.mimeType === 'text/plain')
+            : collection === 'people'
+              ? listed.filter(file => file.name?.includes('.json'))
+              : listed.filter(file => file.mimeType === 'text/plain')
       return files.map(toStored)
     }
     const live = `'${folder}' in parents and trashed=false`
@@ -215,7 +222,9 @@ class DriveSpace implements SpaceStorage {
         ? await this.#api.listDriveFiles(live)
         : collection === 'setlists'
           ? await this.#api.listDriveFiles(`${live} and name contains '.json'`, 'modifiedTime desc')
-          : await this.#api.listDriveFiles(`${live} and mimeType='text/plain'`)
+          : collection === 'people'
+            ? await this.#api.listDriveFiles(`${live} and name contains '.json'`)
+            : await this.#api.listDriveFiles(`${live} and mimeType='text/plain'`)
     return files.map(toStored)
   }
 

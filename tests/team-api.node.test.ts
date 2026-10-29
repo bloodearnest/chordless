@@ -165,6 +165,16 @@ test('reads and updates many files, with null in the place of one that is not in
     body: { items: [{ input: { ...file, name: 'b.json' }, body: '{}' }] },
   })
   assert.equal(many.json().results[0].file.name, 'b.json')
+  // the people of the space are a collection of their own (docs/IDENTITIES.md)
+  const person = await call(rig, 'POST', '/files?collection=people', {
+    body: { input: { ...file, name: 'ann-1234.json' }, body: '{}' },
+  })
+  assert.equal(person.json().file.name, 'ann-1234.json')
+  const listed = await call(rig, 'GET', '/files?collection=people')
+  assert.deepEqual(
+    listed.json().map((each: { name: string }) => each.name),
+    ['ann-1234.json']
+  )
 })
 
 test("keeps to the space: the status, text, update and trash of another space's file", async () => {

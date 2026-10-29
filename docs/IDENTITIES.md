@@ -1,6 +1,6 @@
 # IDENTITIES
 
-> **Status: design (2026-10-29). Step 1 is built on the `claude/leader-identities` branch (people store, upgrade to version 10, `leaderId`); people do not sync yet.** Replaces a setlist's `owner` (a name) and
+> **Status (2026-10-29): step 1 is built (people store, upgrade to version 10, `leaderId`, people synced as a `people` collection: docs/SYNC_ARCHITECTURE.md, "People"). Steps 2 to 4 are not.** Replaces a setlist's `owner` (a name) and
 > `ownerId` (an email) with a link to a person in the space's own list of people.
 
 ## Why

@@ -52,7 +52,7 @@ export interface TeamContext {
   ownedAmong(spaceId: string, refs: string[]): Promise<string[]>
 }
 
-const COLLECTIONS: Collection[] = ['songs', 'setlists', 'shares']
+const COLLECTIONS: Collection[] = ['songs', 'setlists', 'people', 'shares']
 
 /** The space id and the rest of the path, if this is a team space request */
 export function teamSpacePath(path: string): { spaceId: string; rest: string } | null {

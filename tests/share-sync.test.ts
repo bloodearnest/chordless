@@ -24,8 +24,11 @@ describe('Share links: sync', () => {
   type Device = Awaited<ReturnType<typeof makeDevice>>
 
   async function addSetlist(device: Device, songIds: string[], fields: Partial<Setlist> = {}) {
+    await device.db.savePeople([
+      { id: 'ann', name: 'Ann Smith', emails: ['ann@example.com'], modifiedDate: nextWeek },
+    ])
     const setlist = {
-      ...createSetlist({ date: nextWeek }),
+      ...createSetlist({ date: nextWeek, leaderId: 'ann' }),
       songs: songIds.map((songId, i) =>
         makeEntry({ order: i + 1, songId, songUuid: songId, key: 'G', notes: '' })
       ),

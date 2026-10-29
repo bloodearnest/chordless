@@ -755,6 +755,17 @@ export function createDriveApi({
   }
 
   /**
+   * Get or create the people folder within space (docs/IDENTITIES.md)
+   */
+  async function getPeopleFolder(spaceFolderId: string): Promise<string> {
+    let folderId = await findSubfolder(spaceFolderId, 'people')
+    if (!folderId) {
+      folderId = await createSubfolder(spaceFolderId, 'people')
+    }
+    return folderId
+  }
+
+  /**
    * Share links (docs/SHARING.md). A share is one encrypted file in the space's shares/
    * folder, readable by anyone with its id, though not discoverable. Only that file is public.
    */
@@ -873,6 +884,7 @@ export function createDriveApi({
     createTeamFolder,
     getSongsFolder,
     getSetlistsFolder,
+    getPeopleFolder,
     findSharesFolder,
     getSharesFolder,
     publishFile,
