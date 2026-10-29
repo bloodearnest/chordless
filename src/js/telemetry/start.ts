@@ -7,38 +7,47 @@
  * `localStorage.setItem('telemetry-console', '1')` also prints each span in the console, to see what
  * a change reports without Honeycomb.
  */
-import { trace } from '@opentelemetry/api'
+import { context, propagation, trace } from '@opentelemetry/api'
+import { W3CTraceContextPropagator } from '@opentelemetry/core'
 import type { SpanProcessor } from '@opentelemetry/sdk-trace'
 import { appUpdate } from '../app-update.ts'
 import { getTelemetryPreference, TelemetryPreferenceEvent } from '../preferences.ts'
-import { baselineAttributes } from './baseline.ts'
 import { resetDeviceId } from './ids.ts'
 import { reportError } from './telemetry.ts'
-
-const TELEMETRY_URL = '/api/otlp/v1/traces'
 
 let started = false
 
 async function start(): Promise<void> {
-  const [sdk, { OTLPTraceExporter }, { resourceFromAttributes }, { GatedExporter }] =
-    await Promise.all([
-      import('@opentelemetry/sdk-trace'),
-      import('@opentelemetry/exporter-trace-otlp-http'),
-      import('@opentelemetry/resources'),
-      import('./gated-exporter.ts'),
-    ])
-  const { TracerProvider, BatchSpanProcessor, SimpleSpanProcessor, ConsoleSpanExporter } = sdk
+  const [
+    sdk,
+    { OTLPTraceExporter },
+    { resourceFromAttributes },
+    { GatedExporter },
+    { instrumentFetch, TELEMETRY_URL },
+    { sampler },
+    { stampSpans },
+  ] = await Promise.all([
+    import('@opentelemetry/sdk-trace'),
+    import('@opentelemetry/exporter-trace-otlp-http'),
+    import('@opentelemetry/resources'),
+    import('./gated-exporter.ts'),
+    import('./fetch.ts'),
+    import('./sampler.ts'),
+    import('./span-processor.ts'),
+  ])
+  const {
+    TracerProvider,
+    BatchSpanProcessor,
+    SimpleSpanProcessor,
+    ConsoleSpanExporter,
+    StackContextManager,
+  } = sdk
   const running = await appUpdate.runningVersion().catch(() => null)
 
   const exporter = new GatedExporter(new OTLPTraceExporter({ url: TELEMETRY_URL }))
   const spanProcessors: SpanProcessor[] = [
     // Every span gets what is true of the page as it starts
-    {
-      onStart: span => span.setAttributes(baselineAttributes()),
-      onEnd: () => undefined,
-      forceFlush: () => Promise.resolve(),
-      shutdown: () => Promise.resolve(),
-    },
+    stampSpans,
     new BatchSpanProcessor({
       exporter,
       scheduledDelayMillis: 5000,
@@ -61,9 +70,20 @@ async function start(): Promise<void> {
       'deployment.environment.name': import.meta.env?.MODE ?? 'unknown',
       'user_agent.original': navigator.userAgent,
     }),
+    sampler: sampler(),
     spanProcessors,
   })
   trace.setGlobalTracerProvider(provider)
+  // (what is active for a call as it is made: `timedFetch` makes the sync active for its calls)
+  context.setGlobalContextManager(new StackContextManager().enable())
+  // (and what is sent on, to our own Worker: `traceparent`)
+  propagation.setGlobalPropagator(new W3CTraceContextPropagator())
+  // A span for every fetch of the page, until reports are turned off
+  const fetchSpans = instrumentFetch()
+  window.addEventListener(TelemetryPreferenceEvent.type, event => {
+    if (event.enabled) fetchSpans.enable()
+    else fetchSpans.disable()
+  })
 
   // What has not gone yet goes when the page is left (a tab put away may not come back)
   const flush = () => void provider.forceFlush().catch(() => undefined)

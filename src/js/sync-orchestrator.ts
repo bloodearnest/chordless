@@ -100,9 +100,6 @@ interface Messages {
  */
 export type SyncTrigger = 'manual' | 'tick' | 'resume' | 'online' | 'edit' | 'live' | 'other'
 
-/** One in this many `tick` syncs is reported: they are the many, and mostly find nothing */
-export const TICK_SAMPLE = 10
-
 export class SyncOrchestrator {
   spaceName: string
   spaceId: string | null
@@ -180,8 +177,9 @@ export class SyncOrchestrator {
           throw error
         }
       },
-      // (the timer's syncs are the many, and mostly find nothing: one in TICK_SAMPLE is reported)
-      { trackCalls: true, sample: trigger === 'tick' ? TICK_SAMPLE : 1 }
+      // (the timer's syncs are the many, and mostly find nothing: the sampler reports one in ten of
+      // them, going by the trigger above)
+      { trackCalls: true }
     )
   }
 

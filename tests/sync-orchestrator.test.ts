@@ -9,7 +9,6 @@ import {
   createSyncOrchestrator,
   type SyncBroadcast,
   SyncOrchestrator,
-  TICK_SAMPLE,
 } from '../src/js/sync-orchestrator.ts'
 import { resetTelemetryState } from '../src/js/telemetry/telemetry.ts'
 import { setlistTitle } from '../src/js/utils/date-utils.ts'
@@ -334,7 +333,6 @@ describe('SyncOrchestrator', () => {
 describe('what a sync reports of itself', () => {
   suppressConsoleLogs()
   const exporter = new InMemorySpanExporter()
-  const realRandom = Math.random
 
   beforeEach(() => {
     trace.disable()
@@ -345,7 +343,6 @@ describe('what a sync reports of itself', () => {
     resetTelemetryState()
   })
   afterEach(() => {
-    Math.random = realRandom
     trace.disable()
   })
 
@@ -378,24 +375,6 @@ describe('what a sync reports of itself', () => {
       'Incremental sync',
       'Incremental sync',
     ])
-  })
-
-  it('reports one timer sync in TICK_SAMPLE, counted that many times, and every other kind', async () => {
-    const made = orchestrator()
-    Math.random = () => 0
-    await made.incrementalSync(null, { trigger: 'tick' })
-    expect(spans()).to.have.length(1)
-    expect(spans()[0].attributes.SampleRate).to.equal(TICK_SAMPLE)
-
-    Math.random = () => 0.5
-    await made.incrementalSync(null, { trigger: 'tick' })
-    expect(spans(), 'a tick that is not kept is no span, and still runs').to.have.length(1)
-
-    for (const trigger of ['manual', 'resume', 'online', 'edit', 'live', 'other'] as const) {
-      await made.incrementalSync(null, { trigger })
-    }
-    expect(spans()).to.have.length(7)
-    for (const span of spans().slice(1)) expect(span.attributes).to.not.have.property('SampleRate')
   })
 })
 

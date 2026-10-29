@@ -4,21 +4,32 @@
  * loaded here: spans go to an in-memory exporter.
  */
 import { expect } from '@open-wc/testing'
-import { trace } from '@opentelemetry/api'
-import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace'
+import { context, propagation, ROOT_CONTEXT, SpanKind, trace } from '@opentelemetry/api'
+import type { FetchInstrumentation } from '@opentelemetry/browser-instrumentation/experimental/fetch'
+import { W3CTraceContextPropagator } from '@opentelemetry/core'
+import {
+  InMemorySpanExporter,
+  SamplingDecision,
+  SimpleSpanProcessor,
+  StackContextManager,
+  TracerProvider,
+} from '@opentelemetry/sdk-trace'
 import { setTelemetryPreference } from '../src/js/preferences.ts'
 import { baselineAttributes } from '../src/js/telemetry/baseline.ts'
 import { getAmbient, setAmbient } from '../src/js/telemetry/context.ts'
+import { instrumentFetch } from '../src/js/telemetry/fetch.ts'
 import { GatedExporter } from '../src/js/telemetry/gated-exporter.ts'
 import { getDeviceId, resetDeviceId } from '../src/js/telemetry/ids.ts'
+import { sampler } from '../src/js/telemetry/sampler.ts'
+import { stampSpans } from '../src/js/telemetry/span-processor.ts'
 import {
   countCall,
   phase,
   reportError,
   resetTelemetryState,
-  setSizeWait,
-  timedFetch,
-  traced,
+  TICK_SAMPLE,
+  timedFetch as timedFetchNow,
+  traced as tracedNow,
 } from '../src/js/telemetry/telemetry.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -28,21 +39,58 @@ suppressConsoleLogs()
 
 const exporter = new InMemorySpanExporter()
 
+/**
+ * A fetch's span ends once the instrumentation has read its copy of the body, a moment after the call
+ * is answered: so these two wait for that, and a test reads what ended
+ */
+const settle = () => new Promise(resolve => setTimeout(resolve, 0))
+const timedFetch = (...args: Parameters<typeof timedFetchNow>) => {
+  const call = timedFetchNow(...args)
+  return (async (input, init) => {
+    try {
+      return await call(input, init)
+    } finally {
+      await settle()
+    }
+  }) as typeof fetch
+}
+const traced: typeof tracedNow = async (...args) => {
+  try {
+    return await tracedNow(...args)
+  } finally {
+    await settle()
+  }
+}
+
+const realFetch = globalThis.fetch
+/** What the page's `fetch` answers, in a test (the instrumentation wraps the one below) */
+let respond: typeof fetch
+let fetchSpans: FetchInstrumentation
+
 beforeEach(() => {
   localStorage.clear()
   trace.disable()
+  context.disable()
   exporter.reset()
   trace.setGlobalTracerProvider(
     new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] })
   )
+  // (what is active for a call as it is made, as the page has it)
+  context.setGlobalContextManager(new StackContextManager().enable())
+  propagation.setGlobalPropagator(new W3CTraceContextPropagator())
   resetTelemetryState()
-  // (a call to the Worker ends as soon as it is answered, unless a test is about its sizes)
-  setSizeWait(0)
+  respond = async () => new Response('{}')
+  globalThis.fetch = ((input, init) => respond(input, init)) as typeof fetch
+  fetchSpans = instrumentFetch()
   setAmbient({ accountId: undefined, sessionId: undefined, teamPseudoId: undefined })
 })
 
 afterEach(() => {
+  fetchSpans.disable()
+  globalThis.fetch = realFetch
   trace.disable()
+  context.disable()
+  propagation.disable()
   localStorage.clear()
 })
 
@@ -246,63 +294,97 @@ describe('the calls made during a sync', () => {
   })
 })
 
-describe('traced, sampled', () => {
-  const realRandom = Math.random
-  afterEach(() => {
-    Math.random = realRandom
+/** A provider like the page's: its sampler and its stamping, with an id generator that says whether the trace is among the sampled one in ten */
+function pageProvider(traceId: string) {
+  trace.disable()
+  trace.setGlobalTracerProvider(
+    new TracerProvider({
+      sampler: sampler(),
+      idGenerator: { generateTraceId: () => traceId, generateSpanId: () => '1'.repeat(16) },
+      spanProcessors: [stampSpans, new SimpleSpanProcessor({ exporter })],
+    })
+  )
+  // (the instrumentation's tracer is the global provider's as it was when it was made)
+  fetchSpans.disable()
+  fetchSpans = instrumentFetch()
+}
+const DRIVE = 'https://www.googleapis.com/drive/v3/files/'
+const SAMPLED_ID = `${'0'.repeat(31)}1`
+// (a trace id's four words are XORed, and it is kept if the result is under a tenth of the range)
+const DROPPED_ID = `ffffffff${'0'.repeat(24)}`
+
+describe('the sampler', () => {
+  const ask = (trigger: string | undefined, traceId: string) =>
+    sampler().shouldSample(
+      ROOT_CONTEXT,
+      traceId,
+      'chordless.sync.run',
+      SpanKind.INTERNAL,
+      trigger ? { 'chordless.sync.trigger': trigger } : {},
+      []
+    )
+
+  it('keeps every trace but the timer’s, and one in ten of those, counted ten times', () => {
+    expect(ask('manual', DROPPED_ID).decision).to.equal(SamplingDecision.RECORD_AND_SAMPLED)
+    expect(ask(undefined, DROPPED_ID).attributes).to.equal(undefined)
+    expect(ask('tick', SAMPLED_ID)).to.deep.equal({
+      decision: SamplingDecision.RECORD_AND_SAMPLED,
+      attributes: { SampleRate: TICK_SAMPLE },
+    })
+    expect(ask('tick', DROPPED_ID)).to.deep.equal({ decision: SamplingDecision.NOT_RECORD })
+    expect(sampler().toString()).to.contain('1 in 10')
   })
 
-  it('keeps one in N, counted N times, with its calls', async () => {
-    Math.random = () => 0
+  it('reports a kept trace’s spans, each counted ten times, calls below it too', async () => {
+    pageProvider(SAMPLED_ID)
     await traced(
       'chordless.sync.run',
-      {},
-      async () => {
-        await timedFetch('drive', async () => new Response('{}'))('https://x.test/')
-      },
-      { trackCalls: true, sample: 10 }
+      { 'chordless.sync.trigger': 'tick' },
+      () => phase('chordless.sync.feed', {}, () => timedFetch('drive')(DRIVE)),
+      { trackCalls: true }
     )
-    expect(finished()).to.have.length(2)
-    for (const span of finished()) expect(span.attributes.SampleRate).to.equal(10)
+    expect(names()).to.have.members([
+      'chordless.drive.request',
+      'chordless.sync.feed',
+      'chordless.sync.run',
+    ])
+    for (const span of finished()) expect(span.attributes.SampleRate, span.name).to.equal(10)
   })
 
-  it('drops the rest, and the calls they make, but still runs them', async () => {
-    Math.random = () => 0.5
-    let ran = false
-    let calls = 0
+  it('reports nothing of a trace that is not kept, and the call is still made, with the sampled flag off', async () => {
+    pageProvider(DROPPED_ID)
+    let sent: Headers | undefined
+    respond = async (_input, init) => {
+      sent = new Headers(init?.headers)
+      return new Response('{}')
+    }
     const result = await traced(
       'chordless.sync.run',
-      {},
+      { 'chordless.sync.trigger': 'tick' },
       async () => {
-        ran = true
-        await timedFetch('drive', async () => {
-          calls++
-          return new Response('{}')
-        })('https://x.test/')
+        await phase('chordless.sync.feed', {}, () => timedFetch('worker')('/api/x'))
         return 'done'
       },
-      { trackCalls: true, sample: 10 }
+      { trackCalls: true }
     )
     expect(result).to.equal('done')
-    expect([ran, calls]).to.deep.equal([true, 1])
     expect(finished()).to.have.length(0)
-    // (and what follows is not left thinking there is a sync running)
-    await timedFetch('drive', async () => new Response('{}'))('https://x.test/')
-    expect(finished()).to.have.length(1)
-    expect(finished()[0].attributes).to.not.have.property('SampleRate')
+    expect(sent?.get('traceparent')).to.match(/^00-ffffffff0{24}-[0-9a-f]{16}-00$/)
   })
 
-  it('keeps every one when there is no sampling', async () => {
-    Math.random = () => 0.99
-    await traced('chordless.sync.run', {}, () => {}, { sample: 1 })
-    expect(finished()).to.have.length(1)
-    expect(finished()[0].attributes).to.not.have.property('SampleRate')
+  it('does not leave the calls made after it, by others, unreported', async () => {
+    pageProvider(DROPPED_ID)
+    await traced('chordless.sync.run', { 'chordless.sync.trigger': 'tick' }, () => {}, {
+      trackCalls: true,
+    })
+    // (this is not the sync's: a call of its own is a trace of its own, kept)
+    pageProvider(SAMPLED_ID)
+    await timedFetch('drive')(`${DRIVE}other`)
+    expect(names()).to.deep.equal(['chordless.drive.request'])
   })
 })
 
 describe('phase', () => {
-  const ok = async () => new Response('{}')
-
   it('is a child of the sync and the parent of the calls it makes', async () => {
     let syncId = ''
     await traced(
@@ -310,8 +392,10 @@ describe('phase', () => {
       {},
       async span => {
         syncId = span.spanContext().spanId
-        await phase('chordless.sync.feed', {}, () => timedFetch('drive', ok)('https://x.test/a'))
-        await timedFetch('drive', ok)('https://x.test/b')
+        await phase('chordless.sync.feed', {}, () =>
+          timedFetch('drive')('https://www.googleapis.com/drive/v3/files/a')
+        )
+        await timedFetch('drive')('https://www.googleapis.com/drive/v3/files/b')
       },
       { trackCalls: true }
     )
@@ -349,18 +433,8 @@ describe('phase', () => {
     expect(inner?.attributes['chordless.outcome']).to.equal('error')
   })
 
-  it('is no span outside a sync, or in one that is not reported, but still runs', async () => {
+  it('is no span outside a sync, but still runs', async () => {
     expect(await phase('chordless.sync.feed', {}, () => 'ran')).to.equal('ran')
-    const random = Math.random
-    Math.random = () => 0.5
-    try {
-      await traced('chordless.sync.run', {}, () => phase('chordless.sync.feed', {}, () => {}), {
-        trackCalls: true,
-        sample: 10,
-      })
-    } finally {
-      Math.random = random
-    }
     expect(finished()).to.have.length(0)
   })
 
@@ -374,17 +448,16 @@ describe('phase', () => {
 })
 
 describe('timedFetch', () => {
-  const ok = async () => new Response('{}', { status: 200 })
-
-  it('makes a span for a call, a child of the sync, with what the call was', async () => {
-    const fetcher = timedFetch('drive', ok)
+  it('makes a span of a call, a child of the sync, with what the call was', async () => {
     let syncId = ''
     await traced(
       'chordless.sync.run',
       {},
       async span => {
         syncId = span.spanContext().spanId
-        await fetcher('https://www.googleapis.com/drive/v3/files/f1?alt=media', { method: 'get' })
+        await timedFetch('drive')('https://www.googleapis.com/drive/v3/files/f1?alt=media', {
+          method: 'get',
+        })
       },
       { trackCalls: true }
     )
@@ -393,203 +466,152 @@ describe('timedFetch', () => {
     expect(call?.parentSpanContext?.spanId).to.equal(syncId)
     expect(call?.attributes).to.include({
       'http.request.method': 'GET',
-      'server.address': 'www.googleapis.com',
+      'url.full': 'https://www.googleapis.com/drive/v3/files/f1?alt=media',
       'url.path': '/drive/v3/files/f1',
-      'url.query': '?alt=media',
+      'server.address': 'www.googleapis.com',
+      'server.port': 443,
       'http.response.status_code': 200,
     })
-    expect(call?.attributes).to.not.have.property('chordless.error')
     expect(finished().find(span => span.name === 'chordless.sync.run')?.attributes).to.include({
       'chordless.sync.drive_calls': 1,
     })
   })
 
-  it('has a trace of its own when no sync is running, and takes the method from a Request', async () => {
-    await timedFetch('drive', ok)(new Request('https://x.test/a', { method: 'POST' }))
-    const [call] = finished()
-    expect(call.parentSpanContext).to.equal(undefined)
-    expect(call.attributes['http.request.method']).to.equal('POST')
-  })
-
-  it('is a child of the span it is given where there is no sync (a token refresh)', async () => {
-    let parentId = ''
+  it('is a trace of its own where no sync is running, and a child of the span it is given where it has none (a token refresh)', async () => {
+    await timedFetch('drive')('https://www.googleapis.com/drive/v3/files/a')
+    expect(finished()[0].parentSpanContext).to.equal(undefined)
+    exporter.reset()
     await traced('chordless.auth.refresh', {}, async span => {
-      parentId = span.spanContext().spanId
-      await timedFetch('worker', ok, () => span)('/session/refresh', { method: 'POST' })
+      await timedFetch('worker', undefined, () => span)('/session/refresh', { method: 'POST' })
     })
     const call = finished().find(span => span.name === 'chordless.worker.request')
-    expect(call?.parentSpanContext?.spanId).to.equal(parentId)
-    expect(call?.attributes['url.path']).to.equal('/session/refresh')
+    const refresh = finished().find(span => span.name === 'chordless.auth.refresh')
+    expect(call?.parentSpanContext?.spanId).to.equal(refresh?.spanContext().spanId)
+    expect(call?.spanContext().traceId).to.equal(refresh?.spanContext().traceId)
   })
 
-  it('sends a call to our Worker with its own traceparent, so the Worker’s span is its child', async () => {
+  it('sends a call to our Worker with the span’s own traceparent, and never one to Google', async () => {
     const sent: Headers[] = []
-    const fetcher = timedFetch('worker', async (_input, init) => {
+    respond = async (_input, init) => {
       sent.push(new Headers(init?.headers))
       return new Response('{}')
-    })
-    await fetcher('/api/spaces', { headers: { Authorization: 'Bearer t' } })
-    const [call] = finished()
-    const { traceId, spanId } = call.spanContext()
+    }
+    await timedFetch('worker')('/api/spaces', { headers: { Authorization: 'Bearer t' } })
+    await timedFetch('drive')('https://www.googleapis.com/drive/v3/files')
+    const [worker, drive] = finished()
+    const { traceId, spanId } = worker.spanContext()
+    expect(worker.name).to.equal('chordless.worker.request')
     expect(sent[0].get('traceparent')).to.equal(`00-${traceId}-${spanId}-01`)
     expect(sent[0].get('authorization')).to.equal('Bearer t')
-    // (headers given as a list, or a Headers object, are kept too)
-    await fetcher('/api/spaces', { headers: [['X-One', '1']] })
-    await fetcher('/api/spaces', { headers: new Headers({ 'X-Two': '2' }) })
-    expect(sent[1].get('x-one')).to.equal('1')
-    expect(sent[2].get('x-two')).to.equal('2')
-    expect(sent[2].get('traceparent')).to.match(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
+    expect(drive.name).to.equal('chordless.drive.request')
+    expect(sent[1].get('traceparent')).to.equal(null)
   })
 
-  it('keeps the Cloudflare ray id of a response, the way to find the Worker’s span', async () => {
-    const fetcher = timedFetch(
-      'worker',
-      async () => new Response('{}', { headers: { 'cf-ray': 'a51c89e75a0635ca-LHR' } })
-    )
-    await fetcher('/api/spaces')
-    await timedFetch('drive', ok)('https://x.test/')
-    const [worker, drive] = finished()
-    expect(worker.attributes['cloudflare.ray_id']).to.equal('a51c89e75a0635ca')
-    expect(drive.attributes).to.not.have.property('cloudflare.ray_id')
+  it('names a call to anywhere else after what it is', async () => {
+    await timedFetch('drive')('https://x.test/elsewhere')
+    expect(finished()[0].name).to.equal('chordless.http.request')
   })
 
-  it('keeps the scheme and port, the size of a body sent and of one that came back, and what failed', async () => {
-    const answer = () => new Response('abc', { headers: { 'Content-Length': '3' } })
-    await timedFetch('worker', async () => answer())('/api/x', { method: 'POST', body: 'héllo' })
-    await timedFetch('drive', async () => answer())('http://x.test:8080/a', {
-      method: 'PUT',
-      body: new Uint8Array(4),
+  it('keeps the Cloudflare ray id of an answer, the way to find the Worker’s span', async () => {
+    respond = async () => new Response('{}', { headers: { 'cf-ray': 'a51c89e75a0635ca-LHR' } })
+    await timedFetch('worker')('/api/spaces')
+    expect(finished()[0].attributes['cloudflare.ray_id']).to.equal('a51c89e75a0635ca')
+  })
+
+  it('keeps the size of a body sent, and of an answer by its Content-Length', async () => {
+    respond = async () => new Response('abc', { headers: { 'Content-Length': '3' } })
+    await timedFetch('drive')('https://www.googleapis.com/drive/v3/files/a', {
+      method: 'POST',
+      body: 'héllo',
     })
-    await timedFetch('drive', async () => answer())('https://x.test/b', { body: new Blob(['ab']) })
-    await timedFetch('drive', async () => new Response('', { status: 503 }))('https://x.test/c', {
-      body: new ArrayBuffer(1),
-    })
-    await timedFetch(
-      'drive',
-      async () => new Response('', { headers: { 'Content-Length': 'many' } })
-    )('https://x.test/d', { body: new URLSearchParams({ a: '1' }) })
-    await timedFetch('drive', async () => {
-      throw new TypeError('offline')
-    })('https://x.test/e').catch(() => undefined)
-    await timedFetch('drive', async () => {
-      throw 'refused'
-    })('https://x.test/f').catch(() => undefined)
-    const [worker, put, blob, refused, noSize, offline, odd] = finished()
-    expect(worker.attributes).to.include({
-      // (a path is the page's own address)
-      'url.scheme': location.protocol.slice(0, -1),
-      'server.port': Number(location.port),
+    await expectEventually(() => finished()[0]?.attributes['http.request.body.size'] !== undefined)
+    expect(finished()[0].attributes).to.include({
       'http.request.body.size': 6,
       'http.response.body.size': 3,
     })
-    expect(put.attributes).to.include({
-      'url.scheme': 'http',
-      'server.port': 8080,
-      'http.request.body.size': 4,
-    })
-    expect(blob.attributes).to.include({
-      'url.scheme': 'https',
-      'server.port': 443,
-      'http.request.body.size': 2,
-    })
-    expect(refused.attributes).to.include({ 'http.request.body.size': 1, 'error.type': '503' })
-    expect(noSize.attributes).to.not.have.property('http.response.body.size')
-    expect(noSize.attributes).to.not.have.property('http.request.body.size')
-    expect(offline.attributes['error.type']).to.equal('TypeError')
-    expect(odd.attributes['error.type']).to.equal('_OTHER')
   })
 
-  it('takes the size of the answer to a call to the Worker from the browser, for a call that has no Content-Length too', async () => {
-    setSizeWait(500)
-    // (our own server: a script of the test page, as a page's call to its Worker is)
-    const fetcher = timedFetch('worker')
-    const first = await fetcher('/tests/shims/node-builtins.js')
-    await first.text()
-    const second = await fetcher('/tests/shims/node-builtins.js')
-    await second.text()
-    await expectEventually(() => finished().length === 2)
-    for (const call of finished()) {
-      expect(call.attributes['http.response.body.size'], 'wire').to.be.greaterThan(0)
-      expect(
-        call.attributes['chordless.http.response.decoded_body_size'],
-        'decoded'
-      ).to.be.greaterThan(0)
-    }
-    // (the second may come from the cache, which has nothing on the wire)
-    expect(finished()[0].attributes['http.response.size'], 'with headers').to.be.greaterThan(0)
-  })
-
-  it('ends a call to the Worker without sizes when the browser has none for it, at the time it was answered', async () => {
-    setSizeWait(60)
-    const before = Date.now()
-    await timedFetch('worker', ok)('/api/nothing-fetched')
-    expect(finished()).to.have.length(0)
+  it('takes the size of an answer from the browser’s record of it, which a header may not say', async () => {
+    // (our own server, as a page’s call to its Worker is: a script of the test page)
+    fetchSpans.disable()
+    globalThis.fetch = realFetch
+    fetchSpans = instrumentFetch()
+    const response = await timedFetch('worker')('/tests/shims/node-builtins.js')
+    await response.text()
     await expectEventually(() => finished().length === 1)
     const [call] = finished()
-    expect(call.attributes).to.not.have.property('chordless.http.response.decoded_body_size')
-    // (its end is when it was answered, not when the wait gave up)
-    const [seconds, nanos] = call.endTime
-    expect(seconds * 1000 + nanos / 1e6 - before).to.be.lessThan(40)
+    expect(call.attributes['http.response.body.size'], 'wire').to.be.greaterThan(0)
+    expect(
+      call.attributes['chordless.http.response.decoded_body_size'],
+      'decoded'
+    ).to.be.greaterThan(0)
+    expect(call.attributes['http.response.size'], 'with headers').to.be.greaterThan(0)
   })
 
-  it('never sends a traceparent to Google', async () => {
-    const sent: Headers[] = []
-    await timedFetch('drive', async (_input, init) => {
-      sent.push(new Headers(init?.headers))
-      return new Response('{}')
-    })('https://www.googleapis.com/drive/v3/files')
-    expect(sent[0].get('traceparent')).to.equal(null)
-  })
-
-  it('marks a refusal or a server error as one, and a 404 as no error', async () => {
-    for (const status of [404, 500, 403, 429]) {
-      await timedFetch('drive', async () => new Response('', { status }))('https://x.test/')
-    }
-    const byStatus = Object.fromEntries(
-      finished().map(span => [span.attributes['http.response.status_code'], span])
+  it('has no size from the browser for a call it has no record of, and does not break', async () => {
+    await timedFetch('worker')('/api/nothing-fetched-for-real')
+    await expectEventually(() => finished().length === 1)
+    expect(finished()[0].attributes).to.not.have.property(
+      'chordless.http.response.decoded_body_size'
     )
-    expect(byStatus[404].status.code).to.equal(0)
-    expect(byStatus[404].attributes).to.not.have.property('chordless.error')
-    for (const status of [500, 403, 429]) {
-      expect(byStatus[status].status.code, String(status)).to.equal(2)
-      expect(byStatus[status].attributes['chordless.error']).to.equal(true)
-    }
   })
 
-  it('records a call with no answer as an exception, and throws it again', async () => {
-    const fetcher = timedFetch('worker', async () => {
+  it('marks a refusal or a server error as one, counts what the sync counts as errors, and a 404 is no error to it', async () => {
+    let status = 503
+    respond = async () => new Response('', { status })
+    await traced(
+      'chordless.sync.run',
+      {},
+      async () => {
+        await timedFetch('drive')('https://www.googleapis.com/drive/v3/files/a')
+        status = 404
+        await timedFetch('drive')('https://www.googleapis.com/drive/v3/files/b')
+      },
+      { trackCalls: true }
+    )
+    const [refused] = finished().filter(span => span.name === 'chordless.drive.request')
+    expect(refused.attributes).to.include({ 'http.response.status_code': 503, 'error.type': '503' })
+    expect(refused.status.code).to.equal(2)
+    expect(
+      finished().find(span => span.name === 'chordless.sync.run')?.attributes[
+        'chordless.sync.errors'
+      ]
+    ).to.equal(1)
+  })
+
+  it('records a call with no answer as an error, counts it, and throws it again', async () => {
+    respond = async () => {
       throw new TypeError('Failed to fetch')
-    })
+    }
     let thrown: unknown
     await traced(
       'chordless.sync.run',
       {},
       async () => {
-        try {
-          await fetcher('/api/spaces')
-        } catch (error) {
+        await timedFetch('worker')('/api/spaces').catch(error => {
           thrown = error
-        }
+        })
       },
       { trackCalls: true }
     )
-    expect(thrown).to.be.instanceOf(TypeError)
+    expect((thrown as Error).message).to.equal('Failed to fetch')
     const call = finished().find(span => span.name === 'chordless.worker.request')
+    expect(call?.attributes['error.type']).to.equal('TypeError')
     expect(call?.status.code).to.equal(2)
-    expect(call?.events[0].attributes?.['exception.message']).to.equal('Failed to fetch')
-    expect(finished().find(span => span.name === 'chordless.sync.run')?.attributes).to.include({
-      'chordless.sync.worker_calls': 1,
-      'chordless.sync.errors': 1,
-    })
+    expect(
+      finished().find(span => span.name === 'chordless.sync.run')?.attributes[
+        'chordless.sync.errors'
+      ]
+    ).to.equal(1)
   })
 
   it('makes spans for only the first calls of a sync, and counts them all', async () => {
-    const fetcher = timedFetch('drive', ok)
+    const fetcher = timedFetch('drive')
     await traced(
       'chordless.sync.run',
       {},
       async () => {
-        for (let i = 0; i < 250; i++) await fetcher('https://x.test/')
+        for (let i = 0; i < 250; i++) await fetcher(DRIVE)
       },
       { trackCalls: true }
     )
@@ -601,32 +623,34 @@ describe('timedFetch', () => {
     ).to.equal(250)
   })
 
-  it('makes no span while reports are off, and still makes the call', async () => {
+  it('does not make a span of a report on its way: it would be traced sending itself', async () => {
+    await window.fetch('/api/otlp/v1/traces', { method: 'POST', body: '{}' })
+    expect(finished()).to.have.length(0)
+  })
+
+  it('makes the call, with no span, while reports are off and nothing is traced', async () => {
+    fetchSpans.disable()
     setTelemetryPreference(false)
-    const sent: Headers[] = []
-    const response = await timedFetch('worker', async (_input, init) => {
-      sent.push(new Headers(init?.headers))
-      return new Response('{}')
-    })('/api/spaces')
+    const response = await timedFetch('worker')('/api/spaces')
     expect(response.status).to.equal(200)
     expect(finished()).to.have.length(0)
-    expect(sent[0].get('traceparent')).to.equal(null)
   })
 
   it('is the real fetch unless it is given another', async () => {
-    const real = window.fetch
     let asked = ''
-    window.fetch = (async (input: RequestInfo | URL) => {
+    respond = async input => {
       asked = String(input)
       return new Response('ok')
-    }) as typeof fetch
-    try {
-      const response = await timedFetch('drive')('https://x.test/real')
-      expect(await response.text()).to.equal('ok')
-      expect(asked).to.equal('https://x.test/real')
-    } finally {
-      window.fetch = real
     }
+    const response = await timedFetch('drive')('https://x.test/real')
+    expect(await response.text()).to.equal('ok')
+    expect(asked).to.equal('https://x.test/real')
+    const given = await timedFetch(
+      'drive',
+      async () => new Response('given')
+    )('https://x.test/given')
+    expect(await given.text()).to.equal('given')
+    expect(asked).to.equal('https://x.test/real')
   })
 })
 
