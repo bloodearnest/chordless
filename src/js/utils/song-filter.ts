@@ -1,4 +1,5 @@
 import type { ParsedChart } from '../data-types.ts'
+import { formatHiddenLyricsText, normalizeSegmentsForHiddenChords } from './lyrics-normalizer.ts'
 import { SongIndex, type WordRange, wordRanges, wordsFound } from './song-search.ts'
 
 interface SearchableSong {
@@ -11,25 +12,23 @@ interface SearchableSong {
 
 const lyricsCache = new WeakMap<ParsedChart, { lines: string[]; lower: string }>()
 
-/** SongSelect splits a word across chords ("e - [D]nough"): put it back together */
-const SPLIT_WORD = /(?<=\p{L})\s+-\s+(?=\p{L})/gu
+/** A line's words as the lyrics-only view shows them: a word split across chords is whole again */
+function lineLyrics(line: ParsedChart['sections'][number]['lines'][number]): string {
+  let hasPrevious = false
+  return normalizeSegmentsForHiddenChords(line.segments)
+    .map(segment => {
+      const text = formatHiddenLyricsText(segment.lyrics, hasPrevious, segment.__joinWithPrev)
+      if (segment.lyrics) hasPrevious = true
+      return text
+    })
+    .join('')
+}
 
-/**
- * The words of a chart, without its chords or section labels: each line, and all of it lowercased.
- * A word split across chords is whole again.
- */
+/** The words of a chart, without its chords or section labels: each line, and all of it lowercased */
 export function lyricsOf(parsed: ParsedChart) {
   let lyrics = lyricsCache.get(parsed)
   if (!lyrics) {
-    const lines = parsed.sections.flatMap(section =>
-      section.lines.map(line =>
-        line.segments
-          .map(s => s.lyrics)
-          .join('')
-          .replace(SPLIT_WORD, '')
-          .trim()
-      )
-    )
+    const lines = parsed.sections.flatMap(section => section.lines.map(lineLyrics))
     lyrics = { lines, lower: lines.join('\n').toLowerCase() }
     lyricsCache.set(parsed, lyrics)
   }
