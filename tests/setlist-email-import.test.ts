@@ -493,6 +493,14 @@ describe('setlist-email-import', () => {
       expect((await db.getAllSetlists())[0].name).to.equal('Sunday 25th October')
     })
 
+    it('is made without a leader when the page worked out none', async () => {
+      await ready()
+      importer._setlist.leaderId = undefined
+      await importer._save()
+      await waitUntil(() => visited.length === 1, 'the page to go to the setlist')
+      expect('leaderId' in (await db.getAllSetlists())[0]).to.equal(false)
+    })
+
     it('stays where it is when the listener cancels the move', async () => {
       await ready()
       importer.addEventListener(SetlistEmailImportedEvent.type, event => event.preventDefault())

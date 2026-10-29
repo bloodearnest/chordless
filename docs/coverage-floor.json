@@ -5,6 +5,12 @@
     "functions": 0,
     "unloaded": 0
   },
+  "src/js/telemetry/start.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 0
+  },
   "worker/src/index.ts": {
     "lines": 0,
     "branches": 0,
@@ -18,12 +24,6 @@
     "unloaded": 0
   },
   "worker/src/team-space.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 0,
-    "unloaded": 0
-  },
-  "src/js/telemetry/start.ts": {
     "lines": 0,
     "branches": 0,
     "functions": 0,

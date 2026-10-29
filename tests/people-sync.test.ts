@@ -5,9 +5,9 @@
 import { expect } from '@open-wc/testing'
 import type { Person } from '../src/js/data-types.ts'
 import { personHasLocalChanges } from '../src/js/sync/person-hash.ts'
-import { useSyncRig } from './drive-harness.ts'
+import { useFakeDriveRig, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -163,6 +163,140 @@ describe('people in sync (against the memory backend)', () => {
     expect((await stored(phone, 'ann')).fileRef).to.equal(peopleFiles()[0].ref)
   })
 
+  it('ignores a file in the people collection that is not a person’s', async () => {
+    const phone = await makeDevice('phone')
+    await syncDevice(phone)
+    const root = must(rig.storage.rootNamed(TEST_SPACE.name)).ref
+    await rig.storage
+      .space(root)
+      .create('people', { name: 'stray.json', type: 'application/json', props: {} }, '{}')
+
+    await syncDevice(phone)
+
+    expect(await phone.db.getAllPeople()).to.deep.equal([])
+  })
+
+  it('skips a person it cannot download, and gets them next sync', async () => {
+    const phone = await makeDevice('phone')
+    const tablet = await makeDevice('tablet')
+    await phone.db.savePeople([person({ id: 'ann', name: 'Ann' })])
+    await syncDevice(phone)
+    rig.storage.fail('readMany')
+
+    await syncDevice(tablet)
+    expect(await tablet.db.getPerson('ann')).to.equal(undefined)
+
+    const messages: string[] = []
+    await tablet.sync.sync(progress => messages.push(progress.message))
+    expect((await stored(tablet, 'ann')).name).to.equal('Ann')
+    expect(messages.join('\n')).to.contain('Downloading 1 people')
+  })
+
+  it('sends people one at a time when a batch fails, and says how many went', async () => {
+    const phone = await makeDevice('phone')
+    await phone.db.savePeople([
+      person({ id: 'ann', name: 'Ann' }),
+      person({ id: 'ben', name: 'Ben' }),
+    ])
+    rig.storage.fail('createMany')
+    const messages: string[] = []
+
+    await phone.sync.sync(progress => messages.push(progress.message))
+
+    expect(peopleFiles()).to.have.length(2)
+    expect(messages.join('\n')).to.contain('Uploaded 2/2 people')
+
+    const ann = await stored(phone, 'ann')
+    await phone.db.savePeople([{ ...ann, name: 'Anne', modifiedDate: '2026-10-30T10:00:00Z' }])
+    rig.storage.fail('updateMany')
+    await syncDevice(phone)
+    expect(
+      JSON.parse(must(peopleFiles().find(f => f.props.personId === 'ann')).content).name
+    ).to.equal('Anne')
+  })
+
+  it('takes the newer name when the other device changed the person later than this one did', async () => {
+    const phone = await makeDevice('phone')
+    const tablet = await makeDevice('tablet')
+    await phone.db.savePeople([person({ id: 'tom', name: 'Tom' })])
+    await syncDevice(phone)
+    await syncDevice(tablet)
+    const onPhone = await stored(phone, 'tom')
+    await phone.db.savePeople([
+      { ...onPhone, name: 'Thomas', modifiedDate: '2026-10-30T10:00:00Z' },
+    ])
+    const onTablet = await stored(tablet, 'tom')
+    await tablet.db.savePeople([
+      { ...onTablet, name: 'Tom Smith', emails: ['t@x.org'], modifiedDate: '2026-10-31T10:00:00Z' },
+    ])
+    await syncDevice(tablet)
+
+    // (the phone has an older change that was never sent: the tablet's later one wins)
+    await syncDevice(phone)
+
+    const tom = await stored(phone, 'tom')
+    expect(tom.name).to.equal('Tom Smith')
+    expect(tom.modifiedDate).to.equal('2026-10-31T10:00:00Z')
+  })
+
+  it('records the people that were sent when another in the batch was not', async () => {
+    const phone = await makeDevice('phone')
+    await phone.db.savePeople([
+      person({ id: 'ann', name: 'Ann' }),
+      person({ id: 'ben', name: 'Ben' }),
+    ])
+    rig.storage.fail('create')
+
+    await syncDevice(phone)
+
+    const linked = (await phone.db.getAllPeople()).filter(each => each.fileRef)
+    expect(linked).to.have.length(1)
+    await syncDevice(phone)
+    expect(peopleFiles()).to.have.length(2)
+  })
+
+  it('leaves a person it cannot send for the next sync', async () => {
+    const phone = await makeDevice('phone')
+    await phone.db.savePeople([person({ id: 'ann', name: 'Ann' })])
+    rig.storage.fail('createMany')
+    rig.storage.fail('create')
+
+    await syncDevice(phone)
+    expect(peopleFiles()).to.have.length(0)
+
+    await syncDevice(phone)
+    expect(peopleFiles()).to.have.length(1)
+  })
+
+  it('waits for a pull that could not read every file before it makes a file', async () => {
+    const phone = await makeDevice('phone')
+    const tablet = await makeDevice('tablet')
+    await phone.db.savePeople([person({ id: 'ann', name: 'Ann' })])
+    await syncDevice(phone)
+    await tablet.db.savePeople([person({ id: 'ben', name: 'Ben' })])
+    rig.storage.fail('readMany')
+
+    await syncDevice(tablet)
+
+    expect(peopleFiles()).to.have.length(1)
+    await syncDevice(tablet)
+    expect(peopleFiles()).to.have.length(2)
+  })
+
+  it('is let go of with the other links when a space is started over, and cleared with a reset', async () => {
+    const phone = await makeDevice('phone')
+    await phone.db.savePeople([person({ id: 'ann', name: 'Ann' })])
+    await syncDevice(phone)
+
+    await phone.db.clearFileLinks()
+    const let_go = await stored(phone, 'ann')
+    expect(let_go.fileRef).to.equal(null)
+    expect(personHasLocalChanges(let_go)).to.equal(true)
+
+    await phone.db.clearSyncedData()
+    expect(await phone.db.getAllPeople()).to.deep.equal([])
+  })
+
   it('is picked up by a sync that reads only what changed', async () => {
     const phone = await makeDevice('phone')
     const tablet = await makeDevice('tablet')
@@ -175,5 +309,28 @@ describe('people in sync (against the memory backend)', () => {
     await tablet.sync.incrementalSync()
 
     expect((await stored(tablet, 'ann')).name).to.equal('Ann')
+  })
+})
+
+describe('people in sync (against FakeDrive)', () => {
+  const rig = useFakeDriveRig()
+
+  it('keeps people in a people folder, which the feed of changes names', async () => {
+    const phone = await rig.makeDevice('phone')
+    const tablet = await rig.makeDevice('tablet')
+    await rig.syncDevice(phone)
+    await rig.syncDevice(tablet)
+    await tablet.sync.incrementalSync()
+
+    await phone.db.savePeople([person({ id: 'ann', name: 'Ann Smith' })])
+    await phone.sync.incrementalSync()
+    await tablet.sync.incrementalSync()
+
+    const files = rig.drive.listFiles(f => Boolean(f.appProperties.personId))
+    expect(files).to.have.length(1)
+    expect((await must(await tablet.db.getPerson('ann'))).name).to.equal('Ann Smith')
+    // and a full sync lists the folder
+    await rig.syncDevice(tablet)
+    expect(await tablet.db.getAllPeople()).to.have.length(1)
   })
 })

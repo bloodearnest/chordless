@@ -162,6 +162,12 @@ describe('the signed-in user and the space’s people', () => {
     expect(people.map(each => each.name)).to.deep.equal(['Ben'])
   })
 
+  it('has no person for a member with no address and no name', async () => {
+    await withMembers([{ email: '' }, { email: 'ben@example.com', name: 'Ben' }])
+    const { people } = await getSpacePeople(db)
+    expect(people.map(each => each.name)).to.deep.equal(['Ben'])
+  })
+
   it('has none, with no members and nobody signed in', async () => {
     const { people, me } = await getSpacePeople(db)
     expect(me).to.equal(null)

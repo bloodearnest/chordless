@@ -625,14 +625,20 @@ export class SetlistPage {
     if (share && shareDialog) {
       share.addEventListener(
         'click',
-        async () => {
+        () => {
           const setlist = this.currentSetlist
           if (!setlist) return
           // The page may have a newer copy of the setlist (after its details were edited)
           shareDialog.setlist = setlist
           shareDialog.songs = this.songs
-          shareDialog.leader = leaderName(await this._database().getAllPeople(), setlist.leaderId)
+          shareDialog.leader = ''
           shareDialog.show()
+          // (opened at once: the leader's name, for the song list, is filled in when it is read)
+          void this._database()
+            .getAllPeople()
+            .then(people => {
+              shareDialog.leader = leaderName(people, setlist.leaderId)
+            })
         },
         { signal }
       )
@@ -709,7 +715,10 @@ export class SetlistPage {
       dialog.addEventListener(SetlistInfoDeleteEvent.type, this._setlistDeleteHandler)
     }
     dialog.readonly = this._readOnly
-    dialog.people = (await getSpacePeople(this._database())).people
+    // (to read, the people there are; to edit, those the space's members and you would be as well)
+    dialog.people = dialog.readonly
+      ? await this._database().getAllPeople()
+      : (await getSpacePeople(this._database())).people
     await dialog.show(this.currentSetlist)
   }
 

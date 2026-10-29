@@ -240,7 +240,7 @@ export async function pushPeople(
   // A person with no file of its own while storage has a live file for their id waits for a pull
   // to adopt it, or the person would be stored twice. And after a pull that could not read every
   // file, a person may have a file this device does not know of.
-  if (run.pullIncomplete) created = []
+  if (run.peoplePullIncomplete) created = []
   created = created.filter(person => !run.livePeopleIds?.has(person.id))
 
   const report = (uploaded: number) =>

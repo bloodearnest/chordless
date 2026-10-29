@@ -54,6 +54,57 @@ describe('Copying and moving between spaces', () => {
     return setlist
   }
 
+  describe('leaders', () => {
+    const NOW = '2026-10-29T10:00:00.000Z'
+    const led = (id: string, leaderId?: string, date = '2026-10-25') =>
+      source.saveSetlist(makeSetlist({ id, date, ...(leaderId ? { leaderId } : {}) }))
+
+    it('goes to the person the destination has for them, by email then name, else a new one', async () => {
+      await source.savePeople([
+        { id: 'a', name: 'Ann', emails: ['ann@example.com'], modifiedDate: NOW },
+        { id: 'b', name: 'Ben Jones', emails: [], modifiedDate: NOW },
+        { id: 'c', name: 'Cat', emails: ['cat@example.com'], modifiedDate: NOW },
+      ])
+      await destination.savePeople([
+        {
+          id: 'dest-ann',
+          name: 'Annie',
+          emails: ['ANN@example.com'.toLowerCase()],
+          modifiedDate: NOW,
+        },
+        { id: 'dest-ben', name: 'ben jones', emails: [], modifiedDate: NOW },
+      ])
+      await led('s1', 'a', '2026-11-01')
+      await led('s2', 'a', '2026-11-08')
+      await led('s3', 'b', '2026-11-15')
+      await led('s4', 'c', '2026-11-22')
+      await led('s5', 'nobody-known', '2026-11-29')
+      await led('s6', undefined, '2026-12-06')
+
+      await transferSetlists(source, destination, null, 'move')
+
+      const moved = Object.fromEntries((await destination.getAllSetlists()).map(s => [s.id, s]))
+      expect(moved.s1.leaderId).to.equal('dest-ann')
+      expect(moved.s2.leaderId).to.equal('dest-ann')
+      expect(moved.s3.leaderId).to.equal('dest-ben')
+      const cat = must((await destination.getAllPeople()).find(p => p.name === 'Cat'))
+      expect(cat.emails).to.deep.equal(['cat@example.com'])
+      expect(moved.s4.leaderId).to.equal(cat.id)
+      expect('leaderId' in moved.s5).to.equal(false)
+      expect('leaderId' in moved.s6).to.equal(false)
+      expect(await destination.getAllPeople()).to.have.length(3)
+    })
+
+    it('makes a person for a leader with no email, from their name', async () => {
+      await source.savePeople([{ id: 'v', name: 'Visiting Vic', emails: [], modifiedDate: NOW }])
+      await led('s1', 'v')
+      await transferSetlists(source, destination, null, 'copy')
+      const [made] = await destination.getAllPeople()
+      expect(made.name).to.equal('Visiting Vic')
+      expect(must((await destination.getAllSetlists())[0]).leaderId).to.equal(made.id)
+    })
+  })
+
   it('copies songs, and a chart the destination has is not added twice', async () => {
     await addChart(source, ALPHA, ADD)
     await addChart(source, BETA, ADD)
