@@ -56,6 +56,8 @@ export interface ChangeTokenStore {
 }
 
 /** How old the cached members may be before an incremental sync reads them again */
+/** How long a check of the user's access to the space's folder stands, for the syncs from the feed (a refused write asks again) */
+export const ACCESS_REFRESH_MS = 5 * 60_000
 export const MEMBERS_REFRESH_MS = 60 * 60_000
 
 /** Where the space's members are cached for offline use */
@@ -242,6 +244,8 @@ export class SyncManager {
   readonly storage: StorageBackend
   /** The space's files, opened once the folder is known and dropped when a run ends */
   #space: SpaceStorage | null = null
+  /** What the last check of the user's access to the folder said, and when (see refreshAccess) */
+  #access: { readOnly: boolean; at: number } | null = null
 
   /**
    * Open the manager of a space, without asking the storage anything: its database (the one
@@ -435,12 +439,11 @@ export class SyncManager {
       const run = this.newRun()
       // Where the feed of changes stands before anything is read: what changes during this sync
       // is seen by the next incremental one
-      const feedPosition = await phase('chordless.sync.feed_position', {}, () =>
-        this.#feedPosition()
+      // and who the space's folder is shared with, for choosing leaders, and whether the user can write
+      // to it: three questions that do not depend on each other, asked together
+      const [feedPosition] = await phase('chordless.sync.prepare', {}, () =>
+        Promise.all([this.#feedPosition(), this.refreshMembers(), this.refreshAccess(run)])
       )
-      // Who the space's folder is shared with, for choosing leaders
-      await phase('chordless.sync.members', {}, () => this.refreshMembers())
-      await phase('chordless.sync.access', {}, () => this.refreshAccess(run))
 
       // Before changing anything, check local records belong to this folder
       progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
@@ -579,7 +582,7 @@ export class SyncManager {
       const setlists = changes.changed.filter(c => c.collection === 'setlists').map(c => c.file)
 
       progressCallback?.({ stage: 'starting', message: 'Starting sync...' })
-      await phase('chordless.sync.access', {}, () => this.refreshAccess(run))
+      await phase('chordless.sync.access', {}, () => this.#refreshAccessIfOld(run))
       await this.trashPendingDeletions(run)
 
       if (setlists.length > 0) await pullSetlists(run, progressCallback, setlists)
@@ -754,6 +757,7 @@ export class SyncManager {
     }
     run.readOnly = canAdd === false
     if (canAdd !== undefined && canAdd !== null) {
+      this.#access = { readOnly: run.readOnly, at: Date.now() }
       try {
         await this.memberCache.setReadOnly?.(run.readOnly)
       } catch (error) {
@@ -761,6 +765,19 @@ export class SyncManager {
       }
     }
     return run.readOnly
+  }
+
+  /**
+   * The same, for a sync from the feed, which has the answer of a few minutes ago if it has one
+   * (it is as rarely changed as who the folder is shared with; and a write that is refused asks again)
+   */
+  async #refreshAccessIfOld(run: SyncRun): Promise<void> {
+    const known = this.#access
+    if (known && Date.now() - known.at < ACCESS_REFRESH_MS) {
+      run.readOnly = known.readOnly
+      return
+    }
+    await this.refreshAccess(run)
   }
 
   /**
@@ -966,9 +983,12 @@ export class SyncManager {
   }
 
   async #pushAll(progressCallback: ProgressCallback | null, run: SyncRun): Promise<void> {
-    // Build inventory of existing Drive files
-    progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
-    await this.buildDriveInventory(run)
+    // Build inventory of existing Drive files (a full sync has its own, made when it began: nothing
+    // is added to Drive between, and one listing of the whole space is enough)
+    if (!run.inventory) {
+      progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
+      await this.buildDriveInventory(run)
+    }
 
     // Push setlists
     progressCallback?.({

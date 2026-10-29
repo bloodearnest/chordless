@@ -113,14 +113,6 @@ class DriveSpace implements SpaceStorage {
   readonly changes: ChangeFeed = {
     start: () => this.#api.getStartPageToken(),
     since: async token => {
-      // (one listing of the space's folders, and nothing made: a collection with no folder has no files)
-      const folders = await this.#api.listDriveFiles(
-        `'${this.#rootRef}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
-      )
-      const songs = folders.find(folder => folder.name === 'songs')?.id
-      const setlists = folders.find(folder => folder.name === 'setlists')?.id
-      const inFolder = (parents: string[], folder: string | undefined) =>
-        folder !== undefined && parents.includes(folder)
       let result: Awaited<ReturnType<DriveApi['listChanges']>>
       try {
         result = await this.#api.listChanges(token)
@@ -130,6 +122,19 @@ class DriveSpace implements SpaceStorage {
         if ([400, 404, 410].includes(status as number)) throw new ChangeTokenLost()
         throw error
       }
+      // The space's folders tell which collection a changed file is in: listed once, and only when
+      // there is a change (one that finds none is this call alone). Nothing is made: a collection
+      // with no folder has no files
+      const folders =
+        result.changes.length === 0
+          ? []
+          : await this.#api.listDriveFiles(
+              `'${this.#rootRef}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+            )
+      const songs = folders.find(folder => folder.name === 'songs')?.id
+      const setlists = folders.find(folder => folder.name === 'setlists')?.id
+      const inFolder = (parents: string[], folder: string | undefined) =>
+        folder !== undefined && parents.includes(folder)
       const changed: SpaceChanges['changed'] = []
       const gone: string[] = []
       for (const { fileId, file } of result.changes) {
@@ -167,13 +172,16 @@ class DriveSpace implements SpaceStorage {
 
   async inventory(): Promise<Set<string>> {
     const refs = new Set<string>()
+    // (the folders of a folder are listed together: the listing of each does not wait for the others)
     const add = async (folderId: string): Promise<void> => {
+      const folders: string[] = []
       for (const file of await this.#api.listDriveFiles(
         `'${folderId}' in parents and trashed=false`
       )) {
         refs.add(file.id)
-        if (file.mimeType === 'application/vnd.google-apps.folder') await add(file.id)
+        if (file.mimeType === 'application/vnd.google-apps.folder') folders.push(file.id)
       }
+      await Promise.all(folders.map(add))
     }
     await add(this.#rootRef)
     return refs

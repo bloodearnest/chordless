@@ -331,12 +331,29 @@ describe('Google Drive (on FakeDrive): the feed of changes', () => {
     expect(seen.changed.map(c => c.file.ref)).to.not.include(kept.file.ref)
   })
 
-  it('has nothing to say of the files of a space with no folders yet, and lists its folders only once', async () => {
+  it('has nothing to say of the files of a space with no folders yet, and lists nothing to say so', async () => {
     const { fake, feed } = await openSpace()
     const start = await feed.start()
     fake.requests.length = 0
 
     expect(await feed.since(start)).to.deep.include({ changed: [], gone: [] })
+
+    const lists = fake.requests.filter(
+      (request: { path: string; params: URLSearchParams }) =>
+        request.path.endsWith('/files') && request.params.has('q')
+    )
+    expect(lists, 'a feed with no change is one request').to.have.length(0)
+    expect(fake.requests).to.have.length(1)
+  })
+
+  it('lists the space’s folders once, to tell which collection a change is in, when there is one', async () => {
+    const { fake, space, feed } = await openSpace()
+    const start = await feed.start()
+    await space.create('songs', { ...song, name: 'a.txt' }, 'x')
+    await space.create('songs', { ...song, name: 'b.txt' }, 'x')
+    fake.requests.length = 0
+
+    expect((await feed.since(start)).changed).to.have.length(2)
 
     const lists = fake.requests.filter(
       (request: { path: string; params: URLSearchParams }) =>
