@@ -31,6 +31,12 @@ song data
   could fill in a default by guessing based on source chordpro, but users
   should be able to edit it per setlists, as they might structure things
   differently.  
+- feature idea (raised 2026-10-30): a current rotation. Leaders and admins mark a set of songs as in the
+  current rotation, and manage them; a team can then curate its official song list formally. Decide with it
+  who may add songs to a Team and what a PA/media team may do: today only a worship leader and above
+  (writer) can import songs that sync (a team member's import stays on their device, never sent), and
+  the invite defaults to worship leader. Importing a chart could stay open to anyone, since it only makes
+  the chart available; being in the rotation is the curated part
 
 information UI
  - show leader in setlist page
