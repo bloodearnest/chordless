@@ -29,6 +29,30 @@ import {
   type SpanExporter,
   TracerProvider,
 } from '@opentelemetry/sdk-trace'
+import {
+  ATTR_ERROR_TYPE,
+  ATTR_HTTP_REQUEST_METHOD,
+  ATTR_HTTP_RESPONSE_STATUS_CODE,
+  ATTR_HTTP_ROUTE,
+  ATTR_NETWORK_PROTOCOL_NAME,
+  ATTR_NETWORK_PROTOCOL_VERSION,
+  ATTR_SERVER_ADDRESS,
+  ATTR_SERVER_PORT,
+  ATTR_SERVICE_NAME,
+  ATTR_SERVICE_VERSION,
+  ATTR_URL_PATH,
+  ATTR_URL_SCHEME,
+  ATTR_USER_AGENT_ORIGINAL,
+} from '@opentelemetry/semantic-conventions'
+import {
+  ATTR_GEO_CONTINENT_CODE,
+  ATTR_GEO_COUNTRY_ISO_CODE,
+  ATTR_GEO_LOCALITY_NAME,
+  ATTR_GEO_REGION_ISO_CODE,
+  ATTR_HTTP_REQUEST_BODY_SIZE,
+  ATTR_HTTP_RESPONSE_BODY_SIZE,
+  ATTR_RPC_METHOD,
+} from '@opentelemetry/semantic-conventions/incubating'
 import type { Env } from './env.ts'
 import { forward, parseHeaders, type TelemetryDeps, withinLimit } from './telemetry.ts'
 
@@ -43,7 +67,7 @@ interface CloudflareProperties {
   asn?: number
   country?: string
   continent?: string
-  region?: string
+  regionCode?: string
   city?: string
   timezone?: string
   httpProtocol?: string
@@ -161,14 +185,14 @@ export function tracedFetch(
   return (async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input))
     const span = startCall('chordless.worker.fetch', {
-      'http.request.method': (
+      [ATTR_HTTP_REQUEST_METHOD]: (
         init?.method ?? (input instanceof Request ? input.method : 'GET')
       ).toUpperCase(),
-      'url.scheme': url.protocol.slice(0, -1),
-      'server.address': url.hostname,
-      'server.port': portOf(url),
-      'url.path': url.pathname,
-      'http.request.body.size':
+      [ATTR_URL_SCHEME]: url.protocol.slice(0, -1),
+      [ATTR_SERVER_ADDRESS]: url.hostname,
+      [ATTR_SERVER_PORT]: portOf(url),
+      [ATTR_URL_PATH]: url.pathname,
+      [ATTR_HTTP_REQUEST_BODY_SIZE]:
         bodySize(init?.body) ??
         contentLength(
           new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
@@ -179,17 +203,17 @@ export function tracedFetch(
     try {
       response = await base(input, init)
     } catch (error) {
-      span.setAttribute('error.type', errorType(error))
+      span.setAttribute(ATTR_ERROR_TYPE, errorType(error))
       failed(span, error)
       span.end()
       throw error
     }
-    span.setAttribute('http.response.status_code', response.status)
+    span.setAttribute(ATTR_HTTP_RESPONSE_STATUS_CODE, response.status)
     const size = contentLength(response.headers)
-    if (size !== undefined) span.setAttribute('http.response.body.size', size)
+    if (size !== undefined) span.setAttribute(ATTR_HTTP_RESPONSE_BODY_SIZE, size)
     // (a 404 is how Drive says there is no such file)
     if (response.status >= 400 && response.status !== 404) {
-      span.setAttribute('error.type', String(response.status))
+      span.setAttribute(ATTR_ERROR_TYPE, String(response.status))
       span.setStatus({ code: SpanStatusCode.ERROR })
     }
     span.end()
@@ -211,7 +235,7 @@ export function tracedStub<T extends object>(stub: T, className: string): T {
       }
       return (...args: unknown[]) => {
         const span = startCall('chordless.worker.do', {
-          'rpc.method': property,
+          [ATTR_RPC_METHOD]: property,
           'chordless.do.class': className,
         })
         if (!span) return Reflect.apply(value, target, args)
@@ -277,8 +301,8 @@ export async function withWorkerSpan(
   // goes at the end, in one call, when it is shut down)
   const provider = new TracerProvider({
     resource: resourceFromAttributes({
-      'service.name': SERVICE_NAME,
-      ...(version ? { 'service.version': version } : {}),
+      [ATTR_SERVICE_NAME]: SERVICE_NAME,
+      ...(version ? { [ATTR_SERVICE_VERSION]: version } : {}),
     }),
     spanProcessors: [
       new BatchSpanProcessor({
@@ -306,27 +330,27 @@ export async function withWorkerSpan(
   const status = response?.status ?? 500
   const cf = (request as { cf?: CloudflareProperties }).cf
   const attributes: Record<string, Value> = {
-    'http.request.method': request.method,
-    'http.route': routeOf(new URL(request.url).pathname),
-    'url.path': new URL(request.url).pathname,
-    'url.scheme': new URL(request.url).protocol.slice(0, -1),
-    'http.response.status_code': status,
-    'http.request.body.size': contentLength(request.headers),
-    'http.response.body.size': response ? contentLength(response.headers) : undefined,
-    'server.address': new URL(request.url).hostname,
-    'server.port': portOf(new URL(request.url)),
-    'network.protocol.name': 'http',
-    'network.protocol.version': cf?.httpProtocol?.split('/')[1],
-    'error.type': response ? (status >= 500 ? String(status) : undefined) : errorType(thrown),
-    'user_agent.original': request.headers.get('User-Agent') ?? undefined,
+    [ATTR_HTTP_REQUEST_METHOD]: request.method,
+    [ATTR_HTTP_ROUTE]: routeOf(new URL(request.url).pathname),
+    [ATTR_URL_PATH]: new URL(request.url).pathname,
+    [ATTR_URL_SCHEME]: new URL(request.url).protocol.slice(0, -1),
+    [ATTR_HTTP_RESPONSE_STATUS_CODE]: status,
+    [ATTR_HTTP_REQUEST_BODY_SIZE]: contentLength(request.headers),
+    [ATTR_HTTP_RESPONSE_BODY_SIZE]: response ? contentLength(response.headers) : undefined,
+    [ATTR_SERVER_ADDRESS]: new URL(request.url).hostname,
+    [ATTR_SERVER_PORT]: portOf(new URL(request.url)),
+    [ATTR_NETWORK_PROTOCOL_NAME]: 'http',
+    [ATTR_NETWORK_PROTOCOL_VERSION]: cf?.httpProtocol?.split('/')[1],
+    [ATTR_ERROR_TYPE]: response ? (status >= 500 ? String(status) : undefined) : errorType(thrown),
+    [ATTR_USER_AGENT_ORIGINAL]: request.headers.get('User-Agent') ?? undefined,
     'cloudflare.ray_id': request.headers.get('cf-ray')?.split('-')[0],
     'cloudflare.colo': cf?.colo,
     'cloudflare.asn': cf?.asn,
-    'geo.country.code': cf?.country,
-    'geo.continent.code': cf?.continent,
-    'geo.locality.region': cf?.region,
-    'geo.locality.name': cf?.city,
-    'geo.timezone': cf?.timezone,
+    [ATTR_GEO_COUNTRY_ISO_CODE]: cf?.country,
+    [ATTR_GEO_CONTINENT_CODE]: cf?.continent,
+    [ATTR_GEO_REGION_ISO_CODE]: cf?.regionCode,
+    [ATTR_GEO_LOCALITY_NAME]: cf?.city,
+    'chordless.geo.timezone': cf?.timezone,
     'cloudflare.script_version.id': version,
     'chordless.outcome': status >= 500 ? 'error' : 'ok',
   }

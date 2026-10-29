@@ -230,6 +230,13 @@ out: `client.address` (an IP address), the request and response headers (opt-in 
 their names have hyphens, which the telemetry route drops), the query on the Worker's side (the page's call
 spans keep a truncated URL), `http.request.method_original` and the TLS attributes.
 
+**The names come from the conventions' own constants** (`@opentelemetry/semantic-conventions`: the stable ones
+from its main entry, the experimental ones, such as the sizes, `session.id` and the geography, from
+`/incubating`, whose names may change in a minor release, as the package warns), not typed as strings. The Worker's
+geography is what the conventions have (`geo.country.iso_code`, `geo.region.iso_code`, `geo.continent.code`,
+`geo.locality.name`); the colo, ASN and ray id stay `cloudflare.*`, as on the native spans, and the timezone,
+which the conventions have no name for, is `chordless.geo.timezone`.
+
 **The page knows the size of the answers it gets from the Worker.** A call to our Worker is to the page's
 own address, so the browser's resource entry for it (`PerformanceResourceTiming`) has the sizes of the
 answer even when it is streamed or chunked: `http.response.body.size` (the bytes on the wire, as

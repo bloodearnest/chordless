@@ -10,6 +10,12 @@
 import { context, propagation, trace } from '@opentelemetry/api'
 import { W3CTraceContextPropagator } from '@opentelemetry/core'
 import type { SpanProcessor } from '@opentelemetry/sdk-trace'
+import {
+  ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
+  ATTR_SERVICE_NAME,
+  ATTR_SERVICE_VERSION,
+  ATTR_USER_AGENT_ORIGINAL,
+} from '@opentelemetry/semantic-conventions'
 import { appUpdate } from '../app-update.ts'
 import { getTelemetryPreference, TelemetryPreferenceEvent } from '../preferences.ts'
 import { resetDeviceId } from './ids.ts'
@@ -65,10 +71,10 @@ async function start(): Promise<void> {
 
   const provider = new TracerProvider({
     resource: resourceFromAttributes({
-      'service.name': 'chordless-web',
-      'service.version': running?.version ?? 'unknown',
-      'deployment.environment.name': import.meta.env?.MODE ?? 'unknown',
-      'user_agent.original': navigator.userAgent,
+      [ATTR_SERVICE_NAME]: 'chordless-web',
+      [ATTR_SERVICE_VERSION]: running?.version ?? 'unknown',
+      [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: import.meta.env?.MODE ?? 'unknown',
+      [ATTR_USER_AGENT_ORIGINAL]: navigator.userAgent,
     }),
     sampler: sampler(),
     spanProcessors,

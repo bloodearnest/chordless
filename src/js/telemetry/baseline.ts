@@ -5,6 +5,11 @@
  * here is cheap. Not the setlist or the song in view: those are on the spans that are about them.
  */
 import type { Attributes } from '@opentelemetry/api'
+import {
+  ATTR_DEVICE_ID,
+  ATTR_ENDUSER_PSEUDO_ID,
+  ATTR_SESSION_ID,
+} from '@opentelemetry/semantic-conventions/incubating'
 import { getLive } from '../live.ts'
 import { getAmbient } from './context.ts'
 import { getDeviceId } from './ids.ts'
@@ -15,11 +20,11 @@ export function baselineAttributes(): Attributes {
     if (value !== undefined && value !== null) attributes[key] = value
   }
   const ambient = getAmbient()
-  set('device.id', getDeviceId())
-  set('enduser.pseudo.id', ambient.accountId)
+  set(ATTR_DEVICE_ID, getDeviceId())
+  set(ATTR_ENDUSER_PSEUDO_ID, ambient.accountId)
   set('chordless.team.pseudo_id', ambient.teamPseudoId)
   set('chordless.space_kind', ambient.spaceKind)
-  set('session.id', ambient.sessionId)
+  set(ATTR_SESSION_ID, ambient.sessionId)
   // (the name of the page, not its address: the route's own words, like "setlist")
   set('chordless.route', document.body.dataset.view)
   set('chordless.live', getLive() !== null)

@@ -26,6 +26,7 @@
     "@opentelemetry/otlp-transformer": "^0.300.0",
     "@opentelemetry/resources": "^3.0.0",
     "@opentelemetry/sdk-trace": "^3.0.0",
+    "@opentelemetry/semantic-conventions": "^1.44.0",
     "jose": "^6.2.13",
     "lit": "^3.3.3",
     "minisearch": "^7.2.0",
