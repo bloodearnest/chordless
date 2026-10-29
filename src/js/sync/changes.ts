@@ -24,7 +24,7 @@ export function driveMarkers(file: Pick<StoredFile, 'modified' | 'rev'> | null |
 
 /** What makes two setlist records the same setlist, whatever their ids */
 export const setlistKey = (setlist: Setlist) =>
-  [setlist.date, setlist.time, setlist.owner, setlist.type, setlist.name].join('|')
+  [setlist.date, setlist.time, setlist.leaderId ?? '', setlist.type, setlist.name].join('|')
 
 /**
  * Whether a setlist has local changes that aren't in Drive: never uploaded,

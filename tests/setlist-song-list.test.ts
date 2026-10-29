@@ -5,17 +5,17 @@ import { songListHtml, songListText, ukDate } from '../src/js/setlist/song-list-
 
 const { describe, it, afterEach } = window
 
-const setlist = (extra: Partial<Setlist> = {}) =>
+const setlist = (extra: Partial<Setlist> & { leader?: string } = {}) =>
   ({
     id: 's1',
     date: '2026-10-25',
     time: '10:30',
     type: 'Church Service',
     name: 'Harvest',
-    owner: 'Sam',
+    leader: 'Sam',
     songs: [],
     ...extra,
-  }) as Setlist
+  }) as Setlist & { leader: string }
 
 describe('the song list to paste', () => {
   it('is one line per song, with the CCLI number in brackets where there is one', () => {
@@ -41,7 +41,7 @@ describe('the song list to paste', () => {
       'Worship Leader: Sam\n\nA & B (22025) https://songselect.ccli.com/songs/22025\nTwo'
     )
     expect(
-      songListText(songs, setlist({ date: '2026-10-18', owner: '' }), { title: false })
+      songListText(songs, setlist({ date: '2026-10-18', leader: '' }), { title: false })
     ).to.equal('A & B (22025)\nTwo')
     expect(songListHtml(songs, list)).to.equal(
       '<p>Songs for Sunday 18th October<br>Worship Leader: Sam</p>' +
@@ -55,7 +55,7 @@ describe('the song list to paste', () => {
     expect(songListText(songs, setlist({ date: '2026-10-18' }))).to.equal(
       'Songs for Sunday 18th October\nWorship Leader: Sam\n\nOne (22025)'
     )
-    expect(songListText(songs, setlist({ date: '2026-10-22', owner: '' }))).to.equal(
+    expect(songListText(songs, setlist({ date: '2026-10-22', leader: '' }))).to.equal(
       'Songs for Thursday 22nd October\n\nOne (22025)'
     )
     expect(ukDate('2026-11-01')).to.equal('Sunday 1st November')
@@ -82,6 +82,7 @@ describe('the song list to paste', () => {
       const el = await fixture<SetlistShare>(
         html`<setlist-share
           .setlist=${setlist()}
+          .leader=${'Sam'}
           .songs=${[{ title: 'One', _canonicalSong: { ccliNumber: '22025' } }, { title: 'Two' }]}
           .linkable=${linkable}
         ></setlist-share>`

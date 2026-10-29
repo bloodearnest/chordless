@@ -80,8 +80,7 @@ describe('the share view', () => {
     const setlist = makeSetlist({
       id: shareSetlistId('file1'),
       date: '2026-10-25',
-      owner: 'Ann',
-      received: { fileId: 'file1', ...received },
+      received: { fileId: 'file1', leaderName: 'Ann', ...received },
     } as never)
     await db.saveSetlist(setlist)
     return { state: 'ready', db, setlist, fresh: true }
@@ -222,7 +221,8 @@ describe('the share view', () => {
 
     it('has no mention of who or until when, when it does not know', async () => {
       const opening = await readyOpening()
-      if (opening.state === 'ready') opening.setlist.owner = ''
+      if (opening.state === 'ready' && opening.setlist.received)
+        opening.setlist.received.leaderName = ''
       await open(opening)
       const banner = view.querySelector('#share-banner')
       expect(banner?.textContent).to.not.contain(' by ')

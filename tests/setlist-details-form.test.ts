@@ -4,13 +4,20 @@ import {
   SetlistDetailsCancelEvent,
   SetlistDetailsSaveEvent,
 } from '../src/components/setlist-details-form.ts'
+import type { Person } from '../src/js/data-types.ts'
 import { must } from './must.ts'
 import { A11Y } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
-const ann = { id: 'ann@example.com', name: 'Ann Smith' }
-const ben = { id: 'ben@example.com', name: 'Ben Jones' }
+const NOW = '2026-10-29T10:00:00.000Z'
+const ann: Person = {
+  id: 'ann-id',
+  name: 'Ann Smith',
+  emails: ['ann@example.com'],
+  modifiedDate: NOW,
+}
+const ben: Person = { id: 'ben-id', name: 'Ben Jones', emails: [], modifiedDate: NOW }
 
 describe('leaderChoices', () => {
   it('offers the people, with nothing selected for a setlist without a leader', () => {
@@ -20,38 +27,20 @@ describe('leaderChoices', () => {
   })
 
   it('selects the leader by id', () => {
-    const { options, selected } = leaderChoices({ owner: 'Ann', ownerId: 'ANN@example.com' }, [
-      ann,
-      ben,
-    ])
+    const { options, selected } = leaderChoices({ leaderId: 'ann-id' }, [ann, ben])
     expect(must(options.find(o => o.value === selected)).person).to.equal(ann)
   })
 
-  it('matches a leader recorded by name only to the person with that name', () => {
-    const { options, selected } = leaderChoices({ owner: 'ben jones' }, [ann, ben])
-    expect(options).to.have.length(2)
+  it('selects the person a merged leader was merged into', () => {
+    const merged: Person = { ...ben, id: 'old-ben', mergedInto: 'ben-id' }
+    const { options, selected } = leaderChoices({ leaderId: 'old-ben' }, [ann, ben, merged])
     expect(must(options.find(o => o.value === selected)).person).to.equal(ben)
   })
 
-  it('keeps a leader who is not one of the people as an extra choice', () => {
-    const byName = leaderChoices({ owner: 'Visiting Leader' }, [ann])
-    expect(byName.options).to.have.length(2)
-    expect(must(byName.options.find(o => o.value === byName.selected)).person).to.deep.equal({
-      id: '',
-      name: 'Visiting Leader',
-    })
-
-    const byIdOnly = leaderChoices({ ownerId: 'cara@example.com' }, [ann])
-    expect(must(byIdOnly.options.find(o => o.value === byIdOnly.selected)).person).to.deep.equal({
-      id: 'cara@example.com',
-      name: 'cara@example.com',
-    })
-
-    const byId = leaderChoices({ owner: 'Cara', ownerId: 'cara@example.com' }, [ann])
-    expect(must(byId.options.find(o => o.value === byId.selected)).person).to.deep.equal({
-      id: 'cara@example.com',
-      name: 'Cara',
-    })
+  it('selects nobody for a leader who is not one of the people (not synced here yet)', () => {
+    const { options, selected } = leaderChoices({ leaderId: 'cara-id' }, [ann])
+    expect(options).to.have.length(1)
+    expect(selected).to.equal('')
   })
 })
 
@@ -110,8 +99,7 @@ describe('setlist-details-form', () => {
     time: '18:30',
     type: 'Prayer Meeting',
     name: 'Harvest',
-    owner: 'Ann Smith',
-    ownerId: 'ann@example.com',
+    leaderId: 'ann-id',
   }
 
   it("shows the setlist's details", async () => {
@@ -144,20 +132,19 @@ describe('setlist-details-form', () => {
       time: '18:30',
       type: 'Event',
       name: 'Harvest Festival',
-      owner: 'Ben Jones',
-      ownerId: 'ben@example.com',
+      leaderId: 'ben-id',
     })
   })
 
-  it('saves a leader typed in with Other… by name only', async () => {
+  it('saves a leader typed in with Other… as a name to find or make a person for', async () => {
     await makeForm(setlist)
     expect(field('leader-other')).to.equal(null)
     await choose('leader', 'other')
     type('leader-other', '  Visiting Leader  ')
 
     const detail = await save()
-    expect(detail.owner).to.equal('Visiting Leader')
-    expect(detail.ownerId).to.equal('')
+    expect(detail.newLeader).to.equal('Visiting Leader')
+    expect(detail.leaderId).to.equal('')
   })
 
   it('guesses the type from the date and name as they change, for a new setlist', async () => {
@@ -189,14 +176,8 @@ describe('setlist-details-form', () => {
     await makeForm(setlist)
     await choose('leader', '')
     const detail = await save()
-    expect(detail.owner).to.equal('')
-    expect(detail.ownerId).to.equal('')
-  })
-
-  it('adds the id when saving a leader recorded by name only', async () => {
-    await makeForm({ ...setlist, owner: 'Ann Smith', ownerId: undefined })
-    const detail = await save()
-    expect(detail.ownerId).to.equal('ann@example.com')
+    expect(detail.leaderId).to.equal('')
+    expect(detail.newLeader).to.equal(undefined)
   })
 
   it('fires cancel', async () => {

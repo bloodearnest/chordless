@@ -12,7 +12,8 @@ const FILE = 'abcdefghijklmnop1234'
 
 const bundle = (over: { expires?: string; chart?: string } = {}) =>
   buildShareBundle(
-    { date: '2099-10-11', time: '10:30', type: 'Church Service', name: '', owner: 'Ann Smith' },
+    { date: '2099-10-11', time: '10:30', type: 'Church Service', name: '' },
+    'Ann Smith',
     [
       {
         entry: makeEntry({ order: 0, songId: 'a', key: 'A', notes: 'repeat 4x' }),

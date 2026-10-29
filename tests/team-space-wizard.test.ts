@@ -450,13 +450,13 @@ describe('team-space-wizard', () => {
       const db = new ChordlessDB(source.id)
       await db.init()
       // (on different days: a copy skips a setlist that is the same event as one it has)
-      for (const [date, owner, ownerId] of [
+      for (const [date, name, email] of [
         ['2026-11-15', 'Cat', 'cat@example.com'],
         ['2026-11-22', 'Bea', 'bea@example.com'],
       ]) {
-        await db.saveSetlist(
-          makeSetlist({ id: `list-${crypto.randomUUID()}`, date, owner, ownerId })
-        )
+        const leaderId = `leader-${name}`
+        await db.savePeople([{ id: leaderId, name, emails: [email], modifiedDate: date }])
+        await db.saveSetlist(makeSetlist({ id: `list-${crypto.randomUUID()}`, date, leaderId }))
       }
       db.db?.close()
       await openWith(source)

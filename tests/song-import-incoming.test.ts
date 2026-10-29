@@ -233,8 +233,7 @@ describe('song-import: songs that arrive', () => {
           time: '10:30',
           type: 'Church Service',
           name: 'With Song',
-          owner: '',
-          ownerId: '',
+          leaderId: '',
         })
       )
       await waitUntil(() => visited.length === 1, 'the page to go to the setlist')
@@ -260,8 +259,7 @@ describe('song-import: songs that arrive', () => {
             time: '',
             type: 'Other',
             name: '',
-            owner: '',
-            ownerId: '',
+            leaderId: '',
           })
         )
         await waitUntil(() => importer._error, 'the failure to be shown')

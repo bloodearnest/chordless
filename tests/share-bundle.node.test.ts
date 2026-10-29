@@ -28,8 +28,8 @@ const setlist = {
   time: '10:30',
   type: 'Church Service',
   name: '',
-  owner: 'Ann Smith',
 }
+const LEADER = 'Ann Smith'
 
 const source = (
   order: number,
@@ -51,7 +51,10 @@ const source = (
 })
 
 const bundleOf = (sources: ShareSource[]) =>
-  buildShareBundle(setlist, sources, { expires: '2026-10-25', updated: '2026-10-09T19:30:00Z' })
+  buildShareBundle(setlist, LEADER, sources, {
+    expires: '2026-10-25',
+    updated: '2026-10-09T19:30:00Z',
+  })
 
 test('addDays is calendar arithmetic across months and years', () => {
   assert.equal(addDays('2026-10-11', 14), '2026-10-25')
@@ -90,14 +93,14 @@ test('the bundle carries no ids, emails or sync fields', () => {
   const full = {
     ...setlist,
     id: 'setlist-uuid-1',
-    ownerId: 'ann@example.com',
+    leaderId: 'ann-uuid',
     fileRef: 'drive-file-1',
     syncedContentHash: 'hash-1',
     share: { fileId: 'f', key: 'k', created: '', expires: '', bundleHash: '' },
   }
   const text = JSON.stringify(bundleOf([source(1)]).setlist)
   const withExtras = JSON.stringify(
-    buildShareBundle(full, [source(1)], { expires: '2026-10-25' }).setlist
+    buildShareBundle(full, LEADER, [source(1)], { expires: '2026-10-25' }).setlist
   )
   assert.equal(withExtras, text)
   for (const leak of ['uuid', 'example.com', 'drive-file', 'hash-1', 'songId', 'u1']) {
@@ -107,7 +110,7 @@ test('the bundle carries no ids, emails or sync fields', () => {
 
 test('the hash changes with the content and not with the build time', async () => {
   const base = await bundleHash(bundleOf([source(1), source(2)]))
-  const later = buildShareBundle(setlist, [source(1), source(2)], {
+  const later = buildShareBundle(setlist, LEADER, [source(1), source(2)], {
     expires: '2026-10-25',
     updated: '2027-01-01T00:00:00Z',
   })
@@ -129,9 +132,14 @@ test('the hash changes with the content and not with the build time', async () =
     base,
     'a chart'
   )
-  const dateChanged = buildShareBundle({ ...setlist, date: '2026-10-18' }, [source(1), source(2)], {
-    expires: '2026-10-25',
-  })
+  const dateChanged = buildShareBundle(
+    { ...setlist, date: '2026-10-18' },
+    LEADER,
+    [source(1), source(2)],
+    {
+      expires: '2026-10-25',
+    }
+  )
   assert.notEqual(await bundleHash(dateChanged), base, 'the date')
 })
 
@@ -214,6 +222,7 @@ test('decrypted data must be a bundle this version can show', () => {
 test('a setlist with no time, type, name or owner, and a song with no notes, is shared with them empty', () => {
   const bundle = buildShareBundle(
     { date: '2026-10-11' } as Parameters<typeof buildShareBundle>[0],
+    '',
     [
       {
         entry: { order: 0, songId: 's', songUuid: 'u', key: null, tempo: null },

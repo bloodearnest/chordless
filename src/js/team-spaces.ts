@@ -4,9 +4,10 @@
  * (team-client.ts); the space's files are synced as any space's, by whichever backend
  * `storageFor` gives it.
  */
-import type { Setlist, Space } from './data-types.ts'
+import type { Person, Setlist, Space } from './data-types.ts'
 import { ChordlessDB } from './db.ts'
 import { getStoredBlob } from './google-auth.ts'
+import { resolvePerson } from './leaders.ts'
 import { createSpace, deleteSpace, getSpaceById, listSpaces, updateSpace } from './space.ts'
 import { storageFor } from './storage/space-storage.ts'
 import type { TeamStorage } from './storage/team-storage.ts'
@@ -130,18 +131,16 @@ export interface Leader {
  * (docs/SPACES.md, "Creating a team space"). Those with an email come first; `own` (the person
  * making the space) is left out, as are setlists with no leader.
  */
-export function leadersOf(setlists: Setlist[], own?: string | null): Leader[] {
+export function leadersOf(setlists: Setlist[], people: Person[], own?: string | null): Leader[] {
   const mine = own?.trim().toLowerCase()
   const seen = new Set<string>()
   const leaders: Leader[] = []
   for (const setlist of setlists) {
-    const email = setlist.ownerId?.trim().toLowerCase() || null
-    const name = setlist.owner.trim()
-    if (email === mine && email) continue
-    const key = email ?? `name:${name.toLowerCase()}`
-    if ((!email && !name) || seen.has(key)) continue
-    seen.add(key)
-    leaders.push({ name: name || (email as string), email })
+    const person = resolvePerson(people, setlist.leaderId)
+    if (!person || seen.has(person.id)) continue
+    seen.add(person.id)
+    if (mine && person.emails.includes(mine)) continue
+    leaders.push({ name: person.name, email: person.emails[0] ?? null })
   }
   return leaders.sort((a, b) => Number(Boolean(b.email)) - Number(Boolean(a.email)))
 }

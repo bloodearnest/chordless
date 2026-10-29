@@ -216,7 +216,7 @@ describe('Drive sync: errors and missing files', () => {
     it('uploads two identical setlists made on one device', async () => {
       // The user made both; refusing one would leave their work unsynced
       const phone = await makeDevice('phone')
-      const same = { date: '2026-10-11', owner: 'Sam', type: 'Church Service', name: '' }
+      const same = { date: '2026-10-11', leaderId: 'sam', type: 'Church Service', name: '' }
       await addSetlist(phone, same)
       await addSetlist(phone, same)
 
@@ -227,7 +227,7 @@ describe('Drive sync: errors and missing files', () => {
 
     it('uploads two setlists for the same day at different times', async () => {
       const phone = await makeDevice('phone')
-      const same = { date: '2026-10-11', owner: 'Sam', type: 'Church Service', name: '' }
+      const same = { date: '2026-10-11', leaderId: 'sam', type: 'Church Service', name: '' }
       await addSetlist(phone, { ...same, time: '09:00' })
       await addSetlist(phone, { ...same, time: '18:00' })
 
@@ -309,7 +309,7 @@ describe('Drive sync: errors and missing files', () => {
       // e.g. a device with its own record of the same service, under another id
       const phone = await makeDevice('phone')
       const tablet = await makeDevice('tablet')
-      const same = { date: '2026-10-11', owner: 'Sam', type: 'Church Service' }
+      const same = { date: '2026-10-11', leaderId: 'sam', type: 'Church Service' }
       await addSetlist(phone, { ...same, name: '' })
       await syncDevice(phone)
       const own = await addSetlist(tablet, { ...same, name: '' })
@@ -323,7 +323,7 @@ describe('Drive sync: errors and missing files', () => {
     it('still uploads a setlist that differs in its name', async () => {
       const phone = await makeDevice('phone')
       const tablet = await makeDevice('tablet')
-      const same = { date: '2026-10-11', owner: 'Sam', type: 'Event' }
+      const same = { date: '2026-10-11', leaderId: 'sam', type: 'Event' }
       await addSetlist(phone, { ...same, name: 'Morning' })
       await syncDevice(phone)
       await addSetlist(tablet, { ...same, name: 'Evening' })

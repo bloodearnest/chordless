@@ -61,7 +61,6 @@ test('previews, then applies, a repair of a library with a song twice', { tag: '
         time: '10:30',
         type: 'Church Service',
         name: '',
-        owner: 'Ann',
         createdDate: '2026-10-11T10:00:00.000Z',
         modifiedDate: '2026-10-11T10:00:00.000Z',
         songs: [

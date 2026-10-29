@@ -92,7 +92,7 @@ What's encrypted. Everything a recipient needs, and nothing about the space:
 ```
 
 - The chart text is included, not song ids.
-- Not included: space ids, Drive ids, leaders' emails (`ownerId`) and sync
+- Not included: space ids, Drive ids, leaders' emails and ids (the bundle has the leader's name only) and sync
   fields.
 - A typical setlist (4–6 songs) is 10–15 KB of ChordPro, about 3–4 KB compressed.
 

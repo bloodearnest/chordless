@@ -10,7 +10,8 @@ import { parseLocalDate } from '../utils/date-utils.ts'
 /** The setlist details that head the text */
 export interface ListedSetlist {
   date?: string
-  owner?: string | null
+  /** The leader's name */
+  leader?: string | null
 }
 
 /** "Sunday 18th October" (UK style, in English whatever the device's language) */
@@ -45,7 +46,7 @@ export function ccliOf(song: ListedSong): string {
 export function setlistHeadingLines(setlist: ListedSetlist): string[] {
   const lines: string[] = []
   if (setlist.date) lines.push(`Songs for ${ukDate(setlist.date)}`)
-  if (setlist.owner) lines.push(`Worship Leader: ${setlist.owner}`)
+  if (setlist.leader) lines.push(`Worship Leader: ${setlist.leader}`)
   return lines
 }
 

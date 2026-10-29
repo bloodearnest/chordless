@@ -108,6 +108,7 @@ export async function seedSong(page, { setlistId = null }: { setlistId?: string 
   const setlist = setlistId
     ? makeSetlist({
         id: setlistId,
+        leaderId: 'ann-leader',
         songs: [makeEntry({ songId: song.id, songUuid: song.uuid, key: 'A' })],
       })
     : null
@@ -117,7 +118,12 @@ export async function seedSong(page, { setlistId = null }: { setlistId?: string 
       const db = await getCurrentDB()
       await db.saveChordPro(chordpro)
       await db.saveSong(song)
-      if (setlist) await db.saveSetlist(setlist)
+      if (setlist) {
+        await db.savePeople([
+          { id: 'ann-leader', name: 'Ann', emails: [], modifiedDate: new Date().toISOString() },
+        ])
+        await db.saveSetlist(setlist)
+      }
     },
     { chordpro, song, setlist }
   )

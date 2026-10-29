@@ -1,88 +1,94 @@
 /**
- * People who can lead setlists in the current space.
- *
- * A person is { id, name }, where id is their Google account email. Setlists
- * store the leader as `owner` (name) and `ownerId` (id). The id is empty for a
- * leader entered by name only ("Other…" in the setlist form).
+ * The people of the current space, who can lead its setlists (docs/IDENTITIES.md). A setlist's
+ * leader is a person's id (`leaderId`); the people are stored with the space.
  */
 
 import type { Person } from './data-types.ts'
-import { type ChordlessDB, NO_CHANGE } from './db.ts'
+import type { ChordlessDB } from './db.ts'
 import { getCurrentUserInfo } from './google-auth.ts'
+import { findPerson, idFromKey, normalizeEmail } from './leaders.ts'
 import { getCurrentSpaceFull } from './space.ts'
 
-/** The signed-in user as a person, or null if not signed in */
-export async function getCurrentPerson(): Promise<Person | null> {
+/** The signed-in Google account, or null if not signed in */
+export async function getSignedInUser(): Promise<{ email: string; name: string } | null> {
   // (getCurrentUserInfo gives null rather than failing)
   const user = await getCurrentUserInfo()
   if (!user?.email) return null
-  return { id: user.email, name: user.name || user.email }
+  return { email: normalizeEmail(user.email), name: user.name || user.email }
 }
 
 /**
- * The space's members (the people its Drive folder is shared with,
- * cached at each sync) plus the signed-in user, sorted by name.
+ * The person for a name and/or email, found among `people` or made: someone with that email, else
+ * someone of that name (who gains the email if they had none), else a new person. Returns the
+ * person and the list as it should now be stored (`changed` are the people to save).
  */
-export async function getSpacePeople(): Promise<{ people: Person[]; me: Person | null }> {
-  const [me, space] = await Promise.all([getCurrentPerson(), getCurrentSpaceFull()])
-  const members = (space?.members || []).map(m => ({ id: m.email, name: m.name || m.email }))
-  return { people: mergePeople(me ? [me, ...members] : members), me }
-}
-
-/** Combine lists of people, one entry per id (the first wins), sorted by name */
-export function mergePeople(people: Person[]): Person[] {
-  const byId = new Map<string, Person>()
-  for (const person of people) {
-    const key = person.id?.toLowerCase()
-    if (key && !byId.has(key)) byId.set(key, person)
+export function personFor(
+  people: Person[],
+  who: { name?: string | null; email?: string | null },
+  now = new Date().toISOString()
+): { person: Person; changed: Person[] } | null {
+  const email = normalizeEmail(who.email)
+  const name = (who.name ?? '').trim()
+  if (!email && !name) return null
+  const found = findPerson(people, { name, email })
+  if (found) {
+    if (email && !found.emails.includes(email) && found.emails.length === 0) {
+      const person = { ...found, emails: [email], modifiedDate: now }
+      return { person, changed: [person] }
+    }
+    return { person: found, changed: [] }
   }
-  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
+  const person: Person = {
+    id: idFromKey(email ? `email:${email}` : `name:${name.toLowerCase()}`),
+    name: name || email,
+    emails: email ? [email] : [],
+    modifiedDate: now,
+  }
+  return { person, changed: [person] }
 }
 
 /**
- * One-off: give setlists without a leader id to `me`, if their leader is me by
- * name or they have no leader. For setlists from before leaders had ids, while
- * everything was led by the one user. Saved with a new modifiedDate so they
- * sync. Returns how many were updated.
+ * The space's people, with a person for each of the space's members and for the signed-in user
+ * if they have none yet; and the signed-in user's own person.
  */
-export async function claimSetlistsWithoutOwnerId(
+export async function getSpacePeople(
+  db: ChordlessDB
+): Promise<{ people: Person[]; me: Person | null }> {
+  const [user, space] = await Promise.all([getSignedInUser(), getCurrentSpaceFull()])
+  let people = await db.getAllPeople()
+  const known = [
+    ...(user ? [{ name: user.name, email: user.email }] : []),
+    ...(space?.members || []).map(m => ({ name: m.name || m.email, email: m.email })),
+  ]
+  const changed = new Map<string, Person>()
+  for (const who of known) {
+    const made = personFor(people, who)
+    if (!made) continue
+    for (const person of made.changed) changed.set(person.id, person)
+    people = [...people.filter(p => p.id !== made.person.id), made.person]
+  }
+  if (changed.size) await db.savePeople([...changed.values()])
+  const me = user ? (findPerson(people, { email: user.email }) ?? null) : null
+  return { people: livePeople(people), me }
+}
+
+/** The people not merged into another, sorted by name */
+export function livePeople(people: Person[]): Person[] {
+  return people.filter(person => !person.mergedInto).sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * The details of a setlist form as setlist fields: a leader typed in with "Other…" is found among
+ * the people or made, and saved, so what is returned has only a `leaderId`.
+ */
+export async function settleLeader<T extends { leaderId: string; newLeader?: string }>(
   db: ChordlessDB,
-  me: Person | null | undefined
-): Promise<number> {
-  if (!me?.id) return 0
-  let claimed = 0
-  for (const setlist of await db.getAllSetlists()) {
-    if (setlist.ownerId) continue
-    const owner = setlist.owner?.trim() || ''
-    if (owner && owner.toLowerCase() !== me.name.toLowerCase()) continue
-    const saved = await db.updateSetlist(setlist.id, stored => {
-      // (as it is stored now: another writer may have given it a leader since it was read)
-      if (stored.ownerId) return NO_CHANGE
-      stored.owner = me.name
-      stored.ownerId = me.id
-      stored.modifiedDate = new Date().toISOString()
-    })
-    if (saved) claimed++
-  }
-  return claimed
-}
-
-/**
- * Run claimSetlistsWithoutOwnerId once per space on this device. Once
- * done it doesn't run again, so a setlist later saved with "No leader" isn't
- * claimed.
- */
-export async function claimSetlistsOnce(db: ChordlessDB, spaceId: string): Promise<number> {
-  const key = `setlist-owner-ids-claimed:${spaceId}`
-  try {
-    if (localStorage.getItem(key)) return 0
-    const me = await getCurrentPerson()
-    if (!me) return 0 // not signed in: try again next time
-    const claimed = await claimSetlistsWithoutOwnerId(db, me)
-    localStorage.setItem(key, new Date().toISOString())
-    return claimed
-  } catch (error) {
-    console.warn('[People] Could not set setlist leader ids:', error)
-    return 0
-  }
+  details: T
+): Promise<Omit<T, 'newLeader'>> {
+  const { newLeader, ...rest } = details
+  if (!newLeader?.trim()) return rest
+  const made = personFor(await db.getAllPeople(), { name: newLeader })
+  if (!made) return rest
+  await db.savePeople(made.changed)
+  return { ...rest, leaderId: made.person.id }
 }

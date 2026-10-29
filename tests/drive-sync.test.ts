@@ -125,7 +125,7 @@ describe('sync (against the memory backend)', () => {
 
     it('creates and updates setlist files with the metadata from drive-metadata.js', async () => {
       const phone = await makeDevice('phone')
-      const setlist = await addSetlist(phone, { name: 'Harvest', owner: 'Ann' })
+      const setlist = await addSetlist(phone, { name: 'Harvest', leaderId: 'ann' })
       await syncDevice(phone)
       const expected = () => setlistFileMetadata(setlist, { spaceId: TEST_SPACE.id }).appProperties
 
@@ -138,15 +138,17 @@ describe('sync (against the memory backend)', () => {
 
     it("renames a setlist's file when its date or leader changes", async () => {
       const phone = await makeDevice('phone')
+      await phone.db.savePeople([
+        { id: 'ann', name: 'Ann', emails: [], modifiedDate: new Date().toISOString() },
+      ])
       const setlist = await addSetlist(phone, {
         date: '2026-10-11',
-        owner: '',
         type: 'Church Service',
       })
       await syncDevice(phone)
       expect(fileFor(setlist.id).name).to.equal('2026-10-11-church-service.json')
 
-      await editSetlist(phone, setlist.id, { date: '2026-10-18', owner: 'Ann' })
+      await editSetlist(phone, setlist.id, { date: '2026-10-18', leaderId: 'ann' })
       await syncDevice(phone)
 
       expect(fileFor(setlist.id).name).to.equal('2026-10-18-ann-church-service.json')

@@ -13,6 +13,7 @@ import { encodeImport } from '../src/js/email-link.ts'
 import type { ImportedSetlist } from '../src/js/email-setlist.ts'
 import { offerLink, takeLink } from '../src/js/incoming-link.ts'
 import { setRouter } from '../src/js/navigation.ts'
+import { personFor } from '../src/js/people.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
 import { addChart, createSong } from '../src/js/song-utils.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
@@ -78,6 +79,13 @@ describe('setlist-email-import', () => {
     await deleteSpace(spaceId)
     if (before.id) await setCurrentSpace(before.id, before.name)
   })
+
+  /** A person of the space (what a setlist's leaderId points at) */
+  async function addPerson(name: string, personEmail?: string) {
+    const made = must(personFor(await db.getAllPeople(), { name, email: personEmail }))
+    await db.savePeople(made.changed)
+    return made.person
+  }
 
   async function open() {
     importer = await fixture<SetlistEmailImport>(
@@ -403,19 +411,46 @@ describe('setlist-email-import', () => {
   })
 
   describe('the leader', () => {
-    it('is told by email, or by name', async () => {
-      await open()
-      const leader = { name: 'Leader One', email: 'one@example.com' }
-      const setlist = (over: object) => makeSetlist(over as never)
-      expect(importer._isLeader(setlist({ ownerId: 'ONE@example.com' }), leader)).to.equal(true)
-      expect(importer._isLeader(setlist({ ownerId: 'two@example.com' }), leader)).to.equal(false)
-      expect(importer._isLeader(setlist({ owner: 'leader one', ownerId: '' }), leader)).to.equal(
-        true
-      )
-      expect(importer._isLeader(setlist({ owner: 'Someone', ownerId: '' }), leader)).to.equal(false)
-      expect(
-        importer._isLeader(setlist({ owner: 'Leader One' }), { name: '', email: '' })
-      ).to.equal(false)
+    it('is the person the email’s address belongs to, whatever name the email gave', async () => {
+      const known = await addPerson('Leader 1', 'one@example.com')
+      await review(email({ leader: { name: 'L. One', email: 'ONE@example.com' } }))
+      expect(importer._setlist.leaderId).to.equal(known.id)
+      expect(importer._pendingPeople).to.deep.equal([])
+    })
+
+    it('is the person of that name when the email has none', async () => {
+      const known = await addPerson('Leader One')
+      await review(email({ leader: { name: 'leader one', email: '' } }))
+      expect(importer._setlist.leaderId).to.equal(known.id)
+    })
+
+    it('is a new person, chosen in the form but only stored with the setlist', async () => {
+      await createSong(chart('Alpha Song', '111'), {})
+      await review(email({ songs: [makeImportedSong('Alpha Song', { ccli: '111' })] }))
+      const id = importer._setlist.leaderId
+      expect(id).to.be.ok
+      expect(importer._people.map(each => each.name)).to.include('Leader One')
+      expect(await db.getAllPeople()).to.deep.equal([])
+      button(/Create setlist/)?.click()
+      await waitUntil(() => visited.length === 1, 'the page to go to the setlist')
+      const [saved] = await db.getAllSetlists()
+      expect(saved.leaderId).to.equal(id)
+      const stored = must((await db.getAllPeople()).find(each => each.id === id))
+      expect(stored.emails).to.deep.equal(['one@example.com'])
+    })
+
+    it('is not stored when another leader is chosen for the setlist', async () => {
+      await createSong(chart('Alpha Song', '111'), {})
+      const other = await addPerson('Someone Else', 'else@example.com')
+      await review(email({ songs: [makeImportedSong('Alpha Song', { ccli: '111' })] }))
+      await importer._save({
+        date: '2099-10-25',
+        time: '10:30',
+        type: 'Church Service',
+        name: '',
+        leaderId: other.id,
+      })
+      expect((await db.getAllPeople()).map(each => each.name)).to.deep.equal(['Someone Else'])
     })
   })
 
@@ -521,8 +556,7 @@ describe('setlist-email-import', () => {
           id: 'have',
           date: '2099-10-25',
           name: 'Mine',
-          owner: 'Leader One',
-          ownerId: 'one@example.com',
+          leaderId: (await addPerson('Leader One', 'one@example.com')).id,
           songs: [
             makeEntry({ order: 0, songId: bravo.id, songUuid: bravo.uuid, key: 'D' }),
             makeEntry({ order: 1, songId: alpha.id, songUuid: alpha.uuid, key: 'G' }),
@@ -566,8 +600,7 @@ describe('setlist-email-import', () => {
         makeSetlist({
           id: 'same',
           date: '2099-10-25',
-          owner: 'Leader One',
-          ownerId: 'one@example.com',
+          leaderId: (await addPerson('Leader One', 'one@example.com')).id,
           songs: [makeEntry({ order: 0, songId: alpha.id, songUuid: alpha.uuid, key: 'G' })],
         })
       )
@@ -611,8 +644,7 @@ describe('setlist-email-import', () => {
         makeSetlist({
           id: 'theirs',
           date: '2099-10-25',
-          owner: 'Someone Else',
-          ownerId: 'else@example.com',
+          leaderId: (await addPerson('Someone Else', 'else@example.com')).id,
         })
       )
       await review(email())
@@ -623,10 +655,18 @@ describe('setlist-email-import', () => {
 
     it('is not chosen when two setlists of that date are the leader’s', async () => {
       await db.saveSetlist(
-        makeSetlist({ id: 'one', date: '2099-10-25', ownerId: 'one@example.com' })
+        makeSetlist({
+          id: 'one',
+          date: '2099-10-25',
+          leaderId: (await addPerson('Leader One', 'one@example.com')).id,
+        })
       )
       await db.saveSetlist(
-        makeSetlist({ id: 'two', date: '2099-10-25', ownerId: 'one@example.com' })
+        makeSetlist({
+          id: 'two',
+          date: '2099-10-25',
+          leaderId: (await addPerson('Leader One', 'one@example.com')).id,
+        })
       )
       await review(email())
       expect(importer._target).to.equal('new')
@@ -668,8 +708,9 @@ describe('setlist-email-import', () => {
             songs: [makeImportedSong('Alpha Song', { ccli: '111' })],
           })
         )
-        expect(importer._setlist.owner).to.equal('Ann Smith')
-        expect(importer._setlist.ownerId).to.equal('ann@example.com')
+        const ann = must((await db.getAllPeople()).find(each => each.name === 'Ann Smith'))
+        expect(importer._setlist.leaderId).to.equal(ann.id)
+        expect(ann.emails).to.deep.equal(['ann@example.com'])
         expect(text()).to.contain('Setlist from an email')
         button(/Create setlist/)?.click()
         await waitUntil(() => visited.length === 1, 'the page to go to the setlist')
@@ -681,8 +722,7 @@ describe('setlist-email-import', () => {
 
     it('is no leader when the email has none and nobody is signed in', async () => {
       await review(email({ leader: { name: '', email: '' } }))
-      expect(importer._setlist.owner).to.equal('')
-      expect(importer._setlist.ownerId).to.equal('')
+      expect(importer._setlist.leaderId).to.equal('')
     })
 
     it('is the song’s own title, shown when the library calls it something else', async () => {
@@ -722,8 +762,6 @@ describe('setlist-email-import', () => {
           date: '2099-10-25',
           name: '',
           type: 'Church Service',
-          owner: '',
-          ownerId: '',
         })
       )
       await review(email())
@@ -740,8 +778,7 @@ describe('setlist-email-import', () => {
         makeSetlist({
           id: 'order',
           date: '2099-10-25',
-          owner: 'Leader One',
-          ownerId: 'one@example.com',
+          leaderId: (await addPerson('Leader One', 'one@example.com')).id,
           songs: [
             makeEntry({ order: 0, songId: bravo.id, songUuid: bravo.uuid, key: 'D' }),
             makeEntry({ order: 1, songId: alpha.id, songUuid: alpha.uuid, key: 'G' }),

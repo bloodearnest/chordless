@@ -7,14 +7,16 @@
  *   manifest.json                what and when, and how much
  *   songs.json                   each chart's record (its identity, variant, key, tempo)
  *   songs/<title>-<id>.cho       each chart's text
+ *   people.json                  who leads the setlists (docs/IDENTITIES.md)
  *   setlists/<date>-<name>-<id>.json
  *   pads/<set>/<KEY>.mp3
  *
  * An import adds what the space lacks and skips what it has (charts by content, setlists by id),
  * so running it twice adds nothing; it deletes nothing.
  */
-import type { Setlist, SongRecord } from './data-types.ts'
+import type { Person, Setlist, SongRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
+import { adoptLegacyLeader } from './leaders.ts'
 import { PAD_FILE_KEYS } from './pad-keys.ts'
 import { type PadSet, readPadSetAudio, uploadPadSet } from './pad-set-service.ts'
 import { type TransferReport, type TransferSource, transferSpace } from './space-transfer.ts'
@@ -69,6 +71,8 @@ export interface SpaceExport {
   songs: SongRecord[]
   chordpro: Map<string, string>
   setlists: Setlist[]
+  /** The people who lead them (made from the setlists of an export from before there were people) */
+  people: Person[]
   /** The pad sets' audio, read from the zip when asked (they are large) */
   padAudio(dir: string): Promise<Map<string, Uint8Array<ArrayBuffer>>>
 }
@@ -180,6 +184,7 @@ export async function createExport(
     [
       { name: 'manifest.json', data: JSON.stringify(manifest, null, 2) },
       { name: 'songs.json', data: JSON.stringify(songs, null, 2) },
+      { name: 'people.json', data: JSON.stringify(await db.getAllPeople(), null, 2) },
       ...files,
     ],
     now
@@ -241,11 +246,19 @@ export async function readExport(file: Blob): Promise<SpaceExport> {
     }
   }
 
+  // An export from before there were people names each leader on the setlist
+  const peopleEntry = byName.get('people.json')
+  const people: Person[] = peopleEntry ? JSON.parse(await text('people.json')) : []
+  const leaders = { known: people, added: [] as Person[] }
+  const adopted = setlists.map(setlist => adoptLegacyLeader(setlist, leaders))
+  people.push(...leaders.added)
+
   return {
     manifest,
     songs,
     chordpro,
-    setlists,
+    setlists: adopted,
+    people,
     async padAudio(dir) {
       const audio = new Map<string, Uint8Array<ArrayBuffer>>()
       for (const key of PAD_FILE_KEYS) {
@@ -266,6 +279,7 @@ function sourceOf(exported: SpaceExport): TransferSource {
       return content === undefined ? undefined : { content }
     },
     getAllSetlists: async () => exported.setlists,
+    getAllPeople: async () => exported.people,
   }
 }
 

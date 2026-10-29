@@ -8,6 +8,7 @@
 
 import type { Setlist, SongInput, SongRecord } from '../data-types.ts'
 import { withNumericTempos } from '../db.ts'
+import { adoptLegacyLeader, type Leaders } from '../leaders.ts'
 import { songSource } from '../song-source.ts'
 import { chartFields, chartIdentity } from '../song-utils.ts'
 import type { StoredFile } from '../storage/types.ts'
@@ -42,12 +43,14 @@ interface SetlistDownload {
 /** The setlist record to keep for a downloaded file, with its local record (if any) in mind */
 async function downloadSetlist(
   { driveFile, setlistId, localSetlist, adopt }: SetlistDownload,
-  text: string
+  text: string,
+  leaders: Leaders
 ): Promise<Setlist> {
   // Older setlists in Drive may hold a chart's text as a tempo. Saving
   // converts it too, but convert first: the hash recorded as synced must
   // be of what's stored, or the setlist would look edited here
-  const remote = withNumericTempos(JSON.parse(text))
+  // (a file from before leaders were people names its leader: read as the person)
+  const remote = adoptLegacyLeader(withNumericTempos(JSON.parse(text)), leaders)
   const remoteHash = setlistContentHash(remote)
 
   if (adopt && localSetlist) {
@@ -171,12 +174,13 @@ export async function pullSetlists(
   })
 
   const setlistsToSave: Setlist[] = []
+  const leaders: Leaders = { known: await run.db.getAllPeople(), added: [] }
   let completed = 0
   await inBatches(
     run.space,
     downloadQueue,
     item => item.driveFile.ref,
-    (item, text) => downloadSetlist(item, text),
+    (item, text) => downloadSetlist(item, text, leaders),
     results => {
       for (const result of results) {
         if (result.status === 'fulfilled') {
@@ -198,6 +202,8 @@ export async function pullSetlists(
   )
 
   if (setlistsToSave.length > 0) {
+    // (the people first: a setlist whose leader is not stored shows none)
+    await run.db.addPeople(leaders.added)
     await run.db.saveSetlistsBatch(setlistsToSave)
     for (const after of setlistsToSave) {
       const before = resetting.get(after.id)

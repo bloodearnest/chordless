@@ -9,7 +9,7 @@ import { libraryForMatching } from '../js/import-setlist.ts'
 import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
 import { type ChartComparison, compareCharts } from '../js/library-repair.ts'
 import { ChordProParser } from '../js/parser.ts'
-import { getCurrentPerson, getSpacePeople } from '../js/people.ts'
+import { getSignedInUser, getSpacePeople, settleLeader } from '../js/people.ts'
 import {
   createSong,
   findExistingSong,
@@ -731,7 +731,7 @@ export class SongImport extends LitElement {
       this._db = db
       const imports: ImportItem[] = []
       const skipped: string[] = []
-      const importUser = (await getCurrentPerson())?.name
+      const importUser = (await getSignedInUser())?.name
       for (const { chordproText = '', metadata = {}, source, name, skip } of songs) {
         if (skip || !chordproText.trim()) {
           skipped.push(`${name}: ${skip || 'empty'}`)
@@ -839,7 +839,7 @@ export class SongImport extends LitElement {
 
   /** Open the new setlist form with defaults: next Sunday morning, led by you */
   async _openNewSetlist(): Promise<void> {
-    const { people, me } = await getSpacePeople()
+    const { people, me } = await getSpacePeople(this._database())
     const date = toLocalDateString(getNextSunday())
     this._people = people
     this._newSetlist = {
@@ -847,8 +847,7 @@ export class SongImport extends LitElement {
       time: '10:30',
       type: determineSetlistType(date, ''),
       name: '',
-      owner: me?.name || '',
-      ownerId: me?.id || '',
+      leaderId: me?.id || '',
     }
     await this.updateComplete
     this._newSetlistModal()?.show()
@@ -857,8 +856,8 @@ export class SongImport extends LitElement {
   async _createSetlist(event: SetlistDetailsSaveEvent): Promise<void> {
     event.stopPropagation()
     const setlist = createSetlist({
-      ...event.details,
-      createdBy: (await getCurrentPerson())?.id,
+      ...(await settleLeader(this._database(), event.details)),
+      createdBy: (await getSignedInUser())?.email,
     })
     try {
       // biome-ignore lint/plugin: a new setlist, with no stored one to write over

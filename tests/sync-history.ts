@@ -166,7 +166,7 @@ export async function runHistory(
       // One device doesn't make the same setlist twice; devices may make the same one
       if ((await device.db.getAllSetlists()).some(s => s.date === date)) return
       const setlist = {
-        ...createSetlist({ date, owner: 'Sam', type: 'Church Service' }),
+        ...createSetlist({ date, leaderId: 'sam', type: 'Church Service' }),
         songs: someSongs(),
         modifiedDate: stamp(),
       }

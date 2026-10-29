@@ -124,11 +124,10 @@ async function store(
     time: bundle.setlist.time,
     type: bundle.setlist.type,
     name: bundle.setlist.name,
-    owner: bundle.setlist.owner,
     songs: entries,
     createdDate,
     modifiedDate: now,
-    received,
+    received: { ...received, leaderName: bundle.setlist.owner?.trim() || undefined },
   }
   await db.saveSetlist(setlist)
   return setlist

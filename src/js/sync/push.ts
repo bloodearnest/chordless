@@ -10,6 +10,7 @@ import {
   songFileMetadata,
   updateInput,
 } from '../drive-metadata.ts'
+import { leaderName } from '../leaders.ts'
 import type { WriteResult } from '../storage/types.ts'
 import { hashText } from '../utils/hash.ts'
 import {
@@ -30,7 +31,10 @@ function setlistJson(setlist: Setlist): string {
 
 /** Drive file metadata for a setlist (see drive-metadata.ts) */
 function setlistMetadata(run: SyncRun, setlist: Setlist) {
-  return setlistFileMetadata(setlist, { spaceId: run.spaceId })
+  return setlistFileMetadata(setlist, {
+    spaceId: run.spaceId,
+    leader: leaderName(run.people, setlist.leaderId),
+  })
 }
 
 /** Drive file metadata for a song variant's chart (see drive-metadata.ts) */
@@ -203,6 +207,7 @@ export async function pushSetlists(
   progressCallback: ProgressCallback | null = null
 ): Promise<void> {
   const localSetlists = await run.db.getAllSetlists()
+  run.people = await run.db.getAllPeople()
 
   // Only the setlists that need syncing
   const toSync: Setlist[] = []
@@ -293,6 +298,7 @@ export async function pushSetlists(
 /** Push a single setlist to Drive: a new file, or an update of its file */
 export async function pushSetlist(run: SyncRun, setlist: Setlist): Promise<void> {
   try {
+    if (run.people.length === 0) run.people = await run.db.getAllPeople()
     const content = setlistJson(setlist)
     const metadata = setlistMetadata(run, setlist)
     const result = setlist.fileRef

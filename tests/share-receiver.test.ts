@@ -34,7 +34,8 @@ describe('Receiving a share link', () => {
     over: { chart?: string; expires?: string; key?: string; setlistId?: string } = {}
   ) =>
     buildShareBundle(
-      { date: '2026-10-11', time: '10:30', type: 'Church Service', name: '', owner: 'Ann Smith' },
+      { date: '2026-10-11', time: '10:30', type: 'Church Service', name: '' },
+      'Ann Smith',
       [
         {
           entry: makeEntry({ order: 0, songId: 'x', key: over.key ?? 'A', notes: 'repeat 4x' }),
@@ -99,7 +100,7 @@ describe('Receiving a share link', () => {
 
     expect(result.fresh).to.equal(true)
     const setlist = must(await result.db.getSetlist(shareSetlistId(FILE)))
-    expect(setlist).to.include({ date: '2026-10-11', owner: 'Ann Smith', time: '10:30' })
+    expect(setlist).to.include({ date: '2026-10-11', time: '10:30' })
     expect(setlist.songs).to.have.length(1)
     expect(setlist.songs[0]).to.include({ key: 'A', notes: 'repeat 4x', order: 0 })
     expect(setlist.received).to.deep.equal({
@@ -107,6 +108,7 @@ describe('Receiving a share link', () => {
       key,
       etag: '"e1"',
       expires: '2099-01-01',
+      leaderName: 'Ann Smith',
     })
 
     const song = must(await result.db.getDefaultSongVariant(setlist.songs[0].songId))

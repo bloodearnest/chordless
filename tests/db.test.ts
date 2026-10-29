@@ -29,14 +29,10 @@ describe('ChordlessDB', () => {
   })
 
   it('records who made a setlist, apart from its leader, only when it is known', () => {
-    const made = createSetlist({
-      owner: 'Leader',
-      ownerId: 'leader@example.com',
-      createdBy: 'me@example.com',
-    })
+    const made = createSetlist({ leaderId: 'leader-1', createdBy: 'me@example.com' })
     expect(made.createdBy).to.equal('me@example.com')
-    expect(made.ownerId).to.equal('leader@example.com')
-    expect('createdBy' in createSetlist({ owner: 'Leader' })).to.equal(false)
+    expect(made.leaderId).to.equal('leader-1')
+    expect('createdBy' in createSetlist({ leaderId: 'leader-1' })).to.equal(false)
   })
 
   it('saves and retrieves setlist', async () => {
@@ -49,7 +45,7 @@ describe('ChordlessDB', () => {
       time: '09:30',
       type: 'Church Service',
       name: 'Morning Service',
-      owner: 'Alice',
+      leaderId: 'alice',
     })
 
     setlist.songs.push({
@@ -65,7 +61,7 @@ describe('ChordlessDB', () => {
 
     const loaded = await db.getSetlist(setlist.id)
     expect(loaded.name).to.equal('Morning Service')
-    expect(loaded.owner).to.equal('Alice')
+    expect(loaded.leaderId).to.equal('alice')
     expect(loaded.songs).to.have.lengthOf(1)
   })
 })
@@ -407,6 +403,92 @@ describe('ChordlessDB version 8: a song’s source is where it came from, not ho
   })
 })
 
+describe('ChordlessDB version 10: a setlist’s leader is a person of the space', () => {
+  let dbName: string
+
+  afterEach(async () => {
+    await deleteDatabase(dbName)
+  })
+
+  /** A version 9 database, as it was, with these setlists */
+  function makeVersion9(setlists: object[]) {
+    return new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(dbName, 9)
+      request.onupgradeneeded = () => {
+        const db = request.result
+        db.createObjectStore('songs', { keyPath: 'uuid' }).createIndex('id', 'id')
+        db.createObjectStore('chordpro', { keyPath: 'id' })
+        const store = db.createObjectStore('setlists', { keyPath: 'id' })
+        store.createIndex('owner', 'owner')
+        db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
+        db.createObjectStore('pending_deletions', { keyPath: 'ref' })
+      }
+      request.onsuccess = () => {
+        const db = request.result
+        const tx = db.transaction(['setlists'], 'readwrite')
+        for (const setlist of setlists) tx.objectStore('setlists').put(setlist)
+        tx.oncomplete = () => {
+          db.close()
+          resolve()
+        }
+        tx.onerror = () => reject(tx.error)
+      }
+    })
+  }
+
+  it('makes a person of each leader, joins the spellings of one, and drops owner and ownerId', async () => {
+    dbName = `TEST-${uniqueName()}`
+    const old = (id: string, owner: string, ownerId?: string) => ({
+      id,
+      date: '2026-10-11',
+      songs: [],
+      modifiedDate: '2026-01-01T00:00:00Z',
+      owner,
+      ...(ownerId === undefined ? {} : { ownerId }),
+    })
+    await makeVersion9([
+      old('a', 'Tom', 'Tom@Example.com'),
+      old('b', 'Tom Smith', 'tom@example.com'),
+      old('f', 'Tom Smith', 'tom@example.com'),
+      old('c', 'tom smith'),
+      old('d', 'Visiting Vic'),
+      old('e', ''),
+    ])
+    const db = new ChordlessDB(dbName)
+    await db.init()
+    const people = await db.getAllPeople()
+    const setlists = Object.fromEntries((await db.getAllSetlists()).map(each => [each.id, each]))
+
+    expect(people.map(each => [each.name, each.emails]).sort()).to.deep.equal([
+      ['Tom Smith', ['tom@example.com']],
+      ['Visiting Vic', []],
+    ])
+    const tom = must(people.find(each => each.name === 'Tom Smith')).id
+    const vic = must(people.find(each => each.name === 'Visiting Vic')).id
+    expect(
+      [setlists.a, setlists.b, setlists.c, setlists.f].map(each => each.leaderId)
+    ).to.deep.equal([tom, tom, tom, tom])
+    expect(setlists.d.leaderId).to.equal(vic)
+    expect('leaderId' in setlists.e).to.equal(false)
+    for (const each of Object.values(setlists)) {
+      expect('owner' in each).to.equal(false)
+      expect('ownerId' in each).to.equal(false)
+      expect(each.modifiedDate).to.not.equal('2026-01-01T00:00:00Z')
+    }
+    must(db.db).close()
+  })
+
+  it('leaves a database with no leaders without people, and does not run again', async () => {
+    dbName = `TEST-${uniqueName()}`
+    await makeVersion9([{ id: 'x', date: '2026-10-11', songs: [], modifiedDate: 'then' }])
+    const db = new ChordlessDB(dbName)
+    await db.init()
+    expect(await db.getAllPeople()).to.deep.equal([])
+    expect(must(await db.getSetlist('x')).modifiedDate).to.equal('then')
+    must(db.db).close()
+  })
+})
+
 describe('transactionError', () => {
   it("is the failed request's error, not the transaction's null", async () => {
     const name = `idb-test-${crypto.randomUUID()}`
@@ -455,7 +537,7 @@ describe('ChordlessDB usage aggregation', () => {
         id: crypto.randomUUID(),
         date: '2024-01-01',
         name: 'New Year',
-        owner: 'Leader A',
+        leaderId: 'leader-a',
         songs: [
           { order: 0, songId: 'song-1', songUuid: 'uuid-1', key: 'C', tempo: null, notes: '' },
           { order: 1, songId: 'song-2', songUuid: 'uuid-2', key: 'G', tempo: null, notes: '' },
@@ -467,7 +549,7 @@ describe('ChordlessDB usage aggregation', () => {
         id: crypto.randomUUID(),
         date: '2024-02-01',
         name: 'February',
-        owner: 'Leader B',
+        leaderId: 'leader-b',
         songs: [
           { order: 0, songId: 'song-1', songUuid: 'uuid-1', key: 'D', tempo: null, notes: '' },
         ],
@@ -479,6 +561,11 @@ describe('ChordlessDB usage aggregation', () => {
     for (const setlist of setlists) {
       await db.saveSetlist(setlist)
     }
+    const now = new Date().toISOString()
+    await db.savePeople([
+      { id: 'leader-a', name: 'Leader A', emails: [], modifiedDate: now },
+      { id: 'leader-b', name: 'Leader B', emails: [], modifiedDate: now },
+    ])
 
     const usage = await db.getSongUsageFromSetlists('song-1')
     expect(usage).to.have.lengthOf(2)

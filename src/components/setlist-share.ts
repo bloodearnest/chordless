@@ -53,6 +53,7 @@ export class SetlistShare extends LitElement {
     setlist: { attribute: false },
     db: { attribute: false },
     songs: { attribute: false },
+    leader: { type: String },
     linkable: { type: Boolean },
     _mode: { state: true },
     _available: { state: true },
@@ -184,6 +185,8 @@ export class SetlistShare extends LitElement {
   declare db: ChordlessDB | null
   /** The setlist's songs (RuntimeSongs), for the song list */
   declare songs: ListedSong[]
+  /** The leader's name, for the song list */
+  declare leader: string
   /** The setlist can be shared by link (not for a read-only space) */
   declare linkable: boolean
   declare _mode: 'link' | 'list'
@@ -200,6 +203,7 @@ export class SetlistShare extends LitElement {
     this.setlist = null
     this.db = null
     this.songs = []
+    this.leader = ''
     this.linkable = true
     this._mode = 'link'
     this._available = false
@@ -308,7 +312,7 @@ export class SetlistShare extends LitElement {
 
   /** The setlist's date, name, event and leader, then its songs with their CCLI numbers */
   _songListText(setlist: Setlist) {
-    return songListText(this.songs, setlist)
+    return songListText(this.songs, { date: setlist.date, leader: this.leader })
   }
 
   /** The first line of the song list ("Songs for Sunday 18th October"): the email's subject */
@@ -318,7 +322,11 @@ export class SetlistShare extends LitElement {
 
   /** The email's body: no title line (the subject), links to SongSelect, and a signature */
   _listEmailBody(setlist: Setlist) {
-    const list = songListText(this.songs, setlist, { title: false, links: true })
+    const list = songListText(
+      this.songs,
+      { date: setlist.date, leader: this.leader },
+      { title: false, links: true }
+    )
     return `${list}\n\n--\nSent from Chordless: ${APP_URL}\n`
   }
 
@@ -342,7 +350,10 @@ export class SetlistShare extends LitElement {
       await navigator.clipboard.write([
         new ClipboardItem({
           'text/plain': new Blob([text], { type: 'text/plain' }),
-          'text/html': new Blob([songListHtml(this.songs, setlist)], { type: 'text/html' }),
+          'text/html': new Blob(
+            [songListHtml(this.songs, { date: setlist.date, leader: this.leader })],
+            { type: 'text/html' }
+          ),
         }),
       ])
     } catch {

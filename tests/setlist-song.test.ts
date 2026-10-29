@@ -90,7 +90,7 @@ describe('SetlistSong', () => {
       time: '09:30',
       type: 'Church Service',
       name: 'Test Service',
-      owner: 'test-user',
+      leaderId: 'test-user',
     })
 
     setlist.songs.push({

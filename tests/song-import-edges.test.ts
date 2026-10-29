@@ -225,7 +225,8 @@ describe('song-import: corners', () => {
       await element.updateComplete
       expect($(element, 'select').textContent).to.contain('2099')
       await element._openNewSetlist()
-      expect(element._newSetlist.owner).to.equal('Ann Singer')
+      const ann = must((await db.getAllPeople()).find(each => each.name === 'Ann Singer'))
+      expect(element._newSetlist.leaderId).to.equal(ann.id)
       expect($(element, 'setlist-details-form').getAttribute('submit-label')).to.contain('Songs')
       const url = new Promise<string>(resolve =>
         element.addEventListener(

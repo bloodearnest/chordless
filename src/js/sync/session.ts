@@ -2,7 +2,7 @@
  * What the pull and the push of a sync (pull.ts, push.ts) share: the run they are part of
  * (`SyncRun`), its progress, and reading files in batches.
  */
-import type { Setlist } from '../data-types.ts'
+import type { Person, Setlist } from '../data-types.ts'
 import type { ChordlessDB } from '../db.ts'
 import type { ChordProParser } from '../parser.ts'
 import type { SpaceStorage, StoredFile } from '../storage/types.ts'
@@ -93,6 +93,8 @@ export class SyncRun {
 
   /** The refs of the files in the space, once listed (null: not listed, or the listing failed) */
   inventory: Set<string> | null = null
+  /** The space's people, as the push read them: the leaders' names go in the setlist files' names */
+  people: Person[] = []
   /** The setlist files in Drive, as listed by the pull */
   liveSetlistFiles: StoredFile[] | null = null
   /** Whether the user can only read the folder (null: not asked yet) */

@@ -26,8 +26,6 @@ describe('Share links: sync', () => {
   async function addSetlist(device: Device, songIds: string[], fields: Partial<Setlist> = {}) {
     const setlist = {
       ...createSetlist({ date: nextWeek }),
-      owner: 'Ann Smith',
-      ownerId: 'ann@example.com',
       songs: songIds.map((songId, i) =>
         makeEntry({ order: i + 1, songId, songUuid: songId, key: 'G', notes: '' })
       ),

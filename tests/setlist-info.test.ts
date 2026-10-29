@@ -36,12 +36,12 @@ describe('setlist-info', () => {
     expect(text(await show({ setlist: setlist({ songs: undefined }) }))).to.contain('0 songs')
   })
 
-  it('shows what the setlist has, with the leader given or else its owner', async () => {
+  it('shows what the setlist has, with the leader given or else the one who shared it', async () => {
     const full = setlist({
       time: '10:30',
       type: 'Sunday service',
       venue: 'The hall',
-      owner: ' Ann ',
+      received: { leaderName: ' Ann ' } as never,
       createdDate: '2026-01-02T10:00:00Z',
       modifiedDate: '2026-02-03T10:00:00Z',
     })

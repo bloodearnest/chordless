@@ -7,8 +7,9 @@
  * only what is new.
  */
 
-import type { Setlist, SetlistEntry, SongRecord } from './data-types.ts'
+import type { Person, Setlist, SetlistEntry, SongRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
+import { findPerson, idFromKey, normalizeEmail, resolvePerson } from './leaders.ts'
 import { addChart } from './song-utils.ts'
 
 /**
@@ -23,6 +24,8 @@ export interface TransferSource {
   getAllSongs(): Promise<SongRecord[]>
   getChordPro(id: string): Promise<{ content: string } | undefined>
   getAllSetlists(): Promise<Setlist[]>
+  /** The people who lead the setlists */
+  getAllPeople(): Promise<Person[]>
   /** Only a move deletes from the source */
   deleteUnsyncedSetlist?(id: string): Promise<void>
 }
@@ -111,7 +114,12 @@ export async function copySongs(
 }
 
 /** The setlist as the destination gets it: its content, with nothing of the source's Drive */
-function forDestination(setlist: Setlist, id: string, songs: SongMap): Setlist {
+function forDestination(
+  setlist: Setlist,
+  id: string,
+  songs: SongMap,
+  leaderId: string | null
+): Setlist {
   const entries: SetlistEntry[] = setlist.songs.map(entry => ({
     ...entry,
     songUuid: songs.get(entry.songUuid) ?? entry.songUuid,
@@ -125,9 +133,50 @@ function forDestination(setlist: Setlist, id: string, songs: SongMap): Setlist {
     _lastSyncHash,
     share: _share,
     received: _received,
+    leaderId: _leaderId,
     ...content
   } = setlist
-  return { ...content, id, songs: entries }
+  return { ...content, id, songs: entries, ...(leaderId ? { leaderId } : {}) }
+}
+
+/**
+ * Who leads in the destination: the person there for a leader of the source, by email, else by
+ * name, else made (people are the space's own, so an id is never carried across: docs/IDENTITIES.md).
+ * `save()` stores the people made so far.
+ */
+async function leaderMapper(source: TransferSource, destination: ChordlessDB) {
+  const sourcePeople = await source.getAllPeople()
+  const destinationPeople = await destination.getAllPeople()
+  const made: Person[] = []
+  const mapped = new Map<string, string>()
+  const map = (leaderId: string | null | undefined): string | null => {
+    const person = resolvePerson(sourcePeople, leaderId)
+    if (!person) return null
+    const cached = mapped.get(person.id)
+    if (cached) return cached
+    const there =
+      person.emails
+        .map(email => findPerson([...destinationPeople, ...made], { email }))
+        .find(Boolean) ?? findPerson([...destinationPeople, ...made], { name: person.name })
+    let id = there?.id
+    if (!id) {
+      const email = normalizeEmail(person.emails[0])
+      const created: Person = {
+        id: idFromKey(email ? `email:${email}` : `name:${person.name.toLowerCase()}`),
+        name: person.name,
+        emails: person.emails,
+        modifiedDate: new Date().toISOString(),
+      }
+      made.push(created)
+      id = created.id
+    }
+    mapped.set(person.id, id)
+    return id
+  }
+  map.save = async () => {
+    await destination.addPeople(made)
+  }
+  return map
 }
 
 /** Whether two setlists are the same event with the same songs, whatever their ids */
@@ -166,11 +215,17 @@ export async function transferSetlists(
   const sourceSongs = new Set((await source.getAllSongs()).map(song => song.uuid))
 
   const existing = await destination.getAllSetlists()
+  const leaders = await leaderMapper(source, destination)
   for (const setlist of setlists) {
     for (const entry of setlist.songs) {
       if (!sourceSongs.has(entry.songUuid)) report.entriesWithoutSong++
     }
-    const made = forDestination(setlist, mode === 'copy' ? crypto.randomUUID() : setlist.id, songs)
+    const made = forDestination(
+      setlist,
+      mode === 'copy' ? crypto.randomUUID() : setlist.id,
+      songs,
+      leaders(setlist.leaderId)
+    )
     const alreadyThere =
       mode !== 'copy'
         ? existing.some(other => other.id === made.id)
@@ -179,6 +234,7 @@ export async function transferSetlists(
       report.setlistsSkipped++
       continue
     }
+    await leaders.save()
     await destination.saveSetlist(made)
     existing.push(made)
     report.setlistsAdded++

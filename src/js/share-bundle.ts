@@ -39,6 +39,7 @@ export interface ShareBundle {
     time: string
     type: string
     name: string
+    /** The leader's name (the format's name for it from before leaders were people) */
     owner: string
     songs: ShareSong[]
   }
@@ -81,7 +82,8 @@ export function isExpired(expires: string, today: string): boolean {
 
 /** The bundle for a setlist. Leaves out ids, the space, emails and sync fields. */
 export function buildShareBundle(
-  setlist: Pick<Setlist, 'date' | 'time' | 'type' | 'name' | 'owner'>,
+  setlist: Pick<Setlist, 'date' | 'time' | 'type' | 'name'>,
+  leader: string,
   sources: ShareSource[],
   {
     expires,
@@ -109,7 +111,7 @@ export function buildShareBundle(
       time: setlist.time ?? '',
       type: setlist.type ?? '',
       name: setlist.name ?? '',
-      owner: setlist.owner ?? '',
+      owner: leader,
       songs,
     },
   }

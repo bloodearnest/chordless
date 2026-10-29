@@ -5,7 +5,7 @@
  */
 import type { Setlist, SetlistEntry } from '../data-types.ts'
 
-const DETAILS = ['date', 'time', 'type', 'name', 'owner'] as const
+const DETAILS = ['date', 'time', 'type', 'name', 'leaderId'] as const
 
 /** A song is the same song whichever chart (variant) the setlist uses of it */
 const keyOf = (entry: SetlistEntry) => entry.songId

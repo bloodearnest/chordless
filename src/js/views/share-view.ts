@@ -135,7 +135,7 @@ export class ShareView extends PageView {
     if (opening !== 'loading' && opening.state === 'ready') {
       // On the overview only: a song takes the whole screen
       const route = this.route as ShareRoute
-      const owner = opening.setlist.owner?.trim()
+      const owner = opening.setlist.received?.leaderName?.trim()
       const expires = opening.setlist.received?.expires
       const banner =
         route.songIndex < 0
