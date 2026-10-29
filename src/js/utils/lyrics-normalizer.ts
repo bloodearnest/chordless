@@ -16,12 +16,21 @@ export interface ChordDisplaySegment {
   value: string
 }
 
+/**
+ * Lyrics without the hyphens that only mark where a chord falls in a word: one with a space beside
+ * it ("Maj - es - [ty"), or right after a chord ("Je[D]-sus"). One tight against the letters before
+ * it is the word's own, even before a chord ("Three-in-One", "loving-[C]kindness").
+ */
+function withoutChordHyphens(lyrics: string): string {
+  return lyrics.replace(/\s+-+\s*|\s*-+\s+|^\s*-+\s*/g, '')
+}
+
 export function segmentHasVisibleLyrics(segment: LyricSegment | null | undefined): boolean {
   const value = segment?.lyrics
   if (typeof value !== 'string') {
     return false
   }
-  const normalized = value.replace(/\s*-\s*/g, '').trim()
+  const normalized = withoutChordHyphens(value).trim()
   return normalized.length > 0
 }
 
@@ -30,23 +39,26 @@ export function normalizeSegmentsForHiddenChords<T extends LyricSegment>(
 ): NormalizedSegment<T>[] {
   const normalized: NormalizedSegment<T>[] = []
   let carryJoin = false
+  // Whether the last lyrics shown stop mid-word: no space or hyphen after them
+  let midWord = false
 
   for (const segment of segments) {
     const original = segment.lyrics || ''
     const hasLeadingGlue = /^\s*-\s*/.test(original)
-    const hasTrailingGlue = /\s*-\s*$/.test(original)
+    const hasTrailingGlue = /(\s-+\s*|-+\s+)$/.test(original)
     const isGlueOnly = /-/.test(original) && original.replace(/[\s-]/g, '') === ''
 
-    const joinWithPrev = carryJoin || hasLeadingGlue
+    // A chord placed inside a word ("sor[A]rows") leaves no space, so the word stays whole
+    const joinWithPrev = carryJoin || hasLeadingGlue || (midWord && /^\S/.test(original))
 
-    const text = original
-      .replace(/\s*-\s*/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
+    const text = withoutChordHyphens(original).replace(/\s+/g, ' ').trim()
 
     normalized.push({ ...segment, lyrics: text, __joinWithPrev: joinWithPrev })
 
     const producesLyrics = text.length > 0
+    if (producesLyrics) {
+      midWord = /\S$/.test(original)
+    }
     if (producesLyrics) {
       carryJoin = hasTrailingGlue || isGlueOnly
     } else {

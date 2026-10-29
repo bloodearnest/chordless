@@ -5,6 +5,7 @@ const { describe, it } = window
 
 suppressConsoleLogs()
 
+import { lyricsOf } from '../src/js/utils/song-filter.ts'
 import {
   formatHiddenLyricsText,
   normalizeSegmentsForHiddenChords,
@@ -21,6 +22,60 @@ describe('lyrics-normalizer utilities', () => {
     const normalized = normalizeSegmentsForHiddenChords(segments)
     expect(normalized.map(s => s.lyrics)).to.deep.equal(['Ho', 'san', 'na'])
     expect(normalized.map(s => !!s.__joinWithPrev)).to.deep.equal([false, true, true])
+  })
+
+  it('keeps a word whole when a chord falls inside it with no hyphen', () => {
+    const normalized = normalizeSegmentsForHiddenChords([
+      { lyrics: 'It soothes our sor' },
+      { lyrics: 'rows, heals ' },
+      { lyrics: 'our wounds' },
+    ])
+    expect(normalized.map(s => !!s.__joinWithPrev)).to.deep.equal([false, true, false])
+  })
+
+  it('hides hyphens that only place chords, and keeps those in a word', () => {
+    const normalized = normalizeSegmentsForHiddenChords([
+      { lyrics: 'The Three-in-One, Maj - es - ' },
+      { lyrics: 'ty, Je' },
+      { lyrics: '-sus' },
+    ])
+    expect(normalized.map(s => s.lyrics)).to.deep.equal([
+      'The Three-in-One, Majes',
+      'ty, Je',
+      'sus',
+    ])
+    expect(normalized.map(s => !!s.__joinWithPrev)).to.deep.equal([false, true, true])
+  })
+
+  it('keeps a hyphen tight against the word before a chord', () => {
+    const normalized = normalizeSegmentsForHiddenChords([
+      { lyrics: 'our loving-' },
+      { lyrics: 'kindness' },
+    ])
+    expect(normalized.map(s => s.lyrics)).to.deep.equal(['our loving-', 'kindness'])
+    expect(normalized.map(s => !!s.__joinWithPrev)).to.deep.equal([false, true])
+  })
+
+  it('searches the words as the lyrics-only view shows them', () => {
+    const parsed = {
+      metadata: {},
+      sections: [
+        {
+          type: 'section' as const,
+          label: 'V',
+          lines: [
+            {
+              segments: [
+                { chord: 'D', lyrics: 'Je' },
+                { chord: 'A', lyrics: '-sus our loving-' },
+                { chord: 'G', lyrics: 'kindness' },
+              ],
+            },
+          ],
+        },
+      ],
+    }
+    expect(lyricsOf(parsed as never).lines).to.deep.equal(['Jesus our loving-kindness'])
   })
 
   it('formats lyrics when chords are hidden', () => {
@@ -147,7 +202,7 @@ describe('lyrics-normalizer, with less to go on', () => {
       { lyrics: 'na' },
     ])
     expect(normalized.map(s => s.lyrics)).to.deep.equal(['Ho', '', '', 'san', 'na'])
-    expect(normalized.map(s => s.__joinWithPrev)).to.deep.equal([false, false, true, true, false])
+    expect(normalized.map(s => s.__joinWithPrev)).to.deep.equal([false, false, true, true, true])
   })
 
   it('says nothing for no text, however the lyrics were joined', () => {
