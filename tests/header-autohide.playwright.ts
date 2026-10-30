@@ -38,10 +38,14 @@ test.describe('The header on a phone', () => {
         const { top, bottom } = rect ?? { top: Number.NaN, bottom: Number.NaN }
         return { top, bottom }
       }, selector)
-    const header = await box('#app-header')
-    expect(header.top).toBe(0)
-    const section = await box('#song-0 .song-content')
-    expect(section.top).toBeGreaterThanOrEqual(header.bottom - 1)
+    expect((await box('#app-header')).top).toBe(0)
+    // (the song's offset follows the header's height after a layout pass, which a busy machine
+    // can be late with: wait for it, not for a fixed time)
+    await expect
+      .poll(
+        async () => (await box('#song-0 .song-content')).top - (await box('#app-header')).bottom
+      )
+      .toBeGreaterThanOrEqual(-1)
     // Scrolled until the header is away, the text is at the top of the screen
     await scrollTo(page, 150)
     await scrollTo(page, 400)
