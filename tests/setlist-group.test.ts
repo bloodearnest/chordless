@@ -30,6 +30,19 @@ describe('setlist-group', () => {
     ).to.deep.equal(['3 songs', '1 song'])
   })
 
+  it('names the leader under a setlist that has one', async () => {
+    const group = await fixture<SetlistGroup>(html`<setlist-group year="2026"></setlist-group>`)
+    group.setlists = [
+      { id: 'a', name: 'Harvest', leader: 'Ann' },
+      { id: 'b', name: 'Advent', leader: '' },
+    ] as SetlistGroup['setlists']
+    await group.updateComplete
+
+    expect(rows(group).map(row => row.querySelector('.setlist-leader')?.textContent)).to.deep.equal(
+      ['Ann', undefined]
+    )
+  })
+
   it('counts the songs itself when it is not told how many, and says 0 for none', async () => {
     const group = await fixture<SetlistGroup>(html`<setlist-group year="2026"></setlist-group>`)
     group.setlists = [
