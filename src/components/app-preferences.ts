@@ -21,7 +21,7 @@ import {
   setUseUnicodeAccidentals,
   TelemetryPreferenceEvent,
 } from '../js/preferences.ts'
-import { getDeviceId, resetDeviceId } from '../js/telemetry/ids.ts'
+import { resetDeviceId, supportId } from '../js/telemetry/ids.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../js/wake-lock.ts'
 import './theme-settings.ts'
 import { buttonStyles, panelStyles, statusStyles } from './shared-styles.ts'
@@ -198,9 +198,8 @@ export class AppPreferences extends LitElement {
     this.supportId = this._supportIdNow()
   }
 
-  /** The first part of this device's report id: enough to find its reports, and short to say */
   _supportIdNow(): string {
-    return getTelemetryPreference() ? (getDeviceId()?.slice(0, 8) ?? '') : ''
+    return supportId()
   }
 
   async _copySupportId(): Promise<void> {
@@ -417,6 +416,7 @@ export class AppPreferences extends LitElement {
                 </p>
                 <p>
                   If you ask for help, this is how your reports are found. Reset makes a new one.
+                  <a href="/contact">Contact us</a> adds it for you.
                 </p>`
               : ''
           }

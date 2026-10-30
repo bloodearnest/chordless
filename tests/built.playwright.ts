@@ -14,6 +14,7 @@ const VIEWS = [
   ['/import-song', 'import-song-view'],
   ['/import-setlist', 'import-setlist-view'],
   ['/about', 'about-view'],
+  ['/contact', 'contact-view'],
   ['/join', 'join-view'],
   ['/account/new', 'new-team-space-view'],
   ['/media', 'media-view'],
