@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { SETLIST_TYPES } from '../js/db.ts'
 
 /** A setlist as the home page lists it */
 export interface SetlistRow {
@@ -7,6 +8,8 @@ export interface SetlistRow {
   displayName?: string
   /** Who leads it, if known */
   leader?: string
+  /** The kind of service, if it is not the catch-all "Other" */
+  type?: string
   url?: string
   songCount?: number
   songs?: unknown[]
@@ -118,7 +121,7 @@ export class SetlistGroup extends LitElement {
       font-weight: 600;
     }
 
-    .setlist-leader {
+    .setlist-meta {
       display: block;
       font-size: var(--font-ui-small);
       color: var(--text-secondary, #5f6b6d);
@@ -145,11 +148,20 @@ export class SetlistGroup extends LitElement {
           ? setlist.songs.length
           : 0
 
+    const type = setlist.type && setlist.type !== SETLIST_TYPES.OTHER ? setlist.type : ''
+    const meta = [
+      setlist.leader ? html`<span class="setlist-leader">${setlist.leader}</span>` : '',
+      type ? html`<span class="setlist-type">${type}</span>` : '',
+    ].filter(Boolean)
+    if (meta.length === 2) {
+      meta.splice(1, 0, html` · `)
+    }
+
     return html`
       <a class="setlist-button" href=${url}>
         <span class="setlist-text">
           <span class="setlist-name">${name}</span>
-          ${setlist.leader ? html`<span class="setlist-leader">${setlist.leader}</span>` : ''}
+          ${meta.length ? html`<span class="setlist-meta">${meta}</span>` : ''}
         </span>
         <span class="setlist-song-count"> ${songCount} song${songCount === 1 ? '' : 's'} </span>
       </a>

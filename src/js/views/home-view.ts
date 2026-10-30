@@ -72,6 +72,7 @@ export function groupSetlistsByYear(
           url: `/setlist/${setlist.id}`,
           displayName: setlistTitle(setlist, 'short'),
           leader: leaderName(people, setlist.leaderId),
+          type: setlist.type,
           songCount: Array.isArray(setlist.songs) ? setlist.songs.length : 0,
         })),
     }))
@@ -89,6 +90,7 @@ export function sharedGroup(setlists: Setlist[]): SetlistYear[] {
         url: `/s/${encodeURIComponent(setlist.received?.fileId ?? '')}`,
         displayName: setlistTitle(setlist, 'short'),
         leader: setlist.received?.leaderName?.trim() ?? '',
+        type: setlist.type,
         songCount: Array.isArray(setlist.songs) ? setlist.songs.length : 0,
       })),
     },

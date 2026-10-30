@@ -43,6 +43,20 @@ describe('setlist-group', () => {
     )
   })
 
+  it('names the type of service, unless it is Other', async () => {
+    const group = await fixture<SetlistGroup>(html`<setlist-group year="2026"></setlist-group>`)
+    group.setlists = [
+      { id: 'a', type: 'Church Service', leader: 'Ann' },
+      { id: 'b', type: 'Event' },
+      { id: 'c', type: 'Other', leader: 'Bob' },
+    ] as SetlistGroup['setlists']
+    await group.updateComplete
+
+    expect(
+      rows(group).map(row => row.querySelector('.setlist-meta')?.textContent?.trim())
+    ).to.deep.equal(['Ann · Church Service', 'Event', 'Bob'])
+  })
+
   it('counts the songs itself when it is not told how many, and says 0 for none', async () => {
     const group = await fixture<SetlistGroup>(html`<setlist-group year="2026"></setlist-group>`)
     group.setlists = [
