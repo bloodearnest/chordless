@@ -54,6 +54,8 @@ declare global {
 export type SyncState =
   /** Not signed in, no folder yet, or nothing to sync with */
   | 'unavailable'
+  /** Signed in, but Google refuses the stored sign-in: nothing can sync until it is reconnected */
+  | 'expired'
   /** The storage has a feed of changes: a sync is cheap, so it is done every minute */
   | 'feed'
   /** It has none: a sync lists everything, so it is done only when the app opens or comes back */
@@ -73,6 +75,8 @@ export interface AutoSyncDeps {
   state(): Promise<SyncState>
   /** How often the tick syncs the space in use: `TICK_MS` or `PERSONAL_TICK_MS` */
   tickMs(): Promise<number>
+  /** Tell the person that syncing has stopped because the sign-in expired (called once until a sync can run again) */
+  signInExpired(): void
   /** The sync itself, for the space in use; false if it was skipped because another is running, and throws if it fails */
   run(trigger: SyncTrigger): Promise<boolean>
   /** Call `fn` every `ms` until the returned function is called */
@@ -96,6 +100,8 @@ export class AutoSync {
   #sending = false
   /** Another device said it changed something while a sync was running: that one may not have seen it */
   #pullAgain = false
+  /** The person has been told that the sign-in expired; cleared when a sync can run again */
+  #toldExpired = false
 
   constructor(deps: AutoSyncDeps) {
     this.#deps = deps
@@ -216,6 +222,16 @@ export class AutoSync {
     let sent = false
     try {
       const state = await this.#deps.state()
+      if (state === 'expired') {
+        // (nothing is sent, and the edits made here wait: say so once, not on every tick)
+        this.#unsent ||= carrying
+        if (!this.#toldExpired) {
+          this.#toldExpired = true
+          this.#deps.signInExpired()
+        }
+        return
+      }
+      this.#toldExpired = false
       if (state === 'unavailable' || (state === 'no-feed' && !everything)) return
       this.#lastAttempt = this.#deps.now()
       this.#running = true
@@ -272,9 +288,37 @@ async function currentState(): Promise<SyncState> {
   const space = await getCurrentSpaceFull()
   if (!space.rootRef) return 'unavailable'
   const signIn = await getSignInState()
+  if (signIn === 'expired') return 'expired'
   const canSync = signIn === 'signed-in' || (signIn === 'no-drive' && isTeamMember(space))
   if (!canSync) return 'unavailable'
   return storageFor(space).space(space.rootRef).changes ? 'feed' : 'no-feed'
+}
+
+/** Tell the person that nothing is syncing, with a way to put it right where they are */
+async function notifySignInExpired(): Promise<void> {
+  const { id } = getCurrentSpace()
+  const last = id ? lastSyncOf(id) : null
+  const [{ toast }, { authorizeWithGoogle }, { errorMessage }] = await Promise.all([
+    import('./toast.ts'),
+    import('./google-auth.ts'),
+    import('./utils/errors.ts'),
+  ])
+  toast('Your Google sign-in has expired, so your changes are not syncing.', {
+    kind: 'error',
+    details: `Reconnect with Google to carry on. Changes made here are kept on this device and will be sent then.${last ? ` Last synced ${new Date(last).toLocaleString()}.` : ''}`,
+    action: {
+      label: 'Reconnect',
+      run: () =>
+        void authorizeWithGoogle()
+          .then(() => syncSoon())
+          .catch(error =>
+            toast("Couldn't reconnect with Google.", {
+              kind: 'error',
+              details: errorMessage(error),
+            })
+          ),
+    },
+  })
 }
 
 async function runSync(trigger: SyncTrigger): Promise<boolean> {
@@ -312,6 +356,7 @@ export function startAutoSync(): AutoSync {
     live: () => getLive() !== null,
     state: currentState,
     tickMs: async () => ((await getCurrentSpaceFull()).team ? TICK_MS : PERSONAL_TICK_MS),
+    signInExpired: () => void notifySignInExpired(),
     run: runSync,
     every: (ms, fn) => {
       const id = setInterval(fn, ms)

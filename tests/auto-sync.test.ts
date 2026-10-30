@@ -48,6 +48,8 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
     rejectTickMs: false,
     lastSyncAgo: initial.lastSync === undefined ? 0 : initial.lastSync,
     runs: 0,
+    /** How often the person was told that the sign-in expired */
+    expiredNotices: 0,
     /** What started each sync, in turn */
     triggers: [] as SyncTrigger[],
     failNext: false,
@@ -86,6 +88,9 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
       const skipped = world.skipNext
       world.skipNext = false
       return !skipped
+    },
+    signInExpired: () => {
+      world.expiredNotices++
     },
     later: (ms, fn) => {
       const nudge = { ms, fn, cancelled: false }
@@ -222,6 +227,40 @@ describe('Syncing by itself while the app is open', () => {
     world.tick?.()
     await settle()
     expect(world.runs).to.equal(0)
+  })
+
+  it('tells the person once, not at every tick, that an expired sign-in has stopped the sync, and again after it works', async () => {
+    const { auto, world } = rig({ state: 'expired', lastSync: null })
+    auto.start()
+    await settle()
+    expect(world.expiredNotices).to.equal(1)
+    world.tick?.()
+    await settle()
+    world.tick?.()
+    await settle()
+    expect(world.expiredNotices).to.equal(1)
+    expect(world.runs).to.equal(0)
+
+    // reconnected: it syncs, and a later expiry is told afresh
+    world.state = 'feed'
+    world.tick?.()
+    await settle()
+    expect(world.runs).to.equal(1)
+    world.state = 'expired'
+    world.tick?.()
+    await settle()
+    expect(world.expiredNotices).to.equal(2)
+  })
+
+  it('keeps the changes made while the sign-in is expired to send once it works', async () => {
+    const { auto, world, win } = rig({ state: 'expired' })
+    auto.start()
+    await settle()
+    win.dispatchEvent(savedHere())
+    world.nudges.at(-1)?.fn()
+    await settle()
+    expect(world.runs).to.equal(0)
+    expect(auto.hasUnsent()).to.equal(true)
   })
 
   it('syncs every minute while on screen and online, for a storage with a feed', async () => {

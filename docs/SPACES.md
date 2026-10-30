@@ -150,7 +150,10 @@ The Worker keeps no per-user state (until the team service adds its Durable Obje
   `SignInExpiredError`. `getSignInState()` is
   `signed-out`, `signed-in` or `expired`; only those refusals make it `expired` (no network, or
   any other failure, counts as signed in). The Account and Teams page then says "Sign-in expired", offers
-  "Reconnect with Google", and disables the sync panel with the reason.
+  "Reconnect with Google", and disables the sync panel with the reason. The sync that runs by itself
+  (`auto-sync.ts`) stops too, which would otherwise be silent: it shows one error toast with a
+  Reconnect button (a popup, so nothing reloads), once until a sync can run again. Edits made here
+  stay on the device and are sent after reconnecting.
 - **Scope:** `drive.file openid email profile`. Drive access is limited to files the app created
   (or the user picked with the Picker).
 - **Who is asking the team service (built 2026-10-21):** Google's own ID token, as
