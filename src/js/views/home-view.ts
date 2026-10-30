@@ -16,9 +16,10 @@ import type { SetlistGroup, SetlistRow } from '../../components/setlist-group.ts
 import '../../components/setlist-group.ts'
 import '../../components/space-tabs.ts'
 import '../../components/status-message.ts'
-import type { Setlist } from '../data-types.ts'
+import type { Person, Setlist } from '../data-types.ts'
 import { watchData } from '../data-watcher.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
+import { leaderName } from '../leaders.ts'
 import { goTo } from '../navigation.ts'
 import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
@@ -48,7 +49,8 @@ interface HomeViewState extends ViewState {
  */
 export function groupSetlistsByYear(
   setlists: Setlist[],
-  currentYear: number = new Date().getFullYear()
+  currentYear: number = new Date().getFullYear(),
+  people: Person[] = []
 ): SetlistYear[] {
   const byYear = new Map<string, Setlist[]>()
   for (const setlist of setlists) {
@@ -69,6 +71,7 @@ export function groupSetlistsByYear(
           id: setlist.id,
           url: `/setlist/${setlist.id}`,
           displayName: setlistTitle(setlist, 'short'),
+          leader: leaderName(people, setlist.leaderId),
           songCount: Array.isArray(setlist.songs) ? setlist.songs.length : 0,
         })),
     }))
@@ -84,7 +87,8 @@ export function sharedGroup(setlists: Setlist[]): SetlistYear[] {
       setlists: setlists.map(setlist => ({
         id: setlist.id,
         url: `/s/${encodeURIComponent(setlist.received?.fileId ?? '')}`,
-        displayName: `${setlistTitle(setlist, 'short')}${setlist.received?.leaderName ? ` · ${setlist.received.leaderName}` : ''}`,
+        displayName: setlistTitle(setlist, 'short'),
+        leader: setlist.received?.leaderName?.trim() ?? '',
         songCount: Array.isArray(setlist.songs) ? setlist.songs.length : 0,
       })),
     },
@@ -110,7 +114,11 @@ export class HomeView extends PageView {
       }
       const db = await getCurrentDB()
       return {
-        groups: groupSetlistsByYear(await db.getAllSetlists()),
+        groups: groupSetlistsByYear(
+          await db.getAllSetlists(),
+          new Date().getFullYear(),
+          await db.getAllPeople()
+        ),
         shared: sharedGroup(await listSharedWithMe().catch(() => [])),
       }
     },

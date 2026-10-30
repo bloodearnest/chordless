@@ -42,6 +42,16 @@ describe('groupSetlistsByYear', () => {
     expect(groups.map(group => group.expanded)).to.deep.equal([true, false])
   })
 
+  it('names each setlist’s leader, as merged', () => {
+    const people = [
+      { id: 'ann', name: 'Ann', emails: [], modifiedDate: 'then', mergedInto: 'anne' },
+      { id: 'anne', name: 'Anne', emails: [], modifiedDate: 'then' },
+    ]
+    const led = { ...setlist('l', '2026-02-01'), leaderId: 'ann' }
+    const [group] = groupSetlistsByYear([led, setlist('n', '2026-01-01')], 2026, people)
+    expect(group.setlists.map(entry => entry.leader)).to.deep.equal(['Anne', ''])
+  })
+
   it('gives each setlist its link and song count', () => {
     const item = must(
       groupSetlistsByYear(setlists, 2026)[1].setlists.find(entry => entry.id === 'a')
