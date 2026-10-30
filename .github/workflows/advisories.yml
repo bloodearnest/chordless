@@ -1,0 +1,30 @@
+# Known advisories in the production npm dependencies (`just advisories`; docs/CI.md). Its own
+# workflow, not part of CI or its `ci-ok`: a new advisory fails it with no change of ours, so it
+# must not block a pull request or a deploy. A failed scheduled run is emailed by GitHub.
+name: Advisories
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  pull_request:
+    paths:
+      - package-lock.json
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  advisories:
+    name: Advisories
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          tools: node just
+      - run: just advisories

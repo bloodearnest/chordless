@@ -52,11 +52,18 @@ lint-actions:
     @echo "Checking the GitHub workflows (actionlint, zizmor)..."
     scripts/lint-actions.sh
 
-# Check the npm packages: the registry's signatures and provenance, and no known high advisory in
-# a production dependency (the dev tools' are listed, not failed: scripts/audit-deps.sh)
+# Check the npm packages: the lockfile's sources and hashes, and the registry's signatures and provenance
+# (scripts/audit-deps.sh)
 audit:
-    @echo "Checking the npm packages (signatures, advisories)..."
+    @echo "Checking the npm packages (lockfile, signatures)..."
     scripts/audit-deps.sh
+
+# Known advisories: none high or critical in a production dependency with a fix over a week old (the
+# dev tools' are listed, not failed). Apart from `lint` because a new advisory fails it with no
+# change of ours: the Advisories workflow runs it daily (docs/CI.md)
+advisories:
+    @echo "Checking the production dependencies for known advisories..."
+    node scripts/audit-deps.ts
 
 # DAST: ZAP's passive baseline scan of a site (needs Docker), as CI runs weekly: just zap
 # http://localhost:8788 scans `just preview`. The report is left in zap-report/ (docs/CI.md)

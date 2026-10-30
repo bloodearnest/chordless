@@ -26,7 +26,7 @@ its pull request (`"#42"`), and `docs/stats.jsonl` records each run's tree as we
 
 | Job | Runs on | Recipe | Waits for |
 |---|---|---|---|
-| Lint | Linux | `just lint` (Biome, tsc, knip, wrangler, Terraform, actionlint, zizmor, `just audit`) | - |
+| Lint | Linux | `just lint` (Biome, tsc, knip, wrangler, Terraform, actionlint, zizmor, `just audit`: lockfile and signatures) | - |
 | Node tests | Linux | `just test-node` | - |
 | Unit tests | Linux, Chromium | `just test-unit` | - |
 | Coverage | Linux | `just coverage-check`, on the two runs' reports | node, unit |
@@ -76,9 +76,12 @@ authors published (a fork's commit can be reached through the parent repository'
 
 The npm packages get the same care (`just audit`, `scripts/audit-deps.sh`): each must come from the
 npm registry with a sha512 hash (`scripts/check-lockfile.sh`, so a lockfile change cannot point one at a
-tarball elsewhere), must carry the registry's signature (and its provenance, where it publishes one), and no production dependency may
-have a known high or critical advisory. The dev tools' advisories are listed without failing: they
-never reach users, and one with no fix yet would otherwise block every change.
+tarball elsewhere), and must carry the registry's signature (and its provenance, where it publishes one).
+Those are in `just lint`. Known advisories are not: a new one fails with no change of ours, and would
+block every pull request and deploy until fixed. `just advisories` (`scripts/audit-deps.ts`) is its own
+workflow (`.github/workflows/advisories.yml`), run daily and when the lockfile changes, and is not in
+`ci-ok`: a production dependency with a high or critical advisory whose fix is over a week old fails it, and
+GitHub emails about the run. The dev tools' advisories are listed without failing: they never reach users.
 
 To use a third-party action anyway: ask first, say what it does that a script cannot, pin it, add its
 repository to `patterns_allowed` in `infra/github/main.tf`, and `just lint-actions` must pass.
@@ -143,7 +146,7 @@ One pull request a week (Mondays) of every npm package, action and Terraform pro
 provider bump changes `infra/`, so the Terraform workflow plans it and waits for you before any apply; a
 plan that fails holds up the next deploy (which plans first) until the bump is reverted. Each
 is set to merge itself once its checks pass (`.github/workflows/dependabot-auto-merge.yml`): the same
-checks as any pull request, with `just audit` among them.
+checks as any pull request.
 
 ## Renovate (`.github/renovate.json5`)
 
