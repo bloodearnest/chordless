@@ -302,7 +302,7 @@ describe('the library view', () => {
       must(view.querySelector('#library-app-header')).dispatchEvent(
         new CustomEvent('app-header:info-click')
       )
-      await wait(50)
+      await waitUntil(() => shown.length > 0, 'the info dialog is shown')
       expect(shown).to.have.length(1)
       expect((shown[0] as unknown[])[0]).to.equal(song.id)
     })

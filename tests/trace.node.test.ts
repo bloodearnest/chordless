@@ -482,7 +482,7 @@ test('a sign-in with no readable date, and a refusal with no description, are st
       )
   )
   assert.equal(attrs['chordless.auth.blob_age_days'], -1)
-  assert.equal(attrs['chordless.auth.google_description'], 'Bad Request')
+  assert.equal(attrs['chordless.auth.google_description'], 'Bad Request: invalid_grant')
 })
 
 test('annotating outside a traced request does nothing', () => {
