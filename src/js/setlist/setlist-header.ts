@@ -13,7 +13,8 @@ import type { SetlistDiffers } from '../../components/setlist-differs.ts'
 import type { SetlistShare } from '../../components/setlist-share.ts'
 import type { SongSettingsPopover } from '../../components/song-settings-popover.ts'
 import type { Setlist } from '../data-types.ts'
-import type { ChordlessDB } from '../db.ts'
+import { type ChordlessDB, SETLIST_TYPES } from '../db.ts'
+import { leaderName } from '../leaders.ts'
 import { getLive, isLiveSetlist } from '../live.ts'
 import { getLiveSyncStatus } from '../live-sync-status.ts'
 import { wantsMediaPlayer } from '../media-player-loader.ts'
@@ -90,6 +91,7 @@ export class SetlistHeader {
     const subheading = onOverview ? currentSetlist.name || currentSetlist.type || '' : ''
 
     appHeader.showEditToggle = true
+    void this.#showSubheader(appHeader, onOverview ? currentSetlist : null)
     // (nothing to change)
     if (
       appHeader.heading === title &&
@@ -110,6 +112,25 @@ export class SetlistHeader {
       appHeader.subheading = subheading
       appHeader.heading = title
       await this.#fadeControls(() => this.#showContent(song))
+    }
+  }
+
+  /** The overview's second header says who leads the setlist and the kind of service; a song has none */
+  async #showSubheader(appHeader: AppHeader, setlist: Setlist | null) {
+    if (!setlist) {
+      appHeader.subheader = ''
+      return
+    }
+    const type = setlist.type === SETLIST_TYPES.OTHER ? '' : setlist.type
+    const say = (leader: string) => [leader, type].filter(Boolean).join(' · ')
+    // (a setlist received by link has its leader's name with it; for one of a space it is read, so
+    // the type is shown at once and the leader when it is there)
+    appHeader.subheader = say(setlist.received?.leaderName?.trim() ?? '')
+    if (setlist.received) return
+    const people = await this.host._database().getAllPeople()
+    // (the page may have moved on, or the setlist been edited, while the people were read)
+    if (this.host.currentSetlist === setlist && this.host.currentSongIndex < 0) {
+      appHeader.subheader = say(leaderName(people, setlist.leaderId))
     }
   }
 

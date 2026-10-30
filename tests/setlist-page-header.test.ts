@@ -463,6 +463,37 @@ describe('the setlist page: header, menu and keys', () => {
       expect(header().subheading).to.equal('')
     })
 
+    it('gives the overview a second header with its leader and the type, but not Other, and a song none', async () => {
+      await rig.open()
+      Object.assign(rig.page.currentSetlist ?? {}, {
+        type: 'Church Service',
+        received: { fileId: 'f', leaderName: ' Ann ' },
+      })
+      await rig.page.header.show(null, true)
+      expect(header().subheader).to.equal('Ann · Church Service')
+      Object.assign(rig.page.currentSetlist ?? {}, { type: 'Other' })
+      await rig.page.header.show(null, true)
+      expect(header().subheader).to.equal('Ann')
+      await rig.page.header.show(rig.page.songs[0], true)
+      expect(header().subheader).to.equal('')
+    })
+
+    it('names the leader of a setlist of a space in the second header, once the people are read', async () => {
+      await rig.open()
+      // (the rig's database is shared by the tests: this one does not leave a person in it)
+      const real = rig.db.getAllPeople
+      rig.db.getAllPeople = async () => [
+        { id: 'ann', name: 'Ann', emails: [], modifiedDate: 'then' },
+      ]
+      try {
+        Object.assign(rig.page.currentSetlist ?? {}, { type: 'Event', leaderId: 'ann' })
+        await rig.page.header.show(null, true)
+        await waitUntil(() => header().subheader === 'Ann · Event', 'the leader is named')
+      } finally {
+        rig.db.getAllPeople = real
+      }
+    })
+
     it('keeps the header out of a scroll on the overview', async () => {
       await rig.open()
       await rig.page.header.show(null, true)
