@@ -5,11 +5,20 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { encryptBlob } from '../worker/src/blob.ts'
 import type { Env } from '../worker/src/env.ts'
+import type { GoogleApi } from '../worker/src/google-auth.ts'
 import { handleRequest } from '../worker/src/router.ts'
+import { handleTokenRefresh } from '../worker/src/session.ts'
 import type { ShareCache } from '../worker/src/share.ts'
 import type { TelemetryDeps } from '../worker/src/telemetry.ts'
-import { routeOf, tracedFetch, tracedStub, withWorkerSpan } from '../worker/src/trace.ts'
+import {
+  annotateRequest,
+  routeOf,
+  tracedFetch,
+  tracedStub,
+  withWorkerSpan,
+} from '../worker/src/trace.ts'
 
 const ORIGIN = 'https://chordless.test'
 const TRACE = 'a'.repeat(32)
@@ -386,4 +395,71 @@ test('the port is the scheme’s when the address names none', async () => {
   })
   const call = spans.find(s => s.name === 'chordless.worker.fetch')
   assert.equal(attributes(call as Record<string, any>)['server.port'], 80)
+})
+
+const refreshSpan = async (google: Partial<GoogleApi>, blob: (key: string) => Promise<string>) => {
+  const key = btoa('k'.repeat(32))
+  const env = { JWE_ENCRYPTION_KEY: key, GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 's' } as Env
+  const { spans } = await traceCalls(async () => {
+    const request = new Request(`${ORIGIN}/session/refresh`, {
+      method: 'POST',
+      body: JSON.stringify({ blob: await blob(key) }),
+    })
+    return handleTokenRefresh(request, env, google as GoogleApi)
+  })
+  return attributes(spans.find(s => s.name === 'chordless.worker.handle') as Record<string, any>)
+}
+
+const blobOf = (days: number) => (key: string) =>
+  encryptBlob(
+    {
+      owner_email: 'ann@example.com',
+      owner_sub: 'sub-1',
+      scopes: '',
+      refresh_token: 'refresh-token-that-must-not-leak',
+      created_at: new Date(Date.now() - days * 86_400_000 - 1000).toISOString(),
+      blob_id: 'b',
+      kid: 'default',
+    },
+    { JWE_ENCRYPTION_KEY: key }
+  )
+
+test('a refresh Google refuses says why on the request’s span, and how old the sign-in is', async () => {
+  const attrs = await refreshSpan(
+    {
+      refreshAccessToken: (async () => {
+        throw Object.assign(new Error('server responded with an error'), {
+          error: 'invalid_grant',
+          error_description: 'Token has been expired or revoked.',
+        })
+      }) as unknown as GoogleApi['refreshAccessToken'],
+    },
+    blobOf(8)
+  )
+  assert.equal(attrs['chordless.auth.refresh_result'], 'invalid_grant')
+  assert.equal(attrs['chordless.auth.google_description'], 'Token has been expired or revoked.')
+  assert.equal(attrs['chordless.auth.blob_age_days'], 8)
+  assert.equal(attrs['chordless.auth.blob_kid'], 'default')
+  assert.ok(!JSON.stringify(attrs).includes('refresh-token-that-must-not-leak'))
+})
+
+test('a refresh that works, and a blob the Worker cannot read, are told apart on the span', async () => {
+  const ok = await refreshSpan(
+    {
+      refreshAccessToken: (async () => ({
+        access_token: 'a',
+        expires_in: 3600,
+      })) as unknown as GoogleApi['refreshAccessToken'],
+    },
+    blobOf(1)
+  )
+  assert.equal(ok['chordless.auth.refresh_result'], 'ok')
+  assert.equal(ok['chordless.auth.blob_age_days'], 1)
+
+  const unreadable = await refreshSpan({}, async () => 'garbage')
+  assert.equal(unreadable['chordless.auth.refresh_result'], 'invalid_blob')
+})
+
+test('annotating outside a traced request does nothing', () => {
+  annotateRequest({ 'chordless.anything': 1 })
 })

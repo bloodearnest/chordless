@@ -9,6 +9,7 @@ import { type BlobData, decryptBlob, encryptBlob, UnreadableBlob } from './blob.
 import type { Env } from './env.ts'
 import { type GoogleApi, realGoogle } from './google-auth.ts'
 import { jsonResponse, message, Refusal, readJson, refusing } from './http.ts'
+import { annotateRequest } from './trace.ts'
 
 /** A text field of a request's body, or undefined if it is missing, empty or not text */
 function textField(body: Record<string, unknown>, name: string): string | undefined {
@@ -27,7 +28,10 @@ async function openBlob(body: Record<string, unknown>, env: Env): Promise<BlobDa
   try {
     return await decryptBlob(blob, env)
   } catch (error) {
-    if (error instanceof UnreadableBlob) throw new Refusal(401, 'invalid_blob')
+    if (error instanceof UnreadableBlob) {
+      annotateRequest({ 'chordless.auth.refresh_result': 'invalid_blob' })
+      throw new Refusal(401, 'invalid_blob')
+    }
     throw error
   }
 }
@@ -157,6 +161,14 @@ export function handleTokenRefresh(
   return refusing(async () => {
     const body = await readJson(request)
     const blobData = await openBlob(body, env)
+    // (how old the sign-in is, so that a refusal tells a week-old sign-in from a year-old one)
+    const signedInAt = Date.parse(blobData.created_at)
+    annotateRequest({
+      'chordless.auth.blob_age_days': Number.isNaN(signedInAt)
+        ? -1
+        : Math.floor((Date.now() - signedInAt) / 86_400_000),
+      'chordless.auth.blob_kid': blobData.kid,
+    })
 
     // Optional: Verify ID token if provided (extra security layer)
     const idToken = textField(body, 'id_token')
@@ -178,6 +190,7 @@ export function handleTokenRefresh(
         blobData.refresh_token,
         env
       )
+      annotateRequest({ 'chordless.auth.refresh_result': 'ok' })
       return jsonResponse({
         access_token,
         expires_in,
@@ -189,6 +202,13 @@ export function handleTokenRefresh(
       // in "Testing", or the access was revoked): the user has to sign in again, which is
       // expected and not a server error
       if ((error as { error?: string }).error === 'invalid_grant') {
+        // (Google's own words, "Token has been expired or revoked." or "Bad Request": no token in them)
+        annotateRequest({
+          'chordless.auth.refresh_result': 'invalid_grant',
+          'chordless.auth.google_description': (
+            (error as { error_description?: string }).error_description ?? message(error)
+          ).slice(0, 200),
+        })
         return jsonResponse(
           { error: 'invalid_grant', message: 'Google sign-in expired or was revoked' },
           401
