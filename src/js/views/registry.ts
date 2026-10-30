@@ -83,6 +83,11 @@ export const views: Record<string, ViewEntry> = {
     () => import('./about-view.ts'),
     () => 'About - Chordless'
   ),
+  contact: view(
+    'contact-view',
+    () => import('./contact-view.ts'),
+    () => 'Contact - Chordless'
+  ),
   join: view(
     'join-view',
     () => import('./join-view.ts'),

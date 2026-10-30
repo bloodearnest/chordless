@@ -4,6 +4,8 @@
  * removed when they are turned off. Support is given the first part of it, by the person.
  */
 
+import { getTelemetryPreference } from '../preferences.ts'
+
 const KEY = 'telemetry-device-id'
 
 /** This device's id, made the first time it is asked for; null where storage cannot hold one */
@@ -27,4 +29,9 @@ export function resetDeviceId(): void {
   } catch {
     // (storage is blocked: there is no id to forget)
   }
+}
+
+/** The first part of this device's id: enough to find its reports, and short to say. Empty while reports are off */
+export function supportId(): string {
+  return getTelemetryPreference() ? (getDeviceId()?.slice(0, 8) ?? '') : ''
 }

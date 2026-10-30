@@ -18,6 +18,7 @@ export class AboutView extends PageView {
         </p>
         <app-about id="app-about"></app-about>
         <p style="margin: 2rem 1rem">
+          <a href="/contact">Contact</a> ·
           <a href="/privacy.html" rel="external">Privacy policy</a> ·
           <a href="/terms.html" rel="external">Terms of service</a>
         </p>
