@@ -84,12 +84,6 @@ function sameEntry(
 }
 
 const CONFIG = {
-  // Font sizes
-  DEFAULT_FONT_SIZE: 1.6, // rem
-  MIN_FONT_SIZE: 0.8, // rem
-  MAX_FONT_SIZE: 3.0, // rem
-  FONT_SIZE_STEP: 0.1, // rem
-
   // Scrolling
   KEYBOARD_SCROLL_AMOUNT: 200, // px - scroll distance for up/down arrows
 
@@ -410,7 +404,6 @@ export class SetlistPage {
       const songs = await buildRuntimeSongs(setlist, {
         db: this._database(),
         parser: this.parser,
-        fontSize: CONFIG.DEFAULT_FONT_SIZE,
       })
       if (this._disposed) return
 
@@ -459,7 +452,6 @@ export class SetlistPage {
         this._lastVisibleSection = `song-${songIndex}`
         this.currentSongIndex = songIndex
         this.header.show(this.songs[songIndex], true) // true = instant, no animation
-        this.applyFontSize(songIndex)
         this.exitEditMode()
         this.dispatchSongChange(this.songs[songIndex])
       } else {
@@ -578,7 +570,6 @@ export class SetlistPage {
     this.scrollToSection(`song-${index}`, index, instant)
     // Update header with animation for programmatic navigation
     this.header.show(this.songs[index], false)
-    this.applyFontSize(index)
     this.exitEditMode()
 
     // Dispatch song-change event for media player
@@ -911,7 +902,6 @@ export class SetlistPage {
               this.overview.setEditMode(false)
               this.currentSongIndex = index
               this.header.show(this.songs[index], false) // animate=true for smooth transition
-              this.applyFontSize(index)
               this.dispatchSongChange(this.songs[index])
               this._replaceHistoryForSong(index)
             }
@@ -1180,20 +1170,6 @@ export class SetlistPage {
     preloadPadKey(newKey)
   }
 
-  applyFontSize(songIndex: number) {
-    if (songIndex < 0 || songIndex >= this.songs.length) return
-
-    const song = this.songs[songIndex]
-    const songSection = this.root.querySelector<HTMLElement>(`#song-${songIndex}`)
-
-    if (songSection) {
-      const songContainer = songSection.querySelector<HTMLElement>('.song-content')
-      if (songContainer) {
-        songContainer.style.fontSize = `${song.currentFontSize}rem`
-      }
-    }
-  }
-
   async resetCurrentSong() {
     if (this.currentSongIndex < 0 || this.currentSongIndex >= this.songs.length) {
       console.warn('[resetCurrentSong] Invalid song index, returning')
@@ -1207,9 +1183,6 @@ export class SetlistPage {
     // Reset BPM to original
     song.currentBPM = song.metadata.tempo
 
-    // Reset font size to default
-    song.currentFontSize = CONFIG.DEFAULT_FONT_SIZE
-
     // Reset capo to 0 (using handleCapoChange to update all displays)
     if (this._capoEnabled && song.currentCapo !== 0) {
       await this.handleCapoChange(0)
@@ -1222,9 +1195,6 @@ export class SetlistPage {
 
     // Reapply section states (all back to default)
     this.sections.applyAll()
-
-    // Apply font size
-    this.applyFontSize(this.currentSongIndex)
 
     // Reset key last - this will handle re-rendering and updating all displays
     if (originalKey && song.currentKey !== originalKey) {
@@ -1321,11 +1291,6 @@ export class SetlistPage {
 
       // Re-apply section states with new indices
       this.sections.applyAll()
-
-      // Re-apply font sizes
-      this.songs.forEach((_song, index) => {
-        this.applyFontSize(index)
-      })
     }
 
     this.overview.refreshSongs()
@@ -1405,12 +1370,6 @@ export class SetlistPage {
       // Wait for song-section elements to be ready before initializing
       await customElements.whenDefined('song-section')
       this.sections.applyAll(songSection)
-
-      // Re-apply font size
-      const songContentEl = songSection.querySelector<HTMLElement>('.song-content')
-      if (songContentEl) {
-        songContentEl.style.fontSize = `${song.currentFontSize}rem`
-      }
     }
 
     // Update header

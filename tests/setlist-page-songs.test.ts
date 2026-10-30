@@ -505,12 +505,10 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       rig.page.sections.states = {
         0: { 0: { hideMode: 'hide', isCollapsed: false, isHidden: true } },
       }
-      rig.page.songs[0].currentFontSize = 2.5
       await rig.page.resetCurrentSong()
       expect(rig.page.songs[0].currentKey).to.equal('G')
       expect(rig.page.songs[0].currentBPM).to.equal(90)
       expect(rig.page.songs[0].currentCapo).to.equal(0)
-      expect(rig.page.songs[0].currentFontSize).to.equal(1.6)
       expect(rig.page.sections.states[0]).to.equal(undefined)
     })
 
@@ -572,19 +570,6 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       await rig.page.reRenderSong(1)
       rig.root.querySelector('#song-2')?.remove()
       await rig.page.reRenderSong(2)
-    })
-  })
-
-  describe('the font', () => {
-    it('is that of the song, applied to its section', async () => {
-      await rig.open()
-      rig.page.songs[1].currentFontSize = 2
-      rig.page.applyFontSize(1)
-      expect(($('#song-1 .song-content') as HTMLElement).style.fontSize).to.equal('2rem')
-      rig.page.applyFontSize(-1)
-      rig.page.applyFontSize(9)
-      rig.root.querySelector('#song-1')?.remove()
-      rig.page.applyFontSize(1)
     })
   })
 

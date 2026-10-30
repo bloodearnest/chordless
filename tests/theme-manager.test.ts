@@ -169,15 +169,13 @@ describe('ThemeManager', () => {
   })
 
   describe('the font', () => {
-    it('scales to the width it is given, within limits', () => {
-      manager.updateResponsiveFontScale(600)
-      expect(manager.getVariable('font-scale')).to.equal('0.65')
-      manager.updateResponsiveFontScale(1200)
-      expect(manager.getVariable('font-scale')).to.equal('1')
-      manager.updateResponsiveFontScale(5000)
-      expect(manager.getVariable('font-scale')).to.equal('1.2')
-      manager.updateResponsiveFontScale(1000, 2000)
-      expect(manager.getVariable('font-scale')).to.equal('0.65')
+    it('has a scale kept within the range the slider offers', () => {
+      manager.setFontScale(1.25)
+      expect(manager.getVariable('font-scale')).to.equal('1.25')
+      manager.setFontScale(0.1)
+      expect(manager.getVariable('font-scale')).to.equal('0.8')
+      manager.setFontScale(9)
+      expect(manager.getVariable('font-scale')).to.equal('1.5')
     })
 
     it('has a family of its own, kept', () => {

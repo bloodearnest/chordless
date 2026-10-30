@@ -80,7 +80,7 @@ describe('theme-settings', () => {
       ...(el.shadowRoot?.querySelectorAll('.preset-button') ?? []),
     ] as HTMLButtonElement[]
     presets[0].click()
-    expect(el._fontScale).to.equal(0.65)
+    expect(el._fontScale).to.equal(0.8)
     presets[3].click()
     expect(el._fontScale).to.equal(1.5)
     expect(localStorage.getItem('font-scale')).to.equal('1.5')
@@ -98,10 +98,10 @@ describe('theme-settings', () => {
         throw new Error('blocked')
       }
       const slider = el.shadowRoot?.querySelector('.scale-slider') as HTMLInputElement
-      slider.value = '0.8'
+      slider.value = '1.2'
       slider.dispatchEvent(new Event('input'))
       el.shadowRoot?.querySelector<HTMLButtonElement>('.preset-button')?.click()
-      expect(el._fontScale).to.equal(0.65)
+      expect(el._fontScale).to.equal(0.8)
     })
   })
 })

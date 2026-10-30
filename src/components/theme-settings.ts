@@ -1,5 +1,10 @@
 import { css, html, LitElement } from 'lit'
-import { type ThemeObserver, themeManager } from '../js/theme-manager.ts'
+import {
+  MAX_FONT_SCALE,
+  MIN_FONT_SCALE,
+  type ThemeObserver,
+  themeManager,
+} from '../js/theme-manager.ts'
 
 /**
  * ThemeSettings Component
@@ -303,14 +308,14 @@ export class ThemeSettings extends LitElement {
       <div class="settings-group">
         <label class="settings-label">Font Scale</label>
         <div class="settings-description">
-          Adjust the global font size. This affects all text in the app including lyrics display.
+          Make all text in the app, lyrics included, smaller or larger than this device would pick. Saved on this device only.
         </div>
         <div class="font-scale-controls">
           <input
             type="range"
             class="scale-slider"
-            min="0.5"
-            max="2.0"
+            min=${MIN_FONT_SCALE}
+            max=${MAX_FONT_SCALE}
             step="0.05"
             .value=${this._fontScale.toString()}
             @input=${this._handleFontScaleChange}
@@ -319,17 +324,17 @@ export class ThemeSettings extends LitElement {
           <div class="scale-value">${Math.round(this._fontScale * 100)}%</div>
         </div>
         <div class="preset-buttons">
-          <button class="preset-button" @click=${() => this._setPresetScale(0.65)}>
-            Phone (65%)
+          <button class="preset-button" @click=${() => this._setPresetScale(0.8)}>
+            Small (80%)
           </button>
           <button class="preset-button" @click=${() => this._setPresetScale(1.0)}>
             Normal (100%)
           </button>
-          <button class="preset-button" @click=${() => this._setPresetScale(1.125)}>
-            Tablet (113%)
+          <button class="preset-button" @click=${() => this._setPresetScale(1.25)}>
+            Large (125%)
           </button>
           <button class="preset-button" @click=${() => this._setPresetScale(1.5)}>
-            Large (150%)
+            Largest (150%)
           </button>
         </div>
       </div>
