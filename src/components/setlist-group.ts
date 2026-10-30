@@ -5,6 +5,8 @@ export interface SetlistRow {
   id: string
   name?: string
   displayName?: string
+  /** Who leads it, if known */
+  leader?: string
   url?: string
   songCount?: number
   songs?: unknown[]
@@ -108,9 +110,18 @@ export class SetlistGroup extends LitElement {
       background-color: var(--bg-tertiary, #f9f9f9);
     }
 
+    .setlist-text {
+      flex: 1;
+    }
+
     .setlist-name {
       font-weight: 600;
-      flex: 1;
+    }
+
+    .setlist-leader {
+      display: block;
+      font-size: var(--font-ui-small);
+      color: var(--text-secondary, #5f6b6d);
     }
 
     .setlist-song-count {
@@ -136,7 +147,10 @@ export class SetlistGroup extends LitElement {
 
     return html`
       <a class="setlist-button" href=${url}>
-        <span class="setlist-name">${name}</span>
+        <span class="setlist-text">
+          <span class="setlist-name">${name}</span>
+          ${setlist.leader ? html`<span class="setlist-leader">${setlist.leader}</span>` : ''}
+        </span>
         <span class="setlist-song-count"> ${songCount} song${songCount === 1 ? '' : 's'} </span>
       </a>
     `
