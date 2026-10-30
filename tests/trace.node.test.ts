@@ -460,6 +460,31 @@ test('a refresh that works, and a blob the Worker cannot read, are told apart on
   assert.equal(unreadable['chordless.auth.refresh_result'], 'invalid_blob')
 })
 
+test('a sign-in with no readable date, and a refusal with no description, are still recorded', async () => {
+  const attrs = await refreshSpan(
+    {
+      refreshAccessToken: (async () => {
+        throw Object.assign(new Error('Bad Request'), { error: 'invalid_grant' })
+      }) as unknown as GoogleApi['refreshAccessToken'],
+    },
+    async key =>
+      encryptBlob(
+        {
+          owner_email: undefined,
+          owner_sub: undefined,
+          scopes: '',
+          refresh_token: 'r',
+          created_at: 'not a date',
+          blob_id: 'b',
+          kid: 'default',
+        },
+        { JWE_ENCRYPTION_KEY: key }
+      )
+  )
+  assert.equal(attrs['chordless.auth.blob_age_days'], -1)
+  assert.equal(attrs['chordless.auth.google_description'], 'Bad Request')
+})
+
 test('annotating outside a traced request does nothing', () => {
   annotateRequest({ 'chordless.anything': 1 })
 })
