@@ -117,7 +117,7 @@ async function renamePerson(
   identity: Identity
 ): Promise<Response> {
   const name = typeof body.name === 'string' ? body.name.trim() : ''
-  if (!name || name.length > MAX_NAME || /[\u0000-\u001f\u007f]/.test(name)) {
+  if (!name || name.length > MAX_NAME || /\p{Cc}/u.test(name)) {
     throw new Refusal(400, 'A name is one line of text, up to 100 characters')
   }
   const target = (await space.list('people')).find(each => each.props.personId === personId)
