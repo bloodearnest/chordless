@@ -44,6 +44,22 @@ export default defineConfig(({ command, isPreview }) => {
       // just above it, so a second large chunk still warns.
       chunkSizeWarningLimit: 1700,
     },
+    // The app, and the two policy pages (documents: they link the same stylesheet and theme).
+    // For the browser's build only: the Worker's has its own entry.
+    environments: {
+      client: {
+        build: {
+          rollupOptions: {
+            input: Object.fromEntries(
+              ['index', 'privacy', 'terms'].map(page => [
+                page,
+                fileURLToPath(new URL(`./src/${page}.html`, import.meta.url)),
+              ])
+            ),
+          },
+        },
+      },
+    },
     // Port 8787 is the origin the browser's data (IndexedDB, sign-in) belongs to, and the
     // one the Tailscale funnel points at: keep it for development (the tests set CHORDLESS_PORT
     // to run their own server on another port). Vite refuses requests whose Host it does not

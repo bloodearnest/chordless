@@ -24,7 +24,9 @@ use `just serve` for everything else. Playwright and the other tests use the plu
 
 ## Layout
 
-- `src/` is Vite's root: `index.html` (the only page that is built), `js/`, `components/`,
+- `src/` is Vite's root: `index.html` (the app) and `privacy.html` and `terms.html` (documents that
+  link `css/style.css` for the theme and `css/document.css` for reading: they are built, because the
+  page's policy refuses an inline `<style>`), `js/`, `components/`,
   `css/`, `service-worker.js`, and `dev/` (the playgrounds, not built).
 - `public/` is copied as it is: the icons and the manifest.
 - `dist/` is the output, and is not committed. `dist/client` is what is served, and
