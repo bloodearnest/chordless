@@ -43,6 +43,7 @@ export class HeaderInfoClickEvent extends Event {
  * @property {Boolean} editMode - Current edit mode state (for styling the toggle button)
  * @property {String} phoneHeading - The title on a phone, if shorter than `heading` (the top row has little room)
  * @property {String} subheading - On a phone, a row of its own under the top row (not shown wider)
+ * @property {String} subheader - A second header, a band across the full width under the header (and part of it: it floats and tucks away with it), e.g. who leads a setlist. Nothing when empty
  * @property {Boolean} tucked - On phones, the header is slid right out of the way (by a transform the page sets)
  *
  * Slots:
@@ -73,6 +74,7 @@ export class AppHeader extends LitElement {
     disableAnimation: { type: Boolean, attribute: 'disable-animation' },
     phoneHeading: { type: String, attribute: 'phone-heading' },
     subheading: { type: String },
+    subheader: { type: String },
     tucked: { type: Boolean, reflect: true },
     _slottedControls: { state: true }, // whether anything is in the controls slot
     _updateReady: { state: true }, // whether a new version of the app is waiting
@@ -86,6 +88,7 @@ export class AppHeader extends LitElement {
   declare disableAnimation: boolean
   declare phoneHeading: string
   declare subheading: string
+  declare subheader: string
   declare tucked: boolean
   declare _slottedControls: boolean
   declare _updateReady: boolean
@@ -122,6 +125,21 @@ export class AppHeader extends LitElement {
       min-width: 0;
       overflow: hidden;
       transition: height 0.3s ease-in-out;
+    }
+
+    /* A second header: a band under the first, across its width, a shade lighter */
+    .subheader {
+      padding: 0.35rem var(--gap);
+      text-align: center;
+      font-size: var(--font-ui-small);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      background-color: color-mix(in srgb, var(--header-bg), white 14%);
+      color: var(--header-text, white);
+      border-top: 1px solid color-mix(in srgb, var(--header-bg), white 25%);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* Larger padding and gap on tablet/desktop */
@@ -406,6 +424,7 @@ export class AppHeader extends LitElement {
     this.disableAnimation = false
     this.phoneHeading = ''
     this.subheading = ''
+    this.subheader = ''
     this.tucked = false
     this._slottedControls = false
     this._updateReady = appUpdate.ready
@@ -579,6 +598,7 @@ export class AppHeader extends LitElement {
           <slot name="controls" @slotchange=${this._onControlsSlotChange}></slot>
         </div>
       </header>
+      ${this.subheader ? html`<div class="subheader" part="subheader">${this.subheader}</div>` : ''}
     `
   }
 

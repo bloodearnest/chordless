@@ -34,6 +34,16 @@ describe('app-header', () => {
     expect(narrow()).to.equal('18 Oct')
   })
 
+  it('has a second header, a band under the first, only while it has something to say', async () => {
+    const header = await fixture<AppHeader>(html`<app-header heading="Sun"></app-header>`)
+    const band = () => header.shadowRoot?.querySelector('.subheader')?.textContent?.trim()
+    expect(band()).to.equal(undefined)
+    header.subheader = 'Ann · Church Service'
+    await waitUntil(() => band() === 'Ann · Church Service', 'the band is shown')
+    header.subheader = ''
+    await waitUntil(() => band() === undefined, 'the band goes')
+  })
+
   it('shows a new heading after fading the old one out', async () => {
     const header = await fixture<AppHeader>(html`<app-header heading="First"></app-header>`)
     expect(shownTitle(header)).to.equal('First')
