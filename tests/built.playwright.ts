@@ -70,6 +70,24 @@ test('the files it caches are the files the build made', { tag: '@logic' }, asyn
   expect(cached.filter(path => path.startsWith('/help/'))).toEqual([])
 })
 
+test('the privacy and terms pages are styled under the page security policy', async ({ page }) => {
+  // (an inline <style> is refused by style-src 'self', which left them bare)
+  const refused: string[] = []
+  page.on('console', message => {
+    if (/Refused to/.test(message.text())) refused.push(message.text())
+  })
+  for (const path of ['/privacy.html', '/terms.html']) {
+    await page.goto(path)
+    await expect(page.locator('.doc h1'), path).toBeVisible()
+    // The app's own theme reached it: the header's colour, not the browser's default (transparent)
+    await expect(page.locator('.doc-header'), path).not.toHaveCSS(
+      'background-color',
+      'rgba(0, 0, 0, 0)'
+    )
+  }
+  expect(refused).toEqual([])
+})
+
 test('the security headers are on the page, its deep links and the service worker', {
   tag: '@logic',
 }, async ({ request }) => {

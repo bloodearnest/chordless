@@ -7,61 +7,12 @@
     <meta name="theme-color" content="#2c3e50" />
     <link rel="icon" type="image/svg+xml" href="/icons/favicon-light.svg" />
     <title>Chordless terms of service</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-        --bg: #ffffff;
-        --text: #1a1a1a;
-        --muted: #5f6b6d;
-        --link: #2477ad;
-        --header: #2c3e50;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #1a1d21;
-          --text: #e6e8ea;
-          --muted: #a3acb0;
-          --link: #6cb6ee;
-        }
-      }
-      body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--text);
-        font: 1rem/1.6 system-ui, sans-serif;
-      }
-      header {
-        background: var(--header);
-        padding: 1rem;
-      }
-      header a {
-        color: #ecf0f1;
-        font-weight: 600;
-        text-decoration: none;
-      }
-      main {
-        max-width: 42rem;
-        margin: 0 auto;
-        padding: 1rem 1rem 3rem;
-      }
-      a {
-        color: var(--link);
-      }
-      h1 {
-        margin-bottom: 0.25rem;
-      }
-      h2 {
-        margin-top: 2rem;
-      }
-      .updated {
-        color: var(--muted);
-        margin-top: 0;
-      }
-    </style>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/document.css" />
   </head>
   <body>
-    <header><a href="/">Chordless</a></header>
-    <main>
+    <header class="doc-header"><a href="/">Chordless</a></header>
+    <main class="doc">
       <h1>Terms of service</h1>
       <p class="updated">Last updated 12 October 2026</p>
 
@@ -127,5 +78,6 @@
       </p>
       <p><a href="/privacy.html">Privacy policy</a></p>
     </main>
+    <script type="module" src="/js/theme-manager.ts"></script>
   </body>
 </html>
