@@ -131,7 +131,7 @@ export class AppHeader extends LitElement {
     /* A second header: a band under the first, across its width, a shade lighter */
     .subheader {
       padding: 0.35rem var(--gap);
-      text-align: center;
+      text-align: left;
       font-size: var(--font-ui-small);
       font-weight: 600;
       letter-spacing: 0.02em;
