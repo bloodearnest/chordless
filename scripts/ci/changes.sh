@@ -3,13 +3,15 @@
 # skipped this way counts as passed for `ci-ok`; a workflow skipped by `on.paths` would leave the
 # required check waiting forever: docs/CI.md).
 # Prints `name=true|false` lines, which CI appends to $GITHUB_OUTPUT.
-# Usage: scripts/ci/changes.sh <base ref or SHA>   (no base, as on a push or a manual run: all true)
+# Usage: scripts/ci/changes.sh <base ref or SHA>   (no base, as on a push or a manual run: all true,
+# but not `lockfile`: a new advisory must not hold up a deploy, and the Advisories workflow has it)
 set -euo pipefail
 
 base=${1:-}
 if [ -z "$base" ]; then
   echo "code=true"
   echo "infra=true"
+  echo "lockfile=false"
   exit 0
 fi
 
@@ -26,4 +28,11 @@ if grep -qE '^(infra/|scripts/infra-check\.sh$|mise\.toml$)' <<<"$files"; then
   echo "infra=true"
 else
   echo "infra=false"
+fi
+# The npm lockfile: a change to it is checked for known advisories (`just advisories`), as the new
+# versions are the pull request's doing. The daily Advisories workflow covers the rest
+if grep -qxF 'package-lock.json' <<<"$files"; then
+  echo "lockfile=true"
+else
+  echo "lockfile=false"
 fi

@@ -33,6 +33,7 @@ jobs:
     outputs:
       code: ${{ steps.changes.outputs.code }}
       infra: ${{ steps.changes.outputs.infra }}
+      lockfile: ${{ steps.changes.outputs.lockfile }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -241,6 +242,25 @@ jobs:
         with:
           setup: ${{ steps.setup.outputs.save }}
 
+  # Only when the lockfile changed: the new versions are then the pull request's doing. Any other
+  # day's new advisory is the Advisories workflow's, which holds nothing up
+  advisories:
+    name: Advisories
+    needs: changes
+    if: needs.changes.outputs.lockfile == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          tools: node just
+      - run: just advisories
+
   infra:
     name: Terraform
     needs: changes
@@ -260,11 +280,11 @@ jobs:
       - run: just lint-infra
 
   # The one required check: every job above passed, or was skipped as not needed (a change of
-  # prose only, or nothing in infra/)
+  # prose only, nothing in infra/, an unchanged lockfile)
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [changes, lint, node, unit, coverage, e2e-linux, e2e, infra]
+    needs: [changes, lint, node, unit, coverage, e2e-linux, e2e, advisories, infra]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
