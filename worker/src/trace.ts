@@ -161,6 +161,14 @@ const portOf = (url: URL): number =>
 /** The class of an error for `error.type`: its name, or `_OTHER` for something thrown that is not one */
 const errorType = (error: unknown): string => (error instanceof Error ? error.name : '_OTHER')
 
+/**
+ * Add attributes to the span of the request being handled, for what only the handler knows (why a
+ * sign-in was refused). Nothing happens when the request is not traced.
+ */
+export function annotateRequest(attributes: Record<string, string | number>): void {
+  trace.getActiveSpan()?.setAttributes(attributes)
+}
+
 /** A span for a call made while a request is traced, or null when none is (then nothing is done) */
 function startCall(name: string, attributes: Attributes): Span | null {
   const tracing = context.active().getValue(TRACING) as Tracing | undefined

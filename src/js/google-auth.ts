@@ -289,9 +289,12 @@ export async function hasDriveAccess(): Promise<boolean> {
 
 /** Google no longer honours the stored sign-in (it expired or was revoked): sign in again */
 export class SignInExpiredError extends Error {
-  constructor() {
+  /** What the Worker said: Google refused the token, or the Worker could not read the blob */
+  readonly reason: 'invalid_grant' | 'invalid_blob'
+  constructor(reason: 'invalid_grant' | 'invalid_blob' = 'invalid_grant') {
     super('Your Google sign-in has expired: connect with Google again')
     this.name = 'SignInExpiredError'
+    this.reason = reason
   }
 }
 
@@ -399,14 +402,21 @@ function refreshTokens(
   existingMetadata: AuthMetadata
 ): Promise<AuthMetadata & { access_token: string }> {
   // (a span of its own, for how long the Worker takes and whether a sign-in has expired)
-  return traced('chordless.auth.refresh', {}, span =>
-    requestNewTokens(
-      blob,
-      existingMetadata,
-      // (the request is a child of this span, and sends its traceparent: the Worker's is its child)
-      timedFetch('worker', undefined, () => span)
-    )
-  )
+  return traced('chordless.auth.refresh', {}, async span => {
+    try {
+      return await requestNewTokens(
+        blob,
+        existingMetadata,
+        // (the request is a child of this span, and sends its traceparent: the Worker's is its child)
+        timedFetch('worker', undefined, () => span)
+      )
+    } catch (error) {
+      // (which refusal, so that a sign-in that expired is told from one the Worker cannot read)
+      if (error instanceof SignInExpiredError)
+        span.setAttribute('chordless.auth.refused', error.reason)
+      throw error
+    }
+  })
 }
 
 async function requestNewTokens(
@@ -425,7 +435,7 @@ async function requestNewTokens(
     const error = await response.json().catch(() => ({}))
     // (Google no longer honours the sign-in, or the Worker cannot read the blob: sign in again)
     const refused = error.error === 'invalid_grant' || error.error === 'invalid_blob'
-    if (response.status === 401 && refused) throw new SignInExpiredError()
+    if (response.status === 401 && refused) throw new SignInExpiredError(error.error)
     throw new Error(error.error || 'Failed to refresh access token')
   }
 

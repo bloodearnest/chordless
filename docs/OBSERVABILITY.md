@@ -64,6 +64,13 @@ team ids kept in synced data, and the live-update latency.
 | Worker request | Cloudflare's native export | |
 | Errors | `toast()` errors, `window` `error` and `unhandledrejection`, the sync catch | an `exception` event on the active span, plus `chordless.error`; class and message only |
 
+The Worker's span for `/session/refresh` says why a sign-in was refused, and how old it was, so
+"why did this sign-in expire?" is a query: `chordless.auth.refresh_result` (`ok`, `invalid_grant`,
+`invalid_blob`), `chordless.auth.google_description` (Google's own words, e.g. "Token has been expired
+or revoked."), `chordless.auth.blob_age_days` (since the person signed in) and `chordless.auth.blob_kid`.
+A device whose sign-in has expired stops syncing, which leaves no sync span; the toast that tells the
+person is a `chordless.error` span, once a visit.
+
 Other work (auth refresh, share open, import, pad loading) is an attribute (`..._ms`, outcome, counts)
 on whichever of those spans encloses it.
 
@@ -377,7 +384,7 @@ idle, only if reports are on, and again when they are turned on.
   "tracked" span is a module variable, not async context.
 - Spans made so far: `chordless.sync.run` (`SyncOrchestrator`), `chordless.auth.refresh` (a span of its
   own, not an attribute: how long the Worker took is its duration, and a sign-in that has expired
-  is its error), and `chordless.error` (an unhandled error, an unhandled rejection, or a `toast()` error:
+  is its error; `chordless.auth.refused` says which refusal, `invalid_grant` or `invalid_blob`), and `chordless.error` (an unhandled error, an unhandled rejection, or a `toast()` error:
   at most 20 a visit). No auto-instrumentation (`instrumentation-fetch`, document-load, interaction):
   the call spans are our own wrapper, so that they are the calls we choose.
 - Every span gets `baselineAttributes()` as it starts: the device id, the page's name, live, online,
