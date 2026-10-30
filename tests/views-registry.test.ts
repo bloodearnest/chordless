@@ -75,3 +75,16 @@ describe('the about page', () => {
     element.remove()
   })
 })
+
+describe('the contact page', () => {
+  it('has the contact panel, and the policies', async () => {
+    const element = await views.contact.load({ name: 'contact' } as Route)
+    document.body.append(element)
+    await (element as unknown as { updateComplete: Promise<unknown> }).updateComplete
+    expect(element.querySelector('app-contact')).to.not.equal(null)
+    expect(
+      Array.from(element.querySelectorAll('main > p a'), link => link.getAttribute('href'))
+    ).to.deep.equal(['/privacy.html', '/terms.html'])
+    element.remove()
+  })
+})

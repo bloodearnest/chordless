@@ -56,7 +56,7 @@ export function deviceDetails(): DeviceDetails {
   const agent = (navigator as Navigator & { userAgentData?: UserAgentData }).userAgentData
   return {
     deviceClass: classify(coarse, hover, short),
-    touchPoints: navigator.maxTouchPoints ?? 0,
+    touchPoints: navigator.maxTouchPoints,
     pointer: coarse ? 'coarse' : fine ? 'fine' : 'none',
     hover,
     screen: `${short}x${long}`,

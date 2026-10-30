@@ -1,5 +1,6 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
-import type { AppContact } from '../src/components/app-contact.ts'
+import { AppContact } from '../src/components/app-contact.ts'
+import { appUpdate } from '../src/js/app-update.ts'
 import { CONTACT_ADDRESS } from '../src/js/contact.ts'
 import { setTelemetryPreference } from '../src/js/preferences.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -55,7 +56,33 @@ describe('app-contact', () => {
     expect(decodeURIComponent(link.href)).to.contain(CONTACT_ADDRESS)
   })
 
+  it('gives the version that is running, once it is known', async () => {
+    const real = appUpdate.runningVersion
+    appUpdate.runningVersion = async () => ({ version: 'abc123', released: '' })
+    try {
+      const element = await open()
+      await waitUntil(() => details(element).includes('Version: abc123'))
+    } finally {
+      appUpdate.runningVersion = real
+    }
+  })
+
+  it('says the version is unknown when the worker cannot say', async () => {
+    const real = appUpdate.runningVersion
+    appUpdate.runningVersion = async () => {
+      throw new Error('no worker')
+    }
+    try {
+      const element = await open()
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(details(element)).to.contain('Version: unknown')
+    } finally {
+      appUpdate.runningVersion = real
+    }
+  })
+
   it('copies the details, and says it did', async () => {
+    AppContact.copiedMs = 20
     const written: string[] = []
     const real = Object.getOwnPropertyDescriptor(Navigator.prototype, 'clipboard')
     Object.defineProperty(navigator, 'clipboard', {
@@ -69,7 +96,14 @@ describe('app-contact', () => {
       expect(written[0]).to.equal(details(element))
       await element.updateComplete
       expect(element.shadowRoot?.querySelector('#contact-copy')?.textContent).to.contain('Copied')
+      // ...and goes back to offering it
+      await waitUntil(() =>
+        element.shadowRoot
+          ?.querySelector('#contact-copy')
+          ?.textContent?.includes('Copy the details')
+      )
     } finally {
+      AppContact.copiedMs = 2000
       Reflect.deleteProperty(navigator, 'clipboard')
       if (real) Object.defineProperty(Navigator.prototype, 'clipboard', real)
     }

@@ -31,6 +31,9 @@ export class AppContact extends LitElement {
   declare _version: string
   declare _copied: boolean
 
+  /** How long "Copied" stays on the button */
+  static copiedMs = 2000
+
   static override styles = [
     panelStyles,
     buttonStyles,
@@ -116,7 +119,7 @@ export class AppContact extends LitElement {
       this._copied = true
       setTimeout(() => {
         this._copied = false
-      }, 2000)
+      }, AppContact.copiedMs)
     } catch {
       // (the details are on screen to read out, or to select)
     }
