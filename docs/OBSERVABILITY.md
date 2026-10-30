@@ -79,7 +79,13 @@ on whichever of those spans encloses it.
 `enduser.pseudo.id` (signed in), `chordless.team.pseudo_id` (a team space), `chordless.space_kind`;
 in a setlist, `session.id` (so a sync or an error during it joins it); and
 `chordless.route` (the template, not the URL), `chordless.live`, `chordless.online`,
-`chordless.display_mode`. **Not the setlist or the song in view** (decided 2026-10-28): they would
+`chordless.display_mode`, and the device (`js/telemetry/device.ts`, asked of the browser, not read from
+the user agent, which an iPad sets to a Mac's): `chordless.device_class` (`phone`, `tablet`, `desktop`: a
+finger-first device by its screen's shorter side, 600 CSS pixels; a mouse makes a desktop), `chordless.touch_points`,
+`chordless.pointer` (`coarse`, `fine`, `none`), `chordless.hover`, `chordless.screen` (upright, `390x844`),
+`chordless.viewport` (to the nearest 50), `chordless.pixel_ratio`, and where the browser has
+`navigator.userAgentData` (Chromium) `browser.brands`, `browser.platform` and `browser.mobile`. The Contact
+page lists the same, so what a person writes with and what we recorded agree. **Not the setlist or the song in view** (decided 2026-10-28): they would
 make a background sync look as if it were about the song on screen. A span that is about them names
 them itself (`chordless.setlist.id`, `.date` on the open and leave spans); a song-specific span,
 when there is one, adds `chordless.song.*` itself. Resource attributes: `service.name` (`chordless-web`), `service.version`,
@@ -388,7 +394,7 @@ idle, only if reports are on, and again when they are turned on.
   at most 20 a visit). No auto-instrumentation (`instrumentation-fetch`, document-load, interaction):
   the call spans are our own wrapper, so that they are the calls we choose.
 - Every span gets `baselineAttributes()` as it starts: the device id, the page's name, live, online,
-  the display mode, and what `context.ts` knows (nothing yet: step 4 sets the session, setlist, song and
+  the display mode, the device (see Identity above), and what `context.ts` knows (nothing yet: step 4 sets the session, setlist, song and
   account ids there). Resource: `service.name` `chordless-web`, `service.version` (the service
   worker's), `deployment.environment.name`, `user_agent.original`.
 - Batches go every five seconds, and when the page is hidden or left, through `GatedExporter`, which

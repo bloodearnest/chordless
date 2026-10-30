@@ -12,6 +12,7 @@ import {
 } from '@opentelemetry/semantic-conventions/incubating'
 import { getLive } from '../live.ts'
 import { getAmbient } from './context.ts'
+import { deviceDetails } from './device.ts'
 import { getDeviceId } from './ids.ts'
 
 export function baselineAttributes(): Attributes {
@@ -29,9 +30,17 @@ export function baselineAttributes(): Attributes {
   set('chordless.route', document.body.dataset.view)
   set('chordless.live', getLive() !== null)
   set('chordless.online', navigator.onLine)
-  set(
-    'chordless.display_mode',
-    window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser'
-  )
+  const device = deviceDetails()
+  set('chordless.display_mode', device.displayMode)
+  set('chordless.device_class', device.deviceClass)
+  set('chordless.touch_points', device.touchPoints)
+  set('chordless.pointer', device.pointer)
+  set('chordless.hover', device.hover)
+  set('chordless.screen', device.screen)
+  set('chordless.viewport', device.viewport)
+  set('chordless.pixel_ratio', device.pixelRatio)
+  set('browser.platform', device.platform)
+  set('browser.mobile', device.mobile)
+  if (device.brands?.length) attributes['browser.brands'] = device.brands
   return attributes
 }
