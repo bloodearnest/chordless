@@ -94,8 +94,15 @@ app-modal:not(:defined) {
   /* Typography */
   --font-family-base: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  /* Base font size - fluid scaling between mobile (14px) and desktop (24px) */
-  --font-base: clamp(16pt, min(3vw, 0.03 * var(--app-width)), 24pt);
+  /* Base font size: fluid between 16pt on a phone and 24pt on a tablet or desktop frame. This is
+     what the device picks. Spacing that should keep the proportions of the device (the song margin,
+     the header's gap) is built on this one, so a bigger text setting does not eat the screen. */
+  --font-base-auto: clamp(16pt, min(3vw, 0.03 * var(--app-width)), 24pt);
+
+  /* The text size: the device's choice times the user's own setting (Preferences, saved on this
+     device as --font-scale on <html>). The multiplier is outside the clamp so it still has an
+     effect at either end of it, e.g. on a desktop frame, which is always at the maximum. */
+  --font-base: calc(var(--font-base-auto) * var(--font-scale, 1));
 
   /* Semantic font sizes for different content types */
   --font-lyrics: var(--font-base);
@@ -106,7 +113,7 @@ app-modal:not(:defined) {
 
   /* The margin round the song display: scales with the text, so it is the same proportion on a
      phone as on a tablet (a fixed rem was hairline next to a phone's 16pt text) */
-  --song-margin: calc(var(--font-base) * 0.5);
+  --song-margin: calc(var(--font-base-auto) * 0.5);
 }
 
 /* The frame is for a desktop: a primary input that can hover and point finely (a mouse or

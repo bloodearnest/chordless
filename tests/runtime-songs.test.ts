@@ -75,7 +75,6 @@ describe('buildRuntimeSongs', () => {
     buildRuntimeSongs(makeSetlist({ songs: entries.map(entry => makeEntry(entry)) }), {
       db,
       parser,
-      fontSize: 1.6,
     })
   const chart = (extra = '') =>
     `{title: Grace}\n{key: G}\n${extra}\n\n{comment: Verse 1}\n[G]Amazing [C]grace`
@@ -88,7 +87,6 @@ describe('buildRuntimeSongs', () => {
     expect(song.currentKey).to.equal('G')
     expect(song.songId).to.equal(songId)
     expect(song.songIndex).to.equal(0)
-    expect(song.currentFontSize).to.equal(1.6)
     expect(song.currentCapo).to.equal(0)
     expect(song.hasLocalEdits).to.equal(false)
   })
@@ -211,7 +209,6 @@ describe('buildRuntimeSongs', () => {
     const [song] = await buildRuntimeSongs(makeSetlist({ songs: [entry] }), {
       db,
       parser,
-      fontSize: 1.6,
     })
     expect(song._setlistEntry).to.equal(entry)
     expect(must(song._canonicalSong).id).to.equal(songId)

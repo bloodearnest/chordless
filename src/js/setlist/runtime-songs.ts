@@ -36,7 +36,6 @@ export interface RuntimeSong {
   originalKey: string | null
   currentKey: string | undefined
   currentBPM: number | null
-  currentFontSize: number
   currentCapo: number
   songId: string
   /** Which version of the song this is: the stored song's label */
@@ -84,16 +83,11 @@ export function parseTempoMetadata(raw: TempoInput): {
  *
  * @param options.db the space's database
  * @param options.parser a ChordProParser
- * @param options.fontSize the font size, in rem, each song starts at
  * @returns the songs, as the page works with them
  */
 export async function buildRuntimeSongs(
   setlist: Setlist,
-  {
-    db,
-    parser,
-    fontSize,
-  }: { db: ChordlessDB; parser: { parse: (text: string) => ParsedChart }; fontSize: number }
+  { db, parser }: { db: ChordlessDB; parser: { parse: (text: string) => ParsedChart } }
 ): Promise<RuntimeSong[]> {
   const songs: RuntimeSong[] = []
 
@@ -181,7 +175,6 @@ export async function buildRuntimeSongs(
       originalKey: originalKey, // Immutable original
       currentKey: parsed.metadata.key,
       currentBPM: currentBPM,
-      currentFontSize: fontSize,
       currentCapo: 0, // Capo is loaded from localStorage in loadState()
       songId: songEntry.songId,
       variantLabel: canonicalSong?.variantLabel ?? null,

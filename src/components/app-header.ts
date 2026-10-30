@@ -105,8 +105,9 @@ export class AppHeader extends LitElement {
   static override styles = css`
     :host {
       display: block;
-      /* The space between things follows the text size (--font-base), not the browser's rem */
-      --gap: calc(var(--font-base) * 0.4);
+      /* The space between things follows the device's text size (--font-base-auto), not the browser's rem
+         and not the user's text setting, which would crowd the header */
+      --gap: calc(var(--font-base-auto) * 0.4);
     }
 
     header {

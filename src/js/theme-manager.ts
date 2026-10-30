@@ -17,6 +17,10 @@ export class ThemeChangeEvent extends Event {
  */
 
 /** Called with the theme's name ('light', 'dark' or 'system') when it changes */
+/** The range of the text size setting, as a multiple of what the device picks */
+export const MIN_FONT_SCALE = 0.8
+export const MAX_FONT_SCALE = 1.5
+
 export type ThemeObserver = (themeName: string) => void
 
 export class ThemeManager {
@@ -260,18 +264,7 @@ export class ThemeManager {
    * @param scale - Font scale multiplier (e.g., 1.0, 1.2)
    */
   setFontScale(scale: number): void {
-    this.setVariable('font-scale', scale)
-  }
-
-  /**
-   * Update font scale based on container width (responsive)
-   * @param containerWidth - Width in pixels
-   * @param baseWidth - Base width for scale calculation (default: 1200)
-   */
-  updateResponsiveFontScale(containerWidth: number, baseWidth = 1200): void {
-    // Calculate scale factor: min 0.65, max 1.2
-    const scale = Math.min(Math.max(containerWidth / baseWidth, 0.65), 1.2)
-    this.setFontScale(scale)
+    this.setVariable('font-scale', Math.min(Math.max(scale, MIN_FONT_SCALE), MAX_FONT_SCALE))
   }
 
   /**
