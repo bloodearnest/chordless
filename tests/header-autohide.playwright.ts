@@ -30,6 +30,27 @@ test.describe('The header on a phone', () => {
     await expect(header).toBeVisible()
   })
 
+  test('keeps its height as the window changes size, so the song under it is never behind', async ({
+    page,
+  }) => {
+    // (the header's own controls once animated their size, 200 ms of it, for the song to follow a frame late)
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.setViewportSize({ width: 390, height: 600 })
+    const heights = await page.evaluate(
+      () =>
+        new Promise<number[]>(resolve => {
+          const seen: number[] = []
+          const sample = () => {
+            seen.push(document.querySelector('#app-header')?.getBoundingClientRect().height ?? 0)
+            if (seen.length < 40) requestAnimationFrame(sample)
+            else resolve(seen)
+          }
+          requestAnimationFrame(sample)
+        })
+    )
+    expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(0.01)
+  })
+
   test('floats over the page, with the song starting just under it', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 600 })
     const box = (selector: string) =>

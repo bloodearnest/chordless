@@ -386,7 +386,14 @@ export class AppHeader extends LitElement {
       cursor: pointer;
       font-size: var(--font-icon);
       font-weight: bold;
-      transition: all 0.2s;
+      /* (not "all": the size follows the window and the text size, and the song under the
+         header follows its height, so an animated size left the song a frame behind it) */
+      transition:
+        background-color 0.2s,
+        border-color 0.2s,
+        color 0.2s,
+        box-shadow 0.2s,
+        transform 0.2s;
       flex-shrink: 0;
     }
 

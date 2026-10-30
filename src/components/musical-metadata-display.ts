@@ -56,7 +56,11 @@ export class MusicalMetadataDisplay extends LitElement {
       border: 2px solid transparent;
       border-radius: 6px;
       padding: 0.2rem 0.45rem;
-      transition: all 0.2s;
+      /* (not "all": a change of size, from the window or the text size, is not animated, so the
+         header's height, which the song under it follows, is never between two) */
+      transition:
+        background-color 0.2s,
+        border-color 0.2s;
       cursor: default;
     }
 
