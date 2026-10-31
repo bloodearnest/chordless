@@ -8,6 +8,9 @@ const { describe, it } = window
 const device: DeviceDetails = {
   deviceClass: 'tablet',
   touchPoints: 5,
+  touch: true,
+  browserName: 'Chrome',
+  osName: 'Android',
   pointer: 'coarse',
   hover: false,
   screen: '820x1180',

@@ -4,7 +4,7 @@
  */
 import { expect } from '@open-wc/testing'
 import { baselineAttributes } from '../src/js/telemetry/baseline.ts'
-import { deviceDetails } from '../src/js/telemetry/device.ts'
+import { deviceDetails, parseUserAgent } from '../src/js/telemetry/device.ts'
 
 const { describe, it, afterEach } = window
 
@@ -144,6 +144,9 @@ describe('the baseline attributes', () => {
     const attributes = baselineAttributes()
     expect(attributes['chordless.device_class']).to.equal('tablet')
     expect(attributes['chordless.touch_points']).to.equal(5)
+    expect(attributes['chordless.touch']).to.equal(true)
+    expect(attributes['browser.name']).to.be.a('string')
+    expect(attributes['os.name']).to.be.a('string')
     expect(attributes['chordless.pointer']).to.equal('coarse')
     expect(attributes['chordless.hover']).to.equal(false)
     expect(attributes['chordless.screen']).to.equal('820x1180')
@@ -159,5 +162,99 @@ describe('the baseline attributes', () => {
     expect(attributes).to.not.have.property('browser.brands')
     expect(attributes).to.not.have.property('browser.platform')
     expect(attributes).to.not.have.property('browser.mobile')
+  })
+})
+
+describe('parseUserAgent', () => {
+  const cases: [string, string, number, string, string | undefined, string, string | undefined][] =
+    [
+      [
+        'Safari on an iPhone',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+        5,
+        'Safari',
+        '17',
+        'iOS',
+        '17',
+      ],
+      [
+        'Chrome on an iPhone is still iOS',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0.6099.119 Mobile/15E148 Safari/604.1',
+        5,
+        'Chrome',
+        '120',
+        'iOS',
+        '16',
+      ],
+      [
+        'an iPad, which sends a Mac’s string',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+        5,
+        'Safari',
+        '17',
+        'iPadOS',
+        undefined,
+      ],
+      [
+        'a Mac',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+        0,
+        'Safari',
+        '17',
+        'macOS',
+        undefined,
+      ],
+      [
+        'Edge on Windows, not Chrome',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+        0,
+        'Edge',
+        '120',
+        'Windows',
+        undefined,
+      ],
+      [
+        'Chrome on Android',
+        'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+        5,
+        'Chrome',
+        '120',
+        'Android',
+        '10',
+      ],
+      [
+        'Chrome on a Chromebook',
+        'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        0,
+        'Chrome',
+        '120',
+        'ChromeOS',
+        undefined,
+      ],
+      [
+        'Firefox on Linux',
+        'Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0',
+        0,
+        'Firefox',
+        '121',
+        'Linux',
+        undefined,
+      ],
+    ]
+  for (const [name, ua, touch, browser, browserVersion, os, osVersion] of cases) {
+    it(`reads ${name}`, () => {
+      const parsed = parseUserAgent(ua, touch)
+      expect(parsed.browser.name).to.equal(browser)
+      expect(parsed.browser.version).to.equal(browserVersion)
+      expect(parsed.os.name).to.equal(os)
+      expect(parsed.os.version).to.equal(osVersion)
+    })
+  }
+
+  it('does not fail on a string it does not know', () => {
+    expect(parseUserAgent('', 0)).to.deep.equal({
+      browser: { name: 'other' },
+      os: { name: 'other' },
+    })
   })
 })
