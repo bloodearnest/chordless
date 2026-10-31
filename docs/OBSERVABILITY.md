@@ -60,6 +60,7 @@ team ids kept in synced data, and the live-update latency.
 | `chordless.sync.run` | `SyncOrchestrator.#execute` | operation, **trigger**, space kind, pulled and pushed counts, pull and push ms, Drive and Worker call counts, total and max Drive ms, error count, outcome. Each Drive and Worker call is a child span, named by its method (`GET`), as the conventions have it (below) |
 | `chordless.setlist.open` | `SetlistPage` start | open ms (load time, from navigation timing), songs, CCLI numbers (a comma-joined string, queried with `contains`: Honeycomb does not query array elements), source (library or share) |
 | `chordless.setlist.leave` | `dispose()` and `pagehide` | songs viewed, song changes, transposes, edit-mode entries |
+| `chordless.share.open` | `openShare` | a received share opened: `chordless.share.id`, `.outcome` (`ready`, `ended`, `needs-key`, `bad-key`, `unavailable`, `error`), `.via` (`downloaded`; `not_modified`, the worker's 304; `local_copy`, shown from the device for want of an answer, with `.reason`: `offline`, `server_error`, `not_a_file`), `.had_copy`, `.key_from_link`, `.fresh` (the live channel asked for the newest), `.http_status`, `.bytes`, `.songs`, `.decrypt_ms`, `.open_ms`, `.expired` |
 | `chordless.live.receive` | a follower receiving `changed` | see "Live update latency" |
 | Worker request | Cloudflare's native export | |
 | Errors | `toast()` errors, `window` `error` and `unhandledrejection`, the sync catch | an `exception` event on the active span, plus `chordless.error`; class and message only |
@@ -81,8 +82,10 @@ in a setlist, `session.id` (so a sync or an error during it joins it); and
 `chordless.route` (the template, not the URL), `chordless.live`, `chordless.online`,
 `chordless.display_mode`, and the device (`js/telemetry/device.ts`, asked of the browser, not read from
 the user agent, which an iPad sets to a Mac's): `chordless.device_class` (`phone`, `tablet`, `desktop`: a
-finger-first device by its screen's shorter side, 600 CSS pixels; a mouse makes a desktop), `chordless.touch_points`,
-`chordless.pointer` (`coarse`, `fine`, `none`), `chordless.hover`, `chordless.screen` (upright, `390x844`),
+finger-first device by its screen's shorter side, 600 CSS pixels; a mouse makes a desktop), `chordless.touch` (any touch point), `chordless.touch_points`,
+`browser.name` and `.version` (major) and `os.name` and `.version` (read from the user agent string, the one place Safari,
+Firefox and iOS say it, with an iPad's Mac string told by its touch points; a Mac's, Windows' and Linux's versions are frozen
+in the string, so left off), `chordless.pointer` (`coarse`, `fine`, `none`), `chordless.hover`, `chordless.screen` (upright, `390x844`),
 `chordless.viewport` (to the nearest 50), `chordless.pixel_ratio`, and where the browser has
 `navigator.userAgentData` (Chromium) `browser.brands`, `browser.platform` and `browser.mobile`. The Contact
 page lists the same, so what a person writes with and what we recorded agree. **Not the setlist or the song in view** (decided 2026-10-28): they would
@@ -433,9 +436,12 @@ The **Support ID** is in Preferences, "Usage reports": the first eight character
 id, with Copy and Reset (Reset forgets the id; a new one is made at once). It is not shown while
 reports are off. There is no contact form yet to put it in.
 
-Not done, on purpose: the share, import and pad attributes (they would be on a span that encloses them,
+Not done, on purpose: the import and pad attributes (they would be on a span that encloses them,
 and the setlist spans no longer enclose anything; each becomes a span of its own when the data says it
-is worth one).
+is worth one). A share's is: `chordless.share.open` above, and on the Worker's span for `/api/share/:id`
+`chordless.share.result` (`ok`, `not_modified`, `gone`, `drive_error`, `not_found`, `unavailable`),
+`.cache` (`hit`, `miss`, `joined` an ask already in flight, `bypass` for `?fresh=1`), `.fresh` and `.id`:
+so "how many of the band opened it, from what, and did any get an error" is a query on either.
 
 ## Steps
 

@@ -10,6 +10,7 @@
  * seen is theirs to keep.
  */
 
+import type { Attributes } from '@opentelemetry/api'
 import type { DataOrigin } from './data-changes.ts'
 import type { ReceivedShare, Setlist, SetlistEntry } from './data-types.ts'
 import { ChordlessDB } from './db.ts'
@@ -17,6 +18,7 @@ import { isExpired, type ShareBundle } from './share-bundle.ts'
 import { decryptBundle, matchesSetlistCode } from './share-crypto.ts'
 import { addChart } from './song-utils.ts'
 import { getCurrentSpace, listSpaces } from './space.ts'
+import { recordSpan } from './telemetry/telemetry.ts'
 import { toLocalDateString } from './utils/date-utils.ts'
 
 /** The database of received setlists and their songs (one for all shares) */
@@ -142,17 +144,51 @@ async function store(
 export async function openShare(
   fileId: string,
   keyFromLink: string,
+  options: OpenShareOptions = {}
+): Promise<ShareOpening> {
+  const trail: Attributes = {}
+  const started = performance.now()
+  const record = (outcome: string) =>
+    recordSpan('chordless.share.open', {
+      'chordless.share.id': fileId,
+      'chordless.share.fresh': options.fresh ?? false,
+      'chordless.share.key_from_link': Boolean(keyFromLink),
+      'chordless.share.outcome': outcome,
+      'chordless.share.open_ms': Math.round(performance.now() - started),
+      ...trail,
+    })
+  try {
+    const opening = await openShareUntraced(fileId, keyFromLink, options, trail)
+    record(opening.state)
+    return opening
+  } catch (error) {
+    record('error')
+    throw error
+  }
+}
+
+/**
+ * `trail` is filled in as the open goes, for its span: `had_copy` (this device had the setlist), `via`
+ * (`downloaded`; `not_modified` the worker's 304; or `local_copy` when it was shown from the device
+ * for want of an answer, with `reason`: `offline`, `server_error`, `not_a_file`), `http_status`, the
+ * `bytes` downloaded, `decrypt_ms`, `songs`, `expired`
+ */
+async function openShareUntraced(
+  fileId: string,
+  keyFromLink: string,
   {
     fetchFile = fetch,
     today = toLocalDateString(new Date()),
     origin,
     fresh = false,
-  }: OpenShareOptions = {}
+  }: OpenShareOptions,
+  trail: Attributes
 ): Promise<ShareOpening> {
   const db = new ChordlessDB(SHARED_DB_ID, origin)
   await db.init()
   const kept = await db.getSetlist(shareSetlistId(fileId))
   const known = kept?.received
+  trail['chordless.share.had_copy'] = Boolean(kept)
 
   /** Nothing of this share stays (its songs do), and the database is let go */
   const ended = async (): Promise<ShareOpening> => {
@@ -166,7 +202,10 @@ export async function openShare(
     return state
   }
 
-  if (known && isExpired(known.expires, today)) return ended()
+  if (known && isExpired(known.expires, today)) {
+    trail['chordless.share.expired'] = true
+    return ended()
+  }
 
   const key = keyFromLink || known?.key || ''
   if (!key) return empty({ state: 'needs-key' })
@@ -183,31 +222,50 @@ export async function openShare(
     )
   } catch {
     // No connection: the copy on this device is what there is
+    trail['chordless.share.via'] = kept ? 'local_copy' : 'none'
+    trail['chordless.share.reason'] = 'offline'
     if (kept) return { state: 'ready', db, setlist: kept, fresh: false }
     return empty({ state: 'unavailable', offline: true })
   }
 
+  trail['chordless.share.http_status'] = response.status
   if (response.status === 404) return ended()
-  if (response.status === 304 && kept) return { state: 'ready', db, setlist: kept, fresh: false }
+  if (response.status === 304 && kept) {
+    trail['chordless.share.via'] = 'not_modified'
+    return { state: 'ready', db, setlist: kept, fresh: false }
+  }
   if (!response.ok) {
+    trail['chordless.share.via'] = kept ? 'local_copy' : 'none'
+    trail['chordless.share.reason'] = 'server_error'
     if (kept) return { state: 'ready', db, setlist: kept, fresh: false }
     return empty({ state: 'unavailable', offline: false })
   }
 
   // Something other than the file (an error page from a proxy, say) isn't a bad key
   if (!response.headers.get('Content-Type')?.startsWith('application/octet-stream')) {
+    trail['chordless.share.via'] = kept ? 'local_copy' : 'none'
+    trail['chordless.share.reason'] = 'not_a_file'
     if (kept) return { state: 'ready', db, setlist: kept, fresh: false }
     return empty({ state: 'unavailable', offline: false })
   }
 
   let bundle: ShareBundle
+  const decrypting = performance.now()
   try {
-    bundle = await decryptBundle(key, new Uint8Array(await response.arrayBuffer()))
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    trail['chordless.share.bytes'] = bytes.byteLength
+    bundle = await decryptBundle(key, bytes)
+    trail['chordless.share.decrypt_ms'] = Math.round(performance.now() - decrypting)
   } catch {
     // A wrong key can't have worked before: this link doesn't open it
     return empty({ state: 'bad-key' })
   }
-  if (isExpired(bundle.expires, today)) return ended()
+  trail['chordless.share.songs'] = bundle.setlist.songs.length
+  trail['chordless.share.via'] = 'downloaded'
+  if (isExpired(bundle.expires, today)) {
+    trail['chordless.share.expired'] = true
+    return ended()
+  }
 
   // (the day it was first received stays: the page compares setlists, and a new one is a change)
   const setlist = await store(
