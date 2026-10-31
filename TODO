@@ -72,15 +72,11 @@ bugs
 - noUncheckedIndexedAccess was tried on the app project: 142 errors, mostly false positives
   (regex groups after a match, indexes checked against length just above), so it is off. If it
   is revisited: setlist-page.ts (45) is where `this.songs[i]` is the likeliest real bug
-- Nashville-number charts read from the key's root, so a minor key is wrong: with `{key: Bm}`,
-  6m 5 4 becomes G#m F# E (`convertDegreeToNote`, transpose.ts, uses only the root; Bm would need the
-  relative major, D, giving Bm A G). Decide whether SongSelect numbers a minor song from the minor root
-  or from the relative major, then fix and test both. Letters stay the stored format (custom
-  non-SongSelect sheets are letters, and transposing letters is well tested), so numbers are only read.
-  Background: charts imported by the bookmarklet before its fix were numbers under `{key: C}`, which
-  made "See His Love" show Em D C for Gm (Sunday 18 Oct). Reimport the nine such charts in the Gateway
-  Church space: Adonai, All Hail King Jesus, Here Is Love, Holy Holy Holy, More Precious Than Silver,
-  Our God He Reigns, See His Love, Washed, What A Friend.
+- Nashville-number charts in a minor key now count from the relative major (6m is the tonic). Left: the
+  nine charts imported by the bookmarklet before its fix are numbers under `{key: C}`, which made
+  "See His Love" show Em D C for Gm (Sunday 18 Oct). Reimport them in the Gateway Church space: Adonai,
+  All Hail King Jesus, Here Is Love, Holy Holy Holy, More Precious Than Silver, Our God He Reigns,
+  See His Love, Washed, What A Friend.
 browser support
 - Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120 (raised to Safari/iOS 17.4 on 2026-10-27, for `scrollend`), set in .browserslistrc
   and TARGET in vite.config.ts (keep them the same). Reasoning: support devices up to about five

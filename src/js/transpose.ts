@@ -561,13 +561,17 @@ export function isNashvilleChord(chordText: string | null | undefined): boolean 
   return true
 }
 
-/** The note a Nashville number is in a key, or null if the key is not one */
+/**
+ * The note a Nashville number is in a key, or null if the key is not one. Numbers count from the
+ * major key (the key's relative major, for a minor key: 6m is the tonic of a minor song)
+ */
 function convertDegreeToNote(degreeMatch: RegExpMatchArray, key: string): string | null {
   const keyRoot = extractKeyRoot(key)
   if (!keyRoot) return null
   const accidental = accidentToOffset(degreeMatch[1])
   const offset = DEGREE_OFFSETS[Number(degreeMatch[2])]
-  const targetSemitone = noteToSemitone(keyRoot) + offset + accidental
+  const majorRoot = noteToSemitone(keyRoot) + (/^[A-G][#b♯♭]?m(?!aj)/i.test(key) ? 3 : 0)
+  const targetSemitone = majorRoot + offset + accidental
   const keyInfo = getKeyInfo(key)
   const useFlats = keyInfo?.useFlats ?? false
   return semitoneToNote(targetSemitone, useFlats, key)

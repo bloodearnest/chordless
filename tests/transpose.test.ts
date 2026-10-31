@@ -399,6 +399,14 @@ describe('Nashville numbers', () => {
     const converted = convertNashvilleChordToStandard('1', 'C')
     assertEquals(converted, 'C', 'Nashville 1 in C -> C')
   })
+  it('Nashville numbers in a minor key count from its relative major', () => {
+    assertEquals(convertNashvilleChordToStandard('6m', 'Gm'), 'Gm', '6m is the tonic of Gm')
+    assertEquals(convertNashvilleChordToStandard('5', 'Gm'), 'F', '5 in Gm')
+    assertEquals(convertNashvilleChordToStandard('4', 'Gm'), 'Eb', '4 in Gm')
+    assertEquals(convertNashvilleChordToStandard('6m', 'Bm'), 'Bm', '6m is the tonic of Bm')
+    assertEquals(convertNashvilleChordToStandard('5', 'Bm'), 'A', '5 in Bm')
+    assertEquals(convertNashvilleChordToStandard('4', 'Bm'), 'G', '4 in Bm')
+  })
   it("convertNashvilleChordToStandard('#4sus', 'C')", () => {
     const converted = convertNashvilleChordToStandard('#4sus', 'C')
     assertEquals(converted, 'F#sus', 'Nashville #4sus in C -> F#sus')
