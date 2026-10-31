@@ -5,6 +5,7 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { context, type Span, trace } from '@opentelemetry/api'
 import { handleShareDownload, type ShareCache, shareFileId } from '../worker/src/share.ts'
 
 const ID = '1gaujHBXmLfJDPtBn5plrCrTukHnkIB8Y'
@@ -298,4 +299,59 @@ test('an answer in the cache with no content type is given as plain text', async
   const bare: ShareCache = { match: async () => cached, put: async () => {} }
   const res = await handleShareDownload(get(), ID, env, { cache: bare })
   assert.equal(res.headers.get('Content-Type'), 'text/plain')
+})
+
+/** Run the download inside a span that keeps what it is told, and give that and the answer */
+async function noted(
+  request: Request,
+  deps: Parameters<typeof handleShareDownload>[3],
+  fileId = ID
+) {
+  const attributes: Record<string, unknown> = {}
+  const span = {
+    setAttributes: (more: object) => Object.assign(attributes, more),
+  } as unknown as Span
+  const response = await context.with(trace.setSpan(context.active(), span), () =>
+    handleShareDownload(request, fileId, env, deps)
+  )
+  return { attributes, response }
+}
+
+test('says on the request’s span how the download went: cache, result', async () => {
+  const drive = fakeDrive(() => new Response(ciphertext))
+  const cache = memoryCache()
+  const first = await noted(get(), { fetchDrive: drive.fetchDrive, cache })
+  assert.equal(first.attributes['chordless.share.cache'], 'miss')
+  assert.equal(first.attributes['chordless.share.result'], 'ok')
+  assert.equal(first.attributes['chordless.share.id'], ID)
+
+  const etag = first.response.headers.get('ETag') as string
+  const second = await noted(get({ 'If-None-Match': etag }), {
+    fetchDrive: drive.fetchDrive,
+    cache,
+  })
+  assert.equal(second.attributes['chordless.share.cache'], 'hit')
+  assert.equal(second.attributes['chordless.share.result'], 'not_modified')
+
+  const forced = await noted(new Request(`https://chordless.app/api/share/${ID}?fresh=1`), {
+    fetchDrive: drive.fetchDrive,
+    cache,
+  })
+  assert.equal(forced.attributes['chordless.share.cache'], 'bypass')
+  assert.equal(forced.attributes['chordless.share.fresh'], true)
+})
+
+test('says on the span when a share has ended, Drive failed, or the id is none', async () => {
+  const gone = await noted(get(), {
+    fetchDrive: fakeDrive(() => new Response('', { status: 404 })).fetchDrive,
+  })
+  assert.equal(gone.attributes['chordless.share.result'], 'gone')
+
+  const broken = await noted(get(), {
+    fetchDrive: fakeDrive(() => new Response('', { status: 500 })).fetchDrive,
+  })
+  assert.equal(broken.attributes['chordless.share.result'], 'drive_error')
+
+  const bad = await noted(new Request('https://chordless.app/api/share/x'), {}, 'x')
+  assert.equal(bad.attributes['chordless.share.result'], 'not_found')
 })

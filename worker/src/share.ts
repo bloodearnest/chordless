@@ -10,6 +10,7 @@
  * The worker only ever handles ciphertext: the key is in the link's `#` and never gets here.
  */
 
+import { trace } from '@opentelemetry/api'
 import { toHex } from '../../src/js/utils/bytes.ts'
 import { tracedFetch } from './trace.ts'
 
@@ -41,6 +42,17 @@ interface ShareDeps {
   fetchDrive?: typeof fetch
   cache?: ShareCache
   waitUntil?: (promise: Promise<unknown>) => void
+}
+
+/**
+ * What this download came to, on the request's own span (the Worker's `chordless.worker.handle`):
+ * `chordless.share.result` (`ok`, `not_modified`, `gone` when Drive says the share ended, `drive_error`,
+ * `not_found` for an id that is none, `unavailable` when sharing is not set up) and, where Drive may
+ * have been asked, `chordless.share.cache` (`hit`, `miss`, `joined` an ask already in flight,
+ * `bypass` for `?fresh=1`). Nothing if there is no span, as in the tests.
+ */
+function note(attributes: Record<string, string | boolean>): void {
+  trace.getActiveSpan()?.setAttributes(attributes)
 }
 
 const text = (body: string, status: number, headers: Record<string, string> = {}) =>
@@ -113,9 +125,15 @@ export async function handleShareDownload(
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return text('Method not allowed', 405, { Allow: 'GET, HEAD' })
   }
-  if (!FILE_ID.test(fileId)) return text('Not found', 404)
+  if (!FILE_ID.test(fileId)) {
+    note({ 'chordless.share.result': 'not_found' })
+    return text('Not found', 404)
+  }
   const apiKey = env.GOOGLE_API_KEY
-  if (!apiKey) return text('Sharing is not set up on this server', 503)
+  if (!apiKey) {
+    note({ 'chordless.share.result': 'unavailable' })
+    return text('Sharing is not set up on this server', 503)
+  }
 
   // Cached by id alone: the same answer for everyone, whatever else is on the URL. A request that
   // says `?fresh=1` (a recipient told by the live channel that the share was updated) does not take
@@ -123,12 +141,15 @@ export async function handleShareDownload(
   const cacheKey = new Request(new URL(`/api/share/${fileId}`, request.url).href)
   const fresh = new URL(request.url).searchParams.get('fresh') === '1'
   let answer = fresh ? undefined : await cache?.match(cacheKey)
+  note({ 'chordless.share.fresh': fresh, 'chordless.share.id': fileId })
+  if (answer) note({ 'chordless.share.cache': 'hit' })
 
   if (!answer) {
     // Collapsed forwarding: while Drive is being asked about this file, a request for it waits for that
     // answer and does not ask again, however many there are. So asking afresh for every request is
     // affordable, and one person looping on ?fresh=1 is at most one question at a time to Drive
     let asked = asking.get(fileId)
+    note({ 'chordless.share.cache': fresh ? 'bypass' : asked ? 'joined' : 'miss' })
     if (!asked) {
       asked = askDrive(fileId, apiKey, fetchDrive)
         .then(async result => {
@@ -144,7 +165,10 @@ export async function handleShareDownload(
     }
     const result = await asked
     // (each who waited gets a copy: a body is read once)
-    if ('failure' in result) return result.failure.clone()
+    if ('failure' in result) {
+      note({ 'chordless.share.result': 'drive_error' })
+      return result.failure.clone()
+    }
     answer = result.answer.clone()
   }
 
@@ -153,8 +177,10 @@ export async function handleShareDownload(
   const headers = new Headers({ 'Cache-Control': 'no-cache' })
   if (etag) headers.set('ETag', etag)
   if (answer.status === 200 && etag && request.headers.get('If-None-Match') === etag) {
+    note({ 'chordless.share.result': 'not_modified' })
     return new Response(null, { status: 304, headers })
   }
+  note({ 'chordless.share.result': answer.status === 404 ? 'gone' : 'ok' })
   headers.set('Content-Type', answer.headers.get('Content-Type') ?? 'text/plain')
   return new Response(request.method === 'HEAD' ? null : answer.body, {
     status: answer.status,
