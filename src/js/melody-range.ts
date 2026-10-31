@@ -136,7 +136,7 @@ function segments(path: ArrayLike<number>): { moves: number; lines: number; curv
   const count = { moves: 0, lines: 0, curves: 0 }
   // pdf.js's path: a code (0 move, 1 line, 2 curve, 3 quadratic curve, 4 close), then its numbers
   const lengths = [2, 2, 6, 4, 0]
-  for (let i = 0; i < path.length; i += 1 + (lengths[path[i]] ?? 0)) {
+  for (let i = 0; i < path.length; i += 1 + lengths[path[i]]) {
     if (path[i] === 0) count.moves++
     else if (path[i] === 1) count.lines++
     else if (path[i] === 2) count.curves++
@@ -249,7 +249,6 @@ function keySignature(staff: Staff, accidentals: Accidental[], firstHeadX: numbe
     .filter(
       accidental =>
         accidental.x < firstHeadX &&
-        accidental.x < staff.left + 8 * staff.space &&
         accidental.y > staff.bottom - 2 * staff.space &&
         accidental.y < staff.bottom + 6 * staff.space
     )
@@ -257,7 +256,13 @@ function keySignature(staff: Staff, accidentals: Accidental[], firstHeadX: numbe
   const run: Accidental[] = []
   for (const accidental of start) {
     const previous = run[run.length - 1]
-    if (previous && accidental.x - previous.x > 1.6 * staff.space) break
+    // the first must be just after the clef, and each next one close behind the one before
+    if (
+      previous
+        ? accidental.x - previous.x > 1.6 * staff.space
+        : accidental.x > staff.left + 8 * staff.space
+    )
+      break
     run.push(accidental)
   }
   const sharps = run.filter(accidental => accidental.sharp).length

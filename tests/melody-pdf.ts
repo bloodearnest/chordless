@@ -24,6 +24,8 @@ export interface SheetOptions {
   pages: SheetStaff[][]
   /** The size of a staff space in points (4.6 in SongSelect's) */
   space?: number
+  /** A restore with no save before it, which a sloppy PDF can have */
+  strayRestore?: boolean
 }
 
 const LETTERS = 'CDEFGAB'
@@ -111,12 +113,12 @@ function staffContent(staff: SheetStaff, bottom: number, space: number): string 
   return out.join('\n')
 }
 
-export function leadSheetPdf({ pages, space = 4.6 }: SheetOptions): ArrayBuffer {
+export function leadSheetPdf({ pages, space = 4.6, strayRestore }: SheetOptions): ArrayBuffer {
   const contents = pages.map(staves => {
     const body = staves
       .map((staff, index) => staffContent(staff, 700 - index * 12 * space, space))
       .join('\n')
-    return `q 0.1 0 0 0.1 0 0 cm\n0.3 w\n${body}\nQ`
+    return `${strayRestore ? 'Q\n' : ''}q 0.1 0 0 0.1 0 0 cm\n0.3 w\n${body}\nQ`
   })
   // objects: 1 catalog, 2 pages, then a page and its content stream for each, ahead of the last
   const pageObjects = pages.map((_, i) => 3 + i * 2)
