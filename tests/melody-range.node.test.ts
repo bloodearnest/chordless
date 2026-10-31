@@ -18,8 +18,8 @@ function midi(name: string): number {
 
 const notes = (...pitches: string[]): SheetNote[] => pitches.map(pitch => ({ pitch }))
 
-async function rangeOf(pages: SheetStaff[][], space?: number) {
-  return readMelodyRange(leadSheetPdf({ pages, space }))
+async function rangeOf(pages: SheetStaff[][], space?: number, strayRestore?: boolean) {
+  return readMelodyRange(leadSheetPdf({ pages, space, strayRestore }))
 }
 
 test('the range is the lowest and highest note, across staves and pages', async () => {
@@ -97,6 +97,22 @@ test('the key signature sharpens or flattens the notes it names', async () => {
   })
 })
 
+test('a key signature of many sharps is read in full', async () => {
+  // B major: F, C, G, D and A are sharp
+  const range = await rangeOf([[{ key: 5, notes: notes('A4', 'F5') }]])
+  assert.deepEqual(range, { low: midi('A#4'), high: midi('F#5') })
+})
+
+test('a mark far from any staff is not a note', async () => {
+  const range = await rangeOf([[{ notes: notes('G4', 'C7', 'E5') }]])
+  assert.deepEqual(range, { low: midi('G4'), high: midi('E5') })
+})
+
+test('a restore with nothing to restore does not stop the page being read', async () => {
+  const range = await rangeOf([[{ notes: notes('G4', 'E5') }]], undefined, true)
+  assert.deepEqual(range, { low: midi('G4'), high: midi('E5') })
+})
+
 test('a key signature is read for each staff, so a key change at a line is followed', async () => {
   const range = await rangeOf([
     [
@@ -110,6 +126,14 @@ test('a key signature is read for each staff, so a key change at a line is follo
 test('an accidental on the first note of a staff is not mistaken for a key signature', async () => {
   const range = await rangeOf([[{ key: 0, notes: notes('F4', 'F5'), accidentalOnFirstNote: true }]])
   assert.deepEqual(range, { low: midi('F4'), high: midi('F5') })
+})
+
+test('nor is it added to a key signature that is there', async () => {
+  // G major, and a sharp on the first note: only the key's sharps change F
+  const range = await rangeOf([[{ key: 1, notes: notes('C5', 'D5'), accidentalOnFirstNote: true }]])
+  assert.deepEqual(range, { low: midi('C5'), high: midi('D5') })
+  const f = await rangeOf([[{ key: 1, notes: notes('F4'), accidentalOnFirstNote: true }]])
+  assert.deepEqual(f, { low: midi('F#4'), high: midi('F#4') })
 })
 
 test('a sheet with no notes, or no music, or no PDF, has no range', async () => {
