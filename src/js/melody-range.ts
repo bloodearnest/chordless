@@ -128,7 +128,8 @@ export async function readMelodyRange(pdf: ArrayBuffer): Promise<MelodyRead | nu
     return {
       low: low.midi,
       high: high.midi,
-      keySignature: keySignature ?? 0,
+      // (a note was read, so a page with staves was, and gave it)
+      keySignature: keySignature as number,
       notes,
       instrumental,
       pages: document.numPages,
@@ -334,7 +335,7 @@ function keySignature(
   const offsets = [0, 0, 0, 0, 0, 0, 0]
   if (flats === 0) for (const letter of SHARP_LETTERS.slice(0, sharps)) offsets[letter] = 1
   else if (sharps === 0) for (const letter of FLAT_LETTERS.slice(0, flats)) offsets[letter] = -1
-  return { offsets, count: flats === 0 ? sharps : sharps === 0 ? -flats : 0 }
+  return { offsets, count: sharps - flats }
 }
 
 /** The MIDI number of the note a head draws on a treble staff */
