@@ -30,12 +30,13 @@ import {
 import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
 import { hasUnsentChanges } from './auto-sync.ts'
 import { DataChangeEvent, touches } from './data-changes.ts'
-import type { Setlist, SetlistEntry, SongWithContent } from './data-types.ts'
+import type { Setlist, SetlistEntry, SharedChartNote, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB, NO_CHANGE } from './db.ts'
 import { leaderName } from './leaders.ts'
 import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
 import { LiveSyncStatusEvent } from './live-sync-status.ts'
 import { goTo, setPageTitle } from './navigation.ts'
+import { withAnnotations } from './notes/store.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getSpacePeople, identifyMe, settleLeader } from './people.ts'
@@ -1614,6 +1615,11 @@ export class SetlistPage {
     await this.#changeEntry(index, entry => {
       entry.tempo = bpm
     })
+  }
+
+  /** Set the notes everyone with the setlist sees on the song at `index` (docs/NOTES.md) */
+  async changeSongAnnotationsInSetlist(index: number, notes: SharedChartNote[]) {
+    await this.#changeEntry(index, entry => withAnnotations(entry, notes))
   }
 
   /** Change the song at `index`, in the setlist as it is stored, and show it so */

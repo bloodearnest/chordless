@@ -5,7 +5,7 @@
  * someone else reorders or adds to leaves them with the song they were set for. (A song that is in
  * the setlist twice shares them.) The page works on them by place, as the songs are on the page.
  */
-import type { SectionState } from '../data-types.ts'
+import type { ChartNote, SectionState } from '../data-types.ts'
 
 /** Per song index, then per section index */
 export type SectionStates = Record<number, Record<number, SectionState>>
@@ -27,6 +27,11 @@ interface StoredState {
   v: 2
   sections: Record<string, Record<number, SectionState>>
   capos: Record<string, unknown>
+  /**
+   * This setlist's private notes on each song (docs/NOTES.md). An optional field of version 2, so a
+   * build from before notes keeps it when it saves
+   */
+  notes?: Record<string, ChartNote[]>
 }
 
 const keyFor = (setlistId: string | null) => `state-${setlistId}`
@@ -95,6 +100,33 @@ export function loadSongCapo(setlistId: string | null, song: SongRef, index: num
   return saved.v === 2
     ? (saved as unknown as StoredState).capos?.[songKey(song)]
     : byPlace(saved).capoValues[index]
+}
+
+/** The private notes kept for one song in this setlist (by song, so a reordered setlist keeps them) */
+export function loadSetlistNotes(setlistId: string | null, song: SongRef): ChartNote[] {
+  const saved = readSaved(setlistId)
+  return saved.v === 2 ? ((saved as unknown as StoredState).notes?.[songKey(song)] ?? []) : []
+}
+
+/**
+ * Keep these as the private notes for one song in this setlist (none: forget them). `songs` are
+ * the setlist's, as they are now, for state still kept by place to be moved to by song.
+ */
+export function saveSetlistNotes(
+  setlistId: string | null,
+  song: SongRef,
+  notes: ChartNote[],
+  songs: SongRef[]
+) {
+  try {
+    const stored = bySong(readSaved(setlistId), songs)
+    stored.notes ??= {}
+    if (notes.length) stored.notes[songKey(song)] = notes
+    else delete stored.notes[songKey(song)]
+    localStorage.setItem(keyFor(setlistId), JSON.stringify(stored))
+  } catch (error) {
+    console.error('Failed to save the notes:', error)
+  }
 }
 
 /**

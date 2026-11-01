@@ -17,7 +17,7 @@ A note has a body, an anchor (where on the song it sits), and two independent ch
 
 | scope \ reach | Just me | Share with team |
 |---|---|---|
-| This setlist | `local-state` notes map (device) | `SetlistEntry.annotations` (synced with the setlist) |
+| This setlist | `notes` in the setlist's localStorage state (device; an optional field of version 2, so an older build keeps it) | `SetlistEntry.annotations` (synced with the setlist) |
 | Always | IndexedDB `song_notes`, keyed by `songId` (device) | not built (needs a synced collection) |
 
 The display merges every source for a song, by note id. `SetlistEntry.notes` (a string that already

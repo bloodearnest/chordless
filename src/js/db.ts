@@ -1,5 +1,6 @@
 import { announceDataChange, type DataKind, type DataOrigin } from './data-changes.ts'
 import type {
+  ChartNote,
   ChordProRecord,
   PendingDeletion,
   Person,
@@ -23,7 +24,7 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 // NOTE: This now stores ALL space data in one database per space.
 // Space metadata is stored separately in the 'spaces' database.
 
-const DB_VERSION = 10
+const DB_VERSION = 11
 
 // Setlist types
 export const SETLIST_TYPES: Readonly<Record<string, string>> = {
@@ -228,6 +229,11 @@ export class ChordlessDB {
         // The space's people, who lead setlists (new in v10)
         if (!db.objectStoreNames.contains('people')) {
           db.createObjectStore('people', { keyPath: 'id' })
+        }
+
+        // A song's private notes, kept by the song's id, on this device only (new in v11; docs/NOTES.md)
+        if (!db.objectStoreNames.contains('song_notes')) {
+          db.createObjectStore('song_notes', { keyPath: 'songId' })
         }
 
         if (oldVersion > 0 && oldVersion < DB_VERSION) {
@@ -645,6 +651,25 @@ export class ChordlessDB {
     const store = tx.objectStore('setlist_local')
     await store.delete(setlistId)
     return transactionDone(tx)
+  }
+
+  /** The private notes kept for a song in every setlist (docs/NOTES.md) */
+  async getSongNotes(songId: string): Promise<ChartNote[]> {
+    const tx = this.#transaction(['song_notes'], 'readonly')
+    const record = (await requestResult(tx.objectStore('song_notes').get(songId))) as
+      | { songId: string; notes: ChartNote[] }
+      | undefined
+    return record?.notes ?? []
+  }
+
+  /** Keep these as the song's private notes (none: forget the song's record) */
+  async saveSongNotes(songId: string, notes: ChartNote[]): Promise<void> {
+    const tx = this.#transaction(['song_notes'], 'readwrite')
+    const store = tx.objectStore('song_notes')
+    if (notes.length) store.put(cloneForStorage({ songId, notes }))
+    else store.delete(songId)
+    await transactionDone(tx)
+    this.#changed('note', [songId])
   }
 
   // Song Usage operations (workspace-specific)
