@@ -181,6 +181,59 @@ describe('song-import: corners', () => {
       expect(text).to.contain('Key signature: 2 flats (Bb major or G minor).')
     })
 
+    it('says when the song is already in the library and the chart is the same', async () => {
+      const title = unique('Same again')
+      const { element } = await importerReading(async () => read())
+      const text = chart(title)
+      await createSong(`${text.replace('{key: C}', '{key: C}\n{x_chordless_range: D4-E5}')}`)
+      await element.receive({ chordproText: text, source: 'songselect', leadSheet: leadSheet() })
+      expect(element._imports[0].comparison.verdict).to.equal('identical')
+      const said = await element.updateComplete.then(() =>
+        element.shadowRoot.textContent.replace(/\s+/g, ' ')
+      )
+      expect(said).to.contain('Already in your library, and the same chart: nothing was changed.')
+    })
+
+    it('says so in a list of songs too', async () => {
+      const title = unique('In a list')
+      await createSong(chart(title))
+      const { element } = await importerReading(async () => read())
+      await element.receiveAll([
+        { chordproText: chart(title), source: 'songselect' },
+        { chordproText: chart(unique('Another')), source: 'songselect' },
+      ])
+      await element.updateComplete
+      expect(element.shadowRoot.textContent).to.contain('already in library, the same chart')
+    })
+
+    it('suggests updating the library chart when the lead sheet only adds a range to it', async () => {
+      const title = unique('Adds a range')
+      await createSong(chart(title))
+      const { element } = await importerReading(async () => read())
+      await element.receive({
+        chordproText: chart(title),
+        source: 'songselect',
+        leadSheet: leadSheet(),
+      })
+      const [item] = element._imports
+      expect(item.comparison.verdict).to.equal('same-chart')
+      expect(item.pick).to.equal('update')
+      await element.updateComplete
+      expect(element.shadowRoot.textContent).to.contain('The lead sheet adds a melody range.')
+      expect($(element, '.pick-update').checked).to.equal(true)
+    })
+
+    it('still suggests keeping the library chart when the import adds no range', async () => {
+      const title = unique('No range added')
+      await createSong(chart(title))
+      const element = await importer()
+      await element.receive({
+        chordproText: chart(title).replace('{key: C}', '{key: C}\n{tempo: 70}'),
+        source: 'songselect',
+      })
+      expect(element._imports[0].pick).to.equal('use-existing')
+    })
+
     it('says so when a SongSelect song came with no lead sheet, and nothing for a song with none to expect', async () => {
       const element = await importer()
       await element.receive({
@@ -281,6 +334,84 @@ describe('song-import: corners', () => {
     })
   })
 
+  describe('opened by the bookmarklet', () => {
+    /** Run with a window.opener, as a tab the bookmarklet opened has */
+    async function opened<T>(run: () => Promise<T>): Promise<T> {
+      const real = Object.getOwnPropertyDescriptor(window, 'opener')
+      Object.defineProperty(window, 'opener', {
+        configurable: true,
+        value: { postMessage: () => {} },
+      })
+      try {
+        return await run()
+      } finally {
+        if (real) Object.defineProperty(window, 'opener', real)
+        else Reflect.deleteProperty(window, 'opener')
+      }
+    }
+    const said = async (element: any) => {
+      await element.updateComplete
+      return element.shadowRoot.textContent.replace(/\s+/g, ' ')
+    }
+
+    it('shows a spinner and what it is waiting for, and not the ways to import by hand', async () => {
+      await opened(async () => {
+        const element = await importer()
+        expect(await said(element)).to.contain('Waiting for SongSelect…')
+        expect($(element, '.spinner')).to.exist
+        expect($(element, '[role="status"]')).to.exist
+        expect($(element, 'textarea')).to.equal(null)
+        expect($(element, 'input[type="file"]')).to.equal(null)
+      })
+    })
+
+    it('says it is reading the song, and the lead sheet, until it is done', async () => {
+      await opened(async () => {
+        const element = await importer()
+        let finish: (value: unknown) => void = () => {}
+        element.loadMelodyReader = () =>
+          new Promise(resolve => {
+            finish = () => resolve({ readMelodyRange: async () => null })
+          })
+        message({
+          type: 'CHORDLESS_IMPORT',
+          data: {
+            chordproText: chart(unique('Slow')),
+            source: 'songselect',
+            leadSheet: new TextEncoder().encode('%PDF-1.4').buffer,
+          },
+        })
+        await waitFor(() => element._progress === 'Reading the lead sheet…')
+        const text = await said(element)
+        expect(text).to.contain('Reading the lead sheet…')
+        expect($(element, 'textarea')).to.equal(null)
+        finish(null)
+        await waitFor(() => element._state === 'choices')
+        expect(await said(element)).to.not.contain('Reading the lead sheet')
+      })
+    })
+
+    it('shows the ways to import by hand when the import fails', async () => {
+      await opened(async () => {
+        const element = await importer()
+        message({ type: 'CHORDLESS_IMPORT_FAILED', data: { message: 'no access' } })
+        await element.updateComplete
+        expect($(element, '[role="alert"]').textContent).to.contain('no access')
+        expect($(element, 'textarea')).to.exist
+      })
+    })
+
+    it('shows them too when asked to', async () => {
+      await opened(async () => {
+        const element = await importer()
+        $(element, '.manual').click()
+        await element.updateComplete
+        expect($(element, 'textarea')).to.exist
+        expect($(element, '.spinner')).to.equal(null)
+      })
+    })
+  })
+
   it('tells the page that opened it that it is ready', async () => {
     const posted: unknown[] = []
     const real = Object.getOwnPropertyDescriptor(window, 'opener')
@@ -291,7 +422,7 @@ describe('song-import: corners', () => {
     try {
       const element = await importer()
       expect(posted).to.deep.equal([{ type: 'CHORDLESS_READY' }])
-      expect(element.shadowRoot.textContent).to.contain('Waiting for song data')
+      expect(element.shadowRoot.textContent).to.contain('Waiting for SongSelect')
       Object.defineProperty(window, 'opener', {
         configurable: true,
         value: {

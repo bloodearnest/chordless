@@ -42,7 +42,7 @@ import { goTo, loadPage } from '../js/navigation.ts'
 import { describeOrigin } from '../js/song-source.ts'
 import { ensureCurrentSpace, setCurrentSpace } from '../js/space.ts'
 import { visibleSpaces } from '../js/space-tabs.ts'
-import { buttonStyles } from './shared-styles.ts'
+import { buttonStyles, spinnerStyles } from './shared-styles.ts'
 
 /** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */
 export class SongImportedEvent extends Event {
@@ -152,6 +152,8 @@ export class SongImport extends LitElement {
   static override properties = {
     _state: { state: true }, // 'pick' | 'choices'
     _error: { state: true },
+    _progress: { state: true }, // what the bookmarklet's import is doing
+    _manual: { state: true }, // chose to import another way, with the bookmarklet's tab open
     // [{song, chordproText, isDuplicate, choice: null | 'update' | 'use-existing'}]
     _imports: { state: true },
     _skipped: { state: true }, // ['name: reason'], files that weren't songs
@@ -167,6 +169,8 @@ export class SongImport extends LitElement {
 
   declare _state: 'pick' | 'choices'
   declare _error: string
+  declare _progress: string
+  declare _manual: boolean
   declare _imports: ImportItem[]
   declare _skipped: string[]
   declare _unmatched: UnmatchedChart[]
@@ -193,6 +197,7 @@ export class SongImport extends LitElement {
 
   static override styles = [
     buttonStyles,
+    spinnerStyles,
     css`
     /* The page's own reset (* { margin: 0; padding: 0 }) beats :host, so the
        spacing goes on .page */
@@ -410,6 +415,20 @@ export class SongImport extends LitElement {
       display: inline;
     }
 
+    .bookmarklet-wait {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 3rem 1rem;
+      text-align: center;
+    }
+
+    .bookmarklet-wait .spinner {
+      width: 2rem;
+      height: 2rem;
+    }
+
     .range {
       margin: 0.25rem 0;
       font-size: var(--font-ui-small);
@@ -553,6 +572,8 @@ export class SongImport extends LitElement {
     this._newSetlistModalRef = createRef()
     this._state = 'pick'
     this._error = ''
+    this._progress = 'Waiting for SongSelect…'
+    this._manual = false
     this._imports = []
     this._skipped = []
     this._unmatched = []
@@ -709,6 +730,7 @@ export class SongImport extends LitElement {
   _onMessage(event: MessageEvent): void {
     if (event.origin !== SONGSELECT_ORIGIN) return
     if (event.data?.type === 'CHORDLESS_IMPORT') {
+      this._progress = 'Reading the song…'
       this.receive(event.data.data)
     } else if (event.data?.type === 'CHORDLESS_IMPORT_FAILED') {
       this._showError(`Import from SongSelect failed: ${event.data.data?.message}`)
@@ -867,6 +889,7 @@ export class SongImport extends LitElement {
     }
     // (a chart with a range of its own keeps it; one with no key has nothing to put the notes in)
     if (!key || rangeOfChart(chordproText)) return { chordproText }
+    this._progress = 'Reading the lead sheet…'
     try {
       const melody = await (await this.loadMelodyReader()).readMelodyRange(leadSheet)
       if (!melody) return { chordproText, outcome: 'no-melody' }
@@ -879,6 +902,13 @@ export class SongImport extends LitElement {
       console.warn('[Import] Could not read the melody of the lead sheet:', error)
       return { chordproText, outcome: 'unreadable' }
     }
+  }
+
+  /** A song already in the library, and the same chart: nothing is asked, so it says so */
+  _renderAlreadyThere(item: ImportItem) {
+    return item.isDuplicate && item.comparison?.verdict === 'identical'
+      ? html`<p class="range already">Already in your library, and the same chart: nothing was changed.</p>`
+      : ''
   }
 
   /** What the page says of the song's melody range: the one in the chart, or why there is none */
@@ -1052,7 +1082,8 @@ export class SongImport extends LitElement {
     const unresolved = this._imports.filter(item => item.isDuplicate && !item.choice)
     return html`
       <h2>✅ ${several ? `${this._imports.length} songs` : this._imports[0].song.title}</h2>
-      ${several ? this._renderSongList() : unresolved.length ? '' : this._renderRange(this._imports[0])}
+      ${several ? this._renderSongList() : unresolved.length ? '' : this._renderAlreadyThere(this._imports[0])}
+      ${several ? '' : unresolved.length ? '' : this._renderRange(this._imports[0])}
       ${
         this._skipped.length
           ? html`<p class="status error">Not imported: ${this._skipped.join(', ')}</p>`
@@ -1105,10 +1136,27 @@ export class SongImport extends LitElement {
     `
   }
 
+  /**
+   * The tab the bookmarklet opened: it is waiting for a song to arrive, and reading it (a lead
+   * sheet takes a moment), so it says so, and not the ways to import by hand, which would only
+   * be in the way. A failure shows them, and so does asking
+   */
+  _renderBookmarkletWait() {
+    return html`
+      <div class="bookmarklet-wait" role="status" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <p>${this._progress}</p>
+        <button class="btn manual" @click=${() => (this._manual = true)}>
+          Import a file or paste instead
+        </button>
+      </div>
+    `
+  }
+
   _renderPick() {
+    if (window.opener && !this._manual && !this._error) return this._renderBookmarkletWait()
     return html`
       ${this._error ? html`<p class="status error" role="alert">❌ ${this._error}</p>` : ''}
-      ${window.opener ? html`<p class="status">Waiting for song data from bookmarklet...</p>` : ''}
       <div class="choices">
         <label class="choice files">
           <span class="icon">📂</span>
@@ -1152,7 +1200,7 @@ export class SongImport extends LitElement {
       <ol class="songs">
         ${this._imports.map(
           item =>
-            html`<li>${item.song.title} <span class="subtitle">${item.isDuplicate ? (item.choice && status[item.choice]) || 'already in library' : 'new'}</span>${this._renderRange(item)}</li>`
+            html`<li>${item.song.title} <span class="subtitle">${item.isDuplicate ? (item.comparison?.verdict === 'identical' ? 'already in library, the same chart' : (item.choice && status[item.choice]) || 'already in library') : 'new'}</span>${this._renderRange(item)}</li>`
         )}
       </ol>
     `
@@ -1201,6 +1249,8 @@ export class SongImport extends LitElement {
       case 'different-chords':
         return 'as-variant'
       case 'same-chart':
+        // (the same chart, and the lead sheet gives it a range: keeping the library's would lose that)
+        return this._addsRange(item) ? 'update' : 'use-existing'
       case 'other-key':
         return 'use-existing'
       default:
@@ -1209,13 +1259,18 @@ export class SongImport extends LitElement {
   }
 
   /** `alone`: the page is about this one song, so the comparison says its range (a list of songs does) */
+  /** The imported chart has a melody range that the library's has not */
+  _addsRange(item: ImportItem): boolean {
+    return Boolean(rangeOfChart(item.chordproText)) && !rangeOfChart(item.existingText ?? '')
+  }
+
   _renderDuplicate(item: ImportItem, index: number, alone: boolean) {
     const { comparison } = item
     /* v8 ignore next -- every duplicate is given its comparison when it is read */
     const verdict = comparison?.verdict ?? 'different-words'
     const sentence = {
       identical: 'The same song.',
-      'same-chart': 'The same words and chords, with other details.',
+      'same-chart': `The same words and chords, with other details.${this._addsRange(item) ? ' The lead sheet adds a melody range.' : ''}`,
       'other-key': 'The same song in another key.',
       'different-chords': 'The same words, with different chords.',
       'different-words': 'Different words: another version or arrangement.',
