@@ -115,6 +115,12 @@ describe('song-import: corners', () => {
       expect(reads).to.have.length(0)
     })
 
+    it('is read by the real reader, which loads in the browser', async () => {
+      const element = await importer()
+      const reader = await element.loadMelodyReader()
+      expect(reader.readMelodyRange).to.be.a('function')
+    })
+
     it('comes from the bookmarklet in its message', async () => {
       const { element, reads } = await importerReading(async () => D4_TO_E5)
       const title = unique('From the bookmarklet')
