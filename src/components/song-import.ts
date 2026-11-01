@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import { rangeOfChart, withRange } from '../js/chart-range.ts'
 import type { Person, Setlist, SongRecord, Space } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
 import { createSetlist, determineSetlistType, getNextSunday, openSpace } from '../js/db.ts'
@@ -7,7 +8,7 @@ import { parseChartText, songOfChart } from '../js/email-setlist.ts'
 import { type LibrarySong, matchLibrary } from '../js/import-plan.ts'
 import { libraryForMatching } from '../js/import-setlist.ts'
 import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
-import { type ChartComparison, compareCharts } from '../js/library-repair.ts'
+import { type ChartComparison, compareCharts, keyOfChart } from '../js/library-repair.ts'
 import { ChordProParser } from '../js/parser.ts'
 import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../js/people.ts'
 import {
@@ -35,6 +36,7 @@ import { describeOrigin } from '../js/song-source.ts'
 import { ensureCurrentSpace, setCurrentSpace } from '../js/space.ts'
 import { visibleSpaces } from '../js/space-tabs.ts'
 import { buttonStyles } from './shared-styles.ts'
+import type { NoteRange } from '../js/voice-range.ts'
 
 /** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */
 export class SongImportedEvent extends Event {
@@ -72,7 +74,12 @@ export interface IncomingSong {
   source?: string
   /** Why it cannot be imported, if it cannot */
   skip?: string
+  /** The song's SongSelect lead sheet (a PDF), in the chart's key: read for the melody's range, and not kept */
+  leadSheet?: ArrayBuffer
 }
+
+/** A lead sheet is about 130 KB: anything much bigger is not one */
+const MAX_LEAD_SHEET = 8 * 1024 * 1024
 
 /**
  * What to do with a chart of a song the library has: import it as the original (the library's
@@ -501,6 +508,11 @@ export class SongImport extends LitElement {
   loadPdfReader: () => Promise<{ readPdfText(pdf: ArrayBuffer): Promise<string> }> = () =>
     import('../js/pdf-text.ts')
 
+  /** Loads the reader of a lead sheet's melody, which is in the PDF reader's large chunk (a test gives its own) */
+  loadMelodyReader: () => Promise<{
+    readMelodyRange(pdf: ArrayBuffer): Promise<NoteRange | null>
+  }> = () => import('../js/melody-range.ts')
+
   constructor() {
     super()
     this._paste = createRef()
@@ -741,11 +753,19 @@ export class SongImport extends LitElement {
       const imports: ImportItem[] = []
       const skipped: string[] = []
       const importUser = (await getSignedInUser())?.name
-      for (const { chordproText = '', metadata = {}, source, name, skip } of songs) {
-        if (skip || !chordproText.trim()) {
+      for (const {
+        chordproText: incomingText = '',
+        metadata = {},
+        source,
+        name,
+        skip,
+        leadSheet,
+      } of songs) {
+        if (skip || !incomingText.trim()) {
           skipped.push(`${name}: ${skip || 'empty'}`)
           continue
         }
+        const chordproText = await this._chartWithRange(incomingText, leadSheet)
         // As createSong does: the chart's own title and CCLI number win
         const parsed = parser.parse(chordproText).metadata
         const ccliNumber = parsed.ccliSongNumber || parsed.ccli || metadata.ccliNumber || null
@@ -791,6 +811,27 @@ export class SongImport extends LitElement {
     } catch (error) {
       console.error('[Import] Failed to process song:', error)
       this._showError(`Failed to process song: ${errorMessage(error)}`)
+    }
+  }
+
+  /**
+   * The chart with its melody's range in it, read from the song's lead sheet (docs/RANGE.md). The
+   * lead sheet is never kept, and one that cannot be read leaves the chart as it came: the song
+   * is imported without a range, and can be given one.
+   */
+  async _chartWithRange(chordproText: string, leadSheet: unknown): Promise<string> {
+    const key = keyOfChart(chordproText)
+    if (!(leadSheet instanceof ArrayBuffer) || leadSheet.byteLength > MAX_LEAD_SHEET) {
+      return chordproText
+    }
+    // (a chart with a range of its own keeps it; one with no key has nothing to put the notes in)
+    if (!key || rangeOfChart(chordproText)) return chordproText
+    try {
+      const range = await (await this.loadMelodyReader()).readMelodyRange(leadSheet)
+      return range ? withRange(chordproText, range, key) : chordproText
+    } catch (error) {
+      console.warn('[Import] Could not read the melody of the lead sheet:', error)
+      return chordproText
     }
   }
 

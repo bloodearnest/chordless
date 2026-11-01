@@ -38,6 +38,12 @@ describe('bookmarkletUrl', () => {
   })
 })
 
+/** What the lead sheet request gets: nothing (SongSelect says no), the PDF, the PDF as JSON, or what is no PDF */
+type LeadSheet = 'none' | 'pdf' | 'json' | 'html' | 'error'
+
+const PDF = '%PDF-1.4 a lead sheet'
+const bytesOf = (text: string) => new TextEncoder().encode(text)
+
 describe('importFromSongSelect', () => {
   const CHORDLESS = 'https://chordless.app'
 
@@ -50,6 +56,7 @@ describe('importFromSongSelect', () => {
       | { ok: boolean; payload?: string }
       | Error,
     popupBlocked = false,
+    leadSheet = 'none' as LeadSheet,
   } = {}) {
     const log: any[][] = []
     const listeners = new Set<(event: any) => void>()
@@ -75,8 +82,28 @@ describe('importFromSongSelect', () => {
       },
       fetch: async url => {
         log.push(['fetch', url])
+        if (url.includes('GetSongLeadPdf')) {
+          if (leadSheet === 'error') throw new Error('offline')
+          const body = {
+            none: '',
+            pdf: PDF,
+            json: JSON.stringify({ payload: btoa(PDF) }),
+            html: '<html>Please sign in</html>',
+          }[leadSheet]
+          return {
+            ok: leadSheet !== 'none',
+            status: leadSheet === 'none' ? 403 : 200,
+            json: async () => JSON.parse(body),
+            arrayBuffer: async () => bytesOf(body).buffer,
+          }
+        }
         if (download instanceof Error) throw download
-        return { ok: download.ok, status: 403, json: async () => ({ payload: download.payload }) }
+        return {
+          ok: download.ok,
+          status: 403,
+          json: async () => ({ payload: download.payload }),
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
       },
       setTimeout: () => 0, // never times out
       addEventListener: (_type, listener) => listeners.add(listener),
@@ -102,12 +129,12 @@ describe('importFromSongSelect', () => {
   it('opens Chordless before downloading, then sends the song once it is ready', async () => {
     const page = fakePage()
     await run(page)
-    expect(page.log.map(entry => entry[0])).to.deep.equal(['open', 'fetch', 'post'])
+    expect(page.log.map(entry => entry[0])).to.deep.equal(['open', 'fetch', 'fetch', 'post'])
     expect(page.log[0].slice(1)).to.deep.equal([`${CHORDLESS}/import-song`, 'chordless'])
     expect(page.log[1][1]).to.equal(
       'https://songselect.ccli.com/api/GetSongChordPro?songNumber=1234567&key=G&style=Standard&columns=1'
     )
-    expect(page.log[2][1]).to.deep.equal({
+    expect(page.log[3][1]).to.deep.equal({
       type: 'CHORDLESS_IMPORT',
       data: {
         chordproText: '{title: Test}\n{key: G}',
@@ -115,8 +142,56 @@ describe('importFromSongSelect', () => {
         source: 'songselect',
       },
     })
-    expect(page.log[2][2]).to.equal(CHORDLESS)
+    expect(page.log[3][2]).to.equal(CHORDLESS)
     expect(page.listeners.size).to.equal(0)
+  })
+
+  describe('the lead sheet', () => {
+    it("is asked for in the chart's key, after the ChordPro, and sent with the song", async () => {
+      const page = fakePage({ leadSheet: 'pdf' })
+      await run(page)
+      expect(page.log[2][1]).to.equal(
+        'https://songselect.ccli.com/api/GetSongLeadPdf?songNumber=1234567&transposeKey=G&octave=0&noteSize=0&orientation=portrait&paperSize=A4&activityType=downloaded&renderer=pipeline'
+      )
+      const { leadSheet } = page.log[3][1].data
+      expect(leadSheet).to.be.instanceOf(ArrayBuffer)
+      expect(new TextDecoder().decode(leadSheet)).to.equal(PDF)
+    })
+
+    it("is in the chart's key, not the one the page had picked", async () => {
+      const page = fakePage({
+        leadSheet: 'pdf',
+        download: { ok: true, payload: '{title: Test}\n{key: Bb}' },
+      })
+      await run(page)
+      expect(page.log[2][1]).to.contain('transposeKey=Bb&')
+    })
+
+    it('can come as JSON with the PDF in base64, as the ChordPro does', async () => {
+      const page = fakePage({ leadSheet: 'json' })
+      await run(page)
+      expect(new TextDecoder().decode(page.log[3][1].data.leadSheet)).to.equal(PDF)
+    })
+
+    for (const leadSheet of ['none', 'html', 'error'] as const) {
+      it(`does not stop the song when it is not to be had (${leadSheet})`, async () => {
+        const page = fakePage({ leadSheet })
+        await run(page)
+        const message = must(page.log.at(-1))[1]
+        expect(message.type).to.equal('CHORDLESS_IMPORT')
+        expect(message.data.chordproText).to.equal('{title: Test}\n{key: G}')
+        expect(message.data).to.not.have.property('leadSheet')
+      })
+    }
+
+    it('is not asked for when the chart has no key to put its notes in', async () => {
+      const page = fakePage({
+        leadSheet: 'pdf',
+        download: { ok: true, payload: '{title: Test}\n[G]x' },
+      })
+      await run(page)
+      expect(page.log.map(entry => entry[0])).to.deep.equal(['open', 'fetch', 'post'])
+    })
   })
 
   it('sends the song when Chordless was ready before the download finished', async () => {
@@ -127,7 +202,7 @@ describe('importFromSongSelect', () => {
       return realFetch(url)
     }
     await importFromSongSelect(CHORDLESS, page)
-    expect(page.log.map(entry => entry[0])).to.deep.equal(['open', 'fetch', 'post'])
+    expect(page.log.map(entry => entry[0])).to.deep.equal(['open', 'fetch', 'fetch', 'post'])
   })
 
   it('ignores ready messages from other sites', async () => {
@@ -136,7 +211,7 @@ describe('importFromSongSelect', () => {
     await new Promise(resolve => setTimeout(resolve))
     page.ready('https://evil.example')
     await new Promise(resolve => setTimeout(resolve))
-    expect(page.log.map(entry => entry[0])).to.deep.equal(['open', 'fetch'])
+    expect(page.log.map(entry => entry[0])).to.deep.equal(['open', 'fetch', 'fetch'])
     page.ready()
     await done
     expect(must(page.log.at(-1))[0]).to.equal('post')

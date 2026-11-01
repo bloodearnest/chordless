@@ -9,9 +9,10 @@
  *
  * It opens Chordless's /import-song in the tab named 'chordless' (reusing one
  * this SongSelect tab opened before), fetches the song's ChordPro meanwhile
- * (using the user's SongSelect login), waits for CHORDLESS_READY, and posts
- * CHORDLESS_IMPORT, or CHORDLESS_IMPORT_FAILED if the download failed. See
- * song-import.js.
+ * (using the user's SongSelect login), then the song's lead sheet in the chart's key, for its
+ * melody range (docs/RANGE.md), waits for CHORDLESS_READY, and posts CHORDLESS_IMPORT, or
+ * CHORDLESS_IMPORT_FAILED if the download failed. A lead sheet that cannot be had never stops
+ * the song: the import goes without it. See song-import.ts.
  */
 /**
  * The parts of the SongSelect page's window the bookmarklet uses. The real window satisfies
@@ -29,7 +30,12 @@ export interface SongSelectPage {
   fetch(
     url: string,
     init: RequestInit
-  ): Promise<{ ok: boolean; status: number; json(): Promise<{ payload?: string }> }>
+  ): Promise<{
+    ok: boolean
+    status: number
+    json(): Promise<{ payload?: string }>
+    arrayBuffer(): Promise<ArrayBuffer>
+  }>
   setTimeout(handler: () => void, ms: number): unknown
 }
 
@@ -83,6 +89,30 @@ export async function importFromSongSelect(
     if (!response.ok) throw new Error(`SongSelect download failed: ${response.status}`)
     const chordproText = (await response.json()).payload
     if (!chordproText?.trim()) throw new Error('Empty ChordPro file. Do you have access?')
+    const chartKey: string | undefined = chordproText.match(/\{key:\s*([^}\s]+)\s*\}/i)?.[1]
+
+    // The lead sheet, in the same key, so its notes are in the chart's key. It is the PDF itself,
+    // or JSON with the PDF in base64 as its payload, like the ChordPro; anything else is no lead sheet
+    let leadSheet: ArrayBuffer | undefined
+    if (chartKey) {
+      try {
+        const lead = await page.fetch(
+          `https://songselect.ccli.com/api/GetSongLeadPdf?songNumber=${songNumber}&transposeKey=${encodeURIComponent(chartKey)}&octave=0&noteSize=0&orientation=portrait&paperSize=A4&activityType=downloaded&renderer=pipeline`,
+          { headers: { accept: '*/*', 'client-locale': 'en-GB' }, credentials: 'include' }
+        )
+        if (lead.ok) {
+          let bytes = new Uint8Array(await lead.arrayBuffer())
+          const isPdf = (data: Uint8Array) => String.fromCharCode(...data.slice(0, 4)) === '%PDF'
+          if (!isPdf(bytes)) {
+            const payload = JSON.parse(new TextDecoder().decode(bytes)).payload
+            bytes = Uint8Array.from(atob(payload), character => character.charCodeAt(0))
+          }
+          if (isPdf(bytes)) leadSheet = bytes.buffer as ArrayBuffer
+        }
+      } catch {
+        // no lead sheet: the song is imported without a range
+      }
+    }
     message = {
       type: 'CHORDLESS_IMPORT',
       data: {
@@ -90,9 +120,10 @@ export async function importFromSongSelect(
         metadata: {
           ccliNumber: songNumber,
           title,
-          key: chordproText.match(/\{key:\s*([^}\s]+)\s*\}/i)?.[1],
+          key: chartKey,
         },
         source: 'songselect',
+        ...(leadSheet && { leadSheet }),
       },
     }
   } catch (error) {

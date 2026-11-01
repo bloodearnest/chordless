@@ -20,12 +20,7 @@
  * A PDF that cannot be read, or has no music in it, gives null.
  */
 import { getDocumentProxy, getResolvedPDFJS } from 'unpdf'
-
-/** The lowest and highest sung note, as MIDI note numbers (60 is middle C) */
-export interface MelodyRange {
-  low: number
-  high: number
-}
+import type { NoteRange } from './voice-range.ts'
 
 type Matrix = [number, number, number, number, number, number]
 
@@ -76,7 +71,8 @@ const BOTTOM_LINE_LETTER = 2
 /** The octave of that bottom line (E4), the C below it being middle C */
 const BOTTOM_LINE_OCTAVE = 4
 
-export async function readMelodyRange(pdf: ArrayBuffer): Promise<MelodyRange | null> {
+/** The lowest and highest sung note, as MIDI note numbers (60 is middle C) */
+export async function readMelodyRange(pdf: ArrayBuffer): Promise<NoteRange | null> {
   try {
     const pdfjs = await getResolvedPDFJS()
     const document = await getDocumentProxy(new Uint8Array(pdf))
