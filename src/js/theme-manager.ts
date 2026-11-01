@@ -66,6 +66,9 @@ export class ThemeManager {
       'color-danger': '#e74c3c',
       'color-info': '#2980b9',
       'chord-color': '#2980b9',
+      // Notes on a chart: private in pencil, shared in ink (docs/NOTES.md)
+      'note-private-color': '#4f5b66',
+      'note-shared-color': '#b8431f',
 
       // Border colors
       'border-color': '#d5dbdb',
@@ -119,6 +122,8 @@ export class ThemeManager {
       'color-danger': '#e74c3c',
       'color-info': '#3498db',
       'chord-color': '#22d3ee',
+      'note-private-color': '#aab4c0',
+      'note-shared-color': '#ff9f7a',
 
       // Border colors
       'border-color': '#404040',

@@ -10,6 +10,8 @@ import type { TeamRole } from './team-roles.ts'
 export interface ChartSegment {
   chord: string
   lyrics: string
+  /** Notes that sit at the start of this segment, put there to be drawn (never by the parser) */
+  notes?: ShownNote[]
   /** Set by transposeSong */
   transposed?: boolean
   valid?: boolean
@@ -198,6 +200,13 @@ export interface ChartNote {
   createdBy?: string
   /** ISO time of the last change */
   modified: string
+}
+
+/** A note as it is drawn: its text, and whether it is shared with the team (else private, drawn in pencil) */
+export interface ShownNote {
+  id: string
+  text: string
+  shared: boolean
 }
 
 /** A note that can travel with a setlist: text only */

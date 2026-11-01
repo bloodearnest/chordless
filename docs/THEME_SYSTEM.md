@@ -42,6 +42,8 @@ All variables are defined in `/css/style.css` and managed by `/js/theme-manager.
 --color-danger      /* Danger/error state */
 --color-info        /* Info state */
 --chord-color       /* Chord notation color */
+--note-private-color /* A private note on a chart (pencil) */
+--note-shared-color  /* A note shared with the team (ink) */
 --border-color      /* Border color */
 --border-light      /* Light border */
 --overlay-bg        /* Modal/overlay background */
