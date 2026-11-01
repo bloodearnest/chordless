@@ -44,6 +44,7 @@ export class AccountCard extends LitElement {
   declare _message: Message | null
 
   _logoutModal: Ref<AppModal> = createRef()
+  _revokeModal: Ref<AppModal> = createRef()
 
   static override styles = [
     panelStyles,
@@ -155,7 +156,20 @@ export class AccountCard extends LitElement {
     if (!(await this._logoutModal.value?.ask())) return
     try {
       const { logout } = await import('../js/google-auth.ts')
-      const { revoked } = await logout()
+      await logout()
+      await this.refresh()
+      this._message = { text: 'Logged out on this device.', type: 'success' }
+    } catch (error) {
+      console.error('[AccountCard] Logout failed:', error)
+      this._message = { text: `Logging out failed: ${errorMessage(error)}`, type: 'error' }
+    }
+  }
+
+  async _revokeAccess(): Promise<void> {
+    if (!(await this._revokeModal.value?.ask())) return
+    try {
+      const { revokeAccess } = await import('../js/google-auth.ts')
+      const { revoked } = await revokeAccess()
       await this.refresh()
       this._message = {
         text: revoked
@@ -164,8 +178,8 @@ export class AccountCard extends LitElement {
         type: 'success',
       }
     } catch (error) {
-      console.error('[AccountCard] Logout failed:', error)
-      this._message = { text: `Logging out failed: ${errorMessage(error)}`, type: 'error' }
+      console.error('[AccountCard] Revoking access failed:', error)
+      this._message = { text: `Revoking access failed: ${errorMessage(error)}`, type: 'error' }
     }
   }
 
@@ -259,7 +273,15 @@ export class AccountCard extends LitElement {
         size="small"
         heading="Log out of Google?"
         confirm-label="Log Out"
-        message="This signs you out and revokes Chordless's access to your Google Drive at Google (which needs the network). Other devices signed in with this Google account will need to connect again too. Your songs and setlists stay on this device and in Drive."
+        message="This signs you out on this device only. Other devices stay signed in. Your songs and setlists stay on this device and in Drive."
+      ></app-modal>
+      <app-modal
+        ${ref(this._revokeModal)}
+        type="confirm"
+        size="small"
+        heading="Revoke access at Google?"
+        confirm-label="Revoke Access"
+        message="This signs you out and revokes Chordless's access to your Google Drive at Google (which needs the network). Every other device signed in with this Google account will need to connect again too. Your songs and setlists stay on this device and in Drive."
       ></app-modal>
     `
   }
@@ -278,7 +300,8 @@ export class AccountCard extends LitElement {
             state === 'signed-out'
               ? nothing
               : html`<div class="row">
-                <button class="btn danger" id="logout" @click=${this._logout}>Log out and revoke access</button>
+                <button class="btn" id="logout" @click=${this._logout}>Log out</button>
+                <button class="btn danger" id="revoke" @click=${this._revokeAccess}>Revoke access on all devices</button>
               </div>`
           }
           <details class="advanced">

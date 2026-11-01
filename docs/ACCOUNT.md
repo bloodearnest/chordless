@@ -58,7 +58,7 @@ This device
 ```
 
 - **The account card** is a prerequisite shown first, and it can be empty (anonymous). Its "Manage"
-  sheet has reconnect, connect Drive and log out. "Test token refresh" and the auth backup
+  sheet has reconnect, connect Drive, log out (this device only) and "Revoke access on all devices" (Google keeps one grant per account, so revoking it ends every device's sign-in; logging out must not, or one device's logout signs out the rest with `invalid_grant`). "Test token refresh" and the auth backup
   (download, import) are under an *Advanced* disclosure.
 - **Signed out disables nothing.** The Personal space, export, import and delete all work; a card's
   sync line says "Sign in to sync".
