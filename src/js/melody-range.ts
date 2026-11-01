@@ -11,6 +11,9 @@
  *   sheet's treble clef gives that place a letter and an octave;
  * - small noteheads are instrumental lines (the intro, a turnaround), not sung, so they do not
  *   count. Sizes are measured in staff spaces, so a sheet drawn bigger or smaller reads the same;
+ * - nor does a full-size note in a measure with no lyric under it. A measure is the notes between
+ *   two barlines, and one note on a syllable can run on over several, so it is the measure that
+ *   has to have a lyric, not each note. A sheet with no lyrics at all is read by size alone;
  * - the sharps or flats between the clef and the first note of a staff are its key signature.
  *
  * It reads the sheet, not the song as sung: an accidental on a single note is not read, a bass
@@ -81,9 +84,10 @@ export interface Place {
 export interface MelodyRead extends NoteRange {
   /** The key signature the sheet opens with: sharps (positive) or flats (negative) */
   keySignature: number
-  /** Sung notes read, and the small instrumental ones left out */
+  /** Sung notes read, the small instrumental ones left out, and those full-size with no lyric */
   notes: number
   instrumental: number
+  unsung: number
   pages: number
   staves: number
   /** Where the lowest and highest notes are (the first, if there are several) */
@@ -91,9 +95,16 @@ export interface MelodyRead extends NoteRange {
   highAt: Place
 }
 
+/** A syllable of the words: where its middle is on the page */
+interface Lyric {
+  x: number
+  y: number
+}
+
 /** What one page gives */
 interface PageRead {
-  notes: { midi: number; staff: number }[]
+  /** The notes of full size: `lyric` is whether a lyric is under its measure */
+  notes: { midi: number; staff: number; lyric: boolean }[]
   instrumental: number
   staves: number
   /** That of the staff at the top of the page */
@@ -110,18 +121,35 @@ export async function readMelodyRange(pdf: ArrayBuffer): Promise<MelodyRead | nu
     let keySignature: number | null = null
     let notes = 0
     let instrumental = 0
+    let unsung = 0
     let staves = 0
+    const reads: PageRead[] = []
     for (let number = 1; number <= document.numPages; number++) {
       const page = await document.getPage(number)
       const { fnArray, argsArray } = await page.getOperatorList()
-      const read = readPage(shapesOf(fnArray, argsArray, pdfjs.OPS), pdfjs.OPS)
+      const { items } = await page.getTextContent()
+      const lyrics = items.flatMap(item =>
+        'str' in item && item.str.trim()
+          ? [{ x: item.transform[4] + item.width / 2, y: item.transform[5] }]
+          : []
+      )
+      reads.push(readPage(shapesOf(fnArray, argsArray, pdfjs.OPS), pdfjs.OPS, lyrics))
+    }
+    // (a sheet with no lyric under any note has none to go by: size alone says what is sung)
+    const hasLyrics = reads.some(read => read.notes.some(note => note.lyric))
+    for (const [index, read] of reads.entries()) {
       keySignature ??= read.keySignature
       instrumental += read.instrumental
       staves += read.staves
-      notes += read.notes.length
-      for (const { midi, staff } of read.notes) {
-        if (!low || midi < low.midi) low = { midi, at: { page: number, staff } }
-        if (!high || midi > high.midi) high = { midi, at: { page: number, staff } }
+      for (const { midi, staff, lyric } of read.notes) {
+        if (hasLyrics && !lyric) {
+          unsung++
+          continue
+        }
+        notes++
+        const at = { page: index + 1, staff }
+        if (!low || midi < low.midi) low = { midi, at }
+        if (!high || midi > high.midi) high = { midi, at }
       }
     }
     if (!low || !high) return null
@@ -132,6 +160,7 @@ export async function readMelodyRange(pdf: ArrayBuffer): Promise<MelodyRead | nu
       keySignature: keySignature as number,
       notes,
       instrumental,
+      unsung,
       pages: document.numPages,
       staves,
       lowAt: low.at,
@@ -236,7 +265,7 @@ function findStaves(shapes: Shape[], ops: Record<string, number>): Staff[] {
 }
 
 /** Every sung note on the page, with its staff counted from the top, and the page's key signature */
-function readPage(shapes: Shape[], ops: Record<string, number>): PageRead {
+function readPage(shapes: Shape[], ops: Record<string, number>, lyrics: Lyric[]): PageRead {
   const staves = findStaves(shapes, ops)
   if (staves.length === 0) return { notes: [], instrumental: 0, staves: 0, keySignature: null }
   const space = staves[0].space
@@ -271,6 +300,7 @@ function readPage(shapes: Shape[], ops: Record<string, number>): PageRead {
 
   const middle = (staff: Staff) => staff.bottom + 2 * staff.space
   const notes: PageRead['notes'] = []
+  const bars = barlines(shapes, ops, space)
   const headsOf = new Map<Staff, Head[]>()
   for (const head of heads) {
     const staff = staves.reduce((a, b) =>
@@ -288,7 +318,24 @@ function readPage(shapes: Shape[], ops: Record<string, number>): PageRead {
     )
     // (the staves go up the page, so the top one is the last)
     const number = staves.length - staves.indexOf(staff)
-    for (const head of staffHeads) notes.push({ midi: midiOf(staff, head, offsets), staff: number })
+    // the measures of the staff: between the barlines that cross it. The words are under it
+    // (further down than usual when its notes go below the staff)
+    const barXs = bars
+      .filter(bar => Math.abs(bar.y - middle(staff)) < 0.5 * space)
+      .map(bar => bar.x)
+    const measureOf = (x: number) => barXs.filter(bar => bar < x).length
+    const sung = new Set(
+      lyrics
+        .filter(lyric => lyric.y < staff.bottom && lyric.y > staff.bottom - 8 * space)
+        .map(lyric => measureOf(lyric.x))
+    )
+    for (const head of staffHeads) {
+      notes.push({
+        midi: midiOf(staff, head, offsets),
+        staff: number,
+        lyric: sung.has(measureOf(head.x)),
+      })
+    }
   }
   // the staff at the top opens the song, even if it has only an instrumental line
   const top = staves[staves.length - 1]
@@ -298,6 +345,20 @@ function readPage(shapes: Shape[], ops: Record<string, number>): PageRead {
     staves: staves.length,
     keySignature: keySignature(top, accidentals, Infinity).count,
   }
+}
+
+/** The barlines: strokes one staff tall (a stem is another length), where they are on the page */
+function barlines(shapes: Shape[], ops: Record<string, number>, space: number): Head[] {
+  const bars: Head[] = []
+  for (const { paint, path, matrix } of shapes) {
+    if (paint !== ops.stroke || path.length !== 6 || path[0] !== 0 || path[3] !== 1) continue
+    const [x0, y0] = apply(matrix, path[1], path[2])
+    const [x1, y1] = apply(matrix, path[4], path[5])
+    if (Math.abs(x0 - x1) < 0.05 && Math.abs(Math.abs(y1 - y0) - 4 * space) < 0.1 * space) {
+      bars.push({ x: x0, y: (y0 + y1) / 2 })
+    }
+  }
+  return bars
 }
 
 /**

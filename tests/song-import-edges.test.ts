@@ -54,6 +54,7 @@ describe('song-import: corners', () => {
       keySignature: 0,
       notes: 312,
       instrumental: 31,
+      unsung: 7,
       pages: 3,
       staves: 19,
       lowAt: { page: 2, staff: 3 },
@@ -141,7 +142,7 @@ describe('song-import: corners', () => {
       const text = await said(element)
       expect(text).to.contain('How the lead sheet was read')
       expect(text).to.contain(
-        '3 pages and 19 staves: 312 sung notes read, and 31 instrumental notes left out.'
+        '3 pages and 19 staves: 312 sung notes read, and left out 31 small instrumental notes and 7 notes with no lyric.'
       )
       expect(text).to.contain(
         'Key signature: no sharps or flats (C major or A minor). The chart is in C.'
@@ -150,9 +151,24 @@ describe('song-import: corners', () => {
       expect(text).to.contain('Highest note E5: page 1, staff 2 from the top.')
     })
 
+    it('says what it left out when that is only one kind, in the singular', async () => {
+      for (const [overrides, sentence] of [
+        [{ instrumental: 1, unsung: 0 }, 'and left out 1 small instrumental note.'],
+        [{ instrumental: 0, unsung: 1 }, 'and left out 1 note with no lyric.'],
+      ] as const) {
+        const { element } = await importerReading(async () => read(overrides))
+        await element.receive({
+          chordproText: chart(unique('Left out')),
+          source: 'songselect',
+          leadSheet: leadSheet(),
+        })
+        expect(await said(element)).to.contain(sentence)
+      }
+    })
+
     it('says how it was read in the singular, and when it is in another key', async () => {
       const { element } = await importerReading(async () =>
-        read({ pages: 1, staves: 1, notes: 1, instrumental: 0, keySignature: -2 })
+        read({ pages: 1, staves: 1, notes: 1, instrumental: 0, unsung: 0, keySignature: -2 })
       )
       await element.receive({
         chordproText: chart(unique('Singular')),

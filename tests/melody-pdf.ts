@@ -9,6 +9,12 @@ export interface SheetNote {
   pitch: string
   /** Sung (the default), a ring (minim or semibreve) or instrumental: a small head */
   head?: 'solid' | 'ring' | 'cue'
+  /**
+   * Whether a syllable is drawn under it (the default, except for an instrumental note). Notes
+   * are in measures of four, and what matters is whether a measure has one: a run of notes on a
+   * syllable have the one
+   */
+  lyric?: boolean
 }
 
 export interface SheetStaff {
@@ -107,8 +113,16 @@ function staffContent(staff: SheetStaff, bottom: number, space: number): string 
     } else {
       out.push(`${ellipse(x, y, 0.63 * space, 0.53 * space)} h f`)
     }
-    // a stem, and the stroke of a bar line: strokes that are not staff lines
+    // a stem: a stroke that is not a staff line, and not as tall as a staff
     out.push(`${number(x + 3)} ${number(y)} m ${number(x + 3)} ${number(y + 3 * space)} l S`)
+    if ((note.lyric ?? head !== 'cue') && head !== 'cue') {
+      out.push(`BT /F1 80 Tf ${number(x - 3)} ${number(bottom - 3.5 * space)} Td (la) Tj ET`)
+    }
+    // the barline after every fourth note, and at the end: as tall as the staff
+    if (index % 4 === 3 || index === staff.notes.length - 1) {
+      const bar = number(x + 15)
+      out.push(`${bar} ${number(bottom)} m ${bar} ${number(bottom + 4 * space)} l S`)
+    }
   })
   return out.join('\n')
 }
@@ -116,7 +130,7 @@ function staffContent(staff: SheetStaff, bottom: number, space: number): string 
 export function leadSheetPdf({ pages, space = 4.6, strayRestore }: SheetOptions): ArrayBuffer {
   const contents = pages.map(staves => {
     const body = staves
-      .map((staff, index) => staffContent(staff, 700 - index * 12 * space, space))
+      .map((staff, index) => staffContent(staff, 700 - index * 16 * space, space))
       .join('\n')
     return `${strayRestore ? 'Q\n' : ''}q 0.1 0 0 0.1 0 0 cm\n0.3 w\n${body}\nQ`
   })
@@ -128,10 +142,11 @@ export function leadSheetPdf({ pages, space = 4.6, strayRestore }: SheetOptions)
   ]
   contents.forEach((stream, i) => {
     objects.push(
-      `<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Contents ${4 + i * 2} 0 R>>`,
+      `<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Contents ${4 + i * 2} 0 R/Resources<</Font<</F1 ${3 + pages.length * 2} 0 R>>>>>>`,
       `<</Length ${stream.length}>>\nstream\n${stream}\nendstream`
     )
   })
+  objects.push('<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>')
   let out = '%PDF-1.4\n'
   const offsets = objects.map((body, index) => {
     const offset = out.length
