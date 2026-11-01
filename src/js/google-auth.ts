@@ -524,15 +524,25 @@ export async function storeSignIn(blob: string, metadata: AuthMetadata): Promise
 }
 
 /**
- * Logout: forget the sign-in on this device (the blob in the service worker), then ask the
- * auth proxy to revoke it at Google. That needs the network: offline, or if Google does not
- * answer, the device is still signed out and the result says the access was not revoked.
- * @returns whether Google revoked the access
+ * Logout: forget the sign-in on this device (the blob in the service worker), and nothing more.
+ * Google keeps one grant for the account and this app, so revoking the refresh token to end this
+ * device's sign-in ends every other device's too (their next refresh is `invalid_grant`): that is
+ * `revokeAccess()`, asked for on its own.
  */
-export async function logout(): Promise<{ revoked: boolean }> {
-  const stored = await getStoredBlob()
+export async function logout(): Promise<void> {
   const response = await sendToServiceWorker('DELETE_BLOB')
   if (!response.success) throw new Error(response.error || 'Failed to delete the sign-in')
+}
+
+/**
+ * Logout, and ask the auth proxy to revoke the access at Google. That ends the sign-in on every
+ * device with this Google account, and needs the network: offline, or if Google does not answer,
+ * this device is still signed out and the result says the access was not revoked.
+ * @returns whether Google revoked the access
+ */
+export async function revokeAccess(): Promise<{ revoked: boolean }> {
+  const stored = await getStoredBlob()
+  await logout()
   if (!stored?.blob) return { revoked: false }
 
   try {

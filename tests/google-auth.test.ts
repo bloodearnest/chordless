@@ -9,6 +9,7 @@ import {
   hasDriveAccess,
   isAuthenticated,
   logout,
+  revokeAccess,
   SignInExpiredError,
 } from '../src/js/google-auth.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
@@ -340,14 +341,23 @@ describe('google-auth', () => {
       }
     })
 
-    it('logs out by having the worker forget the blob, and Google revoke the access', async () => {
+    it('logs out by having the worker forget the blob, and asks Google for nothing', async () => {
       signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) }, 'the-blob')
-      respondTo = () => json({ success: true })
 
-      expect(await logout()).to.deep.equal({ revoked: true })
+      await logout()
 
       expect(worker.stored).to.equal(undefined)
       expect(await isAuthenticated()).to.equal(false)
+      expect(fetches, 'other devices keep their sign-in').to.have.length(0)
+    })
+
+    it('revokes the access: the worker forgets the blob, and Google revokes the access', async () => {
+      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) }, 'the-blob')
+      respondTo = () => json({ success: true })
+
+      expect(await revokeAccess()).to.deep.equal({ revoked: true })
+
+      expect(worker.stored).to.equal(undefined)
       expect(fetches).to.have.length(1)
       expect(fetches[0].url).to.equal('/session/logout')
       expect(fetches[0].body).to.deep.equal({ blob: 'the-blob' })
@@ -358,17 +368,17 @@ describe('google-auth', () => {
       respondTo = () => {
         throw new TypeError('offline')
       }
-      expect(await logout()).to.deep.equal({ revoked: false })
+      expect(await revokeAccess()).to.deep.equal({ revoked: false })
       expect(worker.stored).to.equal(undefined)
 
       signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) })
       respondTo = () => json({ error: 'Google did not revoke the access' }, 502)
-      expect(await logout()).to.deep.equal({ revoked: false })
+      expect(await revokeAccess()).to.deep.equal({ revoked: false })
       expect(worker.stored).to.equal(undefined)
     })
 
     it('asks Google for nothing when nobody is signed in', async () => {
-      expect(await logout()).to.deep.equal({ revoked: false })
+      expect(await revokeAccess()).to.deep.equal({ revoked: false })
       expect(fetches).to.have.length(0)
     })
 
@@ -377,7 +387,7 @@ describe('google-auth', () => {
       worker.failing.add('DELETE_BLOB')
 
       let error: Error | null = null
-      await logout().catch(e => {
+      await revokeAccess().catch(e => {
         error = e
       })
 

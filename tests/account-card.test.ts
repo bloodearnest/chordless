@@ -64,8 +64,8 @@ describe('account-card', () => {
   }
 
   /** Answer the question the logout asks */
-  async function answerLogout(confirm: boolean) {
-    const modal = must(card.shadowRoot?.querySelector<AppModal>('app-modal[heading^="Log out"]'))
+  async function answerLogout(confirm: boolean, heading = 'Log out') {
+    const modal = must(card.shadowRoot?.querySelector<AppModal>(`app-modal[heading^="${heading}"]`))
     await until(() => modal.open, 'the question to be asked')
     await modal.updateComplete
     must(
@@ -264,12 +264,21 @@ describe('account-card', () => {
       }) as typeof fetch
     })
 
-    it('asks first, then deletes the sign-in, revokes the access at Google, and says so', async () => {
+    it('asks first, then deletes the sign-in on this device only', async () => {
       await open()
       control('logout').click()
       await answerLogout(true)
       await until(() => text().includes('Not signed in'), 'the card to show it is signed out')
       expect(worker.messages.map(m => m.type)).to.include('DELETE_BLOB')
+      expect(worker.stored).to.equal(undefined)
+      expect(revoked, 'the other devices keep theirs').to.deep.equal([])
+    })
+
+    it('revokes the access at Google, when that is asked for, and says so', async () => {
+      await open()
+      control('revoke').click()
+      await answerLogout(true, 'Revoke access')
+      await until(() => text().includes('Not signed in'), 'the card to show it is signed out')
       expect(worker.stored).to.equal(undefined)
       expect(text()).to.contain('access to your Drive was revoked')
       expect(revoked).to.deep.equal(['encrypted-blob'])
@@ -278,8 +287,8 @@ describe('account-card', () => {
     it('says the access was not revoked when Google could not be reached, but is logged out', async () => {
       await open()
       revokeStatus = 502
-      control('logout').click()
-      await answerLogout(true)
+      control('revoke').click()
+      await answerLogout(true, 'Revoke access')
       await until(() => text().includes('Not signed in'), 'the card to show it is signed out')
       expect(text()).to.contain('could not be reached to revoke')
       expect(text()).to.contain('myaccount.google.com/permissions')
