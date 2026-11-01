@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import { classMap } from 'lit/directives/class-map.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { ChartLine, ChartSegment, HideMode, ShownNote } from '../js/data-types.ts'
+import { nudgeLine } from '../js/notes/nudge.ts'
 import { groupSegmentsIntoUnits } from '../js/utils/chart-line-units.ts'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
 import {
@@ -380,8 +381,8 @@ export class SongSection extends LitElement {
     /* A line with a note has a row of room above each of its rows, for the notes to sit in */
     .song-section-wrapper .chord-line.has-notes {
       --note-row: calc(var(--font-note) * 1.1);
-      padding-top: var(--note-row);
-      row-gap: var(--note-row);
+      padding-top: calc(var(--note-row) * var(--note-rows, 1));
+      row-gap: calc(var(--note-row) * var(--note-rows, 1));
     }
 
     /* The notes at a spot sit above its chord and take no width, as a spilling chord does */
@@ -393,6 +394,9 @@ export class SongSection extends LitElement {
       position: absolute;
       left: 0;
       bottom: 100%;
+      /* (a line box of the notes' own, not the line's: its strut would make the row taller than room was made for) */
+      font-size: var(--font-note);
+      line-height: 1.05;
       white-space: nowrap;
       pointer-events: none;
     }
@@ -562,6 +566,35 @@ export class SongSection extends LitElement {
     }
     // Has both or neither, show all
     return 'none'
+  }
+
+  #noteLines: ResizeObserver | undefined
+  #noteFrame = 0
+
+  /** The notes are placed once the text is laid out, and again when the line is (a new width, text size, or a font that arrived) */
+  override updated() {
+    const lines = Array.from(this.renderRoot.querySelectorAll<HTMLElement>('.chord-line.has-notes'))
+    this.#noteLines?.disconnect()
+    if (!lines.length) return
+    this.#noteLines ??= new ResizeObserver(() => this.#placeNotes())
+    for (const line of lines) this.#noteLines.observe(line)
+    this.#placeNotes()
+    void document.fonts?.ready.then(() => this.#placeNotes())
+  }
+
+  #placeNotes() {
+    cancelAnimationFrame(this.#noteFrame)
+    this.#noteFrame = requestAnimationFrame(() => {
+      for (const line of this.renderRoot.querySelectorAll<HTMLElement>('.chord-line.has-notes')) {
+        nudgeLine(line)
+      }
+    })
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback()
+    this.#noteLines?.disconnect()
+    cancelAnimationFrame(this.#noteFrame)
   }
 
   /** @inheritdoc */
