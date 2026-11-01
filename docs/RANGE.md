@@ -9,18 +9,29 @@ ChordPro has no melody. The range comes from a SongSelect lead sheet, or is type
 
 ## The range
 
-`{ low, high, key }`: the lowest and highest note as MIDI numbers (60 is middle C), and the key
-those numbers are in. A key's range is the stored one moved by the distance between the keys, so
-transposing a song moves its range with it, and nothing else needs storing per key.
+The lowest and highest note, in the chart itself, as a ChordPro directive:
+
+    {key: G}
+    {x_chordless_range: D4-E5}
+
+ChordPro has no range directive. It reserves the `x_` prefix for an application's own, which other
+programs ignore, and asks for the application's name after it. The notes are in the chart's own
+`{key:}`, so the range needs no key of its own: a key's range is the written one moved by the
+distance between the keys, so transposing a song moves its range with it, and nothing else needs
+storing per key. Notes are names with an octave (middle C is C4), spelled the way the key spells
+them (F#5 in G, Eb5 in Bb), and read as MIDI numbers (60 is middle C) for the check below.
+Because it is in the chart, it travels with the file: Drive, an export, a share link, a backup, a
+copy in another ChordPro program. It is per chart, so an arrangement (a variant) can have its own.
 
 - **Written pitch.** The melody is written for the higher voices, and men sing it an octave down.
   So every limit below is about the written note: the written low note is what a man reaches
   first, and the written high note is what a woman does.
 - **Editable, always.** A range read from a lead sheet can be wrong (a harmony line, a cue
   note we took for sung), and most songs have no lead sheet. Both ends can be typed in, in the key
-  the song is in at the time: that is then the stored key, so nothing is converted back. A range
-  records where it came from (read from a lead sheet, or edited), so reading a lead sheet again
-  never overwrites a correction.
+  the song is in at the time, and are written back to the directive in the chart's `{key:}` (a
+  chart with no `{key:}` is given one, the song's key). Importing a song again follows the
+  duplicate choices as it does for the rest of the chart, so a correction is not lost without being
+  asked.
 - **None is fine.** A song with no range shows no colours: the picker is as it is today.
 
 ## What counts as comfortable
@@ -53,14 +64,22 @@ shapes, so it reads them from the page (staves, noteheads, the key signature), l
 small noteheads of instrumental lines. See the header of that file for what it reads and does not.
 
 The bookmarklet is to fetch the lead sheet with the ChordPro, in the same key, and send both to
-the import page, which reads the range and then drops the PDF: **a lead sheet is never kept**
+the import page, which reads the range, writes it into the chart as the directive, and drops the PDF: **a lead sheet is never kept**
 (Chordless stores no copyrighted content: CLAUDE.md, "Spaces and copyright"). The PDF reader is a
 1.6 MB chunk the app already loads only when a PDF is shared to it, and is not precached. A lead
 sheet that cannot be fetched or read must not stop the song being imported.
 
+## Costs of keeping it in the chart
+
+- Changing a range changes the chart, so it syncs as a chart change (a new checksum, the whole
+  file) and meets the rules for chart conflicts (docs/SYNC_ARCHITECTURE.md), not the field by
+  field sync of a song's Drive properties. A range changes rarely, so this is accepted.
+- Reading every lead sheet again (a better reader, later) would rewrite every chart it finds a
+  different range for.
+- To find songs by range ("which fit in A?"), the app keeps the range read from the chart on the
+  song's record when it is saved: derived, not synced, so the chart stays the one source.
+
 ## Not decided
 
-- Whether the range lives in the song's record and in Drive's metadata with its key and tempo, or
-  in the chart as a ChordPro directive (`{x_range: D4-E5}`), which would travel with the file.
 - Limits as a preference (a group of altos, a younger group), and showing a song's range in its
   settings in note names.
