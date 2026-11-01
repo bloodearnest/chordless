@@ -1,4 +1,5 @@
 import { expect } from '@open-wc/testing'
+import { DataChangeEvent } from '../src/js/data-changes.ts'
 import { setlistHasLocalChanges } from '../src/js/sync/changes.ts'
 import { deleteDatabase, suppressConsoleLogs, uniqueName } from './test-helpers.ts'
 
@@ -732,5 +733,80 @@ describe('parseTempo', () => {
     expect(parseTempo('60 (half note)').note).to.equal('1/2')
     expect(parseTempo('30 (whole note)').note).to.equal('1/1')
     expect(parseTempo('120 (swung)').note).to.equal('1/4')
+  })
+})
+
+describe('ChordlessDB version 11: a song’s private notes', () => {
+  let dbName: string
+  afterEach(async () => {
+    await deleteDatabase(dbName)
+  })
+
+  const note = {
+    id: 'n1',
+    anchor: { kind: 'song' },
+    body: { kind: 'text', text: 'last time slower' },
+    modified: '2026-11-01T00:00:00Z',
+  } as const
+
+  it('keeps notes by song id, says so on the change bus, and forgets them when none are left', async () => {
+    dbName = `TEST-${uniqueName()}`
+    const db = new ChordlessDB(dbName)
+    await db.init()
+    const heard: { kind: string; ids: string[] | null }[] = []
+    const listen = (event: Event) => heard.push((event as DataChangeEvent).change)
+    window.addEventListener(DataChangeEvent.type, listen)
+    try {
+      expect(await db.getSongNotes('amazing-grace')).to.deep.equal([])
+      await db.saveSongNotes('amazing-grace', [note])
+      expect(await db.getSongNotes('amazing-grace')).to.deep.equal([note])
+      expect(await db.getSongNotes('other')).to.deep.equal([])
+      await db.saveSongNotes('amazing-grace', [])
+      expect(await db.getSongNotes('amazing-grace')).to.deep.equal([])
+    } finally {
+      window.removeEventListener(DataChangeEvent.type, listen)
+    }
+    expect(heard.map(each => [each.kind, each.ids])).to.deep.equal([
+      ['note', ['amazing-grace']],
+      ['note', ['amazing-grace']],
+    ])
+    must(db.db).close()
+  })
+
+  it('adds the store to a version 10 database without touching its setlists', async () => {
+    dbName = `TEST-${uniqueName()}`
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(dbName, 10)
+      request.onupgradeneeded = () => {
+        const db = request.result
+        db.createObjectStore('songs', { keyPath: 'uuid' }).createIndex('id', 'id')
+        db.createObjectStore('chordpro', { keyPath: 'id' })
+        db.createObjectStore('setlists', { keyPath: 'id' })
+        db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
+        db.createObjectStore('pending_deletions', { keyPath: 'ref' })
+        db.createObjectStore('people', { keyPath: 'id' })
+      }
+      request.onsuccess = () => {
+        const db = request.result
+        const tx = db.transaction(['setlists'], 'readwrite')
+        tx.objectStore('setlists').put({
+          id: 'a',
+          date: '2026-10-11',
+          songs: [],
+          modifiedDate: '2026-01-01T00:00:00Z',
+        })
+        tx.oncomplete = () => {
+          db.close()
+          resolve()
+        }
+        tx.onerror = () => reject(tx.error)
+      }
+    })
+    const db = new ChordlessDB(dbName)
+    await db.init()
+    expect((await db.getAllSetlists()).map(each => each.id)).to.deep.equal(['a'])
+    await db.saveSongNotes('s', [note])
+    expect(await db.getSongNotes('s')).to.deep.equal([note])
+    must(db.db).close()
   })
 })

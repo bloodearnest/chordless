@@ -2,8 +2,10 @@ import { expect } from '@open-wc/testing'
 import {
   clearSetlistLocalState,
   loadSetlistLocalState,
+  loadSetlistNotes,
   loadSongCapo,
   saveSetlistLocalState,
+  saveSetlistNotes,
 } from '../src/js/setlist/local-state.ts'
 
 const songs = [
@@ -103,5 +105,50 @@ describe('what a setlist keeps on this device', () => {
     saveSetlistLocalState('s1', { sectionState: {}, capoValues: { 0: 1 } }, songs)
     clearSetlistLocalState('s1')
     expect(localStorage.getItem('state-s1')).to.equal(null)
+  })
+
+  describe('private notes', () => {
+    const note = {
+      id: 'n1',
+      anchor: { kind: 'song' },
+      body: { kind: 'text', text: 'drop out' },
+      modified: '2026-11-01T00:00:00Z',
+    } as const
+
+    it('are kept by song, beside the sections and capos, which they leave alone', () => {
+      saveSetlistLocalState(
+        's1',
+        { sectionState: { 1: { 0: hidden } }, capoValues: { 0: 2 } },
+        songs
+      )
+      saveSetlistNotes('s1', songs[1], [note], songs)
+      expect(loadSetlistNotes('s1', songs[1])).to.deep.equal([note])
+      expect(loadSetlistNotes('s1', songs[0])).to.deep.equal([])
+      expect(loadSetlistLocalState('s1', songs)).to.deep.equal({
+        sectionState: { 1: { 0: hidden } },
+        capoValues: { 0: 2 },
+      })
+      // and the sections saved after do not lose them
+      saveSetlistLocalState('s1', { sectionState: {}, capoValues: {} }, songs)
+      expect(loadSetlistNotes('s1', songs[1])).to.deep.equal([note])
+    })
+
+    it('are forgotten for a song when none are left', () => {
+      saveSetlistNotes('s1', songs[0], [note], songs)
+      saveSetlistNotes('s1', songs[0], [], songs)
+      expect(loadSetlistNotes('s1', songs[0])).to.deep.equal([])
+    })
+
+    it('keep what was kept by place when the state is first saved by song', () => {
+      localStorage.setItem(
+        'state-s1',
+        JSON.stringify({ sectionState: { 1: { 0: hidden } }, capo: { 2: 5 } })
+      )
+      saveSetlistNotes('s1', songs[0], [note], songs)
+      expect(loadSetlistLocalState('s1', songs)).to.deep.equal({
+        sectionState: { 1: { 0: hidden } },
+        capoValues: { 2: 5 },
+      })
+    })
   })
 })

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { ChartSection } from '../src/js/data-types.ts'
-import { resolveAnchor, sectionAnchor, textAnchor } from '../src/js/notes/anchor.ts'
+import { placeNotes, resolveAnchor, sectionAnchor, textAnchor } from '../src/js/notes/anchor.ts'
 
 const section = (label: string | null, ...lines: string[][]): ChartSection => ({
   type: 'section',
@@ -97,4 +97,23 @@ test('an offset past the end is clamped, and a blank line still holds its note',
   const anchor = textAnchor(blank, 0, 0, 40)
   assert.equal(anchor.kind === 'text' && anchor.offset, 0)
   assert.deepEqual(resolveAnchor(blank, anchor), { place: 'text', section: 0, line: 0, offset: 0 })
+})
+
+test('every note is placed, in the order given', () => {
+  const notes = [
+    {
+      id: 'a',
+      anchor: sectionAnchor(chart, 1),
+      body: { kind: 'text', text: 'build' },
+      modified: '',
+    },
+    { id: 'b', anchor: { kind: 'song' }, body: { kind: 'text', text: 'fast' }, modified: '' },
+  ] as const
+  assert.deepEqual(
+    placeNotes(chart, [...notes]).map(({ note, placement }) => [note.id, placement.place]),
+    [
+      ['a', 'section'],
+      ['b', 'song'],
+    ]
+  )
 })
