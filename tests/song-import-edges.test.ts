@@ -62,6 +62,12 @@ describe('song-import: corners', () => {
       return { element, reads }
     }
 
+    /** What the page says, as a person reads it */
+    const said = async (element: any) => {
+      await element.updateComplete
+      return element.shadowRoot.textContent.replace(/\s+/g, ' ')
+    }
+
     it('puts the melody range in the chart it came with, in the chart key', async () => {
       const { element, reads } = await importerReading(async () => D4_TO_E5)
       await element.receive({
@@ -73,6 +79,62 @@ describe('song-import: corners', () => {
       expect(element._imports[0].chordproText).to.equal(
         `{title: ${element._imports[0].song.title}}\n{key: C}\n{x_chordless_range: D4-E5}\n\n[C]Hello`
       )
+      expect(await said(element)).to.contain('Melody range D4–E5 in C, from the lead sheet.')
+    })
+
+    it('says so on the page when the lead sheet had no melody, or could not be read', async () => {
+      const cases: [() => Promise<unknown>, string][] = [
+        [async () => null, 'The lead sheet had no melody to read, so there is no range.'],
+        [
+          async () => Promise.reject(new Error('damaged')),
+          'The lead sheet could not be read, so there is no range.',
+        ],
+      ]
+      for (const [read, sentence] of cases) {
+        const { element } = await importerReading(read)
+        await element.receive({
+          chordproText: chart(unique('Says so')),
+          source: 'songselect',
+          leadSheet: leadSheet(),
+        })
+        expect(await said(element)).to.contain(sentence)
+      }
+    })
+
+    it('says so when a SongSelect song came with no lead sheet, and nothing for a song with none to expect', async () => {
+      const element = await importer()
+      await element.receive({
+        chordproText: chart(unique('From SongSelect')),
+        source: 'songselect',
+      })
+      expect(await said(element)).to.contain(
+        'No lead sheet came with this song, so there is no range.'
+      )
+      const pasted = await importer()
+      await pasted.receive({ chordproText: chart(unique('Pasted')), source: 'paste' })
+      expect(await said(pasted)).to.not.contain('range')
+    })
+
+    it('shows the range a chart already has', async () => {
+      const element = await importer()
+      const ranged = `${chart(unique('Has a range'))}\n{x_chordless_range: E4-D5}`
+      await element.receive({ chordproText: ranged, source: 'file' })
+      const text = await said(element)
+      expect(text).to.contain('Melody range E4–D5 in C.')
+      expect(text).to.not.contain('from the lead sheet')
+    })
+
+    it('shows the range beside the comparison when the song is already in the library', async () => {
+      const title = unique('Already here')
+      await createSong(chart(title))
+      const { element } = await importerReading(async () => D4_TO_E5)
+      await element.receive({
+        chordproText: chart(title, '[C]Hello [F]there'),
+        source: 'songselect',
+        leadSheet: leadSheet(),
+      })
+      expect(element._imports[0].isDuplicate).to.equal(true)
+      expect(await said(element)).to.contain('Melody range D4–E5 in C, from the lead sheet.')
     })
 
     it('imports the song without a range when the lead sheet has no melody, or cannot be read', async () => {
