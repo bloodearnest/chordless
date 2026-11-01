@@ -76,6 +76,13 @@ The import page (`song-import.ts`) reads the range, writes it into the chart as 
 copyrighted content: CLAUDE.md, "Spaces and copyright"). The PDF reader is a 1.6 MB chunk the app
 already loads only when a PDF is shared to it, and is not precached. A lead sheet that cannot be
 fetched or read never stops the song being imported: it comes with no range, which can be typed in.
+**The tab the bookmarklet opens** shows a spinner with what it is doing ("Waiting for SongSelect…",
+"Reading the song…", "Reading the lead sheet…", which takes a moment) and not the ways to import by
+hand, which would only be in the way. A failure shows them, and so does "Import a file or paste
+instead". A song already in the library is compared as any import is; a chart that only gains a
+range from the lead sheet is suggested as "Update current song" (keeping the library's would lose
+it), and one that is the same as the library's says so.
+
 **Checking the import.** The import page says what it found: the range and its key, or why there is
 none (no lead sheet came, it had no melody, it could not be read). Under it, "How the lead sheet was
 read" gives the pages and staves, the sung notes read and what was left out (small instrumental
