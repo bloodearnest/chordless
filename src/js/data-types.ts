@@ -164,6 +164,45 @@ export interface ChordProRecord {
   lastModified?: number | string
 }
 
+// ==================== Notes on a chart (docs/NOTES.md) ====================
+
+/**
+ * Where on a song a note sits: its structure, never a pixel, and never a chord or a variant's uuid,
+ * so it survives transposing, hidden chords, other screen sizes and an edited chart
+ */
+export type NoteAnchor =
+  | { kind: 'song' }
+  /** A section's title: `nth` counts the sections with the same label, from 0 */
+  | { kind: 'section'; label: string | null; nth: number }
+  /** A spot in a lyric line: `offset` characters into the line's lyrics (chords left out), and the text either side */
+  | {
+      kind: 'text'
+      label: string | null
+      nth: number
+      line: number
+      offset: number
+      before: string
+      after: string
+    }
+
+/** Typed text, or (not built yet) a drawing, which is private to one musician and never synced or shared */
+export type NoteBody =
+  | { kind: 'text'; text: string }
+  | { kind: 'ink'; strokes: number[][]; w: number; h: number }
+
+export interface ChartNote {
+  id: string
+  anchor: NoteAnchor
+  body: NoteBody
+  /** The person (an id in `people`) who made a shared note */
+  createdBy?: string
+  /** ISO time of the last change */
+  modified: string
+}
+
+/** A note that can travel with a setlist: text only */
+export type SharedChartNote = ChartNote & { body: { kind: 'text'; text: string } }
+
 /** A song in a setlist: a reference, with this setlist's key and tempo for it */
 export interface SetlistEntry {
   order: number
@@ -172,6 +211,8 @@ export interface SetlistEntry {
   key: string | null
   tempo: number | null
   notes: string
+  /** Notes on the chart that everyone with the setlist sees (docs/NOTES.md) */
+  annotations?: SharedChartNote[]
   /** This setlist's own edited ChordPro text for the song, if it has one */
   chordproEdits?: string
 }
