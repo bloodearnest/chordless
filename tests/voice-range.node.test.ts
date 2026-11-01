@@ -16,12 +16,13 @@ function midi(name: string): number {
 
 const range = (low: string, high: string): NoteRange => ({ low: midi(low), high: midi(high) })
 
-test('the highest note: green to C#5, yellow from D5 to F5, red from F#5', () => {
+test('the highest note: green to C#5, yellow from D5 to E5, red from F5', () => {
   const cases: [string, RangeStatus][] = [
     ['G4', 'green'],
     ['C#5', 'green'],
     ['D5', 'yellow'],
-    ['F5', 'yellow'],
+    ['E5', 'yellow'],
+    ['F5', 'red'],
     ['F#5', 'red'],
     ['C6', 'red'],
   ]

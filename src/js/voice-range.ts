@@ -27,7 +27,7 @@ export type RangeStatus = 'green' | 'yellow' | 'red'
  */
 export const RANGE_LIMITS = {
   low: { green: 59 /* B3 */, yellow: 55 /* G3 */ },
-  high: { green: 73 /* C#5 */, yellow: 77 /* F5 */ },
+  high: { green: 73 /* C#5 */, yellow: 76 /* E5 */ },
 } as const
 
 export interface RangeCheck {
