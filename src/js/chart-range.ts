@@ -15,10 +15,9 @@ const DIRECTIVE = /^[ \t]*\{[ \t]*x_chordless_range[ \t]*:([^}]*)\}[ \t]*(\r?\n)
 
 const SEMITONES: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
 
-/** MIDI number of a note name like 'D4', 'F#5' or 'Bb3' (null if it is not one) */
-function parseNote(name: string): number | null {
-  const [, letter, accidental, octave] = /^([A-G])([#b♯♭]?)(\d)$/.exec(name) ?? []
-  if (!letter) return null
+/** MIDI number of a note name like 'D4', 'F#5' or 'Bb3' (one that matched NAME) */
+function parseNote(name: string): number {
+  const [, letter, accidental, octave] = /^([A-G])([#b♯♭]?)(\d)$/.exec(name) as RegExpExecArray
   const shift = accidental === '#' || accidental === '♯' ? 1 : accidental ? -1 : 0
   return 12 * (Number(octave) + 1) + SEMITONES[letter] + shift
 }
@@ -27,15 +26,15 @@ function parseNote(name: string): number | null {
 const FLAT_KEY = /^(?:[A-G]b|F)m?$|^(?:Dm|Gm|Cm)$/
 
 /** A note's name in a key, with its octave: 'F#5' in G, 'Eb5' in Bb */
-function noteName(midi: number, key: string | null): string {
+function noteName(midi: number, key: string): string {
   const pitchClass = ((midi % 12) + 12) % 12
-  const name = transposeNote('C', pitchClass, Boolean(key && FLAT_KEY.test(key)), key) ?? 'C'
+  const name = transposeNote('C', pitchClass, FLAT_KEY.test(key), key) as string
   // B is Cb in a very flat key, and that is an octave up in the number
   return `${name}${Math.floor(midi / 12) - 1 + (name === 'Cb' ? 1 : 0)}`
 }
 
 /** The range as the directive says it, 'D4-E5', in a key */
-export function formatRange(range: NoteRange, key: string | null): string {
+export function formatRange(range: NoteRange, key: string): string {
   return `${noteName(range.low, key)}-${noteName(range.high, key)}`
 }
 
@@ -46,7 +45,7 @@ export function rangeOfChart(chordpro: string): NoteRange | null {
   if (!notes) return null
   const low = parseNote(notes[1])
   const high = parseNote(notes[2])
-  return low !== null && high !== null && low <= high ? { low, high } : null
+  return low <= high ? { low, high } : null
 }
 
 /**
