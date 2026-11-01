@@ -1,7 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { classMap } from 'lit/directives/class-map.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
-import type { ChartLine, ChartSegment, HideMode } from '../js/data-types.ts'
+import type { ChartLine, ChartSegment, HideMode, ShownNote } from '../js/data-types.ts'
 import { groupSegmentsIntoUnits } from '../js/utils/chart-line-units.ts'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
 import {
@@ -11,6 +11,7 @@ import {
 } from '../js/utils/lyrics-normalizer.ts'
 import type { BarGroupData, Measure } from './bar-group.ts'
 import './bar-group.ts'
+import { noteStyles, renderNotes } from './chart-note.ts'
 import './chord-display.ts'
 
 /** A Show option or the collapse button was pressed: action is show-all, show-lyrics, show-chords, show-none or collapse */
@@ -71,6 +72,8 @@ export class SongSection extends LitElement {
     label: { type: String, attribute: 'label' },
     /** @type {string} Text shown after the label, e.g. "(first time a cappella)" */
     note: { type: String, attribute: 'note' },
+    /** Notes on the section's title (docs/NOTES.md) */
+    titleNotes: { attribute: false },
     /** @type {Array<{segments: Array<{chord: string, lyrics: string}>}>} Parsed chord/lyric lines */
     lines: { attribute: false },
     /** @type {boolean} Display chords as Nashville numbers */
@@ -93,6 +96,7 @@ export class SongSection extends LitElement {
   declare isHidden: boolean
   declare label: string
   declare note: string
+  declare titleNotes: ShownNote[]
   declare displayAsNashville: boolean
   declare unicodeAccidentals: boolean
   declare displayKey: string
@@ -105,7 +109,9 @@ export class SongSection extends LitElement {
   _hasAnyChords: boolean
   _hasAnyLyrics: boolean
 
-  static override styles = css`
+  static override styles = [
+    noteStyles,
+    css`
     .song-section-wrapper {
       padding: 0;
       margin: 0 0 0.1rem 0;
@@ -140,8 +146,9 @@ export class SongSection extends LitElement {
 
     .song-section-wrapper .section-title-wrapper {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.1rem 0.4rem;
       min-width: 0;
     }
 
@@ -370,6 +377,30 @@ export class SongSection extends LitElement {
       flex-wrap: wrap;
     }
 
+    /* A line with a note has a row of room above each of its rows, for the notes to sit in */
+    .song-section-wrapper .chord-line.has-notes {
+      --note-row: calc(var(--font-note) * 1.1);
+      padding-top: var(--note-row);
+      row-gap: var(--note-row);
+    }
+
+    /* The notes at a spot sit above its chord and take no width, as a spilling chord does */
+    .song-section-wrapper .chord-segment {
+      position: relative;
+    }
+
+    .song-section-wrapper .segment-notes {
+      position: absolute;
+      left: 0;
+      bottom: 100%;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .song-section-wrapper .plain-notes {
+      margin-bottom: 0.1rem;
+    }
+
     /* A word and the chords over it: the line breaks between units, never inside one */
     .song-section-wrapper .chord-unit {
       display: inline-flex;
@@ -385,7 +416,7 @@ export class SongSection extends LitElement {
       padding-right: 0.5em;
     }
 
-    .song-section-wrapper.chords-hidden .chord-segment.chord-only {
+    .song-section-wrapper.chords-hidden .chord-segment.chord-only:not(.has-note) {
       display: none;
     }
 
@@ -443,7 +474,8 @@ export class SongSection extends LitElement {
       transform: translateY(-0.3em);
       margin-left: 0.05em;
     }
-  `
+  `,
+  ]
 
   constructor() {
     super()
@@ -456,6 +488,7 @@ export class SongSection extends LitElement {
     this.isHidden = false
     this.label = ''
     this.note = ''
+    this.titleNotes = []
     this._lines = undefined // Private storage for lines
     this._contentBlocks = []
     this._hasAnyChords = false
@@ -584,6 +617,7 @@ export class SongSection extends LitElement {
             <div class="section-title-wrapper">
               <h3 class="section-title">${label}</h3>
               ${this.note ? html`<span class="section-note">${this.note}</span>` : ''}
+              ${renderNotes(this.titleNotes)}
               ${this._renderCollapseToggle()}
             </div>
             ${this._renderControls()}
@@ -597,6 +631,7 @@ export class SongSection extends LitElement {
   _renderPlainSection() {
     return html`
       <div class="song-section">
+        ${this.titleNotes?.length ? html`<div class="plain-notes">${renderNotes(this.titleNotes)}</div>` : nothing}
         <div class="section-content">${this._renderContent()}</div>
       </div>
     `
@@ -718,7 +753,10 @@ export class SongSection extends LitElement {
       : shown.map(segment => [segment])
 
     return html`
-      <div class="chord-line" data-line-index=${index}>
+      <div
+        class=${classMap({ 'chord-line': true, 'has-notes': shown.some(segment => segment.notes?.length) })}
+        data-line-index=${index}
+      >
         ${units.map(
           unit =>
             html`<span class="chord-unit">${unit.map((piece, at) =>
@@ -741,6 +779,7 @@ export class SongSection extends LitElement {
       'chord-segment': true,
       'chord-only': !hasLyrics,
       'chord-spills': chordSpills && hasLyrics,
+      'has-note': !!segment.notes?.length,
     })
 
     // If the line has no chords at all, don't render chord placeholders
@@ -748,6 +787,11 @@ export class SongSection extends LitElement {
 
     return html`
       <span class=${classes}>
+        ${
+          segment.notes?.length
+            ? html`<span class="segment-notes">${renderNotes(segment.notes)}</span>`
+            : nothing
+        }
         ${
           shouldRenderChordSpace
             ? chordText
@@ -920,7 +964,8 @@ export class SongSection extends LitElement {
     let hasBar = false
     for (const segment of line.segments) {
       const hasLyrics = segment.lyrics && segment.lyrics.trim().length > 0
-      if (hasLyrics) return false
+      // (a note is drawn on a line, not in a group of bars)
+      if (hasLyrics || segment.notes?.length) return false
       if (segment.chord && isBarMarker(segment.chord)) {
         hasBar = true
       }

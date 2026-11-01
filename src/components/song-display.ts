@@ -3,7 +3,9 @@ import './song-section.ts'
 import { ContextConsumer } from '@lit/context'
 import type { ChartSection, ParsedChart } from '../js/data-types.ts'
 import { displayPreferencesContext } from '../js/display-preferences.ts'
+import { attachNotes, type ChartNotes } from '../js/notes/shown.ts'
 import { transposeKeyName } from '../js/transpose.ts'
+import { noteStyles, renderNotes } from './chart-note.ts'
 
 /** How chords are shown before the page has said */
 const NO_DISPLAY_PREFERENCES = { nashville: false, unicodeAccidentals: false }
@@ -24,25 +26,39 @@ export class SongDisplay extends LitElement {
     songIndex: { type: Number, attribute: 'song-index' },
     /** @type {number} Current capo value */
     capo: { type: Number },
+    /** The song's notes, placed on its sections (docs/NOTES.md) */
+    notes: { attribute: false },
   }
 
   declare parsed: ParsedChart | null
   declare songIndex: number
   declare capo: number
+  declare notes: ChartNotes | null
 
   _display: ContextConsumer<typeof displayPreferencesContext, SongDisplay>
 
-  static override styles = css`
-    :host {
-      display: block;
-    }
-  `
+  static override styles = [
+    noteStyles,
+    css`
+      :host {
+        display: block;
+      }
+
+      .song-notes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0 0.8em;
+        margin: 0 0.5rem 0.25rem;
+      }
+    `,
+  ]
 
   constructor() {
     super()
     this.parsed = null
     this.songIndex = 0
     this.capo = 0
+    this.notes = null
     // How chords are shown (Nashville numbers, unicode accidentals), passed
     // down to the sections; re-renders when a preference changes
     this._display = new ContextConsumer(this, {
@@ -60,7 +76,12 @@ export class SongDisplay extends LitElement {
       this._renderSection(section, index)
     )
 
-    return html`${sections}`
+    const song = this.notes?.song ?? []
+    return html`${
+      song.length
+        ? html`<div class="song-notes">${song.map(note => renderNotes([note], note.orphan))}</div>`
+        : nothing
+    }${sections}`
   }
 
   _renderSection(section: ChartSection, index: number) {
@@ -73,7 +94,8 @@ export class SongDisplay extends LitElement {
     const capoKey = capoValue > 0 && displayKey ? transposeKeyName(displayKey, -capoValue) : ''
     return html`
       <song-section
-        .lines=${section.lines}
+        .lines=${attachNotes(section.lines, this.notes?.sections[index]?.lines ?? [])}
+        .titleNotes=${this.notes?.sections[index]?.title ?? []}
         .label=${section.label || ''}
         .note=${section.note || ''}
         .songIndex=${this.songIndex}

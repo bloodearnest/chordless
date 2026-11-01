@@ -15,6 +15,6 @@
     "/js/*": ["src/js/*"]
   },
   "ignoreExportsUsedInFile": true,
-  "ignoreDependencies": ["@biomejs/biome", "cloudflare"],
+  "ignoreDependencies": ["@biomejs/biome", "cloudflare", "@fontsource/caveat"],
   "ignoreBinaries": ["mise"]
 }
