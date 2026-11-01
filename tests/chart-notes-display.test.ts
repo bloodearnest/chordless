@@ -121,4 +121,79 @@ describe('notes on a chart', () => {
       ['slowly', false],
     ])
   })
+
+  describe('placed so they do not run off the line or into each other', () => {
+    const frame = () =>
+      new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
+    async function narrow(...notes: [number, string][]) {
+      let sources = noSources()
+      for (const [offset, words] of notes) {
+        const made = {
+          ...note(words, textAnchor(parsed.sections, 0, 0, offset)),
+          body: { kind: 'text', text: words },
+        } as ChartNote
+        sources = putNote(sources, made, { scope: 'setlist', reach: 'private' })
+      }
+      const wrapper = await fixture<HTMLElement>(
+        html`<div style="width: 300px; --font-lyrics: 21px; --font-chords: 19px; --font-note: 18px"></div>`
+      )
+      const display = document.createElement('song-display') as SongDisplay
+      wrapper.append(display)
+      display.parsed = parsed
+      display.notes = notesBySection(parsed.sections, sources)
+      await display.updateComplete
+      const section = display.shadowRoot?.querySelector('song-section') as SongSection
+      await section.updateComplete
+      await frame()
+      const root = section.shadowRoot as ShadowRoot
+      return {
+        line: root.querySelector('.chord-line') as HTMLElement,
+        notes: Array.from(root.querySelectorAll<HTMLElement>('.segment-notes')),
+      }
+    }
+
+    it('keeps a note near the right edge inside the line', async () => {
+      const { line, notes } = await narrow([14, 'a long way to the right edge'])
+      const edge = line.getBoundingClientRect().right
+      expect(notes[0].getBoundingClientRect().right).to.be.at.most(edge + 1)
+      expect(notes[0].getBoundingClientRect().left).to.be.at.least(
+        line.getBoundingClientRect().left - 1
+      )
+    })
+
+    it('moves them again when the line gets narrower', async () => {
+      const { line, notes } = await narrow([14, 'a long way to the right edge'])
+      const wrapper = line.getRootNode() as ShadowRoot
+      const host = (wrapper.host.getRootNode() as ShadowRoot).host.parentElement as HTMLElement
+      host.style.width = '230px'
+      await frame()
+      await frame()
+      expect(notes[0].getBoundingClientRect().right).to.be.at.most(
+        line.getBoundingClientRect().right + 1
+      )
+      expect(notes[0].getBoundingClientRect().left).to.be.at.least(
+        line.getBoundingClientRect().left - 1
+      )
+    })
+
+    it('pushes notes on neighbouring words apart', async () => {
+      const { notes } = await narrow([0, 'quietly at first'], [8, 'then build up'])
+      const [a, b] = notes.map(each => each.getBoundingClientRect())
+      expect(a.right).to.be.at.most(b.left)
+    })
+
+    it('puts what does not fit in a row above, and makes room for it', async () => {
+      const { line, notes } = await narrow(
+        [0, 'quietly at first'],
+        [8, 'then build up slowly'],
+        [14, 'all drop out']
+      )
+      expect(line.style.getPropertyValue('--note-rows')).to.equal('2')
+      const tops = new Set(notes.map(each => Math.round(each.getBoundingClientRect().top)))
+      expect(tops.size).to.equal(2)
+      const first = notes.map(each => each.getBoundingClientRect()).sort((a, b) => a.top - b.top)[0]
+      expect(first.top).to.be.at.least(line.getBoundingClientRect().top - 1)
+    })
+  })
 })
