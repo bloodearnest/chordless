@@ -191,7 +191,14 @@ describe('song-import: corners', () => {
       const said = await element.updateComplete.then(() =>
         element.shadowRoot.textContent.replace(/\s+/g, ' ')
       )
-      expect(said).to.contain('Already in your library, and the same chart: nothing was changed.')
+      expect(said).to.contain(
+        'An identical version of this song is already in your library, nothing to import.'
+      )
+      // (nothing to save: it is only added to a setlist)
+      expect($(element, '.library-only')).to.equal(null)
+      expect($(element, '.new-setlist')).to.exist
+      expect($(element, '.add-to-setlist')).to.exist
+      expect(element.shadowRoot.querySelector('.already')).to.exist
     })
 
     it('says so in a list of songs too', async () => {
@@ -203,7 +210,9 @@ describe('song-import: corners', () => {
         { chordproText: chart(unique('Another')), source: 'songselect' },
       ])
       await element.updateComplete
-      expect(element.shadowRoot.textContent).to.contain('already in library, the same chart')
+      expect(element.shadowRoot.textContent).to.contain('identical version already in library')
+      // (the other song is new, so there is something to save)
+      expect($(element, '.library-only')).to.exist
     })
 
     it('suggests updating the library chart when the lead sheet only adds a range to it', async () => {
