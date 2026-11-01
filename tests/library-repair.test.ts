@@ -48,6 +48,10 @@ describe('comparing two charts', () => {
     expect(verdict(IN_G, IN_G)).to.equal('identical')
     expect(verdict(IN_G, IN_G.replace('2017 Somebody', 'Other'))).to.equal('same-chart')
     expect(verdict(IN_G, IN_A)).to.equal('other-key')
+    // the melody's range is about the song, not the arrangement
+    expect(
+      verdict(IN_G, IN_G.replace('{key: G}', '{key: G}\n{x_chordless_range: D4-E5}'))
+    ).to.equal('same-chart')
     expect(verdict(IN_G, IN_G_ARRANGED)).to.equal('different-chords')
     expect(verdict(IN_G, IN_G.replace('Hallelujah', 'Glory'))).to.equal('different-words')
   })

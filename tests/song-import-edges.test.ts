@@ -45,6 +45,94 @@ describe('song-import: corners', () => {
     expect(element._imports[0].song.title).to.equal(title)
   })
 
+  describe('a lead sheet', () => {
+    const leadSheet = () => new TextEncoder().encode('%PDF-1.4 a lead sheet').buffer
+    const D4_TO_E5 = { low: 62, high: 76 }
+
+    /** An importer whose melody reader is a stand-in, and a log of what it was asked to read */
+    async function importerReading(read: (pdf: ArrayBuffer) => Promise<unknown>) {
+      const element = await importer()
+      const reads: ArrayBuffer[] = []
+      element.loadMelodyReader = async () => ({
+        readMelodyRange: async (pdf: ArrayBuffer) => {
+          reads.push(pdf)
+          return read(pdf)
+        },
+      })
+      return { element, reads }
+    }
+
+    it('puts the melody range in the chart it came with, in the chart key', async () => {
+      const { element, reads } = await importerReading(async () => D4_TO_E5)
+      await element.receive({
+        chordproText: chart(unique('With a range')),
+        source: 'songselect',
+        leadSheet: leadSheet(),
+      })
+      expect(reads).to.have.length(1)
+      expect(element._imports[0].chordproText).to.equal(
+        `{title: ${element._imports[0].song.title}}\n{key: C}\n{x_chordless_range: D4-E5}\n\n[C]Hello`
+      )
+    })
+
+    it('imports the song without a range when the lead sheet has no melody, or cannot be read', async () => {
+      for (const read of [async () => null, async () => Promise.reject(new Error('damaged'))]) {
+        const { element } = await importerReading(read)
+        const text = chart(unique('No range'))
+        await element.receive({ chordproText: text, source: 'songselect', leadSheet: leadSheet() })
+        expect(element._imports[0].chordproText).to.equal(text)
+      }
+    })
+
+    it('imports the song without a range when the reader cannot be loaded', async () => {
+      const element = await importer()
+      element.loadMelodyReader = async () => {
+        throw new Error('offline')
+      }
+      const text = chart(unique('No reader'))
+      await element.receive({ chordproText: text, source: 'songselect', leadSheet: leadSheet() })
+      expect(element._imports[0].chordproText).to.equal(text)
+    })
+
+    it('is not read when there is no key to put its notes in, or the chart has a range', async () => {
+      const { element, reads } = await importerReading(async () => D4_TO_E5)
+      const noKey = `{title: ${unique('No key')}}\n\n[C]Hello`
+      await element.receive({ chordproText: noKey, source: 'songselect', leadSheet: leadSheet() })
+      expect(element._imports[0].chordproText).to.equal(noKey)
+      const ranged = `${chart(unique('Has a range'))}\n{x_chordless_range: E4-D5}`
+      await element.receive({ chordproText: ranged, source: 'songselect', leadSheet: leadSheet() })
+      expect(element._imports[0].chordproText).to.equal(ranged)
+      expect(reads).to.have.length(0)
+    })
+
+    it('is not read when it is not a PDF in a buffer, or is far too big', async () => {
+      const { element, reads } = await importerReading(async () => D4_TO_E5)
+      for (const sent of ['%PDF', { byteLength: 5 }, new ArrayBuffer(9 * 1024 * 1024)]) {
+        const text = chart(unique('Not a lead sheet'))
+        await element.receive({ chordproText: text, source: 'songselect', leadSheet: sent })
+        expect(element._imports[0].chordproText).to.equal(text)
+      }
+      expect(reads).to.have.length(0)
+    })
+
+    it('comes from the bookmarklet in its message', async () => {
+      const { element, reads } = await importerReading(async () => D4_TO_E5)
+      const title = unique('From the bookmarklet')
+      message({
+        type: 'CHORDLESS_IMPORT',
+        data: {
+          chordproText: chart(title),
+          metadata: { title },
+          source: 'songselect',
+          leadSheet: leadSheet(),
+        },
+      })
+      await waitFor(() => element._state === 'choices')
+      expect(reads).to.have.length(1)
+      expect(element._imports[0].chordproText).to.contain('{x_chordless_range: D4-E5}')
+    })
+  })
+
   it('tells the page that opened it that it is ready', async () => {
     const posted: unknown[] = []
     const real = Object.getOwnPropertyDescriptor(window, 'opener')

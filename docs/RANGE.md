@@ -63,11 +63,17 @@ which keys it stops being red in.
 shapes, so it reads them from the page (staves, noteheads, the key signature), leaving out the
 small noteheads of instrumental lines. See the header of that file for what it reads and does not.
 
-The bookmarklet is to fetch the lead sheet with the ChordPro, in the same key, and send both to
-the import page, which reads the range, writes it into the chart as the directive, and drops the PDF: **a lead sheet is never kept**
-(Chordless stores no copyrighted content: CLAUDE.md, "Spaces and copyright"). The PDF reader is a
-1.6 MB chunk the app already loads only when a PDF is shared to it, and is not precached. A lead
-sheet that cannot be fetched or read must not stop the song being imported.
+The bookmarklet (`src/js/songselect-bookmarklet.ts`) fetches the lead sheet after the ChordPro,
+from `/api/GetSongLeadPdf?songNumber=…&transposeKey=<the chart's key>&…`, so its notes are in the
+chart's own `{key:}`, and sends both in its message. It takes the response as the PDF itself, or as
+JSON with the PDF in base64, like the ChordPro (the endpoint's answer was not seen, only its URL).
+The import page (`song-import.ts`) reads the range, writes it into the chart as the directive
+(`src/js/chart-range.ts`), and drops the PDF: **a lead sheet is never kept** (Chordless stores no
+copyrighted content: CLAUDE.md, "Spaces and copyright"). The PDF reader is a 1.6 MB chunk the app
+already loads only when a PDF is shared to it, and is not precached. A lead sheet that cannot be
+fetched or read never stops the song being imported: it comes with no range, which can be typed in.
+The download is recorded by SongSelect as a download (`activityType=downloaded`, as its own button
+sends).
 
 ## Costs of keeping it in the chart
 
