@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
-import { rangeOfChart, withRange } from '../js/chart-range.ts'
+import { formatRange, rangeOfChart, withRange } from '../js/chart-range.ts'
 import type { Person, Setlist, SongRecord, Space } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
 import { createSetlist, determineSetlistType, getNextSunday, openSpace } from '../js/db.ts'
@@ -78,6 +78,9 @@ export interface IncomingSong {
   leadSheet?: ArrayBuffer
 }
 
+/** What came of a lead sheet: its melody's range was put in the chart, it had no melody, or it could not be read */
+type LeadSheetOutcome = 'read' | 'no-melody' | 'unreadable'
+
 /** A lead sheet is about 130 KB: anything much bigger is not one */
 const MAX_LEAD_SHEET = 8 * 1024 * 1024
 
@@ -102,6 +105,8 @@ interface ImportItem {
   pick?: DuplicateChoice | null
   /** The name of the chart that becomes a variant: the library's if imported as the original, else the imported one */
   label?: string
+  /** What came of the lead sheet that came with it, if one did */
+  leadSheet?: LeadSheetOutcome
   /** Where the chart came from, and who is importing it */
   source?: string
   importUser?: string
@@ -392,6 +397,12 @@ export class SongImport extends LitElement {
 
     .songs .subtitle {
       display: inline;
+    }
+
+    .range {
+      margin: 0.25rem 0;
+      font-size: var(--font-ui-small);
+      color: var(--text-secondary);
     }
 
     .status.error + .duplicate,
@@ -765,7 +776,7 @@ export class SongImport extends LitElement {
           skipped.push(`${name}: ${skip || 'empty'}`)
           continue
         }
-        const chordproText = await this._chartWithRange(incomingText, leadSheet)
+        const { chordproText, outcome } = await this._chartWithRange(incomingText, leadSheet)
         // As createSong does: the chart's own title and CCLI number win
         const parsed = parser.parse(chordproText).metadata
         const ccliNumber = parsed.ccliSongNumber || parsed.ccli || metadata.ccliNumber || null
@@ -785,6 +796,7 @@ export class SongImport extends LitElement {
           chordproText,
           isDuplicate: Boolean(existing),
           choice: null,
+          leadSheet: outcome,
           source,
           importUser,
         }
@@ -819,20 +831,43 @@ export class SongImport extends LitElement {
    * lead sheet is never kept, and one that cannot be read leaves the chart as it came: the song
    * is imported without a range, and can be given one.
    */
-  async _chartWithRange(chordproText: string, leadSheet: unknown): Promise<string> {
+  async _chartWithRange(
+    chordproText: string,
+    leadSheet: unknown
+  ): Promise<{ chordproText: string; outcome?: LeadSheetOutcome }> {
     const key = keyOfChart(chordproText)
     if (!(leadSheet instanceof ArrayBuffer) || leadSheet.byteLength > MAX_LEAD_SHEET) {
-      return chordproText
+      return { chordproText }
     }
     // (a chart with a range of its own keeps it; one with no key has nothing to put the notes in)
-    if (!key || rangeOfChart(chordproText)) return chordproText
+    if (!key || rangeOfChart(chordproText)) return { chordproText }
     try {
       const range = await (await this.loadMelodyReader()).readMelodyRange(leadSheet)
-      return range ? withRange(chordproText, range, key) : chordproText
+      return range
+        ? { chordproText: withRange(chordproText, range, key), outcome: 'read' }
+        : { chordproText, outcome: 'no-melody' }
     } catch (error) {
       console.warn('[Import] Could not read the melody of the lead sheet:', error)
-      return chordproText
+      return { chordproText, outcome: 'unreadable' }
     }
+  }
+
+  /** What the page says of the song's melody range: the one in the chart, or why there is none */
+  _renderRange(item: ImportItem) {
+    const key = keyOfChart(item.chordproText)
+    const range = rangeOfChart(item.chordproText)
+    let text = ''
+    if (range && key) {
+      const notes = formatRange(range, key).replace('-', '–')
+      text = `Melody range ${notes} in ${key}${item.leadSheet === 'read' ? ', from the lead sheet' : ''}.`
+    } else if (item.leadSheet === 'no-melody') {
+      text = 'The lead sheet had no melody to read, so there is no range.'
+    } else if (item.leadSheet === 'unreadable') {
+      text = 'The lead sheet could not be read, so there is no range.'
+    } else if (item.source === 'songselect') {
+      text = 'No lead sheet came with this song, so there is no range.'
+    }
+    return text ? html`<p class="range">${text}</p>` : ''
   }
 
   _showError(message: string): void {
@@ -959,7 +994,7 @@ export class SongImport extends LitElement {
     const unresolved = this._imports.filter(item => item.isDuplicate && !item.choice)
     return html`
       <h2>✅ ${several ? `${this._imports.length} songs` : this._imports[0].song.title}</h2>
-      ${several ? this._renderSongList() : ''}
+      ${several ? this._renderSongList() : unresolved.length ? '' : this._renderRange(this._imports[0])}
       ${
         this._skipped.length
           ? html`<p class="status error">Not imported: ${this._skipped.join(', ')}</p>`
@@ -1058,8 +1093,8 @@ export class SongImport extends LitElement {
     return html`
       <ol class="songs">
         ${this._imports.map(
-          ({ song, isDuplicate, choice }) =>
-            html`<li>${song.title} <span class="subtitle">${isDuplicate ? (choice && status[choice]) || 'already in library' : 'new'}</span></li>`
+          item =>
+            html`<li>${item.song.title} <span class="subtitle">${item.isDuplicate ? (item.choice && status[item.choice]) || 'already in library' : 'new'}</span>${this._renderRange(item)}</li>`
         )}
       </ol>
     `
@@ -1115,7 +1150,8 @@ export class SongImport extends LitElement {
     }
   }
 
-  _renderDuplicate(item: ImportItem, index: number) {
+  /** `alone`: the page is about this one song, so the comparison says its range (a list of songs does) */
+  _renderDuplicate(item: ImportItem, index: number, alone: boolean) {
     const { comparison } = item
     /* v8 ignore next -- every duplicate is given its comparison when it is read */
     const verdict = comparison?.verdict ?? 'different-words'
@@ -1164,6 +1200,7 @@ export class SongImport extends LitElement {
     const naming = item.pick === 'as-original' || item.pick === 'as-variant'
     return html`
       <p class="verdict">${sentence}</p>
+      ${alone ? this._renderRange(item) : ''}
       <fieldset class="picks">
         <legend>What to do with it</legend>
         ${options.map(
@@ -1249,7 +1286,7 @@ export class SongImport extends LitElement {
             (item, index) => html`
               <li>
                 ${single ? '' : html`<strong>${item.song.title}</strong>`}
-                ${this._renderDuplicate(item, index)}
+                ${this._renderDuplicate(item, index, single)}
               </li>
             `
           )}
