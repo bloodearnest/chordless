@@ -35,8 +35,8 @@ import { goTo, loadPage } from '../js/navigation.ts'
 import { describeOrigin } from '../js/song-source.ts'
 import { ensureCurrentSpace, setCurrentSpace } from '../js/space.ts'
 import { visibleSpaces } from '../js/space-tabs.ts'
-import { buttonStyles } from './shared-styles.ts'
 import type { NoteRange } from '../js/voice-range.ts'
+import { buttonStyles } from './shared-styles.ts'
 
 /** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */
 export class SongImportedEvent extends Event {
