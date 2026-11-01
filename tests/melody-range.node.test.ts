@@ -18,8 +18,15 @@ function midi(name: string): number {
 
 const notes = (...pitches: string[]): SheetNote[] => pitches.map(pitch => ({ pitch }))
 
-async function rangeOf(pages: SheetStaff[][], space?: number, strayRestore?: boolean) {
+/** The sheet read, whole */
+async function readOf(pages: SheetStaff[][], space?: number, strayRestore?: boolean) {
   return readMelodyRange(leadSheetPdf({ pages, space, strayRestore }))
+}
+
+/** Just the range of it */
+async function rangeOf(pages: SheetStaff[][], space?: number, strayRestore?: boolean) {
+  const read = await readOf(pages, space, strayRestore)
+  return read && { low: read.low, high: read.high }
 }
 
 test('the range is the lowest and highest note, across staves and pages', async () => {
@@ -149,4 +156,53 @@ test('a sheet with no notes, or no music, or no PDF, has no range', async () => 
   } finally {
     console.warn = warn
   }
+})
+
+test('it says what it read: the notes, the pages and staves, and the key signature it opens with', async () => {
+  const read = await readOf([
+    [
+      { key: 1, notes: [...notes('G4', 'B4'), { pitch: 'C4', head: 'cue' }] },
+      { key: 1, notes: notes('D4', 'E5', 'A4') },
+    ],
+    [{ key: 1, notes: notes('F4') }],
+  ])
+  assert.ok(read)
+  assert.equal(read.notes, 6)
+  assert.equal(read.instrumental, 1)
+  assert.equal(read.pages, 2)
+  assert.equal(read.staves, 3)
+  assert.equal(read.keySignature, 1)
+})
+
+test('it says where the lowest and highest notes are, counting the staves from the top', async () => {
+  const read = await readOf([
+    [{ notes: notes('G4', 'B4') }, { notes: notes('A4', 'E5') }, { notes: notes('D4', 'C5') }],
+    [{ notes: notes('F4') }],
+  ])
+  assert.ok(read)
+  assert.deepEqual(read.lowAt, { page: 1, staff: 3 })
+  assert.deepEqual(read.highAt, { page: 1, staff: 2 })
+})
+
+test('the key signature is that of the staff the sheet opens with, flats as negative', async () => {
+  const flats = await readOf([
+    [
+      { key: -2, notes: notes('G4') },
+      { key: 3, notes: notes('G4') },
+    ],
+  ])
+  assert.equal(flats?.keySignature, -2)
+  const none = await readOf([[{ notes: notes('G4') }]])
+  assert.equal(none?.keySignature, 0)
+})
+
+test('a first staff of only an instrumental line still gives the key', async () => {
+  const read = await readOf([
+    [
+      { key: -3, notes: [{ pitch: 'G4', head: 'cue' as const }] },
+      { key: -3, notes: notes('D4', 'F4') },
+    ],
+  ])
+  assert.equal(read?.keySignature, -3)
+  assert.equal(read?.instrumental, 1)
 })

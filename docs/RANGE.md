@@ -72,6 +72,14 @@ The import page (`song-import.ts`) reads the range, writes it into the chart as 
 copyrighted content: CLAUDE.md, "Spaces and copyright"). The PDF reader is a 1.6 MB chunk the app
 already loads only when a PDF is shared to it, and is not precached. A lead sheet that cannot be
 fetched or read never stops the song being imported: it comes with no range, which can be typed in.
+**Checking the import.** The import page says what it found: the range and its key, or why there is
+none (no lead sheet came, it had no melody, it could not be read). Under it, "How the lead sheet was
+read" gives the pages and staves, the sung notes read and the instrumental ones left out, the key
+signature, and where the lowest and highest notes are (page, and staff counted from the top), so
+each can be found on the PDF and checked. The lead sheet's key signature is compared with the
+chart's `{key:}` (a minor key by its relative major, and by pitch, so D flat is C sharp): a sheet in
+another key is **not used**, as its notes would be out by the difference, and the page says so.
+
 The download is recorded by SongSelect as a download (`activityType=downloaded`, as its own button
 sends).
 

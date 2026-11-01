@@ -71,23 +71,71 @@ const BOTTOM_LINE_LETTER = 2
 /** The octave of that bottom line (E4), the C below it being middle C */
 const BOTTOM_LINE_OCTAVE = 4
 
-/** The lowest and highest sung note, as MIDI note numbers (60 is middle C) */
-export async function readMelodyRange(pdf: ArrayBuffer): Promise<NoteRange | null> {
+/** A place on the sheet, to find a note by: the page, and the staff counted from the top of it */
+export interface Place {
+  page: number
+  staff: number
+}
+
+/** What was read from a sheet: the range, and enough of how to check it against the page */
+export interface MelodyRead extends NoteRange {
+  /** The key signature the sheet opens with: sharps (positive) or flats (negative) */
+  keySignature: number
+  /** Sung notes read, and the small instrumental ones left out */
+  notes: number
+  instrumental: number
+  pages: number
+  staves: number
+  /** Where the lowest and highest notes are (the first, if there are several) */
+  lowAt: Place
+  highAt: Place
+}
+
+/** What one page gives */
+interface PageRead {
+  notes: { midi: number; staff: number }[]
+  instrumental: number
+  staves: number
+  /** That of the staff at the top of the page */
+  keySignature: number | null
+}
+
+/** The range of the sung notes of a lead sheet (MIDI note numbers, 60 is middle C), and how it was read */
+export async function readMelodyRange(pdf: ArrayBuffer): Promise<MelodyRead | null> {
   try {
     const pdfjs = await getResolvedPDFJS()
     const document = await getDocumentProxy(new Uint8Array(pdf))
-    let low = Infinity
-    let high = -Infinity
+    let low: { midi: number; at: Place } | undefined
+    let high: { midi: number; at: Place } | undefined
+    let keySignature: number | null = null
+    let notes = 0
+    let instrumental = 0
+    let staves = 0
     for (let number = 1; number <= document.numPages; number++) {
       const page = await document.getPage(number)
       const { fnArray, argsArray } = await page.getOperatorList()
-      const shapes = shapesOf(fnArray, argsArray, pdfjs.OPS)
-      for (const midi of sungNotes(shapes, pdfjs.OPS)) {
-        low = Math.min(low, midi)
-        high = Math.max(high, midi)
+      const read = readPage(shapesOf(fnArray, argsArray, pdfjs.OPS), pdfjs.OPS)
+      keySignature ??= read.keySignature
+      instrumental += read.instrumental
+      staves += read.staves
+      notes += read.notes.length
+      for (const { midi, staff } of read.notes) {
+        if (!low || midi < low.midi) low = { midi, at: { page: number, staff } }
+        if (!high || midi > high.midi) high = { midi, at: { page: number, staff } }
       }
     }
-    return low <= high ? { low, high } : null
+    if (!low || !high) return null
+    return {
+      low: low.midi,
+      high: high.midi,
+      keySignature: keySignature ?? 0,
+      notes,
+      instrumental,
+      pages: document.numPages,
+      staves,
+      lowAt: low.at,
+      highAt: high.at,
+    }
   } catch (error) {
     console.warn('Could not read the melody of a PDF:', error)
     return null
@@ -186,13 +234,14 @@ function findStaves(shapes: Shape[], ops: Record<string, number>): Staff[] {
   return staves
 }
 
-/** The MIDI numbers of every sung note on the page */
-function sungNotes(shapes: Shape[], ops: Record<string, number>): number[] {
+/** Every sung note on the page, with its staff counted from the top, and the page's key signature */
+function readPage(shapes: Shape[], ops: Record<string, number>): PageRead {
   const staves = findStaves(shapes, ops)
-  if (staves.length === 0) return []
+  if (staves.length === 0) return { notes: [], instrumental: 0, staves: 0, keySignature: null }
   const space = staves[0].space
 
   const heads: Head[] = []
+  let instrumental = 0
   const accidentals: Accidental[] = []
   for (const { paint, path, box, matrix } of shapes) {
     if (paint !== ops.fill && paint !== ops.eoFill) continue
@@ -207,6 +256,8 @@ function sungNotes(shapes: Shape[], ops: Record<string, number>): number[] {
     const ring = moves === 2 && curves >= 8 && curves <= 12
     if ((solid || ring) && height > 0.9 * space && height < 1.25 * space) {
       if (width > space && width < 2.2 * space) heads.push({ x, y })
+    } else if ((solid || ring) && height > 0.6 * space && height <= 0.9 * space) {
+      instrumental++
     } else if (width > 0.7 * space && width < 0.9 * space) {
       // a sharp is straight-sided and about 2.8 spaces tall; a flat has curves and is 2.6
       if (curves === 0 && lines >= 8 && height > 2.6 * space && height < 3.0 * space) {
@@ -218,7 +269,7 @@ function sungNotes(shapes: Shape[], ops: Record<string, number>): number[] {
   }
 
   const middle = (staff: Staff) => staff.bottom + 2 * staff.space
-  const midis: number[] = []
+  const notes: PageRead['notes'] = []
   const headsOf = new Map<Staff, Head[]>()
   for (const head of heads) {
     const staff = staves.reduce((a, b) =>
@@ -229,10 +280,23 @@ function sungNotes(shapes: Shape[], ops: Record<string, number>): number[] {
     headsOf.set(staff, [...(headsOf.get(staff) ?? []), head])
   }
   for (const [staff, staffHeads] of headsOf) {
-    const offsets = keySignature(staff, accidentals, Math.min(...staffHeads.map(head => head.x)))
-    for (const head of staffHeads) midis.push(midiOf(staff, head, offsets))
+    const { offsets } = keySignature(
+      staff,
+      accidentals,
+      Math.min(...staffHeads.map(head => head.x))
+    )
+    // (the staves go up the page, so the top one is the last)
+    const number = staves.length - staves.indexOf(staff)
+    for (const head of staffHeads) notes.push({ midi: midiOf(staff, head, offsets), staff: number })
   }
-  return midis
+  // the staff at the top opens the song, even if it has only an instrumental line
+  const top = staves[staves.length - 1]
+  return {
+    notes,
+    instrumental,
+    staves: staves.length,
+    keySignature: keySignature(top, accidentals, Infinity).count,
+  }
 }
 
 /**
@@ -240,7 +304,11 @@ function sungNotes(shapes: Shape[], ops: Record<string, number>): number[] {
  * flats at the start of the staff: just after the clef, left of the first note, and packed in a
  * run (an accidental on the first note itself is not part of it).
  */
-function keySignature(staff: Staff, accidentals: Accidental[], firstHeadX: number): number[] {
+function keySignature(
+  staff: Staff,
+  accidentals: Accidental[],
+  firstHeadX: number
+): { offsets: number[]; count: number } {
   const start = accidentals
     .filter(
       accidental =>
@@ -266,7 +334,7 @@ function keySignature(staff: Staff, accidentals: Accidental[], firstHeadX: numbe
   const offsets = [0, 0, 0, 0, 0, 0, 0]
   if (flats === 0) for (const letter of SHARP_LETTERS.slice(0, sharps)) offsets[letter] = 1
   else if (sharps === 0) for (const letter of FLAT_LETTERS.slice(0, flats)) offsets[letter] = -1
-  return offsets
+  return { offsets, count: flats === 0 ? sharps : sharps === 0 ? -flats : 0 }
 }
 
 /** The MIDI number of the note a head draws on a treble staff */
