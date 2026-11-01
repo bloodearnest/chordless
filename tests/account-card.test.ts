@@ -304,6 +304,25 @@ describe('account-card', () => {
       expect(revoked).to.deep.equal([])
     })
 
+    it('does not revoke when that is not confirmed', async () => {
+      await open()
+      control('revoke').click()
+      await answerLogout(false, 'Revoke access')
+      await wait(100)
+      expect(worker.stored).to.not.equal(undefined)
+      expect(revoked).to.deep.equal([])
+    })
+
+    it('says so, and stays signed in, when the service worker cannot revoke', async () => {
+      await open()
+      worker.failing.add('DELETE_BLOB')
+      control('revoke').click()
+      await answerLogout(true, 'Revoke access')
+      await until(() => text().includes('Revoking access failed'), 'the failure to be shown')
+      expect(card._state).to.equal('signed-in')
+      expect(revoked).to.deep.equal([])
+    })
+
     it('says so, and stays signed in, when the service worker cannot do it', async () => {
       await open()
       worker.failing.add('DELETE_BLOB')
