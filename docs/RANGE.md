@@ -30,7 +30,7 @@ to be tuned (they are constants in one place now, and a preference later).
 
 | | Green | Yellow (the edge) | Red |
 | --- | --- | --- | --- |
-| Highest note | C♯5 or lower | D5 to F5 | F♯5 and above |
+| Highest note | C♯5 or lower | D5 to E5 | F5 and above |
 | Lowest note | B3 or higher | G3 to A♯3 | F♯3 and below |
 
 A key is as good as its worse end. Many songs start out red in their original key (a song written
