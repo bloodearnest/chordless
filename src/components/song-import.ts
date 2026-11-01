@@ -909,12 +909,16 @@ export class SongImport extends LitElement {
     const many = (count: number, thing: string, plural = `${thing}s`) =>
       `${count} ${count === 1 ? thing : plural}`
     const where = (at: MelodyRead['lowAt']) => `page ${at.page}, staff ${at.staff} from the top`
+    const leftOut = [
+      melody.instrumental && many(melody.instrumental, 'small instrumental note'),
+      melody.unsung && `${many(melody.unsung, 'note')} with no lyric`,
+    ].filter(Boolean)
     return html`
       <details class="range-how">
         <summary>How the lead sheet was read</summary>
         <ul>
           <li>
-            ${many(melody.pages, 'page')} and ${many(melody.staves, 'staff', 'staves')}: ${many(melody.notes, 'sung note')} read${melody.instrumental ? `, and ${many(melody.instrumental, 'instrumental note')} left out` : ''}.
+            ${many(melody.pages, 'page')} and ${many(melody.staves, 'staff', 'staves')}: ${many(melody.notes, 'sung note')} read${leftOut.length ? `, and left out ${leftOut.join(' and ')}` : ''}.
           </li>
           <li>Key signature: ${describeSignature(melody.keySignature)}. The chart is in ${key}.</li>
           <li>Lowest note ${noteName(melody.low, key)}: ${where(melody.lowAt)}.</li>

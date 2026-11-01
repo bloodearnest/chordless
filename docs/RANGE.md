@@ -60,8 +60,12 @@ which keys it stops being red in.
 ## Getting a range from a lead sheet
 
 `src/js/melody-range.ts`, `readMelodyRange(pdf)`: the notes of a SongSelect lead sheet are drawn
-shapes, so it reads them from the page (staves, noteheads, the key signature), leaving out the
-small noteheads of instrumental lines. See the header of that file for what it reads and does not.
+shapes, so it reads them from the page (staves, noteheads, the key signature). Two signs say a note
+is not sung, and either leaves it out: it is drawn small (an instrumental line: an intro, a
+turnaround), or its measure has no lyric under it (a full-size instrumental line has none). It is
+the measure, not each note, that needs a lyric, as a run of notes on one syllable has the one. A
+sheet with no lyrics at all is read by size alone. See the header of that file for what it reads
+and does not.
 
 The bookmarklet (`src/js/songselect-bookmarklet.ts`) fetches the lead sheet after the ChordPro,
 from `/api/GetSongLeadPdf?songNumber=…&transposeKey=<the chart's key>&…`, so its notes are in the
@@ -74,7 +78,8 @@ already loads only when a PDF is shared to it, and is not precached. A lead shee
 fetched or read never stops the song being imported: it comes with no range, which can be typed in.
 **Checking the import.** The import page says what it found: the range and its key, or why there is
 none (no lead sheet came, it had no melody, it could not be read). Under it, "How the lead sheet was
-read" gives the pages and staves, the sung notes read and the instrumental ones left out, the key
+read" gives the pages and staves, the sung notes read and what was left out (small instrumental
+notes, and notes with no lyric), the key
 signature, and where the lowest and highest notes are (page, and staff counted from the top), so
 each can be found on the PDF and checked. The lead sheet's key signature is compared with the
 chart's `{key:}` (a minor key by its relative major, and by pitch, so D flat is C sharp): a sheet in

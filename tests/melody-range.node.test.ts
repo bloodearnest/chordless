@@ -206,3 +206,54 @@ test('a first staff of only an instrumental line still gives the key', async () 
   assert.equal(read?.keySignature, -3)
   assert.equal(read?.instrumental, 1)
 })
+
+const unlyriced = (...pitches: string[]): SheetNote[] =>
+  pitches.map(pitch => ({ pitch, lyric: false }))
+
+test('a full-size measure with no lyric under it is not sung, so it does not count', async () => {
+  const read = await readOf([
+    [{ notes: [...notes('G4', 'A4', 'B4', 'C5'), ...unlyriced('E4', 'F4', 'G4', 'A5')] }],
+  ])
+  assert.ok(read)
+  assert.deepEqual({ low: read.low, high: read.high }, { low: midi('G4'), high: midi('C5') })
+  assert.equal(read.notes, 4)
+  assert.equal(read.unsung, 4)
+})
+
+test('a run of notes on one syllable counts: it is the measure that has the lyric', async () => {
+  const read = await readOf([[{ notes: [{ pitch: 'D4' }, ...unlyriced('E4', 'F4', 'G5')] }]])
+  assert.ok(read)
+  assert.deepEqual({ low: read.low, high: read.high }, { low: midi('D4'), high: midi('G5') })
+  assert.equal(read.unsung, 0)
+})
+
+test('a note with its lyric after a measure of full-size notes with none counts, as a pickup does', async () => {
+  const read = await readOf([[{ notes: [...unlyriced('C4', 'D4', 'E4', 'F4'), { pitch: 'G3' }] }]])
+  assert.ok(read)
+  assert.deepEqual({ low: read.low, high: read.high }, { low: midi('G3'), high: midi('G3') })
+  assert.equal(read.unsung, 4)
+})
+
+test('the lyric is that of its own staff', async () => {
+  const read = await readOf([[{ notes: unlyriced('C4', 'D4') }, { notes: notes('G4', 'A4') }]])
+  assert.ok(read)
+  assert.deepEqual({ low: read.low, high: read.high }, { low: midi('G4'), high: midi('A4') })
+  assert.equal(read.unsung, 2)
+})
+
+test('a sheet with no lyrics at all is read by the size of the notes alone', async () => {
+  const read = await readOf([[{ notes: unlyriced('E4', 'G5') }]])
+  assert.ok(read)
+  assert.deepEqual({ low: read.low, high: read.high }, { low: midi('E4'), high: midi('G5') })
+  assert.equal(read.unsung, 0)
+})
+
+test('a sheet of only notes with no lyric among many that have one reads the ones that do', async () => {
+  const read = await readOf([
+    [{ notes: [...notes('G4', 'A4', 'B4', 'C5'), ...unlyriced('C4', 'D4', 'E4', 'F4')] }],
+    [{ notes: unlyriced('A3', 'B3') }],
+  ])
+  assert.ok(read)
+  assert.deepEqual({ low: read.low, high: read.high }, { low: midi('G4'), high: midi('C5') })
+  assert.equal(read.unsung, 6)
+})
