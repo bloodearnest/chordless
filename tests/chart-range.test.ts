@@ -2,7 +2,14 @@
  * A chart's melody range as a ChordPro directive (src/js/chart-range.ts).
  */
 import { expect } from '@open-wc/testing'
-import { formatRange, rangeOfChart, withRange } from '../src/js/chart-range.ts'
+import {
+  describeSignature,
+  formatRange,
+  noteName,
+  rangeOfChart,
+  signatureMatchesKey,
+  withRange,
+} from '../src/js/chart-range.ts'
 import type { NoteRange } from '../src/js/voice-range.ts'
 
 const { describe, it } = window
@@ -95,6 +102,48 @@ describe('chart-range', () => {
     // B to C is up one, not down eleven
     const inC = CHART.replace('{key: G}', '{key: C}')
     expect(withRange(inC, range('B3', 'B4'), 'B')).to.contain('{x_chordless_range: C4-C5}')
+  })
+
+  it('names a note in a key', () => {
+    expect(noteName(midi('F#5'), 'G')).to.equal('F#5')
+    expect(noteName(midi('Eb4'), 'Bb')).to.equal('Eb4')
+  })
+
+  it('says a key signature in words', () => {
+    expect(describeSignature(0)).to.equal('no sharps or flats (C major or A minor)')
+    expect(describeSignature(1)).to.equal('1 sharp (G major or E minor)')
+    expect(describeSignature(3)).to.equal('3 sharps (A major or F# minor)')
+    expect(describeSignature(-1)).to.equal('1 flat (F major or D minor)')
+    expect(describeSignature(-2)).to.equal('2 flats (Bb major or G minor)')
+  })
+
+  it('knows which key a key signature is, major or minor, by pitch', () => {
+    const cases: [number, string, boolean][] = [
+      [1, 'G', true],
+      [1, 'Em', true],
+      [0, 'C', true],
+      [0, 'Am', true],
+      [-2, 'Bb', true],
+      [-2, 'Gm', true],
+      [3, 'A', true],
+      [3, 'F#m', true],
+      [3, 'F♯m', true],
+      [-5, 'Db', true],
+      [7, 'C#', true], // (the same pitch as D flat)
+      [0, 'G', false],
+      [1, 'A', false],
+      [-2, 'Bm', false],
+      [3, 'Am', false],
+      [1, 'Gm', false],
+    ]
+    for (const [signature, key, expected] of cases) {
+      expect(signatureMatchesKey(signature, key), `${signature} and ${key}`).to.equal(expected)
+    }
+  })
+
+  it('takes a key it cannot read to match, as there is no telling', () => {
+    expect(signatureMatchesKey(2, 'Hm')).to.equal(true)
+    expect(signatureMatchesKey(2, '')).to.equal(true)
   })
 
   it('keeps Windows line endings', () => {

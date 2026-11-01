@@ -47,7 +47,19 @@ describe('song-import: corners', () => {
 
   describe('a lead sheet', () => {
     const leadSheet = () => new TextEncoder().encode('%PDF-1.4 a lead sheet').buffer
-    const D4_TO_E5 = { low: 62, high: 76 }
+    /** What the reader gives for the sheet of a song in C, D4 to E5, as it reads it */
+    const read = (overrides = {}) => ({
+      low: 62,
+      high: 76,
+      keySignature: 0,
+      notes: 312,
+      instrumental: 31,
+      pages: 3,
+      staves: 19,
+      lowAt: { page: 2, staff: 3 },
+      highAt: { page: 1, staff: 2 },
+      ...overrides,
+    })
 
     /** An importer whose melody reader is a stand-in, and a log of what it was asked to read */
     async function importerReading(read: (pdf: ArrayBuffer) => Promise<unknown>) {
@@ -69,7 +81,7 @@ describe('song-import: corners', () => {
     }
 
     it('puts the melody range in the chart it came with, in the chart key', async () => {
-      const { element, reads } = await importerReading(async () => D4_TO_E5)
+      const { element, reads } = await importerReading(async () => read())
       await element.receive({
         chordproText: chart(unique('With a range')),
         source: 'songselect',
@@ -101,6 +113,58 @@ describe('song-import: corners', () => {
       }
     })
 
+    it('is not used when it is in another key than the chart, and says so', async () => {
+      // the sheet has a sharp, and the chart is in C
+      const { element } = await importerReading(async () => read({ keySignature: 1 }))
+      const text = chart(unique('Another key'))
+      await element.receive({ chordproText: text, source: 'songselect', leadSheet: leadSheet() })
+      expect(element._imports[0].chordproText).to.equal(text)
+      expect(await said(element)).to.contain(
+        'The lead sheet is in another key than the chart (1 sharp (G major or E minor); the chart is in C), so its range was not used.'
+      )
+    })
+
+    it('is used when it is in the chart key, a minor chart with its relative major signature too', async () => {
+      const { element } = await importerReading(async () => read({ keySignature: 1 }))
+      const minor = `{title: ${unique('Minor')}}\n{key: Em}\n\n[Em]Hello`
+      await element.receive({ chordproText: minor, source: 'songselect', leadSheet: leadSheet() })
+      expect(element._imports[0].chordproText).to.contain('{x_chordless_range: D4-E5}')
+    })
+
+    it('says how it was read, and where the lowest and highest notes are, to check them by', async () => {
+      const { element } = await importerReading(async () => read())
+      await element.receive({
+        chordproText: chart(unique('How')),
+        source: 'songselect',
+        leadSheet: leadSheet(),
+      })
+      const text = await said(element)
+      expect(text).to.contain('How the lead sheet was read')
+      expect(text).to.contain(
+        '3 pages and 19 staves: 312 sung notes read, and 31 instrumental notes left out.'
+      )
+      expect(text).to.contain(
+        'Key signature: no sharps or flats (C major or A minor). The chart is in C.'
+      )
+      expect(text).to.contain('Lowest note D4: page 2, staff 3 from the top.')
+      expect(text).to.contain('Highest note E5: page 1, staff 2 from the top.')
+    })
+
+    it('says how it was read in the singular, and when it is in another key', async () => {
+      const { element } = await importerReading(async () =>
+        read({ pages: 1, staves: 1, notes: 1, instrumental: 0, keySignature: -2 })
+      )
+      await element.receive({
+        chordproText: chart(unique('Singular')),
+        source: 'songselect',
+        leadSheet: leadSheet(),
+      })
+      const text = await said(element)
+      expect(text).to.contain('1 page and 1 staff: 1 sung note read.')
+      expect(text).to.not.contain('left out')
+      expect(text).to.contain('Key signature: 2 flats (Bb major or G minor).')
+    })
+
     it('says so when a SongSelect song came with no lead sheet, and nothing for a song with none to expect', async () => {
       const element = await importer()
       await element.receive({
@@ -127,7 +191,7 @@ describe('song-import: corners', () => {
     it('shows the range beside the comparison when the song is already in the library', async () => {
       const title = unique('Already here')
       await createSong(chart(title))
-      const { element } = await importerReading(async () => D4_TO_E5)
+      const { element } = await importerReading(async () => read())
       await element.receive({
         chordproText: chart(title, '[C]Hello [F]there'),
         source: 'songselect',
@@ -157,7 +221,7 @@ describe('song-import: corners', () => {
     })
 
     it('is not read when there is no key to put its notes in, or the chart has a range', async () => {
-      const { element, reads } = await importerReading(async () => D4_TO_E5)
+      const { element, reads } = await importerReading(async () => read())
       const noKey = `{title: ${unique('No key')}}\n\n[C]Hello`
       await element.receive({ chordproText: noKey, source: 'songselect', leadSheet: leadSheet() })
       expect(element._imports[0].chordproText).to.equal(noKey)
@@ -168,7 +232,7 @@ describe('song-import: corners', () => {
     })
 
     it('is not read when it is not a PDF in a buffer, or is far too big', async () => {
-      const { element, reads } = await importerReading(async () => D4_TO_E5)
+      const { element, reads } = await importerReading(async () => read())
       for (const sent of ['%PDF', { byteLength: 5 }, new ArrayBuffer(9 * 1024 * 1024)]) {
         const text = chart(unique('Not a lead sheet'))
         await element.receive({ chordproText: text, source: 'songselect', leadSheet: sent })
@@ -184,7 +248,7 @@ describe('song-import: corners', () => {
     })
 
     it('comes from the bookmarklet in its message', async () => {
-      const { element, reads } = await importerReading(async () => D4_TO_E5)
+      const { element, reads } = await importerReading(async () => read())
       const title = unique('From the bookmarklet')
       message({
         type: 'CHORDLESS_IMPORT',

@@ -26,7 +26,7 @@ function parseNote(name: string): number {
 const FLAT_KEY = /^(?:[A-G]b|F)m?$|^(?:Dm|Gm|Cm)$/
 
 /** A note's name in a key, with its octave: 'F#5' in G, 'Eb5' in Bb */
-function noteName(midi: number, key: string): string {
+export function noteName(midi: number, key: string): string {
   const pitchClass = ((midi % 12) + 12) % 12
   const name = transposeNote('C', pitchClass, FLAT_KEY.test(key), key) as string
   // B is Cb in a very flat key, and that is an octave up in the number
@@ -46,6 +46,68 @@ export function rangeOfChart(chordpro: string): NoteRange | null {
   const low = parseNote(notes[1])
   const high = parseNote(notes[2])
   return low <= high ? { low, high } : null
+}
+
+/** The major key, and its relative minor, of each key signature from seven flats to seven sharps */
+const MAJOR_OF_SIGNATURE = [
+  'Cb',
+  'Gb',
+  'Db',
+  'Ab',
+  'Eb',
+  'Bb',
+  'F',
+  'C',
+  'G',
+  'D',
+  'A',
+  'E',
+  'B',
+  'F#',
+  'C#',
+]
+const MINOR_OF_SIGNATURE = [
+  'Ab',
+  'Eb',
+  'Bb',
+  'F',
+  'C',
+  'G',
+  'D',
+  'A',
+  'E',
+  'B',
+  'F#',
+  'C#',
+  'G#',
+  'D#',
+  'A#',
+]
+
+/** A key signature in words: '1 sharp (G major or E minor)' */
+export function describeSignature(signature: number): string {
+  const count = Math.abs(signature)
+  const accidentals =
+    signature === 0
+      ? 'no sharps or flats'
+      : `${count} ${signature > 0 ? 'sharp' : 'flat'}${count > 1 ? 's' : ''}`
+  const at = Math.max(-7, Math.min(7, signature)) + 7
+  return `${accidentals} (${MAJOR_OF_SIGNATURE[at]} major or ${MINOR_OF_SIGNATURE[at]} minor)`
+}
+
+/**
+ * Whether a key signature (sharps positive, flats negative) is a chart's key: the major key of
+ * the signature, or the minor of the same, by pitch, so D flat and C sharp are the same. A key
+ * that is not one to be read (no way to tell) is taken to match.
+ */
+export function signatureMatchesKey(signature: number, key: string): boolean {
+  const [, letter, accidental, minor] = /^([A-G])([#b♯♭]?)(m|min|minor)?$/.exec(key.trim()) ?? []
+  if (!letter) return true
+  const shift = accidental === '#' || accidental === '♯' ? 1 : accidental ? -1 : 0
+  // the major key a minor one shares its signature with is a minor third up
+  const tonic = SEMITONES[letter] + shift + (minor ? 3 : 0)
+  const wanted = (((7 * signature) % 12) + 12) % 12
+  return ((tonic % 12) + 12) % 12 === wanted
 }
 
 /**
