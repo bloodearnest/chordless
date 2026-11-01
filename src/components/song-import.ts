@@ -415,6 +415,13 @@ export class SongImport extends LitElement {
       display: inline;
     }
 
+    /* what came of an import that had nothing to do: the result, so as big as the title */
+    .already {
+      margin: -0.75rem 0 1.25rem;
+      font-size: var(--font-ui);
+      font-weight: 700;
+    }
+
     .bookmarklet-wait {
       display: flex;
       flex-direction: column;
@@ -907,7 +914,7 @@ export class SongImport extends LitElement {
   /** A song already in the library, and the same chart: nothing is asked, so it says so */
   _renderAlreadyThere(item: ImportItem) {
     return item.isDuplicate && item.comparison?.verdict === 'identical'
-      ? html`<p class="range already">Already in your library, and the same chart: nothing was changed.</p>`
+      ? html`<p class="already">An identical version of this song is already in your library, nothing to import.</p>`
       : ''
   }
 
@@ -1200,7 +1207,7 @@ export class SongImport extends LitElement {
       <ol class="songs">
         ${this._imports.map(
           item =>
-            html`<li>${item.song.title} <span class="subtitle">${item.isDuplicate ? (item.comparison?.verdict === 'identical' ? 'already in library, the same chart' : (item.choice && status[item.choice]) || 'already in library') : 'new'}</span>${this._renderRange(item)}</li>`
+            html`<li>${item.song.title} <span class="subtitle">${item.isDuplicate ? (item.comparison?.verdict === 'identical' ? 'identical version already in library' : (item.choice && status[item.choice]) || 'already in library') : 'new'}</span>${this._renderRange(item)}</li>`
         )}
       </ol>
     `
@@ -1409,6 +1416,9 @@ export class SongImport extends LitElement {
   }
 
   _renderChoices() {
+    // (songs are saved when they arrive, and the button only goes to them: with every song already
+    // in the library as it is, there is nothing for it to keep)
+    const nothingToKeep = this._imports.every(item => item.comparison?.verdict === 'identical')
     return html`
       <div class="choices">
         ${
@@ -1443,13 +1453,19 @@ export class SongImport extends LitElement {
             </span>
           </span>
         </button>
-        <button class="choice library-only" @click=${this._libraryOnly}>
-          <span class="icon">💾</span>
-          <span class="content">
-            <span class="title">Save to Library Only</span>
-            <span class="subtitle">Don't add to any setlist</span>
-          </span>
-        </button>
+        ${
+          nothingToKeep
+            ? ''
+            : html`
+              <button class="choice library-only" @click=${this._libraryOnly}>
+                <span class="icon">💾</span>
+                <span class="content">
+                  <span class="title">Save to Library Only</span>
+                  <span class="subtitle">Don't add to any setlist</span>
+                </span>
+              </button>
+            `
+        }
       </div>
     `
   }
