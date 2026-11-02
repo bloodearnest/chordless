@@ -154,17 +154,17 @@ describe('key-selector', () => {
       expect(optionOf('G')?.getAttribute('aria-label')).to.equal('G, high')
     })
 
-    it('marks the key in use on the button, and says so in its label', async () => {
+    it('keeps the key in use plain on the button: the fit is for choosing a key, then out of the way', async () => {
       await withRange(D4_TO_E5)
       const button = selector.shadowRoot.querySelector('.picker-button')
-      const badge = must(button.querySelector('.range-badge'))
-      expect(badge.getAttribute('data-direction')).to.equal('high')
-      expect(badge.classList.contains('tone-yellow')).to.equal(true)
-      expect(button.getAttribute('aria-label')).to.equal('Key: G, high')
-
+      expect(button.querySelector('.range-badge')).to.equal(null)
+      expect(button.getAttribute('aria-label')).to.equal('Key: G')
+      // (the key in use is still marked in the list of keys, where it is looked at)
+      expect(noteOf('G')).to.exist
       selector.value = 'E'
       await selector.updateComplete
-      expect(button.getAttribute('aria-label')).to.equal('Key: E, in range')
+      expect(button.querySelector('.range-badge')).to.equal(null)
+      expect(button.getAttribute('aria-label')).to.equal('Key: E')
     })
 
     it('names both ends when both are out of range', async () => {
@@ -191,14 +191,6 @@ describe('key-selector', () => {
       ).to.equal('Key: G')
       await withRange(D4_TO_E5, '')
       expect(selector.shadowRoot.querySelector('.range-badge')).to.equal(null)
-    })
-
-    it('shows nothing for the current key when it is not among the keys', async () => {
-      await withRange(D4_TO_E5)
-      selector.value = '-'
-      selector.keys = []
-      await selector.updateComplete
-      expect(selector.shadowRoot.querySelector('.picker-button .range-badge')).to.equal(null)
     })
 
     it('does not hide a red key: choosing it still works', async () => {

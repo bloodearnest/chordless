@@ -11,7 +11,6 @@ import {
   rangeOfMetadata,
   rangeSpan,
   semitonesBetween,
-  shiftRange,
   signatureMatchesKey,
   withRange,
 } from '../src/js/chart-range.ts'
@@ -177,16 +176,8 @@ describe('chart-range', () => {
     expect(rangeSpan(range('C4', 'C5'), 'C')).to.deep.equal({ notes: 8, semitones: 12 })
     expect(rangeSpan(range('Bb3', 'Eb5'), 'Bb')).to.deep.equal({ notes: 11, semitones: 17 })
     expect(rangeSpan(range('G4', 'G4'), 'G')).to.deep.equal({ notes: 1, semitones: 0 })
-    // (the notes are those of the key: the same range moved is as wide)
-    expect(rangeSpan(shiftRange(range('D4', 'E5'), 2), 'A')).to.deep.equal({
-      notes: 9,
-      semitones: 14,
-    })
-  })
-
-  it('moves a range by semitones', () => {
-    expect(shiftRange(range('D4', 'E5'), 2)).to.deep.equal(range('E4', 'F#5'))
-    expect(shiftRange(range('D4', 'E5'), -3)).to.deep.equal(range('B3', 'C#5'))
+    // (counted by the notes of the key: the same range a tone up, in the key a tone up, is as wide)
+    expect(rangeSpan(range('E4', 'F#5'), 'A')).to.deep.equal({ notes: 9, semitones: 14 })
   })
 
   it('keeps Windows line endings', () => {

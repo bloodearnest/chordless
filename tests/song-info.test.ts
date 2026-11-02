@@ -63,18 +63,17 @@ describe('song-info', () => {
       expect(shown).to.not.contain('F#5 in')
     })
 
-    it('shows it in the key the library has the song in, when that is another', async () => {
-      const info = await show({ song: ranged({ key: 'A' }) })
-      const shown = text(info)
+    it('is the same whatever key the library has the song in, as the range is the song’s own', async () => {
+      const shown = text(await show({ song: ranged({ key: 'A' }) }))
       expect(shown).to.contain('D4–E5 in G')
-      expect(shown).to.contain('E4–F#5 in A')
-      expect(shown).to.contain('too high')
-      expect(badges(info)).to.have.length(2)
+      expect(shown).to.not.contain('E4')
+      expect(shown).to.not.contain('in A')
+      expect(shown).to.equal(text(await show({ song: ranged({ key: 'G' }) })))
     })
 
-    it('says in words when the song fits', async () => {
-      const info = await show({ song: ranged({ key: 'E' }) })
-      expect(text(info)).to.contain('B3–C#5 in E')
+    it('says in words when the song fits as written', async () => {
+      const info = await show({ song: ranged({}, { x_chordless_range: 'D4-C5' }) })
+      expect(text(info)).to.contain('D4–C5 in G')
       expect(text(info)).to.contain('in range')
     })
 

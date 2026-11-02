@@ -37,10 +37,15 @@ test.describe('Song library', () => {
     await header.getByRole('button', { name: 'Toggle edit mode' }).click()
 
     const keySelector = page.locator('#library-key-selector')
-    // (the key in use says so on the button: E5 is the edge)
+    // (the key in use is plain on the button: the fit is for choosing a key, then out of the way)
     const button = keySelector.getByRole('button', { name: /^Key/ })
-    await expect(button).toHaveAccessibleName('Key: G, high')
+    await expect(button).toHaveAccessibleName('Key: G')
+    await expect(button.locator('.range-badge')).toHaveCount(0)
     await button.click()
+    // (E5 is the edge: the key in use is marked in the list)
+    await expect(keySelector.getByRole('option', { name: /^G\*,/ })).toHaveAccessibleName(
+      'G*, high'
+    )
     await expect(keySelector.getByRole('option', { name: /^A\s/ })).toHaveAccessibleName(
       'A +2, too high'
     )
@@ -53,7 +58,8 @@ test.describe('Song library', () => {
 
     // (a hint, not a gate)
     await keySelector.getByRole('option', { name: /^A\s/ }).click()
-    await expect(button).toHaveAccessibleName('Key: A, too high')
+    await expect(button).toHaveAccessibleName('Key: A')
+    await expect(button.locator('.range-badge')).toHaveCount(0)
     await expect(
       page.locator('#library-song-content song-section chord-display').first()
     ).toHaveText('A')
