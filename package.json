@@ -31,13 +31,13 @@
     "lit": "^3.3.3",
     "minisearch": "^7.2.0",
     "oauth4webapi": "^3.8.8",
-    "postal-mime": "^4.0.11",
+    "postal-mime": "^4.1.4",
     "qrcode-generator": "^2.0.4",
     "stemmer": "^2.0.1",
     "unpdf": "^1.9.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.15",
+    "@biomejs/biome": "^2.6.3",
     "@cloudflare/vite-plugin": "^1.66.0",
     "@open-wc/testing": "^5.0.0",
     "@playwright/test": "^1.64.0",
@@ -48,10 +48,10 @@
     "@web/test-runner": "^1.0.0",
     "@web/test-runner-commands": "^1.0.1",
     "@web/test-runner-playwright": "^1.0.0",
-    "knip": "^6.42.1",
+    "knip": "^6.43.0",
     "semver": "^7.8.5",
     "typescript": "^7.0.2",
-    "vite": "^8.3.4",
+    "vite": "^8.3.5",
     "wrangler": "^4.154.0"
   },
   "keywords": [],
