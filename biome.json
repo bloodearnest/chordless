@@ -21,8 +21,7 @@
       "!**/*.html",
       "!**/*.css",
       "!**/*.svg",
-      "!**/*.md",
-      "!**/*.yml"
+      "!**/*.md"
     ]
   },
   "formatter": {
@@ -123,6 +122,11 @@
       "quoteStyle": "single",
       "attributePosition": "auto",
       "bracketSpacing": true
+    }
+  },
+  "yaml": {
+    "formatter": {
+      "bracketSpacing": false
     }
   },
   "html": {
