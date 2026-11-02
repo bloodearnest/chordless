@@ -701,7 +701,8 @@ export class SongImport extends LitElement {
         .filter(Boolean)
         .map(title => normalizeTitle(title as string))
       const about = (song: IncomingSong) => {
-        const meta = parser.parse(song.chordproText ?? '').metadata
+        // (it is only asked of songs that have a chart)
+        const meta = parser.parse(song.chordproText as string).metadata
         return { ccli: meta.ccliSongNumber || meta.ccli, title: meta.title ?? '' }
       }
       const open = songs.filter(song => song.chordproText && !song.leadSheet)

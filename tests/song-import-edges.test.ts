@@ -373,8 +373,11 @@ describe('song-import: corners', () => {
           { SHEET: `${title}\n(based on the recording by Someone)` },
           { SHEET: { low: 62, high: 76 } }
         )
-        await element.importFiles([cho(title), pdf(`${title}-lead-G.pdf`, 'SHEET')])
-        expect(rangeIn(element, 0)).to.equal('D4-E5')
+        // (a chart with no title of its own is not this song)
+        const untitled = new File(['{key: C}\n[C]No title'], 'untitled.chordpro')
+        await element.importFiles([untitled, cho(title), pdf(`${title}-lead-G.pdf`, 'SHEET')])
+        expect(rangeIn(element, 0)).to.equal(undefined)
+        expect(rangeIn(element, 1)).to.equal('D4-E5')
         const named = await importerForSheets({}, { NAMED: { low: 62, high: 76 } })
         const other = unique('By name')
         await named.importFiles([cho(other), pdf(`${other}.pdf`, 'NAMED')])
