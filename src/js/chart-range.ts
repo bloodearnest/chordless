@@ -34,6 +34,25 @@ export function noteName(midi: number, key: string): string {
   return `${name}${Math.floor(midi / 12) - 1 + (name === 'Cb' ? 1 : 0)}`
 }
 
+/**
+ * How wide a range is, in the scale tones it covers (D4 to E5 is nine: a 9th, counting the notes
+ * of the scale in between) and in semitones (fourteen). The notes are counted by their names in
+ * the key, so a flat or a sharp does not change them. A leader asks how many notes a song asks of
+ * a singer, and that does not change with the key; the semitones are there for being exact.
+ */
+export function rangeSpan(range: NoteRange, key: string): { notes: number; semitones: number } {
+  const place = (midi: number) => {
+    const [, letter, octave] = /^([A-G])[#b]?(\d)$/.exec(noteName(midi, key)) as RegExpExecArray
+    return Number(octave) * 7 + 'CDEFGAB'.indexOf(letter)
+  }
+  return { notes: place(range.high) - place(range.low) + 1, semitones: range.high - range.low }
+}
+
+/** A range moved by some semitones (a song transposed, the range with it) */
+export function shiftRange(range: NoteRange, semitones: number): NoteRange {
+  return { low: range.low + semitones, high: range.high + semitones }
+}
+
 /** The range as the directive says it, 'D4-E5', in a key */
 export function formatRange(range: NoteRange, key: string): string {
   return `${noteName(range.low, key)}-${noteName(range.high, key)}`

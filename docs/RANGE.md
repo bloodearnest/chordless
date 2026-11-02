@@ -69,6 +69,17 @@ words). A song with no range, or no key to measure it from, shows the picker as 
   edit mode. Each key's distance shown is from the key in use, as it always was; the range is
   measured from the key the chart is written in, going the near way round.
 
+## In the song info
+
+The song's info dialog has a "Melody Range" item under its key: the lowest and highest note in the
+chart's key ("D4–E5 in G") with its fit (the badge and its words, as the picker has them), again in
+the key the library has the song in when that is another ("E4–F#5 in A"), and how wide it is: **"9
+notes wide (14 semitones)"**. Width is counted in the scale tones the range covers (D4 to E5 is
+nine, a 9th), by the notes' names in the key, so it does not change with the key. It is what a
+leader asks (how many notes does this ask of a singer?), where semitones, which are kept for being
+exact, are not how singers think, and octaves are too coarse (nearly every song is an octave to an
+octave and a half). The notes are written pitch: men sing the melody an octave down.
+
 ## Getting a range from a lead sheet
 
 `src/js/melody-range.ts`, `readMelodyRange(pdf)`: the notes of a SongSelect lead sheet are drawn
