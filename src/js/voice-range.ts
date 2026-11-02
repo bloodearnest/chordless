@@ -39,6 +39,29 @@ export interface RangeCheck {
 
 const ORDER: RangeStatus[] = ['green', 'yellow', 'red']
 
+/** A status for a person to read: a mark, and words, as well as the colour (which is never all of it) */
+export interface RangeNote {
+  tone: RangeStatus
+  mark: string
+  /** What is out of range ('too high, low'): none when all is well */
+  words: string
+}
+
+const MARKS: Record<RangeStatus, string> = { green: '✓', yellow: '!', red: '✕' }
+
+/** A check in words: 'too high' for an end that is red, 'high' for one that is yellow */
+export function describeRange(check: RangeCheck): RangeNote {
+  const ends = [
+    ['high', check.high],
+    ['low', check.low],
+  ] as const
+  const words = ends
+    .filter(([, status]) => status !== 'green')
+    .map(([end, status]) => `${status === 'red' ? 'too ' : ''}${end}`)
+    .join(', ')
+  return { tone: check.status, mark: MARKS[check.status], words }
+}
+
 /**
  * How the melody fares if the song is moved by `semitones` (up is positive): the chart's own key
  * is 0, and each key in the picker is its offset from the key the range was written in.

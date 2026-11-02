@@ -4,6 +4,7 @@
  * programs ignore it. The notes are in the chart's own `{key:}`, and are names with an octave
  * (middle C is C4), spelled the way the key spells them.
  */
+import type { ChartMetadata } from './data-types.ts'
 import { keyOfChart } from './library-repair.ts'
 import { getKeyOffset, transposeNote } from './transpose.ts'
 import type { NoteRange } from './voice-range.ts'
@@ -40,12 +41,21 @@ export function formatRange(range: NoteRange, key: string): string {
 
 /** The range a chart says (in the chart's own key), or null if it says none or it is not one */
 export function rangeOfChart(chordpro: string): NoteRange | null {
-  const match = DIRECTIVE.exec(chordpro)
-  const notes = RANGE.exec(match?.[1] ?? '')
+  return parseRange(DIRECTIVE.exec(chordpro)?.[1] ?? '')
+}
+
+/** The range a directive's value says ('D4-E5'), or null if it is not one */
+export function parseRange(value: string): NoteRange | null {
+  const notes = RANGE.exec(value)
   if (!notes) return null
   const low = parseNote(notes[1])
   const high = parseNote(notes[2])
   return low <= high ? { low, high } : null
+}
+
+/** The range in a parsed chart's metadata, where its directives are (in the chart's own key) */
+export function rangeOfMetadata(metadata: ChartMetadata | undefined): NoteRange | null {
+  return parseRange(String(metadata?.x_chordless_range ?? ''))
 }
 
 /** The major key, and its relative minor, of each key signature from seven flats to seven sharps */
@@ -115,7 +125,7 @@ export function signatureMatchesKey(signature: number, key: string): boolean {
  * G to A is up two, and B to C up one, not down eleven. A melody moved the long way would be an
  * octave out.
  */
-function nearestOffset(from: string, to: string): number {
+export function semitonesBetween(from: string, to: string): number {
   return ((((getKeyOffset(from, to) + 6) % 12) + 12) % 12) - 6
 }
 
@@ -127,7 +137,7 @@ function nearestOffset(from: string, to: string): number {
 export function withRange(chordpro: string, range: NoteRange, rangeKey: string): string {
   const chartKey = keyOfChart(chordpro)
   const key = chartKey ?? rangeKey
-  const shift = chartKey && chartKey !== rangeKey ? nearestOffset(rangeKey, chartKey) : 0
+  const shift = chartKey && chartKey !== rangeKey ? semitonesBetween(rangeKey, chartKey) : 0
   const written = formatRange({ low: range.low + shift, high: range.high + shift }, key)
 
   const eol = chordpro.includes('\r\n') ? '\r\n' : '\n'

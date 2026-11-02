@@ -90,11 +90,14 @@ export async function waitForServiceWorker(page) {
  * Open the app (unless it is open already), so it sets up its space and database, then add a
  * test song (Info Test Song, in G: [G]Amazing [C]grace), and optionally a setlist containing it.
  */
-export async function seedSong(page, { setlistId = null }: { setlistId?: string | null } = {}) {
+export async function seedSong(
+  page,
+  { setlistId = null, range = null }: { setlistId?: string | null; range?: string | null } = {}
+) {
   if (!(await appIsOpen(page))) await openApp(page, '/songs')
   const chordpro = {
     id: 'chordpro-info-test',
-    content: '{title: Info Test Song}\n{key: G}\n\n[G]Amazing [C]grace',
+    content: `{title: Info Test Song}\n{key: G}\n${range ? `{x_chordless_range: ${range}}\n` : ''}\n[G]Amazing [C]grace`,
     contentHash: 'test',
     lastModified: Date.now(),
   }

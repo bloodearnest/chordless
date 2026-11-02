@@ -7,11 +7,13 @@
  * navigates there, and the view shows what the route says. Uses song-view-manager
  * for rendering, and the LibrarySong model for saving.
  */
+
 import { Task } from '@lit/task'
 import type { PropertyValues } from 'lit'
 import { html, nothing } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import type { AppHeader } from '../../components/app-header.ts'
+import { rangeOfMetadata } from '../chart-range.ts'
 import '../../components/app-header.ts'
 import type { AppModal } from '../../components/app-modal.ts'
 import '../../components/app-modal.ts'
@@ -386,6 +388,9 @@ export class LibraryView extends PageView {
     keySelector.value = selectedKey
     keySelector.keys = getAvailableKeys(selectedKey)
     keySelector.originalKey = (this.#song?.originalKey || this.#parsed?.metadata?.key) as string
+    // (the melody's range is in the chart's own key)
+    keySelector.range = rangeOfMetadata(this.#parsed?.metadata)
+    keySelector.rangeKey = this.#parsed?.metadata?.key ?? ''
     // The key is saved with the song, which a user who can only read can't change
     keySelector.editMode = this.#editMode
   }

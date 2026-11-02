@@ -117,6 +117,36 @@ describe('song-card', () => {
       expect(must(none.shadowRoot?.querySelector<KeySelector>('key-selector')).value).to.equal('-')
     })
 
+    it('gives the key picker the melody range the chart says, and the key it is written in', async () => {
+      const parsed = new ChordProParser().parse(
+        '{title: Washed}\n{key: G}\n{x_chordless_range: D4-E5}\n[G]Washed'
+      )
+      const card = await show({
+        song: song({ currentKey: 'A', originalKey: 'G', parsed }),
+        editMode: true,
+      })
+      const picker = must(card.shadowRoot?.querySelector<KeySelector>('key-selector'))
+      expect(picker.range).to.deep.equal({ low: 62, high: 76 })
+      expect(picker.rangeKey).to.equal('G')
+      await picker.updateComplete
+      // (the song is two up from the chart's key, so F#5: too high)
+      expect(
+        picker.shadowRoot?.querySelector('.picker-button')?.getAttribute('aria-label')
+      ).to.equal('Key: A, too high')
+    })
+
+    it('has no range for the key picker when the chart says none, and takes the key from the chart if need be', async () => {
+      const bare = new ChordProParser().parse('{title: Bare}\n{key: D}\n[D]Bare')
+      const card = await show({ song: song({ currentKey: 'E', parsed: bare }), editMode: true })
+      const picker = must(card.shadowRoot?.querySelector<KeySelector>('key-selector'))
+      expect(picker.range).to.equal(null)
+      expect(picker.rangeKey).to.equal('D')
+      const none = await show({ song: song({ currentKey: 'E' }), editMode: true })
+      expect(must(none.shadowRoot?.querySelector<KeySelector>('key-selector')).rangeKey).to.equal(
+        ''
+      )
+    })
+
     it('does not let the key button be pressed outside edit mode, so a tap goes to the card', async () => {
       const card = await show({ song: song({ currentKey: 'E' }) })
       const picker = must(card.shadowRoot?.querySelector<KeySelector>('key-selector'))

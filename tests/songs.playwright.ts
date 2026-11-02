@@ -25,6 +25,38 @@ test.describe('Song library', () => {
     }
   })
 
+  test('the key picker marks each key by how the melody range fits it, and a red one can be chosen', async ({
+    page,
+  }) => {
+    // written in G: D4 to E5
+    await seedSong(page, { range: 'D4-E5' })
+    await page.goto('/songs/info-test-song')
+    await page.reload()
+    const header = page.locator('#library-app-header')
+    await expect(header).toContainText('Info Test Song')
+    await header.getByRole('button', { name: 'Toggle edit mode' }).click()
+
+    const keySelector = page.locator('#library-key-selector')
+    // (the key in use says so on the button: E5 is the edge)
+    const button = keySelector.getByRole('button', { name: /^Key/ })
+    await expect(button).toHaveAccessibleName('Key: G, high')
+    await button.click()
+    await expect(keySelector.getByRole('option', { name: /^A\s/ })).toHaveAccessibleName(
+      'A +2, too high'
+    )
+    await expect(keySelector.getByRole('option', { name: /^E\s/ })).toHaveAccessibleName(
+      'E -3, in range'
+    )
+    await expect(keySelector.getByRole('option', { name: /^A\s/ })).toContainText('too high')
+
+    // (a hint, not a gate)
+    await keySelector.getByRole('option', { name: /^A\s/ }).click()
+    await expect(button).toHaveAccessibleName('Key: A, too high')
+    await expect(
+      page.locator('#library-song-content song-section chord-display').first()
+    ).toHaveText('A')
+  })
+
   test('the reset button is there in edit mode only, and puts the song back in its key', {
     tag: '@logic',
   }, async ({ page }) => {

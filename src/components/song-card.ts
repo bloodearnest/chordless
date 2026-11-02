@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { rangeOfMetadata } from '../js/chart-range.ts'
 import type { ParsedChart } from '../js/data-types.ts'
 import { formatArtistNames } from '../js/song-utils.ts'
 import { getWeeksAgo } from '../js/utils/date-utils.ts'
@@ -583,6 +584,8 @@ export class SongCard extends LitElement {
           .value=${currentKey ?? '-'}
           .keys=${keys}
           .originalKey=${this.song?.originalKey ?? ''}
+          .range=${rangeOfMetadata(this.song?.parsed?.metadata)}
+          .rangeKey=${this.song?.originalKey ?? this.song?.parsed?.metadata?.key ?? ''}
           .editMode=${this.editMode}
           @key-selector:change=${this._handleKeyEditChange}
         ></key-selector>

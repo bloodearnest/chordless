@@ -3,7 +3,12 @@
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { type NoteRange, type RangeStatus, rangeStatus } from '../src/js/voice-range.ts'
+import {
+  describeRange,
+  type NoteRange,
+  type RangeStatus,
+  rangeStatus,
+} from '../src/js/voice-range.ts'
 
 const SEMITONES: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
 
@@ -87,4 +92,39 @@ test('a song that starts red is red in its own key and green in a lower one', ()
   assert.equal(rangeStatus(reasons).status, 'red')
   assert.equal(rangeStatus(reasons, -3).high, 'yellow')
   assert.equal(rangeStatus(reasons, -5).high, 'green')
+})
+
+test('a check is told in a mark, words and a tone, so colour is never the only sign', () => {
+  assert.deepEqual(describeRange(rangeStatus(range('D4', 'C5'))), {
+    tone: 'green',
+    mark: '✓',
+    words: '',
+  })
+  assert.deepEqual(describeRange(rangeStatus(range('D4', 'E5'))), {
+    tone: 'yellow',
+    mark: '!',
+    words: 'high',
+  })
+  assert.deepEqual(describeRange(rangeStatus(range('A#3', 'C5'))), {
+    tone: 'yellow',
+    mark: '!',
+    words: 'low',
+  })
+  assert.deepEqual(describeRange(rangeStatus(range('D4', 'F#5'))), {
+    tone: 'red',
+    mark: '✕',
+    words: 'too high',
+  })
+  assert.deepEqual(describeRange(rangeStatus(range('F#3', 'C5'))), {
+    tone: 'red',
+    mark: '✕',
+    words: 'too low',
+  })
+})
+
+test('an end that is red says too, an end that is yellow does not, and both ends are named', () => {
+  assert.equal(describeRange(rangeStatus(range('G3', 'F#5'))).words, 'too high, low')
+  assert.equal(describeRange(rangeStatus(range('F#3', 'D5'))).words, 'high, too low')
+  assert.equal(describeRange(rangeStatus(range('A#3', 'D5'))).words, 'high, low')
+  assert.equal(describeRange(rangeStatus(range('F#3', 'F#5'))).words, 'too high, too low')
 })
