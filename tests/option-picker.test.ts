@@ -27,6 +27,40 @@ class TestPicker extends OptionPicker<string> {
 }
 customElements.define('test-picker', TestPicker)
 
+/** A picker whose options carry a fit to a range, with notes or without */
+class RangedPicker extends OptionPicker<string> {
+  static override properties = { ...OptionPicker.properties, value: { type: String } }
+
+  _options(): PickerOption<string>[] {
+    const range = { tone: 'red', direction: 'high', words: 'too high' } as const
+    return [
+      { value: 'with', label: 'with', hint: '+2', range, notes: { low: 'E4', high: 'F#5' } },
+      { value: 'without', label: 'without', hint: '', range },
+    ]
+  }
+
+  _changeEvent(value: string) {
+    return new ChosenEvent(value)
+  }
+}
+customElements.define('ranged-picker', RangedPicker)
+
+describe('an option picker with the fit to a range', () => {
+  it('says an option in words, with its notes if it has them, as it shows them', async () => {
+    const picker = document.createElement('ranged-picker') as RangedPicker
+    document.body.append(picker)
+    await picker.updateComplete
+    const labelOf = (label: string) =>
+      [...(picker.shadowRoot?.querySelectorAll('.picker-option') ?? [])]
+        .find(option => option.querySelector('.option-label')?.textContent === label)
+        ?.getAttribute('aria-label')
+    expect(labelOf('with')).to.equal('with +2, E4–F#5, too high')
+    // (no hint and no notes: just the key and what is wrong)
+    expect(labelOf('without')).to.equal('without, too high')
+    picker.remove()
+  })
+})
+
 describe('the option picker', () => {
   let picker: TestPicker
   let host: HTMLElement
