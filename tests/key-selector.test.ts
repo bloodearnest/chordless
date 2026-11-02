@@ -98,23 +98,52 @@ describe('key-selector', () => {
       [...selector.shadowRoot.querySelectorAll('.picker-option')].find(
         (option: Element) => option.querySelector('.option-label')?.textContent?.trim() === key
       )
-    const noteOf = (key: string) => optionOf(key).querySelector('.range-note')
+    const noteOf = (key: string) => optionOf(key).querySelector('.range-badge')
 
-    it('marks each key with a mark, words and a tone, by how the melody fits it', async () => {
+    it('marks each key with a badge: a tone, and an icon that says which way, by how the melody fits it', async () => {
       await withRange(D4_TO_E5)
-      const cases: [string, string, string, string][] = [
-        ['A', 'tone-red', '✕', 'too high'], // F#5
-        ['G', 'tone-yellow', '!', 'high'], // E5
-        ['F', 'tone-yellow', '!', 'high'], // D5
-        ['E', 'tone-green', '✓', ''], // C#5
-        ['D', 'tone-yellow', '!', 'low'], // A3 at the bottom
+      // [key, tone, direction, triangles drawn, hover tip]
+      const cases: [string, string, string, number, string][] = [
+        ['A', 'tone-red', 'high', 2, 'too high'], // F#5: two stacked
+        ['G', 'tone-yellow', 'high', 1, 'high'], // E5
+        ['F', 'tone-yellow', 'high', 1, 'high'], // D5
+        ['E', 'tone-green', 'none', 0, 'in range'], // C#5
+        ['D', 'tone-yellow', 'low', 1, 'low'], // A3 at the bottom
       ]
-      for (const [key, tone, mark, words] of cases) {
-        const note = must(noteOf(key))
-        expect(note.classList.contains(tone), key).to.equal(true)
-        expect(must(note.querySelector('.range-mark')).textContent, key).to.equal(mark)
-        expect(note.textContent?.replace(mark, '').trim(), key).to.equal(words)
+      for (const [key, tone, direction, triangles, tip] of cases) {
+        const badge = must(noteOf(key))
+        expect(badge.classList.contains(tone), key).to.equal(true)
+        expect(badge.getAttribute('data-direction'), key).to.equal(direction)
+        expect(badge.querySelectorAll('polygon'), key).to.have.length(triangles)
+        expect(badge.getAttribute('title'), key).to.equal(tip)
+        expect(badge.getAttribute('aria-hidden'), key).to.equal('true')
       }
+      // (a tick, not a triangle, for a key that fits)
+      expect(noteOf('E')?.querySelector('path')).to.exist
+    })
+
+    it('draws an up and a down triangle when both ends are out', async () => {
+      await withRange({ low: 55, high: 78 })
+      expect(noteOf('G')?.getAttribute('data-direction')).to.equal('both')
+      expect(noteOf('G')?.querySelectorAll('polygon')).to.have.length(2)
+    })
+
+    it('stacks two triangles down for a bottom that is too low, as two up for a top too high', async () => {
+      // F#3 to C5 in G: the bottom is red, the top fits
+      await withRange({ low: 54, high: 72 })
+      const badge = must(noteOf('G'))
+      expect(badge.classList.contains('tone-red')).to.equal(true)
+      expect(badge.getAttribute('data-direction')).to.equal('low')
+      expect(badge.querySelectorAll('polygon')).to.have.length(2)
+    })
+
+    it('draws every badge the same size, whatever it says', async () => {
+      await withRange(D4_TO_E5)
+      const sizes = ['A', 'G', 'E', 'D'].map(key => {
+        const box = must(noteOf(key)).getBoundingClientRect()
+        return `${Math.round(box.width)}x${Math.round(box.height)}`
+      })
+      expect(new Set(sizes).size).to.equal(1)
     })
 
     it('says it for a screen reader, with the key and its distance, and "in range" for a green one', async () => {
@@ -128,9 +157,9 @@ describe('key-selector', () => {
     it('marks the key in use on the button, and says so in its label', async () => {
       await withRange(D4_TO_E5)
       const button = selector.shadowRoot.querySelector('.picker-button')
-      const mark = must(button.querySelector('.range-mark'))
-      expect(mark.textContent).to.equal('!')
-      expect(mark.classList.contains('tone-yellow')).to.equal(true)
+      const badge = must(button.querySelector('.range-badge'))
+      expect(badge.getAttribute('data-direction')).to.equal('high')
+      expect(badge.classList.contains('tone-yellow')).to.equal(true)
       expect(button.getAttribute('aria-label')).to.equal('Key: G, high')
 
       selector.value = 'E'
@@ -141,7 +170,7 @@ describe('key-selector', () => {
     it('names both ends when both are out of range', async () => {
       // G3 to F#5 in G: the top is red, the bottom is the edge
       await withRange({ low: 55, high: 78 })
-      expect(noteOf('G')?.textContent).to.contain('too high, low')
+      expect(noteOf('G')?.getAttribute('title')).to.equal('too high, low')
     })
 
     it('measures from the key the range is written in, not from the key in use', async () => {
@@ -155,14 +184,13 @@ describe('key-selector', () => {
 
     it('shows nothing when there is no range, or no key it is written in', async () => {
       await withRange(null)
-      expect(selector.shadowRoot.querySelector('.range-note')).to.equal(null)
-      expect(selector.shadowRoot.querySelector('.range-mark')).to.equal(null)
+      expect(selector.shadowRoot.querySelector('.range-badge')).to.equal(null)
       expect(optionOf('A').hasAttribute('aria-label')).to.equal(false)
       expect(
         selector.shadowRoot.querySelector('.picker-button').getAttribute('aria-label')
       ).to.equal('Key: G')
       await withRange(D4_TO_E5, '')
-      expect(selector.shadowRoot.querySelector('.range-note')).to.equal(null)
+      expect(selector.shadowRoot.querySelector('.range-badge')).to.equal(null)
     })
 
     it('shows nothing for the current key when it is not among the keys', async () => {
@@ -170,7 +198,7 @@ describe('key-selector', () => {
       selector.value = '-'
       selector.keys = []
       await selector.updateComplete
-      expect(selector.shadowRoot.querySelector('.picker-button .range-mark')).to.equal(null)
+      expect(selector.shadowRoot.querySelector('.picker-button .range-badge')).to.equal(null)
     })
 
     it('does not hide a red key: choosing it still works', async () => {

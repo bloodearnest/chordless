@@ -39,15 +39,14 @@ export interface RangeCheck {
 
 const ORDER: RangeStatus[] = ['green', 'yellow', 'red']
 
-/** A status for a person to read: a mark, and words, as well as the colour (which is never all of it) */
+/** A status for a person to read: which way it is out, and words, as well as the colour (which is never all of it) */
 export interface RangeNote {
   tone: RangeStatus
-  mark: string
+  /** Which end is out of range: none when all is well */
+  direction: 'none' | 'high' | 'low' | 'both'
   /** What is out of range ('too high, low'): none when all is well */
   words: string
 }
-
-const MARKS: Record<RangeStatus, string> = { green: '✓', yellow: '!', red: '✕' }
 
 /** A check in words: 'too high' for an end that is red, 'high' for one that is yellow */
 export function describeRange(check: RangeCheck): RangeNote {
@@ -59,7 +58,10 @@ export function describeRange(check: RangeCheck): RangeNote {
     .filter(([, status]) => status !== 'green')
     .map(([end, status]) => `${status === 'red' ? 'too ' : ''}${end}`)
     .join(', ')
-  return { tone: check.status, mark: MARKS[check.status], words }
+  const high = check.high !== 'green'
+  const low = check.low !== 'green'
+  const direction = high && low ? 'both' : high ? 'high' : low ? 'low' : 'none'
+  return { tone: check.status, direction, words }
 }
 
 /**

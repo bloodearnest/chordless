@@ -94,31 +94,36 @@ test('a song that starts red is red in its own key and green in a lower one', ()
   assert.equal(rangeStatus(reasons, -5).high, 'green')
 })
 
-test('a check is told in a mark, words and a tone, so colour is never the only sign', () => {
+test('a check is told in a tone, a direction and words, so colour is never the only sign', () => {
   assert.deepEqual(describeRange(rangeStatus(range('D4', 'C5'))), {
     tone: 'green',
-    mark: '✓',
+    direction: 'none',
     words: '',
   })
   assert.deepEqual(describeRange(rangeStatus(range('D4', 'E5'))), {
     tone: 'yellow',
-    mark: '!',
+    direction: 'high',
     words: 'high',
   })
   assert.deepEqual(describeRange(rangeStatus(range('A#3', 'C5'))), {
     tone: 'yellow',
-    mark: '!',
+    direction: 'low',
     words: 'low',
   })
   assert.deepEqual(describeRange(rangeStatus(range('D4', 'F#5'))), {
     tone: 'red',
-    mark: '✕',
+    direction: 'high',
     words: 'too high',
   })
   assert.deepEqual(describeRange(rangeStatus(range('F#3', 'C5'))), {
     tone: 'red',
-    mark: '✕',
+    direction: 'low',
     words: 'too low',
+  })
+  assert.deepEqual(describeRange(rangeStatus(range('G3', 'F#5'))), {
+    tone: 'red',
+    direction: 'both',
+    words: 'too high, low',
   })
 })
 
