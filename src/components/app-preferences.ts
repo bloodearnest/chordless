@@ -5,6 +5,7 @@ import {
   getKeepAwakeMinutes,
   getKeepAwakePreference,
   getMusicianType,
+  getNotesPreference,
   getTelemetryPreference,
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
@@ -16,6 +17,7 @@ import {
   setKeepAwakeMinutes,
   setKeepAwakePreference,
   setMusicianType,
+  setNotesPreference,
   setTelemetryPreference,
   setUseNashvilleNumbers,
   setUseUnicodeAccidentals,
@@ -41,6 +43,8 @@ export class AppPreferences extends LitElement {
     useUnicodeAccidentals: { type: Boolean, attribute: false },
     musicianType: { type: String, attribute: false },
     capoEnabled: { type: Boolean, attribute: false },
+    sharedNotes: { type: Boolean, attribute: false },
+    myNotes: { type: Boolean, attribute: false },
     keepAwake: { type: Boolean, attribute: false },
     keepAwakeMinutes: { type: Number, attribute: false },
     telemetry: { type: Boolean, attribute: false },
@@ -51,6 +55,8 @@ export class AppPreferences extends LitElement {
   declare useUnicodeAccidentals: boolean
   declare musicianType: MusicianType
   declare capoEnabled: boolean
+  declare sharedNotes: boolean
+  declare myNotes: boolean
   declare keepAwake: boolean
   declare keepAwakeMinutes: number
   declare telemetry: boolean
@@ -156,6 +162,8 @@ export class AppPreferences extends LitElement {
     this.useUnicodeAccidentals = getUseUnicodeAccidentals()
     this.musicianType = getMusicianType()
     this.capoEnabled = getCapoPreference()
+    this.sharedNotes = getNotesPreference().shared
+    this.myNotes = getNotesPreference().mine
     this.keepAwake = getKeepAwakePreference()
     this.keepAwakeMinutes = getKeepAwakeMinutes()
     this.telemetry = getTelemetryPreference()
@@ -386,6 +394,31 @@ export class AppPreferences extends LitElement {
         </div>
 
         <div class="panel">
+          <h3>Notes</h3>
+          <p>Show the handwritten notes on a chart. Notes are made in edit mode.</p>
+          <label class="toggle" for="toggle-shared-notes">
+            <input
+              type="checkbox"
+              id="toggle-shared-notes"
+              name="show-shared-notes"
+              ?checked=${this.sharedNotes}
+              @change=${this._onSharedNotesToggle}
+            />
+            <span>Show notes shared with the team</span>
+          </label>
+          <label class="toggle" for="toggle-my-notes">
+            <input
+              type="checkbox"
+              id="toggle-my-notes"
+              name="show-my-notes"
+              ?checked=${this.myNotes}
+              @change=${this._onMyNotesToggle}
+            />
+            <span>Show my own notes</span>
+          </label>
+        </div>
+
+        <div class="panel">
           <h3>Usage reports</h3>
           <p>
             Chordless sends anonymous reports of how it runs (how long a sync took, what failed) so
@@ -531,6 +564,16 @@ export class AppPreferences extends LitElement {
     const minutes = Number((event.currentTarget as HTMLSelectElement).value)
     this.keepAwakeMinutes = minutes
     setKeepAwakeMinutes(minutes)
+  }
+
+  _onSharedNotesToggle(event: Event): void {
+    this.sharedNotes = (event.currentTarget as HTMLInputElement).checked
+    setNotesPreference('shared', this.sharedNotes)
+  }
+
+  _onMyNotesToggle(event: Event): void {
+    this.myNotes = (event.currentTarget as HTMLInputElement).checked
+    setNotesPreference('mine', this.myNotes)
   }
 
   _onCapoToggle(event: Event): void {

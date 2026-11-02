@@ -51,6 +51,29 @@ export function textAnchor(sections: ChartSection[], section: number, line: numb
   }
 }
 
+/**
+ * The nearest place in a line a note can sensibly start, to an approximate offset: the start of a
+ * word, or of a segment (where a chord is). Offsets worked out from lyrics as drawn (with the
+ * chords hidden, hyphens and spaces are folded) can be a few characters off the chart's own.
+ */
+export function snapOffset(section: ChartSection, line: number, approx: number): number {
+  const text = lineLyrics(section, line)
+  const starts = new Set<number>([0])
+  let at = 0
+  for (const segment of section.lines[line]?.segments ?? []) {
+    starts.add(at)
+    at += segment.lyrics.length
+  }
+  for (let i = 1; i < text.length; i++) {
+    if (/\S/.test(text[i] as string) && /[\s-]/.test(text[i - 1] as string)) starts.add(i)
+  }
+  let best = 0
+  for (const start of starts) {
+    if (Math.abs(start - approx) < Math.abs(best - approx)) best = start
+  }
+  return Math.min(best, text.length)
+}
+
 /** Where a note has been placed on the chart as it is now */
 export type Placement =
   | { place: 'song' }

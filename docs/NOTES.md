@@ -62,7 +62,13 @@ Notes are made and edited in **edit mode** only, with no separate mode. Long-pre
 second; mouse: long-press or right-click; keyboard: Enter or the context-menu key on a focused
 target) on a section title, a word or a chord opens the note editor: text, a scope control, a
 reach control, delete. Moving a note between kinds keeps its id. Outside edit mode notes are shown,
-not edited. Deleting shows a toast with Undo.
+not edited. Deleting shows a toast with Undo. A note for the whole song is made with "+ Note on the
+whole song", shown with the notes whose place is gone, above the sections. Preferences can hide the
+team's notes or the user's own (shown in edit mode whatever they say).
+
+Where in a line a press lands is worked out from the lyrics as they are drawn, which with chords
+hidden are tidied (hyphens, spaces); `snapOffset` moves it to the nearest start of a word or
+segment of the chart's own lyrics, so the anchor is exact.
 
 ## Handwriting
 
@@ -91,7 +97,9 @@ scales with the font on that musician's own devices.
 
 ## Not built yet
 
-Ink; notes beside the chords in the same band to save height; shared + Always notes; exporting
+`SetlistEntry.notes`, the older plain-text note of a song in a setlist, is kept and synced but not
+drawn or edited. A line of bars only (drawn as aligned measures) cannot be pressed for a note; a note
+attached to one is drawn on the line as chords. Ink; notes beside the chords in the same band to save height; shared + Always notes; exporting
 private notes.
 
 ## Order of work

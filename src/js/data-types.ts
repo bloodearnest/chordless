@@ -12,6 +12,8 @@ export interface ChartSegment {
   lyrics: string
   /** Notes that sit at the start of this segment, put there to be drawn (never by the parser) */
   notes?: ShownNote[]
+  /** Where it starts in the line's lyrics, put there to be drawn (never by the parser) */
+  offset?: number
   /** Set by transposeSong */
   transposed?: boolean
   valid?: boolean

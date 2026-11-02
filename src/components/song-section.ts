@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import { classMap } from 'lit/directives/class-map.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { ChartLine, ChartSegment, HideMode, ShownNote } from '../js/data-types.ts'
+import { listenForLongPress } from '../js/notes/long-press.ts'
 import { nudgeLine } from '../js/notes/nudge.ts'
 import { groupSegmentsIntoUnits } from '../js/utils/chart-line-units.ts'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
@@ -29,6 +30,37 @@ export class SectionActionEvent extends Event {
   }
 }
 
+/**
+ * A spot on the chart was pressed in edit mode, or a note on it tapped: the place for the note
+ * editor to open at (docs/NOTES.md). `place` is the section's title, a word (the line and about
+ * where in the line's lyrics), or the song as a whole (sent by the song-display). `noteId` is set when an existing note was tapped.
+ */
+export class NoteRequestEvent extends Event {
+  static readonly type = 'song-section:note-request'
+  readonly songIndex: number
+  readonly sectionIndex: number
+  readonly place: 'title' | 'text' | 'song'
+  readonly line: number
+  readonly offset: number
+  readonly noteId: string | undefined
+  /** What was pressed, for the editor to open beside */
+  readonly element: HTMLElement
+  constructor(
+    section: { songIndex: number; sectionIndex: number },
+    where: { place: 'title' | 'text' | 'song'; line?: number; offset?: number; noteId?: string },
+    element: HTMLElement
+  ) {
+    super(NoteRequestEvent.type, { bubbles: true, composed: true })
+    this.songIndex = section.songIndex
+    this.sectionIndex = section.sectionIndex
+    this.place = where.place
+    this.line = where.line ?? 0
+    this.offset = where.offset ?? 0
+    this.noteId = where.noteId
+    this.element = element
+  }
+}
+
 /** The section's heading was clicked */
 export class SectionToggleEvent extends Event {
   static readonly type = 'song-section:toggle'
@@ -42,7 +74,9 @@ export class SectionToggleEvent extends Event {
 }
 
 /** What a section renders: a line of lyrics and chords, or a run of bar-only lines laid out together */
-type ContentBlock = { type: 'bar-group'; data: BarGroupData } | { type: 'line'; line: ChartLine }
+type ContentBlock =
+  | { type: 'bar-group'; data: BarGroupData }
+  | { type: 'line'; line: ChartLine; lineIndex: number }
 
 /** A segment as rendered; hiding chords marks which join the word before them */
 type RenderedSegment = ChartSegment & { __joinWithPrev?: boolean }
@@ -401,6 +435,30 @@ export class SongSection extends LitElement {
       pointer-events: none;
     }
 
+    /* In edit mode a word or a title can be long-pressed for a note, and a note tapped to change it */
+    :host([edit-mode]) [data-note-target],
+    :host([edit-mode]) .note {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    :host([edit-mode]) .note {
+      cursor: pointer;
+    }
+
+    :host([edit-mode]) .segment-notes {
+      pointer-events: auto;
+    }
+
+    :host([edit-mode]) .chord-segment[data-note-target]:hover,
+    :host([edit-mode]) .chord-segment[data-note-target]:focus-visible,
+    :host([edit-mode]) .section-title:hover {
+      outline: 1px dashed var(--note-private-color);
+      outline-offset: 2px;
+      border-radius: 3px;
+    }
+
     .song-section-wrapper .plain-notes {
       margin-bottom: 0.1rem;
     }
@@ -568,6 +626,74 @@ export class SongSection extends LitElement {
     return 'none'
   }
 
+  /** In edit mode: a long press on a word or the title, or a tap on a note, asks for the note editor */
+  override firstUpdated() {
+    const root = this.renderRoot
+    const where = (event: Event): HTMLElement | null => {
+      const path = event.composedPath()
+      const hit = path.find(
+        node => node instanceof HTMLElement && node.dataset.noteTarget !== undefined
+      )
+      if (hit) return hit as HTMLElement
+      // The keyboard is on the title's <summary>
+      const summary = path.find(
+        node => node instanceof HTMLElement && node.matches('summary.section-label')
+      )
+      return (
+        (summary as HTMLElement | undefined)?.querySelector('[data-note-target="title"]') ?? null
+      )
+    }
+    listenForLongPress(root, {
+      enabled: () => this.editMode,
+      targetOf: where,
+      onPress: element => {
+        const place = element.dataset.noteTarget === 'title' ? 'title' : 'text'
+        this.dispatchEvent(
+          new NoteRequestEvent(
+            this,
+            {
+              place,
+              line: Number(
+                (element.closest('.chord-line') as HTMLElement | null)?.dataset.line ?? 0
+              ),
+              offset: Number(element.dataset.offset ?? 0),
+            },
+            element
+          )
+        )
+      },
+    })
+    root.addEventListener(
+      'click',
+      event => {
+        if (!this.editMode) return
+        const note = event
+          .composedPath()
+          .find(node => node instanceof HTMLElement && node.dataset.noteId !== undefined) as
+          | HTMLElement
+          | undefined
+        if (!note) return
+        // (before the title's own click, which would collapse the section)
+        event.stopPropagation()
+        event.preventDefault()
+        const target = note.closest('.chord-segment') as HTMLElement | null
+        this.dispatchEvent(
+          new NoteRequestEvent(
+            this,
+            {
+              place: target ? 'text' : 'title',
+              line: Number((note.closest('.chord-line') as HTMLElement | null)?.dataset.line ?? 0),
+              offset: Number(target?.dataset.offset ?? 0),
+              noteId: note.dataset.noteId,
+            },
+            note
+          )
+        )
+      },
+      { capture: true }
+    )
+  }
+
   #noteLines: ResizeObserver | undefined
   #noteFrame = 0
 
@@ -648,7 +774,7 @@ export class SongSection extends LitElement {
         <summary class="section-label" @click=${this._onSummaryClick}>
           <div class="section-header">
             <div class="section-title-wrapper">
-              <h3 class="section-title">${label}</h3>
+              <h3 class="section-title" data-note-target="title">${label}</h3>
               ${this.note ? html`<span class="section-note">${this.note}</span>` : ''}
               ${renderNotes(this.titleNotes)}
               ${this._renderCollapseToggle()}
@@ -754,17 +880,24 @@ export class SongSection extends LitElement {
           .capoKey=${this.capoKey}
         ></bar-group>`
       }
-      return this._renderLine(block.line, index)
+      return this._renderLine(block.line, index, block.lineIndex)
     })
   }
 
-  _renderLine(line: ChartLine | undefined, index: number) {
+  _renderLine(line: ChartLine | undefined, index: number, lineIndex = index) {
     const segments = line?.segments || []
     if (segments.length === 0) {
       return nothing
     }
 
-    const normalizedSegments = this._normalizeSegmentLyrics(segments)
+    // (where each starts in the line's lyrics as the chart has them, before they are tidied to show)
+    let at = 0
+    const placed = segments.map(segment => {
+      const offset = at
+      at += segment.lyrics.length
+      return { ...segment, offset }
+    })
+    const normalizedSegments = this._normalizeSegmentLyrics(placed)
 
     // Check if this line has ANY chords
     const lineHasChords = normalizedSegments.some(seg => seg.chord?.trim())
@@ -789,6 +922,7 @@ export class SongSection extends LitElement {
       <div
         class=${classMap({ 'chord-line': true, 'has-notes': shown.some(segment => segment.notes?.length) })}
         data-line-index=${index}
+        data-line=${lineIndex}
       >
         ${units.map(
           unit =>
@@ -819,7 +953,12 @@ export class SongSection extends LitElement {
     const shouldRenderChordSpace = lineHasChords
 
     return html`
-      <span class=${classes}>
+      <span
+        class=${classes}
+        data-note-target="text"
+        data-offset=${segment.offset ?? 0}
+        tabindex=${this.editMode && hasLyrics ? '0' : nothing}
+      >
         ${
           segment.notes?.length
             ? html`<span class="segment-notes">${renderNotes(segment.notes)}</span>`
@@ -907,7 +1046,7 @@ export class SongSection extends LitElement {
         })
         i += barLines.length
       } else {
-        blocks.push({ type: 'line', line })
+        blocks.push({ type: 'line', line, lineIndex: i })
         i++
       }
     }
@@ -1062,5 +1201,6 @@ declare global {
   interface GlobalEventHandlersEventMap {
     [SectionActionEvent.type]: SectionActionEvent
     [SectionToggleEvent.type]: SectionToggleEvent
+    [NoteRequestEvent.type]: NoteRequestEvent
   }
 }
