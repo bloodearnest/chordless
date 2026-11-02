@@ -30,6 +30,8 @@ export interface PickerOption<V> {
   hint: string
   /** How the option fares for the melody's range (key-selector), shown by a coloured badge whose icon says which way, not by colour alone */
   range?: RangeNote
+  /** The melody's lowest and highest note in this key, by name: the ends that are out of range are in bold */
+  notes?: { low: string; high: string }
 }
 
 export abstract class OptionPicker<V extends string | number> extends LitElement {
@@ -140,8 +142,26 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
 
     .option-end {
       display: inline-flex;
-      align-items: baseline;
+      align-items: center;
       gap: 1rem;
+    }
+
+    /* (the hints and the notes have a width of their own, so the columns line up from row to row) */
+    .option-hint {
+      min-width: 2ch;
+      text-align: right;
+    }
+
+    /* (in the full text colour: a muted one fails the contrast check on the lighter row of the key in use) */
+    .option-notes {
+      min-width: 9ch;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* the note that is out of range: said in weight as well as in the badge's colour */
+    .option-notes .out {
+      font-weight: 700;
     }
 
   `,
@@ -200,6 +220,22 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
     if (changed.has('editMode') && !this.editMode) this._popup.close()
   }
 
+  /** An option said in words, for a screen reader: 'A +2, E4–F#5, too high' (with the text it shows, as it must) */
+  _spoken(option: PickerOption<V>, range: RangeNote): string {
+    const key = [option.label, option.hint].filter(Boolean).join(' ')
+    const notes = option.notes ? `, ${option.notes.low}–${option.notes.high}` : ''
+    return `${key}${notes}, ${range.words || 'in range'}`
+  }
+
+  /** The lowest and highest note, the end that is out of range in bold */
+  _renderNotes(notes: { low: string; high: string }, range: RangeNote | undefined) {
+    const highOut = range?.direction === 'high' || range?.direction === 'both'
+    const lowOut = range?.direction === 'low' || range?.direction === 'both'
+    return html`<span class="option-notes"
+      ><span class=${lowOut ? 'out' : ''}>${notes.low}</span>–<span class=${highOut ? 'out' : ''}>${notes.high}</span></span
+    >`
+  }
+
   override render() {
     const options = this._options()
     return html`
@@ -231,12 +267,13 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
                 role="option"
                 class="picker-option ${option.value === this.value ? 'selected' : ''}"
                 aria-selected=${option.value === this.value ? 'true' : 'false'}
-                aria-label=${option.range ? `${[option.label, option.hint].filter(Boolean).join(' ')}, ${option.range.words || 'in range'}` : nothing}
+                aria-label=${option.range ? this._spoken(option, option.range) : nothing}
                 @click=${() => this._choose(option.value)}
               >
                 <span class="option-label">${option.label}</span>
                 <span class="option-end">
                   <span class="option-hint">${option.hint}</span>
+                  ${option.notes ? this._renderNotes(option.notes, option.range) : nothing}
                   ${option.range ? rangeBadge(option.range) : nothing}
                 </span>
               </button>

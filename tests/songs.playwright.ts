@@ -28,7 +28,7 @@ test.describe('Song library', () => {
   test('the key picker marks each key by how the melody range fits it, and a red one can be chosen', async ({
     page,
   }) => {
-    // written in G: D4 to E5
+    // written in G: D4–E5
     await seedSong(page, { range: 'D4-E5' })
     await page.goto('/songs/info-test-song')
     await page.reload()
@@ -44,17 +44,21 @@ test.describe('Song library', () => {
     await button.click()
     // (E5 is the edge: the key in use is marked in the list)
     await expect(keySelector.getByRole('option', { name: /^G\*,/ })).toHaveAccessibleName(
-      'G*, high'
+      'G*, D4–E5, high'
     )
     await expect(keySelector.getByRole('option', { name: /^A\s/ })).toHaveAccessibleName(
-      'A +2, too high'
+      'A +2, E4–F#5, too high'
     )
     await expect(keySelector.getByRole('option', { name: /^E\s/ })).toHaveAccessibleName(
-      'E -3, in range'
+      'E -3, B3–C#5, in range'
     )
     await expect(
       keySelector.getByRole('option', { name: /^A\s/ }).locator('.range-badge')
     ).toHaveAttribute('title', 'too high')
+    // (and the notes it comes to in A, the one out of range in bold)
+    const notes = keySelector.getByRole('option', { name: /^A\s/ }).locator('.option-notes')
+    await expect(notes).toHaveText('E4–F#5')
+    await expect(notes.locator('.out')).toHaveText('F#5')
 
     // (a hint, not a gate)
     await keySelector.getByRole('option', { name: /^A\s/ }).click()

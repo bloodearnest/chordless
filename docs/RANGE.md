@@ -62,6 +62,11 @@ words). A song with no range, or no key to measure it from, shows the picker as 
   them in the key's label ("A +2, too high", "E -3, in range"). The icon is dark on the solid
   colour, which reads the same on the popup's navy and on the lighter row of the key in use
   (coloured text on that row fails the contrast check).
+- **The notes, to say what the colour means.** Each key's row also says the melody's lowest and
+  highest note in that key ("E4–F#5", spelled as the key spells them), with the one that is out of
+  range in bold: A is red because the top is F#5. The screen-reader label has the same text, as it
+  must contain what is shown ("A +2, E4–F#5, too high"). The notes are in the full text colour: a
+  muted one fails the contrast check on the lighter row of the key in use.
 - **Only while choosing.** The badges are in the list of keys, where a key is chosen (the key in
   use is marked there too). The picker's button, and the key shown once chosen, are plain: the fit
   is for choosing, and then it gets out of the way.
