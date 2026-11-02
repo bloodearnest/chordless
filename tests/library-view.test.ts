@@ -8,6 +8,7 @@ import { expect } from '@open-wc/testing'
 import type { AppHeader } from '../src/components/app-header.ts'
 import type { AppModal } from '../src/components/app-modal.ts'
 import { KeyChangeEvent, type KeySelector } from '../src/components/key-selector.ts'
+import { SongRangeChangedEvent } from '../src/components/song-info-dialog.ts'
 import {
   SectionActionEvent,
   SectionToggleEvent,
@@ -248,6 +249,41 @@ describe('the library view, with a song open', () => {
         view.querySelector<HTMLElement & { parsed: unknown }>('song-display')?.parsed
       )
       expect(text).to.contain('"A"')
+    })
+
+    describe('the melody range', () => {
+      const infoDialog = () => control('library-song-info-dialog')
+      const selector = () => control<KeySelector>('library-key-selector')
+
+      it('is given to the key picker, and the new one when the info dialog sets it', async () => {
+        await open()
+        expect(selector().range).to.equal(null)
+        infoDialog().dispatchEvent(new SongRangeChangedEvent(song.id, 'D4-E5'))
+        expect(selector().range).to.deep.equal({ low: 62, high: 76 })
+        // (in the chart's key, whatever key the song is shown in)
+        expect(selector().rangeKey).to.equal('G')
+        infoDialog().dispatchEvent(new SongRangeChangedEvent(song.id, null))
+        expect(selector().range).to.equal(null)
+      })
+
+      it('is left alone when it is another song’s, or no song is open', async () => {
+        await open()
+        infoDialog().dispatchEvent(new SongRangeChangedEvent('title-another-song', 'D4-E5'))
+        expect(selector().range).to.equal(null)
+
+        view.remove()
+        view = document.createElement('library-view')
+        view.route = { name: 'songs' }
+        outlet.append(view)
+        await wait(100)
+        infoDialog().dispatchEvent(new SongRangeChangedEvent(song.id, 'D4-E5'))
+      })
+
+      it('does not light up a picker for a song with no key to measure from', async () => {
+        await open(keyless.uuid)
+        infoDialog().dispatchEvent(new SongRangeChangedEvent(keyless.id, 'D4-E5'))
+        expect(selector().range).to.equal(null)
+      })
     })
 
     it('keeps the sections as the user has set them', async () => {

@@ -1,6 +1,8 @@
 import { expect, fixture, html } from '@open-wc/testing'
-import type { SongInfo } from '../src/components/song-info.ts'
+import { type SongInfo, SongRangeChangeEvent } from '../src/components/song-info.ts'
 import '../src/components/song-info.ts'
+
+import { A11Y } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -77,12 +79,14 @@ describe('song-info', () => {
       expect(text(info)).to.contain('in range')
     })
 
-    it('shows nothing when the chart says no range', async () => {
-      const shown = text(await show({ song: ranged({}, { x_chordless_range: '' }) }))
-      expect(shown).to.not.contain('Melody Range')
-      expect(text(await show({ song: song({ metadata: { key: 'G' } }) }))).to.not.contain(
-        'Melody Range'
-      )
+    it('offers to add one when the chart says none, and says nothing with no key to write it in', async () => {
+      const none = text(await show({ song: ranged({}, { x_chordless_range: '' }) }))
+      expect(none).to.contain('Melody Range')
+      expect(none).to.contain('None yet')
+      expect(none).to.contain('Add a range')
+      // (a song with no chart key and no key of the record's: no key to write the notes in)
+      const keyless = await show({ song: song({ metadata: {}, parsed: { metadata: {} } }) })
+      expect(text(keyless)).to.not.contain('Melody Range')
     })
 
     it('shows the notes, and not how they fit, for a chart with no key to measure from', async () => {
@@ -91,6 +95,181 @@ describe('song-info', () => {
       })
       expect(text(info)).to.contain('D4–E5 9 notes wide (14 semitones)')
       expect(badges(info)).to.have.length(0)
+    })
+
+    describe('setting it', () => {
+      const info = async (over: Record<string, unknown> = {}, chart: Record<string, string> = {}) =>
+        show({ song: ranged({ uuid: 'song-1', ...over }, chart) })
+      const click = (element: SongInfo, label: string) =>
+        [...(element.shadowRoot?.querySelectorAll('button') ?? [])]
+          .find(button => button.textContent?.trim() === label)
+          ?.click()
+      const select = (element: SongInfo, label: string) =>
+        [...(element.shadowRoot?.querySelectorAll('.range-picker') ?? [])]
+          .find(picker => picker.textContent?.trim().startsWith(label))
+          ?.querySelector('select') as HTMLSelectElement
+      const choose = async (element: SongInfo, label: string, name: string) => {
+        const picker = select(element, label)
+        const option = [...picker.options].find(o => o.textContent === name)
+        picker.value = (option as HTMLOptionElement).value
+        picker.dispatchEvent(new Event('change'))
+        await element.updateComplete
+      }
+      const changes = (element: SongInfo) => {
+        const sent: SongRangeChangeEvent[] = []
+        element.addEventListener(SongRangeChangeEvent.type, event => sent.push(event))
+        return sent
+      }
+
+      it('opens two pickers of notes, at the range it has, named as the key names them', async () => {
+        const element = await info()
+        click(element, 'Edit')
+        await element.updateComplete
+        const low = select(element, 'Lowest note')
+        const high = select(element, 'Highest note')
+        expect(low.selectedOptions[0].textContent).to.equal('D4')
+        expect(high.selectedOptions[0].textContent).to.equal('E5')
+        // (A2 to C6 are offered: a singer's span)
+        expect(low.options[0].textContent).to.equal('A2')
+        expect(low.options[low.options.length - 1].textContent).to.equal('C6')
+        expect(text(element)).to.contain('In G, as written')
+        expect(text(element)).to.not.contain('9 notes wide')
+      })
+
+      it('sends the range the person chose, in the key the notes are in, and shuts the pickers', async () => {
+        const element = await info()
+        const sent = changes(element)
+        click(element, 'Edit')
+        await element.updateComplete
+        await choose(element, 'Lowest note', 'E4')
+        await choose(element, 'Highest note', 'F#5')
+        click(element, 'Save')
+        await element.updateComplete
+        expect(sent).to.have.length(1)
+        expect(sent[0].songUuid).to.equal('song-1')
+        expect(sent[0].range).to.deep.equal({ low: 64, high: 78 })
+        expect(sent[0].key).to.equal('G')
+        expect(select(element, 'Lowest note')).to.equal(undefined)
+      })
+
+      it('passes the accessibility checks, with the pickers open and with the error', async () => {
+        const element = await info()
+        click(element, 'Edit')
+        await element.updateComplete
+        await expect(element).to.be.accessible(A11Y)
+        await choose(element, 'Lowest note', 'C6')
+        await expect(element).to.be.accessible(A11Y)
+      })
+
+      it('sends nothing when cancelled', async () => {
+        const element = await info()
+        const sent = changes(element)
+        click(element, 'Edit')
+        await element.updateComplete
+        await choose(element, 'Lowest note', 'E4')
+        click(element, 'Cancel')
+        await element.updateComplete
+        expect(sent).to.have.length(0)
+        expect(text(element)).to.contain('D4–E5 in G')
+      })
+
+      it('takes the range away, when there is one', async () => {
+        const element = await info()
+        const sent = changes(element)
+        click(element, 'Edit')
+        await element.updateComplete
+        click(element, 'Remove')
+        expect(sent).to.have.length(1)
+        expect(sent[0].range).to.equal(null)
+      })
+
+      it('adds one to a song with none, starting at an octave from D4', async () => {
+        const element = await info({}, { x_chordless_range: '' })
+        const sent = changes(element)
+        click(element, 'Add a range')
+        await element.updateComplete
+        expect(select(element, 'Lowest note').selectedOptions[0].textContent).to.equal('D4')
+        expect(select(element, 'Highest note').selectedOptions[0].textContent).to.equal('D5')
+        // (nothing to take away yet)
+        expect(text(element)).to.not.contain('Remove')
+        click(element, 'Save')
+        expect(sent[0].range).to.deep.equal({ low: 62, high: 74 })
+      })
+
+      it('will not save a lowest note above the highest, and says so', async () => {
+        const element = await info()
+        const sent = changes(element)
+        click(element, 'Edit')
+        await element.updateComplete
+        await choose(element, 'Lowest note', 'C6')
+        expect(element.shadowRoot?.querySelector('[role="alert"]')?.textContent).to.contain(
+          'The lowest note is above the highest'
+        )
+        const save = [...(element.shadowRoot?.querySelectorAll('button') ?? [])].find(
+          button => button.textContent?.trim() === 'Save'
+        ) as HTMLButtonElement
+        expect(save.disabled).to.equal(true)
+        click(element, 'Save')
+        expect(sent).to.have.length(0)
+        await choose(element, 'Lowest note', 'D4')
+        expect(element.shadowRoot?.querySelector('[role="alert"]')).to.equal(null)
+      })
+
+      it('offers more notes when the range is wider than a singer’s span', async () => {
+        const element = await info({}, { x_chordless_range: 'F2-D7' })
+        click(element, 'Edit')
+        await element.updateComplete
+        const low = select(element, 'Lowest note')
+        expect(low.options[0].textContent).to.equal('F2')
+        expect(low.options[low.options.length - 1].textContent).to.equal('D7')
+      })
+
+      it('shuts the pickers when another song is shown', async () => {
+        const element = await info()
+        click(element, 'Edit')
+        await element.updateComplete
+        element.song = ranged({ uuid: 'song-2' }, { x_chordless_range: 'G4-G5' })
+        await element.updateComplete
+        expect(select(element, 'Lowest note')).to.equal(undefined)
+        expect(text(element)).to.contain('G4–G5 in G')
+      })
+
+      it('names the notes in the record’s key for a chart with no key, and writes it there', async () => {
+        const element = await show({
+          song: song({
+            uuid: 'song-1',
+            key: 'Bb',
+            metadata: {},
+            parsed: { metadata: { x_chordless_range: 'Bb3-Eb5' } },
+          }),
+        })
+        const sent = changes(element)
+        expect(text(element)).to.contain('Bb3–Eb5')
+        click(element, 'Edit')
+        await element.updateComplete
+        expect(select(element, 'Lowest note').selectedOptions[0].textContent).to.equal('Bb3')
+        click(element, 'Save')
+        expect(sent[0].key).to.equal('Bb')
+      })
+
+      it('cannot be edited with no key to name the notes by: shown, with no button', async () => {
+        const element = await show({
+          song: song({ metadata: {}, parsed: { metadata: { x_chordless_range: 'D4-E5' } } }),
+        })
+        expect(text(element)).to.contain('D4–E5')
+        expect(text(element)).to.not.contain('Edit')
+      })
+
+      it('does nothing when saved with no song shown', async () => {
+        const element = await info()
+        const sent = changes(element)
+        click(element, 'Edit')
+        await element.updateComplete
+        element._saveRange({ low: 60, high: 72 }, 'G')
+        element.song = null
+        element._saveRange({ low: 60, high: 72 }, 'G')
+        expect(sent).to.have.length(1)
+      })
     })
 
     it('says one note, in the singular', async () => {

@@ -58,6 +58,11 @@ export function rangeOfChart(chordpro: string): NoteRange | null {
   return parseRange(DIRECTIVE.exec(chordpro)?.[1] ?? '')
 }
 
+/** The chart without a range: its directive line is taken out, with its line ending */
+export function withoutRange(chordpro: string): string {
+  return chordpro.replace(DIRECTIVE, '')
+}
+
 /** The range a directive's value says ('D4-E5'), or null if it is not one */
 export function parseRange(value: string): NoteRange | null {
   const notes = RANGE.exec(value)

@@ -191,6 +191,42 @@ test.describe('Song info', () => {
     await expect(info.locator('.range-badge')).toHaveAttribute('data-direction', 'high')
   })
 
+  test('the melody range is set in the song info, the key picker follows, and it is kept', async ({
+    page,
+  }) => {
+    await seedSong(page)
+    await page.goto('/songs/info-test-song')
+    await page.reload()
+    const header = page.locator('#library-app-header')
+    await expect(header).toContainText('Info Test Song')
+    await header.getByRole('button', { name: 'Information' }).click()
+
+    const info = page.locator('#library-song-info-dialog song-info')
+    await expect(info).toContainText('None yet')
+    await info.getByRole('button', { name: 'Add a range' }).click()
+    await info.getByLabel('Lowest note').selectOption({ label: 'D4' })
+    await info.getByLabel('Highest note').selectOption({ label: 'E5' })
+    await info.getByRole('button', { name: 'Save' }).click()
+    await expect(info).toContainText('D4–E5 in G')
+    await expect(info).toContainText('9 notes wide (14 semitones)')
+
+    // (the key picker has it, without a reload)
+    await page.keyboard.press('Escape')
+    await header.getByRole('button', { name: 'Toggle edit mode' }).click()
+    const keySelector = page.locator('#library-key-selector')
+    await keySelector.getByRole('button', { name: /^Key/ }).click()
+    await expect(keySelector.getByRole('option', { name: /^A\s/ })).toHaveAccessibleName(
+      'A +2, E4–F#5, too high'
+    )
+    await page.keyboard.press('Escape')
+
+    // (and it is in the chart, so it is kept)
+    await page.reload()
+    await expect(header).toContainText('Info Test Song')
+    await header.getByRole('button', { name: 'Information' }).click()
+    await expect(info).toContainText('D4–E5 in G')
+  })
+
   test('info button on a setlist song opens the song info dialog', { tag: '@logic' }, async ({
     page,
   }) => {

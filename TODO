@@ -167,9 +167,10 @@ storage/sync
   lowest and highest sung note from a SongSelect lead sheet PDF (ChordPro has no melody, the lead sheet does; the
   notes are drawn shapes, not text; instrumental lines, drawn small, are left out). Built and tested
   (tests/melody-range.node.test.ts, on lead sheets drawn by tests/melody-pdf.ts: the real ones are CCLI's, so none are
-  kept here). Not built: how a lead sheet reaches the app (the bookmarklet, an upload), storing the range with the song
-  as semitones in the key the sheet was printed in so transposing moves it, and showing it. Not read: an accidental on
-  a single note, a bass clef, a semibreve (checked on no real sheet, it is drawn as a wider ring)
+  kept here). Built since: the bookmarklet and the file picker bring a lead sheet in, the range is kept in the chart
+  (`{x_chordless_range: D4-E5}`), the key picker marks each key by it, the song info shows it, and it can be set by hand
+  there (docs/RANGE.md). Not built: the limits as a preference. Not read: an accidental on a single note, a bass clef, a
+  semibreve (checked on no real sheet, it is drawn as a wider ring)
 - variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the space's default, a chart editor for fixes and arrangements; the picker's cards and the versions list are built)
 - conflict resolution (currently Drive wins when edited on two devices, and the local edit is
   silently dropped). Idea: keep the losing edit as a conflict copy of the setlist instead.

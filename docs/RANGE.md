@@ -27,11 +27,9 @@ copy in another ChordPro program. It is per chart, so an arrangement (a variant)
   So every limit below is about the written note: the written low note is what a man reaches
   first, and the written high note is what a woman does.
 - **Editable, always.** A range read from a lead sheet can be wrong (a harmony line, a cue
-  note we took for sung), and most songs have no lead sheet. Both ends can be typed in, in the key
-  the song is in at the time, and are written back to the directive in the chart's `{key:}` (a
-  chart with no `{key:}` is given one, the song's key). Importing a song again follows the
-  duplicate choices as it does for the rest of the chart, so a correction is not lost without being
-  asked.
+  note we took for sung), and most songs have no lead sheet: see "Setting a range by hand".
+  Importing a song again follows the duplicate choices as it does for the rest of the chart, so a
+  correction is not lost without being asked.
 - **None is fine.** A song with no range shows no colours: the picker is as it is today.
 
 ## What counts as comfortable
@@ -145,7 +143,29 @@ sends).
 - To find songs by range ("which fit in A?"), the app keeps the range read from the chart on the
   song's record when it is saved: derived, not synced, so the chart stays the one source.
 
+## Setting a range by hand
+
+The song info's "Melody Range" item has **Add a range** (when there is none) or **Edit**. Two
+pickers, "Lowest note" and "Highest note", offer the notes from A2 to C6 (wider if the range is),
+named as the chart's key names them; **Save**, **Cancel**, and **Remove** (when there is one). A
+new range starts at D4 to D5. A lowest note above the highest is not saved, and says so. The notes
+are in the chart's own key, as written: men sing the melody an octave down.
+
+- **Not behind edit mode.** It changes the song's chart, not the setlist, and it is reached from
+  the library and the setlist alike, live too (docs: "permissive in the moment"). The friction is
+  the dialog and the two taps.
+- **The chart's text changes, and nothing else** (`setSongRange` in `song-utils.ts`): the chart, its
+  hash and its date, for sync to see. Not the key or tempo saved on the song: `overwriteSong`
+  takes those back from the chart, which would undo a key someone had chosen. A chart with no
+  `{key:}` is given the song's, which the notes are then in; a song with no key at all cannot be
+  given a range (there is nothing to name the notes by).
+- **A failure is a toast** with "Try again", never lost silently.
+- **The key picker follows at once**, in the library and in the setlist (the dialog says
+  `song-info-dialog:range-changed` and each page gives the picker the new one), and the info shows
+  the song as it was saved.
+- It is the song's chart (the default variant the info shows), so every setlist that uses the song
+  sees it. A setlist's own edits of a chart (`chordproEdits`) are not written anywhere yet.
+
 ## Not decided
 
-- Limits as a preference (a group of altos, a younger group), and showing a song's range in its
-  settings in note names.
+- Limits as a preference (a group of altos, a younger group).

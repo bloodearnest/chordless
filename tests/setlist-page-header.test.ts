@@ -7,6 +7,7 @@ import { expect, waitUntil } from '@open-wc/testing'
 import type { AppHeader } from '../src/components/app-header.ts'
 import { EditModeToggleEvent, HeaderInfoClickEvent } from '../src/components/app-header.ts'
 import type { AppModal } from '../src/components/app-modal.ts'
+import type { KeySelector } from '../src/components/key-selector.ts'
 import {
   MenuOverviewClickEvent,
   MenuSongClickEvent,
@@ -27,6 +28,7 @@ import {
   OverviewSongKeyChangeEvent,
 } from '../src/components/setlist-overview.ts'
 import { SetlistShareChangeEvent } from '../src/components/setlist-share.ts'
+import { type SongInfoDialog, SongRangeChangedEvent } from '../src/components/song-info-dialog.ts'
 import { SongChangeEvent } from '../src/js/app-events.ts'
 import type { Person, Setlist } from '../src/js/data-types.ts'
 import { setCapoPreference } from '../src/js/preferences.ts'
@@ -649,6 +651,34 @@ describe('the setlist page: header, menu and keys', () => {
       await wait(30)
       expect(shownSongs).to.have.length(1)
       expect(shownSongs[0][0]).to.equal(rig.page.songs[0].songId)
+    })
+
+    it('gives the key picker the melody range the song info dialog sets, or takes away', async () => {
+      await rig.open()
+      rig.page.showSong(0, true)
+      await rig.page.header.show(rig.page.songs[0], true)
+      const dialog = must($<SongInfoDialog>('#song-info-dialog'))
+      dialog.show = async () => {}
+      await rig.page.showSongInfo(rig.page.songs[0])
+      // (asked again: it listens once)
+      const handler = rig.page._rangeChangedHandler
+      await rig.page.showSongInfo(rig.page.songs[0])
+      expect(rig.page._rangeChangedHandler).to.equal(handler)
+
+      const song = rig.page.songs[0]
+      const picker = () => must($('#key-selector')) as unknown as KeySelector
+      dialog.dispatchEvent(new SongRangeChangedEvent(song.songId, 'D4-E5'))
+      expect(song.parsed.metadata.x_chordless_range).to.equal('D4-E5')
+      expect(picker().range).to.deep.equal({ low: 62, high: 76 })
+      expect(picker().rangeKey).to.equal(song.originalKey)
+
+      dialog.dispatchEvent(new SongRangeChangedEvent(song.songId, null))
+      expect(song.parsed.metadata.x_chordless_range).to.equal(undefined)
+      expect(picker().range).to.equal(null)
+
+      // (another song's is not this one's)
+      dialog.dispatchEvent(new SongRangeChangedEvent('title-another-song', 'D4-E5'))
+      expect(picker().range).to.equal(null)
     })
 
     it('does nothing for an info dialog that is not there', async () => {
