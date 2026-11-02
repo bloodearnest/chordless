@@ -323,8 +323,11 @@ describe('song-import: corners', () => {
     describe('chosen together with its ChordPro', () => {
       const pdf = (name: string, marker: string) =>
         new File([`%PDF-1.4 ${marker}`], name, { type: 'application/pdf' })
-      const cho = (title: string, extra = '') =>
-        new File([`{title: ${title}}\n${extra}{key: C}\n\n[C]Hello`], `${title}.chordpro`)
+      const cho = (title: string, extra = '', trailer = '') =>
+        new File([`{title: ${title}}\n${extra}{key: C}\n\n[C]Hello${trailer}`], `${title}.chordpro`)
+      /** What SongSelect puts at the foot of a ChordPro: the number is a line of text, not a directive */
+      const ccliTrailer = (number: string) =>
+        `\n\nCCLI Song # ${number}\n© 2022 A Publisher\nFor use solely with the SongSelect® Terms of Use. All rights reserved. www.ccli.com\nCCLI License # 471102`
       const markerOf = (bytes: ArrayBuffer) =>
         new TextDecoder().decode(bytes).replace('%PDF-1.4 ', '')
 
@@ -357,7 +360,8 @@ describe('song-import: corners', () => {
         )
         await element.importFiles([
           pdf('b.pdf', 'B'),
-          cho(a, '{ccli: 1111111}\n'),
+          // (the number as SongSelect's ChordPro has it, and as a directive)
+          cho(a, '', ccliTrailer('1111111')),
           cho(b, '{ccli: 2222222}\n'),
           pdf('a.pdf', 'A'),
         ])
