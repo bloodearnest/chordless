@@ -48,11 +48,6 @@ export function rangeSpan(range: NoteRange, key: string): { notes: number; semit
   return { notes: place(range.high) - place(range.low) + 1, semitones: range.high - range.low }
 }
 
-/** A range moved by some semitones (a song transposed, the range with it) */
-export function shiftRange(range: NoteRange, semitones: number): NoteRange {
-  return { low: range.low + semitones, high: range.high + semitones }
-}
-
 /** The range as the directive says it, 'D4-E5', in a key */
 export function formatRange(range: NoteRange, key: string): string {
   return `${noteName(range.low, key)}-${noteName(range.high, key)}`

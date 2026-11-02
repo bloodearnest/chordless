@@ -62,8 +62,9 @@ words). A song with no range, or no key to measure it from, shows the picker as 
   them in the key's label ("A +2, too high", "E -3, in range"). The icon is dark on the solid
   colour, which reads the same on the popup's navy and on the lighter row of the key in use
   (coloured text on that row fails the contrast check).
-- **The key in use** has its badge on the picker's button too, and in the button's label ("Key: G,
-  high"), so it is there when the popup is shut.
+- **Only while choosing.** The badges are in the list of keys, where a key is chosen (the key in
+  use is marked there too). The picker's button, and the key shown once chosen, are plain: the fit
+  is for choosing, and then it gets out of the way.
 - **A hint, never a gate.** A red key can be chosen as any other can.
 - **Where.** The library's song view, the setlist's song settings, and the key on a song's card in
   edit mode. Each key's distance shown is from the key in use, as it always was; the range is
@@ -72,13 +73,16 @@ words). A song with no range, or no key to measure it from, shows the picker as 
 ## In the song info
 
 The song's info dialog has a "Melody Range" item under its key: the lowest and highest note in the
-chart's key ("D4–E5 in G") with its fit (the badge and its words, as the picker has them), again in
-the key the library has the song in when that is another ("E4–F#5 in A"), and how wide it is: **"9
-notes wide (14 semitones)"**. Width is counted in the scale tones the range covers (D4 to E5 is
-nine, a 9th), by the notes' names in the key, so it does not change with the key. It is what a
-leader asks (how many notes does this ask of a singer?), where semitones, which are kept for being
-exact, are not how singers think, and octaves are too coarse (nearly every song is an octave to an
-octave and a half). The notes are written pitch: men sing the melody an octave down.
+chart's key ("D4–E5 in G"), how it fits voices as written (the badge and its words, as the picker
+has them), and how wide it is: **"9 notes wide (14 semitones)"**. It is the song's, so it is the
+same whatever key the library has the song in (a different key is not a different song: it takes
+different chords); the fit in other keys is the key picker's to show.
+
+Width is counted in the scale tones the range covers (D4 to E5 is nine, a 9th), by the notes' names
+in the key, so it does not change with the key. It is what a leader asks (how many notes does this
+ask of a singer?), where semitones, which are kept for being exact, are not how singers think, and
+octaves are too coarse (nearly every song is an octave to an octave and a half). The notes are
+written pitch: men sing the melody an octave down.
 
 ## Getting a range from a lead sheet
 

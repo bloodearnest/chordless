@@ -129,10 +129,13 @@ describe('song-card', () => {
       expect(picker.range).to.deep.equal({ low: 62, high: 76 })
       expect(picker.rangeKey).to.equal('G')
       await picker.updateComplete
-      // (the song is two up from the chart's key, so F#5: too high)
-      expect(
-        picker.shadowRoot?.querySelector('.picker-button')?.getAttribute('aria-label')
-      ).to.equal('Key: A, too high')
+      // (the song is two up from the chart's key: A is F#5 at the top, too high, in the list)
+      const keyA = [...(picker.shadowRoot?.querySelectorAll('.picker-option') ?? [])].find(
+        option => option.querySelector('.option-label')?.textContent?.trim() === 'A'
+      )
+      const badge = must(keyA?.querySelector('.range-badge'))
+      expect(badge.classList.contains('tone-red')).to.equal(true)
+      expect(badge.getAttribute('data-direction')).to.equal('high')
     })
 
     it('has no range for the key picker when the chart says none, and takes the key from the chart if need be', async () => {

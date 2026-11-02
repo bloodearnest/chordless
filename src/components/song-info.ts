@@ -1,11 +1,5 @@
 import { css, html, LitElement } from 'lit'
-import {
-  noteName,
-  rangeOfMetadata,
-  rangeSpan,
-  semitonesBetween,
-  shiftRange,
-} from '../js/chart-range.ts'
+import { noteName, rangeOfMetadata, rangeSpan } from '../js/chart-range.ts'
 import type { SongWithContent } from '../js/data-types.ts'
 import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.ts'
 import { describeRange, rangeStatus } from '../js/voice-range.ts'
@@ -208,10 +202,6 @@ export class SongInfo extends LitElement {
       height: 1.5rem;
     }
 
-    /* (the notes in a column, so the badges line up from one line to the next) */
-    .range-line > span:first-child {
-      min-width: 13ch;
-    }
   `,
   ]
 
@@ -327,9 +317,10 @@ export class SongInfo extends LitElement {
   }
 
   /**
-   * The melody's range (docs/RANGE.md): the lowest and highest note in the chart's key, and how
-   * it fits voices; again in the key the library has the song in, if that is another; and how
-   * wide it is. Written pitch: men sing it an octave down.
+   * The melody's range (docs/RANGE.md): the lowest and highest note in the chart's key, how it
+   * fits voices as written, and how wide it is. It is the song's, so it is the same whatever key
+   * it is played in: the key picker is where a key's fit is looked at. Written pitch: men sing it
+   * an octave down.
    */
   _renderRange() {
     const range = rangeOfMetadata(this.song?.parsed?.metadata)
@@ -338,26 +329,14 @@ export class SongInfo extends LitElement {
     const key = chartKey || 'C'
     const span = rangeSpan(range, key)
     const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
-    // one key's line: the notes, and how they fit (the badge and its words, as the key picker has them)
-    const line = (inKey: string | undefined, shift: number) => {
-      const shown = shiftRange(range, shift)
-      const names = `${noteName(shown.low, inKey || key)}–${noteName(shown.high, inKey || key)}`
-      const note = describeRange(rangeStatus(range, shift))
-      return html`
-        <div class="modal-info-value range-line">
-          <span>${names}${inKey ? ` in ${inKey}` : ''}</span>
-          ${inKey ? html`${rangeBadge(note)}<span>${note.words || 'in range'}</span>` : ''}
-        </div>
-      `
-    }
-    // (the song is in another key now than the chart: the range moves with it)
-    const current = this.song?.key
-    const moved = chartKey && current && current !== chartKey ? current : null
+    const note = describeRange(rangeStatus(range))
     return html`
       <div class="modal-info-item">
         <div class="modal-info-label">Melody Range</div>
-        ${line(chartKey, 0)}
-        ${moved ? line(moved, semitonesBetween(chartKey as string, moved)) : ''}
+        <div class="modal-info-value range-line">
+          <span>${noteName(range.low, key)}–${noteName(range.high, key)}${chartKey ? ` in ${chartKey}` : ''}</span>
+          ${chartKey ? html`${rangeBadge(note)}<span>${note.words || 'in range'}</span>` : ''}
+        </div>
         <div class="modal-info-value">
           ${plural(span.notes, 'note')} wide (${plural(span.semitones, 'semitone')})
         </div>

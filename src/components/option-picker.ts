@@ -144,17 +144,6 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
       gap: 1rem;
     }
 
-    /* On the button: the same, a little smaller */
-    .picker-button .range-badge {
-      width: 1.35rem;
-      height: 1.35rem;
-      margin-left: 0.4rem;
-    }
-
-    .picker-button .range-badge svg {
-      width: 0.8rem;
-      height: 0.8rem;
-    }
   `,
   ]
 
@@ -213,9 +202,6 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
 
   override render() {
     const options = this._options()
-    // (how the current value fares, on the button too: it is the one in use)
-    const current = options.find(option => option.value === this.value)?.range
-    const spoken = current ? `, ${current.words || 'in range'}` : ''
     return html`
       ${this.label ? html`<span class="meta-label">${this.label}:</span>` : ''}
       <button
@@ -223,11 +209,11 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
         class="picker-button"
         type="button"
         aria-haspopup="listbox"
-        aria-label=${this.label ? `${this.label}: ${this._displayValue()}${spoken}` : nothing}
+        aria-label=${this.label ? `${this.label}: ${this._displayValue()}` : nothing}
         aria-expanded=${this._popup.isOpen ? 'true' : 'false'}
         @click=${() => this._popup.toggle()}
       >
-        ${this._displayValue()}${current ? rangeBadge(current) : nothing}
+        ${this._displayValue()}
       </button>
       <dialog
         id="options"
