@@ -24,7 +24,7 @@ import '../../components/library-space-filter.ts'
 import '../../components/song-card.ts'
 import '../../components/space-tabs.ts'
 import '../../components/song-display.ts'
-import type { SongInfoDialog } from '../../components/song-info-dialog.ts'
+import type { SongInfoDialog, SongRangeChangedEvent } from '../../components/song-info-dialog.ts'
 import type { SongVersionsChangedEvent } from '../../components/song-versions.ts'
 import '../../components/song-info-dialog.ts'
 import type { SongSelectEvent } from '../../components/song-list.ts'
@@ -512,6 +512,16 @@ export class LibraryView extends PageView {
     if (event.songDeleted) void goTo(buildUrl({ name: 'songs' }), { replace: true })
   }
 
+  /** The song's melody range was set in the info dialog: the key picker is given the new one */
+  #rangeChanged(event: SongRangeChangedEvent): void {
+    const metadata = this.#parsed?.metadata
+    if (!metadata || this.#song?.id !== event.songId) return
+    if (event.value) metadata.x_chordless_range = event.value
+    else delete metadata.x_chordless_range
+    const keySelector = this.#control<KeySelector>('library-key-selector')
+    if (keySelector?.value && keySelector.value !== '-') this.#updateKeySelector(keySelector.value)
+  }
+
   async #showInfo(): Promise<void> {
     if (!this.#parsed || !this.#song || this.#song.source) return
     const dialog = this.#infoDialog.value as SongInfoDialog
@@ -642,6 +652,7 @@ export class LibraryView extends PageView {
         id="library-song-info-dialog"
         ${ref(this.#infoDialog)}
         @song-versions:changed=${(event: SongVersionsChangedEvent) => this.#versionsChanged(event)}
+        @song-info-dialog:range-changed=${(event: SongRangeChangedEvent) => this.#rangeChanged(event)}
       ></song-info-dialog>
 
       <app-modal

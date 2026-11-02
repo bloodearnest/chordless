@@ -18,6 +18,7 @@ import {
   overwriteSong,
   replaceSong,
   setDefaultVariant,
+  setSongRange,
 } from '../src/js/song-utils.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
@@ -169,6 +170,109 @@ describe('overwriteSong', () => {
     const full = await getSongWithContent(song.uuid)
     expect(full.chordpro).to.contain('[A]New words')
     expect(full.parsed.sections[0].lines[0].segments[0].chord).to.equal('A')
+  })
+})
+
+describe('setSongRange', () => {
+  const D4_TO_E5 = { low: 62, high: 76 }
+
+  it('puts the range in the chart, and changes the hash and date for sync to see', async () => {
+    const song = await createSong(chart(unique('Ranged')))
+    await getSongWithContent(song.uuid) // (parsed, so the parse cache holds the chart without it)
+
+    const updated = await setSongRange(song.uuid, D4_TO_E5)
+    expect(updated.uuid).to.equal(song.uuid)
+    expect(updated.contentHash).to.not.equal(song.contentHash)
+    expect(updated.modifiedDate >= song.modifiedDate).to.equal(true)
+
+    const full = await getSongWithContent(song.uuid)
+    expect(full.chordpro).to.contain('{key: G}\n{x_chordless_range: D4-E5}')
+    // (the parse cache was cleared: the chart shows the range)
+    expect(full.parsed.metadata.x_chordless_range).to.equal('D4-E5')
+  })
+
+  it('changes a range already there where it stands, and takes it out with null', async () => {
+    const song = await createSong(chart(unique('Changed')))
+    await setSongRange(song.uuid, D4_TO_E5)
+    await setSongRange(song.uuid, { low: 64, high: 77 })
+    const changed = await getSongWithContent(song.uuid)
+    expect(changed.chordpro.match(/x_chordless_range/g)).to.have.length(1)
+    expect(changed.parsed.metadata.x_chordless_range).to.equal('E4-F5')
+
+    const removed = await setSongRange(song.uuid, null)
+    const after = await getSongWithContent(song.uuid)
+    expect(after.chordpro).to.not.contain('x_chordless_range')
+    expect(removed.contentHash).to.equal(hashText(after.chordpro))
+  })
+
+  it('does not touch the key or tempo the song was saved with: only the chart changes', async () => {
+    const song = await createSong(chart(unique('Kept key'), { extra: '{tempo: 72}\n' }))
+    const db = await getCurrentDB()
+    // (a key and a tempo the person chose for the song, which the chart does not say)
+    await db.saveSong({ ...must(await db.getSong(song.uuid)), key: 'A', tempo: 90 })
+    await setSongRange(song.uuid, D4_TO_E5)
+    const after = must(await db.getSong(song.uuid))
+    expect(after.key).to.equal('A')
+    expect(after.tempo).to.equal(90)
+    expect(after.originalKey).to.equal('G')
+  })
+
+  it('does nothing when the chart would be the same', async () => {
+    const song = await createSong(chart(unique('Same')))
+    await setSongRange(song.uuid, D4_TO_E5)
+    const again = await setSongRange(song.uuid, D4_TO_E5)
+    const once = must(await (await getCurrentDB()).getSong(song.uuid))
+    expect(again.contentHash).to.equal(once.contentHash)
+    expect(again.modifiedDate).to.equal(once.modifiedDate)
+    // (and there is nothing to take out of a chart with none)
+    const bare = await createSong(chart(unique('Bare')))
+    expect((await setSongRange(bare.uuid, null)).contentHash).to.equal(bare.contentHash)
+  })
+
+  it('gives a chart with no key the record’s, which the range is in', async () => {
+    const title = unique('Keyless')
+    const song = await createSong(`{title: ${title}}\n\n[G]No key line`)
+    const db = await getCurrentDB()
+    await db.saveSong({ ...must(await db.getSong(song.uuid)), key: 'D' })
+    await setSongRange(song.uuid, D4_TO_E5)
+    const full = await getSongWithContent(song.uuid)
+    expect(full.chordpro).to.contain('{key: D}\n{x_chordless_range: D4-E5}')
+  })
+
+  it('says so when there is no key at all to write it in, or no song, or no chart', async () => {
+    const song = await createSong(`{title: ${unique('No key anywhere')}}\n\n[G]Words`)
+    let thrown = ''
+    try {
+      await setSongRange(song.uuid, D4_TO_E5)
+    } catch (error) {
+      thrown = (error as Error).message
+    }
+    expect(thrown).to.contain('no key')
+    // (it can still be taken out, or there is nothing to take out)
+    await setSongRange(song.uuid, null)
+
+    for (const [uuid, message] of [['nobody', 'Song not found']] as const) {
+      let error = ''
+      try {
+        await setSongRange(uuid, null)
+      } catch (caught) {
+        error = (caught as Error).message
+      }
+      expect(error).to.contain(message)
+    }
+
+    const db = await getCurrentDB()
+    const orphan = makeSong({ chordproFileId: 'chordpro-not-there', key: 'G' })
+    await db.saveSong(orphan)
+    let missing = ''
+    try {
+      await setSongRange(orphan.uuid, D4_TO_E5)
+    } catch (caught) {
+      missing = (caught as Error).message
+    }
+    expect(missing).to.contain('chart of the song is not there')
+    // (the test browser's database is shared: the song with no chart is not left in it)
+    await db.deleteSong(orphan.uuid, { remember: false })
   })
 })
 

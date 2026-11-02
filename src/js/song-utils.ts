@@ -6,6 +6,7 @@
  * Each variant is a separate song document linked by variantOf field.
  */
 
+import { withoutRange, withRange } from './chart-range.ts'
 import type {
   ChartMetadata,
   ParsedChart,
@@ -15,9 +16,11 @@ import type {
 } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { getCurrentDB, normalizeTitle } from './db.ts'
+import { keyOfChart } from './library-repair.ts'
 import { ChordProParser } from './parser.ts'
 import { songSource } from './song-source.ts'
 import { hashText } from './utils/hash.ts'
+import type { NoteRange } from './voice-range.ts'
 
 export { hashText }
 
@@ -509,6 +512,48 @@ export async function overwriteSong(
     modifiedDate: now,
   }
   return database.saveSong(updated)
+}
+
+/**
+ * Set a song's melody range in its chart, or take it out (null): the `{x_chordless_range:}` line
+ * (docs/RANGE.md). The range is in the chart's own key. A chart with no `{key:}` is given the
+ * record's, which the range is then in.
+ *
+ * Only the chart's text changes (and its hash and date, for sync to see): not the record's key or
+ * tempo, which overwriteSong takes back from the chart, and a range edit must not undo a key the
+ * person has chosen for the song.
+ *
+ * @returns The song, as it is after (the same one if the chart did not change)
+ */
+export async function setSongRange(
+  songUuid: string,
+  range: NoteRange | null,
+  db: ChordlessDB | null = null
+): Promise<SongRecord> {
+  const database = db ?? (await getCurrentDB())
+  const song = await database.getSong(songUuid)
+  if (!song) throw new Error(`Song not found: ${songUuid}`)
+  const chordpro = await database.getChordPro(song.chordproFileId)
+  if (!chordpro) throw new Error(`The chart of the song is not there: ${song.chordproFileId}`)
+
+  const key = keyOfChart(chordpro.content) ?? song.key ?? song.originalKey
+  if (range && !key) throw new Error('The song has no key to write its range in')
+  const content = range
+    ? withRange(chordpro.content, range, key as string)
+    : withoutRange(chordpro.content)
+  if (content === chordpro.content) return song
+
+  const now = new Date().toISOString()
+  const contentHash = hashText(content)
+  await database.saveChordPro({
+    ...chordpro,
+    id: song.chordproFileId,
+    content,
+    contentHash,
+    modifiedDate: now,
+  })
+  parseCache.delete(song.chordproFileId)
+  return database.saveSong({ ...song, contentHash, modifiedDate: now })
 }
 
 /** Who made a chart that replaces or joins the library's: where it is from, and who imported it */

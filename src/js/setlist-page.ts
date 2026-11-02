@@ -20,7 +20,7 @@ import {
 } from '../components/setlist-info-dialog.ts'
 import { type SetlistShare, SetlistShareChangeEvent } from '../components/setlist-share.ts'
 import type { SongDisplay } from '../components/song-display.ts'
-import type { SongInfoDialog } from '../components/song-info-dialog.ts'
+import { type SongInfoDialog, SongRangeChangedEvent } from '../components/song-info-dialog.ts'
 import {
   BpmChangeEvent,
   PadSetChoiceEvent,
@@ -137,6 +137,7 @@ export class SetlistPage {
   overview: OverviewController
   _capoEnabled: boolean
   _setlistDetailsSaveHandler?: (event: SetlistInfoSaveEvent) => void
+  _rangeChangedHandler?: (event: SongRangeChangedEvent) => void
   _setlistDeleteHandler?: (event: SetlistInfoDeleteEvent) => void
   _identifyHandler?: (event: SetlistDetailsIdentifyEvent) => void
   _lastVisibleSection?: string | null
@@ -693,7 +694,23 @@ export class SetlistPage {
     const dialog = this.root.querySelector<SongInfoDialog>('#song-info-dialog')
     if (!dialog) return
     dialog.db = this._database()
+    if (!this._rangeChangedHandler) {
+      this._rangeChangedHandler = event => this.rangeChanged(event)
+      dialog.addEventListener(SongRangeChangedEvent.type, this._rangeChangedHandler)
+    }
     await dialog.show(song.songId, { title: song.title })
+  }
+
+  /**
+   * A song's melody range was set in the info dialog: the setlist's songs of it are given the new
+   * one, and the key picker shows it
+   */
+  rangeChanged(event: SongRangeChangedEvent): void {
+    for (const song of this.songs.filter(song => song.songId === event.songId)) {
+      if (event.value) song.parsed.metadata.x_chordless_range = event.value
+      else delete song.parsed.metadata.x_chordless_range
+    }
+    this.header.showCurrentKey()
   }
 
   async showSetlistInfo() {

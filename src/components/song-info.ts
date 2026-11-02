@@ -2,8 +2,30 @@ import { css, html, LitElement } from 'lit'
 import { noteName, rangeOfMetadata, rangeSpan } from '../js/chart-range.ts'
 import type { SongWithContent } from '../js/data-types.ts'
 import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.ts'
-import { describeRange, rangeStatus } from '../js/voice-range.ts'
+import { describeRange, type NoteRange, rangeStatus } from '../js/voice-range.ts'
 import { rangeBadge, rangeBadgeStyles } from './range-badge.ts'
+import { buttonStyles } from './shared-styles.ts'
+
+/**
+ * The person set the song's melody range, or took it away (null). `key` is the key the range is
+ * in: the chart's own. The dialog saves it.
+ */
+export class SongRangeChangeEvent extends Event {
+  static readonly type = 'song-info:range-change'
+  readonly songUuid: string
+  readonly range: NoteRange | null
+  readonly key: string
+  constructor(songUuid: string, range: NoteRange | null, key: string) {
+    super(SongRangeChangeEvent.type, { bubbles: true, composed: true })
+    this.songUuid = songUuid
+    this.range = range
+    this.key = key
+  }
+}
+
+/** The notes the range's pickers offer: A2 to C6 (a singer's span), and wider if the range is */
+const LOWEST_OFFERED = 45
+const HIGHEST_OFFERED = 84
 
 /**
  * SongInfo Component
@@ -31,13 +53,21 @@ export class SongInfo extends LitElement {
     song: { type: Object, attribute: false },
     appearances: { type: Array, attribute: false },
     loading: { type: Boolean },
+    _editingRange: { state: true },
+    _low: { state: true },
+    _high: { state: true },
   }
 
   declare song: SongWithContent | null
   declare appearances: Appearance[]
   declare loading: boolean
+  /** The melody range's pickers are open, with these notes (MIDI numbers) */
+  declare _editingRange: boolean
+  declare _low: number
+  declare _high: number
 
   static override styles = [
+    buttonStyles,
     rangeBadgeStyles,
     css`
     :host {
@@ -190,6 +220,31 @@ export class SongInfo extends LitElement {
       font-style: italic;
     }
 
+    .range-editor {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .range-picker {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: var(--font-ui-small);
+    }
+
+    .range-picker select {
+      min-height: 2.5rem;
+      padding: 0 0.5rem;
+      font: inherit;
+      font-size: var(--font-ui);
+    }
+
+    /* (the danger colour, mixed toward the text colour: it reads on the light page and on the dark) */
+    .range-error {
+      color: color-mix(in srgb, var(--color-danger, #e74c3c) 65%, var(--text-color, #1a1a1a));
+    }
+
     /* the range's lines: a badge and its words sit level with the text */
     .range-line {
       display: flex;
@@ -210,6 +265,14 @@ export class SongInfo extends LitElement {
     this.song = null
     this.appearances = []
     this.loading = false
+    this._editingRange = false
+    this._low = 62
+    this._high = 74
+  }
+
+  override willUpdate(changed: Map<string, unknown>): void {
+    // (another song, or the song saved: the pickers shut)
+    if (changed.has('song')) this._editingRange = false
   }
 
   override render() {
@@ -321,12 +384,29 @@ export class SongInfo extends LitElement {
    * fits voices as written, and how wide it is. It is the song's, so it is the same whatever key
    * it is played in: the key picker is where a key's fit is looked at. Written pitch: men sing it
    * an octave down.
+   *
+   * It can be set here, for a song with no lead sheet or to correct what one gave. It is not
+   * behind edit mode: it changes the song's chart, not the setlist, and a person is able to.
    */
   _renderRange() {
     const range = rangeOfMetadata(this.song?.parsed?.metadata)
-    if (!range) return ''
     const chartKey = this.song?.parsed?.metadata?.key
-    const key = chartKey || 'C'
+    // the key the notes are in: the chart's, or for a chart with no key the record's (which it is given)
+    const key = chartKey || this.song?.key || this.song?.originalKey || ''
+    if (this._editingRange && key) return this._renderRangeEditor(range, key)
+    if (!range) {
+      return key
+        ? html`
+          <div class="modal-info-item">
+            <div class="modal-info-label">Melody Range</div>
+            <div class="modal-info-value range-line">
+              <span>None yet</span>
+              <button class="btn" type="button" @click=${() => this._editRange(range)}>Add a range</button>
+            </div>
+          </div>
+        `
+        : ''
+    }
     const span = rangeSpan(range, key)
     const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
     const note = describeRange(rangeStatus(range))
@@ -336,12 +416,71 @@ export class SongInfo extends LitElement {
         <div class="modal-info-value range-line">
           <span>${noteName(range.low, key)}–${noteName(range.high, key)}${chartKey ? ` in ${chartKey}` : ''}</span>
           ${chartKey ? html`${rangeBadge(note)}<span>${note.words || 'in range'}</span>` : ''}
+          ${key ? html`<button class="btn" type="button" @click=${() => this._editRange(range)}>Edit</button>` : ''}
         </div>
         <div class="modal-info-value">
           ${plural(span.notes, 'note')} wide (${plural(span.semitones, 'semitone')})
         </div>
       </div>
     `
+  }
+
+  _editRange(range: NoteRange | null): void {
+    // (a song with none starts at a comfortable octave: D4 to D5)
+    this._low = range?.low ?? 62
+    this._high = range?.high ?? 74
+    this._editingRange = true
+  }
+
+  /** Two pickers of notes (named as the key names them), to set the range, change it or take it away */
+  _renderRangeEditor(range: NoteRange | null, key: string) {
+    const first = Math.min(LOWEST_OFFERED, this._low, this._high)
+    const last = Math.max(HIGHEST_OFFERED, this._low, this._high)
+    const notes = Array.from({ length: last - first + 1 }, (_, index) => first + index)
+    const picker = (label: string, value: number, set: (midi: number) => void) => html`
+      <label class="range-picker">
+        ${label}
+        <select @change=${(event: Event) => set(Number((event.target as HTMLSelectElement).value))}>
+          ${notes.map(
+            midi =>
+              html`<option value=${midi} ?selected=${midi === value}>${noteName(midi, key)}</option>`
+          )}
+        </select>
+      </label>
+    `
+    const wrong = this._low > this._high
+    return html`
+      <div class="modal-info-item">
+        <div class="modal-info-label">Melody Range</div>
+        <div class="range-editor">
+          ${picker('Lowest note', this._low, midi => (this._low = midi))}
+          ${picker('Highest note', this._high, midi => (this._high = midi))}
+        </div>
+        <div class="modal-info-value">In ${key}, as written: men sing it an octave down.</div>
+        ${wrong ? html`<div class="range-error" role="alert">The lowest note is above the highest.</div>` : ''}
+        <div class="range-line">
+          <button
+            class="btn primary"
+            type="button"
+            ?disabled=${wrong}
+            @click=${() => this._saveRange({ low: this._low, high: this._high }, key)}
+          >
+            Save
+          </button>
+          <button class="btn" type="button" @click=${() => (this._editingRange = false)}>Cancel</button>
+          ${
+            range
+              ? html`<button class="btn" type="button" @click=${() => this._saveRange(null, key)}>Remove</button>`
+              : ''
+          }
+        </div>
+      </div>
+    `
+  }
+
+  _saveRange(range: NoteRange | null, key: string): void {
+    this._editingRange = false
+    if (this.song) this.dispatchEvent(new SongRangeChangeEvent(this.song.uuid, range, key))
   }
 
   _renderAppearanceMeta(appearance: { leader?: string; playedInKey?: string | null }) {
@@ -474,5 +613,11 @@ customElements.define('song-info', SongInfo)
 declare global {
   interface HTMLElementTagNameMap {
     'song-info': SongInfo
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [SongRangeChangeEvent.type]: SongRangeChangeEvent
   }
 }

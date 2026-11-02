@@ -1,8 +1,10 @@
 import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/song-info-dialog.ts'
+import { SongRangeChangeEvent } from '../src/components/song-info.ts'
+import { SongRangeChangedEvent } from '../src/components/song-info-dialog.ts'
 import { SongVersionsChangedEvent } from '../src/components/song-versions.ts'
 import { must } from './must.ts'
-import { A11Y, wait } from './test-helpers.ts'
+import { A11Y, clearToasts, shownToast, wait } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -22,6 +24,13 @@ function fakeDb() {
       chordpro:
         '{title: Credited Song}\n{copyright: Words PD. Chords © 2026 A. Person}\n[G]Words\nCCLI Song # 7654321\nA. Writer\n© 2020 A Publisher',
     },
+    ranged: {
+      uuid: 'ranged',
+      id: 'ranged',
+      title: 'Ranged Song',
+      chordproFileId: 'c-ranged',
+      chordpro: '{title: Ranged Song}\n{key: G}\n\n[G]Words',
+    },
     repeated: {
       uuid: 'repeated',
       id: 'repeated',
@@ -31,7 +40,19 @@ function fakeDb() {
         '{title: Repeated Song}\n{copyright: 2020 A Publisher}\n[G]Words\nCCLI Song # 7654321\nA. Writer\n© 2020  A Publisher',
     },
   }
+  /** What saveChordPro was given, and a number of failures to give first */
+  const saved: string[] = []
+  const faults = { saveChordPro: 0 }
   return {
+    saved,
+    faults,
+    saveChordPro: async (file: { id: string; content: string }) => {
+      if (faults.saveChordPro-- > 0) throw new Error('disk full')
+      saved.push(file.content)
+      must(Object.values(songs).find(each => each.chordproFileId === file.id)).chordpro =
+        file.content
+    },
+    saveSong: async song => song,
     getDefaultSongVariant: async id => songs[id] ?? null,
     getSong: async uuid => songs[uuid],
     getChordPro: async id => {
@@ -93,6 +114,80 @@ describe('song-info-dialog', () => {
     expect(closed).to.equal(0)
     versions.dispatchEvent(new SongVersionsChangedEvent(true))
     expect(closed).to.equal(1)
+  })
+
+  describe('setting the melody range', () => {
+    const rangeChange = (range, key = 'G') => new SongRangeChangeEvent('ranged', range, key)
+    const infoOf = () => dialog.shadowRoot.querySelector('song-info')
+
+    it('saves it in the chart, shows the song as it is now, and says so to the page', async () => {
+      await setUp()
+      await dialog.show('ranged')
+      await wait(100)
+      const told: (string | null)[] = []
+      dialog.addEventListener(SongRangeChangedEvent.type, event => told.push(event.value))
+      infoOf().dispatchEvent(rangeChange({ low: 62, high: 76 }))
+      await wait(150)
+      expect(dialog.db.saved).to.have.length(1)
+      expect(dialog.db.saved[0]).to.contain('{key: G}\n{x_chordless_range: D4-E5}')
+      // (the song was loaded again: its chart says the range now)
+      expect(infoOf().song.parsed.metadata.x_chordless_range).to.equal('D4-E5')
+      expect(infoOf().shadowRoot.textContent).to.contain('D4–E5 in G')
+      expect(told).to.deep.equal(['D4-E5'])
+    })
+
+    it('tells the page there is none when it is taken away', async () => {
+      await setUp()
+      await dialog.show('ranged')
+      await wait(100)
+      infoOf().dispatchEvent(rangeChange({ low: 62, high: 76 }))
+      await wait(150)
+      const told: (string | null)[] = []
+      let songId = ''
+      dialog.addEventListener(SongRangeChangedEvent.type, event => {
+        told.push(event.value)
+        songId = event.songId
+      })
+      infoOf().dispatchEvent(rangeChange(null))
+      await wait(150)
+      expect(told).to.deep.equal([null])
+      expect(songId).to.equal('ranged')
+      expect(infoOf().shadowRoot.textContent).to.contain('None yet')
+    })
+
+    it('says so in a toast, with a way to try again, when it cannot be saved', async () => {
+      clearToasts()
+      await setUp()
+      await dialog.show('ranged')
+      await wait(100)
+      dialog.db.faults.saveChordPro = 1
+      const told: (string | null)[] = []
+      dialog.addEventListener(SongRangeChangedEvent.type, event => told.push(event.value))
+      infoOf().dispatchEvent(rangeChange({ low: 62, high: 76 }))
+      await wait(100)
+      const toast = must(shownToast())
+      expect(toast.kind).to.equal('error')
+      expect(toast.message).to.equal("Couldn't save the melody range.")
+      expect(toast.details).to.equal('disk full')
+      expect(told).to.deep.equal([])
+      // (trying again, which works now)
+      must(toast.action).run()
+      await wait(150)
+      expect(dialog.db.saved).to.have.length(1)
+      expect(told).to.deep.equal(['D4-E5'])
+      clearToasts()
+    })
+
+    it('does not look for the song again when it was given the data to show', async () => {
+      await setUp()
+      await dialog.showData({ song: { title: 'Shown', metadata: {}, uuid: 'ranged' } })
+      const told: string[] = []
+      dialog.addEventListener(SongRangeChangedEvent.type, event => told.push(event.songId))
+      infoOf().dispatchEvent(rangeChange({ low: 62, high: 76 }))
+      await wait(100)
+      expect(dialog.db.saved).to.have.length(1)
+      expect(told).to.deep.equal([''])
+    })
   })
 
   it("shows the chart's CCLI number and trailer", async () => {

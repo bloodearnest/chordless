@@ -1,15 +1,33 @@
 import { Task } from '@lit/task'
 import { html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import { formatRange } from '../js/chart-range.ts'
 import type { SongWithContent } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
+import { toast } from '../js/toast.ts'
+import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
-import type { Appearance } from './song-info.ts'
+import type { Appearance, SongRangeChangeEvent } from './song-info.ts'
 import './song-info.ts'
 import type { SongVersionsChangedEvent } from './song-versions.ts'
 import './song-versions.ts'
 import './status-message.ts'
+
+/**
+ * A song's melody range was saved (or taken away: value null), as the chart says it, in the
+ * chart's key. The page the dialog is in updates what it shows from it, such as the key picker.
+ */
+export class SongRangeChangedEvent extends Event {
+  static readonly type = 'song-info-dialog:range-changed'
+  readonly songId: string
+  readonly value: string | null
+  constructor(songId: string, value: string | null) {
+    super(SongRangeChangedEvent.type, { bubbles: true, composed: true })
+    this.songId = songId
+    this.value = value
+  }
+}
 
 /** What the dialog shows: a song and where it has been played */
 interface InfoData {
@@ -43,6 +61,8 @@ export class SongInfoDialog extends LitElement {
   declare _data: InfoData | null
 
   _modal: Ref<AppModal>
+  /** What show() was asked for, to load the song again after a change */
+  _shown: [string, string] | null = null
   _load: Task<[string, string], { song: SongWithContent; appearances: Appearance[] }>
 
   constructor() {
@@ -92,8 +112,32 @@ export class SongInfoDialog extends LitElement {
   async show(songId: string, { title = '' }: { title?: string } = {}): Promise<void> {
     this._title = title
     this._data = null
+    this._shown = [songId, title]
     this._load.run([songId, title])
     await this._open()
+  }
+
+  /** Save a melody range the person set (or took away), and show the song as it is now */
+  async _saveRange(event: SongRangeChangeEvent): Promise<void> {
+    try {
+      const { setSongRange } = await import('../js/song-utils.ts')
+      const db = this.db ?? (await (await import('../js/db.ts')).getCurrentDB())
+      await setSongRange(event.songUuid, event.range, db)
+    } catch (error) {
+      console.error('[SongInfoDialog] Could not save the range:', error)
+      toast("Couldn't save the melody range.", {
+        kind: 'error',
+        details: errorMessage(error),
+        action: { label: 'Try again', run: () => void this._saveRange(event) },
+      })
+      return
+    }
+    // (the song again, with its chart as saved)
+    if (this._shown) this._load.run(this._shown)
+    const songId = this._shown?.[0] ?? ''
+    this.dispatchEvent(
+      new SongRangeChangedEvent(songId, event.range && formatRange(event.range, event.key))
+    )
   }
 
   /** Open the dialog with already-loaded data (dev pages) */
@@ -123,7 +167,12 @@ export class SongInfoDialog extends LitElement {
 
   _renderInfo({ song = null, appearances = [], loading = false }: Partial<InfoData>) {
     return html`
-      <song-info .song=${song} .appearances=${appearances} .loading=${loading}></song-info>
+      <song-info
+        .song=${song}
+        .appearances=${appearances}
+        .loading=${loading}
+        @song-info:range-change=${(event: SongRangeChangeEvent) => this._saveRange(event)}
+      ></song-info>
       ${
         song
           ? html`<song-versions
@@ -168,5 +217,11 @@ customElements.define('song-info-dialog', SongInfoDialog)
 declare global {
   interface HTMLElementTagNameMap {
     'song-info-dialog': SongInfoDialog
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [SongRangeChangedEvent.type]: SongRangeChangedEvent
   }
 }
