@@ -76,6 +76,14 @@ The import page (`song-import.ts`) reads the range, writes it into the chart as 
 copyrighted content: CLAUDE.md, "Spaces and copyright"). The PDF reader is a 1.6 MB chunk the app
 already loads only when a PDF is shared to it, and is not precached. A lead sheet that cannot be
 fetched or read never stops the song being imported: it comes with no range, which can be typed in.
+**Files chosen together.** The file picker (and files opened with or shared to Chordless) takes a
+ChordPro and its lead sheet PDF together, as the bookmarklet sends them. Each PDF goes with the
+ChordPro of the song it is the sheet of: the same CCLI number (printed at the foot of the sheet),
+else the same title (the sheet's, or its filename's). It is then read as a bookmarklet's is, key
+check and all. A PDF that goes with none of the chosen songs is not imported (the picker says
+so), and a song has one lead sheet: another is left out. Shared PDFs that are no song's lead sheet
+are still matched to the library as a leader's charts (docs/EMAIL_IMPORT.md).
+
 **The tab the bookmarklet opens** shows a spinner with what it is doing ("Waiting for SongSelect…",
 "Reading the song…", "Reading the lead sheet…", which takes a moment) and not the ways to import by
 hand, which would only be in the way. A failure shows them, and so does "Import a file or paste

@@ -9,7 +9,13 @@ import {
 } from '../js/chart-range.ts'
 import type { Person, Setlist, SongRecord, Space } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
-import { createSetlist, determineSetlistType, getNextSunday, openSpace } from '../js/db.ts'
+import {
+  createSetlist,
+  determineSetlistType,
+  getNextSunday,
+  normalizeTitle,
+  openSpace,
+} from '../js/db.ts'
 import { parseChartText, songOfChart } from '../js/email-setlist.ts'
 import { type LibrarySong, matchLibrary } from '../js/import-plan.ts'
 import { libraryForMatching } from '../js/import-setlist.ts'
@@ -152,7 +158,8 @@ export class SongImport extends LitElement {
   static override properties = {
     _state: { state: true }, // 'pick' | 'choices'
     _error: { state: true },
-    _progress: { state: true }, // what the bookmarklet's import is doing
+    _progress: { state: true }, // what an import is doing
+    _busy: { state: true }, // files with a PDF are being read
     _manual: { state: true }, // chose to import another way, with the bookmarklet's tab open
     // [{song, chordproText, isDuplicate, choice: null | 'update' | 'use-existing'}]
     _imports: { state: true },
@@ -170,6 +177,7 @@ export class SongImport extends LitElement {
   declare _state: 'pick' | 'choices'
   declare _error: string
   declare _progress: string
+  declare _busy: boolean
   declare _manual: boolean
   declare _imports: ImportItem[]
   declare _skipped: string[]
@@ -580,6 +588,7 @@ export class SongImport extends LitElement {
     this._state = 'pick'
     this._error = ''
     this._progress = 'Waiting for SongSelect…'
+    this._busy = false
     this._manual = false
     this._imports = []
     this._skipped = []
@@ -648,12 +657,61 @@ export class SongImport extends LitElement {
     const incoming = await takeIncoming()
     if (!incoming) return
     const pdfs = incoming.files.filter(isPdf)
-    const songs = await this._songsFromFiles(incoming.files.filter(file => !isPdf(file)))
-    if (incoming.text.trim()) {
-      songs.push({ name: 'Shared text', chordproText: incoming.text, source: 'share' })
+    this._startReading(pdfs)
+    try {
+      const songs = await this._songsFromFiles(incoming.files.filter(file => !isPdf(file)))
+      if (incoming.text.trim()) {
+        songs.push({ name: 'Shared text', chordproText: incoming.text, source: 'share' })
+      }
+      // (a PDF of a song that came with it is its lead sheet; the others are charts to match)
+      const charts = await this._pairLeadSheets(songs, pdfs)
+      if (songs.length) await this.receiveAll(songs)
+      if (charts.length) await this._matchCharts(charts)
+    } finally {
+      this._busy = false
     }
-    if (songs.length) await this.receiveAll(songs)
-    if (pdfs.length) await this._matchCharts(pdfs)
+  }
+
+  /** Say so while PDFs are read: it takes a moment */
+  _startReading(pdfs: File[]): void {
+    this._busy = pdfs.length > 0
+    this._progress = 'Reading the PDF…'
+  }
+
+  /**
+   * Pair each PDF with the ChordPro it is the lead sheet of, among those chosen with it: the song
+   * with its CCLI number (printed at the foot of the sheet), or else with its title. The sheet is
+   * then read for the song's melody range, as a bookmarklet's is. Returns the PDFs that go with
+   * none of them.
+   */
+  async _pairLeadSheets(songs: IncomingSong[], pdfs: File[]): Promise<File[]> {
+    if (!pdfs.length || !songs.some(song => song.chordproText)) return pdfs
+    let readPdf = async (_pdf: ArrayBuffer) => ''
+    try {
+      readPdf = (await this.loadPdfReader()).readPdfText
+    } catch (error) {
+      console.warn('[Import] Could not load the PDF reader, using filenames:', error)
+    }
+    const unpaired: File[] = []
+    for (const pdf of pdfs) {
+      const bytes = await pdf.arrayBuffer()
+      // (the reader may take the buffer it is given)
+      const chart = parseChartText(await readPdf(bytes.slice(0)), pdf.name)
+      const titles = [chart.title, chart.textTitle]
+        .filter(Boolean)
+        .map(title => normalizeTitle(title as string))
+      const about = (song: IncomingSong) => {
+        const meta = parser.parse(song.chordproText ?? '').metadata
+        return { ccli: meta.ccliSongNumber || meta.ccli, title: meta.title ?? '' }
+      }
+      const open = songs.filter(song => song.chordproText && !song.leadSheet)
+      const match =
+        open.find(song => chart.ccli && about(song).ccli === chart.ccli) ??
+        open.find(song => titles.includes(normalizeTitle(about(song).title)))
+      if (match) match.leadSheet = bytes
+      else unpaired.push(pdf)
+    }
+    return unpaired
   }
 
   /**
@@ -764,7 +822,21 @@ export class SongImport extends LitElement {
 
   /** Import songs from ChordPro files */
   async importFiles(files: File[]): Promise<void> {
-    await this.receiveAll(await this._songsFromFiles(files))
+    const pdfs = files.filter(isPdf)
+    this._startReading(pdfs)
+    try {
+      const songs = await this._songsFromFiles(files.filter(file => !isPdf(file)))
+      // a PDF is a song's lead sheet if the song is chosen with it: a PDF of none is not imported
+      for (const pdf of await this._pairLeadSheets(songs, pdfs)) {
+        songs.push({
+          name: pdf.name,
+          skip: 'a PDF, but no ChordPro chosen with it is of this song',
+        })
+      }
+      await this.receiveAll(songs)
+    } finally {
+      this._busy = false
+    }
   }
 
   /** The songs in ChordPro files (one that is not text is listed as skipped) */
@@ -1163,13 +1235,18 @@ export class SongImport extends LitElement {
   _renderPick() {
     if (window.opener && !this._manual && !this._error) return this._renderBookmarkletWait()
     return html`
+      ${
+        this._busy
+          ? html`<p class="status working" role="status"><span class="spinner" aria-hidden="true"></span> ${this._progress}</p>`
+          : ''
+      }
       ${this._error ? html`<p class="status error" role="alert">❌ ${this._error}</p>` : ''}
       <div class="choices">
         <label class="choice files">
           <span class="icon">📂</span>
           <span class="content">
             <span class="title">Import ChordPro Files</span>
-            <span class="subtitle">Choose one or more files</span>
+            <span class="subtitle">ChordPro files, each with its lead sheet PDF if you have one</span>
           </span>
           <input type="file" multiple @change=${this._onFilesChosen} />
         </label>

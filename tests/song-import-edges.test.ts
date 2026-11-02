@@ -1,6 +1,7 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import { SongImportedEvent } from '../src/components/song-import.ts'
 import { createSetlist, getCurrentDB, normalizeTitle } from '../src/js/db.ts'
+import { offerIncoming } from '../src/js/incoming-songs.ts'
 import { createSong } from '../src/js/song-utils.ts'
 import { makeSong } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
@@ -317,6 +318,142 @@ describe('song-import: corners', () => {
         expect(element._imports[0].chordproText).to.equal(text)
       }
       expect(reads).to.have.length(0)
+    })
+
+    describe('chosen together with its ChordPro', () => {
+      const pdf = (name: string, marker: string) =>
+        new File([`%PDF-1.4 ${marker}`], name, { type: 'application/pdf' })
+      const cho = (title: string, extra = '') =>
+        new File([`{title: ${title}}\n${extra}{key: C}\n\n[C]Hello`], `${title}.chordpro`)
+      const markerOf = (bytes: ArrayBuffer) =>
+        new TextDecoder().decode(bytes).replace('%PDF-1.4 ', '')
+
+      /** An importer whose PDFs say what the table says by their marker, and have the range it gives */
+      async function importerForSheets(
+        texts: Record<string, string>,
+        ranges: Record<string, { low: number; high: number }>
+      ) {
+        const element = await importer()
+        element.loadPdfReader = async () => ({
+          readPdfText: async (bytes: ArrayBuffer) => texts[markerOf(bytes)] ?? '',
+        })
+        element.loadMelodyReader = async () => ({
+          readMelodyRange: async (bytes: ArrayBuffer) => {
+            const range = ranges[markerOf(bytes)]
+            return range ? read(range) : null
+          },
+        })
+        return element
+      }
+      const rangeIn = (element: any, index: number) =>
+        /x_chordless_range: (\S+)}/.exec(element._imports[index].chordproText)?.[1]
+
+      it('pairs each PDF with the song of its CCLI number, in whatever order they come', async () => {
+        const a = unique('Song A')
+        const b = unique('Song B')
+        const element = await importerForSheets(
+          { A: 'Another title\nCCLI Song # 1111111', B: 'Not this title\nCCLI Song # 2222222' },
+          { A: { low: 62, high: 76 }, B: { low: 64, high: 77 } }
+        )
+        await element.importFiles([
+          pdf('b.pdf', 'B'),
+          cho(a, '{ccli: 1111111}\n'),
+          cho(b, '{ccli: 2222222}\n'),
+          pdf('a.pdf', 'A'),
+        ])
+        expect(element._imports).to.have.length(2)
+        expect(rangeIn(element, 0)).to.equal('D4-E5')
+        expect(rangeIn(element, 1)).to.equal('E4-F5')
+        expect(await said(element)).to.contain('Melody range D4–E5 in C, from the lead sheet.')
+      })
+
+      it('pairs by title when there is no CCLI number, from the sheet or from its filename', async () => {
+        const title = unique('Washed')
+        const element = await importerForSheets(
+          { SHEET: `${title}\n(based on the recording by Someone)` },
+          { SHEET: { low: 62, high: 76 } }
+        )
+        await element.importFiles([cho(title), pdf(`${title}-lead-G.pdf`, 'SHEET')])
+        expect(rangeIn(element, 0)).to.equal('D4-E5')
+        const named = await importerForSheets({}, { NAMED: { low: 62, high: 76 } })
+        const other = unique('By name')
+        await named.importFiles([cho(other), pdf(`${other}.pdf`, 'NAMED')])
+        expect(rangeIn(named, 0)).to.equal('D4-E5')
+      })
+
+      it('pairs by filename when the PDF reader cannot be loaded', async () => {
+        const title = unique('No reader')
+        const element = await importerForSheets({}, { X: { low: 62, high: 76 } })
+        element.loadPdfReader = async () => {
+          throw new Error('offline')
+        }
+        await element.importFiles([cho(title), pdf(`${title}.pdf`, 'X')])
+        expect(rangeIn(element, 0)).to.equal('D4-E5')
+      })
+
+      it('does not import a PDF of no song chosen with it, and says why, and imports the song', async () => {
+        const element = await importerForSheets({ OTHER: 'Quite another song' }, {})
+        await element.importFiles([cho(unique('Chosen')), pdf('other.pdf', 'OTHER')])
+        expect(element._imports).to.have.length(1)
+        expect(element._imports[0].chordproText).to.not.contain('x_chordless_range')
+        expect(await said(element)).to.contain(
+          'Not imported: other.pdf: a PDF, but no ChordPro chosen with it is of this song'
+        )
+      })
+
+      it('says so when only a PDF is chosen', async () => {
+        const element = await importerForSheets({}, {})
+        await element.importFiles([pdf('alone.pdf', 'X')])
+        await element.updateComplete
+        expect(element._error).to.contain('No songs to import')
+        expect(element._error).to.contain('alone.pdf')
+      })
+
+      it('gives a song one lead sheet, and not a second: the other is not imported', async () => {
+        const title = unique('Two sheets')
+        const element = await importerForSheets(
+          { ONE: title, TWO: title },
+          { ONE: { low: 62, high: 76 }, TWO: { low: 40, high: 90 } }
+        )
+        await element.importFiles([cho(title), pdf('one.pdf', 'ONE'), pdf('two.pdf', 'TWO')])
+        expect(rangeIn(element, 0)).to.equal('D4-E5')
+        expect(await said(element)).to.contain('Not imported: two.pdf')
+      })
+
+      it('says it is reading the PDF while it does', async () => {
+        const title = unique('Slow PDF')
+        const element = await importerForSheets({}, {})
+        let finish: (text: string) => void = () => {}
+        let started = false
+        element.loadPdfReader = async () => ({
+          readPdfText: () =>
+            new Promise<string>(resolve => {
+              finish = resolve
+              started = true
+            }),
+        })
+        const done = element.importFiles([cho(title), pdf(`${title}.pdf`, 'X')])
+        await waitFor(() => started)
+        await element.updateComplete
+        expect($(element, '.working').textContent).to.contain('Reading the PDF…')
+        finish(title)
+        await done
+        expect(element._busy).to.equal(false)
+      })
+
+      it('does the same for files opened with Chordless or shared to it', async () => {
+        const title = unique('Shared')
+        const element = await importerForSheets(
+          { SHEET: `${title}\nCCLI Song # 3333333` },
+          { SHEET: { low: 62, high: 76 } }
+        )
+        offerIncoming({
+          files: [cho(title, '{ccli: 3333333}\n'), pdf('sheet.pdf', 'SHEET')],
+          text: '',
+        })
+        await waitFor(() => element._state === 'choices')
+        expect(rangeIn(element, 0)).to.equal('D4-E5')
+      })
     })
 
     it('is read by the real reader, which loads in the browser', async () => {
