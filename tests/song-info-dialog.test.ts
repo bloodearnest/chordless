@@ -178,6 +178,21 @@ describe('song-info-dialog', () => {
       clearToasts()
     })
 
+    it('uses the space’s own database when it was not given one, as the pages do', async () => {
+      const { createSong, getSongWithContent } = await import('../src/js/song-utils.ts')
+      const title = `Real database ${crypto.randomUUID().slice(0, 8)}`
+      const song = await createSong(`{title: ${title}}\n{key: G}\n\n[G]Words`)
+      dialog = document.createElement('song-info-dialog')
+      document.body.appendChild(dialog)
+      await dialog.updateComplete
+      await dialog.show(song.id)
+      await wait(200)
+      infoOf().dispatchEvent(new SongRangeChangeEvent(song.uuid, { low: 62, high: 76 }, 'G'))
+      await wait(200)
+      const saved = await getSongWithContent(song.uuid)
+      expect(saved.parsed.metadata.x_chordless_range).to.equal('D4-E5')
+    })
+
     it('does not look for the song again when it was given the data to show', async () => {
       await setUp()
       await dialog.showData({ song: { title: 'Shown', metadata: {}, uuid: 'ranged' } })
