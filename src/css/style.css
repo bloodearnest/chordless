@@ -113,7 +113,7 @@ app-modal:not(:defined) {
   /* Semantic font sizes for different content types */
   --font-lyrics: var(--font-base);
   --font-chords: calc(var(--font-base) * 0.9);
-  --font-note: calc(var(--font-base) * 0.85);
+  --font-note: calc(var(--font-base) * 1.05);
   --font-family-note: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
   --font-ui: calc(var(--font-base) * 0.8);
   --font-ui-small: calc(var(--font-base) * 0.7);
