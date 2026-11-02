@@ -51,7 +51,7 @@ which keys it stops being red in.
 ## In the picker
 
 Built: `key-selector` takes the song's `range` and the key it is written in (`rangeKey`), and every
-key in its list is marked by `rangeStatus` (`describeRange` in `voice-range.ts` gives the mark and
+key in its list is marked by `rangeStatus` (`describeRange` in `voice-range.ts` gives the tone, direction and
 words). A song with no range, or no key to measure it from, shows the picker as it was.
 
 - **Not by colour alone.** Each key has a round badge of its tone with an icon that says which way:
