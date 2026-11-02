@@ -281,7 +281,7 @@ test.describe('The melody range in the song settings', () => {
   test("a setlist's key picker marks each key by how the song's range fits it", async ({
     page,
   }) => {
-    // written in G (D4 to E5); this setlist has the song in A: F#5, too high
+    // written in G (D4–E5); this setlist has the song in A: F#5, too high
     await seedSong(page, { setlistId: 'range-test-setlist', range: 'D4-E5' })
     await page.goto('/setlist/range-test-setlist')
     await page.locator('setlist-overview song-card').first().click()
@@ -292,10 +292,16 @@ test.describe('The melody range in the song settings', () => {
     await expect(key.getByRole('button', { name: /^Key/ })).toHaveAccessibleName('Key: A')
     await key.getByRole('button', { name: /^Key/ }).click()
     // (the key in use is marked in the list, where keys are chosen: A is F#5, too high)
-    await expect(key.getByRole('option', { name: /^A,/ })).toHaveAccessibleName('A, too high')
+    await expect(key.getByRole('option', { name: /^A,/ })).toHaveAccessibleName(
+      'A, E4–F#5, too high'
+    )
     // (the hints are the distance from the key in use, A; the range is the chart's, from G)
-    await expect(key.getByRole('option', { name: /^F\s/ })).toHaveAccessibleName('F -4, high')
-    await expect(key.getByRole('option', { name: /^E\s/ })).toHaveAccessibleName('E -5, in range')
+    await expect(key.getByRole('option', { name: /^F\s/ })).toHaveAccessibleName(
+      'F -4, C4–D5, high'
+    )
+    await expect(key.getByRole('option', { name: /^E\s/ })).toHaveAccessibleName(
+      'E -5, B3–C#5, in range'
+    )
   })
 })
 

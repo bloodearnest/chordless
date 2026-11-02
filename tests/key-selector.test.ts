@@ -79,7 +79,7 @@ describe('key-selector', () => {
   })
 
   describe('the melody range', () => {
-    // Washed, written in G: D4 to E5
+    // Washed, written in G: D4–E5
     const D4_TO_E5 = { low: 62, high: 76 }
 
     /** A key selector at G, with the keys as the app lists them: a semitone apart, the highest first */
@@ -129,12 +129,40 @@ describe('key-selector', () => {
     })
 
     it('stacks two triangles down for a bottom that is too low, as two up for a top too high', async () => {
-      // F#3 to C5 in G: the bottom is red, the top fits
+      // F#3–C5 in G: the bottom is red, the top fits
       await withRange({ low: 54, high: 72 })
       const badge = must(noteOf('G'))
       expect(badge.classList.contains('tone-red')).to.equal(true)
       expect(badge.getAttribute('data-direction')).to.equal('low')
       expect(badge.querySelectorAll('polygon')).to.have.length(2)
+    })
+
+    it('shows the lowest and highest note in each key, to say what the colour means', async () => {
+      await withRange(D4_TO_E5)
+      const notesOf = (key: string) => must(optionOf(key)?.querySelector('.option-notes'))
+      expect(notesOf('A').textContent).to.equal('E4–F#5')
+      expect(notesOf('G').textContent).to.equal('D4–E5')
+      expect(notesOf('E').textContent).to.equal('B3–C#5')
+      // spelled as the key spells them
+      expect(notesOf('Eb').textContent).to.equal('Bb3–C5')
+      expect(notesOf('F#').textContent).to.equal('C#4–D#5')
+    })
+
+    it('puts the note that is out of range in bold, and none when the key fits', async () => {
+      await withRange(D4_TO_E5)
+      const outOf = (key: string) =>
+        [...(optionOf(key)?.querySelectorAll('.option-notes .out') ?? [])].map(e => e.textContent)
+      expect(outOf('A')).to.deep.equal(['F#5']) // the top, too high
+      expect(outOf('G')).to.deep.equal(['E5']) // the top, at the edge
+      expect(outOf('D')).to.deep.equal(['A3']) // the bottom, at the edge
+      expect(outOf('E')).to.deep.equal([])
+      await withRange({ low: 55, high: 78 })
+      expect(outOf('G')).to.deep.equal(['G3', 'F#5']) // both
+    })
+
+    it('shows no notes when there is no range', async () => {
+      await withRange(null)
+      expect(selector.shadowRoot.querySelector('.option-notes')).to.equal(null)
     })
 
     it('draws every badge the same size, whatever it says', async () => {
@@ -148,10 +176,10 @@ describe('key-selector', () => {
 
     it('says it for a screen reader, with the key and its distance, and "in range" for a green one', async () => {
       await withRange(D4_TO_E5)
-      expect(optionOf('A')?.getAttribute('aria-label')).to.equal('A +2, too high')
-      expect(optionOf('E')?.getAttribute('aria-label')).to.equal('E -3, in range')
+      expect(optionOf('A')?.getAttribute('aria-label')).to.equal('A +2, E4–F#5, too high')
+      expect(optionOf('E')?.getAttribute('aria-label')).to.equal('E -3, B3–C#5, in range')
       // (the current key has no distance, so no gap in what is said)
-      expect(optionOf('G')?.getAttribute('aria-label')).to.equal('G, high')
+      expect(optionOf('G')?.getAttribute('aria-label')).to.equal('G, D4–E5, high')
     })
 
     it('keeps the key in use plain on the button: the fit is for choosing a key, then out of the way', async () => {
@@ -168,7 +196,7 @@ describe('key-selector', () => {
     })
 
     it('names both ends when both are out of range', async () => {
-      // G3 to F#5 in G: the top is red, the bottom is the edge
+      // G3–F#5 in G: the top is red, the bottom is the edge
       await withRange({ low: 55, high: 78 })
       expect(noteOf('G')?.getAttribute('title')).to.equal('too high, low')
     })
