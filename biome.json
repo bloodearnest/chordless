@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -20,7 +20,9 @@
       "!tests/fixtures",
       "!**/*.html",
       "!**/*.css",
-      "!**/*.svg"
+      "!**/*.svg",
+      "!**/*.md",
+      "!**/*.yml"
     ]
   },
   "formatter": {
@@ -68,6 +70,7 @@
         "noUnusedPrivateClassMembers": "error",
         "noUnusedVariables": "error",
         "noUnusedImports": "error",
+        "usePlaywrightValidDescribeCallback": "off",
         "useIsNan": "error",
         "useValidForDirection": "error",
         "useValidTypeof": "error",
@@ -129,6 +132,10 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["public/floor.js"],
+      "linter": { "rules": { "complexity": { "useArrowFunction": "off" } } }
+    },
     {
       "includes": ["src/*.{js,ts}", "src/components/**/*.{js,ts}", "src/js/**/*.{js,ts}"],
       "linter": {
