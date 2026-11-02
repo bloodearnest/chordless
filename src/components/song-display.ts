@@ -4,8 +4,10 @@ import { ContextConsumer } from '@lit/context'
 import type { ChartSection, ParsedChart } from '../js/data-types.ts'
 import { displayPreferencesContext } from '../js/display-preferences.ts'
 import { attachNotes, type ChartNotes } from '../js/notes/shown.ts'
+import { isEditMode } from '../js/setlist/edit-mode-ui.ts'
 import { transposeKeyName } from '../js/transpose.ts'
 import { noteStyles, renderNotes } from './chart-note.ts'
+import { NoteRequestEvent } from './song-section.ts'
 
 /** How chords are shown before the page has said */
 const NO_DISPLAY_PREFERENCES = { nashville: false, unicodeAccidentals: false }
@@ -47,8 +49,29 @@ export class SongDisplay extends LitElement {
       .song-notes {
         display: flex;
         flex-wrap: wrap;
+        align-items: baseline;
         gap: 0 0.8em;
         margin: 0 0.5rem 0.25rem;
+      }
+
+      .song-notes .note {
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      .song-notes.editing .note {
+        cursor: pointer;
+      }
+
+      .add-song-note {
+        border: 1px dashed var(--note-private-color);
+        border-radius: 6px;
+        background: none;
+        color: var(--note-private-color);
+        font-family: var(--font-family-note);
+        font-size: var(--font-note);
+        padding: 0 0.5em;
+        cursor: pointer;
       }
     `,
   ]
@@ -77,11 +100,45 @@ export class SongDisplay extends LitElement {
     )
 
     const song = this.notes?.song ?? []
+    const editing = isEditMode()
     return html`${
-      song.length
-        ? html`<div class="song-notes">${song.map(note => renderNotes([note], note.orphan))}</div>`
+      song.length || editing
+        ? html`<div class=${editing ? 'song-notes editing' : 'song-notes'} @click=${this._onSongNoteClick}>
+              ${song.map(note => renderNotes([note], note.orphan))}
+              ${
+                editing
+                  ? html`<button class="add-song-note" @click=${this._onAddSongNote}>
+                      + Note on the whole song
+                    </button>`
+                  : nothing
+              }
+            </div>`
         : nothing
     }${sections}`
+  }
+
+  /** Edit mode: a note of the song's is tapped to change it */
+  _onSongNoteClick(event: Event): void {
+    if (!isEditMode()) return
+    const note = (event.target as HTMLElement).closest<HTMLElement>('[data-note-id]')
+    if (!note) return
+    this.dispatchEvent(
+      new NoteRequestEvent(
+        { songIndex: this.songIndex, sectionIndex: 0 },
+        { place: 'song', noteId: note.dataset.noteId },
+        note
+      )
+    )
+  }
+
+  _onAddSongNote(event: Event): void {
+    this.dispatchEvent(
+      new NoteRequestEvent(
+        { songIndex: this.songIndex, sectionIndex: 0 },
+        { place: 'song' },
+        event.currentTarget as HTMLElement
+      )
+    )
   }
 
   _renderSection(section: ChartSection, index: number) {

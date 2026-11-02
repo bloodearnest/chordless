@@ -1,0 +1,116 @@
+import { expect, fixture, html } from '@open-wc/testing'
+import '../src/components/note-editor.ts'
+import type { NoteEditor, NoteEditorRequest } from '../src/components/note-editor.ts'
+
+const { describe, it } = window
+
+const request = (set: Partial<NoteEditorRequest> = {}): NoteEditorRequest => ({
+  anchorElement: document.body,
+  about: '“grace”',
+  text: '',
+  kind: { scope: 'setlist', reach: 'private' },
+  canShare: true,
+  isNew: true,
+  ...set,
+})
+
+describe('note-editor', () => {
+  async function open(set: Partial<NoteEditorRequest> = {}) {
+    const editor = await fixture<NoteEditor>(html`<note-editor></note-editor>`)
+    const answer = editor.edit(request(set))
+    await editor.updateComplete
+    const root = editor.shadowRoot as ShadowRoot
+    await new Promise(resolve => requestAnimationFrame(resolve))
+    const dialog = root.querySelector('dialog') as HTMLDialogElement
+    const text = root.querySelector('textarea') as HTMLTextAreaElement
+    const radio = (label: string) =>
+      Array.from(root.querySelectorAll<HTMLLabelElement>('label'))
+        .find(each => each.textContent?.trim() === label)
+        ?.querySelector('input') as HTMLInputElement
+    const button = (label: string) =>
+      Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
+        each => each.textContent?.trim() === label
+      )
+    return { editor, answer, dialog, text, radio, button }
+  }
+
+  const type = (text: HTMLTextAreaElement, value: string) => {
+    text.value = value
+    text.dispatchEvent(new Event('input'))
+  }
+
+  it('opens on a new note for this setlist and just the user, and answers with what was written', async () => {
+    const { answer, dialog, text, radio, button } = await open()
+    expect(dialog.open).to.equal(true)
+    expect(dialog.getAttribute('aria-label')).to.equal('Note')
+    expect(radio('This setlist').checked).to.equal(true)
+    expect(radio('Just me').checked).to.equal(true)
+    expect(button('Delete')).to.equal(undefined)
+    type(text, '  softly ')
+    button('Done')?.click()
+    expect(await answer).to.deep.equal({
+      action: 'save',
+      text: 'softly',
+      kind: { scope: 'setlist', reach: 'private' },
+    })
+    expect(dialog.open).to.equal(false)
+  })
+
+  it('answers with null when cancelled or dismissed', async () => {
+    const first = await open()
+    first.button('Cancel')?.click()
+    expect(await first.answer).to.equal(null)
+    const second = await open()
+    second.dialog.close()
+    expect(await second.answer).to.equal(null)
+  })
+
+  it('edits an existing note as it is, and can delete it', async () => {
+    const { answer, text, radio, button } = await open({
+      isNew: false,
+      text: 'repeat 4×',
+      kind: { scope: 'setlist', reach: 'shared' },
+    })
+    expect(text.value).to.equal('repeat 4×')
+    expect(radio('The team').checked).to.equal(true)
+    button('Delete')?.click()
+    expect(await answer).to.deep.equal({ action: 'delete' })
+  })
+
+  it('shares only for those who can, and only a note for this setlist', async () => {
+    const reader = await open({ canShare: false })
+    expect(reader.radio('The team').disabled).to.equal(true)
+    expect(reader.dialog.textContent).to.contain('Only people who can edit the setlist')
+    reader.button('Cancel')?.click()
+
+    const writer = await open()
+    expect(writer.radio('The team').disabled).to.equal(false)
+    writer.radio('The team').click()
+    await writer.editor.updateComplete
+    expect(writer.radio('The team').checked).to.equal(true)
+    // For the song, it is the user's own again, and cannot be shared
+    writer.radio('Always, this song').click()
+    await writer.editor.updateComplete
+    expect(writer.radio('Just me').checked).to.equal(true)
+    expect(writer.radio('The team').disabled).to.equal(true)
+    writer.button('Done')?.click()
+    expect(await writer.answer).to.deep.equal({
+      action: 'save',
+      text: '',
+      kind: { scope: 'song', reach: 'private' },
+    })
+  })
+
+  it('saves with Ctrl+Enter, and a second request replaces the first (which is answered null)', async () => {
+    const { editor, answer, text } = await open()
+    type(text, 'drop out')
+    text.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }))
+    expect(await answer).to.deep.include({ action: 'save', text: 'drop out' })
+    const later = editor.edit(request())
+    const latest = editor.edit(request({ text: 'again' }))
+    expect(await later).to.equal(null)
+    await editor.updateComplete
+    ;((editor.shadowRoot as ShadowRoot).querySelector('dialog') as HTMLDialogElement).close()
+    expect(await latest).to.equal(null)
+  })
+})

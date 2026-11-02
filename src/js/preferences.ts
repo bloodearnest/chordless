@@ -49,6 +49,17 @@ export class CapoPreferenceEvent extends Event {
     this.enabled = enabled
   }
 }
+/** Which notes on a chart to show changed (sent on window) */
+export class NotesPreferenceEvent extends Event {
+  static readonly type = 'preferences:notes-changed'
+  readonly shared: boolean
+  readonly mine: boolean
+  constructor(shared: boolean, mine: boolean) {
+    super(NotesPreferenceEvent.type)
+    this.shared = shared
+    this.mine = mine
+  }
+}
 /** The keep-the-screen-awake preference changed (sent on window) */
 export class KeepAwakePreferenceEvent extends Event {
   static readonly type = 'preferences:keep-awake-changed'
@@ -165,6 +176,20 @@ const capo = definePreference<boolean>({
   changed: on => new CapoPreferenceEvent(on),
 })
 
+// Notes on a chart (docs/NOTES.md): both kinds shown unless turned off
+const showSharedNotes = definePreference<boolean>({
+  keys: ['show_shared_notes'],
+  read: ([stored]) => stored !== 'false',
+  write: on => (on ? 'true' : 'false'),
+  blocked: true,
+})
+const showMyNotes = definePreference<boolean>({
+  keys: ['show_my_notes'],
+  read: ([stored]) => stored !== 'false',
+  write: on => (on ? 'true' : 'false'),
+  blocked: true,
+})
+
 const keepAwake = definePreference<boolean>({
   keys: ['keep_screen_awake'],
   read: ([stored]) => stored !== 'false',
@@ -231,6 +256,17 @@ export const getSectionDefaults = (): SectionDefaults => sectionDefaults.get()
 export const getCapoPreference = (): boolean => capo.get()
 export const setCapoPreference = (value: boolean) => capo.set(!!value)
 
+/** Which notes on a chart are shown: those shared with the team, and the user's own */
+export const getNotesPreference = (): { shared: boolean; mine: boolean } => ({
+  shared: showSharedNotes.get(),
+  mine: showMyNotes.get(),
+})
+export function setNotesPreference(which: 'shared' | 'mine', on: boolean) {
+  ;(which === 'shared' ? showSharedNotes : showMyNotes).set(on)
+  const { shared, mine } = getNotesPreference()
+  window.dispatchEvent(new NotesPreferenceEvent(shared, mine))
+}
+
 /** Whether to keep the screen awake while a setlist is open: on unless the user turned it off */
 export const getKeepAwakePreference = (): boolean => keepAwake.get()
 export const setKeepAwakePreference = (value: boolean) => keepAwake.set(!!value)
@@ -258,6 +294,7 @@ declare global {
     [AccidentalsPreferenceEvent.type]: AccidentalsPreferenceEvent
     [SectionDefaultsEvent.type]: SectionDefaultsEvent
     [CapoPreferenceEvent.type]: CapoPreferenceEvent
+    [NotesPreferenceEvent.type]: NotesPreferenceEvent
   }
 }
 

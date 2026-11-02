@@ -36,7 +36,7 @@ import { leaderName } from './leaders.ts'
 import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
 import { LiveSyncStatusEvent } from './live-sync-status.ts'
 import { goTo, setPageTitle } from './navigation.ts'
-import { withAnnotations } from './notes/store.ts'
+import { canShareNotes, withAnnotations } from './notes/store.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getSpacePeople, identifyMe, settleLeader } from './people.ts'
@@ -53,11 +53,13 @@ import {
   renumberSongs,
   saveSetlistLocalState,
 } from './setlist/local-state.ts'
+import { NotesController } from './setlist/notes-controller.ts'
 import { OverviewController } from './setlist/overview-controller.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
 import { SectionController } from './setlist/section-controller.ts'
 import { SetlistHeader } from './setlist/setlist-header.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
+import { getSpaceById } from './space.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
 import {
@@ -131,6 +133,7 @@ export class SetlistPage {
   currentSetlistId: string | null
   currentSetlist: Setlist | undefined
   sections: SectionController
+  notes: NotesController
   /** What the header shows */
   header: SetlistHeader
   sectionObserver: IntersectionObserver | null
@@ -195,6 +198,7 @@ export class SetlistPage {
     this.currentSetlist = undefined
     // Track section visibility state: { songIndex: { sectionIndex: { hideMode: 'none'|'section'|'chords'|'lyrics' } } }
     this.sections = new SectionController(this)
+    this.notes = new NotesController(this)
     this.header = new SetlistHeader(this)
     this.sectionObserver = null
     this.overview = new OverviewController(this)
@@ -420,6 +424,10 @@ export class SetlistPage {
       // Kick off background pad caching for all keys in this setlist
       preloadPadKeysForSongs(this.songs)
 
+      // The notes on each song, to draw with it
+      await this.notes.load()
+      if (this._disposed) return
+
       // Initialize section states (load saved overrides for this setlist)
       this.sections.states = {}
       this.loadState()
@@ -474,6 +482,7 @@ export class SetlistPage {
 
         // Set up section control buttons
         this.sections.listen()
+        this.notes.listen(this._abort.signal)
 
         // Apply saved state to sections
         this.sections.applyAll()
@@ -538,6 +547,7 @@ export class SetlistPage {
         songDisplay.parsed = song.parsed
         songDisplay.songIndex = song.songIndex
         songDisplay.capo = this._capoEnabled ? song.currentCapo || 0 : 0
+        songDisplay.notes = this.notes.chartNotes(index)
         const songContent = document.createElement('div')
         songContent.className = 'song-content'
         songContent.appendChild(songDisplay)
@@ -586,6 +596,7 @@ export class SetlistPage {
 
       // Update all sections to reflect non-edit mode
       this.sections.applyAll()
+      this.notes.refreshAll()
 
       // Stamp the setlist as modified (each edit saved itself as it was made)
       await this.editSetlist(() => undefined)
@@ -1040,6 +1051,7 @@ export class SetlistPage {
           })
           // Update all sections based on edit mode
           this.sections.applyAll()
+          this.notes.refreshAll()
         } else {
           // (each edit saved itself as it was made: this stamps the setlist as modified)
           leaveEditMode(this.root, appHeader, async () => {
@@ -1047,6 +1059,7 @@ export class SetlistPage {
           })
           // Refresh song sections immediately so their controls begin fading out in sync
           this.sections.applyAll()
+          this.notes.refreshAll()
         }
       },
       { signal }
@@ -1376,6 +1389,7 @@ export class SetlistPage {
         songDisplay.parsed = song.parsed
         songDisplay.songIndex = song.songIndex
         songDisplay.capo = this._capoEnabled ? song.currentCapo || 0 : 0
+        songDisplay.notes = this.notes.chartNotes(songIndex)
         songContent.appendChild(songDisplay)
 
         // Wait for Lit to render the shadow DOM contents
@@ -1618,12 +1632,18 @@ export class SetlistPage {
   }
 
   /** Set the notes everyone with the setlist sees on the song at `index` (docs/NOTES.md) */
-  async changeSongAnnotationsInSetlist(index: number, notes: SharedChartNote[]) {
-    await this.#changeEntry(index, entry => withAnnotations(entry, notes))
+  async setAnnotations(index: number, notes: SharedChartNote[]) {
+    await this.#changeEntry(index, entry => withAnnotations(entry, notes), false)
+  }
+
+  /** Whether the user can share a note on this setlist with the team (docs/NOTES.md) */
+  async canShare(): Promise<boolean> {
+    const space = await getSpaceById(this.spaceId())
+    return canShareNotes(space, this.currentSetlist)
   }
 
   /** Change the song at `index`, in the setlist as it is stored, and show it so */
-  async #changeEntry(index: number, change: (entry: SetlistEntry) => void) {
+  async #changeEntry(index: number, change: (entry: SetlistEntry) => void, rerender = true) {
     const shown = this.currentSetlist?.songs?.[index]
     if (!shown) return
     await this.editSetlist(stored => {
@@ -1631,7 +1651,7 @@ export class SetlistPage {
       if (!entry || !sameEntry(entry, shown)) return NO_CHANGE
       change(entry)
     })
-    if (this.currentSetlistId) await this.renderSetlist(this.currentSetlistId)
+    if (rerender && this.currentSetlistId) await this.renderSetlist(this.currentSetlistId)
   }
 
   async deleteSongFromSetlist(index: number) {

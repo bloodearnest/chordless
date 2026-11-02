@@ -24,9 +24,12 @@ export function groupSegmentsIntoUnits(
     // spaces alone is the gap after its chord, which stays.
     const previous = pieces[pieces.length - 1]
     const gap = lyrics.match(/^\s+/)?.[0]
+    // (where in the line each piece starts, when the segment says where it does)
+    let consumed = 0
     if (gap && /\S/.test(lyrics) && previous?.lyrics) {
       previous.lyrics += gap
       lyrics = lyrics.slice(gap.length)
+      consumed = gap.length
     }
     if (!lyrics) {
       if (segment.chord || segment.notes?.length) pieces.push({ ...segment, lyrics })
@@ -35,7 +38,14 @@ export function groupSegmentsIntoUnits(
     // (every character is a space or not, so non-empty lyrics always match)
     const words = lyrics.match(/\s*\S+\s*|\s+/g) as string[]
     words.forEach((word, index) => {
-      pieces.push(index === 0 ? { ...segment, lyrics: word } : { chord: '', lyrics: word })
+      const offset = segment.offset === undefined ? undefined : segment.offset + consumed
+      consumed += word.length
+      const placed = offset === undefined ? {} : { offset }
+      pieces.push(
+        index === 0
+          ? { ...segment, lyrics: word, ...placed }
+          : { chord: '', lyrics: word, ...placed }
+      )
     })
   }
 

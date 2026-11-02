@@ -5,7 +5,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { ChartSection } from '../src/js/data-types.ts'
-import { placeNotes, resolveAnchor, sectionAnchor, textAnchor } from '../src/js/notes/anchor.ts'
+import {
+  placeNotes,
+  resolveAnchor,
+  sectionAnchor,
+  snapOffset,
+  textAnchor,
+} from '../src/js/notes/anchor.ts'
 
 const section = (label: string | null, ...lines: string[][]): ChartSection => ({
   type: 'section',
@@ -116,4 +122,16 @@ test('every note is placed, in the order given', () => {
       ['b', 'song'],
     ]
   )
+})
+
+test('an approximate spot snaps to the nearest start of a word or segment', () => {
+  const verse = chart[0] as ChartSection
+  // "Amazing " | "grace how sweet": words start at 0, 8, 14, 18; the segment at 8
+  assert.equal(snapOffset(verse, 0, 0), 0)
+  assert.equal(snapOffset(verse, 0, 7), 8)
+  assert.equal(snapOffset(verse, 0, 10), 8)
+  assert.equal(snapOffset(verse, 0, 16), 14)
+  assert.equal(snapOffset(verse, 0, 99), 18)
+  assert.equal(snapOffset(verse, 5, 3), 0)
+  assert.equal(snapOffset(section('Hy', ['Maj - ', 'es - ', 'ty']), 0, 7), 6)
 })
