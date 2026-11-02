@@ -6,7 +6,10 @@ import {
   describeSignature,
   formatRange,
   noteName,
+  parseRange,
   rangeOfChart,
+  rangeOfMetadata,
+  semitonesBetween,
   signatureMatchesKey,
   withRange,
 } from '../src/js/chart-range.ts'
@@ -144,6 +147,25 @@ describe('chart-range', () => {
   it('takes a key it cannot read to match, as there is no telling', () => {
     expect(signatureMatchesKey(2, 'Hm')).to.equal(true)
     expect(signatureMatchesKey(2, '')).to.equal(true)
+  })
+
+  it('reads a range from a directive value, and from the metadata of a parsed chart', () => {
+    expect(parseRange('Bb3-Eb5')).to.deep.equal(range('Bb3', 'Eb5'))
+    expect(parseRange('nonsense')).to.equal(null)
+    expect(rangeOfMetadata({ key: 'G', x_chordless_range: 'D4-E5' })).to.deep.equal(
+      range('D4', 'E5')
+    )
+    expect(rangeOfMetadata({ key: 'G' })).to.equal(null)
+    expect(rangeOfMetadata(undefined)).to.equal(null)
+  })
+
+  it('counts the semitones between keys the near way round, as the key picker lists them', () => {
+    expect(semitonesBetween('G', 'A')).to.equal(2)
+    expect(semitonesBetween('G', 'E')).to.equal(-3)
+    expect(semitonesBetween('B', 'C')).to.equal(1)
+    expect(semitonesBetween('C', 'B')).to.equal(-1)
+    expect(semitonesBetween('G', 'G')).to.equal(0)
+    expect(semitonesBetween('Em', 'Am')).to.equal(5)
   })
 
   it('keeps Windows line endings', () => {

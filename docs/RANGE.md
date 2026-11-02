@@ -50,12 +50,22 @@ which keys it stops being red in.
 
 ## In the picker
 
-- **Not by colour alone.** Each key also has a mark and a word ("high", "low", "high and low"), for
-  anyone who cannot tell the colours apart, and for a screen reader.
-- **Always shown**, in live mode as in edit mode: nothing is withheld, and a red key can be chosen.
-  It is a hint, never a gate.
-- In the library and in a setlist (where a song's key is its own): the range is the song's, and the
-  key shown is the setlist's.
+Built: `key-selector` takes the song's `range` and the key it is written in (`rangeKey`), and every
+key in its list is marked by `rangeStatus` (`describeRange` in `voice-range.ts` gives the mark and
+words). A song with no range, or no key to measure it from, shows the picker as it was.
+
+- **Not by colour alone.** Each key is a pill with a mark and words: green `✓` (nothing, in range),
+  yellow `!` with "high", "low" or both, red `✕` with "too high", "too low" or both ("too high, low"
+  when the top is red and the bottom the edge). A screen reader gets it in the key's label ("A +2,
+  too high", "E -3, in range"). The pills are solid colour with dark text, so they read the same
+  on the popup's navy and on the lighter row of the key in use (coloured text on that row fails the
+  contrast check).
+- **The key in use** has its mark on the picker's button too, and in the button's label ("Key: G,
+  high"), so it is there when the popup is shut.
+- **A hint, never a gate.** A red key can be chosen as any other can.
+- **Where.** The library's song view, the setlist's song settings, and the key on a song's card in
+  edit mode. Each key's distance shown is from the key in use, as it always was; the range is
+  measured from the key the chart is written in, going the near way round.
 
 ## Getting a range from a lead sheet
 

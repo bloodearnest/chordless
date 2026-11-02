@@ -1,3 +1,5 @@
+import { semitonesBetween } from '../js/chart-range.ts'
+import { describeRange, type NoteRange, rangeStatus } from '../js/voice-range.ts'
 import { OptionPicker, type PickerOption } from './option-picker.ts'
 
 /** A different key was chosen; value is the key */
@@ -23,6 +25,9 @@ export class KeyChangeEvent extends Event {
  * @property {Array<string>} keys - Available keys to select from
  * @property {string} originalKey - Original key of the song (marked with *)
  * @property {boolean} editMode - Whether the key can be changed
+ * @property {NoteRange|null} range - The melody's range, if known: each key is then marked as green,
+ *   yellow or red by whether the range fits voices in it (docs/RANGE.md), with a mark and words
+ * @property {string} rangeKey - The key the range is written in (the chart's own)
  *
  * Events:
  * @fires KeyChangeEvent - When a new key is selected (value: string)
@@ -33,10 +38,14 @@ export class KeySelector extends OptionPicker<string> {
     value: { type: String },
     keys: { type: Array, attribute: false },
     originalKey: { type: String, attribute: 'original-key' },
+    range: { attribute: false },
+    rangeKey: { type: String, attribute: 'range-key' },
   }
 
   declare keys: string[]
   declare originalKey: string
+  declare range: NoteRange | null
+  declare rangeKey: string
 
   constructor() {
     super()
@@ -44,6 +53,8 @@ export class KeySelector extends OptionPicker<string> {
     this.value = '-'
     this.keys = []
     this.originalKey = ''
+    this.range = null
+    this.rangeKey = ''
   }
 
   override _displayValue(): string {
@@ -62,6 +73,11 @@ export class KeySelector extends OptionPicker<string> {
         value: key,
         label: key === this.originalKey ? `${key}*` : key,
         hint: offset === 0 ? '' : `${offset > 0 ? '+' : '-'}${Math.abs(offset)}`,
+        // (the range is the chart's, in its own key: each key is a shift from there)
+        ...(this.range &&
+          this.rangeKey && {
+            range: describeRange(rangeStatus(this.range, semitonesBetween(this.rangeKey, key))),
+          }),
       }
     })
   }

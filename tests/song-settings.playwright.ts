@@ -277,6 +277,26 @@ test.describe('Media player settings', () => {
   })
 })
 
+test.describe('The melody range in the song settings', () => {
+  test("a setlist's key picker marks each key by how the song's range fits it", async ({
+    page,
+  }) => {
+    // written in G (D4 to E5); this setlist has the song in A: F#5, too high
+    await seedSong(page, { setlistId: 'range-test-setlist', range: 'D4-E5' })
+    await page.goto('/setlist/range-test-setlist')
+    await page.locator('setlist-overview song-card').first().click()
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    await page.locator('#app-header').getByRole('button', { name: 'Toggle edit mode' }).click()
+    await page.locator('#musical-metadata').click()
+    const key = page.locator('#key-selector')
+    await expect(key.getByRole('button', { name: /^Key/ })).toHaveAccessibleName('Key: A, too high')
+    await key.getByRole('button', { name: /^Key/ }).click()
+    // (the hints are the distance from the key in use, A; the range is the chart's, from G)
+    await expect(key.getByRole('option', { name: /^F\s/ })).toHaveAccessibleName('F -4, high')
+    await expect(key.getByRole('option', { name: /^E\s/ })).toHaveAccessibleName('E -5, in range')
+  })
+})
+
 test.describe('Popups in the song settings', () => {
   test('a tap outside the key picker, or Esc, closes it and leaves the settings open', async ({
     page,

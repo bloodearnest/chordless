@@ -5,6 +5,7 @@
  * (the setlist, the song being viewed); what the header's controls do is the page's, which
  * listens to them (SetlistPage._listenToControls).
  */
+
 import type { AppHeader } from '../../components/app-header.ts'
 import type { CapoSelector } from '../../components/capo-selector.ts'
 import type { KeySelector } from '../../components/key-selector.ts'
@@ -12,6 +13,7 @@ import type { MusicalMetadataDisplay } from '../../components/musical-metadata-d
 import type { SetlistDiffers } from '../../components/setlist-differs.ts'
 import type { SetlistShare } from '../../components/setlist-share.ts'
 import type { SongSettingsPopover } from '../../components/song-settings-popover.ts'
+import { rangeOfMetadata } from '../chart-range.ts'
 import type { Setlist } from '../data-types.ts'
 import { type ChordlessDB, SETLIST_TYPES } from '../db.ts'
 import { leaderName } from '../leaders.ts'
@@ -254,6 +256,9 @@ export class SetlistHeader {
     keySelector.value = key
     keySelector.keys = getAvailableKeys(key)
     keySelector.originalKey = this.#song?.originalKey ?? ''
+    // (the melody's range is in the chart's own key)
+    keySelector.range = rangeOfMetadata(this.#song?.parsed.metadata)
+    keySelector.rangeKey = this.#song?.originalKey ?? ''
     keySelector.editMode = isEditMode()
   }
 
