@@ -390,7 +390,7 @@ export class LibraryView extends PageView {
     keySelector.originalKey = (this.#song?.originalKey || this.#parsed?.metadata?.key) as string
     // (the melody's range is in the chart's own key)
     keySelector.range = rangeOfMetadata(this.#parsed?.metadata)
-    keySelector.rangeKey = this.#parsed?.metadata?.key ?? ''
+    keySelector.rangeKey = this.#parsed?.metadata?.key as string
     // The key is saved with the song, which a user who can only read can't change
     keySelector.editMode = this.#editMode
   }
