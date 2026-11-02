@@ -54,13 +54,15 @@ Built: `key-selector` takes the song's `range` and the key it is written in (`ra
 key in its list is marked by `rangeStatus` (`describeRange` in `voice-range.ts` gives the mark and
 words). A song with no range, or no key to measure it from, shows the picker as it was.
 
-- **Not by colour alone.** Each key is a pill with a mark and words: green `✓` (nothing, in range),
-  yellow `!` with "high", "low" or both, red `✕` with "too high", "too low" or both ("too high, low"
-  when the top is red and the bottom the edge). A screen reader gets it in the key's label ("A +2,
-  too high", "E -3, in range"). The pills are solid colour with dark text, so they read the same
-  on the popup's navy and on the lighter row of the key in use (coloured text on that row fails the
-  contrast check).
-- **The key in use** has its mark on the picker's button too, and in the button's label ("Key: G,
+- **Not by colour alone.** Each key has a round badge of its tone with an icon that says which way:
+  a tick when it fits; a triangle up for the top at the edge (yellow), two stacked when too high
+  (red); down for the bottom, the same; one up over one down when both ends are out. Every badge
+  is drawn the same size (an SVG, not characters: side-by-side arrows would be wider than one),
+  so they line up. The words ("too high", "in range") are the hover tip, and a screen reader has
+  them in the key's label ("A +2, too high", "E -3, in range"). The icon is dark on the solid
+  colour, which reads the same on the popup's navy and on the lighter row of the key in use
+  (coloured text on that row fails the contrast check).
+- **The key in use** has its badge on the picker's button too, and in the button's label ("Key: G,
   high"), so it is there when the popup is shut.
 - **A hint, never a gate.** A red key can be chosen as any other can.
 - **Where.** The library's song view, the setlist's song settings, and the key on a song's card in

@@ -47,7 +47,9 @@ test.describe('Song library', () => {
     await expect(keySelector.getByRole('option', { name: /^E\s/ })).toHaveAccessibleName(
       'E -3, in range'
     )
-    await expect(keySelector.getByRole('option', { name: /^A\s/ })).toContainText('too high')
+    await expect(
+      keySelector.getByRole('option', { name: /^A\s/ }).locator('.range-badge')
+    ).toHaveAttribute('title', 'too high')
 
     // (a hint, not a gate)
     await keySelector.getByRole('option', { name: /^A\s/ }).click()

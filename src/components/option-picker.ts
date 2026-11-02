@@ -3,6 +3,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { DialogPopup } from '../js/dialog-popup.ts'
 import { frameBounds } from '../js/utils/frame.ts'
 import type { RangeNote } from '../js/voice-range.ts'
+import { rangeBadge, rangeBadgeStyles } from './range-badge.ts'
 
 /**
  * OptionPicker: a label and a value which, in edit mode, is a button opening
@@ -27,7 +28,7 @@ export interface PickerOption<V> {
   value: V
   label: string
   hint: string
-  /** How the option fares for the melody's range (key-selector), shown by a mark and words, not by colour alone */
+  /** How the option fares for the melody's range (key-selector), shown by a coloured badge whose icon says which way, not by colour alone */
   range?: RangeNote
 }
 
@@ -45,7 +46,9 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
   _button: Ref<HTMLButtonElement>
   _popup: DialogPopup
 
-  static override styles = css`
+  static override styles = [
+    rangeBadgeStyles,
+    css`
     :host {
       display: contents;
     }
@@ -141,52 +144,19 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
       gap: 1rem;
     }
 
-    /*
-     * A key's range: a mark and words on a pill of its tone. Dark text on a solid colour reads
-     * the same on the popup's navy and on the lighter row of the key in use, which coloured text
-     * does not (it fails the contrast check there)
-     */
-    .range-note {
-      display: inline-flex;
-      align-items: baseline;
-      gap: 0.35rem;
-      padding: 0.1rem 0.55rem;
-      border-radius: 999px;
-      font-size: var(--font-ui-small);
-      font-weight: 600;
-    }
-
-    .range-mark {
-      font-weight: 700;
-    }
-
-    .tone-green {
-      background: var(--color-success, #27ae60);
-      color: #14202b;
-    }
-
-    .tone-yellow {
-      background: var(--color-warning, #f39c12);
-      color: #14202b;
-    }
-
-    .tone-red {
-      background: color-mix(in srgb, var(--color-danger, #e74c3c) 70%, white);
-      color: #14202b;
-    }
-
-    /* On the button: just the mark, in a round badge */
-    .picker-button .range-mark {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.3em;
-      height: 1.3em;
+    /* On the button: the same, a little smaller */
+    .picker-button .range-badge {
+      width: 1.35rem;
+      height: 1.35rem;
       margin-left: 0.4rem;
-      border-radius: 50%;
-      font-size: var(--font-ui-small);
     }
-  `
+
+    .picker-button .range-badge svg {
+      width: 0.8rem;
+      height: 0.8rem;
+    }
+  `,
+  ]
 
   constructor() {
     super()
@@ -257,7 +227,7 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
         aria-expanded=${this._popup.isOpen ? 'true' : 'false'}
         @click=${() => this._popup.toggle()}
       >
-        ${this._displayValue()}${current ? html`<span class="range-mark tone-${current.tone}" aria-hidden="true">${current.mark}</span>` : nothing}
+        ${this._displayValue()}${current ? rangeBadge(current) : nothing}
       </button>
       <dialog
         id="options"
@@ -281,11 +251,7 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
                 <span class="option-label">${option.label}</span>
                 <span class="option-end">
                   <span class="option-hint">${option.hint}</span>
-                  ${
-                    option.range
-                      ? html`<span class="range-note tone-${option.range.tone}"><span class="range-mark" aria-hidden="true">${option.range.mark}</span>${option.range.words}</span>`
-                      : nothing
-                  }
+                  ${option.range ? rangeBadge(option.range) : nothing}
                 </span>
               </button>
             `
