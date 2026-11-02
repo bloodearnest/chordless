@@ -1,6 +1,15 @@
 import { css, html, LitElement } from 'lit'
+import {
+  noteName,
+  rangeOfMetadata,
+  rangeSpan,
+  semitonesBetween,
+  shiftRange,
+} from '../js/chart-range.ts'
 import type { SongWithContent } from '../js/data-types.ts'
 import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.ts'
+import { describeRange, rangeStatus } from '../js/voice-range.ts'
+import { rangeBadge, rangeBadgeStyles } from './range-badge.ts'
 
 /**
  * SongInfo Component
@@ -34,7 +43,9 @@ export class SongInfo extends LitElement {
   declare appearances: Appearance[]
   declare loading: boolean
 
-  static override styles = css`
+  static override styles = [
+    rangeBadgeStyles,
+    css`
     :host {
       display: block;
       font-family: var(
@@ -184,7 +195,25 @@ export class SongInfo extends LitElement {
       color: var(--text-secondary, #5f6b6d);
       font-style: italic;
     }
-  `
+
+    /* the range's lines: a badge and its words sit level with the text */
+    .range-line {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .range-line .range-badge {
+      width: 1.5rem;
+      height: 1.5rem;
+    }
+
+    /* (the notes in a column, so the badges line up from one line to the next) */
+    .range-line > span:first-child {
+      min-width: 13ch;
+    }
+  `,
+  ]
 
   constructor() {
     super()
@@ -235,6 +264,7 @@ export class SongInfo extends LitElement {
                 `
                 : ''
             }
+            ${this._renderRange()}
             ${
               this.song.metadata?.timeSignature
                 ? html`
@@ -292,6 +322,45 @@ export class SongInfo extends LitElement {
 
         <!-- CCLI section -->
         ${this._renderCCLI()}
+      </div>
+    `
+  }
+
+  /**
+   * The melody's range (docs/RANGE.md): the lowest and highest note in the chart's key, and how
+   * it fits voices; again in the key the library has the song in, if that is another; and how
+   * wide it is. Written pitch: men sing it an octave down.
+   */
+  _renderRange() {
+    const range = rangeOfMetadata(this.song?.parsed?.metadata)
+    if (!range) return ''
+    const chartKey = this.song?.parsed?.metadata?.key
+    const key = chartKey || 'C'
+    const span = rangeSpan(range, key)
+    const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
+    // one key's line: the notes, and how they fit (the badge and its words, as the key picker has them)
+    const line = (inKey: string | undefined, shift: number) => {
+      const shown = shiftRange(range, shift)
+      const names = `${noteName(shown.low, inKey || key)}–${noteName(shown.high, inKey || key)}`
+      const note = describeRange(rangeStatus(range, shift))
+      return html`
+        <div class="modal-info-value range-line">
+          <span>${names}${inKey ? ` in ${inKey}` : ''}</span>
+          ${inKey ? html`${rangeBadge(note)}<span>${note.words || 'in range'}</span>` : ''}
+        </div>
+      `
+    }
+    // (the song is in another key now than the chart: the range moves with it)
+    const current = this.song?.key
+    const moved = chartKey && current && current !== chartKey ? current : null
+    return html`
+      <div class="modal-info-item">
+        <div class="modal-info-label">Melody Range</div>
+        ${line(chartKey, 0)}
+        ${moved ? line(moved, semitonesBetween(chartKey as string, moved)) : ''}
+        <div class="modal-info-value">
+          ${plural(span.notes, 'note')} wide (${plural(span.semitones, 'semitone')})
+        </div>
       </div>
     `
   }

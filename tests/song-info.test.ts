@@ -39,6 +39,67 @@ describe('song-info', () => {
     expect(shown).to.not.contain('Recent Plays')
   })
 
+  describe('the melody range', () => {
+    /** A song with a chart that says its range (and the key it is in, if it says) */
+    const ranged = (over: Record<string, unknown> = {}, chart: Record<string, string> = {}) =>
+      song({
+        key: 'G',
+        metadata: { key: 'G' },
+        parsed: { metadata: { key: 'G', x_chordless_range: 'D4-E5', ...chart } },
+        ...over,
+      })
+    const badges = (info: SongInfo) => info.shadowRoot?.querySelectorAll('.range-badge') ?? []
+
+    it('shows the lowest and highest note, how wide it is, and how it fits', async () => {
+      const info = await show({ song: ranged() })
+      const shown = text(info)
+      expect(shown).to.contain('Melody Range')
+      expect(shown).to.contain('D4–E5 in G')
+      expect(shown).to.contain('9 notes wide (14 semitones)')
+      // (E5 is the edge: yellow, and the words say so as well as the badge)
+      expect(shown).to.contain('high')
+      expect(badges(info)).to.have.length(1)
+      expect(badges(info)[0].getAttribute('data-direction')).to.equal('high')
+      expect(shown).to.not.contain('F#5 in')
+    })
+
+    it('shows it in the key the library has the song in, when that is another', async () => {
+      const info = await show({ song: ranged({ key: 'A' }) })
+      const shown = text(info)
+      expect(shown).to.contain('D4–E5 in G')
+      expect(shown).to.contain('E4–F#5 in A')
+      expect(shown).to.contain('too high')
+      expect(badges(info)).to.have.length(2)
+    })
+
+    it('says in words when the song fits', async () => {
+      const info = await show({ song: ranged({ key: 'E' }) })
+      expect(text(info)).to.contain('B3–C#5 in E')
+      expect(text(info)).to.contain('in range')
+    })
+
+    it('shows nothing when the chart says no range', async () => {
+      const shown = text(await show({ song: ranged({}, { x_chordless_range: '' }) }))
+      expect(shown).to.not.contain('Melody Range')
+      expect(text(await show({ song: song({ metadata: { key: 'G' } }) }))).to.not.contain(
+        'Melody Range'
+      )
+    })
+
+    it('shows the notes, and not how they fit, for a chart with no key to measure from', async () => {
+      const info = await show({
+        song: song({ metadata: {}, parsed: { metadata: { x_chordless_range: 'D4-E5' } } }),
+      })
+      expect(text(info)).to.contain('D4–E5 9 notes wide (14 semitones)')
+      expect(badges(info)).to.have.length(0)
+    })
+
+    it('says one note, in the singular', async () => {
+      const shown = text(await show({ song: ranged({}, { x_chordless_range: 'G4-G4' }) }))
+      expect(shown).to.contain('1 note wide (0 semitones)')
+    })
+  })
+
   it('shows a key with no tempo, and leaves out what is not there', async () => {
     const shown = text(await show({ song: song({ metadata: { key: 'D' } }) }))
     expect(shown).to.contain('Key: D')

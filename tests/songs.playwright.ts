@@ -167,6 +167,20 @@ test.describe('Song info', () => {
     await expect(page.locator('#library-song-info-dialog song-info')).toContainText('Key')
   })
 
+  test('the song info says the melody range, how wide it is, and how it fits', async ({ page }) => {
+    await seedSong(page, { range: 'D4-E5' })
+    await page.goto('/songs/info-test-song')
+    await page.reload()
+    await expect(page.locator('#library-app-header')).toContainText('Info Test Song')
+    await page.locator('#library-app-header').getByRole('button', { name: 'Information' }).click()
+
+    const info = page.locator('#library-song-info-dialog song-info')
+    await expect(info).toContainText('Melody Range')
+    await expect(info).toContainText('D4–E5 in G')
+    await expect(info).toContainText('9 notes wide (14 semitones)')
+    await expect(info.locator('.range-badge')).toHaveAttribute('data-direction', 'high')
+  })
+
   test('info button on a setlist song opens the song info dialog', { tag: '@logic' }, async ({
     page,
   }) => {
