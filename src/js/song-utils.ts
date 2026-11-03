@@ -613,6 +613,11 @@ function identityOver(existing: SongRecord, chordproContent: string): ChartIdent
  * the new chart's CCLI number, title, source, importer and import date (an official chart that
  * replaces a hand-made one is no longer hand-made). Every variant of the song follows the new
  * id; the song keeps its uuid, so setlists carry on using it.
+ *
+ * The song's saved key and tempo are kept: they are what a setlist entry with none of its own
+ * shows (it follows the song), so an update that moved them to the new chart's would change the
+ * key of every such setlist, old services too. What comes from the chart does change: the chart
+ * itself, and the original key and tempo (which the key picker marks and a reset goes back to).
  */
 export async function replaceSong(
   songUuid: string,
@@ -621,12 +626,16 @@ export async function replaceSong(
   db: ChordlessDB | null = null
 ): Promise<SongRecord> {
   const database = db ?? (await getCurrentDB())
+  const before = await database.getSong(songUuid)
   const replaced = await overwriteSong(songUuid, chordproContent, database)
   const now = new Date().toISOString()
   const identity = identityOver(replaced, chordproContent)
   await moveToIdentity(database, replaced.id, identity, now)
   return database.saveSong({
     ...((await database.getSong(songUuid)) as SongRecord),
+    // (a song that had none takes the chart's)
+    key: before?.key ?? replaced.key,
+    tempo: before?.tempo ?? replaced.tempo,
     id: identity.id,
     ccliNumber: identity.ccliNumber,
     title: identity.title,
