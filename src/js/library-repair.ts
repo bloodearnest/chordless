@@ -41,6 +41,23 @@ export function hasCcliBumph(chordpro: string): boolean {
   return /CCLI Song #|SongSelect|CCLI Licen[cs]e|\{\s*ccli_license/i.test(chordpro)
 }
 
+/** Sources that only say how a chart arrived (as a file, as pasted text, shared), not where it is from */
+const ARRIVALS = new Set(['file', 'paste', 'share'])
+
+/**
+ * The origin of a chart that came in as `source`: SongSelect when the chart carries SongSelect's
+ * CCLI material, though it arrived as a file, as pasted text or shared (a download from SongSelect
+ * saved and chosen is from SongSelect); else as it came
+ */
+export function originOfChart(source: string | undefined, chordpro: string): string | undefined {
+  return (!source || ARRIVALS.has(source)) && hasCcliBumph(chordpro) ? SONGSELECT : source
+}
+
+/** Whether a song's recorded source could be bettered by a chart known to be SongSelect's: it is unknown, or only says it was a file */
+export function sourceToImprove(recorded: string | null | undefined): boolean {
+  return !songSource(recorded) || ARRIVALS.has(recorded as string)
+}
+
 /** The key a chart says it is in, if it says */
 export function keyOfChart(chordpro: string): string | null {
   return /^\s*\{\s*key\s*:\s*([^}\s]+)\s*\}/im.exec(chordpro)?.[1] ?? null
@@ -432,13 +449,16 @@ export interface SourceChange {
 
 /**
  * The sources to set: for each song with none known, SongSelect where its chart has the CCLI
- * material, else the person who wrote it (`writtenBy`). A song with a source is left alone.
+ * material, else the person who wrote it (`writtenBy`). A song that only says it came as a file
+ * (or as text, or shared) is SongSelect's too if its chart has the CCLI material, and is otherwise
+ * left as it is. A song with a source is left alone.
  */
 export function planSources(songs: SongWithText[], writtenBy: string): SourceChange[] {
   const changes: SourceChange[] = []
   for (const { song, text } of songs) {
-    if (songSource(song.importSource)) continue
     const becauseCcli = hasCcliBumph(text)
+    const unknown = !songSource(song.importSource)
+    if (!unknown && !(sourceToImprove(song.importSource) && becauseCcli)) continue
     changes.push({
       uuid: song.uuid,
       title: song.title,

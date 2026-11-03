@@ -14,12 +14,14 @@ import {
   compareCharts,
   hasCcliBumph,
   keyOfChart,
+  originOfChart,
   planImporters,
   planLinks,
   planMerge,
   planRepair,
   planSources,
   type SongWithText,
+  sourceToImprove,
   usageOf,
   wordSimilarity,
 } from '../src/js/library-repair.ts'
@@ -443,6 +445,56 @@ describe('what source a song should have', () => {
       'Simon Davy'
     )
     expect(changes.map(change => change.title)).to.deep.equal(['Drive', 'None'])
+  })
+})
+
+describe('where a chart is from, when it arrived as a file', () => {
+  const song = (overrides: Partial<SongRecord>) =>
+    record({ uuid: crypto.randomUUID(), ...overrides })
+
+  it('is SongSelect for a chart with SongSelect’s CCLI material, however it arrived', () => {
+    const text = `${IN_G}${BUMPH}`
+    for (const arrived of ['file', 'paste', 'share', undefined, '']) {
+      expect(originOfChart(arrived, text), String(arrived)).to.equal('songselect')
+    }
+  })
+
+  it('is as it came for a chart without that material, and when it came from somewhere real', () => {
+    expect(originOfChart('file', IN_G)).to.equal('file')
+    expect(originOfChart('paste', IN_G)).to.equal('paste')
+    expect(originOfChart(undefined, IN_G)).to.equal(undefined)
+    expect(originOfChart('songselect', IN_G)).to.equal('songselect')
+    // (a song from a person, or another app, keeps what it said even with the material on it)
+    expect(originOfChart('OnSong', `${IN_G}${BUMPH}`)).to.equal('OnSong')
+  })
+
+  it('could be bettered when a source says nothing, or only that it was a file', () => {
+    for (const recorded of ['', null, undefined, 'drive', 'copy', 'file', 'paste', 'share']) {
+      expect(sourceToImprove(recorded), String(recorded)).to.equal(true)
+    }
+    for (const recorded of ['songselect', 'Simon Davy', 'OnSong', 'manual']) {
+      expect(sourceToImprove(recorded), recorded).to.equal(false)
+    }
+  })
+
+  it('is mended in a library: a song that only said it was a file, whose chart is SongSelect’s', () => {
+    const changes = planSources(
+      [
+        withText(song({ title: 'File from SongSelect', importSource: 'file' }), `${IN_G}${BUMPH}`),
+        withText(
+          song({ title: 'Pasted from SongSelect', importSource: 'paste' }),
+          `${IN_G}${BUMPH}`
+        ),
+        withText(song({ title: 'File typed in', importSource: 'file' }), IN_G),
+        withText(song({ title: 'Manual', importSource: 'manual' }), `${IN_G}${BUMPH}`),
+      ],
+      'Simon Davy'
+    )
+    // (a file with no CCLI material stays a file: it is not given to the person who owns the library)
+    expect(changes.map(change => [change.title, change.to])).to.deep.equal([
+      ['File from SongSelect', 'songselect'],
+      ['Pasted from SongSelect', 'songselect'],
+    ])
   })
 })
 
