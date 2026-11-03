@@ -567,6 +567,41 @@ describe('an incoming chart of a song the library has', () => {
     })
   })
 
+  it('keeps the key and tempo the song is saved in, and takes the chart and its original key and tempo', async () => {
+    ccli++
+    const title = unique('Kept key')
+    const old = await createSong(chart(title, { extra: '{tempo: 80}\n' }))
+    const db = await getCurrentDB()
+    // (a key and a tempo someone chose for the song, which setlists with none of their own follow)
+    await db.saveSong({ ...must(await db.getSong(old.uuid)), key: 'A', tempo: 90 })
+
+    const replaced = await replaceSong(
+      old.uuid,
+      `{title: ${title}}\n{key: E}\n{tempo: 70}\n{ccli: ${ccli}}\n[E]Amazing [A]grace`,
+      incoming
+    )
+    expect(replaced.key).to.equal('A')
+    expect(replaced.tempo).to.equal(90)
+    expect(replaced.originalKey).to.equal('E')
+    expect(replaced.originalTempo).to.equal(70)
+    expect(must(await db.getChordPro(replaced.chordproFileId)).content).to.contain('{key: E}')
+  })
+
+  it('gives a song that had no saved key or tempo the new chart’s', async () => {
+    ccli++
+    const title = unique('Had none')
+    const old = await createSong(`{title: ${title}}\n\n[G]No key line`)
+    const db = await getCurrentDB()
+    await db.saveSong({ ...must(await db.getSong(old.uuid)), key: null, tempo: null })
+    const replaced = await replaceSong(
+      old.uuid,
+      `{title: ${title}}\n{key: E}\n{tempo: 70}\n{ccli: ${ccli}}\n[E]Words`,
+      incoming
+    )
+    expect(replaced.key).to.equal('E')
+    expect(replaced.tempo).to.equal(70)
+  })
+
   it("imports as the original: the incoming chart is the default, the library's hangs from it, setlists keep theirs", async () => {
     ccli++
     const title = unique('Both')

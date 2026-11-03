@@ -87,6 +87,11 @@ ask of a singer?), where semitones, which are kept for being exact, are not how 
 octaves are too coarse (nearly every song is an octave to an octave and a half). The notes are
 written pitch: men sing the melody an octave down.
 
+## Giving a whole library its ranges
+
+A library imported before lead sheets were read can be brought up to date in one pass, without
+opening each song: docs/REIMPORT.md.
+
 ## Getting a range from a lead sheet
 
 `src/js/melody-range.ts`, `readMelodyRange(pdf)`: the notes of a SongSelect lead sheet are drawn

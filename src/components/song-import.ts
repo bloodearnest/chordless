@@ -160,6 +160,7 @@ export class SongImport extends LitElement {
     _error: { state: true },
     _progress: { state: true }, // what an import is doing
     _busy: { state: true }, // files with a PDF are being read
+    _applying: { state: true }, // 'Importing 3 of 140…' while the choices are carried out
     _manual: { state: true }, // chose to import another way, with the bookmarklet's tab open
     // [{song, chordproText, isDuplicate, choice: null | 'update' | 'use-existing'}]
     _imports: { state: true },
@@ -178,6 +179,7 @@ export class SongImport extends LitElement {
   declare _error: string
   declare _progress: string
   declare _busy: boolean
+  declare _applying: string
   declare _manual: boolean
   declare _imports: ImportItem[]
   declare _skipped: string[]
@@ -430,6 +432,14 @@ export class SongImport extends LitElement {
       font-weight: 700;
     }
 
+    .bulk-picks {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0.75rem 0;
+    }
+
     .bookmarklet-wait {
       display: flex;
       flex-direction: column;
@@ -589,6 +599,7 @@ export class SongImport extends LitElement {
     this._error = ''
     this._progress = 'Waiting for SongSelect…'
     this._busy = false
+    this._applying = ''
     this._manual = false
     this._imports = []
     this._skipped = []
@@ -1291,6 +1302,16 @@ export class SongImport extends LitElement {
     `
   }
 
+  /**
+   * Make one choice for the duplicates that are not decided yet and are `of` (all of them, or only
+   * those that are the same song as the library's), as a long list of them has no time for each
+   */
+  _pickAll(pick: DuplicateChoice, of: (item: ImportItem) => boolean = () => true): void {
+    this._imports = this._imports.map(item =>
+      item.isDuplicate && !item.choice && of(item) ? { ...item, pick } : item
+    )
+  }
+
   /** Pick what to do with one duplicate (done when "Import" is pressed) */
   _pick(item: ImportItem, pick: DuplicateChoice): void {
     this._imports = this._imports.map(i => (i === item ? { ...i, pick } : i))
@@ -1298,8 +1319,20 @@ export class SongImport extends LitElement {
 
   /** Do what is picked for each duplicate, and go on to where to put the songs */
   async _applyPicks(items: ImportItem[]): Promise<void> {
-    for (const item of items) {
-      if (!item.pick) continue
+    try {
+      await this._carryOutPicks(items)
+    } finally {
+      this._applying = ''
+    }
+  }
+
+  async _carryOutPicks(items: ImportItem[]): Promise<void> {
+    const todo = items.filter((item): item is ImportItem & { pick: DuplicateChoice } =>
+      Boolean(item.pick)
+    )
+    for (const [index, item] of todo.entries()) {
+      // (a long list takes a while: it says how far it has got)
+      if (todo.length > 1) this._applying = `Importing ${index + 1} of ${todo.length}…`
       const incoming = { importSource: item.source ?? '', importUser: item.importUser }
       const label = item.label?.trim() || undefined
       const db = this._database()
@@ -1387,7 +1420,7 @@ export class SongImport extends LitElement {
       {
         value: 'update',
         title: 'Update current song',
-        help: 'Replace your current song with the imported one. Setlists keep using it.',
+        help: 'Replace your current song with the imported one. Setlists keep using it, and it stays in the key you have it in.',
       },
       {
         value: 'use-existing',
@@ -1455,6 +1488,10 @@ export class SongImport extends LitElement {
 
   _renderDuplicates(unresolved: ImportItem[]) {
     const single = unresolved.length === 1 && this._imports.length === 1
+    // (the same song as the library's: the same words and chords, whatever else differs, even the key)
+    const isSameSong = (item: ImportItem) =>
+      item.comparison?.verdict === 'same-chart' || item.comparison?.verdict === 'other-key'
+    const sameSong = unresolved.filter(isSameSong).length
     return html`
       <div class="duplicate">
         <strong>
@@ -1468,6 +1505,24 @@ export class SongImport extends LitElement {
           single
             ? ''
             : html`
+              <div class="bulk-picks" role="group" aria-label="The same choice for all of them">
+                <span>For all of them:</span>
+                <button
+                  class="btn bulk-update-same"
+                  type="button"
+                  ?disabled=${sameSong === 0}
+                  @click=${() => this._pickAll('update', isSameSong)}
+                >
+                  Update the ${sameSong} that are the same song
+                </button>
+                <button class="btn bulk-update-all" type="button" @click=${() => this._pickAll('update')}>
+                  Update all ${unresolved.length}
+                </button>
+                <button class="btn bulk-skip" type="button" @click=${() => this._pickAll('use-existing')}>
+                  Do not import any
+                </button>
+              </div>
+              ${this._applying ? html`<p class="status" role="status">${this._applying}</p>` : ''}
               <div class="duplicate-actions">
                 <button
                   class="btn apply-all"
