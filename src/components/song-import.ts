@@ -959,10 +959,9 @@ export class SongImport extends LitElement {
             // and if it is now known to be SongSelect's, the library's record of where it is from
             // (which said a file, or nothing) catches up
             if (origin === SONGSELECT && sourceToImprove(existing.importSource)) {
-              await db.saveSong({
-                ...existing,
-                importSource: SONGSELECT,
-                metadataChangedAt: new Date().toISOString(),
+              await db.updateSong(existing.uuid, stored => {
+                stored.importSource = SONGSELECT
+                stored.metadataChangedAt = new Date().toISOString()
               })
               item.sourceSet = true
             }
