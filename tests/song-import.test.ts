@@ -189,6 +189,91 @@ describe('song-import', () => {
     expect(must(await db.getChordPro(song.chordproFileId)).content).to.contain('[A]Updated')
   })
 
+  describe('where an imported chart is from', () => {
+    /** A chart as SongSelect gives it: with its CCLI material at the foot */
+    let ccliNumber = 8100000
+    const fromSongSelect = (title: string, body = '[C]Hello') =>
+      `${chart(title, body)}\n\nCCLI Song # ${++ccliNumber}\n© 2020 A Publisher\nFor use solely with the SongSelect® Terms of Use. All rights reserved. www.ccli.com\nCCLI License # 471102`
+    const sourceOf = async (uuid: string) =>
+      must(await (await getCurrentDB()).getSong(uuid)).importSource
+
+    it('is SongSelect for a download chosen as a file, which carries SongSelect’s material', async () => {
+      const element: any = await importer()
+      await element.importFiles([file('a.cho', fromSongSelect(unique('Downloaded')))])
+      expect(element._imports[0].source).to.equal('songselect')
+      expect(await sourceOf(element._imports[0].song.uuid)).to.equal('songselect')
+    })
+
+    it('is a file when the chart has no such material', async () => {
+      const element: any = await importer()
+      await element.importFiles([file('a.cho', chart(unique('Typed')))])
+      expect(await sourceOf(element._imports[0].song.uuid)).to.equal('file')
+    })
+
+    it('is SongSelect for text pasted from it, and pasted otherwise', async () => {
+      const element: any = await importer()
+      await paste(element, fromSongSelect(unique('Pasted download')))
+      expect(await sourceOf(element._imports[0].song.uuid)).to.equal('songselect')
+      const other: any = await importer()
+      await paste(other, chart(unique('Pasted typing')))
+      expect(await sourceOf(other._imports[0].song.uuid)).to.equal('paste')
+    })
+
+    it('catches the library up when the same chart comes again, and the library said a file', async () => {
+      const title = unique('Said a file')
+      const body = fromSongSelect(title)
+      const song = await createSong(body, { importSource: 'file' } as never)
+      const element: any = await importer()
+      await element.importFiles([file('a.cho', body)])
+      expect(element._imports[0].comparison.verdict).to.equal('identical')
+      expect(element._imports[0].sourceSet).to.equal(true)
+      expect(await sourceOf(song.uuid)).to.equal('songselect')
+      expect(text(element)).to.contain(
+        'nothing to import. Its source is now recorded as SongSelect.'
+      )
+    })
+
+    it('says so in a list of songs too', async () => {
+      const title = unique('In a list of files')
+      const body = fromSongSelect(title)
+      await createSong(body, { importSource: 'file' } as never)
+      const element: any = await importer()
+      await element.importFiles([
+        file('a.cho', body),
+        file('b.cho', fromSongSelect(unique('A new one'))),
+      ])
+      expect(text(element)).to.contain(
+        'identical version already in library, now recorded as from SongSelect'
+      )
+    })
+
+    it('leaves the library as it is when it already said SongSelect, or a person, or the chart is not SongSelect’s', async () => {
+      for (const [recorded, chartText] of [
+        ['songselect', fromSongSelect(unique('Already'))],
+        ['Simon', fromSongSelect(unique('A person'))],
+        ['file', chart(unique('Typed file'))],
+      ] as const) {
+        const song = await createSong(chartText, { importSource: recorded } as never)
+        const element: any = await importer()
+        await element.importFiles([file('a.cho', chartText)])
+        expect(element._imports[0].comparison.verdict).to.equal('identical')
+        expect(element._imports[0].sourceSet, recorded).to.equal(undefined)
+        expect(await sourceOf(song.uuid), recorded).to.equal(recorded)
+        expect(text(element)).to.not.contain('Its source is now')
+      }
+    })
+
+    it('is SongSelect for the library song that an update replaces with a download', async () => {
+      const title = unique('Updated from a file')
+      const song = await createSong(chart(title, '[G]Old words'), { importSource: 'file' } as never)
+      const element: any = await importer()
+      await element.importFiles([file('a.cho', fromSongSelect(title, '[A]Imported'))])
+      await choose(element, 'update')
+      await waitFor(() => !text(element).includes('already exists in your library'))
+      expect(await sourceOf(song.uuid)).to.equal('songselect')
+    })
+  })
+
   describe('several songs the library has: the same choice for all of them', () => {
     /** The same song in a key, its chords moved with it */
     const inKey = (title: string, key: string, chords: [string, string]) =>

@@ -20,7 +20,13 @@ import { parseChartText, songOfChart } from '../js/email-setlist.ts'
 import { type LibrarySong, matchLibrary } from '../js/import-plan.ts'
 import { libraryForMatching } from '../js/import-setlist.ts'
 import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
-import { type ChartComparison, compareCharts, keyOfChart } from '../js/library-repair.ts'
+import {
+  type ChartComparison,
+  compareCharts,
+  keyOfChart,
+  originOfChart,
+  sourceToImprove,
+} from '../js/library-repair.ts'
 import { ChordProParser } from '../js/parser.ts'
 import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../js/people.ts'
 import {
@@ -45,7 +51,7 @@ import type {
 import './setlist-details-form.ts'
 import type { MelodyRead } from '../js/melody-range.ts'
 import { goTo, loadPage } from '../js/navigation.ts'
-import { describeOrigin } from '../js/song-source.ts'
+import { describeOrigin, SONGSELECT } from '../js/song-source.ts'
 import { ensureCurrentSpace, setCurrentSpace } from '../js/space.ts'
 import { visibleSpaces } from '../js/space-tabs.ts'
 import { buttonStyles, spinnerStyles } from './shared-styles.ts'
@@ -120,6 +126,8 @@ interface ImportItem {
   pick?: DuplicateChoice | null
   /** The name of the chart that becomes a variant: the library's if imported as the original, else the imported one */
   label?: string
+  /** The same chart as the library's, which only said it was a file: its source is now SongSelect */
+  sourceSet?: boolean
   /** What came of the lead sheet that came with it, if one did */
   leadSheet?: LeadSheetOutcome
   /** What was read from it, to show how */
@@ -920,12 +928,14 @@ export class SongImport extends LitElement {
         const ccliNumber = parsed.ccliSongNumber || parsed.ccli || metadata.ccliNumber || null
         const title = parsed.title || metadata.title || 'Untitled'
 
+        // (a download from SongSelect is SongSelect's, though it came as a file or as text)
+        const origin = originOfChart(source, chordproText)
         const existing = await findExistingSong(ccliNumber, title, db)
         const song =
           existing ||
           (await createSong(
             chordproText,
-            { ccliNumber, title, importSource: source, importUser },
+            { ccliNumber, title, importSource: origin, importUser },
             db
           ))
         if (!existing) this._created.push(song)
@@ -936,16 +946,27 @@ export class SongImport extends LitElement {
           choice: null,
           leadSheet: outcome,
           melody,
-          source,
+          source: origin,
           importUser,
         }
         if (existing) {
           const existingText = (await db.getChordPro(existing.chordproFileId))?.content ?? ''
           item.existingText = existingText
           item.comparison = compareCharts(existingText, chordproText)
-          // (the same chart again: nothing to ask)
-          if (item.comparison.verdict === 'identical') item.choice = 'use-existing'
-          else item.pick = this._suggested(item)
+          if (item.comparison.verdict === 'identical') {
+            // (the same chart again: nothing to ask)
+            item.choice = 'use-existing'
+            // and if it is now known to be SongSelect's, the library's record of where it is from
+            // (which said a file, or nothing) catches up
+            if (origin === SONGSELECT && sourceToImprove(existing.importSource)) {
+              await db.saveSong({
+                ...existing,
+                importSource: SONGSELECT,
+                metadataChangedAt: new Date().toISOString(),
+              })
+              item.sourceSet = true
+            }
+          } else item.pick = this._suggested(item)
         }
         imports.push(item)
       }
@@ -998,7 +1019,7 @@ export class SongImport extends LitElement {
   /** A song already in the library, and the same chart: nothing is asked, so it says so */
   _renderAlreadyThere(item: ImportItem) {
     return item.isDuplicate && item.comparison?.verdict === 'identical'
-      ? html`<p class="already">An identical version of this song is already in your library, nothing to import.</p>`
+      ? html`<p class="already">An identical version of this song is already in your library, nothing to import.${item.sourceSet ? ' Its source is now recorded as SongSelect.' : ''}</p>`
       : ''
   }
 
@@ -1296,7 +1317,7 @@ export class SongImport extends LitElement {
       <ol class="songs">
         ${this._imports.map(
           item =>
-            html`<li>${item.song.title} <span class="subtitle">${item.isDuplicate ? (item.comparison?.verdict === 'identical' ? 'identical version already in library' : (item.choice && status[item.choice]) || 'already in library') : 'new'}</span>${this._renderRange(item)}</li>`
+            html`<li>${item.song.title} <span class="subtitle">${item.isDuplicate ? (item.comparison?.verdict === 'identical' ? `identical version already in library${item.sourceSet ? ', now recorded as from SongSelect' : ''}` : (item.choice && status[item.choice]) || 'already in library') : 'new'}</span>${this._renderRange(item)}</li>`
         )}
       </ol>
     `

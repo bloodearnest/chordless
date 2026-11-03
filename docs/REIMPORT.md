@@ -56,6 +56,14 @@ already has. Then, in the bar "For all of them":
 
 and "Import all with these choices". It says how far it has got ("Importing 37 of 141…").
 
+**Where the songs are recorded as from.** A chart that carries SongSelect's CCLI material (its
+`CCLI Song #` line and the terms-of-use footer: `hasCcliBumph`) is recorded as from SongSelect even
+when it arrives as a file or as pasted text, as a download from SongSelect is. A chart without it
+stays a file, or pasted text. A library song that was imported as a file before, and comes again as
+the same chart, has its source set to SongSelect: a folder imported earlier can be imported again to
+correct it, and nothing else changes ("Its source is now recorded as SongSelect"). The library
+repair (`planSources`, docs/ACCOUNT.md) does the same for a whole library.
+
 **What "Update current song" does** (`replaceSong`): the song keeps its identity and its place in
 every setlist; its chart is replaced; its original key and tempo come from the new chart (the key
 picker marks the original, and reset goes back to it); and **the key and tempo the library has the
