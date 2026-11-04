@@ -521,8 +521,9 @@ describe('song-import', () => {
       const element: any = await importer()
       await paste(element, `{title: ${key}}\n{key: D}\n[D]Amazing [G]grace`)
       // (the same song, in another key: there is nothing to ask, and it is now in the new key)
+      // (it is done a moment after the results are shown)
+      await waitFor(() => text(element).includes('It has been updated.'))
       expect($(element, '.duplicate')).to.equal(null)
-      expect(text(element)).to.contain('It has been updated.')
       const db = await getCurrentDB()
       expect(must(await db.getSong(song.uuid)).key).to.equal('D')
       expect(
