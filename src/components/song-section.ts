@@ -956,7 +956,7 @@ export class SongSection extends LitElement {
       <span
         class=${classes}
         data-note-target="text"
-        data-offset=${segment.offset ?? 0}
+        data-offset=${segment.offset}
         tabindex=${this.editMode && hasLyrics ? '0' : nothing}
       >
         ${

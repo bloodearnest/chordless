@@ -133,6 +133,18 @@ describe('what a setlist keeps on this device', () => {
       expect(loadSetlistNotes('s1', songs[1])).to.deep.equal([note])
     })
 
+    it('carry on when they cannot be kept, as when storage is full', () => {
+      const realSetItem = Storage.prototype.setItem
+      Storage.prototype.setItem = () => {
+        throw new DOMException('full', 'QuotaExceededError')
+      }
+      try {
+        expect(() => saveSetlistNotes('s1', songs[0], [note], songs)).to.not.throw()
+      } finally {
+        Storage.prototype.setItem = realSetItem
+      }
+    })
+
     it('are forgotten for a song when none are left', () => {
       saveSetlistNotes('s1', songs[0], [note], songs)
       saveSetlistNotes('s1', songs[0], [], songs)

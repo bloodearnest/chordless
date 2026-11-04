@@ -3,7 +3,7 @@
  * them (above their word), then sets each one's offset, row and wrap. All reads come before all
  * writes, so a line is laid out twice, not once per note.
  */
-import { type NoteBox, packNotes } from './pack.ts'
+import { type NoteBox, type NotePlace, packNotes } from './pack.ts'
 
 /** Space kept between two notes on a row, in pixels */
 const GAP = 8
@@ -54,8 +54,7 @@ export function nudgeLine(line: HTMLElement): number {
       GAP
     )
     members.forEach((each, i) => {
-      const place = places[i]
-      if (!place) return
+      const place = places[i] as NotePlace
       rows = Math.max(rows, place.row + 1)
       writes.push(() => {
         each.el.style.left = `${place.x - each.segmentX}px`

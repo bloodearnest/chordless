@@ -1,7 +1,7 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import '../src/components/song-display.ts'
 import type { SongDisplay } from '../src/components/song-display.ts'
-import type { SongSection } from '../src/components/song-section.ts'
+import { NoteRequestEvent, type SongSection } from '../src/components/song-section.ts'
 import type { ChartNote } from '../src/js/data-types.ts'
 import { sectionAnchor, textAnchor } from '../src/js/notes/anchor.ts'
 import { notesBySection } from '../src/js/notes/shown.ts'
@@ -53,6 +53,21 @@ describe('notes on a chart', () => {
       title?.getBoundingClientRect().right ?? 0
     )
     expect(sections[0].shadowRoot?.querySelector('.note')).to.equal(null)
+  })
+
+  it('on a section with no name are above its lines', async () => {
+    const plain = new ChordProParser().parse('{title: A}\n{key: G}\n\n[G]Amazing grace')
+    const sources = putNote(noSources(), note('intro', sectionAnchor(plain.sections, 0)), {
+      scope: 'setlist',
+      reach: 'private',
+    })
+    const display = await fixture<SongDisplay>(html`<song-display></song-display>`)
+    display.parsed = plain
+    display.notes = notesBySection(plain.sections, sources)
+    await display.updateComplete
+    const section = display.shadowRoot?.querySelector('song-section') as SongSection
+    await section.updateComplete
+    expect(text(section.shadowRoot?.querySelector('.plain-notes .note'))).to.equal('intro')
   })
 
   it('sit above their word, with the chord between, and take no width', async () => {
@@ -194,6 +209,154 @@ describe('notes on a chart', () => {
       expect(tops.size).to.equal(2)
       const first = notes.map(each => each.getBoundingClientRect()).sort((a, b) => a.top - b.top)[0]
       expect(first.top).to.be.at.least(line.getBoundingClientRect().top - 1)
+    })
+  })
+
+  describe('in edit mode', () => {
+    const labelled = new ChordProParser().parse(
+      '{title: A}\n{key: G}\n\n{comment: Verse}\n[G]Amazing [C]grace how sweet'
+    )
+    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+    async function editing(withNotes = noSources()) {
+      const display = await fixture<SongDisplay>(html`<song-display></song-display>`)
+      display.parsed = labelled
+      display.songIndex = 3
+      display.notes = notesBySection(labelled.sections, withNotes)
+      await display.updateComplete
+      const section = display.shadowRoot?.querySelector('song-section') as SongSection
+      section.editMode = true
+      await section.updateComplete
+      const requests: NoteRequestEvent[] = []
+      display.addEventListener(NoteRequestEvent.type, event =>
+        requests.push(event as NoteRequestEvent)
+      )
+      return { display, section, root: section.shadowRoot as ShadowRoot, requests }
+    }
+
+    const press = (target: Element) =>
+      target.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          composed: true,
+          isPrimary: true,
+          pointerId: 1,
+          pointerType: 'touch',
+        })
+      )
+
+    it('asks for the note editor when a word or the title is held', async () => {
+      const { root, requests } = await editing()
+      press(root.querySelectorAll('.chord-segment')[1] as Element)
+      await wait(650)
+      press(root.querySelector('.section-title') as Element)
+      await wait(650)
+      expect(
+        requests.map(each => [
+          each.songIndex,
+          each.sectionIndex,
+          each.place,
+          each.line,
+          each.offset,
+          each.noteId,
+        ])
+      ).to.deep.equal([
+        [3, 0, 'text', 0, 8, undefined],
+        [3, 0, 'title', 0, 0, undefined],
+      ])
+      expect(requests[0].element.classList.contains('chord-segment')).to.equal(true)
+    })
+
+    it('makes the words reachable by keyboard, and asks with the context-menu key', async () => {
+      const { root, requests } = await editing()
+      expect(root.querySelector('.chord-segment')?.getAttribute('tabindex')).to.equal('0')
+      const summary = root.querySelector('summary') as HTMLElement
+      summary.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'ContextMenu',
+          bubbles: true,
+          composed: true,
+          cancelable: true,
+        })
+      )
+      expect(requests.map(each => each.place)).to.deep.equal(['title'])
+    })
+
+    it('asks for the editor on a note that is tapped, with its id, and does not collapse the section', async () => {
+      let sources = putNote(noSources(), note('spot', textAnchor(labelled.sections, 0, 0, 8)), {
+        scope: 'setlist',
+        reach: 'private',
+      })
+      sources = putNote(sources, note('head', sectionAnchor(labelled.sections, 0)), {
+        scope: 'setlist',
+        reach: 'private',
+      })
+      const { root, section, requests } = await editing(sources)
+      let toggled = 0
+      section.addEventListener('song-section:toggle', () => toggled++)
+      ;(root.querySelector('.segment-notes .note') as HTMLElement).click()
+      ;(root.querySelector('.section-title-wrapper .note') as HTMLElement).click()
+      expect(requests.map(each => [each.place, each.noteId, each.line, each.offset])).to.deep.equal(
+        [
+          ['text', 'spot', 0, 8],
+          ['title', 'head', 0, 0],
+        ]
+      )
+      expect(toggled).to.equal(0)
+    })
+
+    it('does nothing for a hold or a tap when not editing', async () => {
+      const sources = putNote(noSources(), note('spot', textAnchor(labelled.sections, 0, 0, 8)), {
+        scope: 'setlist',
+        reach: 'private',
+      })
+      const { section, root, requests } = await editing(sources)
+      section.editMode = false
+      await section.updateComplete
+      press(root.querySelectorAll('.chord-segment')[1] as Element)
+      await wait(650)
+      ;(root.querySelector('.segment-notes .note') as HTMLElement).click()
+      expect(requests).to.deep.equal([])
+      expect(root.querySelector('.chord-segment')?.hasAttribute('tabindex')).to.equal(false)
+    })
+
+    it('has a place in the song’s strip for a note on the whole song, and one to start it', async () => {
+      document.body.classList.add('edit-mode')
+      try {
+        const sources = putNote(noSources(), note('whole', { kind: 'song' }), {
+          scope: 'song',
+          reach: 'private',
+        })
+        const { display, requests } = await editing(sources)
+        await display.updateComplete
+        const strip = display.shadowRoot as ShadowRoot
+        ;(strip.querySelector('.song-notes .note') as HTMLElement).click()
+        ;(strip.querySelector('.add-song-note') as HTMLElement).click()
+        // (what is in the strip but is not a note does nothing)
+        ;(strip.querySelector('.song-notes') as HTMLElement).click()
+        expect(requests.map(each => [each.place, each.noteId, each.songIndex])).to.deep.equal([
+          ['song', 'whole', 3],
+          ['song', undefined, 3],
+        ])
+      } finally {
+        document.body.classList.remove('edit-mode')
+      }
+    })
+
+    it('leaves a song’s strip alone when not editing: taps do nothing, and with no notes there is none', async () => {
+      const sources = putNote(noSources(), note('whole', { kind: 'song' }), {
+        scope: 'song',
+        reach: 'private',
+      })
+      const { display, requests } = await editing(sources)
+      ;(
+        (display.shadowRoot as ShadowRoot).querySelector('.song-notes .note') as HTMLElement
+      ).click()
+      expect(requests).to.deep.equal([])
+      expect(display.shadowRoot?.querySelector('.add-song-note')).to.equal(null)
+      display.notes = notesBySection(labelled.sections, noSources())
+      await display.updateComplete
+      expect(display.shadowRoot?.querySelector('.song-notes')).to.equal(null)
     })
   })
 })
