@@ -216,9 +216,9 @@ describe('song-import: corners', () => {
       expect($(element, '.library-only')).to.exist
     })
 
-    it('suggests updating the library chart when the lead sheet only adds a range to it', async () => {
+    it('updates the library chart with no question when the lead sheet only adds a range to it', async () => {
       const title = unique('Adds a range')
-      await createSong(chart(title))
+      const song = await createSong(chart(title))
       const { element } = await importerReading(async () => read())
       await element.receive({
         chordproText: chart(title),
@@ -227,21 +227,31 @@ describe('song-import: corners', () => {
       })
       const [item] = element._imports
       expect(item.comparison.verdict).to.equal('same-chart')
-      expect(item.pick).to.equal('update')
+      expect(item.auto).to.equal(true)
+      expect(item.choice).to.equal('update')
       await element.updateComplete
-      expect(element.shadowRoot.textContent).to.contain('The lead sheet adds a melody range.')
-      expect($(element, '.pick-update').checked).to.equal(true)
+      expect($(element, '.duplicate')).to.equal(null)
+      expect(await said(element)).to.contain(
+        'This song was already in your library, as the same song. It has been updated.'
+      )
+      const db = await getCurrentDB()
+      const stored = must(await db.getSong(song.uuid))
+      expect(must(await db.getChordPro(stored.chordproFileId)).content).to.contain(
+        '{x_chordless_range: D4-E5}'
+      )
     })
 
-    it('still suggests keeping the library chart when the import adds no range', async () => {
+    it('updates it too when only other details differ, and the import adds no range', async () => {
       const title = unique('No range added')
-      await createSong(chart(title))
+      const song = await createSong(chart(title))
       const element = await importer()
       await element.receive({
         chordproText: chart(title).replace('{key: C}', '{key: C}\n{tempo: 70}'),
         source: 'songselect',
       })
-      expect(element._imports[0].pick).to.equal('use-existing')
+      expect(element._imports[0].choice).to.equal('update')
+      const db = await getCurrentDB()
+      expect(must(await db.getSong(song.uuid)).tempo).to.equal(70)
     })
 
     it('says so when a SongSelect song came with no lead sheet, and nothing for a song with none to expect', async () => {

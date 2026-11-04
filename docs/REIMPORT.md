@@ -45,16 +45,20 @@ song's own) and for the lead sheet in that key, and saves `<number>-<title>.cho`
 ## 3. Import the folder
 
 In Chordless, Import, "Import ChordPro Files": choose every file in the folder. Each lead sheet is
-paired with its ChordPro by CCLI number (docs/RANGE.md), and the page lists the songs the library
-already has. Then, in the bar "For all of them":
+paired with its ChordPro by CCLI number (docs/RANGE.md), and the page reads them all.
 
-- **Update the N that are the same song**: the same words and chords as the library's, whatever else
-  differs, the key included. Those with other words or chords are left for you to decide one by one
-  (they may be arrangements).
-- **Update all N**: every one, including those that differ.
-- **Do not import any**.
+**The same song is updated with no question.** A song the library has, whose new chart has the same
+words and chords as the library's (whatever else differs: the copyright, the tempo, even the key),
+is updated at once: there is nothing to decide. The page says "updated: the same song as in your
+library", and says how far it has got when there are several ("Importing 37 of 141…"). What is
+listed for you to decide is only what differs: other words or other chords (they may be
+arrangements), which can be imported as a variant, replace the library's, or not be imported. When
+several are listed, a bar "For all of them" makes one choice for all: **Update all N**, or **Do not
+import any**; then "Import all with these choices".
 
-and "Import all with these choices". It says how far it has got ("Importing 37 of 141…").
+The one exception is a library chart from SongSelect, with a chart that is not from SongSelect (it
+has none of SongSelect's CCLI material): that is not replaced without asking, though it is the same
+song.
 
 **Where the songs are recorded as from.** A chart that carries SongSelect's CCLI material (its
 `CCLI Song #` line and the terms-of-use footer: `hasCcliBumph`) is recorded as from SongSelect even
@@ -64,11 +68,15 @@ the same chart, has its source set to SongSelect: a folder imported earlier can 
 correct it, and nothing else changes ("Its source is now recorded as SongSelect"). The library
 repair (`planSources`, docs/ACCOUNT.md) does the same for a whole library.
 
-**What "Update current song" does** (`replaceSong`): the song keeps its identity and its place in
-every setlist; its chart is replaced; its original key and tempo come from the new chart (the key
-picker marks the original, and reset goes back to it); and **the key and tempo the library has the
-song in are kept**. A setlist entry with no key of its own follows the song's, so moving that to the
-new chart's would change the key of every such setlist, old services included.
+**What an update does** (`replaceSong`): the song keeps its identity and its place in every setlist;
+its chart is replaced; and **the new chart's key and tempo become the song's own** (the key it is in
+by default, and the original that the key picker marks and a reset goes back to). A setlist entry
+with no key or tempo of its own shows the song's, so moving the song would move every such setlist,
+old services included: **the entries that would change are given the key and tempo they showed**
+(`keepShown`, as merging two songs already does), and only those are written. A setlist that has
+none of the song, an entry with its own key, and a song whose key does not move are not touched.
+So no setlist changes; new setlists have the song in its new key. No migration is needed first: it
+is done for each song as it is updated.
 
 **Variants are left alone.** The import finds the song's default variant by its CCLI number and
 updates only that: another variant of the same song (an arrangement with its own label) is not

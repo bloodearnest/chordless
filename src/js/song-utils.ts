@@ -10,6 +10,7 @@ import { withoutRange, withRange } from './chart-range.ts'
 import type {
   ChartMetadata,
   ParsedChart,
+  SetlistEntry,
   SongInput,
   SongRecord,
   SongWithContent,
@@ -614,10 +615,11 @@ function identityOver(existing: SongRecord, chordproContent: string): ChartIdent
  * replaces a hand-made one is no longer hand-made). Every variant of the song follows the new
  * id; the song keeps its uuid, so setlists carry on using it.
  *
- * The song's saved key and tempo are kept: they are what a setlist entry with none of its own
- * shows (it follows the song), so an update that moved them to the new chart's would change the
- * key of every such setlist, old services too. What comes from the chart does change: the chart
- * itself, and the original key and tempo (which the key picker marks and a reset goes back to).
+ * The song takes the new chart's key and tempo as its own (the chart is in SongSelect's key, and
+ * that is the key the song is now in by default), and the original ones the key picker marks and a
+ * reset goes back to. A setlist entry with no key or tempo of its own shows the song's, so the
+ * entries that would change are given the key and tempo they showed (`keepShown`): no setlist, old
+ * services included, is changed by an update.
  */
 export async function replaceSong(
   songUuid: string,
@@ -627,15 +629,15 @@ export async function replaceSong(
 ): Promise<SongRecord> {
   const database = db ?? (await getCurrentDB())
   const before = await database.getSong(songUuid)
+  // (setlists show the variant a song's id resolves to: only a change to that one reaches them)
+  const shownBySetlists =
+    before && (await database.getDefaultSongVariant(before.id))?.uuid === songUuid
   const replaced = await overwriteSong(songUuid, chordproContent, database)
   const now = new Date().toISOString()
   const identity = identityOver(replaced, chordproContent)
   await moveToIdentity(database, replaced.id, identity, now)
-  return database.saveSong({
+  const song = await database.saveSong({
     ...((await database.getSong(songUuid)) as SongRecord),
-    // (a song that had none takes the chart's)
-    key: before?.key ?? replaced.key,
-    tempo: before?.tempo ?? replaced.tempo,
     id: identity.id,
     ccliNumber: identity.ccliNumber,
     title: identity.title,
@@ -645,6 +647,43 @@ export async function replaceSong(
     importDate: now,
     metadataChangedAt: now,
   })
+  if (before && shownBySetlists) await keepShown(database, before, song)
+  return song
+}
+
+/**
+ * Give the setlist entries that follow a song the key and tempo they showed, when the song's
+ * change. An entry with no key or tempo of its own shows the song's (the one its id resolves to),
+ * so a song moved to another key, or tempo, by a new chart would move every such setlist with it:
+ * the entries that would change get the old values written into them, and the setlists with none
+ * are left alone. Entries with a key or tempo of their own are not touched.
+ *
+ * @param before The song as it was, and `after` as it is: the key shown is its key, else the chart's
+ */
+async function keepShown(db: ChordlessDB, before: SongRecord, after: SongRecord): Promise<void> {
+  const shownKey = (song: SongRecord) => song.key || song.originalKey || null
+  const shownTempo = (song: SongRecord) => song.tempo ?? song.originalTempo ?? null
+  const key = shownKey(before)
+  const tempo = shownTempo(before)
+  const keyMoved = Boolean(key) && key !== shownKey(after)
+  const tempoMoved = tempo != null && tempo !== shownTempo(after)
+  if (!keyMoved && !tempoMoved) return
+
+  const needsKey = (entry: SetlistEntry) => keyMoved && !entry.key
+  const needsTempo = (entry: SetlistEntry) => tempoMoved && entry.tempo == null
+  const now = new Date().toISOString()
+  for (const setlist of await db.getAllSetlists()) {
+    const follows = (entry: SetlistEntry) =>
+      entry.songId === after.id && (needsKey(entry) || needsTempo(entry))
+    if (!setlist.songs.some(follows)) continue
+    await db.updateSetlist(setlist.id, draft => {
+      for (const entry of draft.songs.filter(follows)) {
+        if (needsKey(entry)) entry.key = key
+        if (needsTempo(entry)) entry.tempo = tempo
+      }
+      draft.modifiedDate = now
+    })
+  }
 }
 
 /**
