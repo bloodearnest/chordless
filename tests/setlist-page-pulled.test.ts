@@ -132,7 +132,8 @@ describe('the setlist page: a sync saves its setlist', () => {
   it('says only that it was updated when nothing it can describe changed', async () => {
     const setlist = await rig.open(2)
     const latest = must(await rig.db.getSetlist(setlist.id))
-    const entry = { ...latest.songs[0], notes: 'repeat the chorus' }
+    // (a chart edit is not described; notes are: see setlist-diff.node.test.ts)
+    const entry = { ...latest.songs[0], chordproEdits: '{title: Alpha, fixed}' }
     await rig.db.saveSetlist({ ...latest, songs: [entry, latest.songs[1]] })
 
     await pulled([setlist.id])

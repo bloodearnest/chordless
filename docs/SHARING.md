@@ -92,6 +92,9 @@ What's encrypted. Everything a recipient needs, and nothing about the space:
 ```
 
 - The chart text is included, not song ids.
+- A song's shared notes (`docs/NOTES.md`) are in `annotations`, only when it has some (so a share of a
+  setlist without notes keeps its hash). A receiver keeps only the well formed text notes of them. The
+  sender's private notes and any drawings are never in a bundle.
 - Not included: space ids, Drive ids, leaders' emails and ids (the bundle has the leader's name only) and sync
   fields.
 - A typical setlist (4–6 songs) is 10–15 KB of ChordPro, about 3–4 KB compressed.

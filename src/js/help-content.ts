@@ -238,6 +238,37 @@ const SONG: HelpPage = {
         },
       ],
     },
+    {
+      heading: 'Edit mode: notes',
+      intro:
+        'Write a note on the chart: how to play a part, where to drop out, how many times to repeat. It is set in handwriting, above the word it is on, or beside the name of a section. Notes are shown when you are not editing too.',
+      items: [
+        {
+          image: 'song-note',
+          wide: true,
+          label: 'Press and hold',
+          text: 'Press and hold a word, a chord or the name of a section to write a note there. (On a computer, right-click does it too.)',
+        },
+        {
+          image: 'note-editor',
+          wide: true,
+          label: 'The note',
+          text: 'Type the note. “Shown in” is for this setlist only (the usual), or for this song wherever it comes up, in every setlist. “Seen by” is just you (the usual), or the team: a note for the team goes with the setlist, so everyone who has it sees it. Only people who can edit the setlist can share a note.',
+        },
+        {
+          label: 'Change or delete a note',
+          text: 'Tap a note to change it. Delete takes it off, and you can bring it back with Undo.',
+        },
+        {
+          label: 'A note for the whole song',
+          text: 'Use “+ Note on the whole song” above the first section.',
+        },
+        {
+          label: 'Hide notes',
+          text: 'Turn off the team’s notes, or your own, in [Preferences](/preferences).',
+        },
+      ],
+    },
   ],
 }
 

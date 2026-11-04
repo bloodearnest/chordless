@@ -87,8 +87,10 @@ scales with the font on that musician's own devices.
 
 - Shared notes are part of the setlist file, so they sync, hash and go over live sync exactly as the
   rest of the setlist does. The Worker sees nothing new.
-- A reader whose setlist is reset to the leader's is told notes changed (`describeSetlistChange`).
-- Share links carry the shared notes (`ShareSong.annotations`); private notes never leave the device.
+- A reader whose setlist is reset to the leader's is told "<song>: notes changed" (`describeSetlistChange`).
+- Share links carry the shared notes (`ShareSong.annotations`, only when a song has some, so older shares
+  keep their hash). A receiver keeps the well formed text notes (`notes/validate.ts`) and leaves out
+  the rest. Private notes and drawings never leave the device.
 - The export zip carries shared notes (they are in the setlist JSON); private notes are not
   exported, like section visibility.
 - A setlist is one file and a conflict is "Drive wins" (`SYNC_ARCHITECTURE.md`), so two writers
@@ -104,5 +106,6 @@ private notes.
 
 ## Order of work
 
-1. This doc. 2. Types and anchors. 3. Persistence and permissions. 4. Rendering. 5. The collision
-pass. 6. The editor and long-press in edit mode, preferences. 7. Sync diff, share bundle, help.
+All built: 1. This doc. 2. Types and anchors. 3. Persistence and permissions. 4. Rendering. 5. The
+collision pass. 6. The editor and long-press in edit mode, preferences. 7. Sync diff, share bundle,
+help (Setlist Song > Edit mode: notes).

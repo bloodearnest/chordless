@@ -118,6 +118,26 @@ describe('Receiving a share link', () => {
     result.db.db?.close()
   })
 
+  it('keeps the notes the sender shared on a song', async () => {
+    const withNotes = bundle()
+    withNotes.setlist.songs[0].annotations = [
+      {
+        id: 'n1',
+        anchor: { kind: 'song' },
+        body: { kind: 'text', text: 'capo 2' },
+        modified: '2026-11-01T00:00:00Z',
+      },
+    ]
+    const { fetchFile } = await worker(withNotes)
+    const result = await openShare(FILE, key, { fetchFile, today: '2026-10-12' })
+    if (result.state !== 'ready') throw new Error(result.state)
+    const setlist = must(await result.db.getSetlist(shareSetlistId(FILE)))
+    expect(setlist.songs[0].annotations?.map(each => each.body)).to.deep.equal([
+      { kind: 'text', text: 'capo 2' },
+    ])
+    result.db.db?.close()
+  })
+
   it('opens again from the copy, asking the worker whether it changed', async () => {
     const { fetchFile, calls } = await worker()
     await open(key, fetchFile)

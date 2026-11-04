@@ -85,9 +85,7 @@ export class NoteEditor extends LitElement {
       }
 
       textarea {
-        font-family: var(--font-family-note);
-        font-size: var(--font-lyrics);
-        line-height: 1.2;
+        line-height: 1.3;
         resize: vertical;
         min-height: 4.5em;
       }

@@ -80,4 +80,39 @@ describe('describing what a setlist changed', () => {
     assert.deepEqual(describe_(noName, setlist([], { name: '' })), [])
     assert.deepEqual(describe_(setlist([], { name: '' }), noName), [])
   })
+
+  describe('notes', () => {
+    const note = (id: string, text: string) => ({
+      id,
+      anchor: { kind: 'song' as const },
+      body: { kind: 'text' as const, text },
+      modified: '',
+    })
+    const withNotes = (...notes: ReturnType<typeof note>[]) =>
+      setlist([song('a', { annotations: notes }), song('b')])
+
+    it('says when a song’s notes changed: added, edited, removed, or the older note text', () => {
+      const none = withNotes()
+      assert.deepEqual(describe_(none, withNotes(note('1', 'softly'))), ['A: notes changed'])
+      assert.deepEqual(describe_(withNotes(note('1', 'softly')), withNotes(note('1', 'loudly'))), [
+        'A: notes changed',
+      ])
+      assert.deepEqual(describe_(withNotes(note('1', 'softly')), none), ['A: notes changed'])
+      assert.deepEqual(
+        describe_(setlist([song('a', { notes: 'x' })]), setlist([song('a', { notes: 'y' })])),
+        ['A: notes changed']
+      )
+    })
+
+    it('says nothing for the same notes in another order, or for none to none', () => {
+      assert.deepEqual(
+        describe_(
+          withNotes(note('1', 'a'), note('2', 'b')),
+          withNotes(note('2', 'b'), note('1', 'a'))
+        ),
+        []
+      )
+      assert.deepEqual(describe_(withNotes(), setlist([song('a'), song('b')])), [])
+    })
+  })
 })

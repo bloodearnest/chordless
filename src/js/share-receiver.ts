@@ -117,6 +117,7 @@ async function store(
       key: song.key,
       tempo: song.tempo,
       notes: song.notes,
+      ...(song.annotations?.length && { annotations: song.annotations }),
     })
   }
 
