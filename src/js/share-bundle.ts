@@ -3,7 +3,8 @@
  * about the space. Pure: no storage, no network.
  */
 
-import type { Setlist, SetlistEntry } from './data-types.ts'
+import type { Setlist, SetlistEntry, SharedChartNote } from './data-types.ts'
+import { readSharedNotes } from './notes/validate.ts'
 import { sha256Hex } from './utils/bytes.ts'
 
 export const SHARE_FORMAT = 'chordless-share'
@@ -20,6 +21,8 @@ export interface ShareSong {
   notes: string
   /** The chart's text, including this setlist's edits to it */
   chordpro: string
+  /** The notes on the chart shared with the team (docs/NOTES.md); left out when there are none */
+  annotations?: SharedChartNote[]
 }
 
 export interface ShareBundle {
@@ -99,6 +102,8 @@ export function buildShareBundle(
       tempo: entry.tempo ?? songTempo ?? null,
       notes: entry.notes ?? '',
       chordpro: entry.chordproEdits ?? chordpro,
+      // (left out when there are none, so a share of a setlist without notes keeps its hash)
+      ...(entry.annotations?.length && { annotations: entry.annotations }),
     }))
   return {
     format: SHARE_FORMAT,
@@ -139,6 +144,12 @@ export function parseShareBundle(data: unknown): ShareBundle {
   for (const song of setlist.songs) {
     if (!isRecord(song) || typeof song.title !== 'string' || typeof song.chordpro !== 'string') {
       throw new Error('The share is damaged')
+    }
+    // (a note that is not well formed is left out, not a reason to refuse the share)
+    if ('annotations' in song) {
+      const notes = readSharedNotes(song.annotations)
+      if (notes.length) song.annotations = notes
+      else delete song.annotations
     }
   }
   if (data.setlistId !== undefined && typeof data.setlistId !== 'string') {

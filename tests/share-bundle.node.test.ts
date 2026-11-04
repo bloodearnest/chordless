@@ -273,3 +273,58 @@ test('an id that is not a UUID has no setlist code, and so matches nothing', () 
   assert.equal(setlistCode('not-a-uuid'), '')
   assert.equal(matchesSetlistCode('', 'not-a-uuid'), false)
 })
+
+const sharedNote = (id: string, text: string) => ({
+  id,
+  anchor: { kind: 'section' as const, label: 'Chorus', nth: 0 },
+  body: { kind: 'text' as const, text },
+  modified: '2026-11-01T00:00:00Z',
+})
+
+test('shared notes go in the bundle for their song, and only when there are some', async () => {
+  const bundle = bundleOf([
+    source(1, { annotations: [sharedNote('n1', 'all in')] }),
+    source(2),
+    source(3, { annotations: [] }),
+  ])
+  assert.deepEqual(bundle.setlist.songs[0]?.annotations, [sharedNote('n1', 'all in')])
+  // (a share of a setlist without notes is as it was before notes, so its hash is too)
+  assert.equal('annotations' in (bundle.setlist.songs[1] ?? {}), false)
+  assert.equal('annotations' in (bundle.setlist.songs[2] ?? {}), false)
+  assert.notEqual(
+    await bundleHash(bundle),
+    await bundleHash(bundleOf([source(1), source(2), source(3)]))
+  )
+  assert.notEqual(
+    await bundleHash(bundleOf([source(1, { annotations: [sharedNote('n1', 'quietly')] })])),
+    await bundleHash(bundleOf([source(1, { annotations: [sharedNote('n1', 'all in')] })]))
+  )
+})
+
+test('reading a share keeps the notes that are well formed and leaves out the rest, drawings included', () => {
+  const bundle = JSON.parse(
+    JSON.stringify(bundleOf([source(1, { annotations: [sharedNote('n1', 'ok')] })]))
+  )
+  bundle.setlist.songs[0].annotations.push(
+    { id: 'ink', anchor: { kind: 'song' }, body: { kind: 'ink', strokes: [], w: 1, h: 1 } },
+    { id: 'bad-anchor', anchor: { kind: 'nowhere' }, body: { kind: 'text', text: 'x' } },
+    { id: '', anchor: { kind: 'song' }, body: { kind: 'text', text: 'x' } },
+    { id: 'no-text', anchor: { kind: 'song' }, body: { kind: 'text' } },
+    'junk',
+    {
+      id: 'spot',
+      anchor: { kind: 'text', label: null, nth: 0, line: 2, offset: 4, before: 'a', after: 'b' },
+      body: { kind: 'text', text: 'here' },
+    }
+  )
+  const read = parseShareBundle(bundle)
+  assert.deepEqual(
+    read.setlist.songs[0]?.annotations?.map(n => n.id),
+    ['n1', 'spot']
+  )
+  const none = JSON.parse(JSON.stringify(bundleOf([source(1)])))
+  none.setlist.songs[0].annotations = [
+    { id: 'ink', anchor: { kind: 'song' }, body: { kind: 'ink' } },
+  ]
+  assert.equal('annotations' in (parseShareBundle(none).setlist.songs[0] ?? {}), false)
+})
