@@ -1,5 +1,6 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import { SongImportedEvent } from '../src/components/song-import.ts'
+import type { SongRecord } from '../src/js/data-types.ts'
 import { createSetlist, getCurrentDB, openSpace } from '../src/js/db.ts'
 import { addChart, createSong } from '../src/js/song-utils.ts'
 import {
@@ -9,6 +10,7 @@ import {
   setCurrentSpace,
   updateSpace,
 } from '../src/js/space.ts'
+import { makeEntry, makeSetlist } from './builders.ts'
 import { must } from './must.ts'
 import { A11Y, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -274,10 +276,20 @@ describe('song-import', () => {
     })
   })
 
-  describe('several songs the library has: the same choice for all of them', () => {
+  describe('several songs the library has', () => {
     /** The same song in a key, its chords moved with it */
     const inKey = (title: string, key: string, chords: [string, string]) =>
       `{title: ${title}}\n{key: ${key}}\n\n[${chords[0]}]Amazing [${chords[1]}]grace how [${chords[0]}]sweet`
+    const sameWords = (title: string, chord: string) =>
+      chart(title, `[${chord}]Amazing grace how sweet`)
+
+    const chartOf = async (uuid: string) => {
+      const db = await getCurrentDB()
+      return must(await db.getChordPro(must(await db.getSong(uuid)).chordproFileId)).content
+    }
+    const picks = (element: any) => element._imports.map((item: any) => item.pick)
+    const asked = (element: any) =>
+      element._imports.filter((item: any) => item.isDuplicate && !item.choice && !item.auto)
 
     /** Three songs the library has, and a new chart of each: another key, other details, other chords */
     async function threeDuplicates() {
@@ -285,120 +297,190 @@ describe('song-import', () => {
       const library = [
         await createSong(inKey(titles[0], 'C', ['C', 'F'])),
         await createSong(chart(titles[1], '[C]Same')),
-        await createSong(chart(titles[2], '[G]Amazing grace how sweet')),
+        await createSong(sameWords(titles[2], 'G')),
       ]
       const element: any = await importer()
       await element.importFiles([
         file('a.cho', inKey(titles[0], 'D', ['D', 'G'])),
         file('b.cho', `{title: ${titles[1]}}\n{key: C}\n{tempo: 80}\n\n[C]Same`),
-        file('c.cho', chart(titles[2], '[D]Amazing grace how sweet')),
+        file('c.cho', sameWords(titles[2], 'D')),
       ])
       await element.updateComplete
       return { element, library, titles }
     }
-    const chartOf = async (uuid: string) => {
-      const db = await getCurrentDB()
-      return must(await db.getChordPro(must(await db.getSong(uuid)).chordproFileId)).content
-    }
-    const picks = (element: any) => element._imports.map((item: any) => item.pick)
 
-    it('says what each is, and offers to update the ones that are the same song', async () => {
-      const { element } = await threeDuplicates()
+    it('updates the songs that are the same song with no question, and asks only about the rest', async () => {
+      const { element, library } = await threeDuplicates()
       expect(element._imports.map((item: any) => item.comparison.verdict)).to.deep.equal([
         'other-key',
         'same-chart',
         'different-chords',
       ])
-      expect(text(element)).to.contain('For all of them:')
-      expect(text(element)).to.contain('Update the 2 that are the same song')
-      expect(text(element)).to.contain('Update all 3')
+      expect(element._imports.map((item: any) => item.choice)).to.deep.equal([
+        'update',
+        'update',
+        null,
+      ])
+      // (the other chords are not the library's: that is for the person to decide)
+      expect(asked(element)).to.have.length(1)
+      expect(text(element)).to.contain('1 of these songs is already in your library')
+      expect(text(element)).to.contain('updated: the same song as in your library')
+      expect(await chartOf(library[0].uuid)).to.contain('{key: D}')
+      expect(await chartOf(library[1].uuid)).to.contain('{tempo: 80}')
+      expect(await chartOf(library[2].uuid)).to.contain('[G]Amazing grace')
       await expect(element).to.be.accessible(A11Y)
     })
 
-    it('updates the same song, and leaves the one with other chords to be decided', async () => {
-      const { element, library } = await threeDuplicates()
-      $(element, '.bulk-update-same').click()
-      await element.updateComplete
-      // (the one with other chords keeps what was suggested for it: a variant)
-      expect(picks(element)).to.deep.equal(['update', 'update', 'as-variant'])
-      $(element, '.apply-all').click()
-      await waitFor(() => $(element, '.choices'))
-      expect(await chartOf(library[0].uuid)).to.contain('{key: D}')
-      expect(await chartOf(library[1].uuid)).to.contain('{tempo: 80}')
-      // (the other chords are not the library's: they came in as a variant beside it)
-      expect(await chartOf(library[2].uuid)).to.contain('[G]Amazing grace how sweet')
+    it('makes the new key the song’s own, and keeps the setlists in the keys they had it in', async () => {
+      const title = unique('Setlists keep their key')
+      const song = await createSong(inKey(title, 'C', ['C', 'F']))
       const db = await getCurrentDB()
-      expect((await db.getSongVariants(library[2].id)).length).to.equal(2)
+      const setlist = makeSetlist({
+        id: `keeps-${crypto.randomUUID().slice(0, 8)}`,
+        songs: [
+          makeEntry({ songUuid: song.uuid, songId: song.id }),
+          makeEntry({ order: 1, songUuid: song.uuid, songId: song.id, key: 'A' }),
+        ],
+      })
+      await db.saveSetlist(setlist)
+      const element: any = await importer()
+      await element.importFiles([file('a.cho', inKey(title, 'D', ['D', 'G']))])
+      await element.updateComplete
+
+      // the song is in D now, by default and as its original
+      const updated = must(await db.getSong(song.uuid))
+      expect(updated.key).to.equal('D')
+      expect(updated.originalKey).to.equal('D')
+      // the setlist that followed the song is in C still, and the one with its own key in A
+      const stored = must(await db.getSetlist(setlist.id))
+      expect(stored.songs.map(entry => entry.key)).to.deep.equal(['C', 'A'])
     })
 
-    it('updates them all, saying how far it has got, and keeps the key each is in', async () => {
-      const { element, library } = await threeDuplicates()
-      const db = await getCurrentDB()
-      // (a key someone chose for the first, which setlists with none of their own follow)
-      await db.saveSong({ ...must(await db.getSong(library[0].uuid)), key: 'E' })
-      $(element, '.bulk-update-all').click()
-      await element.updateComplete
-      expect(picks(element)).to.deep.equal(['update', 'update', 'update'])
-
+    it('says how far it has got, when there are several to update', async () => {
+      const titles = [unique('First'), unique('Second'), unique('Third')]
+      for (const title of titles) await createSong(inKey(title, 'C', ['C', 'F']))
+      const element: any = await importer()
       const seen: string[] = []
       const setChoice = element._setChoice.bind(element)
       element._setChoice = (...args: unknown[]) => {
         seen.push(element._applying)
         return setChoice(...args)
       }
-      $(element, '.apply-all').click()
-      await waitFor(() => $(element, '.choices'))
+      await element.importFiles(
+        titles.map(title => file(`${title}.cho`, inKey(title, 'D', ['D', 'G'])))
+      )
       expect(seen).to.deep.equal(['Importing 1 of 3…', 'Importing 2 of 3…', 'Importing 3 of 3…'])
       expect(element._applying).to.equal('')
-      expect(await chartOf(library[2].uuid)).to.contain('[D]Amazing grace how sweet')
-      const first = must(await db.getSong(library[0].uuid))
-      expect(first.key).to.equal('E')
-      expect(first.originalKey).to.equal('D')
+      expect(asked(element)).to.have.length(0)
+      expect($(element, '.choices')).to.exist
+    })
+
+    it('does not leave the comparison on the page while it updates', async () => {
+      const title = unique('No flicker')
+      await createSong(inKey(title, 'C', ['C', 'F']))
+      const element: any = await importer()
+      const shown: boolean[] = []
+      const setChoice = element._setChoice.bind(element)
+      element._setChoice = (...args: unknown[]) => {
+        shown.push(Boolean($(element, '.duplicate')))
+        return setChoice(...args)
+      }
+      await element.importFiles([file('a.cho', inKey(title, 'D', ['D', 'G']))])
+      expect(shown).to.deep.equal([false])
+    })
+
+    it('leaves a library chart from SongSelect alone when the same song comes from somewhere less sure', async () => {
+      const title = unique('Library chart')
+      const song = await createSong(chart(title, '[C]Same words'), {
+        importSource: 'songselect',
+      } as never)
+      const element: any = await importer()
+      // (a file with none of SongSelect's material, with another detail)
+      await element.importFiles([
+        file('a.cho', chart(title, '[C]Same words').replace('{key: C}', '{key: C}\n{tempo: 99}')),
+      ])
+      await element.updateComplete
+      expect(element._imports[0].auto).to.equal(undefined)
+      expect(element._imports[0].pick).to.equal('use-existing')
+      expect(text(element)).to.contain('This song already exists in your library')
+      expect(await chartOf(song.uuid)).to.not.contain('{tempo: 99}')
+    })
+
+    it('updates a library chart from SongSelect with one that is from SongSelect too', async () => {
+      const title = unique('Both official')
+      const song = await createSong(chart(title, '[C]Same words'), {
+        importSource: 'songselect',
+      } as never)
+      const element: any = await importer()
+      await element.receive({
+        chordproText: chart(title, '[C]Same words').replace('{key: C}', '{key: C}\n{tempo: 99}'),
+        source: 'songselect',
+      })
+      expect(element._imports[0].choice).to.equal('update')
+      expect(await chartOf(song.uuid)).to.contain('{tempo: 99}')
+    })
+
+    it('asks about the others as a list, with a choice for all of them', async () => {
+      const titles = [unique('Chords one'), unique('Chords two'), unique('Chords three')]
+      for (const title of titles) await createSong(sameWords(title, 'G'))
+      const element: any = await importer()
+      await element.importFiles(titles.map(title => file(`${title}.cho`, sameWords(title, 'D'))))
+      await element.updateComplete
+      expect(text(element)).to.contain('For all of them:')
+      expect(text(element)).to.contain('Update all 3')
+      expect(text(element)).to.not.contain('that are the same song')
+      expect(picks(element)).to.deep.equal(['as-variant', 'as-variant', 'as-variant'])
+      $(element, '.bulk-update-all').click()
+      await element.updateComplete
+      expect(picks(element)).to.deep.equal(['update', 'update', 'update'])
+      $(element, '.apply-all').click()
+      await waitFor(() => $(element, '.choices'))
+      for (const title of titles) {
+        const [existing] = await (await getCurrentDB()).findSongByNormalizedTitle(
+          title.toLowerCase().replace(/[^a-z0-9]/g, '')
+        )
+        expect(await chartOf(existing.uuid)).to.contain('[D]Amazing grace')
+      }
     })
 
     it('imports none of them when asked not to', async () => {
-      const { element, library } = await threeDuplicates()
+      const titles = [unique('Skip one'), unique('Skip two')]
+      const library: SongRecord[] = []
+      for (const title of titles) library.push(await createSong(sameWords(title, 'G')))
+      const element: any = await importer()
+      await element.importFiles(titles.map(title => file(`${title}.cho`, sameWords(title, 'D'))))
+      await element.updateComplete
       $(element, '.bulk-skip').click()
       await element.updateComplete
-      expect(picks(element)).to.deep.equal(['use-existing', 'use-existing', 'use-existing'])
+      expect(picks(element)).to.deep.equal(['use-existing', 'use-existing'])
       $(element, '.apply-all').click()
       await waitFor(() => $(element, '.choices'))
-      expect(await chartOf(library[2].uuid)).to.contain('[G]Amazing grace how sweet')
-      expect(await chartOf(library[0].uuid)).to.contain('{key: C}')
+      expect(await chartOf(library[0].uuid)).to.contain('[G]Amazing grace')
     })
 
-    it('has no one to update as the same song when none of them is, and still updates them all', async () => {
-      const titles = [unique('Chords one'), unique('Chords two')]
-      for (const title of titles) await createSong(chart(title, '[G]Amazing grace how sweet'))
-      const element: any = await importer()
-      await element.importFiles(
-        titles.map(title => file(`${title}.cho`, chart(title, '[D]Amazing grace how sweet')))
-      )
-      await element.updateComplete
-      expect($(element, '.bulk-update-same').disabled).to.equal(true)
-      expect(text(element)).to.contain('Update the 0 that are the same song')
-      $(element, '.bulk-update-all').click()
-      await element.updateComplete
-      expect(picks(element)).to.deep.equal(['update', 'update'])
+    it('has no choice for all of them when only one is asked about, or the page is about one song', async () => {
+      const { element } = await threeDuplicates()
+      expect($(element, '.bulk-picks')).to.equal(null)
+      const title = unique('Only one')
+      await createSong(sameWords(title, 'G'))
+      const single: any = await importer()
+      await single.importFiles([file('a.cho', sameWords(title, 'D'))])
+      await single.updateComplete
+      expect($(single, '.bulk-picks')).to.equal(null)
     })
 
     it('leaves a duplicate already decided as it is', async () => {
-      const { element } = await threeDuplicates()
+      const titles = [unique('Decided'), unique('Undecided one'), unique('Undecided two')]
+      for (const title of titles) await createSong(sameWords(title, 'G'))
+      const element: any = await importer()
+      await element.importFiles(titles.map(title => file(`${title}.cho`, sameWords(title, 'D'))))
+      await element.updateComplete
       await element._applyPicks([{ ...element._imports[0], pick: 'use-existing' }])
       $(element, '.bulk-update-all').click()
       await element.updateComplete
       // (the first was decided; the two left were picked)
       expect(picks(element)[1]).to.equal('update')
       expect(picks(element)[2]).to.equal('update')
-    })
-
-    it('has no bulk choices for one song', async () => {
-      const title = unique('Only one')
-      await createSong(chart(title, '[G]Amazing grace how sweet'))
-      const element: any = await importer()
-      await element.importFiles([file('a.cho', chart(title, '[D]Amazing grace how sweet'))])
-      await element.updateComplete
-      expect($(element, '.bulk-picks')).to.equal(null)
     })
   })
 
@@ -433,13 +515,19 @@ describe('song-import', () => {
       await expect(element).to.be.accessible(A11Y)
     })
 
-    it('leads with not importing for a change of key, and with nothing for other words', async () => {
+    it('updates a change of key with no question, and leaves nothing chosen for other words', async () => {
       const key = unique('Key')
-      await createSong(`{title: ${key}}\n{key: C}\n[C]Amazing [F]grace`)
+      const song = await createSong(`{title: ${key}}\n{key: C}\n[C]Amazing [F]grace`)
       const element: any = await importer()
       await paste(element, `{title: ${key}}\n{key: D}\n[D]Amazing [G]grace`)
-      expect(text(element)).to.contain('The same song in another key')
-      expect($(element, '.pick-use-existing').checked).to.equal(true)
+      // (the same song, in another key: there is nothing to ask, and it is now in the new key)
+      expect($(element, '.duplicate')).to.equal(null)
+      expect(text(element)).to.contain('It has been updated.')
+      const db = await getCurrentDB()
+      expect(must(await db.getSong(song.uuid)).key).to.equal('D')
+      expect(
+        must(await db.getChordPro(must(await db.getSong(song.uuid)).chordproFileId)).content
+      ).to.contain('{key: D}')
 
       const words = unique('Words')
       await createSong(chart(words, '[G]Amazing grace'))

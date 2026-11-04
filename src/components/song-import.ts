@@ -128,6 +128,8 @@ interface ImportItem {
   label?: string
   /** The same chart as the library's, which only said it was a file: its source is now SongSelect */
   sourceSet?: boolean
+  /** The same song as the library's: it was updated with no question asked */
+  auto?: boolean
   /** What came of the lead sheet that came with it, if one did */
   leadSheet?: LeadSheetOutcome
   /** What was read from it, to show how */
@@ -979,6 +981,14 @@ export class SongImport extends LitElement {
       const setlists = await db.getAllSetlists()
       this._setlists = setlists.sort((a, b) => b.date.localeCompare(a.date))
       this._state = 'choices'
+
+      // The same song as the library's is updated, with no question: there is nothing to decide
+      const same = imports.filter(item => this._updatesWithoutAsking(item))
+      for (const item of same) {
+        item.pick = 'update'
+        item.auto = true
+      }
+      await this._applyPicks(same)
     } catch (error) {
       console.error('[Import] Failed to process song:', error)
       this._showError(`Failed to process song: ${errorMessage(error)}`)
@@ -1017,6 +1027,9 @@ export class SongImport extends LitElement {
 
   /** A song already in the library, and the same chart: nothing is asked, so it says so */
   _renderAlreadyThere(item: ImportItem) {
+    if (item.auto && item.choice === 'update') {
+      return html`<p class="already">This song was already in your library, as the same song. It has been updated.</p>`
+    }
     return item.isDuplicate && item.comparison?.verdict === 'identical'
       ? html`<p class="already">An identical version of this song is already in your library, nothing to import.${item.sourceSet ? ' Its source is now recorded as SongSelect.' : ''}</p>`
       : ''
@@ -1183,16 +1196,17 @@ export class SongImport extends LitElement {
 
   override render() {
     // (the comparison of two charts wants the whole width)
-    const comparing = this._imports.some(item => item.isDuplicate && !item.choice)
+    const comparing = this._imports.some(item => this._isUnresolved(item))
     return html`<div class="page ${comparing ? 'wide' : ''}">${this._renderSpacePicker()}${this._renderUnmatched()}${this._renderState()}</div>`
   }
 
   _renderState() {
     if (this._state === 'pick') return this._renderPick()
     const several = this._imports.length > 1
-    const unresolved = this._imports.filter(item => item.isDuplicate && !item.choice)
+    const unresolved = this._imports.filter(item => this._isUnresolved(item))
     return html`
       <h2>✅ ${several ? `${this._imports.length} songs` : this._imports[0].song.title}</h2>
+      ${this._applying ? html`<p class="status" role="status">${this._applying}</p>` : ''}
       ${several ? this._renderSongList() : unresolved.length ? '' : this._renderAlreadyThere(this._imports[0])}
       ${several ? '' : unresolved.length ? '' : this._renderRange(this._imports[0])}
       ${
@@ -1316,20 +1330,23 @@ export class SongImport extends LitElement {
       <ol class="songs">
         ${this._imports.map(
           item =>
-            html`<li>${item.song.title} <span class="subtitle">${item.isDuplicate ? (item.comparison?.verdict === 'identical' ? `identical version already in library${item.sourceSet ? ', now recorded as from SongSelect' : ''}` : (item.choice && status[item.choice]) || 'already in library') : 'new'}</span>${this._renderRange(item)}</li>`
+            html`<li>${item.song.title} <span class="subtitle">${item.isDuplicate ? (item.auto && item.choice === 'update' ? 'updated: the same song as in your library' : item.comparison?.verdict === 'identical' ? `identical version already in library${item.sourceSet ? ', now recorded as from SongSelect' : ''}` : (item.choice && status[item.choice]) || 'already in library') : 'new'}</span>${this._renderRange(item)}</li>`
         )}
       </ol>
     `
   }
 
   /**
-   * Make one choice for the duplicates that are not decided yet and are `of` (all of them, or only
-   * those that are the same song as the library's), as a long list of them has no time for each
+   * Make one choice for the duplicates that are not decided yet, as a long list of them has no
+   * time for each
    */
-  _pickAll(pick: DuplicateChoice, of: (item: ImportItem) => boolean = () => true): void {
-    this._imports = this._imports.map(item =>
-      item.isDuplicate && !item.choice && of(item) ? { ...item, pick } : item
-    )
+  _pickAll(pick: DuplicateChoice): void {
+    this._imports = this._imports.map(item => (this._isUnresolved(item) ? { ...item, pick } : item))
+  }
+
+  /** A song the library has, with a choice to be made for it (not one that is being updated with no question) */
+  _isUnresolved(item: ImportItem): boolean {
+    return item.isDuplicate && !item.choice && !item.auto
   }
 
   /** Pick what to do with one duplicate (done when "Import" is pressed) */
@@ -1387,9 +1404,9 @@ export class SongImport extends LitElement {
       case 'different-chords':
         return 'as-variant'
       case 'same-chart':
-        // (the same chart, and the lead sheet gives it a range: keeping the library's would lose that)
-        return this._addsRange(item) ? 'update' : 'use-existing'
       case 'other-key':
+        // (the same song, which is updated with no question unless the library's chart is the
+        // better authority: so what is asked about is whether to replace it)
         return 'use-existing'
       default:
         return null
@@ -1397,9 +1414,16 @@ export class SongImport extends LitElement {
   }
 
   /** `alone`: the page is about this one song, so the comparison says its range (a list of songs does) */
-  /** The imported chart has a melody range that the library's has not */
-  _addsRange(item: ImportItem): boolean {
-    return Boolean(rangeOfChart(item.chordproText)) && !rangeOfChart(item.existingText ?? '')
+  /**
+   * Whether a song the library has is updated with no question: it is the same song (the same
+   * words and chords, whatever else differs, even the key), and the chart coming is no less the
+   * authority than the library's: a chart from SongSelect is not replaced by one that is not
+   */
+  _updatesWithoutAsking(item: ImportItem): boolean {
+    const verdict = item.comparison?.verdict
+    const sameSong = verdict === 'same-chart' || verdict === 'other-key'
+    const lesser = item.song.importSource === SONGSELECT && item.source !== SONGSELECT
+    return sameSong && !lesser
   }
 
   _renderDuplicate(item: ImportItem, index: number, alone: boolean) {
@@ -1408,7 +1432,7 @@ export class SongImport extends LitElement {
     const verdict = comparison?.verdict ?? 'different-words'
     const sentence = {
       identical: 'The same song.',
-      'same-chart': `The same words and chords, with other details.${this._addsRange(item) ? ' The lead sheet adds a melody range.' : ''}`,
+      'same-chart': 'The same words and chords, with other details.',
       'other-key': 'The same song in another key.',
       'different-chords': 'The same words, with different chords.',
       'different-words': 'Different words: another version or arrangement.',
@@ -1440,7 +1464,7 @@ export class SongImport extends LitElement {
       {
         value: 'update',
         title: 'Update current song',
-        help: 'Replace your current song with the imported one. Setlists keep using it, and it stays in the key you have it in.',
+        help: 'Replace your current song with the imported one, in its key. Setlists keep using it, and keep the keys they have it in.',
       },
       {
         value: 'use-existing',
@@ -1508,10 +1532,6 @@ export class SongImport extends LitElement {
 
   _renderDuplicates(unresolved: ImportItem[]) {
     const single = unresolved.length === 1 && this._imports.length === 1
-    // (the same song as the library's: the same words and chords, whatever else differs, even the key)
-    const isSameSong = (item: ImportItem) =>
-      item.comparison?.verdict === 'same-chart' || item.comparison?.verdict === 'other-key'
-    const sameSong = unresolved.filter(isSameSong).length
     return html`
       <div class="duplicate">
         <strong>
@@ -1525,24 +1545,21 @@ export class SongImport extends LitElement {
           single
             ? ''
             : html`
-              <div class="bulk-picks" role="group" aria-label="The same choice for all of them">
-                <span>For all of them:</span>
-                <button
-                  class="btn bulk-update-same"
-                  type="button"
-                  ?disabled=${sameSong === 0}
-                  @click=${() => this._pickAll('update', isSameSong)}
-                >
-                  Update the ${sameSong} that are the same song
-                </button>
-                <button class="btn bulk-update-all" type="button" @click=${() => this._pickAll('update')}>
-                  Update all ${unresolved.length}
-                </button>
-                <button class="btn bulk-skip" type="button" @click=${() => this._pickAll('use-existing')}>
-                  Do not import any
-                </button>
-              </div>
-              ${this._applying ? html`<p class="status" role="status">${this._applying}</p>` : ''}
+              ${
+                unresolved.length > 1
+                  ? html`
+                    <div class="bulk-picks" role="group" aria-label="The same choice for all of them">
+                      <span>For all of them:</span>
+                      <button class="btn bulk-update-all" type="button" @click=${() => this._pickAll('update')}>
+                        Update all ${unresolved.length}
+                      </button>
+                      <button class="btn bulk-skip" type="button" @click=${() => this._pickAll('use-existing')}>
+                        Do not import any
+                      </button>
+                    </div>
+                  `
+                  : ''
+              }
               <div class="duplicate-actions">
                 <button
                   class="btn apply-all"

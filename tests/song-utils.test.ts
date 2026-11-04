@@ -567,39 +567,152 @@ describe('an incoming chart of a song the library has', () => {
     })
   })
 
-  it('keeps the key and tempo the song is saved in, and takes the chart and its original key and tempo', async () => {
-    ccli++
-    const title = unique('Kept key')
-    const old = await createSong(chart(title, { extra: '{tempo: 80}\n' }))
-    const db = await getCurrentDB()
-    // (a key and a tempo someone chose for the song, which setlists with none of their own follow)
-    await db.saveSong({ ...must(await db.getSong(old.uuid)), key: 'A', tempo: 90 })
+  describe('the key and tempo it is in', () => {
+    const NOW_ISO = '2026-01-01T00:00:00.000Z'
+    const setlistOf = (id: string, entries: ReturnType<typeof makeEntry>[]) =>
+      makeSetlist({ id, songs: entries, modifiedDate: NOW_ISO })
+    const entryOf = async (setlistId: string, index = 0) =>
+      must((await (await getCurrentDB()).getSetlist(setlistId))?.songs[index])
 
-    const replaced = await replaceSong(
-      old.uuid,
-      `{title: ${title}}\n{key: E}\n{tempo: 70}\n{ccli: ${ccli}}\n[E]Amazing [A]grace`,
-      incoming
-    )
-    expect(replaced.key).to.equal('A')
-    expect(replaced.tempo).to.equal(90)
-    expect(replaced.originalKey).to.equal('E')
-    expect(replaced.originalTempo).to.equal(70)
-    expect(must(await db.getChordPro(replaced.chordproFileId)).content).to.contain('{key: E}')
-  })
+    /** A song in G, 80, that someone has put in A, 90 (as the library shows it), and the chart that replaces it */
+    async function songInA(titlePrefix: string, extra = '') {
+      const title = unique(titlePrefix)
+      const song = await createSong(chart(title, { extra: `{tempo: 80}\n${extra}` }))
+      const db = await getCurrentDB()
+      await db.saveSong({ ...must(await db.getSong(song.uuid)), key: 'A', tempo: 90 })
+      return { title, song, db }
+    }
+    const newChart = (title: string, key = 'E', tempo = 70) =>
+      `{title: ${title}}\n{key: ${key}}\n{tempo: ${tempo}}\n{ccli: ${ccli}}\n[${key}]Amazing [A]grace`
 
-  it('gives a song that had no saved key or tempo the new chart’s', async () => {
-    ccli++
-    const title = unique('Had none')
-    const old = await createSong(`{title: ${title}}\n\n[G]No key line`)
-    const db = await getCurrentDB()
-    await db.saveSong({ ...must(await db.getSong(old.uuid)), key: null, tempo: null })
-    const replaced = await replaceSong(
-      old.uuid,
-      `{title: ${title}}\n{key: E}\n{tempo: 70}\n{ccli: ${ccli}}\n[E]Words`,
-      incoming
-    )
-    expect(replaced.key).to.equal('E')
-    expect(replaced.tempo).to.equal(70)
+    it('is the new chart’s: the song is now in the key SongSelect has it, with that original key and tempo', async () => {
+      ccli++
+      const { title, song, db } = await songInA('Takes the new key')
+      const replaced = await replaceSong(song.uuid, newChart(title), incoming)
+      expect(replaced.key).to.equal('E')
+      expect(replaced.tempo).to.equal(70)
+      expect(replaced.originalKey).to.equal('E')
+      expect(replaced.originalTempo).to.equal(70)
+      expect(must(await db.getChordPro(replaced.chordproFileId)).content).to.contain('{key: E}')
+    })
+
+    it('writes the key and tempo the setlists showed into their entries, so no setlist changes', async () => {
+      ccli++
+      const { title, song, db } = await songInA('Pins setlists')
+      await db.saveSetlist(
+        setlistOf('pins-1', [
+          makeEntry({ songUuid: song.uuid, songId: song.id }), // follows the song: A, 90
+          makeEntry({ order: 1, songUuid: song.uuid, songId: song.id, key: 'C', tempo: 100 }),
+          makeEntry({ order: 2, songUuid: 'other', songId: 'title-another-song' }),
+        ])
+      )
+      await db.saveSetlist(
+        setlistOf('pins-2', [makeEntry({ songUuid: song.uuid, songId: song.id })])
+      )
+      // (one that has none of the song: not saved at all)
+      await db.saveSetlist(
+        setlistOf('pins-none', [makeEntry({ songUuid: 'other', songId: 'title-another-song' })])
+      )
+
+      const replaced = await replaceSong(song.uuid, newChart(title), incoming)
+
+      const followed = await entryOf('pins-1')
+      expect(followed).to.include({ key: 'A', tempo: 90, songId: replaced.id })
+      // (an entry with its own key and tempo keeps them, and another song's is left as it is)
+      expect(await entryOf('pins-1', 1)).to.include({ key: 'C', tempo: 100 })
+      expect(await entryOf('pins-1', 2)).to.include({ key: null, tempo: null })
+      expect(await entryOf('pins-2')).to.include({ key: 'A', tempo: 90 })
+      const untouched = must(await db.getSetlist('pins-none'))
+      expect(untouched.modifiedDate).to.equal(NOW_ISO)
+      expect(must(await db.getSetlist('pins-1')).modifiedDate).to.not.equal(NOW_ISO)
+    })
+
+    it('pins the key when only the key moves, and the tempo when only the tempo does', async () => {
+      ccli++
+      const { title, song, db } = await songInA('Only one moves')
+      await db.saveSetlist(
+        setlistOf('only-key', [makeEntry({ songUuid: song.uuid, songId: song.id })])
+      )
+      await replaceSong(song.uuid, newChart(title, 'E', 90), incoming)
+      // (the new chart's tempo is the song's 90 already: only the key moved)
+      expect(await entryOf('only-key')).to.include({ key: 'A', tempo: null })
+
+      ccli++
+      const other = await songInA('Only tempo')
+      await other.db.saveSetlist(
+        setlistOf('only-tempo', [makeEntry({ songUuid: other.song.uuid, songId: other.song.id })])
+      )
+      await replaceSong(other.song.uuid, newChart(other.title, 'A', 70), incoming)
+      expect(await entryOf('only-tempo')).to.include({ key: null, tempo: 90 })
+    })
+
+    it('changes no setlist when the key and tempo do not move', async () => {
+      ccli++
+      const { title, song, db } = await songInA('Does not move', `{ccli: ${ccli}}\n`)
+      await db.saveSetlist(
+        setlistOf('no-move', [makeEntry({ songUuid: song.uuid, songId: song.id })])
+      )
+      await replaceSong(song.uuid, newChart(title, 'A', 90), incoming)
+      const after = must(await db.getSetlist('no-move'))
+      expect(after.modifiedDate).to.equal(NOW_ISO)
+      expect(after.songs[0]).to.include({ key: null, tempo: null })
+    })
+
+    it('follows a song whose id changes with the new chart: the entry moves, and is pinned', async () => {
+      ccli++
+      const title = unique('Changes id')
+      const old = await createSong(chart(title))
+      const db = await getCurrentDB()
+      expect(old.id).to.not.equal(`ccli-${ccli}`)
+      await db.saveSetlist(setlistOf('new-id', [makeEntry({ songUuid: old.uuid, songId: old.id })]))
+      const replaced = await replaceSong(old.uuid, newChart(title), incoming)
+      expect(replaced.id).to.equal(`ccli-${ccli}`)
+      expect(await entryOf('new-id')).to.include({ songId: `ccli-${ccli}`, key: 'G' })
+    })
+
+    it('pins a song that is its id’s only version, though it is not flagged the default', async () => {
+      ccli++
+      const title = unique('Lone version')
+      const song = await createSong(chart(title))
+      const db = await getCurrentDB()
+      await db.saveSong({ ...must(await db.getSong(song.uuid)), isDefault: false })
+      await db.saveSetlist(setlistOf('lone', [makeEntry({ songUuid: song.uuid, songId: song.id })]))
+      await replaceSong(song.uuid, newChart(title), incoming)
+      expect(await entryOf('lone')).to.include({ key: 'G' })
+    })
+
+    it('leaves the setlists alone when the version it replaces is not the one they show', async () => {
+      ccli++
+      const title = unique('Other version')
+      const withCcli = `{ccli: ${ccli}}\n`
+      const original = await createSong(chart(title, { extra: withCcli }))
+      const variant = await createVariant(
+        original.uuid,
+        'Simpler',
+        chart(title, { key: 'D', extra: withCcli })
+      )
+      const db = await getCurrentDB()
+      await db.saveSetlist(
+        setlistOf('shown', [makeEntry({ songUuid: original.uuid, songId: original.id })])
+      )
+      await replaceSong(variant.uuid, newChart(title), incoming)
+      // (the setlist shows the original, which has not changed)
+      expect(await entryOf('shown')).to.include({ key: null })
+      expect(must(await db.getSetlist('shown')).modifiedDate).to.equal(NOW_ISO)
+    })
+
+    it('writes nothing for a song that had no key to show', async () => {
+      ccli++
+      const title = unique('No key before')
+      const song = await createSong(`{title: ${title}}\n\n[G]No key line`)
+      const db = await getCurrentDB()
+      await db.saveSong({ ...must(await db.getSong(song.uuid)), key: null, originalKey: null })
+      await db.saveSetlist(
+        setlistOf('no-key', [makeEntry({ songUuid: song.uuid, songId: song.id })])
+      )
+      await replaceSong(song.uuid, newChart(title), incoming)
+      expect(await entryOf('no-key')).to.include({ key: null })
+    })
   })
 
   it("imports as the original: the incoming chart is the default, the library's hangs from it, setlists keep theirs", async () => {
