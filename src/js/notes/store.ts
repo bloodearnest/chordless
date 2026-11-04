@@ -47,11 +47,6 @@ export function kindAllowed(kind: NoteKind, note: ChartNote, mayShare: boolean):
   return true
 }
 
-function listFor(sources: NoteSources, kind: NoteKind): ChartNote[] {
-  if (kind.reach === 'shared') return sources.shared
-  return kind.scope === 'setlist' ? sources.setlistPrivate : sources.songPrivate
-}
-
 /** Every note, with the kind it is kept as (one id shows once: the first place that has it) */
 export function allNotes(sources: NoteSources): { note: ChartNote; kind: NoteKind }[] {
   const seen = new Set<string>()
@@ -93,7 +88,7 @@ export function putNote(sources: NoteSources, note: ChartNote, kind: NoteKind): 
   const put = { ...note, modified: new Date().toISOString() }
   if (kind.reach === 'shared') return { ...without, shared: [...without.shared, put as SharedChartNote] }
   const field = kind.scope === 'setlist' ? 'setlistPrivate' : 'songPrivate'
-  return { ...without, [field]: [...listFor(without, kind), put] }
+  return { ...without, [field]: [...without[field], put] }
 }
 
 /** Which places differ between two states of the sources, so only those are written */

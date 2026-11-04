@@ -15,16 +15,16 @@ export function lineLyrics(section: ChartSection, line: number): string {
 }
 
 function nthOfLabel(sections: ChartSection[], index: number): number {
-  const label = sections[index]?.label ?? null
+  const label = (sections[index] as ChartSection).label
   let nth = 0
-  for (let i = 0; i < index; i++) if ((sections[i]?.label ?? null) === label) nth++
+  for (let i = 0; i < index; i++) if ((sections[i] as ChartSection).label === label) nth++
   return nth
 }
 
 function findSection(sections: ChartSection[], label: string | null, nth: number): number {
   let seen = 0
   for (let i = 0; i < sections.length; i++) {
-    if ((sections[i]?.label ?? null) !== label) continue
+    if ((sections[i] as ChartSection).label !== label) continue
     if (seen === nth) return i
     seen++
   }
@@ -33,7 +33,11 @@ function findSection(sections: ChartSection[], label: string | null, nth: number
 
 /** The anchor for a section's title */
 export function sectionAnchor(sections: ChartSection[], section: number): NoteAnchor {
-  return { kind: 'section', label: sections[section]?.label ?? null, nth: nthOfLabel(sections, section) }
+  return {
+    kind: 'section',
+    label: (sections[section] as ChartSection).label,
+    nth: nthOfLabel(sections, section),
+  }
 }
 
 /** The anchor for a spot `offset` characters into a line's lyrics */
@@ -42,7 +46,7 @@ export function textAnchor(sections: ChartSection[], section: number, line: numb
   const at = Math.max(0, Math.min(offset, text.length))
   return {
     kind: 'text',
-    label: sections[section]?.label ?? null,
+    label: (sections[section] as ChartSection).label,
     nth: nthOfLabel(sections, section),
     line,
     offset: at,

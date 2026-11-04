@@ -113,4 +113,51 @@ describe('note-editor', () => {
     ;((editor.shadowRoot as ShadowRoot).querySelector('dialog') as HTMLDialogElement).close()
     expect(await latest).to.equal(null)
   })
+
+  describe('where it opens', () => {
+    const screen = (width: number, height: number) => {
+      const was = [window.innerWidth, window.innerHeight]
+      Object.defineProperty(window, 'innerWidth', { value: width, configurable: true })
+      Object.defineProperty(window, 'innerHeight', { value: height, configurable: true })
+      return () => {
+        Object.defineProperty(window, 'innerWidth', { value: was[0], configurable: true })
+        Object.defineProperty(window, 'innerHeight', { value: was[1], configurable: true })
+      }
+    }
+    const beside = (top: number) => {
+      const target = document.createElement('div')
+      target.style.cssText = `position: fixed; left: 30px; top: ${top}px; width: 40px; height: 20px`
+      document.body.append(target)
+      return target
+    }
+
+    it('is at the top of a narrow screen, clear of the keyboard', async () => {
+      const restore = screen(500, 700)
+      try {
+        const { dialog, button } = await open({ anchorElement: beside(400) })
+        expect(dialog.style.top).to.equal('3rem')
+        button('Cancel')?.click()
+      } finally {
+        restore()
+      }
+    })
+
+    it('is under what was pressed on a wide screen, or over it if there is no room under', async () => {
+      const restore = screen(1200, 2000)
+      const low = beside(1900)
+      const high = beside(100)
+      try {
+        const under = await open({ anchorElement: high })
+        expect(Number.parseFloat(under.dialog.style.top)).to.be.closeTo(126, 1)
+        under.button('Cancel')?.click()
+        const over = await open({ anchorElement: low })
+        expect(Number.parseFloat(over.dialog.style.top)).to.be.lessThan(1900)
+        over.button('Cancel')?.click()
+      } finally {
+        restore()
+        low.remove()
+        high.remove()
+      }
+    })
+  })
 })

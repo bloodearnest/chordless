@@ -426,6 +426,7 @@ export class SetlistPage {
 
       // The notes on each song, to draw with it
       await this.notes.load()
+      /* v8 ignore next -- the view can be left while the notes load: the guard every load here has */
       if (this._disposed) return
 
       // Initialize section states (load saved overrides for this setlist)

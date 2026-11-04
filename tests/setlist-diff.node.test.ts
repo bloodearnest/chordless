@@ -104,6 +104,11 @@ describe('describing what a setlist changed', () => {
       )
     })
 
+    it('treats a song with no notes field as one with none', () => {
+      const bare = { ...song('a'), notes: undefined } as unknown as SetlistEntry
+      assert.deepEqual(describe_(setlist([bare]), setlist([{ ...song('a'), notes: '' }])), [])
+    })
+
     it('says nothing for the same notes in another order, or for none to none', () => {
       assert.deepEqual(
         describe_(

@@ -98,6 +98,18 @@ test('a note whose section and text are both gone is orphaned, not dropped', () 
   })
 })
 
+test('a spot on a blank line that is gone falls back to its section: there is no text to search for', () => {
+  const blank = [section('Intro', [''])]
+  const anchor = textAnchor(blank, 0, 0, 0)
+  assert.deepEqual(
+    resolveAnchor([section('Intro', ['one'])], { ...anchor, line: 3 } as typeof anchor),
+    {
+      place: 'section',
+      section: 0,
+    }
+  )
+})
+
 test('an offset past the end is clamped, and a blank line still holds its note', () => {
   const blank = [section('Intro', [''])]
   const anchor = textAnchor(blank, 0, 0, 40)

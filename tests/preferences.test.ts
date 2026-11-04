@@ -19,6 +19,8 @@ const KEYS = [
   'setup-done',
   'keep_screen_awake',
   'keep_awake_minutes',
+  'show_shared_notes',
+  'show_my_notes',
 ]
 
 const fresh = (): Promise<Preferences> => Promise.resolve(preferencesModule)
@@ -55,6 +57,30 @@ describe('preferences', () => {
   })
   afterEach(() => {
     for (const key of KEYS) localStorage.removeItem(key)
+  })
+
+  describe('notes on a chart', () => {
+    it('are shown unless turned off, each kind on its own, and said on window', async () => {
+      const preferences = await fresh()
+      expect(preferences.getNotesPreference()).to.deep.equal({ shared: true, mine: true })
+      const heardOf = heard<InstanceType<Preferences['NotesPreferenceEvent']>>(
+        'preferences:notes-changed',
+        () => {
+          preferences.setNotesPreference('shared', false)
+          preferences.setNotesPreference('mine', false)
+          preferences.setNotesPreference('shared', true)
+        }
+      )
+      expect(heardOf.map(event => [event.shared, event.mine])).to.deep.equal([
+        [false, true],
+        [false, false],
+        [true, false],
+      ])
+      expect(preferences.getNotesPreference()).to.deep.equal({ shared: true, mine: false })
+      expect(localStorage.getItem('show_my_notes')).to.equal('false')
+      preferences.setNotesPreference('mine', true)
+      expect(localStorage.getItem('show_my_notes')).to.equal('true')
+    })
   })
 
   describe('Nashville numbers and accidentals', () => {

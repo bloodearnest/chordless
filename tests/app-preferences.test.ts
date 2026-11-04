@@ -22,6 +22,8 @@ const KEYS = [
   'enabled_capo',
   'keep_screen_awake',
   'keep_awake_minutes',
+  'show_shared_notes',
+  'show_my_notes',
   'telemetry',
   'telemetry-device-id',
 ]
@@ -77,6 +79,8 @@ describe('app-preferences', () => {
         ['#toggle-capo', 'enable_capo', 'true'],
         ['#toggle-use-nashville', 'use-nashville', '1'],
         ['#toggle-unicode-accidentals', 'use-unicode-accidentals', '1'],
+        ['#toggle-shared-notes', 'show_shared_notes', 'false'],
+        ['#toggle-my-notes', 'show_my_notes', 'false'],
         ['#toggle-keep-awake', 'keep_screen_awake', 'false'],
         ['#toggle-telemetry', 'telemetry', 'false'],
       ] as const) {

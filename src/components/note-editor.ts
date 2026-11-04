@@ -208,6 +208,8 @@ export class NoteEditor extends LitElement {
 
   #closed = () => {
     this.#popup.onClose()
+    // (a request that came in just after one was closed has reopened it: this is the old one's event)
+    if (this.#popup.isOpen) return
     const settle = this.#settle
     this.#settle = null
     settle?.(this.#answer)
