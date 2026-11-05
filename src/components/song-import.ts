@@ -1188,11 +1188,10 @@ export class SongImport extends LitElement {
       })
       return
     }
-    this._imports = this._imports.map(i =>
-      i === item
-        ? { ...i, chordproText: withRange(i.chordproText, range, key), rangeSetByHand: true }
-        : i
-    )
+    // (it is only offered when the page is about this one song)
+    this._imports = [
+      { ...item, chordproText: withRange(item.chordproText, range, key), rangeSetByHand: true },
+    ]
   }
 
   /** What was read from a lead sheet, and where its lowest and highest notes are, to check it by */
