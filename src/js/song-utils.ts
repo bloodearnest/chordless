@@ -137,12 +137,20 @@ export async function getLibrarySongs(
       if (allVariants) song.variantCount = variantCounts.get(record.id)
       if (withLastUsage) {
         const usage = await db.getSongUsageFromSetlists(song.id)
-        if (usage?.length > 0) {
+        // (a card that is one version of a song says when that version was played, and not
+        // another's; a card that is the song says when any was)
+        const versions = records.filter(each => each.id === record.id)
+        const own = allVariants
+          ? usage.filter(each => versionForEntry(each, versions)?.uuid === record.uuid)
+          : usage
+        if (own.length > 0) {
           song.lastUsageInfo = {
-            date: usage[0].setlistDate,
-            leader: usage[0].leader,
-            key: usage[0].playedInKey,
+            date: own[0].setlistDate,
+            leader: own[0].leader,
+            key: own[0].playedInKey,
           }
+        } else if (usage.length > 0) {
+          song.playedInOtherVersion = true
         }
       }
       songs.push(song)
@@ -198,6 +206,36 @@ export async function getDefaultVariant(
  * @param db - Optional database instance
  * @returns Song with parsed content and metadata
  */
+/**
+ * The version of a song that a setlist entry plays: the one it names (`songUuid`), or, when that is
+ * not among the song's versions (it is not in this library, or it is another song's now), the
+ * song's default. An entry points at one version (docs/VARIANTS.md): a song's other versions are
+ * not what it plays, and a version that was played is not the one that has not been.
+ *
+ * @param variants All the versions of the entry's song (those with its id)
+ */
+export function versionForEntry(
+  entry: Pick<SetlistEntry, 'songUuid'>,
+  variants: SongRecord[]
+): SongRecord | undefined {
+  return (
+    variants.find(variant => variant.uuid === entry.songUuid) ??
+    variants.find(variant => variant.isDefault) ??
+    variants[0]
+  )
+}
+
+/** The song, with its chart, that a setlist entry plays (see versionForEntry) */
+export async function songOfEntry(
+  entry: Pick<SetlistEntry, 'songId' | 'songUuid'>,
+  db: ChordlessDB | null = null
+): Promise<SongWithContent> {
+  const database = db ?? (await getCurrentDB())
+  const version = versionForEntry(entry, await database.getSongVariants(entry.songId))
+  if (!version) throw new Error(`Song not found: ${entry.songId}`)
+  return getSongWithContent(version.uuid, database)
+}
+
 export async function getSongById(
   songId: string,
   db: ChordlessDB | null = null
@@ -629,9 +667,6 @@ export async function replaceSong(
 ): Promise<SongRecord> {
   const database = db ?? (await getCurrentDB())
   const before = await database.getSong(songUuid)
-  // (setlists show the variant a song's id resolves to: only a change to that one reaches them)
-  const shownBySetlists =
-    before && (await database.getDefaultSongVariant(before.id))?.uuid === songUuid
   const replaced = await overwriteSong(songUuid, chordproContent, database)
   const now = new Date().toISOString()
   const identity = identityOver(replaced, chordproContent)
@@ -647,16 +682,16 @@ export async function replaceSong(
     importDate: now,
     metadataChangedAt: now,
   })
-  if (before && shownBySetlists) await keepShown(database, before, song)
+  if (before) await keepShown(database, before, song)
   return song
 }
 
 /**
  * Give the setlist entries that follow a song the key and tempo they showed, when the song's
- * change. An entry with no key or tempo of its own shows the song's (the one its id resolves to),
- * so a song moved to another key, or tempo, by a new chart would move every such setlist with it:
- * the entries that would change get the old values written into them, and the setlists with none
- * are left alone. Entries with a key or tempo of their own are not touched.
+ * change. An entry with no key or tempo of its own shows the song's (the version it plays: see
+ * versionForEntry), so a song moved to another key, or tempo, by a new chart would move every such
+ * setlist with it: the entries that would change get the old values written into them, and the
+ * setlists with none are left alone. Entries with a key or tempo of their own are not touched.
  *
  * @param before The song as it was, and `after` as it is: the key shown is its key, else the chart's
  */
@@ -671,10 +706,13 @@ async function keepShown(db: ChordlessDB, before: SongRecord, after: SongRecord)
 
   const needsKey = (entry: SetlistEntry) => keyMoved && !entry.key
   const needsTempo = (entry: SetlistEntry) => tempoMoved && entry.tempo == null
+  const variants = await db.getSongVariants(after.id)
   const now = new Date().toISOString()
   for (const setlist of await db.getAllSetlists()) {
     const follows = (entry: SetlistEntry) =>
-      entry.songId === after.id && (needsKey(entry) || needsTempo(entry))
+      entry.songId === after.id &&
+      versionForEntry(entry, variants)?.uuid === after.uuid &&
+      (needsKey(entry) || needsTempo(entry))
     if (!setlist.songs.some(follows)) continue
     await db.updateSetlist(setlist.id, draft => {
       for (const entry of draft.songs.filter(follows)) {

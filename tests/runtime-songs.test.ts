@@ -8,6 +8,7 @@ import {
   type RuntimeSong,
 } from '../src/js/setlist/runtime-songs.ts'
 import { createSetlistSongModel } from '../src/js/song-model-factory.ts'
+import { createSong, createVariant } from '../src/js/song-utils.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -89,6 +90,31 @@ describe('buildRuntimeSongs', () => {
     expect(song.songIndex).to.equal(0)
     expect(song.currentCapo).to.equal(0)
     expect(song.hasLocalEdits).to.equal(false)
+  })
+
+  it('plays the version the entry names, though it is not the default, and the default if it is not there', async () => {
+    const title = `Versions ${crypto.randomUUID().slice(0, 8)}`
+    const original = await createSong(`{title: ${title}}\n{key: D}\n[D]Original words`)
+    const newday = await createVariant(
+      original.uuid,
+      'Newday',
+      `{title: ${title}}\n{key: A}\n[A]Newday words`
+    )
+    const played = async (songUuid: string) => {
+      const [song] = await build([{ songId: original.id, songUuid, order: 0 }])
+      return song
+    }
+    const named = await played(newday.uuid)
+    expect(named.variantLabel).to.equal('Newday')
+    expect(named.originalKey).to.equal('A')
+    expect(JSON.stringify(named.parsed)).to.include('Newday words')
+
+    const other = await played(original.uuid)
+    expect(other.originalKey).to.equal('D')
+    expect(JSON.stringify(other.parsed)).to.include('Original words')
+
+    // (a version that is not in the library: the song's default)
+    expect((await played('not-here')).originalKey).to.equal('D')
   })
 
   it("carries the song's version label, for the card to show", async () => {

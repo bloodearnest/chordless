@@ -26,6 +26,8 @@ export interface SongCardSong {
   currentKey?: string
   originalKey?: string | null
   lastUsageInfo?: { date: string; leader: string; key: string | null }
+  /** Another version of the song has been played, and this one has not */
+  playedInOtherVersion?: boolean
   /** Set for a song from another database than the space's: where it is from */
   source?: { label: string }
   /** The space the song is in, to say so where the library holds more than one space's songs */
@@ -540,7 +542,8 @@ export class SongCard extends LitElement {
   }
 
   _renderLastPlayed() {
-    const { lastUsageInfo, lastUsedAt, source, spaceName } = this.song as SongCardSong
+    const { lastUsageInfo, lastUsedAt, source, spaceName, playedInOtherVersion } = this
+      .song as SongCardSong
 
     if (source) {
       return html`<div class="last-played" part="last-played">From ${source.label}</div>`
@@ -566,6 +569,9 @@ export class SongCard extends LitElement {
     } else if (lastUsedAt) {
       // Fallback to old lastUsedAt field
       parts.push(`Last played ${getWeeksAgo(lastUsedAt)}`)
+    } else if (playedInOtherVersion) {
+      // (it has not been played, and the song has: so it is said, not left to look as if it had)
+      parts.push('Not played in this version')
     }
 
     return parts.length

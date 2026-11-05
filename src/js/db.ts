@@ -91,6 +91,9 @@ function cloneForStorage(value: unknown, path = ''): unknown {
 
 /** A time a song was played in a setlist (see getSongUsageFromSetlists) */
 export interface SongUsage {
+  /** The song, and the version of it that the entry names */
+  songId: string
+  songUuid: string
   setlistId: string
   setlistDate: string
   setlistName: string
@@ -687,6 +690,8 @@ export class ChordlessDB {
         if (song.songId !== songId) return
 
         appearances.push({
+          songId: song.songId,
+          songUuid: song.songUuid,
           setlistId: setlist.id,
           setlistDate: setlist.date,
           setlistName: setlist.name,
