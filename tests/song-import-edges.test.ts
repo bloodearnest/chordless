@@ -46,6 +46,23 @@ describe('song-import: corners', () => {
     expect(element._imports[0].song.title).to.equal(title)
   })
 
+  it('makes a minimal chart of the lyrics when SongSelect has no ChordPro for the song', async () => {
+    const element = await importer()
+    const title = unique('Lyrics only')
+    await element.receive({
+      lyricsText: `${title}\n\nVerse 1\nWords here\n\nChorus\nMore words\n\nA Writer\nCCLI Song #9\n© 2024 Music`,
+      metadata: { title },
+      source: 'songselect',
+    })
+    const [item] = element._imports
+    expect(item.chordproText).to.contain('{comment: Verse 1}\nWords here')
+    expect(item.chordproText).to.contain('{ccli: 9}')
+    expect(item.song.title).to.equal(title)
+    // and lyrics that are not lyrics are no song
+    await element.receive({ lyricsText: 'Just a title' })
+    expect(element._error).to.contain('No songs to import')
+  })
+
   describe('a lead sheet', () => {
     const leadSheet = () => new TextEncoder().encode('%PDF-1.4 a lead sheet').buffer
     /** What the reader gives for the sheet of a song in C, D4 to E5, as it reads it */
