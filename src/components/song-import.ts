@@ -102,6 +102,9 @@ export interface IncomingSong {
  */
 type LeadSheetOutcome = 'read' | 'no-melody' | 'unreadable' | 'other-key'
 
+/** Up to this many songs imported at once are listed; more are folded behind a count of what came of them */
+const MANY_SONGS = 8
+
 /** A lead sheet is about 130 KB: anything much bigger is not one */
 const MAX_LEAD_SHEET = 8 * 1024 * 1024
 
@@ -440,6 +443,18 @@ export class SongImport extends LitElement {
       margin: -0.75rem 0 1.25rem;
       font-size: var(--font-ui);
       font-weight: 700;
+    }
+
+    .songs-summary {
+      margin: 0 0 0.5rem;
+    }
+
+    .songs-detail {
+      margin-bottom: 1.5rem;
+    }
+
+    .songs-detail summary {
+      cursor: pointer;
     }
 
     .bulk-picks {
@@ -1324,20 +1339,46 @@ export class SongImport extends LitElement {
     `
   }
 
-  _renderSongList() {
+  /** What came of a song, in words, for the list of songs (and for the count of them) */
+  _statusOf(item: ImportItem): string {
     const status: Record<string, string> = {
       update: 'updated',
       'as-original': 'imported as the original',
       'as-variant': 'imported as a variant',
       'use-existing': 'not imported',
     }
-    return html`
+    if (!item.isDuplicate) return 'new'
+    if (item.auto && item.choice === 'update') return 'updated: the same song as in your library'
+    if (item.comparison?.verdict === 'identical') {
+      return `identical version already in library${item.sourceSet ? ', now recorded as from SongSelect' : ''}`
+    }
+    return (item.choice && status[item.choice]) || 'already in library'
+  }
+
+  _renderSongList() {
+    const list = html`
       <ol class="songs">
         ${this._imports.map(
           item =>
-            html`<li>${item.song.title} <span class="subtitle">${item.isDuplicate ? (item.auto && item.choice === 'update' ? 'updated: the same song as in your library' : item.comparison?.verdict === 'identical' ? `identical version already in library${item.sourceSet ? ', now recorded as from SongSelect' : ''}` : (item.choice && status[item.choice]) || 'already in library') : 'new'}</span>${this._renderRange(item)}</li>`
+            html`<li>${item.song.title} <span class="subtitle">${this._statusOf(item)}</span>${this._renderRange(item)}</li>`
         )}
       </ol>
+    `
+    if (this._imports.length <= MANY_SONGS) return list
+    // A long list is folded behind a count of what came of the songs: the choices that follow it
+    // (the setlist to add them to) would be many screens down, past a list of 140 songs
+    const counts = new Map<string, number>()
+    for (const item of this._imports) {
+      const status = this._statusOf(item)
+      counts.set(status, (counts.get(status) ?? 0) + 1)
+    }
+    const summary = [...counts].map(([status, count]) => `${count} ${status}`).join('; ')
+    return html`
+      <p class="songs-summary">${summary}</p>
+      <details class="songs-detail">
+        <summary>Show the ${this._imports.length} songs</summary>
+        ${list}
+      </details>
     `
   }
 

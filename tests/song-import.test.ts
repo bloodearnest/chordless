@@ -301,6 +301,57 @@ describe('song-import', () => {
     })
   })
 
+  describe('a long list of songs', () => {
+    const importMany = async (count: number) => {
+      const element: any = await importer()
+      await element.importFiles(
+        Array.from({ length: count }, (_, i) => file(`${i}.cho`, chart(unique(`Many ${i}`))))
+      )
+      await element.updateComplete
+      return element
+    }
+
+    it('is listed in full for a few songs, with no count and nothing folded', async () => {
+      const element = await importMany(8)
+      expect($(element, '.songs li')).to.exist
+      expect($(element, '.songs-summary')).to.equal(null)
+      expect($(element, '.songs-detail')).to.equal(null)
+    })
+
+    it('is folded behind a count of what came of the songs, so the choices are not far down the page', async () => {
+      const element = await importMany(40)
+      expect($(element, '.songs-summary').textContent.trim()).to.equal('40 new')
+      const detail = $(element, '.songs-detail')
+      expect(detail.open).to.equal(false)
+      expect(detail.querySelectorAll('.songs li')).to.have.length(40)
+      // (the buttons that follow are near the top, not 40 rows down)
+      const top = $(element, '.choices').getBoundingClientRect().top
+      expect(top).to.be.lessThan(window.innerHeight)
+      // and the list can be opened
+      detail.open = true
+      await element.updateComplete
+      expect(detail.open).to.equal(true)
+      await expect(element).to.be.accessible(A11Y)
+    })
+
+    it('counts the songs by what came of them', async () => {
+      const titles = Array.from({ length: 9 }, (_, i) => unique(`Counted ${i}`))
+      const inKey = (title: string, key: string, chords: [string, string]) =>
+        `{title: ${title}}\n{key: ${key}}\n\n[${chords[0]}]Amazing [${chords[1]}]grace how [${chords[0]}]sweet`
+      for (const title of titles.slice(0, 4)) await createSong(inKey(title, 'C', ['C', 'F']))
+      const element: any = await importer()
+      await element.importFiles(
+        titles.map((title, i) =>
+          file(`${i}.cho`, i < 4 ? inKey(title, 'D', ['D', 'G']) : chart(title))
+        )
+      )
+      await element.updateComplete
+      expect($(element, '.songs-summary').textContent.trim()).to.equal(
+        '4 updated: the same song as in your library; 5 new'
+      )
+    })
+  })
+
   describe('several songs the library has', () => {
     /** The same song in a key, its chords moved with it */
     const inKey = (title: string, key: string, chords: [string, string]) =>
