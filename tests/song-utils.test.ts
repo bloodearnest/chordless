@@ -19,6 +19,8 @@ import {
   replaceSong,
   setDefaultVariant,
   setSongRange,
+  songOfEntry,
+  versionForEntry,
 } from '../src/js/song-utils.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
@@ -407,6 +409,153 @@ describe('getLibrarySongs', () => {
   })
 })
 
+describe('which version of a song a setlist entry plays', () => {
+  const record = (uuid: string, isDefault: boolean) => ({ uuid, isDefault }) as never
+  const entry = (songUuid: string) => makeEntry({ songId: 'title-x', songUuid })
+
+  it('is the one it names, else the default, else the first', () => {
+    const versions = [record('old', false), record('new', true), record('other', false)]
+    expect(versionForEntry(entry('other'), versions)?.uuid).to.equal('other')
+    expect(versionForEntry(entry('gone'), versions)?.uuid).to.equal('new')
+    expect(versionForEntry(entry('gone'), [record('a', false), record('b', false)])?.uuid).to.equal(
+      'a'
+    )
+    expect(versionForEntry(entry('gone'), [])).to.equal(undefined)
+  })
+
+  describe('as the chart it plays', () => {
+    async function twoVersions() {
+      const title = unique('Two versions')
+      const original = await createSong(chart(title, { key: 'D', body: '[D]Original chart' }))
+      const newday = await createVariant(
+        original.uuid,
+        'Newday',
+        chart(title, { key: 'A', body: '[A]Newday chart' })
+      )
+      return { original, newday }
+    }
+
+    it('is the version the entry names, though it is not the default', async () => {
+      const { original, newday } = await twoVersions()
+      const played = await songOfEntry(makeEntry({ songId: original.id, songUuid: newday.uuid }))
+      expect(played.uuid).to.equal(newday.uuid)
+      expect(played.chordpro).to.contain('[A]Newday chart')
+      const other = await songOfEntry(makeEntry({ songId: original.id, songUuid: original.uuid }))
+      expect(other.chordpro).to.contain('[D]Original chart')
+    })
+
+    it('is the default when the version it names is not in the library, or is another song’s', async () => {
+      const { original } = await twoVersions()
+      const stranger = await createSong(chart(unique('Another song')))
+      for (const songUuid of ['not-here', stranger.uuid]) {
+        const played = await songOfEntry(makeEntry({ songId: original.id, songUuid }))
+        expect(played.uuid, songUuid).to.equal(original.uuid)
+      }
+    })
+
+    it('says so when there is no such song', async () => {
+      let thrown = ''
+      try {
+        await songOfEntry(makeEntry({ songId: 'title-nobody', songUuid: 'nobody' }))
+      } catch (error) {
+        thrown = (error as Error).message
+      }
+      expect(thrown).to.contain('Song not found: title-nobody')
+    })
+  })
+
+  describe('and when each version was last played', () => {
+    const played = (id: string, date: string, entry: ReturnType<typeof makeEntry>) =>
+      makeSetlist({ id, date, songs: [entry], leaderId: 'someone' })
+
+    it('is not the date of another version: a version never played says so', async () => {
+      const title = unique('Newday version')
+      const original = await createSong(chart(title, { key: 'D' }))
+      const newday = await createVariant(
+        original.uuid,
+        'Newday version',
+        chart(title, { key: 'A' })
+      )
+      const db = await getCurrentDB()
+      await db.saveSetlist(
+        played(
+          crypto.randomUUID(),
+          '2026-10-12',
+          makeEntry({ songId: original.id, songUuid: newday.uuid, key: 'A' })
+        )
+      )
+
+      const cards = (await getLibrarySongs(db, { withLastUsage: true, allVariants: true })).filter(
+        card => card.id === original.id
+      )
+      const [originalCard, newdayCard] = [original, newday].map(version =>
+        must(cards.find(card => card.uuid === version.uuid))
+      )
+      // the original has never been played, and the card can say so, since the song has
+      expect(originalCard.lastUsageInfo).to.equal(undefined)
+      expect(originalCard.playedInOtherVersion).to.equal(true)
+      expect(newdayCard.lastUsageInfo).to.include({ date: '2026-10-12', key: 'A' })
+      expect(newdayCard.playedInOtherVersion).to.equal(undefined)
+    })
+
+    it('is when any version was, for the one card that stands for the song', async () => {
+      const title = unique('One card')
+      const original = await createSong(chart(title))
+      const variant = await createVariant(original.uuid, 'Other', chart(title, { key: 'A' }))
+      const db = await getCurrentDB()
+      await db.saveSetlist(
+        played(
+          crypto.randomUUID(),
+          '2026-09-01',
+          makeEntry({ songId: original.id, songUuid: variant.uuid })
+        )
+      )
+      const [card] = (await getLibrarySongs(db, { withLastUsage: true })).filter(
+        each => each.id === original.id
+      )
+      expect(card.lastUsageInfo?.date).to.equal('2026-09-01')
+      expect(card.playedInOtherVersion).to.equal(undefined)
+    })
+
+    it('counts an entry whose version is not here for the default, which it plays', async () => {
+      const title = unique('Plays the default')
+      const original = await createSong(chart(title))
+      await createVariant(original.uuid, 'Other', chart(title, { key: 'A' }))
+      const db = await getCurrentDB()
+      await db.saveSetlist(
+        played(
+          crypto.randomUUID(),
+          '2026-08-01',
+          makeEntry({ songId: original.id, songUuid: 'not-here' })
+        )
+      )
+      const cards = (await getLibrarySongs(db, { withLastUsage: true, allVariants: true })).filter(
+        card => card.id === original.id
+      )
+      expect(must(cards.find(card => card.uuid === original.uuid)).lastUsageInfo?.date).to.equal(
+        '2026-08-01'
+      )
+      expect(must(cards.find(card => card.uuid !== original.uuid)).lastUsageInfo).to.equal(
+        undefined
+      )
+    })
+
+    it('is nothing, and nothing is said, for a song with no version played', async () => {
+      const title = unique('No version played')
+      const original = await createSong(chart(title))
+      await createVariant(original.uuid, 'Other', chart(title, { key: 'A' }))
+      const db = await getCurrentDB()
+      const cards = (await getLibrarySongs(db, { withLastUsage: true, allVariants: true })).filter(
+        card => card.id === original.id
+      )
+      for (const card of cards) {
+        expect(card.lastUsageInfo).to.equal(undefined)
+        expect(card.playedInOtherVersion).to.equal(undefined)
+      }
+    })
+  })
+})
+
 describe('songs that are not as they should be', () => {
   const failure = async (promise: Promise<unknown>) => {
     try {
@@ -699,6 +848,37 @@ describe('an incoming chart of a song the library has', () => {
       // (the setlist shows the original, which has not changed)
       expect(await entryOf('shown')).to.include({ key: null })
       expect(must(await db.getSetlist('shown')).modifiedDate).to.equal(NOW_ISO)
+    })
+
+    it('pins the entries that name a version that is replaced, and not those that name another', async () => {
+      ccli++
+      const title = unique('Names a version')
+      const withCcli = `{ccli: ${ccli}}\n`
+      const original = await createSong(chart(title, { key: 'G', extra: withCcli }))
+      const variant = await createVariant(
+        original.uuid,
+        'Simpler',
+        chart(title, { key: 'D', extra: withCcli })
+      )
+      const db = await getCurrentDB()
+      await db.saveSetlist(
+        setlistOf('names-version', [
+          makeEntry({ songUuid: original.uuid, songId: original.id }), // plays the original: G
+          makeEntry({ order: 1, songUuid: variant.uuid, songId: original.id }), // plays the variant: D
+          makeEntry({ order: 2, songUuid: 'not-here', songId: original.id }), // plays the default: G
+        ])
+      )
+      await replaceSong(variant.uuid, newChart(title, 'E', 70), incoming)
+      // (only the entry that played the variant moves with it: it is pinned to the key it showed)
+      expect((await entryOf('names-version', 0)).key).to.equal(null)
+      expect((await entryOf('names-version', 1)).key).to.equal('D')
+      expect((await entryOf('names-version', 2)).key).to.equal(null)
+
+      await replaceSong(original.uuid, newChart(title, 'A', 70), incoming)
+      // (now the default is replaced: the entry that played it, and the one that falls back to it)
+      expect((await entryOf('names-version', 0)).key).to.equal('G')
+      expect((await entryOf('names-version', 2)).key).to.equal('G')
+      expect((await entryOf('names-version', 1)).key).to.equal('D')
     })
 
     it('writes nothing for a song that had no key to show', async () => {

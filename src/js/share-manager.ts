@@ -16,7 +16,7 @@ import {
   shareExpiry,
 } from './share-bundle.ts'
 import { encryptBundle, generateShareKey } from './share-crypto.ts'
-import { getSongById } from './song-utils.ts'
+import { songOfEntry } from './song-utils.ts'
 import type { SpaceStorage } from './storage/types.ts'
 import { setlistHasLocalChanges } from './sync/changes.ts'
 import { toLocalDateString } from './utils/date-utils.ts'
@@ -61,7 +61,7 @@ async function loadShareSources(setlist: Setlist, db: ChordlessDB): Promise<Shar
   const sources: ShareSource[] = []
   for (const entry of setlist.songs) {
     try {
-      const song = await getSongById(entry.songId, db)
+      const song = await songOfEntry(entry, db)
       sources.push({
         entry,
         title: song.title,

@@ -205,6 +205,25 @@ describe('song-card', () => {
       )
     })
 
+    it('says a version has not been played when another version of the song has, and not otherwise', async () => {
+      expect(last(await show({ song: song({ playedInOtherVersion: true }) }))).to.equal(
+        'Not played in this version'
+      )
+      expect(
+        last(
+          await show({ song: song({ spaceName: 'Gateway Church', playedInOtherVersion: true }) })
+        )
+      ).to.equal('Gateway Church • Not played in this version')
+      // (a version that has been played says when, and not this)
+      const played = await show({
+        song: song({
+          playedInOtherVersion: true,
+          lastUsageInfo: { date: '2020-01-05', leader: 'Ann', key: 'A' },
+        }),
+      })
+      expect(last(played)).to.not.contain('Not played')
+    })
+
     it('says nothing for a song never played, or in a setlist', async () => {
       expect(last(await show({ song: song() }))).to.equal(undefined)
       expect(

@@ -13,6 +13,16 @@ receiving a share (the newest chart becomes the default) and by "Add to my libra
 a variant, not the default). `overwriteSong` replaces a chart in place (an import of a song the
 library has); sync sees the changed hash and uploads it.
 
+**A setlist entry plays the version it names** (`versionForEntry`, `songOfEntry` in
+`src/js/song-utils.ts`): the setlist page, a shared setlist's bundle, the key and tempo an update
+writes into the entries (docs/REIMPORT.md) and the library's "last played" all go by it. If the
+version it names is not in the library (or is another song's now) it plays the song's default. Until
+2026-11-05 the setlist page and sharing went by the song's id, so an entry that named a version
+other than the default showed the default's chart. Last played is per version: a card that is one
+version says when that version was played, and says "Not played in this version" when another
+version has been; the one card that stands for a song when only the defaults are listed says when
+any version was.
+
 ## Decisions
 
 1. **Origin on every variant.** Each variant records the space (id and name) and the

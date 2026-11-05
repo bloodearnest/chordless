@@ -425,6 +425,8 @@ export interface SongWithContent {
   variantCount?: number
   /** Set by getLibrarySongs when asked: the last setlist the song was played in */
   lastUsageInfo?: { date: string; leader: string; key: string | null }
+  /** For a version that has not been played, when another version of its song has */
+  playedInOtherVersion?: boolean
 }
 
 // ==================== Google Drive ====================

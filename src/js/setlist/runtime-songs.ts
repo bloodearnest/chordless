@@ -12,7 +12,7 @@ import type {
   TempoInput,
 } from '../data-types.ts'
 import type { ChordlessDB } from '../db.ts'
-import { getSongById } from '../song-utils.ts'
+import { songOfEntry } from '../song-utils.ts'
 import { transposeSong } from '../transpose.ts'
 
 /**
@@ -100,7 +100,7 @@ export async function buildRuntimeSongs(
     } else {
       // Get song with content using deterministic ID
       try {
-        canonicalSong = await getSongById(songEntry.songId, db)
+        canonicalSong = await songOfEntry(songEntry, db)
         sourceText = canonicalSong.chordpro
       } catch (error) {
         console.error('[ERROR] Song not found in DB:', songEntry.songId, error)
