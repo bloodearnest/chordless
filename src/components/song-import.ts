@@ -1633,7 +1633,7 @@ export class SongImport extends LitElement {
 
   _renderChoices() {
     // (songs are saved when they arrive, and the button only goes to them: with every song already
-    // in the library as it is, there is nothing for it to keep)
+    // in the library as it is, there is nothing to save, but there is still a way on: to the library)
     const nothingToKeep = this._imports.every(item => item.comparison?.verdict === 'identical')
     return html`
       <div class="choices">
@@ -1669,19 +1669,19 @@ export class SongImport extends LitElement {
             </span>
           </span>
         </button>
-        ${
-          nothingToKeep
-            ? ''
-            : html`
-              <button class="choice library-only" @click=${this._libraryOnly}>
-                <span class="icon">💾</span>
-                <span class="content">
-                  <span class="title">Save to Library Only</span>
-                  <span class="subtitle">Don't add to any setlist</span>
-                </span>
-              </button>
-            `
-        }
+        <button class="choice library-only" @click=${this._libraryOnly}>
+          <span class="icon">${nothingToKeep ? '📚' : '💾'}</span>
+          <span class="content">
+            <span class="title">${nothingToKeep ? 'Go to the Library' : 'Save to Library Only'}</span>
+            <span class="subtitle">
+              ${
+                nothingToKeep
+                  ? `Nothing to save: ${this._imports.length > 1 ? 'they are all' : 'it is'} in the library`
+                  : "Don't add to any setlist"
+              }
+            </span>
+          </span>
+        </button>
       </div>
     `
   }

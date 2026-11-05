@@ -195,8 +195,11 @@ describe('song-import: corners', () => {
       expect(said).to.contain(
         'An identical version of this song is already in your library, nothing to import.'
       )
-      // (nothing to save: it is only added to a setlist)
-      expect($(element, '.library-only')).to.equal(null)
+      // (nothing to save, but a way on: to the library, said as that and not as saving)
+      expect($(element, '.library-only .title').textContent.trim()).to.equal('Go to the Library')
+      expect($(element, '.library-only .subtitle').textContent.trim()).to.equal(
+        'Nothing to save: it is in the library'
+      )
       expect($(element, '.new-setlist')).to.exist
       expect($(element, '.add-to-setlist')).to.exist
       expect(element.shadowRoot.querySelector('.already')).to.exist
@@ -213,7 +216,7 @@ describe('song-import: corners', () => {
       await element.updateComplete
       expect(element.shadowRoot.textContent).to.contain('identical version already in library')
       // (the other song is new, so there is something to save)
-      expect($(element, '.library-only')).to.exist
+      expect($(element, '.library-only .title').textContent.trim()).to.equal('Save to Library Only')
     })
 
     it('updates the library chart with no question when the lead sheet only adds a range to it', async () => {
