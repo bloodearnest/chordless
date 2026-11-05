@@ -865,6 +865,11 @@ export class SongImport extends LitElement {
   async _songsFromFiles(files: File[]): Promise<IncomingSong[]> {
     const songs: IncomingSong[] = []
     for (const file of files) {
+      // (a JSON file is data, such as the backfill's manifest in the folder it saves to, and never a chart)
+      if (/\.json$/i.test(file.name) || file.type === 'application/json') {
+        songs.push({ name: file.name, skip: 'a JSON file, not a ChordPro chart' })
+        continue
+      }
       // ChordPro has no registered type, so .cho files come as '' or
       // application/octet-stream: rule out what's plainly not text instead
       const chordproText = NOT_TEXT.test(file.type) ? '' : await file.text()

@@ -81,6 +81,14 @@ async function songSelectBackfill(songs, overrides = {}) {
       throw signedOut()
     }
     if (!payload?.trim()) throw new Error('an empty chart: no access to this song?')
+    // (SongSelect answers a song that has no ChordPro with a sentence, as if it were the chart)
+    if (!looksLikeChordPro(payload)) {
+      const error = new Error(
+        `SongSelect has no ChordPro for it ("${payload.trim().slice(0, 60)}")`
+      )
+      error.noChart = true
+      throw error
+    }
 
     const key = /\{key:\s*([^}\s]+)\s*\}/i.exec(payload)?.[1] ?? null
     const name = `${ccli}-${slug(/\{title:\s*([^}]+)\}/i.exec(payload)?.[1] ?? title)}`
@@ -142,6 +150,11 @@ async function songSelectBackfill(songs, overrides = {}) {
     return (low + high) / 2
   }
 
+  /** Whether what SongSelect gave is a ChordPro chart: it has a directive ({title: …}) or a chord ([G]) */
+  function looksLikeChordPro(text) {
+    return /\{\s*[a-z_]+\s*:/i.test(text) || /\[[A-G][^\]]*\]/.test(text)
+  }
+
   function signedOut() {
     const error = new Error('SongSelect did not give the chart: signed out, or no access to it?')
     error.signedOut = true
@@ -194,7 +207,8 @@ async function songSelectBackfill(songs, overrides = {}) {
 
   // ---- the songs, one after another ----
 
-  const todo = songs.filter(([ccli]) => !manifest.done[ccli])
+  // (a song SongSelect has no ChordPro for is not asked for again)
+  const todo = songs.filter(([ccli]) => !manifest.done[ccli] && !manifest.failed[ccli]?.noChart)
   log(
     `${songs.length} songs, ${songs.length - todo.length} done already: ${todo.length} to fetch. ` +
       `About ${Math.ceil((todo.length * 2 * average(settings.delayMs)) / 60000)} minutes. ` +
@@ -221,9 +235,15 @@ async function songSelectBackfill(songs, overrides = {}) {
         log(`${label}: ${error.message}`)
         break
       }
-      manifest.failed[ccli] = { title, reason: error.message, at: settings.now() }
-      failuresInARow++
-      log(`${label}: failed (${error.message})`)
+      manifest.failed[ccli] = {
+        title,
+        reason: error.message,
+        ...(error.noChart && { noChart: true }),
+        at: settings.now(),
+      }
+      log(`${label}: ${error.noChart ? 'left out' : 'failed'} (${error.message})`)
+      // (a song with no ChordPro is nothing to do with SongSelect limiting the requests)
+      if (!error.noChart) failuresInARow++
       if (failuresInARow >= settings.maxFailuresInARow) {
         problem = `${failuresInARow} songs failed in a row: SongSelect may be limiting requests. Wait a while, then run it again.`
         log(problem)
@@ -235,20 +255,28 @@ async function songSelectBackfill(songs, overrides = {}) {
   await io.writeManifest(manifest)
 
   const noLead = Object.values(manifest.done).filter(song => !song.lead)
-  const failed = Object.entries(manifest.failed).filter(([ccli]) => !manifest.done[ccli])
+  const notDone = Object.entries(manifest.failed).filter(([ccli]) => !manifest.done[ccli])
+  const noChart = notDone.filter(([, song]) => song.noChart)
+  const failed = notDone.filter(([, song]) => !song.noChart)
+  const named = list => list.map(([ccli, song]) => `${song.title} (${ccli})`).join(', ')
   log(
     `Done: ${Object.keys(manifest.done).length} songs saved, ${noLead.length} without a lead sheet, ` +
       `${failed.length} failed.${stopped ? ' (Stopped.)' : ''}`
   )
-  if (failed.length)
-    log('Failed:', failed.map(([ccli, song]) => `${song.title} (${ccli})`).join(', '))
+  if (noChart.length)
+    log(`SongSelect has no ChordPro for ${noChart.length}, left out:`, named(noChart))
+  if (failed.length) log('Failed:', named(failed))
   if (!problem && !stopped && !failed.length) {
-    log('Next: in Chordless, Import ChordPro Files, and choose every file in that folder.')
+    log(
+      'Next: in Chordless, Import ChordPro Files, and choose every file in that folder ' +
+        '(the manifest is passed over).'
+    )
   }
   return {
     done: Object.keys(manifest.done).length,
     withoutLeadSheet: noLead.length,
     failed: failed.length,
+    noChart: noChart.length,
     stopped,
     problem,
   }

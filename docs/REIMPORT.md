@@ -37,6 +37,11 @@ song's own) and for the lead sheet in that key, and saves `<number>-<title>.cho`
   song it is on. A manifest in the folder (`backfill-manifest.json`) remembers what is done, so
   running the script again carries on, and tries again those that failed.
 - **Signed out** (or no access) is noticed, and it stops at once rather than asking again.
+- A song SongSelect has **no ChordPro for** is left out, and listed at the end. SongSelect answers
+  such a song with a sentence ("no chordPro for this song") as if it were the chart; the script
+  checks that what came is ChordPro (a directive like `{title: …}`, or a chord like `[G]`) and does
+  not save the sentence. It is not counted as a failure (it is not SongSelect limiting the
+  requests), and is not asked for again when the script is run again.
 - A song with no lead sheet (SongSelect has none, or the account cannot get it) is still saved,
   with no range. A chart with no key in it cannot be asked for a lead sheet in its key.
 - SongSelect counts a lead sheet fetched this way as a download (`activityType=downloaded`, as its
@@ -44,7 +49,9 @@ song's own) and for the lead sheet in that key, and saves `<number>-<title>.cho`
 
 ## 3. Import the folder
 
-In Chordless, Import, "Import ChordPro Files": choose every file in the folder. Each lead sheet is
+In Chordless, Import, "Import ChordPro Files": choose every file in the folder (the manifest in it,
+`backfill-manifest.json`, is a JSON file, and the import page passes over any: "a JSON file, not a
+ChordPro chart"). Each lead sheet is
 paired with its ChordPro by CCLI number (docs/RANGE.md), and the page reads them all.
 
 **The same song is updated with no question.** A song the library has, whose new chart has the same
