@@ -26,6 +26,10 @@ function parseNote(name: string): number {
 /** A key written with flats (F and the flat keys, and D, G and C minor), so its notes are too */
 const FLAT_KEY = /^(?:[A-G]b|F)m?$|^(?:Dm|Gm|Cm)$/
 
+/** The notes a range's pickers offer: A2 to C6 (a singer's span), and wider if the range is */
+export const LOWEST_OFFERED = 45
+export const HIGHEST_OFFERED = 84
+
 /** A note's name in a key, with its octave: 'F#5' in G, 'Eb5' in Bb */
 export function noteName(midi: number, key: string): string {
   const pitchClass = ((midi % 12) + 12) % 12

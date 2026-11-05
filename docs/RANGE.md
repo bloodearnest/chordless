@@ -156,6 +156,12 @@ named as the chart's key names them; **Save**, **Cancel**, and **Remove** (when 
 new range starts at D4 to D5. A lowest note above the highest is not saved, and says so. The notes
 are in the chart's own key, as written: men sing the melody an octave down.
 
+The import page offers the same two pickers, under "Set the range yourself", for a single song that
+has no range (no lead sheet came, or it could not be read), once the song is in the library as it is
+to stay: **Save the range** writes it with `setSongRange`, and the page then says "set by you". It is
+not offered for a list of songs, for a song waiting on a choice, or for one that is the library's
+already.
+
 - **Not behind edit mode.** It changes the song's chart, not the setlist, and it is reached from
   the library and the setlist alike, live too (docs: "permissive in the moment"). The friction is
   the dialog and the two taps.
