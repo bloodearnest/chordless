@@ -6,7 +6,7 @@ import { createSong } from '../src/js/song-utils.ts'
 import { makeSong } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { clearToasts, shownToast, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -268,7 +268,94 @@ describe('song-import: corners', () => {
       )
       const pasted = await importer()
       await pasted.receive({ chordproText: chart(unique('Pasted')), source: 'paste' })
-      expect(await said(pasted)).to.not.contain('range')
+      await pasted.updateComplete
+      expect($(pasted, '.range')).to.equal(null)
+    })
+
+    describe('a range set by the person', () => {
+      const choose = async (element: any, label: string, value: number) => {
+        const picker = [...element.shadowRoot.querySelectorAll('.range-picker')].find(one =>
+          one.textContent.includes(label)
+        )
+        const select = picker.querySelector('select')
+        select.value = String(value)
+        select.dispatchEvent(new Event('change'))
+        await element.updateComplete
+      }
+
+      it('is offered for a song with no range, and put in its chart', async () => {
+        const element = await importer()
+        const title = unique('Set by hand')
+        await element.receive({ chordproText: chart(title), source: 'songselect' })
+        expect(await said(element)).to.contain('Set the range yourself')
+        await choose(element, 'Lowest note', 60)
+        await choose(element, 'Highest note', 76)
+        $(element, '.range-set button').click()
+        await waitFor(() => element._imports[0].rangeSetByHand)
+        await element.updateComplete
+        expect(await said(element)).to.contain('Melody range C4–E5 in C, set by you.')
+        expect($(element, '.range-set')).to.equal(null)
+        const db = await getCurrentDB()
+        const stored = must(await db.getSong(element._imports[0].song.uuid))
+        expect(must(await db.getChordPro(stored.chordproFileId)).content).to.contain(
+          '{x_chordless_range: C4-E5}'
+        )
+      })
+
+      it('is offered for a pasted song too, and not for a chart that has a range', async () => {
+        const pasted = await importer()
+        await pasted.receive({ chordproText: chart(unique('Pasted')), source: 'paste' })
+        await pasted.updateComplete
+        expect($(pasted, '.range-set')).to.not.equal(null)
+        const ranged = await importer()
+        await ranged.receive({
+          chordproText: `${chart(unique('Has one'))}\n{x_chordless_range: E4-D5}`,
+          source: 'file',
+        })
+        await ranged.updateComplete
+        expect($(ranged, '.range-set')).to.equal(null)
+      })
+
+      it('cannot be saved with the lowest note above the highest', async () => {
+        const element = await importer()
+        await element.receive({ chordproText: chart(unique('Backwards')), source: 'songselect' })
+        await choose(element, 'Lowest note', 76)
+        await choose(element, 'Highest note', 60)
+        expect($(element, '.range-set button').disabled).to.equal(true)
+        expect($(element, '.range-error').textContent).to.contain('lowest note is above')
+      })
+
+      it("is not offered for a list of songs, or one that is the library's already", async () => {
+        const several = await importer()
+        await several.receiveAll([
+          { chordproText: chart(unique('One')), source: 'songselect' },
+          { chordproText: chart(unique('Two')), source: 'songselect' },
+        ])
+        await several.updateComplete
+        expect($(several, '.range-set')).to.equal(null)
+        const title = unique('Identical')
+        await createSong(chart(title))
+        const again = await importer()
+        await again.receive({ chordproText: chart(title), source: 'songselect' })
+        await again.updateComplete
+        expect($(again, '.range-set')).to.equal(null)
+      })
+
+      it('says so in a toast, with a way to try again, when it cannot be saved', async () => {
+        clearToasts()
+        const element = await importer()
+        await element.receive({ chordproText: chart(unique('Cannot save')), source: 'songselect' })
+        const db = await getCurrentDB()
+        const { uuid } = element._imports[0].song
+        await db.deleteSong(uuid, { remember: false })
+        $(element, '.range-set button').click()
+        await waitFor(() => shownToast())
+        const toast = must(shownToast())
+        expect(toast.kind).to.equal('error')
+        expect(toast.message).to.equal("Couldn't save the melody range.")
+        expect(toast.details).to.contain('Song not found')
+        expect(element._imports[0].rangeSetByHand).to.equal(undefined)
+      })
     })
 
     it('shows the range a chart already has', async () => {

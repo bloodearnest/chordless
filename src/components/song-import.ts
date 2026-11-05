@@ -2,6 +2,8 @@ import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import {
   describeSignature,
+  HIGHEST_OFFERED,
+  LOWEST_OFFERED,
   noteName,
   rangeOfChart,
   signatureMatchesKey,
@@ -35,8 +37,10 @@ import {
   importAsOriginal,
   importAsVariant,
   replaceSong,
+  setSongRange,
 } from '../js/song-utils.ts'
 import { songSelectLink } from '../js/songselect-link.ts'
+import { toast } from '../js/toast.ts'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -133,6 +137,8 @@ interface ImportItem {
   sourceSet?: boolean
   /** The same song as the library's: it was updated with no question asked */
   auto?: boolean
+  /** Its range was set by the person, not read from a lead sheet */
+  rangeSetByHand?: boolean
   /** What came of the lead sheet that came with it, if one did */
   leadSheet?: LeadSheetOutcome
   /** What was read from it, to show how */
@@ -186,11 +192,15 @@ export class SongImport extends LitElement {
     _spaces: { state: true }, // the spaces an import can go to
     _spaceId: { state: true }, // the one it goes to
     _newSetlist: { state: true },
+    _low: { state: true }, // the notes the range pickers are on
+    _high: { state: true },
   }
 
   declare _state: 'pick' | 'choices'
   declare _error: string
   declare _progress: string
+  declare _low: number
+  declare _high: number
   declare _busy: boolean
   declare _applying: string
   declare _manual: boolean
@@ -485,6 +495,42 @@ export class SongImport extends LitElement {
       color: var(--text-secondary);
     }
 
+    .range-set {
+      margin: 0.25rem 0 0.5rem;
+      font-size: var(--font-ui-small);
+    }
+
+    .range-set summary {
+      cursor: pointer;
+      color: var(--text-secondary);
+    }
+
+    .range-set .range-editor {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 1rem;
+      margin: 0.5rem 0;
+    }
+
+    .range-picker {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .range-picker select {
+      min-height: 2.5rem;
+      padding: 0 0.5rem;
+      font: inherit;
+      font-size: var(--font-ui);
+    }
+
+    /* (the danger colour, mixed toward the text colour: it reads on the light page and on the dark) */
+    .range-error {
+      color: color-mix(in srgb, var(--color-danger, #e74c3c) 65%, var(--text-color, #1a1a1a));
+    }
+
     .range-how {
       margin: 0.25rem 0 0.5rem;
       font-size: var(--font-ui-small);
@@ -624,6 +670,9 @@ export class SongImport extends LitElement {
     this._error = ''
     this._progress = 'Waiting for SongSelect…'
     this._busy = false
+    // (a song with no range starts at a comfortable octave: D4 to D5)
+    this._low = 62
+    this._high = 74
     this._applying = ''
     this._manual = false
     this._imports = []
@@ -1063,7 +1112,12 @@ export class SongImport extends LitElement {
     let text = ''
     if (range && key) {
       const notes = `${noteName(range.low, key)}–${noteName(range.high, key)}`
-      text = `Melody range ${notes} in ${key}${item.leadSheet === 'read' ? ', from the lead sheet' : ''}.`
+      const from = item.rangeSetByHand
+        ? ', set by you'
+        : item.leadSheet === 'read'
+          ? ', from the lead sheet'
+          : ''
+      text = `Melody range ${notes} in ${key}${from}.`
     } else if (item.leadSheet === 'other-key' && melody) {
       text = `The lead sheet is in another key than the chart (${describeSignature(melody.keySignature)}; the chart is in ${key}), so its range was not used.`
     } else if (item.leadSheet === 'no-melody') {
@@ -1073,9 +1127,72 @@ export class SongImport extends LitElement {
     } else if (item.source === 'songselect') {
       text = 'No lead sheet came with this song, so there is no range.'
     }
-    return text
-      ? html`<p class="range">${text}</p>${melody && key ? this._renderHowRead(melody, key) : ''}`
-      : ''
+    const settable = !range && key && this._canSetRange(item)
+    return html`${text ? html`<p class="range">${text}</p>` : ''}${text && melody && key ? this._renderHowRead(melody, key) : ''}${settable ? this._renderRangePickers(item, key) : ''}`
+  }
+
+  /** Whether the page is about this one song, which is in the library as it is to stay, and has no range */
+  _canSetRange(item: ImportItem): boolean {
+    return this._imports.length === 1 && !this._isUnresolved(item) && item.choice !== 'use-existing'
+  }
+
+  /** Two pickers of notes (named as the key names them), for a song with no lead sheet to read them from */
+  _renderRangePickers(item: ImportItem, key: string) {
+    const first = Math.min(LOWEST_OFFERED, this._low, this._high)
+    const last = Math.max(HIGHEST_OFFERED, this._low, this._high)
+    const notes = Array.from({ length: last - first + 1 }, (_, index) => first + index)
+    const picker = (label: string, value: number, set: (midi: number) => void) => html`
+      <label class="range-picker">
+        ${label}
+        <select @change=${(event: Event) => set(Number((event.target as HTMLSelectElement).value))}>
+          ${notes.map(
+            midi =>
+              html`<option value=${midi} ?selected=${midi === value}>${noteName(midi, key)}</option>`
+          )}
+        </select>
+      </label>
+    `
+    const wrong = this._low > this._high
+    return html`
+      <details class="range-set">
+        <summary>Set the range yourself</summary>
+        <div class="range-editor">
+          ${picker('Lowest note', this._low, midi => (this._low = midi))}
+          ${picker('Highest note', this._high, midi => (this._high = midi))}
+          <button
+            class="btn"
+            type="button"
+            ?disabled=${wrong}
+            @click=${() => this._setRange(item, key)}
+          >
+            Save the range
+          </button>
+        </div>
+        <div>In ${key}, as written: men sing it an octave down.</div>
+        ${wrong ? html`<div class="range-error" role="alert">The lowest note is above the highest.</div>` : ''}
+      </details>
+    `
+  }
+
+  /** Put the range the person set in the song's chart */
+  async _setRange(item: ImportItem, key: string): Promise<void> {
+    const range = { low: this._low, high: this._high }
+    try {
+      await setSongRange(item.song.uuid, range, this._database())
+    } catch (error) {
+      console.error('[Import] Could not save the range:', error)
+      toast("Couldn't save the melody range.", {
+        kind: 'error',
+        details: errorMessage(error),
+        action: { label: 'Try again', run: () => void this._setRange(item, key) },
+      })
+      return
+    }
+    this._imports = this._imports.map(i =>
+      i === item
+        ? { ...i, chordproText: withRange(i.chordproText, range, key), rangeSetByHand: true }
+        : i
+    )
   }
 
   /** What was read from a lead sheet, and where its lowest and highest notes are, to check it by */

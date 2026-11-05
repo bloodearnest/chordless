@@ -1,5 +1,11 @@
 import { css, html, LitElement } from 'lit'
-import { noteName, rangeOfMetadata, rangeSpan } from '../js/chart-range.ts'
+import {
+  HIGHEST_OFFERED,
+  LOWEST_OFFERED,
+  noteName,
+  rangeOfMetadata,
+  rangeSpan,
+} from '../js/chart-range.ts'
 import type { SongWithContent } from '../js/data-types.ts'
 import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.ts'
 import { describeRange, type NoteRange, rangeStatus } from '../js/voice-range.ts'
@@ -22,10 +28,6 @@ export class SongRangeChangeEvent extends Event {
     this.key = key
   }
 }
-
-/** The notes the range's pickers offer: A2 to C6 (a singer's span), and wider if the range is */
-const LOWEST_OFFERED = 45
-const HIGHEST_OFFERED = 84
 
 /**
  * SongInfo Component
