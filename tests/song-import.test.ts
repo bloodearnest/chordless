@@ -111,6 +111,31 @@ describe('song-import', () => {
     expect(song.importSource).to.equal('paste')
   })
 
+  it('does not import a JSON file as a song, such as the manifest the backfill leaves in its folder', async () => {
+    const element: any = await importer()
+    const title = unique('With a manifest')
+    await element.importFiles([
+      file('backfill-manifest.json', '{\n  "done": {}\n}'),
+      file('typed-as-json.cho', '{"done": {}}', 'application/json'),
+      file('song.cho', chart(title)),
+    ])
+    await element.updateComplete
+    expect(element._imports).to.have.length(1)
+    expect(text(element)).to.contain(
+      'Not imported: backfill-manifest.json: a JSON file, not a ChordPro chart'
+    )
+    expect(text(element)).to.contain('typed-as-json.cho: a JSON file')
+    expect(await songTitled('backfill-manifest')).to.equal(undefined)
+  })
+
+  it('says so when the only file chosen is JSON', async () => {
+    const element: any = await importer()
+    await element.importFiles([file('backfill-manifest.json', '{}')])
+    await element.updateComplete
+    expect(element._error).to.contain('No songs to import')
+    expect(element._error).to.contain('a JSON file')
+  })
+
   it('imports several files, naming untitled ones after the file and skipping non-text', async () => {
     const element: any = await importer()
     const first = unique('First')

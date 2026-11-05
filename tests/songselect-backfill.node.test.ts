@@ -155,6 +155,7 @@ describe('the backfill script', () => {
         done: 2,
         withoutLeadSheet: 0,
         failed: 0,
+        noChart: 0,
         stopped: false,
         problem: '',
       }
@@ -462,6 +463,104 @@ describe('the backfill script', () => {
     )
     assert.equal(done.failed, 2)
     assert.equal(folder.files.size, 0) // (nothing saved)
+  })
+
+  describe('a song SongSelect has no ChordPro for', () => {
+    // (it answers with a sentence, as if it were the chart)
+    const SENTENCE = 'no chordPro for this song'
+
+    test('is not saved as a chart, and is listed as left out', async () => {
+      const site = fakeSongSelect({ '1': { body: SENTENCE }, '2': { body: chordpro('Two') } })
+      const { done, folder, out } = await run(
+        [
+          ['1', 'One'],
+          ['2', 'Two'],
+        ],
+        site
+      )
+      assert.deepEqual([...folder.files.keys()], ['2-Two.cho'])
+      assert.equal(done.noChart, 1)
+      assert.equal(done.failed, 0)
+      assert.ok(
+        out.lines.some(line =>
+          line.includes(
+            'left out (SongSelect has no ChordPro for it ("no chordPro for this song"))'
+          )
+        )
+      )
+      assert.ok(
+        out.lines.some(line =>
+          line.startsWith('SongSelect has no ChordPro for 1, left out: One (1)')
+        )
+      )
+      const last = folder.manifests[folder.manifests.length - 1] as any
+      assert.equal(last.failed['1'].noChart, true)
+    })
+
+    test('is not SongSelect limiting the requests: it does not count toward giving up', async () => {
+      const songs = Array.from(
+        { length: 8 },
+        (_, i) => [String(i), `Song ${i}`] as [string, string]
+      )
+      const site = fakeSongSelect(Object.fromEntries(songs.map(([n]) => [n, { body: SENTENCE }])))
+      const { done } = await run(songs, site, fakeFolder(), { maxFailuresInARow: 3 })
+      assert.equal(site.requests.length, 8)
+      assert.equal(done.noChart, 8)
+      assert.equal(done.problem, '')
+    })
+
+    test('still says what to do next, as the others were saved', async () => {
+      const site = fakeSongSelect(
+        { '1': { body: SENTENCE }, '2': { body: chordpro('Two') } },
+        { '2': { raw: PDF } }
+      )
+      const { out } = await run(
+        [
+          ['1', 'One'],
+          ['2', 'Two'],
+        ],
+        site
+      )
+      assert.ok(out.lines.some(line => line.startsWith('Next: in Chordless')))
+      assert.ok(out.lines.some(line => line.includes('the manifest is passed over')))
+    })
+
+    test('is not asked for again when the script is run again', async () => {
+      const folder = fakeFolder({
+        done: {},
+        failed: { '1': { title: 'One', reason: 'no', noChart: true, at: 'before' } },
+      })
+      const site = fakeSongSelect({ '2': { body: chordpro('Two') } }, { '2': { raw: PDF } })
+      await run(
+        [
+          ['1', 'One'],
+          ['2', 'Two'],
+        ],
+        site,
+        folder
+      )
+      assert.ok(site.requests.every(url => !url.includes('songNumber=1&')))
+      assert.equal(site.requests.filter(url => url.includes('GetSongChordPro')).length, 1)
+    })
+
+    test('is told from a chart that is only chords, or only directives', async () => {
+      const site = fakeSongSelect({
+        '1': { body: '[G]Only a chord' },
+        '2': { body: '{title: Only a directive}' },
+        '3': { body: '{"json": "is not ChordPro"}' },
+      })
+      const { done, folder } = await run(
+        [
+          ['1', 'One'],
+          ['2', 'Two'],
+          ['3', 'Three'],
+        ],
+        site
+      )
+      assert.equal(done.noChart, 1)
+      assert.ok(folder.files.has('1-One.cho'))
+      assert.ok(folder.files.has('2-Only-a-directive.cho'))
+    })
   })
 
   test('names a file from the chart’s title, made safe, or from the library’s when it has none', async () => {
