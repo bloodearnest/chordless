@@ -60,7 +60,9 @@ is updated at once: there is nothing to decide. The page says "updated: the same
 library", and says how far it has got when there are several ("Importing 37 of 141…"). More than
 eight songs are folded behind a count of what came of them ("141 updated: the same song as in your
 library") with "Show the 141 songs" to open the list, so the choices that follow (add them to a
-setlist, or save to the library only) are on the first screen and not thirteen screens down. What is
+setlist, or save to the library only) are on the first screen and not thirteen screens down.
+When there is nothing to save (every song is the same as the library's) the page still has a way
+on: "Go to the Library", beside adding them to a setlist or making one. What is
 listed for you to decide is only what differs: other words or other chords (they may be
 arrangements), which can be imported as a variant, replace the library's, or not be imported. When
 several are listed, a bar "For all of them" makes one choice for all: **Update all N**, or **Do not

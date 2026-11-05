@@ -334,6 +334,26 @@ describe('song-import', () => {
       await expect(element).to.be.accessible(A11Y)
     })
 
+    it('still has a way on when every song is identical: to the library, with all of them', async () => {
+      const titles = Array.from({ length: 10 }, (_, i) => unique(`Identical ${i}`))
+      const bodies = titles.map(title => chart(title))
+      for (const body of bodies) await createSong(body)
+      const element: any = await importer()
+      await element.importFiles(bodies.map((body, i) => file(`${i}.cho`, body)))
+      await element.updateComplete
+      expect($(element, '.songs-summary').textContent.trim()).to.equal(
+        '10 identical version already in library'
+      )
+      expect($(element, '.library-only .title').textContent.trim()).to.equal('Go to the Library')
+      expect($(element, '.library-only .subtitle').textContent.trim()).to.equal(
+        'Nothing to save: they are all in the library'
+      )
+      // (and it is among the first things on the page, not far below the list)
+      expect($(element, '.library-only').getBoundingClientRect().top).to.be.lessThan(
+        window.innerHeight
+      )
+    })
+
     it('counts the songs by what came of them', async () => {
       const titles = Array.from({ length: 9 }, (_, i) => unique(`Counted ${i}`))
       const inKey = (title: string, key: string, chords: [string, string]) =>
