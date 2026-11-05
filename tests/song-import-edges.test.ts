@@ -355,6 +355,11 @@ describe('song-import: corners', () => {
         expect(toast.message).to.equal("Couldn't save the melody range.")
         expect(toast.details).to.contain('Song not found')
         expect(element._imports[0].rangeSetByHand).to.equal(undefined)
+        // (trying again tries again: the song is still not there, so it says so again)
+        clearToasts()
+        must(toast.action).run()
+        await waitFor(() => shownToast())
+        expect(must(shownToast()).message).to.equal("Couldn't save the melody range.")
       })
     })
 
