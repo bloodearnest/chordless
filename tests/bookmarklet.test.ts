@@ -232,6 +232,15 @@ describe('importFromSongSelect', () => {
     expect(must(page.log.at(-1))[1].type).to.equal('CHORDLESS_IMPORT_FAILED')
   })
 
+  it('tells Chordless when SongSelect has no ChordPro for the song, rather than importing its sentence', async () => {
+    const page = fakePage({ download: { ok: true, payload: 'no chordPro for this song' } })
+    await run(page)
+    const sent = must(page.log.at(-1))[1]
+    expect(sent.type).to.equal('CHORDLESS_IMPORT_FAILED')
+    expect(sent.data.message).to.contain('no ChordPro chart')
+    expect(sent.data.message).to.contain('no chordPro for this song')
+  })
+
   it('asks for a SongSelect page when run on another site, and opens nothing', async () => {
     const page = fakePage()
     page.location.href = 'https://example.com/songs/1234567'
