@@ -63,15 +63,15 @@ Looking at the lead sheet viewer on SongSelect (the song's Lead tab, which is no
   length of a note, the kind of a rest, and the accidentals are read off by name, not recognised
   from a shape. The beams are a group that holds their notes; a tie is its own element.
   The syllables are `syl` elements inside `verse`, and the chords are `harm`; sections are `reh`.
-- The page has **"Play midi"** and a playback tempo box, so the notes reach the page in a form it
-  can play, with a piano made of one sample per note (`midi-samples/splendid-grand-piano/PP-<note>.ogg`
-  from `cdn.ccli.com`). The only SongSelect request the Lead tab makes for data is
-  `GetSongLeadPreview` (the same arguments as the PDF's `GetSongLeadPdf`: `songNumber`,
-  `transposeKey`, `octave`, `noteSize`, `orientation`, `paperSize`, `renderer`). No MIDI file is
-  downloaded, so either the response holds the SVG pages and the MIDI (Verovio gives a MIDI as
-  base64, and a "timemap" that ties each note id to a time), or the page works the notes out from
-  the SVG. Which it is **has not been seen**: the browser tool used to look would not make the
-  request. It is to be read in the browser's Network tab (the response of `GetSongLeadPreview`).
+- The page has **"Play midi"**, and the notes reach it as data. `GetSongLeadPreview` (arguments
+  `songNumber`, `transposeKey`, `octave`, `noteSize`, `orientation`, `paperSize`, `renderer`)
+  returns `payload` with: `svgs` (one base64 SVG per page, Verovio), `midi` (a standard MIDI file in
+  base64, with the lyric syllables as text events), `timemap` (per event: `on`/`off` lists of
+  note ids, `restsOn`/`restsOff`, `measureOn`, `tstamp` ms, `qstamp` quarter notes, `tempo`),
+  `defaultBpm`, `defaultKey`, `numPages`. Checked on Holy Forever (a 1.1 MB response): the MIDI holds 299 notes with pitch
+  and time, and every one of the timemap's 362 note ids is an element id in the SVG, so a MIDI
+  pitch can be tied to its spelled notehead, lyric and bar. The playback samples are one piano
+  `.ogg` per note from `cdn.ccli.com`.
 
 If the response is, or holds, the SVG, **the reader is a DOM walk, not a PDF reader**: the same
 checks apply (measure sums), but the hard column of the table below, note lengths and rests, becomes
@@ -169,9 +169,9 @@ Transposing is the notes moved by the interval and respelled for the new key, wh
 
 ## Open questions
 
-1. **What does `GetSongLeadPreview` return?** The SVG pages? A MIDI and a timemap beside them? This
-   decides the size of the work. Read the response in the Network tab on a song's Lead tab; see
-   above. (SongSelect has no MusicXML download, and no MIDI file download: checked.)
+1. ~~What does `GetSongLeadPreview` return?~~ SVG pages, a MIDI and a timemap (above). Still to
+   check: how it varies by song (several voices? repeats played out or not? pickup bars?), and
+   what the time map gives for ties and chords (362 ids against 299 MIDI notes on one song).
 2. ~~Is it Verovio?~~ Yes: its SVG classes and the music font say so (above).
 3. **How are repeats and endings drawn**, and what does a lead sheet with a coda look like? The
    SVG should say by class, from a few more songs than the two probed.
