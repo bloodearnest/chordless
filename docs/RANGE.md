@@ -179,4 +179,5 @@ already.
 
 ## Not decided
 
-- Limits as a preference (a group of altos, a younger group).
+- Limits as a preference (a group of altos, a younger group). Reading the whole melody, not just
+  its range, would let the picker rate keys per voice: see `docs/MELODY.md`.
