@@ -11,7 +11,7 @@
  */
 import { type Melody, type MelodyChord, type MelodyEvent, type MelodyMeasure, type MelodyNote, midiOf } from './melody.ts'
 
-interface El {
+export interface El {
   name: string
   attrs: Record<string, string>
   children: El[]
@@ -160,13 +160,20 @@ function lengthOf(beats: number, beatType: number): number {
 
 /** Read the pages' SVG text, in page order, into a melody */
 export function readMelodySvg(svgs: string[], stats?: ReadStats): Melody {
+  return readMelodyTrees(svgs.map(parseXml), stats)
+}
+
+/**
+ * Read pages already parsed. The PDF reader (`melody-pdf.ts`) builds the same tree from the page's
+ * drawing, so everything from here on is shared.
+ */
+export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
   const warnings: string[] = stats?.warnings ?? []
   const raws: Raw[] = []
   const notice: string[] = []
   let title: string | null = null
   let systemIndex = 0
-  for (const svg of svgs) {
-    const root = parseXml(svg)
+  for (const root of roots) {
     for (const head of byClass(root, 'pgHead')) {
       const t = firstByClass(head, 'text')
       if (t && title === null) title = textOf(t)
@@ -488,6 +495,8 @@ function tieNotes(raws: Raw[], heads: Head[], warnings: string[]) {
       if (v.length < 8) continue
       const a = before(systemIndex, v[0] as number, v[1] as number)
       const b = after(systemIndex, v[6] as number, v[7] as number)
+      // A curve between two different pitches is a slur
+      if (a && b && a.note.midi !== b.note.midi) continue
       if (a) a.note.tieStart = true
       if (b) b.note.tieStop = true
       // A tie that runs off the end of a system goes on into the first head of the next, drawn without its own curve
