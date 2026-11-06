@@ -60,6 +60,7 @@ const IGNORED = new Set(['E4C0', 'E4C1', 'E07A', 'E1E7', 'E887'])
 export function pdfPageToTree(svg: string, warnings: string[]): El | null {
   const root = parseXml(svg)
   const lines: Line[] = []
+  const hooks: { hookX: number; endX: number; y: number }[] = []
   const glyphs: Glyph[] = []
   const polys: Poly[] = []
   const dots: { x: number; y: number }[] = []
@@ -99,7 +100,11 @@ export function pdfPageToTree(svg: string, warnings: string[]): El | null {
       if (w <= 1) continue // the hairline mutool draws over every filled shape
       if (Math.abs(m.a - ua) > 1e-9 || m.d <= 0) continue
       const p = absolutePath(el.attrs.d ?? '')
-      if (p.points.length === 2) {
+      if (p.points.length === 3) {
+        // a tuplet bracket's half: a hook down at one end and the line across
+        const [a, b, c] = p.points as [number[], number[], number[]]
+        if (a[0] === b[0]) hooks.push({ hookX: a[0] as number, endX: c[0] as number, y: c[1] as number })
+      } else if (p.points.length === 2) {
         const [a, b] = p.points as [number[], number[]]
         lines.push({ x1: a[0] as number, y1: a[1] as number, x2: b[0] as number, y2: b[1] as number, width: w })
       }
@@ -186,6 +191,16 @@ export function pdfPageToTree(svg: string, warnings: string[]): El | null {
     const s = staffFor((p.minX + p.maxX) / 2, (p.minY + p.maxY) / 2)
     if (s && p.maxY - p.minY >= 50) perStaff.get(s)?.polys.push(p) // a beam, not a hyphen
   }
+  const tupletsOf = new Map<Staff, { x: number; y: number; from: number | null; to: number | null; g: Glyph }[]>()
+  for (const g of glyphs.filter((x) => x.code === 'E887')) {
+    const s = staffFor(g.x, g.y)
+    if (!s) continue
+    // its bracket, if drawn: a half to each side of the number, and the hooks at the far ends
+    const near = hooks.filter((h) => Math.abs(h.y - g.y) < 400)
+    const left = near.filter((h) => h.hookX < g.x && h.endX > h.hookX).sort((a, b) => b.hookX - a.hookX)[0]
+    const right = near.filter((h) => h.hookX > g.x && h.endX < h.hookX).sort((a, b) => a.hookX - b.hookX)[0]
+    tupletsOf.set(s, [...(tupletsOf.get(s) ?? []), { x: g.x, y: g.y, from: left ? left.hookX : null, to: right ? right.hookX : null, g }])
+  }
   for (const c of curves) {
     const s = staffFor((c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2)
     if (s) perStaff.get(s)?.curves.push(c)
@@ -195,7 +210,7 @@ export function pdfPageToTree(svg: string, warnings: string[]): El | null {
   const systems: El[] = []
   for (const s of staves) {
     const sysEl = (systems[s.sys] ??= group('system'))
-    sysEl.children.push(buildMeasure(s, perStaff.get(s) as NonNullable<ReturnType<typeof perStaff.get>>, warnings))
+    sysEl.children.push(buildMeasure(s, { ...(perStaff.get(s) as NonNullable<ReturnType<typeof perStaff.get>>), tuplets: tupletsOf.get(s) ?? [] }, warnings))
   }
   page.children.push(...systems)
   return node('svg', {}, [page])
@@ -209,7 +224,7 @@ interface Staff {
 
 function buildMeasure(
   s: Staff,
-  c: { glyphs: Glyph[]; stems: Line[]; dots: { x: number; y: number }[]; polys: Poly[]; curves: { d: string; minX: number; maxX: number; minY: number; maxY: number }[] },
+  c: { tuplets: { x: number; y: number; from: number | null; to: number | null; g: Glyph }[]; glyphs: Glyph[]; stems: Line[]; dots: { x: number; y: number }[]; polys: Poly[]; curves: { d: string; minX: number; maxX: number; minY: number; maxY: number }[] },
   warnings: string[],
 ): El {
   const space = ((s.ys[4] as number) - (s.ys[0] as number)) / 4
@@ -265,6 +280,8 @@ function buildMeasure(
     el: El
     stemX: number | null
     stemEnd: number | null
+    /** Cue size: an instrumental line that sounds with the melody, so it is a voice of its own */
+    cue: boolean
   }
   const items: Item[] = []
 
@@ -308,17 +325,18 @@ function buildMeasure(
     void w
     if (hs.length === 1) {
       const own = [...shared, ...(dotsEl ? [dotsEl] : [])]
-      items.push({ x: lead.x, el: makeNote(lead, own), stemX, stemEnd })
+      items.push({ x: lead.x, el: makeNote(lead, own), stemX, stemEnd, cue: lead.scale < 0.65 })
     } else {
       const notes = hs.map((h) => makeNote(h, []))
-      items.push({ x: lead.x, el: group('chord', [...shared, ...(dotsEl ? [dotsEl] : []), ...notes]), stemX, stemEnd })
+      items.push({ x: lead.x, el: group('chord', [...shared, ...(dotsEl ? [dotsEl] : []), ...notes]), stemX, stemEnd, cue: lead.scale < 0.65 })
     }
   }
   for (const r of rests) {
     const right = r.x + 1.2 * 250 * r.scale
     const dotsEl = takeDots(r.x, r.y, right)
-    items.push({ x: r.x, el: group('rest', [useOf(r), ...(dotsEl ? [dotsEl] : [])]), stemX: null, stemEnd: null })
+    items.push({ x: r.x, el: group('rest', [useOf(r), ...(dotsEl ? [dotsEl] : [])]), stemX: null, stemEnd: null, cue: r.scale < 0.65 })
   }
+  for (const it of items) it.el.attrs['data-x'] = String(Math.round(it.x))
   items.sort((p, q) => p.x - q.x)
 
   // Beams: polygons that overlap in x are one group holding the notes whose stems they run across
@@ -333,24 +351,45 @@ function buildMeasure(
       cl.polys.push(p)
     } else clusters.push({ minX: p.minX, maxX: p.maxX, minY: p.minY, maxY: p.maxY, polys: [p] })
   }
-  const layer = group('layer')
-  const placed = new Set<Item>()
-  for (const it of items) {
-    if (placed.has(it)) continue
-    const cl = it.stemX !== null ? clusters.find((k) => it.stemX! >= k.minX - 25 && it.stemX! <= k.maxX + 25 && Math.abs((it.stemEnd as number) - (k.minY + k.maxY) / 2) < 500) : undefined
-    if (!cl) {
-      layer.children.push(it.el)
-      placed.add(it)
-      continue
+  const buildLayer = (mine: Item[]): El => {
+    const units: { x: number; el: El; members: Item[] }[] = []
+    const placed = new Set<Item>()
+    for (const it of mine) {
+      if (placed.has(it)) continue
+      const cl = it.stemX !== null ? clusters.find((k) => it.stemX! >= k.minX - 25 && it.stemX! <= k.maxX + 25 && Math.abs((it.stemEnd as number) - (k.minY + k.maxY) / 2) < 500) : undefined
+      if (!cl) {
+        units.push({ x: it.x, el: it.el, members: [it] })
+        placed.add(it)
+        continue
+      }
+      const inside = mine.filter(
+        (o) => !placed.has(o) && ((o.stemX !== null && o.stemX >= cl.minX - 25 && o.stemX <= cl.maxX + 25 && Math.abs((o.stemEnd as number) - (cl.minY + cl.maxY) / 2) < 500) || (o.stemX === null && o.x >= cl.minX && o.x <= cl.maxX)),
+      )
+      const beam = group('beam', [...cl.polys.map((p) => node('polygon', { points: polyPoints(p.d) })), ...inside.map((o) => o.el)])
+      inside.forEach((o) => placed.add(o))
+      units.push({ x: it.x, el: beam, members: inside })
     }
-    const inside = items.filter(
-      (o) => !placed.has(o) && ((o.stemX !== null && o.stemX >= cl.minX - 25 && o.stemX <= cl.maxX + 25 && Math.abs((o.stemEnd as number) - (cl.minY + cl.maxY) / 2) < 500) || (o.stemX === null && o.x >= cl.minX && o.x <= cl.maxX)),
-    )
-    const beam = group('beam', [...cl.polys.map((p) => node('polygon', { points: polyPoints(p.d) })), ...inside.map((o) => o.el)])
-    inside.forEach((o) => placed.add(o))
-    layer.children.push(beam)
+    // Tuplets: the units under a bracket, or, with no bracket drawn, the beamed group the number sits over
+    for (const tu of c.tuplets) {
+      let from = tu.from
+      let to = tu.to
+      if (from === null || to === null) {
+        const under = units.filter((u) => u.el.attrs.class === 'beam' && Math.abs((Math.min(...u.members.map((m) => m.x)) + Math.max(...u.members.map((m) => m.x))) / 2 - tu.x) < 400)
+        const u = under.sort((p, q) => Math.abs(p.x - tu.x) - Math.abs(q.x - tu.x))[0]
+        if (!u) continue
+        from = Math.min(...u.members.map((m) => m.x))
+        to = Math.max(...u.members.map((m) => m.x))
+      }
+      const mine2 = units.filter((u) => u.members.every((m) => m.x >= (from as number) - 30 && m.x <= (to as number) + 30))
+      if (!mine2.length) continue
+      const first = units.indexOf(mine2[0] as (typeof units)[number])
+      const wrapped = { x: (mine2[0] as (typeof units)[number]).x, el: group('tuplet', [node('use', { 'xlink:href': '#E083-pdf', transform: `translate(${tu.x}, ${tu.y}) scale(0.72, 0.72)` }), ...mine2.map((u) => u.el)]), members: mine2.flatMap((u) => u.members) }
+      units.splice(first, mine2.length, wrapped)
+    }
+    return group('layer', units.map((u) => u.el))
   }
-  staffEl.children.push(layer)
+  const voices = [items.filter((i) => !i.cue), items.filter((i) => i.cue)].filter((v) => v.length)
+  for (const v of voices) staffEl.children.push(buildLayer(v))
 
   // Curves that join two heads are ties (the reader checks the pitches)
   for (const cv of c.curves) measure.children.push(group('tie', [node('path', { d: cv.d })]))
