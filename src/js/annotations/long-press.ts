@@ -1,6 +1,6 @@
 /**
- * A long press (or a right click, or the context-menu key) on a target, to open the note editor
- * (docs/NOTES.md). Made so that scrolling and swiping still work: the hold is cancelled by moving
+ * A long press (or a right click, or the context-menu key) on a target, to open the annotation editor
+ * (docs/ANNOTATIONS.md). Made so that scrolling and swiping still work: the hold is cancelled by moving
  * more than a few pixels, a second finger, or lifting early; the press itself does nothing else,
  * and the click that follows it is swallowed so a title does not collapse as the finger lifts.
  */
@@ -44,7 +44,12 @@ export function listenForLongPress(root: EventTarget, options: LongPressOptions)
     event => {
       const down = event as PointerEvent
       // A second finger is a pinch or a swipe, not a hold; and a mouse presses with its right button
-      if (!enabled() || start || !down.isPrimary || (down.pointerType === 'mouse' && down.button !== 0)) {
+      if (
+        !enabled() ||
+        start ||
+        !down.isPrimary ||
+        (down.pointerType === 'mouse' && down.button !== 0)
+      ) {
         cancel()
         return
       }

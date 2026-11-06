@@ -1,6 +1,6 @@
 import { announceDataChange, type DataKind, type DataOrigin } from './data-changes.ts'
 import type {
-  ChartNote,
+  ChartAnnotation,
   ChordProRecord,
   PendingDeletion,
   Person,
@@ -234,7 +234,7 @@ export class ChordlessDB {
           db.createObjectStore('people', { keyPath: 'id' })
         }
 
-        // A song's private notes, kept by the song's id, on this device only (new in v11; docs/NOTES.md)
+        // A song's private annotations, kept by the song's id, on this device only (new in v11; removed with the next change)
         if (!db.objectStoreNames.contains('song_notes')) {
           db.createObjectStore('song_notes', { keyPath: 'songId' })
         }
@@ -656,23 +656,23 @@ export class ChordlessDB {
     return transactionDone(tx)
   }
 
-  /** The private notes kept for a song in every setlist (docs/NOTES.md) */
-  async getSongNotes(songId: string): Promise<ChartNote[]> {
+  /** The private annotations kept for a song in every setlist (docs/ANNOTATIONS.md) */
+  async getSongAnnotations(songId: string): Promise<ChartAnnotation[]> {
     const tx = this.#transaction(['song_notes'], 'readonly')
     const record = (await requestResult(tx.objectStore('song_notes').get(songId))) as
-      | { songId: string; notes: ChartNote[] }
+      | { songId: string; annotations: ChartAnnotation[] }
       | undefined
-    return record?.notes ?? []
+    return record?.annotations ?? []
   }
 
-  /** Keep these as the song's private notes (none: forget the song's record) */
-  async saveSongNotes(songId: string, notes: ChartNote[]): Promise<void> {
+  /** Keep these as the song's private annotations (none: forget the song's record) */
+  async saveSongAnnotations(songId: string, annotations: ChartAnnotation[]): Promise<void> {
     const tx = this.#transaction(['song_notes'], 'readwrite')
     const store = tx.objectStore('song_notes')
-    if (notes.length) store.put(cloneForStorage({ songId, notes }))
+    if (annotations.length) store.put(cloneForStorage({ songId, annotations }))
     else store.delete(songId)
     await transactionDone(tx)
-    this.#changed('note', [songId])
+    this.#changed('annotation', [songId])
   }
 
   // Song Usage operations (workspace-specific)

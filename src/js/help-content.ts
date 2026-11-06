@@ -239,33 +239,33 @@ const SONG: HelpPage = {
       ],
     },
     {
-      heading: 'Edit mode: notes',
+      heading: 'Edit mode: annotations',
       intro:
-        'Write a note on the chart: how to play a part, where to drop out, how many times to repeat. It is set in handwriting, above the word it is on, or beside the name of a section. Notes are shown when you are not editing too.',
+        'Write an annotation on the chart: how to play a part, where to drop out, how many times to repeat. It is set in handwriting, above the word it is on, or beside the name of a section. Annotations are shown when you are not editing too.',
       items: [
         {
-          image: 'song-note',
+          image: 'song-annotation',
           wide: true,
           label: 'Press and hold',
-          text: 'Press and hold a word, a chord or the name of a section to write a note there. (On a computer, right-click does it too.)',
+          text: 'Press and hold a word, a chord or the name of a section to write an annotation there. (On a computer, right-click does it too.)',
         },
         {
-          image: 'note-editor',
+          image: 'annotation-editor',
           wide: true,
-          label: 'The note',
-          text: 'Type the note. “Shown in” is for this setlist only (the usual), or for this song wherever it comes up, in every setlist. “Seen by” is just you (the usual), or the team: a note for the team goes with the setlist, so everyone who has it sees it. Only people who can edit the setlist can share a note.',
+          label: 'The annotation',
+          text: 'Type the annotation. “Shown in” is for this setlist only (the usual), or for this song wherever it comes up, in every setlist. “Seen by” is just you (the usual), or the team: an annotation for the team goes with the setlist, so everyone who has it sees it. Only people who can edit the setlist can share an annotation.',
         },
         {
-          label: 'Change or delete a note',
-          text: 'Tap a note to change it. Delete takes it off, and you can bring it back with Undo.',
+          label: 'Change or delete an annotation',
+          text: 'Tap an annotation to change it. Delete takes it off, and you can bring it back with Undo.',
         },
         {
-          label: 'A note for the whole song',
-          text: 'Use “+ Note on the whole song” above the first section.',
+          label: 'An annotation for the whole song',
+          text: 'Use “+ Annotation on the whole song” above the first section.',
         },
         {
-          label: 'Hide notes',
-          text: 'Turn off the team’s notes, or your own, in [Preferences](/preferences).',
+          label: 'Hide annotations',
+          text: 'Turn off the team’s annotations, or your own, in [Preferences](/preferences).',
         },
       ],
     },

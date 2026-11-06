@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { listenForLongPress } from '../src/js/notes/long-press.ts'
+import { listenForLongPress } from '../src/js/annotations/long-press.ts'
 
 const { describe, it } = window
 

@@ -736,20 +736,20 @@ describe('parseTempo', () => {
   })
 })
 
-describe('ChordlessDB version 11: a song’s private notes', () => {
+describe('ChordlessDB version 11: a song’s private annotations', () => {
   let dbName: string
   afterEach(async () => {
     await deleteDatabase(dbName)
   })
 
-  const note = {
+  const annotation = {
     id: 'n1',
     anchor: { kind: 'song' },
     body: { kind: 'text', text: 'last time slower' },
     modified: '2026-11-01T00:00:00Z',
   } as const
 
-  it('keeps notes by song id, says so on the change bus, and forgets them when none are left', async () => {
+  it('keeps annotations by song id, says so on the change bus, and forgets them when none are left', async () => {
     dbName = `TEST-${uniqueName()}`
     const db = new ChordlessDB(dbName)
     await db.init()
@@ -757,18 +757,18 @@ describe('ChordlessDB version 11: a song’s private notes', () => {
     const listen = (event: Event) => heard.push((event as DataChangeEvent).change)
     window.addEventListener(DataChangeEvent.type, listen)
     try {
-      expect(await db.getSongNotes('amazing-grace')).to.deep.equal([])
-      await db.saveSongNotes('amazing-grace', [note])
-      expect(await db.getSongNotes('amazing-grace')).to.deep.equal([note])
-      expect(await db.getSongNotes('other')).to.deep.equal([])
-      await db.saveSongNotes('amazing-grace', [])
-      expect(await db.getSongNotes('amazing-grace')).to.deep.equal([])
+      expect(await db.getSongAnnotations('amazing-grace')).to.deep.equal([])
+      await db.saveSongAnnotations('amazing-grace', [annotation])
+      expect(await db.getSongAnnotations('amazing-grace')).to.deep.equal([annotation])
+      expect(await db.getSongAnnotations('other')).to.deep.equal([])
+      await db.saveSongAnnotations('amazing-grace', [])
+      expect(await db.getSongAnnotations('amazing-grace')).to.deep.equal([])
     } finally {
       window.removeEventListener(DataChangeEvent.type, listen)
     }
     expect(heard.map(each => [each.kind, each.ids])).to.deep.equal([
-      ['note', ['amazing-grace']],
-      ['note', ['amazing-grace']],
+      ['annotation', ['amazing-grace']],
+      ['annotation', ['amazing-grace']],
     ])
     must(db.db).close()
   })
@@ -805,8 +805,8 @@ describe('ChordlessDB version 11: a song’s private notes', () => {
     const db = new ChordlessDB(dbName)
     await db.init()
     expect((await db.getAllSetlists()).map(each => each.id)).to.deep.equal(['a'])
-    await db.saveSongNotes('s', [note])
-    expect(await db.getSongNotes('s')).to.deep.equal([note])
+    await db.saveSongAnnotations('s', [annotation])
+    expect(await db.getSongAnnotations('s')).to.deep.equal([annotation])
     must(db.db).close()
   })
 })

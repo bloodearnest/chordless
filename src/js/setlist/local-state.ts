@@ -5,7 +5,7 @@
  * someone else reorders or adds to leaves them with the song they were set for. (A song that is in
  * the setlist twice shares them.) The page works on them by place, as the songs are on the page.
  */
-import type { ChartNote, SectionState } from '../data-types.ts'
+import type { ChartAnnotation, SectionState } from '../data-types.ts'
 
 /** Per song index, then per section index */
 export type SectionStates = Record<number, Record<number, SectionState>>
@@ -28,10 +28,12 @@ interface StoredState {
   sections: Record<string, Record<number, SectionState>>
   capos: Record<string, unknown>
   /**
-   * This setlist's private notes on each song (docs/NOTES.md). An optional field of version 2, so a
-   * build from before notes keeps it when it saves
+   * This setlist's private annotations on each song (docs/ANNOTATIONS.md). An optional field of
+   * version 2, so a build from before annotations keeps it when it saves
    */
-  notes?: Record<string, ChartNote[]>
+  annotations?: Record<string, ChartAnnotation[]>
+  /** What `annotations` was called until 2026-11-06: read, and moved to `annotations` when saved */
+  notes?: Record<string, ChartAnnotation[]>
 }
 
 const keyFor = (setlistId: string | null) => `state-${setlistId}`
@@ -102,30 +104,33 @@ export function loadSongCapo(setlistId: string | null, song: SongRef, index: num
     : byPlace(saved).capoValues[index]
 }
 
-/** The private notes kept for one song in this setlist (by song, so a reordered setlist keeps them) */
-export function loadSetlistNotes(setlistId: string | null, song: SongRef): ChartNote[] {
+/** The private annotations kept for one song in this setlist (by song, so a reordered setlist keeps them) */
+export function loadSetlistAnnotations(setlistId: string | null, song: SongRef): ChartAnnotation[] {
   const saved = readSaved(setlistId)
-  return saved.v === 2 ? ((saved as unknown as StoredState).notes?.[songKey(song)] ?? []) : []
+  if (saved.v !== 2) return []
+  const stored = saved as unknown as StoredState
+  return (stored.annotations ?? stored.notes)?.[songKey(song)] ?? []
 }
 
 /**
- * Keep these as the private notes for one song in this setlist (none: forget them). `songs` are
+ * Keep these as the private annotations for one song in this setlist (none: forget them). `songs` are
  * the setlist's, as they are now, for state still kept by place to be moved to by song.
  */
-export function saveSetlistNotes(
+export function saveSetlistAnnotations(
   setlistId: string | null,
   song: SongRef,
-  notes: ChartNote[],
+  annotations: ChartAnnotation[],
   songs: SongRef[]
 ) {
   try {
     const stored = bySong(readSaved(setlistId), songs)
-    stored.notes ??= {}
-    if (notes.length) stored.notes[songKey(song)] = notes
-    else delete stored.notes[songKey(song)]
+    stored.annotations ??= stored.notes ?? {}
+    delete stored.notes
+    if (annotations.length) stored.annotations[songKey(song)] = annotations
+    else delete stored.annotations[songKey(song)]
     localStorage.setItem(keyFor(setlistId), JSON.stringify(stored))
   } catch (error) {
-    console.error('Failed to save the notes:', error)
+    console.error('Failed to save the annotations:', error)
   }
 }
 

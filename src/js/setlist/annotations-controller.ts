@@ -1,51 +1,51 @@
 /**
- * The notes on a setlist's songs (docs/NOTES.md): loads the three places a song's notes are kept,
+ * The annotations on a setlist's songs (docs/ANNOTATIONS.md): loads the three places a song's annotations are kept,
  * gives each song's display the ones to draw, and, in edit mode, opens the editor when a spot is
- * long-pressed or a note tapped and keeps what comes of it. Which note goes where is notes/store.ts.
+ * long-pressed or a annotation tapped and keeps what comes of it. Which annotation goes where is annotations/store.ts.
  */
-import '../../components/note-editor.ts'
-import type { NoteEditor } from '../../components/note-editor.ts'
+import '../../components/annotation-editor.ts'
+import type { AnnotationEditor } from '../../components/annotation-editor.ts'
 import type { SongDisplay } from '../../components/song-display.ts'
-import { NoteRequestEvent } from '../../components/song-section.ts'
-import type { ChartNote, Setlist, SharedChartNote } from '../data-types.ts'
-import type { ChordlessDB } from '../db.ts'
-import { sectionAnchor, snapOffset, textAnchor } from '../notes/anchor.ts'
-import { type ChartNotes, notesBySection } from '../notes/shown.ts'
+import { AnnotationRequestEvent } from '../../components/song-section.ts'
+import { sectionAnchor, snapOffset, textAnchor } from '../annotations/anchor.ts'
+import { annotationsBySection, type ChartAnnotations } from '../annotations/shown.ts'
 import {
-  allNotes,
+  type AnnotationSources,
+  allAnnotations,
   changedSources,
-  DEFAULT_NOTE_KIND,
-  type NoteSources,
-  putNote,
-  removeNote,
-} from '../notes/store.ts'
-import { getNotesPreference, NotesPreferenceEvent } from '../preferences.ts'
+  DEFAULT_ANNOTATION_KIND,
+  putAnnotation,
+  removeAnnotation,
+} from '../annotations/store.ts'
+import type { ChartAnnotation, Setlist, SharedChartAnnotation } from '../data-types.ts'
+import type { ChordlessDB } from '../db.ts'
+import { AnnotationsPreferenceEvent, getAnnotationsPreference } from '../preferences.ts'
 import { toast } from '../toast.ts'
 import { errorMessage } from '../utils/errors.ts'
 import { isEditMode } from './edit-mode-ui.ts'
-import { loadSetlistNotes, type SongRef, saveSetlistNotes } from './local-state.ts'
+import { loadSetlistAnnotations, type SongRef, saveSetlistAnnotations } from './local-state.ts'
 import type { RuntimeSong } from './runtime-songs.ts'
 
 /** What the controller asks of the page it is in */
-export interface NotesHost {
+export interface AnnotationsHost {
   readonly root: HTMLElement
   readonly songs: RuntimeSong[]
   readonly currentSetlist: Setlist | undefined
   readonly currentSetlistId: string | null
   _database(): ChordlessDB
-  /** Keep these as the notes everyone with the setlist sees on the song at `index` */
-  setAnnotations(index: number, notes: SharedChartNote[]): Promise<void>
-  /** Whether the user can share a note with the team on this setlist */
+  /** Keep these as the annotations everyone with the setlist sees on the song at `index` */
+  setAnnotations(index: number, annotations: SharedChartAnnotation[]): Promise<void>
+  /** Whether the user can share a annotation with the team on this setlist */
   canShare(): Promise<boolean>
 }
 
-export class NotesController {
-  #host: NotesHost
+export class AnnotationsController {
+  #host: AnnotationsHost
   /** By song index */
-  #sources: NoteSources[] = []
-  #editor: NoteEditor | null = null
+  #sources: AnnotationSources[] = []
+  #editor: AnnotationEditor | null = null
 
-  constructor(host: NotesHost) {
+  constructor(host: AnnotationsHost) {
     this.#host = host
   }
 
@@ -58,32 +58,32 @@ export class NotesController {
     return this.#host.songs.map((_, index) => this.#refOf(index))
   }
 
-  /** Read every song's notes: those in the setlist, those on this device for it, and those for the song */
+  /** Read every song's annotations: those in the setlist, those on this device for it, and those for the song */
   async load(): Promise<void> {
     const { currentSetlist: setlist, currentSetlistId: id } = this.#host
     const db = this.#host._database()
     this.#sources = await Promise.all(
       this.#host.songs.map(async (_, index) => ({
         shared: setlist?.songs[index]?.annotations ?? [],
-        setlistPrivate: loadSetlistNotes(id, this.#refOf(index)),
-        songPrivate: await db.getSongNotes(this.#refOf(index).songId),
+        setlistPrivate: loadSetlistAnnotations(id, this.#refOf(index)),
+        songPrivate: await db.getSongAnnotations(this.#refOf(index).songId),
       }))
     )
   }
 
-  /** The notes to draw on a song: all of them when editing, else those the user's preferences choose */
-  chartNotes(index: number): ChartNotes | null {
+  /** The annotations to draw on a song: all of them when editing, else those the user's preferences choose */
+  chartAnnotations(index: number): ChartAnnotations | null {
     const song = this.#host.songs[index]
     const sources = this.#sources[index]
     if (!song?.parsed || !sources) return null
-    return notesBySection(
+    return annotationsBySection(
       song.parsed.sections,
       sources,
-      isEditMode() ? { shared: true, mine: true } : getNotesPreference()
+      isEditMode() ? { shared: true, mine: true } : getAnnotationsPreference()
     )
   }
 
-  /** Give every song's display its notes again (after editing starts or ends, or a preference changes) */
+  /** Give every song's display its annotations again (after editing starts or ends, or a preference changes) */
   refreshAll(): void {
     this.#host.songs.forEach((_, index) => {
       this.#refresh(index)
@@ -92,61 +92,67 @@ export class NotesController {
 
   #refresh(index: number) {
     const display = this.#host.root.querySelector<SongDisplay>(`#song-${index} song-display`)
-    if (display) display.notes = this.chartNotes(index)
+    if (display) display.annotations = this.chartAnnotations(index)
   }
 
-  /** Listen for the editor to be asked for, and for the notes shown to change */
+  /** Listen for the editor to be asked for, and for the annotations shown to change */
   listen(signal: AbortSignal): void {
     this.#host.root.addEventListener(
-      NoteRequestEvent.type,
-      event => void this.#edit(event as NoteRequestEvent),
+      AnnotationRequestEvent.type,
+      event => void this.#edit(event as AnnotationRequestEvent),
       { signal }
     )
-    window.addEventListener(NotesPreferenceEvent.type, () => this.refreshAll(), { signal })
+    window.addEventListener(AnnotationsPreferenceEvent.type, () => this.refreshAll(), { signal })
   }
 
-  async #edit(event: NoteRequestEvent) {
+  async #edit(event: AnnotationRequestEvent) {
     const { songIndex: index } = event
     const song = this.#host.songs[index]
     const sources = this.#sources[index]
     if (!song || !sources) return
 
-    const existing = event.noteId
-      ? allNotes(sources).find(({ note }) => note.id === event.noteId)
+    const existing = event.annotationId
+      ? allAnnotations(sources).find(({ annotation }) => annotation.id === event.annotationId)
       : undefined
-    const note: ChartNote = existing?.note ?? {
+    const annotation: ChartAnnotation = existing?.annotation ?? {
       id: crypto.randomUUID(),
       anchor: this.#anchorFor(event, song),
       body: { kind: 'text', text: '' },
       modified: new Date().toISOString(),
     }
     // (a drawing is not edited as text)
-    if (note.body.kind !== 'text') return
+    if (annotation.body.kind !== 'text') return
 
-    this.#editor ??= this.#host.root.appendChild(document.createElement('note-editor'))
+    this.#editor ??= this.#host.root.appendChild(document.createElement('annotation-editor'))
     const result = await this.#editor.edit({
       anchorElement: event.element,
       about: this.#about(event, song),
-      text: note.body.text,
-      kind: existing?.kind ?? DEFAULT_NOTE_KIND,
+      text: annotation.body.text,
+      kind: existing?.kind ?? DEFAULT_ANNOTATION_KIND,
       canShare: await this.#host.canShare(),
       isNew: !existing,
     })
     if (!result) return
 
     if (result.action === 'delete' || !result.text) {
-      if (existing) await this.#apply(index, removeNote(sources, note.id), 'Note deleted', sources)
+      if (existing)
+        await this.#apply(
+          index,
+          removeAnnotation(sources, annotation.id),
+          'Annotation deleted',
+          sources
+        )
       return
     }
-    const next = putNote(
+    const next = putAnnotation(
       sources,
-      { ...note, body: { kind: 'text', text: result.text } },
+      { ...annotation, body: { kind: 'text', text: result.text } },
       result.kind
     )
     await this.#apply(index, next)
   }
 
-  #anchorFor(event: NoteRequestEvent, song: RuntimeSong): ChartNote['anchor'] {
+  #anchorFor(event: AnnotationRequestEvent, song: RuntimeSong): ChartAnnotation['anchor'] {
     const sections = song.parsed.sections
     if (event.place === 'song') return { kind: 'song' }
     if (event.place === 'title') return sectionAnchor(sections, event.sectionIndex)
@@ -160,8 +166,8 @@ export class NotesController {
     )
   }
 
-  /** What the note is on, for the editor's heading: “grace”, Chorus, the song */
-  #about(event: NoteRequestEvent, song: RuntimeSong): string {
+  /** What the annotation is on, for the editor's heading: “grace”, Chorus, the song */
+  #about(event: AnnotationRequestEvent, song: RuntimeSong): string {
     const section = song.parsed.sections[event.sectionIndex]
     if (event.place === 'song') return 'the whole song'
     if (event.place === 'title') return section?.label ? `“${section.label}”` : 'this section'
@@ -175,15 +181,20 @@ export class NotesController {
   }
 
   /** Keep what changed (only the places that differ), show it, and for a deletion offer Undo */
-  async #apply(index: number, next: NoteSources, deleted?: string, before?: NoteSources) {
-    const previous = this.#sources[index] as NoteSources
+  async #apply(
+    index: number,
+    next: AnnotationSources,
+    deleted?: string,
+    before?: AnnotationSources
+  ) {
+    const previous = this.#sources[index] as AnnotationSources
     const changed = changedSources(previous, next)
     this.#sources[index] = next
     this.#refresh(index)
     try {
       const { songId } = this.#refOf(index)
       if (changed.includes('setlistPrivate')) {
-        saveSetlistNotes(
+        saveSetlistAnnotations(
           this.#host.currentSetlistId,
           this.#refOf(index),
           next.setlistPrivate,
@@ -191,11 +202,11 @@ export class NotesController {
         )
       }
       if (changed.includes('songPrivate')) {
-        await this.#host._database().saveSongNotes(songId, next.songPrivate)
-        // (the same song again in the setlist has the same notes)
+        await this.#host._database().saveSongAnnotations(songId, next.songPrivate)
+        // (the same song again in the setlist has the same annotations)
         this.#host.songs.forEach((other, at) => {
           if (at !== index && other.songId === songId && this.#sources[at]) {
-            ;(this.#sources[at] as NoteSources).songPrivate = next.songPrivate
+            ;(this.#sources[at] as AnnotationSources).songPrivate = next.songPrivate
             this.#refresh(at)
           }
         })
@@ -204,7 +215,7 @@ export class NotesController {
     } catch (error) {
       this.#sources[index] = previous
       this.#refresh(index)
-      toast("Couldn't save the note. It is as it was.", {
+      toast("Couldn't save the annotation. It is as it was.", {
         kind: 'error',
         details: errorMessage(error),
       })

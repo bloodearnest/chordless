@@ -118,9 +118,9 @@ describe('Receiving a share link', () => {
     result.db.db?.close()
   })
 
-  it('keeps the notes the sender shared on a song', async () => {
-    const withNotes = bundle()
-    withNotes.setlist.songs[0].annotations = [
+  it('keeps the annotations the sender shared on a song', async () => {
+    const withAnnotations = bundle()
+    withAnnotations.setlist.songs[0].annotations = [
       {
         id: 'n1',
         anchor: { kind: 'song' },
@@ -128,7 +128,7 @@ describe('Receiving a share link', () => {
         modified: '2026-11-01T00:00:00Z',
       },
     ]
-    const { fetchFile } = await worker(withNotes)
+    const { fetchFile } = await worker(withAnnotations)
     const result = await openShare(FILE, key, { fetchFile, today: '2026-10-12' })
     if (result.state !== 'ready') throw new Error(result.state)
     const setlist = must(await result.db.getSetlist(shareSetlistId(FILE)))

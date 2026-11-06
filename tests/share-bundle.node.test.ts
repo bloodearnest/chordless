@@ -274,21 +274,21 @@ test('an id that is not a UUID has no setlist code, and so matches nothing', () 
   assert.equal(matchesSetlistCode('', 'not-a-uuid'), false)
 })
 
-const sharedNote = (id: string, text: string) => ({
+const sharedAnnotation = (id: string, text: string) => ({
   id,
   anchor: { kind: 'section' as const, label: 'Chorus', nth: 0 },
   body: { kind: 'text' as const, text },
   modified: '2026-11-01T00:00:00Z',
 })
 
-test('shared notes go in the bundle for their song, and only when there are some', async () => {
+test('shared annotations go in the bundle for their song, and only when there are some', async () => {
   const bundle = bundleOf([
-    source(1, { annotations: [sharedNote('n1', 'all in')] }),
+    source(1, { annotations: [sharedAnnotation('n1', 'all in')] }),
     source(2),
     source(3, { annotations: [] }),
   ])
-  assert.deepEqual(bundle.setlist.songs[0]?.annotations, [sharedNote('n1', 'all in')])
-  // (a share of a setlist without notes is as it was before notes, so its hash is too)
+  assert.deepEqual(bundle.setlist.songs[0]?.annotations, [sharedAnnotation('n1', 'all in')])
+  // (a share of a setlist without annotations is as it was before annotations, so its hash is too)
   assert.equal('annotations' in (bundle.setlist.songs[1] ?? {}), false)
   assert.equal('annotations' in (bundle.setlist.songs[2] ?? {}), false)
   assert.notEqual(
@@ -296,14 +296,14 @@ test('shared notes go in the bundle for their song, and only when there are some
     await bundleHash(bundleOf([source(1), source(2), source(3)]))
   )
   assert.notEqual(
-    await bundleHash(bundleOf([source(1, { annotations: [sharedNote('n1', 'quietly')] })])),
-    await bundleHash(bundleOf([source(1, { annotations: [sharedNote('n1', 'all in')] })]))
+    await bundleHash(bundleOf([source(1, { annotations: [sharedAnnotation('n1', 'quietly')] })])),
+    await bundleHash(bundleOf([source(1, { annotations: [sharedAnnotation('n1', 'all in')] })]))
   )
 })
 
-test('reading a share keeps the notes that are well formed and leaves out the rest, drawings included', () => {
+test('reading a share keeps the annotations that are well formed and leaves out the rest, drawings included', () => {
   const bundle = JSON.parse(
-    JSON.stringify(bundleOf([source(1, { annotations: [sharedNote('n1', 'ok')] })]))
+    JSON.stringify(bundleOf([source(1, { annotations: [sharedAnnotation('n1', 'ok')] })]))
   )
   bundle.setlist.songs[0].annotations.push(
     { id: 'ink', anchor: { kind: 'song' }, body: { kind: 'ink', strokes: [], w: 1, h: 1 } },

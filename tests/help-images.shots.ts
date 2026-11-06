@@ -100,7 +100,7 @@ test('the pictures of the setlist pages and the library', async ({ page }, testI
   await shot(settings, 'song-settings', { also: header })
   await page.keyboard.press('Escape')
 
-  // ---- A note, made by holding a word in edit mode
+  // ---- An annotation, made by holding a word in edit mode
   const chorus = page.locator('#song-0 song-section[data-label="Chorus"]')
   await chorus.scrollIntoViewIfNeeded()
   const word = await chorus.locator('.chord-segment', { hasText: 'chorus' }).boundingBox()
@@ -109,21 +109,21 @@ test('the pictures of the setlist pages and the library', async ({ page }, testI
   await page.mouse.down()
   await page.waitForTimeout(700)
   await page.mouse.up()
-  const noteEditor = page.locator('note-editor dialog')
-  await expect(noteEditor).toBeVisible()
-  const noteText = noteEditor.getByLabel('Note text')
-  await noteText.fill('big finish, all in')
-  await noteText.blur()
-  await shot(noteEditor, 'note-editor')
-  await noteEditor.getByRole('button', { name: 'Done' }).click()
-  await expect(noteEditor).toBeHidden()
+  const annotationEditor = page.locator('annotation-editor dialog')
+  await expect(annotationEditor).toBeVisible()
+  const annotationText = annotationEditor.getByLabel('Annotation text')
+  await annotationText.fill('big finish, all in')
+  await annotationText.blur()
+  await shot(annotationEditor, 'annotation-editor')
+  await annotationEditor.getByRole('button', { name: 'Done' }).click()
+  await expect(annotationEditor).toBeHidden()
   await page.mouse.move(0, 0)
   // (the player floats over the corner of the page: not in this picture)
   await page.locator('media-player').evaluate(el => {
     el.style.visibility = 'hidden'
   })
   // (just the title and the line: the section's own controls and the player float over the rest)
-  await shot(chorus.locator('.chord-line'), 'song-note', {
+  await shot(chorus.locator('.chord-line'), 'song-annotation', {
     pad: 14,
     also: chorus.locator('.section-title'),
   })

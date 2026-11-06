@@ -3,8 +3,8 @@
  * about the space. Pure: no storage, no network.
  */
 
-import type { Setlist, SetlistEntry, SharedChartNote } from './data-types.ts'
-import { readSharedNotes } from './notes/validate.ts'
+import { readSharedAnnotations } from './annotations/validate.ts'
+import type { Setlist, SetlistEntry, SharedChartAnnotation } from './data-types.ts'
 import { sha256Hex } from './utils/bytes.ts'
 
 export const SHARE_FORMAT = 'chordless-share'
@@ -21,8 +21,8 @@ export interface ShareSong {
   notes: string
   /** The chart's text, including this setlist's edits to it */
   chordpro: string
-  /** The notes on the chart shared with the team (docs/NOTES.md); left out when there are none */
-  annotations?: SharedChartNote[]
+  /** The annotations on the chart shared with everyone (docs/ANNOTATIONS.md); left out when there are none */
+  annotations?: SharedChartAnnotation[]
 }
 
 export interface ShareBundle {
@@ -102,7 +102,7 @@ export function buildShareBundle(
       tempo: entry.tempo ?? songTempo ?? null,
       notes: entry.notes ?? '',
       chordpro: entry.chordproEdits ?? chordpro,
-      // (left out when there are none, so a share of a setlist without notes keeps its hash)
+      // (left out when there are none, so a share of a setlist without annotations keeps its hash)
       ...(entry.annotations?.length && { annotations: entry.annotations }),
     }))
   return {
@@ -145,10 +145,10 @@ export function parseShareBundle(data: unknown): ShareBundle {
     if (!isRecord(song) || typeof song.title !== 'string' || typeof song.chordpro !== 'string') {
       throw new Error('The share is damaged')
     }
-    // (a note that is not well formed is left out, not a reason to refuse the share)
+    // (an annotation that is not well formed is left out, not a reason to refuse the share)
     if ('annotations' in song) {
-      const notes = readSharedNotes(song.annotations)
-      if (notes.length) song.annotations = notes
+      const annotations = readSharedAnnotations(song.annotations)
+      if (annotations.length) song.annotations = annotations
       else delete song.annotations
     }
   }
