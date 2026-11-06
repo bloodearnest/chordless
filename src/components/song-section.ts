@@ -461,6 +461,8 @@ export class SongSection extends LitElement {
       line-height: 1.05;
       white-space: nowrap;
       pointer-events: none;
+      /* Above the words after it, which it runs over and which come later in the page: else they are painted over it, and take its taps */
+      z-index: 1;
     }
 
     /* In edit mode a word or a title can be long-pressed for an annotation, and an annotation tapped to change it */

@@ -212,4 +212,39 @@ test.describe('Annotations on a chart', () => {
     expect(Math.abs(annotation.x - word.x)).toBeLessThan(60)
     expect(annotation.y).toBeLessThan(word.y)
   })
+
+  test('an annotation that runs over the words after it is tapped anywhere along it to change it', async ({
+    page,
+  }) => {
+    await openSong(page)
+    await page.evaluate(async () => {
+      const { getCurrentDB } = await import('/js/db.ts')
+      const db = await getCurrentDB()
+      const chart = await db.getChordPro('chordpro-info-test')
+      if (!chart) throw new Error('no chart')
+      await db.saveChordPro({
+        ...chart,
+        content: chart.content.replace(
+          '[G]Amazing [C]grace',
+          '[G]Amazing grace how sweet the sound'
+        ),
+      })
+    })
+    await page.reload()
+    await enterEditMode(page)
+    await hold(page, 'Amazing')
+    await writeAnnotation(page, 'runs over the words after it')
+    await editor(page).getByRole('button', { name: 'Done' }).click()
+    await expect(editor(page)).toBeHidden()
+    await page.waitForTimeout(300)
+
+    // its right end is over the words that come after "Amazing", which are later in the page
+    const box = must(await shownAnnotations(page).first().boundingBox())
+    await page.mouse.click(box.x + box.width * 0.9, box.y + box.height / 2)
+    await expect(editor(page).getByLabel('Annotation text')).toHaveValue(
+      'runs over the words after it'
+    )
+    await editor(page).getByRole('button', { name: 'Delete' }).click()
+    await expect(shownAnnotations(page)).toHaveCount(0)
+  })
 })
