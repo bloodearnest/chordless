@@ -6,8 +6,8 @@
  *   node scripts/melody-spike.ts preview.json [--musicxml out.musicxml] [--dump]
  */
 import { readFileSync, writeFileSync } from 'node:fs'
-import { type MelodyNote } from '../src/js/melody.ts'
-import { readMelodySvg, type ReadStats } from '../src/js/melody-svg.ts'
+import type { MelodyNote } from '../src/js/melody.ts'
+import { type ReadStats, readMelodySvg } from '../src/js/melody-svg.ts'
 
 interface TimeEvent {
   on: string[] | null
@@ -97,13 +97,16 @@ const file = args[0]
 if (!file) throw new Error('usage: melody-spike.ts preview.json [--musicxml out]')
 const res = JSON.parse(readFileSync(file, 'utf8'))
 const payload = res.payload ?? res
-const svgs: string[] = (payload.svgs as string[]).map((s) => b64(s).toString('utf8'))
+const svgs: string[] = (payload.svgs as string[]).map(s => b64(s).toString('utf8'))
 const stats = { warnings: [] as string[] } as ReadStats
 const melody = readMelodySvg(svgs, stats)
 
-console.log(`${melody.title}: ${stats.measures} measures, ${stats.full} add up to the time signature`)
+console.log(
+  `${melody.title}: ${stats.measures} measures, ${stats.full} add up to the time signature`
+)
 console.log(`${stats.notes} notes, ${stats.rests} rests`)
-for (const m of stats.short) console.log(`  measure ${m.number}: ${m.length} of ${(m.beats * 4) / m.beatType}`)
+for (const m of stats.short)
+  console.log(`  measure ${m.number}: ${m.length} of ${(m.beats * 4) / m.beatType}`)
 for (const w of stats.warnings.slice(0, 20)) console.log(`  warning: ${w}`)
 console.log(`notice: ${melody.notice.join(' / ')}`)
 
@@ -115,7 +118,9 @@ for (const e of timemap) {
   for (const id of e.on ?? []) onAt.set(id, e.qstamp)
   for (const id of e.off ?? []) offAt.set(id, e.qstamp)
 }
-const notes: MelodyNote[] = melody.measures.flatMap((m) => m.voices.flat().filter((e): e is MelodyNote => e.kind === 'note'))
+const notes: MelodyNote[] = melody.measures.flatMap(m =>
+  m.voices.flat().filter((e): e is MelodyNote => e.kind === 'note')
+)
 let known = 0
 let durOk = 0
 const durBad: string[] = []
@@ -142,10 +147,15 @@ for (const n of notes) {
   const ms = timeMs.get(n.id)
   if (ms === undefined) continue
   pitchChecked++
-  if (midi.some((x) => Math.abs(x.ms - ms) < 5 && x.pitch === n.midi)) pitchOk++
-  else pitchBad.push(`${n.id} ${n.step}${n.alter ? (n.alter > 0 ? '#' : 'b') : ''}${n.octave} (${n.midi}) at ${ms}ms: midi has ${midi.filter((x) => Math.abs(x.ms - ms) < 5).map((x) => x.pitch)}`)
+  if (midi.some(x => Math.abs(x.ms - ms) < 5 && x.pitch === n.midi)) pitchOk++
+  else
+    pitchBad.push(
+      `${n.id} ${n.step}${n.alter ? (n.alter > 0 ? '#' : 'b') : ''}${n.octave} (${n.midi}) at ${ms}ms: midi has ${midi.filter(x => Math.abs(x.ms - ms) < 5).map(x => x.pitch)}`
+    )
 }
-console.log(`midi: ${midi.length} notes; ${pitchOk}/${pitchChecked} of ours match a MIDI note at the same time and pitch`)
+console.log(
+  `midi: ${midi.length} notes; ${pitchOk}/${pitchChecked} of ours match a MIDI note at the same time and pitch`
+)
 for (const d of pitchBad.slice(0, 8)) console.log(`  ${d}`)
 
 // Lyrics: the words the notes carry against the words of the chart (--cho file)
@@ -168,14 +178,28 @@ if (cho >= 0 && args[cho + 1]) {
       cur = ''
     }
   }
-  const missing = words.filter((w) => !chartWords.has(norm(w)))
-  console.log(`lyrics: ${words.length - missing.length}/${words.length} words of verse 1 are in the chart${missing.length ? `; not: ${[...new Set(missing)].slice(0, 12).join(' ')}` : ''}`)
+  const missing = words.filter(w => !chartWords.has(norm(w)))
+  console.log(
+    `lyrics: ${words.length - missing.length}/${words.length} words of verse 1 are in the chart${missing.length ? `; not: ${[...new Set(missing)].slice(0, 12).join(' ')}` : ''}`
+  )
 }
 
 if (args.includes('--dump')) {
   for (const m of melody.measures) {
-    const body = m.voices.map((v) => v.map((e) => (e.kind === 'rest' ? `r${e.duration}` : `${e.step}${e.alter ? (e.alter > 0 ? '#' : 'b') : ''}${e.octave}:${e.duration}${e.tieStart ? '~' : ''}${e.syllables[0] ?? ''}${e.cue ? '(c)' : ''}`)).join(' ')).join(' | ')
-    console.log(`${String(m.number).padStart(3)} ${m.section ?? ''} ${m.chords.map((c) => `${c.text}@${c.start}`).join(' ')} :: ${body} ${m.full ? '' : '!!'}`)
+    const body = m.voices
+      .map(v =>
+        v
+          .map(e =>
+            e.kind === 'rest'
+              ? `r${e.duration}`
+              : `${e.step}${e.alter ? (e.alter > 0 ? '#' : 'b') : ''}${e.octave}:${e.duration}${e.tieStart ? '~' : ''}${e.syllables[0] ?? ''}${e.cue ? '(c)' : ''}`
+          )
+          .join(' ')
+      )
+      .join(' | ')
+    console.log(
+      `${String(m.number).padStart(3)} ${m.section ?? ''} ${m.chords.map(c => `${c.text}@${c.start}`).join(' ')} :: ${body} ${m.full ? '' : '!!'}`
+    )
   }
 }
 const xo = args.indexOf('--musicxml')
