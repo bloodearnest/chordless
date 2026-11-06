@@ -138,7 +138,7 @@ describe('the setlist page: annotations', () => {
       .annotations as SharedChartAnnotation[]
     expect(saved.map(annotation => [annotation.anchor, annotation.body])).to.deep.equal([
       [
-        { kind: 'section', label: 'Verse 1', nth: 0 },
+        { kind: 'section', label: 'Verse 1', nth: 0, sectionHead: 'Amazing grace' },
         { kind: 'text', text: 'all in' },
       ],
     ])
@@ -356,5 +356,111 @@ describe('the setlist page: annotations', () => {
     ])
     await rig.page.setAnnotations(1, [])
     expect('annotations' in must(await rig.db.getSetlist(setlist.id)).songs[1]).to.equal(false)
+  })
+
+  describe('when the chart is fixed', () => {
+    /** The chart of the first song, with a line added above the one the annotations are on */
+    async function addALineAbove() {
+      const song = must(await rig.db.getSong(rig.songs[0].uuid))
+      const chart = must(await rig.db.getChordPro(song.chordproFileId))
+      await rig.db.saveChordPro({
+        ...chart,
+        content: chart.content.replace(
+          '{comment: Verse 1}\n',
+          '{comment: Verse 1}\nA brand new line\n'
+        ),
+      })
+      return chart
+    }
+    const restore = async (chart: Awaited<ReturnType<typeof addALineAbove>>) =>
+      rig.db.saveChordPro(chart)
+    const ref = () => ({ songId: rig.songs[0].id, songUuid: rig.songs[0].uuid })
+
+    it('follows its line, and the user’s own is kept up to date on this device', async () => {
+      const setlist = await rig.open(1)
+      await make(word, 'softly')
+      const original = await addALineAbove()
+      await rig.page.renderSetlist(setlist.id)
+      await rig.flush()
+
+      expect(shown()).to.deep.equal([{ text: 'softly', shared: false }])
+      const [kept] = loadSetlistAnnotations(setlist.id, ref())
+      expect(kept.anchor).to.include({ kind: 'text', line: 1, offset: 8 })
+      // and it finds its place for the chart as it is, not as it was
+      await restore(original)
+      await rig.page.renderSetlist(setlist.id)
+      await rig.flush()
+      expect(loadSetlistAnnotations(setlist.id, ref())[0].anchor).to.include({ line: 0, offset: 8 })
+    })
+
+    it('shared with everyone is found the same way, and kept up to date by the one who can write when they finish editing', async () => {
+      const setlist = await rig.open(1)
+      await make(word, 'band drops', root => choose(root, 'Everyone'))
+      await addALineAbove()
+      await rig.page.renderSetlist(setlist.id)
+      await rig.flush()
+      expect(shown()).to.deep.equal([{ text: 'band drops', shared: true }])
+
+      // (finding it again writes nothing: the setlist is as it was)
+      const stored = async () =>
+        must(await rig.db.getSetlist(setlist.id)).songs[0].annotations?.[0]?.anchor
+      expect(await stored()).to.include({ line: 0 })
+      await rig.page.annotations.healShared()
+      expect(await stored()).to.include({ line: 1, offset: 8 })
+    })
+
+    it('says nothing, and carries on, when where an annotation is cannot be kept', async () => {
+      const setlist = await rig.open(1)
+      await make(word, 'band drops', root => choose(root, 'Everyone'))
+      await addALineAbove()
+      await rig.page.renderSetlist(setlist.id)
+      const real = rig.page.setAnnotations.bind(rig.page)
+      rig.page.setAnnotations = async () => {
+        throw new Error('the disk is full')
+      }
+      try {
+        await rig.page.annotations.healShared()
+      } finally {
+        rig.page.setAnnotations = real
+      }
+      expect(rig.errors.some(args => String(args[0]).includes('Could not keep where'))).to.equal(
+        true
+      )
+      expect(shownToast()).to.equal(null)
+    })
+
+    it('shared with everyone is not written by one who cannot write the setlist', async () => {
+      const entry = makeEntry({
+        order: 0,
+        songId: rig.songs[0].id,
+        songUuid: rig.songs[0].uuid,
+        key: 'G',
+      })
+      entry.annotations = [
+        {
+          id: 'a1',
+          anchor: {
+            kind: 'text',
+            label: 'Verse 1',
+            nth: 0,
+            line: 0,
+            offset: 8,
+            before: 'Amazing ',
+            after: 'grace',
+          },
+          body: { kind: 'text', text: 'from the leader' },
+          modified: '',
+        },
+      ]
+      await addALineAbove()
+      const setlist = await rig.open(0, {
+        songs: [entry],
+        received: { fileId: 'f', key: 'k', etag: 'e', expires: '2099-01-01' },
+      })
+      expect(shown()).to.deep.equal([{ text: 'from the leader', shared: true }])
+      await rig.page.annotations.healShared()
+      const stored = must(await rig.db.getSetlist(setlist.id)).songs[0].annotations?.[0]
+      expect(stored?.anchor).to.include({ line: 0 })
+    })
   })
 })

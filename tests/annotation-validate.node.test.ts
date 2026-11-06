@@ -64,3 +64,33 @@ test('leaves out what is not well formed', () => {
   ]
   assert.deepEqual(readSharedAnnotations(bad), [])
 })
+
+test('keeps the snapshot of an anchor, cut short, and leaves out what is not text', () => {
+  const long = 'x'.repeat(500)
+  const [read] = readSharedAnnotations([
+    text('a', {
+      kind: 'text',
+      label: 'Verse',
+      nth: 0,
+      line: 1,
+      offset: 2,
+      before: 'a',
+      after: 'b',
+      lineText: long,
+      prevLine: 'above',
+      nextLine: 7,
+      occ: 2,
+      sectionHead: 'first line',
+    }),
+  ])
+  const anchor = read?.anchor as Record<string, unknown>
+  assert.equal((anchor.lineText as string).length, 200)
+  assert.equal(anchor.prevLine, 'above')
+  assert.equal('nextLine' in anchor, false)
+  assert.equal(anchor.occ, 2)
+  assert.equal(anchor.sectionHead, 'first line')
+  const [section] = readSharedAnnotations([
+    text('b', { kind: 'section', label: null, nth: 0, sectionHead: 'head' }),
+  ])
+  assert.equal(((section?.anchor ?? {}) as Record<string, unknown>).sectionHead, 'head')
+})

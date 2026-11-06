@@ -293,6 +293,20 @@ describe('annotations on a chart', () => {
       expect(requests.map(each => each.place)).to.deep.equal(['title'])
     })
 
+    it('does not ask for the editor from a key pressed somewhere that is not a place for one', async () => {
+      const { root, requests } = await editing()
+      const content = root.querySelector('.section-content') as HTMLElement
+      content.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'ContextMenu',
+          bubbles: true,
+          composed: true,
+          cancelable: true,
+        })
+      )
+      expect(requests).to.deep.equal([])
+    })
+
     it('asks for the editor on an annotation that is tapped, with its id, and does not collapse the section', async () => {
       let sources = putAnnotation(
         noSources(),

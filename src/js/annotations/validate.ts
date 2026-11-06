@@ -10,6 +10,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isLabel = (value: unknown): value is string | null =>
   value === null || typeof value === 'string'
+/** The snapshot fields of an anchor are optional text, cut short; one that is not text is left out */
+const optionalText = (value: unknown, name = 'sectionHead') =>
+  typeof value === 'string' ? { [name]: value.slice(0, 200) } : {}
+
 const isCount = (value: unknown): value is number =>
   Number.isInteger(value) && (value as number) >= 0
 
@@ -17,7 +21,10 @@ function readAnchor(value: unknown): AnnotationAnchor | null {
   if (!isRecord(value)) return null
   if (value.kind === 'song') return { kind: 'song' }
   if (!isLabel(value.label) || !isCount(value.nth)) return null
-  if (value.kind === 'section') return { kind: 'section', label: value.label, nth: value.nth }
+  const head = optionalText(value.sectionHead)
+  if (value.kind === 'section') {
+    return { kind: 'section', label: value.label, nth: value.nth, ...head }
+  }
   if (
     value.kind === 'text' &&
     isCount(value.line) &&
@@ -33,6 +40,11 @@ function readAnchor(value: unknown): AnnotationAnchor | null {
       offset: value.offset,
       before: value.before,
       after: value.after,
+      ...optionalText(value.lineText, 'lineText'),
+      ...optionalText(value.prevLine, 'prevLine'),
+      ...optionalText(value.nextLine, 'nextLine'),
+      ...(isCount(value.occ) && { occ: value.occ }),
+      ...head,
     }
   }
   return null

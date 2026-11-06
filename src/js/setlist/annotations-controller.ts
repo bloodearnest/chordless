@@ -8,6 +8,7 @@ import type { AnnotationEditor } from '../../components/annotation-editor.ts'
 import type { SongDisplay } from '../../components/song-display.ts'
 import { AnnotationRequestEvent } from '../../components/song-section.ts'
 import { sectionAnchor, snapOffset, textAnchor } from '../annotations/anchor.ts'
+import { healSources } from '../annotations/heal.ts'
 import { annotationsBySection, type ChartAnnotations } from '../annotations/shown.ts'
 import {
   type AnnotationSources,
@@ -65,6 +66,49 @@ export class AnnotationsController {
         private: loadSetlistAnnotations(id, this.#refOf(index)),
       }))
     )
+    this.#healPrivate()
+  }
+
+  /**
+   * The chart is fixed in place and the fix arrives by sync, so where an annotation is can differ from
+   * where it is kept. The user's own are kept up to date as the setlist is drawn (this device only,
+   * so nothing is sent); see annotations/anchor.ts
+   */
+  #healPrivate() {
+    this.#host.songs.forEach((song, index) => {
+      const sources = this.#sources[index]
+      const healed =
+        sources && song.parsed && healSources(song.parsed.sections, sources, ['private'])
+      if (!healed) return
+      this.#sources[index] = healed
+      saveSetlistAnnotations(
+        this.#host.currentSetlistId,
+        this.#refOf(index),
+        healed.private,
+        this.#songRefs()
+      )
+    })
+  }
+
+  /**
+   * The same for those shared with everyone, which are in the setlist and so are written by someone
+   * who can write it, when they finish editing (not by every device that sees a fix: others find
+   * their place the same way from what is kept, without writing)
+   */
+  async healShared(): Promise<void> {
+    if (!(await this.#host.canShare())) return
+    for (const [index, song] of this.#host.songs.entries()) {
+      const sources = this.#sources[index]
+      const healed =
+        sources && song.parsed && healSources(song.parsed.sections, sources, ['shared'])
+      if (!healed) continue
+      this.#sources[index] = healed
+      try {
+        await this.#host.setAnnotations(index, healed.shared)
+      } catch (error) {
+        console.error('[Annotations] Could not keep where annotations are:', error)
+      }
+    }
   }
 
   /** The annotations to draw on a song: all of them when editing, else those the user's preferences choose */

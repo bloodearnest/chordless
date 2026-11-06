@@ -166,4 +166,44 @@ test.describe('Annotations on a chart', () => {
       expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
     })
   }
+
+  test('an annotation stays on its word when the chart is fixed, even after several fixes', async ({
+    page,
+  }) => {
+    await openSong(page)
+    await enterEditMode(page)
+    await hold(page, 'grace')
+    await writeAnnotation(page, 'softly')
+    await editor(page).getByRole('button', { name: 'Done' }).click()
+    await expect(shownAnnotations(page)).toHaveText(['softly'])
+
+    const fix = (change: string) =>
+      page.evaluate(
+        async change => {
+          const { getCurrentDB } = await import('/js/db.ts')
+          const db = await getCurrentDB()
+          const chart = await db.getChordPro('chordpro-info-test')
+          if (!chart) throw new Error('no chart')
+          const [from, to] = JSON.parse(change)
+          await db.saveChordPro({ ...chart, content: chart.content.replace(from, to) })
+        },
+        JSON.stringify(change.split('=>'))
+      )
+
+    // a line goes in above, then the line is reworded, then another goes above: each is a fix of the chart
+    await fix('[G]Amazing =>[D]Something first\n[G]Amazing ')
+    await page.reload()
+    await expect(shownAnnotations(page)).toHaveText(['softly'])
+    await fix('grace=>grace, oh grace')
+    await page.reload()
+    await fix('[D]Something first=>[D]Something first\n[C]And one more')
+    await page.reload()
+
+    const annotation = must(await shownAnnotations(page).first().boundingBox())
+    const word = must(
+      await page.locator('song-section .chord-segment', { hasText: 'grace,' }).first().boundingBox()
+    )
+    expect(Math.abs(annotation.x - word.x)).toBeLessThan(60)
+    expect(annotation.y).toBeLessThan(word.y)
+  })
 })
