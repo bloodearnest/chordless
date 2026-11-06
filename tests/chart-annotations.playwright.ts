@@ -205,12 +205,15 @@ test.describe('Annotations on a chart', () => {
     await fix('[D]Something first=>[D]Something first\n[C]And one more')
     await page.reload()
 
-    const annotation = must(await shownAnnotations(page).first().boundingBox())
-    const word = must(
-      await page.locator('song-section .chord-segment', { hasText: 'grace,' }).first().boundingBox()
-    )
-    expect(Math.abs(annotation.x - word.x)).toBeLessThan(60)
-    expect(annotation.y).toBeLessThan(word.y)
+    // (on the chord row, so over the word's lyrics, which are below it)
+    await expect(async () => {
+      const annotation = must(await shownAnnotations(page).first().boundingBox())
+      const segment = page.locator('song-section .chord-segment', { hasText: 'grace,' }).first()
+      const word = must(await segment.boundingBox())
+      const lyrics = must(await segment.locator('.lyrics').boundingBox())
+      expect(Math.abs(annotation.x - word.x)).toBeLessThan(60)
+      expect(annotation.y + annotation.height).toBeLessThanOrEqual(lyrics.y + 2)
+    }).toPass()
   })
 
   test('an annotation that runs over the words after it is tapped anywhere along it to change it', async ({
