@@ -57,7 +57,15 @@ export interface MelodyMeasure {
   /** A boxed section name that starts here ("INTRO", "VERSE 1") */
   section: string | null
   /** The barline that closes the measure */
-  barline: 'single' | 'double' | 'final' | 'repeat-end' | 'repeat-start' | 'repeat-both' | 'dashed' | 'none'
+  barline:
+    | 'single'
+    | 'double'
+    | 'final'
+    | 'repeat-end'
+    | 'repeat-start'
+    | 'repeat-both'
+    | 'dashed'
+    | 'none'
   /** Sum of the voices' lengths, checked against the time signature */
   length: number
   /** The measure holds as much as the time signature says (a pickup or last measure may not) */

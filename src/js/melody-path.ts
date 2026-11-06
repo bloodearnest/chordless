@@ -37,7 +37,8 @@ export function absolutePath(d: string): { key: string; box: PathBox; points: nu
       i++
       if (t === 'z' || t === 'Z') {
         // A line back to the start before the close is the close
-        if (parts[parts.length - 1] === `L${Math.round(sx * 10) / 10},${Math.round(sy * 10) / 10}`) parts.pop()
+        if (parts[parts.length - 1] === `L${Math.round(sx * 10) / 10},${Math.round(sy * 10) / 10}`)
+          parts.pop()
         parts.push('Z')
         x = sx
         y = sy
@@ -61,7 +62,7 @@ export function absolutePath(d: string): { key: string; box: PathBox; points: nu
       letter = 'C'
     }
     lastCtrl = letter === 'C' ? [abs[2] as number, abs[3] as number] : null
-    parts.push(letter + abs.map((v) => Math.round(v * 10) / 10).join(','))
+    parts.push(letter + abs.map(v => Math.round(v * 10) / 10).join(','))
     for (let k = 0; k < abs.length; k += 2) put(abs[k] as number, abs[k + 1] as number)
     x = abs[abs.length - 2] as number
     y = abs[abs.length - 1] as number
