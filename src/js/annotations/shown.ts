@@ -39,7 +39,7 @@ export function annotationsBySection(
   visible: AnnotationVisibility = { shared: true, mine: true }
 ): ChartAnnotations {
   const kept = allAnnotations(sources).filter(({ kind }) =>
-    kind.reach === 'shared' ? visible.shared : visible.mine
+    kind === 'shared' ? visible.shared : visible.mine
   )
   const shownBy = new Map<string, ShownAnnotation>()
   const texts = kept.flatMap(({ annotation, kind }) => {
@@ -48,7 +48,7 @@ export function annotationsBySection(
     shownBy.set(annotation.id, {
       id: annotation.id,
       text: annotation.body.text,
-      shared: kind.reach === 'shared',
+      shared: kind === 'shared',
     })
     return [annotation]
   })
@@ -75,7 +75,7 @@ export function annotationsBySection(
 }
 
 /**
- * The lines with their annotations put in: a segment is cut where a annotation falls inside it, and the piece
+ * The lines with their annotations put in: a segment is cut where an annotation falls inside it, and the piece
  * that starts there carries the annotation. Lines without annotations are the same objects as before; the
  * rest are new, so the parsed chart is not changed.
  */
@@ -97,7 +97,7 @@ function attachToSegments(segments: ChartSegment[], annotations: LineAnnotation[
     const { lyrics } = segment
     const end = start + lyrics.length
     const last = at === segments.length - 1
-    // A annotation belongs to the segment it starts in; one at the line's end, or past it, to the last
+    // An annotation belongs to the segment it starts in; one at the line's end, or past it, to the last
     const mine = annotations.filter(
       each =>
         !claimed.has(each) &&

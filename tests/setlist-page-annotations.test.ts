@@ -9,7 +9,7 @@ import type { SongDisplay } from '../src/components/song-display.ts'
 import { AnnotationRequestEvent, type SongSection } from '../src/components/song-section.ts'
 import type { ChartAnnotation, SharedChartAnnotation } from '../src/js/data-types.ts'
 import { setAnnotationsPreference } from '../src/js/preferences.ts'
-import { loadSetlistAnnotations } from '../src/js/setlist/local-state.ts'
+import { loadSetlistAnnotations, saveSetlistAnnotations } from '../src/js/setlist/local-state.ts'
 import { makeEntry } from './builders.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
 import { clearToasts, shownToast } from './test-helpers.ts'
@@ -19,8 +19,6 @@ const { describe, it, afterEach } = window
 describe('the setlist page: annotations', () => {
   const rig = useSetlistPage()
   afterEach(async () => {
-    // (the library's annotations are for the song, so they outlast the setlist)
-    for (const each of rig.songs) await rig.db.saveSongAnnotations(each.id, [])
     clearToasts()
     setAnnotationsPreference('shared', true)
     setAnnotationsPreference('mine', true)
@@ -88,7 +86,7 @@ describe('the setlist page: annotations', () => {
     field.value = text
     field.dispatchEvent(new Event('input'))
   }
-  /** Make a annotation on a spot and wait until it is drawn */
+  /** Make an annotation on a spot and wait until it is drawn */
   async function make(
     where: Where,
     text: string,
@@ -107,7 +105,7 @@ describe('the setlist page: annotations', () => {
 
   const word = { place: 'text' as const, line: 0, offset: 9 }
 
-  it('opens the editor on a word, and keeps a annotation as the user’s own, for this setlist, where it is drawn', async () => {
+  it('opens the editor on a word, and keeps an annotation as the user’s own, for this setlist, where it is drawn', async () => {
     const setlist = await rig.open(2)
     ask(word)
     await inEditor(root => {
@@ -125,15 +123,14 @@ describe('the setlist page: annotations', () => {
     expect(annotations).to.have.length(1)
     // (found by the word it is on, whatever the chords: the offset was snapped to the word's start)
     expect(annotations[0].anchor).to.include({ kind: 'text', line: 0, offset: 8 })
-    // Not in the setlist, which is shared, nor for the song
+    // Not in the setlist, which is shared
     expect(must(await rig.db.getSetlist(setlist.id)).songs[0].annotations).to.equal(undefined)
-    expect(await rig.db.getSongAnnotations(rig.songs[0].id)).to.deep.equal([])
   })
 
-  it('keeps a annotation for the team in the setlist, without drawing the page again', async () => {
+  it('keeps an annotation for everyone in the setlist, without drawing the page again', async () => {
     const setlist = await rig.open(2)
     const before = display()
-    await make({ place: 'title' }, 'all in', root => choose(root, 'The team'))
+    await make({ place: 'title' }, 'all in', root => choose(root, 'Everyone'))
 
     expect(display()).to.equal(before)
     expect(shown()).to.deep.equal([{ text: 'all in', shared: true }])
@@ -148,25 +145,23 @@ describe('the setlist page: annotations', () => {
     expect(must(rig.page.currentSetlist).songs[0].annotations).to.have.length(1)
   })
 
-  it('keeps a annotation for the song in the library, for every place the song is in the setlist, and on the whole song', async () => {
-    const [first] = rig.songs
+  it('keeps an annotation on the whole song, for this setlist, above the sections', async () => {
+    const first = rig.songs[0]
     const entry = (order: number) =>
       makeEntry({ order, songId: first.id, songUuid: first.uuid, key: 'G' })
     await rig.open(0, { songs: [entry(0), entry(1)] })
-    await make({ place: 'song' }, 'capo 2', root => choose(root, 'Always, this song'))
+    await make({ place: 'song' }, 'capo 2')
 
-    expect(await rig.db.getSongAnnotations(first.id)).to.have.length(1)
-    expect(shown(0)).to.deep.equal([{ text: 'capo 2', shared: false }])
-    // (the song is there twice)
-    expect(shown(1)).to.deep.equal([{ text: 'capo 2', shared: false }])
     expect(
       Array.from(
         display(0).shadowRoot?.querySelectorAll('.song-annotations .annotation') ?? []
       ).map(each => each.textContent)
     ).to.deep.equal(['capo 2'])
+    // (the same song again in the setlist is another place for it: it has its own)
+    expect(shown(1)).to.deep.equal([])
   })
 
-  it('edits a annotation that is there, and moves it between kinds keeping its place', async () => {
+  it('edits an annotation that is there, and moves it between kinds keeping its place', async () => {
     const setlist = await rig.open(1)
     await make(word, 'softly')
     const id = firstAnnotationId()
@@ -177,7 +172,7 @@ describe('the setlist page: annotations', () => {
       expect(must(root.querySelector('textarea')).value).to.equal('softly')
       expect(root.querySelector('h2')?.textContent).to.contain('Annotation on')
       write(root, 'very softly')
-      choose(root, 'The team')
+      choose(root, 'Everyone')
       press(root, 'Done')
     })
     await waitUntil(() => !editorRoot().querySelector('dialog')?.open)
@@ -194,7 +189,7 @@ describe('the setlist page: annotations', () => {
     ).to.deep.equal([id])
   })
 
-  it('deletes a annotation, and puts it back with Undo', async () => {
+  it('deletes an annotation, and puts it back with Undo', async () => {
     await rig.open(1)
     await make(word, 'softly')
     const id = firstAnnotationId()
@@ -232,19 +227,19 @@ describe('the setlist page: annotations', () => {
     await waitUntil(() => shown().length === 0)
   })
 
-  it('says so, and keeps the annotations as they were, when a annotation could not be saved', async () => {
+  it('says so, and keeps the annotations as they were, when an annotation could not be saved', async () => {
     await rig.open(1)
-    const real = rig.db.saveSongAnnotations.bind(rig.db)
-    rig.db.saveSongAnnotations = async () => {
+    const real = rig.page.setAnnotations.bind(rig.page)
+    rig.page.setAnnotations = async () => {
       throw new Error('the disk is full')
     }
     try {
-      await make(word, 'softly', root => choose(root, 'Always, this song'))
+      await make(word, 'softly', root => choose(root, 'Everyone'))
       await waitUntil(() => shownToast()?.kind === 'error')
       expect(shownToast()?.details).to.contain('the disk is full')
       expect(shown()).to.deep.equal([])
     } finally {
-      rig.db.saveSongAnnotations = real
+      rig.page.setAnnotations = real
     }
   })
 
@@ -269,7 +264,12 @@ describe('the setlist page: annotations', () => {
       body: { kind: 'ink', strokes: [], w: 1, h: 1 },
       modified: '',
     }
-    await rig.db.saveSongAnnotations(rig.songs[0].id, [ink])
+    saveSetlistAnnotations(
+      setlist.id,
+      { songId: rig.songs[0].id, songUuid: rig.songs[0].uuid },
+      [ink],
+      setlist.songs.map(entry => ({ songId: entry.songId, songUuid: entry.songUuid }))
+    )
     await rig.page.renderSetlist(setlist.id)
     await rig.flush()
     send(0, 0, 'ink1')
@@ -277,7 +277,7 @@ describe('the setlist page: annotations', () => {
     expect(rig.root.querySelector('annotation-editor')).to.equal(null)
     expect(shown()).to.deep.equal([])
 
-    // (a spot in a section the chart does not have is a annotation on the song, said of the line)
+    // (a spot in a section the chart does not have is an annotation on the song, said of the line)
     send(0, 9)
     await inEditor(root => {
       expect(root.querySelector('h2')?.textContent).to.contain('this line')
@@ -288,7 +288,7 @@ describe('the setlist page: annotations', () => {
     expect(shown()).to.deep.equal([{ text: 'somewhere', shared: false }])
   })
 
-  it('names what a annotation is on: a title, a word, a line, a section without a name', async () => {
+  it('names what an annotation is on: a title, a word, a line, a section without a name', async () => {
     await rig.open(1)
     const heading = async (where: Where, at?: Parameters<typeof ask>[1]) => {
       ask(where, at)
@@ -308,7 +308,7 @@ describe('the setlist page: annotations', () => {
 
   it('draws the annotations the preferences choose, and all of them while editing', async () => {
     await rig.open(1)
-    await make({ place: 'title' }, 'team', root => choose(root, 'The team'))
+    await make({ place: 'title' }, 'team', root => choose(root, 'Everyone'))
     await make(word, 'mine')
     expect(shown().map(annotation => annotation.text)).to.have.members(['team', 'mine'])
 
@@ -327,7 +327,7 @@ describe('the setlist page: annotations', () => {
 
   it('reads the annotations of the setlist again when it is drawn again', async () => {
     const setlist = await rig.open(1)
-    await make({ place: 'title' }, 'team', root => choose(root, 'The team'))
+    await make({ place: 'title' }, 'team', root => choose(root, 'Everyone'))
     await rig.page.renderSetlist(setlist.id)
     await rig.flush()
     expect(shown()).to.deep.equal([{ text: 'team', shared: true }])

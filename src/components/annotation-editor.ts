@@ -13,22 +13,22 @@ export interface AnnotationEditorRequest {
   about: string
   text: string
   kind: AnnotationKind
-  /** The user can share a annotation with the team (else "The team" is off, with the reason) */
+  /** The user can share an annotation with everyone (else "Everyone" is off, with the reason) */
   canShare: boolean
-  /** A annotation that is not made yet: there is nothing to delete */
+  /** An annotation that is not made yet: there is nothing to delete */
   isNew: boolean
 }
 
-/** What was chosen: kept as this (a annotation with no text is deleted), or deleted; null if closed without either */
+/** What was chosen: kept as this (an annotation with no text is deleted), or deleted; null if closed without either */
 export type AnnotationEditorResult =
   | { action: 'save'; text: string; kind: AnnotationKind }
   | { action: 'delete' }
   | null
 
 /**
- * The editor for a annotation (docs/ANNOTATIONS.md): its words, where it is shown (this setlist, or this song
- * wherever it is) and who sees it (just me, or the team). A popup in a modal <dialog> beside what
- * was pressed; on a narrow screen it sits at the top, clear of the on-screen keyboard.
+ * The editor for an annotation (docs/ANNOTATIONS.md): its words, and who sees it (just me, or
+ * everyone who has the setlist). A popup in a modal <dialog> beside what was pressed; on a narrow
+ * screen it sits at the top, clear of the on-screen keyboard.
  *
  *   const result = await editor.edit({ anchorElement, about: '“grace”', … })
  */
@@ -36,14 +36,12 @@ export class AnnotationEditor extends LitElement {
   static override properties = {
     _request: { state: true },
     _text: { state: true },
-    _scope: { state: true },
-    _reach: { state: true },
+    _kind: { state: true },
   }
 
   declare _request: AnnotationEditorRequest | null
   declare _text: string
-  declare _scope: AnnotationKind['scope']
-  declare _reach: AnnotationKind['reach']
+  declare _kind: AnnotationKind
 
   #popup = new DialogPopup(this, { position: dialog => this.#place(dialog) })
   #settle: ((result: AnnotationEditorResult) => void) | null = null
@@ -163,8 +161,7 @@ export class AnnotationEditor extends LitElement {
     super()
     this._request = null
     this._text = ''
-    this._scope = 'setlist'
-    this._reach = 'private'
+    this._kind = 'private'
   }
 
   /** Open it; resolves when it is closed */
@@ -172,8 +169,7 @@ export class AnnotationEditor extends LitElement {
     this.#settle?.(null)
     this._request = request
     this._text = request.text
-    this._scope = request.kind.scope
-    this._reach = request.kind.reach
+    this._kind = request.kind
     this.#answer = null
     return new Promise(resolve => {
       this.#settle = resolve
@@ -219,32 +215,17 @@ export class AnnotationEditor extends LitElement {
     this.#finish({
       action: 'save',
       text: this._text.trim(),
-      kind: { scope: this._scope, reach: this._reach },
+      kind: this._kind,
     })
-  }
-
-  /** Shared annotations are for this setlist: the team's copy is the setlist's */
-  #canChoose(reach: AnnotationKind['reach']): boolean {
-    return reach === 'private' || (Boolean(this._request?.canShare) && this._scope === 'setlist')
-  }
-
-  #choose(field: '_scope' | '_reach', value: string) {
-    if (field === '_scope') {
-      this._scope = value as AnnotationKind['scope']
-      // (what is only for the setlist's own cannot be kept for the song)
-      if (this._scope === 'song') this._reach = 'private'
-    } else {
-      this._reach = value as AnnotationKind['reach']
-    }
   }
 
   override render() {
     const request = this._request
     if (!request) return html``
-    const sharingWhy = !request.canShare
-      ? 'Only people who can edit the setlist can share a annotation.'
-      : this._scope === 'song'
-        ? 'A annotation kept for the song is only yours; annotations shared with the team belong to a setlist.'
+    const hint = !request.canShare
+      ? 'Only people who can edit the setlist can share an annotation with everyone.'
+      : this._kind === 'shared'
+        ? 'Everyone who has this setlist sees it.'
         : ''
     return html`
       <dialog
@@ -269,19 +250,12 @@ export class AnnotationEditor extends LitElement {
           }}
         ></textarea>
         <fieldset>
-          <legend>Shown in</legend>
-          <div class="choices">
-            ${this.#radio('scope', '_scope', 'setlist', 'This setlist', this._scope)}
-            ${this.#radio('scope', '_scope', 'song', 'Always, this song', this._scope)}
-          </div>
-        </fieldset>
-        <fieldset>
           <legend>Seen by</legend>
           <div class="choices">
-            ${this.#radio('reach', '_reach', 'private', 'Just me', this._reach)}
-            ${this.#radio('reach', '_reach', 'shared', 'The team', this._reach, !this.#canChoose('shared'))}
+            ${this.#radio('private', 'Just me')}
+            ${this.#radio('shared', 'Everyone', !request.canShare)}
           </div>
-          ${sharingWhy ? html`<p class="hint">${sharingWhy}</p>` : ''}
+          ${hint ? html`<p class="hint">${hint}</p>` : ''}
         </fieldset>
         <div class="actions">
           ${
@@ -298,22 +272,17 @@ export class AnnotationEditor extends LitElement {
     `
   }
 
-  #radio(
-    name: string,
-    field: '_scope' | '_reach',
-    value: string,
-    label: string,
-    current: string,
-    disabled = false
-  ) {
+  #radio(kind: AnnotationKind, label: string, disabled = false) {
     return html`<label>
       <input
         type="radio"
-        name=${name}
-        .value=${value}
-        .checked=${current === value}
+        name="seen-by"
+        .value=${kind}
+        .checked=${this._kind === kind}
         ?disabled=${disabled}
-        @change=${() => this.#choose(field, value)}
+        @change=${() => {
+          this._kind = kind
+        }}
       />
       ${label}
     </label>`

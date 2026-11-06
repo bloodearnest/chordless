@@ -1,27 +1,22 @@
-# NOTES
+# ANNOTATIONS
 
-Typed annotations on a chart: dynamics, stops, "repeat 4 times", "drop out here". Status: designed
-2026-11-01, built in steps (see the end).
+Typed annotations on a chart: dynamics, stops, "repeat 4 times", "drop out here". ("Note" is
+confusing in a musical context, so these are annotations.) Status: built in #97, reworked since.
 
 ## What an annotation is
 
-An annotation has a body, an anchor (where on the song it sits), and two independent choices.
+An annotation belongs to **one song in one setlist**: it is for a specific arrangement on a given
+day, so it is never kept for the song as a whole or shown in another setlist. It has a body, an
+anchor (where on the song it sits), and one choice: who sees it.
 
-- **Reach**: *Just me* (the default) or *Share with team*. Shared annotations travel with the setlist.
-  Anyone who can write the setlist can share one (`atLeast(role, 'writer') && !readOnly`); a reader,
-  or someone looking at a received share, can only keep private annotations. Private annotations are never
-  blocked by a role: a last-minute annotation must work for everyone.
-- **Scope**: *This setlist* (the default) or *Always* (this song, in every setlist that has it).
-  Shared + Always (a permanent annotation every team member sees on the song) needs a new synced
-  collection and is not built yet; the editor disables "Share with team" for "Always".
+- **Just me** (the default): kept on this device, in the setlist's local state.
+- **Everyone**: kept in the setlist's entry for the song (`SetlistEntry.annotations`), so it syncs, is
+  hashed and is exported with the setlist, and everyone who has the setlist sees it.
 
-| scope \ reach | Just me | Share with team |
-|---|---|---|
-| This setlist | `annotations` in the setlist's localStorage state (device; an optional field of version 2, so an older build keeps it) | `SetlistEntry.annotations` (synced with the setlist) |
-| Always | IndexedDB `song_notes`, keyed by `songId` (device) | not built (needs a synced collection) |
-
-The display merges every source for a song, by annotation id. `SetlistEntry.notes` (a string that already
-existed) is the song-level line, shown with the song's header.
+Anyone who can write the setlist can share one (`atLeast(role, 'writer') && !readOnly`); a reader, or
+someone looking at a received share, can only keep their own. Private annotations are never blocked
+by a role: a last-minute annotation must work for everyone. The display merges both, by id.
+(`SetlistEntry.notes`, a string that already existed, is the older note of a song in a setlist.)
 
 ## Anchors
 
@@ -54,17 +49,17 @@ Annotations are laid out with the chords, not on top of them.
 - Hidden and collapsed sections hide their annotations. Annotations are shown in lyrics-only and chords-only modes.
 
 Typed annotations use a bundled handwriting font. Private annotations are in a pencil colour, shared ones in a
-warm ink with a small people glyph.
+warm ink with a bullet.
 
 ## Making annotations
 
 Annotations are made and edited in **edit mode** only, with no separate mode. Long-press (about half a
 second; mouse: long-press or right-click; keyboard: Enter or the context-menu key on a focused
-target) on a section title, a word or a chord opens the annotation editor: text, a scope control, a
-reach control, delete. Moving an annotation between kinds keeps its id. Outside edit mode annotations are shown,
+target) on a section title, a word or a chord opens the annotation editor: text, who sees it
+(Just me or Everyone), delete. Changing who sees it keeps the annotation's id. Outside edit mode annotations are shown,
 not edited. Deleting shows a toast with Undo. An annotation for the whole song is made with "+ Annotation on the
 whole song", shown with the annotations whose place is gone, above the sections. Preferences can hide the
-team's annotations or the user's own (shown in edit mode whatever they say).
+the annotations shared with everyone, or the user's own (shown in edit mode whatever they say).
 
 Where in a line a press lands is worked out from the lyrics as they are drawn, which with chords
 hidden are tidied (hyphens, spaces); `snapOffset` moves it to the nearest start of a word or
@@ -79,7 +74,7 @@ record a melody line, an underline, a circle, an arrow.
 to serialise and re-render arbitrary vectors or bitmaps across devices and screen sizes. The types
 and the stores enforce it: an `ink` body is accepted only by the private stores, and
 `SetlistEntry.annotations`, share bundles and the export zip cannot carry one. Ink is not built
-yet; it will reuse the same anchors and scope choice, live in IndexedDB (strokes are larger than
+yet; it will reuse the same anchors, live in IndexedDB (strokes are larger than
 localStorage should hold), and be drawn in a box sized in `em` relative to the anchor line, so it
 scales with the font on that musician's own devices.
 
@@ -101,8 +96,7 @@ scales with the font on that musician's own devices.
 
 `SetlistEntry.notes`, the older plain-text note of a song in a setlist, is kept and synced but not
 drawn or edited. A line of bars only (drawn as aligned measures) cannot be pressed for an annotation; an annotation
-attached to one is drawn on the line as chords. Ink; annotations beside the chords in the same band to save height; shared + Always annotations; exporting
-private annotations.
+attached to one is drawn on the line as chords. Ink; exporting private annotations.
 
 ## Order of work
 

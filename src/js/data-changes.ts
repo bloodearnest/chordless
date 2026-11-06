@@ -7,8 +7,7 @@
  */
 
 /** The kinds of stored record a change is about */
-/** (`annotation`: a song's private annotations, which stay on this device: ids are song ids) */
-export type DataKind = 'setlist' | 'song' | 'chart' | 'person' | 'annotation'
+export type DataKind = 'setlist' | 'song' | 'chart' | 'person'
 
 /** Where a change came from: made here by the user (so it may need sending), or by a sync (it came from storage) */
 export type DataOrigin = 'local' | 'sync'

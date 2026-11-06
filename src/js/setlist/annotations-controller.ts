@@ -1,7 +1,7 @@
 /**
- * The annotations on a setlist's songs (docs/ANNOTATIONS.md): loads the three places a song's annotations are kept,
+ * The annotations on a setlist's songs (docs/ANNOTATIONS.md): loads the two places a song's annotations are kept,
  * gives each song's display the ones to draw, and, in edit mode, opens the editor when a spot is
- * long-pressed or a annotation tapped and keeps what comes of it. Which annotation goes where is annotations/store.ts.
+ * long-pressed or an annotation tapped and keeps what comes of it. Which annotation goes where is annotations/store.ts.
  */
 import '../../components/annotation-editor.ts'
 import type { AnnotationEditor } from '../../components/annotation-editor.ts'
@@ -18,7 +18,6 @@ import {
   removeAnnotation,
 } from '../annotations/store.ts'
 import type { ChartAnnotation, Setlist, SharedChartAnnotation } from '../data-types.ts'
-import type { ChordlessDB } from '../db.ts'
 import { AnnotationsPreferenceEvent, getAnnotationsPreference } from '../preferences.ts'
 import { toast } from '../toast.ts'
 import { errorMessage } from '../utils/errors.ts'
@@ -32,10 +31,9 @@ export interface AnnotationsHost {
   readonly songs: RuntimeSong[]
   readonly currentSetlist: Setlist | undefined
   readonly currentSetlistId: string | null
-  _database(): ChordlessDB
   /** Keep these as the annotations everyone with the setlist sees on the song at `index` */
   setAnnotations(index: number, annotations: SharedChartAnnotation[]): Promise<void>
-  /** Whether the user can share a annotation with the team on this setlist */
+  /** Whether the user can share an annotation with everyone on this setlist */
   canShare(): Promise<boolean>
 }
 
@@ -58,15 +56,13 @@ export class AnnotationsController {
     return this.#host.songs.map((_, index) => this.#refOf(index))
   }
 
-  /** Read every song's annotations: those in the setlist, those on this device for it, and those for the song */
+  /** Read every song's annotations: those in the setlist (everyone's), and those on this device for it (the user's own) */
   async load(): Promise<void> {
     const { currentSetlist: setlist, currentSetlistId: id } = this.#host
-    const db = this.#host._database()
     this.#sources = await Promise.all(
       this.#host.songs.map(async (_, index) => ({
         shared: setlist?.songs[index]?.annotations ?? [],
-        setlistPrivate: loadSetlistAnnotations(id, this.#refOf(index)),
-        songPrivate: await db.getSongAnnotations(this.#refOf(index).songId),
+        private: loadSetlistAnnotations(id, this.#refOf(index)),
       }))
     )
   }
@@ -192,24 +188,13 @@ export class AnnotationsController {
     this.#sources[index] = next
     this.#refresh(index)
     try {
-      const { songId } = this.#refOf(index)
-      if (changed.includes('setlistPrivate')) {
+      if (changed.includes('private')) {
         saveSetlistAnnotations(
           this.#host.currentSetlistId,
           this.#refOf(index),
-          next.setlistPrivate,
+          next.private,
           this.#songRefs()
         )
-      }
-      if (changed.includes('songPrivate')) {
-        await this.#host._database().saveSongAnnotations(songId, next.songPrivate)
-        // (the same song again in the setlist has the same annotations)
-        this.#host.songs.forEach((other, at) => {
-          if (at !== index && other.songId === songId && this.#sources[at]) {
-            ;(this.#sources[at] as AnnotationSources).songPrivate = next.songPrivate
-            this.#refresh(at)
-          }
-        })
       }
       if (changed.includes('shared')) await this.#host.setAnnotations(index, next.shared)
     } catch (error) {

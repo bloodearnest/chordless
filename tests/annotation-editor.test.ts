@@ -11,7 +11,7 @@ const request = (set: Partial<AnnotationEditorRequest> = {}): AnnotationEditorRe
   anchorElement: document.body,
   about: '“grace”',
   text: '',
-  kind: { scope: 'setlist', reach: 'private' },
+  kind: 'private',
   canShare: true,
   isNew: true,
   ...set,
@@ -46,7 +46,6 @@ describe('annotation-editor', () => {
     const { answer, dialog, text, radio, button } = await open()
     expect(dialog.open).to.equal(true)
     expect(dialog.getAttribute('aria-label')).to.equal('Annotation')
-    expect(radio('This setlist').checked).to.equal(true)
     expect(radio('Just me').checked).to.equal(true)
     expect(button('Delete')).to.equal(undefined)
     type(text, '  softly ')
@@ -54,7 +53,7 @@ describe('annotation-editor', () => {
     expect(await answer).to.deep.equal({
       action: 'save',
       text: 'softly',
-      kind: { scope: 'setlist', reach: 'private' },
+      kind: 'private',
     })
     expect(dialog.open).to.equal(false)
   })
@@ -72,36 +71,47 @@ describe('annotation-editor', () => {
     const { answer, text, radio, button } = await open({
       isNew: false,
       text: 'repeat 4×',
-      kind: { scope: 'setlist', reach: 'shared' },
+      kind: 'shared',
     })
     expect(text.value).to.equal('repeat 4×')
-    expect(radio('The team').checked).to.equal(true)
+    expect(radio('Everyone').checked).to.equal(true)
     button('Delete')?.click()
     expect(await answer).to.deep.equal({ action: 'delete' })
   })
 
-  it('shares only for those who can, and only a annotation for this setlist', async () => {
+  it('shares with everyone only for those who can, and says what everyone is', async () => {
     const reader = await open({ canShare: false })
-    expect(reader.radio('The team').disabled).to.equal(true)
-    expect(reader.dialog.textContent).to.contain('Only people who can edit the setlist')
+    expect(reader.radio('Everyone').disabled).to.equal(true)
+    expect(reader.dialog.textContent).to.contain(
+      'Only people who can edit the setlist can share an annotation with everyone.'
+    )
     reader.button('Cancel')?.click()
 
     const writer = await open()
-    expect(writer.radio('The team').disabled).to.equal(false)
-    writer.radio('The team').click()
+    expect(writer.radio('Everyone').disabled).to.equal(false)
+    expect(writer.dialog.querySelector('.hint')).to.equal(null)
+    writer.radio('Everyone').click()
     await writer.editor.updateComplete
-    expect(writer.radio('The team').checked).to.equal(true)
-    // For the song, it is the user's own again, and cannot be shared
-    writer.radio('Always, this song').click()
+    expect(writer.radio('Everyone').checked).to.equal(true)
+    expect(writer.radio('Just me').checked).to.equal(false)
+    expect(writer.dialog.querySelector('.hint')?.textContent).to.equal(
+      'Everyone who has this setlist sees it.'
+    )
+    writer.radio('Just me').click()
     await writer.editor.updateComplete
     expect(writer.radio('Just me').checked).to.equal(true)
-    expect(writer.radio('The team').disabled).to.equal(true)
+    expect(writer.radio('Everyone').checked).to.equal(false)
+    writer.radio('Everyone').click()
+    await writer.editor.updateComplete
     writer.button('Done')?.click()
-    expect(await writer.answer).to.deep.equal({
-      action: 'save',
-      text: '',
-      kind: { scope: 'song', reach: 'private' },
-    })
+    expect(await writer.answer).to.deep.equal({ action: 'save', text: '', kind: 'shared' })
+  })
+
+  it('has no choice of where it is shown: an annotation is for this song in this setlist', async () => {
+    const { dialog, button } = await open()
+    expect(dialog.textContent).to.not.contain('Shown in')
+    expect(dialog.textContent).to.not.contain('Always')
+    button('Cancel')?.click()
   })
 
   it('saves with Ctrl+Enter, and a second request replaces the first (which is answered null)', async () => {

@@ -404,7 +404,7 @@ export class AppPreferences extends LitElement {
               ?checked=${this.sharedAnnotations}
               @change=${this._onSharedAnnotationsToggle}
             />
-            <span>Show annotations shared with the team</span>
+            <span>Show annotations shared with everyone</span>
           </label>
           <label class="toggle" for="toggle-my-annotations">
             <input

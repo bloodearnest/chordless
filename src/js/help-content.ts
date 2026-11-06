@@ -241,7 +241,7 @@ const SONG: HelpPage = {
     {
       heading: 'Edit mode: annotations',
       intro:
-        'Write an annotation on the chart: how to play a part, where to drop out, how many times to repeat. It is set in handwriting, above the word it is on, or beside the name of a section. Annotations are shown when you are not editing too.',
+        'Write an annotation on the chart: how to play a part, where to drop out, how many times to repeat. It is set in handwriting, above the word it is on, or beside the name of a section. Annotations are shown when you are not editing too. An annotation belongs to this song in this setlist.',
       items: [
         {
           image: 'song-annotation',
@@ -253,7 +253,7 @@ const SONG: HelpPage = {
           image: 'annotation-editor',
           wide: true,
           label: 'The annotation',
-          text: 'Type the annotation. “Shown in” is for this setlist only (the usual), or for this song wherever it comes up, in every setlist. “Seen by” is just you (the usual), or the team: an annotation for the team goes with the setlist, so everyone who has it sees it. Only people who can edit the setlist can share an annotation.',
+          text: 'Type the annotation. “Seen by” is just you (the usual), or everyone: an annotation for everyone goes with the setlist, so everyone who has it sees it. Only people who can edit the setlist can share an annotation with everyone.',
         },
         {
           label: 'Change or delete an annotation',
@@ -265,7 +265,7 @@ const SONG: HelpPage = {
         },
         {
           label: 'Hide annotations',
-          text: 'Turn off the team’s annotations, or your own, in [Preferences](/preferences).',
+          text: 'Turn off the ones shared with everyone, or your own, in [Preferences](/preferences).',
         },
       ],
     },
