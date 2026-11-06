@@ -1,6 +1,6 @@
 /**
  * Where annotations sit on a chart and finding the place again (src/js/annotations/anchor.ts): by section
- * label and the lyrics around a spot, so an edited chart moves a annotation rather than losing it.
+ * label and the lyrics around a spot, so an edited chart moves an annotation rather than losing it.
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
@@ -89,7 +89,7 @@ test('text gone from a section that is still there falls back to the section', (
   assert.deepEqual(resolveAnchor(rewritten, anchor), { place: 'section', section: 1 })
 })
 
-test('a annotation whose section and text are both gone is orphaned, not dropped', () => {
+test('an annotation whose section and text are both gone is orphaned, not dropped', () => {
   assert.deepEqual(resolveAnchor([chart[0] as ChartSection], textAnchor(chart, 1, 0, 3)), {
     place: 'orphan',
   })

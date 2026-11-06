@@ -36,14 +36,13 @@ async function writeAnnotation(page: Page, words: string) {
 }
 
 test.describe('Annotations on a chart', () => {
-  test('a annotation is made by holding a word in edit mode, and is just the user’s, for this setlist', async ({
+  test('an annotation is made by holding a word in edit mode, and is just the user’s, for this setlist', async ({
     page,
   }) => {
     await openSong(page)
     await enterEditMode(page)
     await hold(page, 'grace')
     await writeAnnotation(page, 'softly')
-    await expect(editor(page).getByLabel('This setlist')).toBeChecked()
     await expect(editor(page).getByLabel('Just me')).toBeChecked()
     await editor(page).getByRole('button', { name: 'Done' }).click()
     await expect(editor(page)).toBeHidden()
@@ -74,7 +73,7 @@ test.describe('Annotations on a chart', () => {
     await expect(editor(page)).toBeHidden()
   })
 
-  test('a annotation kept for the song is in every setlist that has it; one for the team is in the setlist', async ({
+  test('an annotation for everyone is in the setlist, and one just for the user is not', async ({
     page,
   }) => {
     await openSong(page)
@@ -82,26 +81,26 @@ test.describe('Annotations on a chart', () => {
 
     await hold(page, 'Amazing')
     await writeAnnotation(page, 'every time')
-    await editor(page).getByText('Always, this song').click()
-    // (what is only for this setlist cannot be for the team)
-    await expect(editor(page).getByLabel('The team')).toBeDisabled()
     await editor(page).getByRole('button', { name: 'Done' }).click()
-    expect(await fromDB(page, 'getSongAnnotations', 'title-info-test-song')).toHaveLength(1)
+    let setlist = await fromDB(page, 'getSetlist', SETLIST)
+    expect(setlist.songs[0].annotations).toBe(undefined)
 
     await hold(page, 'grace')
     await writeAnnotation(page, 'band drops')
-    await editor(page).getByText('The team').click()
+    await editor(page).getByText('Everyone', { exact: true }).click()
     await editor(page).getByRole('button', { name: 'Done' }).click()
-    const setlist = await fromDB(page, 'getSetlist', SETLIST)
+    setlist = await fromDB(page, 'getSetlist', SETLIST)
     expect(setlist.songs[0].annotations).toHaveLength(1)
     expect(setlist.songs[0].annotations[0].body.text).toBe('band drops')
     await expect(shownAnnotations(page)).toHaveText(['every time', 'band drops'])
-    // (the team's is drawn as shared)
+    // (the one for everyone is drawn as shared)
     await expect(shownAnnotations(page).nth(1)).toHaveClass(/shared/)
     await expect(shownAnnotations(page).nth(0)).not.toHaveClass(/shared/)
   })
 
-  test('a annotation is changed by tapping it, and deleting it can be undone', async ({ page }) => {
+  test('an annotation is changed by tapping it, and deleting it can be undone', async ({
+    page,
+  }) => {
     await openSong(page)
     await enterEditMode(page)
     await hold(page, 'grace')

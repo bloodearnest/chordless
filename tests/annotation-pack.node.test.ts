@@ -15,7 +15,7 @@ test('annotations that fit stay where their words are, on the first row', () => 
   ])
 })
 
-test('a annotation near the right edge is pulled back inside it', () => {
+test('an annotation near the right edge is pulled back inside it', () => {
   assert.deepEqual(packAnnotations(at([350, 100]), 400, 8), [{ x: 300, row: 0, wrap: false }])
   assert.deepEqual(packAnnotations(at([-20, 50]), 400, 8), [{ x: 0, row: 0, wrap: false }])
 })
@@ -40,7 +40,7 @@ test('what does not fit in the row goes in a row above, in the order given back'
   assert.equal(placed[2]?.x, 250)
 })
 
-test('a annotation wider than the line is set in the line’s width in a row of its own', () => {
+test('an annotation wider than the line is set in the line’s width in a row of its own', () => {
   const placed = packAnnotations(at([20, 600], [30, 50]), 400, 8)
   assert.deepEqual(placed[0], { x: 0, row: 0, wrap: true })
   assert.deepEqual(placed[1], { x: 30, row: 1, wrap: false })

@@ -43,10 +43,7 @@ describe('annotations on a chart', () => {
     const sources = putAnnotation(
       noSources(),
       annotation('softly', sectionAnchor(parsed.sections, 1)),
-      {
-        scope: 'setlist',
-        reach: 'shared',
-      }
+      'shared'
     )
     const { sections } = await show(annotationsBySection(parsed.sections, sources))
     const title = sections[1].shadowRoot?.querySelector('.section-title')
@@ -64,10 +61,7 @@ describe('annotations on a chart', () => {
     const sources = putAnnotation(
       noSources(),
       annotation('intro', sectionAnchor(plain.sections, 0)),
-      {
-        scope: 'setlist',
-        reach: 'private',
-      }
+      'private'
     )
     const display = await fixture<SongDisplay>(html`<song-display></song-display>`)
     display.parsed = plain
@@ -84,10 +78,7 @@ describe('annotations on a chart', () => {
     const sources = putAnnotation(
       noSources(),
       annotation('build', textAnchor(parsed.sections, 0, 0, 8)),
-      {
-        scope: 'setlist',
-        reach: 'private',
-      }
+      'private'
     )
     const { sections } = await show(annotationsBySection(parsed.sections, sources))
     const root = sections[0].shadowRoot as ShadowRoot
@@ -113,10 +104,7 @@ describe('annotations on a chart', () => {
     const sources = putAnnotation(
       noSources(),
       annotation('here', textAnchor(parsed.sections, 0, 0, 14)),
-      {
-        scope: 'setlist',
-        reach: 'private',
-      }
+      'private'
     )
     const { sections } = await show(annotationsBySection(parsed.sections, sources))
     const root = sections[0].shadowRoot as ShadowRoot
@@ -131,10 +119,7 @@ describe('annotations on a chart', () => {
     const sources = putAnnotation(
       noSources(),
       annotation('build', textAnchor(parsed.sections, 0, 0, 8)),
-      {
-        scope: 'setlist',
-        reach: 'private',
-      }
+      'private'
     )
     const { sections } = await show(annotationsBySection(parsed.sections, sources), 'chords')
     const shownAnnotation = sections[0].shadowRoot?.querySelector(
@@ -145,25 +130,19 @@ describe('annotations on a chart', () => {
   })
 
   it('for the whole song, or whose place is gone, show above the sections, the latter marked', async () => {
-    let sources = putAnnotation(noSources(), annotation('slowly', { kind: 'song' }), {
-      scope: 'song',
-      reach: 'private',
-    })
+    let sources = putAnnotation(noSources(), annotation('slowly', { kind: 'song' }), 'private')
     sources = putAnnotation(
       sources,
       annotation('lost', { kind: 'section', label: 'Bridge', nth: 0 }),
-      {
-        scope: 'setlist',
-        reach: 'private',
-      }
+      'private'
     )
     const { display } = await show(annotationsBySection(parsed.sections, sources))
     const strip = Array.from(
       display.shadowRoot?.querySelectorAll('.song-annotations .annotation') ?? []
     )
     expect(strip.map(each => [text(each), each.classList.contains('orphan')])).to.deep.equal([
-      ['lost', true],
       ['slowly', false],
+      ['lost', true],
     ])
   })
 
@@ -178,7 +157,7 @@ describe('annotations on a chart', () => {
           ...annotation(words, textAnchor(parsed.sections, 0, 0, offset)),
           body: { kind: 'text', text: words },
         } as ChartAnnotation
-        sources = putAnnotation(sources, made, { scope: 'setlist', reach: 'private' })
+        sources = putAnnotation(sources, made, 'private')
       }
       const wrapper = await fixture<HTMLElement>(
         html`<div style="width: 300px; --font-lyrics: 21px; --font-chords: 19px; --font-annotation: 18px"></div>`
@@ -198,7 +177,7 @@ describe('annotations on a chart', () => {
       }
     }
 
-    it('keeps a annotation near the right edge inside the line', async () => {
+    it('keeps an annotation near the right edge inside the line', async () => {
       const { line, annotations } = await narrow([14, 'a long way to the right edge'])
       const edge = line.getBoundingClientRect().right
       expect(annotations[0].getBoundingClientRect().right).to.be.at.most(edge + 1)
@@ -314,19 +293,17 @@ describe('annotations on a chart', () => {
       expect(requests.map(each => each.place)).to.deep.equal(['title'])
     })
 
-    it('asks for the editor on a annotation that is tapped, with its id, and does not collapse the section', async () => {
+    it('asks for the editor on an annotation that is tapped, with its id, and does not collapse the section', async () => {
       let sources = putAnnotation(
         noSources(),
         annotation('spot', textAnchor(labelled.sections, 0, 0, 8)),
-        {
-          scope: 'setlist',
-          reach: 'private',
-        }
+        'private'
       )
-      sources = putAnnotation(sources, annotation('head', sectionAnchor(labelled.sections, 0)), {
-        scope: 'setlist',
-        reach: 'private',
-      })
+      sources = putAnnotation(
+        sources,
+        annotation('head', sectionAnchor(labelled.sections, 0)),
+        'private'
+      )
       const { root, section, requests } = await editing(sources)
       let toggled = 0
       section.addEventListener('song-section:toggle', () => toggled++)
@@ -345,10 +322,7 @@ describe('annotations on a chart', () => {
       const sources = putAnnotation(
         noSources(),
         annotation('spot', textAnchor(labelled.sections, 0, 0, 8)),
-        {
-          scope: 'setlist',
-          reach: 'private',
-        }
+        'private'
       )
       const { section, root, requests } = await editing(sources)
       section.editMode = false
@@ -360,19 +334,16 @@ describe('annotations on a chart', () => {
       expect(root.querySelector('.chord-segment')?.hasAttribute('tabindex')).to.equal(false)
     })
 
-    it('has a place in the song’s strip for a annotation on the whole song, and one to start it', async () => {
+    it('has a place in the song’s strip for an annotation on the whole song, and one to start it', async () => {
       document.body.classList.add('edit-mode')
       try {
-        const sources = putAnnotation(noSources(), annotation('whole', { kind: 'song' }), {
-          scope: 'song',
-          reach: 'private',
-        })
+        const sources = putAnnotation(noSources(), annotation('whole', { kind: 'song' }), 'private')
         const { display, requests } = await editing(sources)
         await display.updateComplete
         const strip = display.shadowRoot as ShadowRoot
         ;(strip.querySelector('.song-annotations .annotation') as HTMLElement).click()
         ;(strip.querySelector('.add-song-annotation') as HTMLElement).click()
-        // (what is in the strip but is not a annotation does nothing)
+        // (what is in the strip but is not an annotation does nothing)
         ;(strip.querySelector('.song-annotations') as HTMLElement).click()
         expect(requests.map(each => [each.place, each.annotationId, each.songIndex])).to.deep.equal(
           [
@@ -386,10 +357,7 @@ describe('annotations on a chart', () => {
     })
 
     it('leaves a song’s strip alone when not editing: taps do nothing, and with no annotations there is none', async () => {
-      const sources = putAnnotation(noSources(), annotation('whole', { kind: 'song' }), {
-        scope: 'song',
-        reach: 'private',
-      })
+      const sources = putAnnotation(noSources(), annotation('whole', { kind: 'song' }), 'private')
       const { display, requests } = await editing(sources)
       ;(
         (display.shadowRoot as ShadowRoot).querySelector(

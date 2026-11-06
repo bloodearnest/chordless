@@ -1,8 +1,8 @@
 /**
- * Where a annotation sits on a chart, and finding that place again (docs/ANNOTATIONS.md). An anchor names a
+ * Where an annotation sits on a chart, and finding that place again (docs/ANNOTATIONS.md). An anchor names a
  * section by label and a spot by the lyrics around it, so it holds across transposing, hidden
  * chords and screen sizes; if the chart changed under it, the text around it is searched for, and
- * a annotation that cannot be placed is orphaned, never dropped.
+ * an annotation that cannot be placed is orphaned, never dropped.
  */
 import type { AnnotationAnchor, ChartAnnotation, ChartSection } from '../data-types.ts'
 
@@ -61,7 +61,7 @@ export function textAnchor(
 }
 
 /**
- * The nearest place in a line a annotation can sensibly start, to an approximate offset: the start of a
+ * The nearest place in a line an annotation can sensibly start, to an approximate offset: the start of a
  * word, or of a segment (where a chord is). Offsets worked out from lyrics as drawn (with the
  * chords hidden, hyphens and spaces are folded) can be a few characters off the chart's own.
  */
@@ -83,7 +83,7 @@ export function snapOffset(section: ChartSection, line: number, approx: number):
   return Math.min(best, text.length)
 }
 
-/** Where a annotation has been placed on the chart as it is now */
+/** Where an annotation has been placed on the chart as it is now */
 export type Placement =
   | { place: 'song' }
   | { place: 'section'; section: number }

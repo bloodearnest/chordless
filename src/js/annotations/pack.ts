@@ -1,11 +1,11 @@
 /**
  * Where annotations go along a line so they do not run off its edge or into each other (docs/ANNOTATIONS.md).
- * Pure: the boxes are measured by the caller, which then moves the annotations. A annotation sits where its
+ * Pure: the boxes are measured by the caller, which then moves the annotations. An annotation sits where its
  * word is if it can; else it is pushed along, then back from the edge; if the row has no room for
  * all of them, the rest go in a row above.
  */
 
-/** A annotation as measured: where it would start, along the line, and how wide it is (pixels) */
+/** An annotation as measured: where it would start, along the line, and how wide it is (pixels) */
 export interface AnnotationBox {
   x: number
   w: number
