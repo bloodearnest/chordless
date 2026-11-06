@@ -363,6 +363,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
               id: c.attrs.id ?? '',
               start: t,
               duration: dur,
+              tupletRatio,
               wholeMeasure: whole,
               cue: g.scale < 0.65,
             })
@@ -422,6 +423,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
                 midi: midiOf(step, alter, octave),
                 start: first ? t : t,
                 duration: d,
+                tupletRatio,
                 tieStart: false,
                 tieStop: false,
                 cue: hg.scale < 0.65,

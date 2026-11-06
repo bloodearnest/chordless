@@ -45,8 +45,19 @@ function harmony(text: string): string {
   return `<harmony>${root}<kind text="${esc(m[3] ?? '')}">${kind}</kind>${bass}</harmony>`
 }
 
+/** `<time-modification>` for a tuplet: 2/3 is three in the time of two */
+function timeModification(ratio: number): string {
+  if (ratio === 1) return ''
+  for (let normal = 1; normal <= 16; normal++) {
+    const actual = normal / ratio
+    if (Math.abs(actual - Math.round(actual)) < 1e-6)
+      return `<time-modification><actual-notes>${Math.round(actual)}</actual-notes><normal-notes>${normal}</normal-notes></time-modification>`
+  }
+  return ''
+}
+
 function noteXml(n: MelodyNote, voice: number, prev: MelodyNote | undefined): string {
-  const { type, dots } = typeOf(n.duration)
+  const { type, dots } = typeOf(n.duration / n.tupletRatio)
   const lyrics = n.syllables
     .map((raw, i) => {
       if (!raw || /^\d+\.$/.test(raw)) return ''
@@ -62,18 +73,18 @@ function noteXml(n: MelodyNote, voice: number, prev: MelodyNote | undefined): st
     `<pitch><step>${n.step}</step>${n.alter ? `<alter>${n.alter}</alter>` : ''}<octave>${n.octave}</octave></pitch>` +
     `<duration>${Math.round(n.duration * DIVISIONS)}</duration>` +
     `${n.tieStop ? '<tie type="stop"/>' : ''}${n.tieStart ? '<tie type="start"/>' : ''}` +
-    `<voice>${voice}</voice><type>${type}</type>${'<dot/>'.repeat(dots)}` +
+    `<voice>${voice}</voice><type>${type}</type>${'<dot/>'.repeat(dots)}${timeModification(n.tupletRatio)}` +
     `${n.tieStop || n.tieStart ? `<notations>${n.tieStop ? '<tied type="stop"/>' : ''}${n.tieStart ? '<tied type="start"/>' : ''}</notations>` : ''}` +
     `${n.cue ? '' : lyrics}</note>`
   )
 }
 
 function restXml(e: Extract<MelodyEvent, { kind: 'rest' }>, voice: number): string {
-  const { type, dots } = typeOf(e.duration)
+  const { type, dots } = typeOf(e.duration / e.tupletRatio)
   return (
     `<note>${e.cue ? '<cue/>' : ''}<rest${e.wholeMeasure ? ' measure="yes"' : ''}/>` +
     `<duration>${Math.round(e.duration * DIVISIONS)}</duration><voice>${voice}</voice>` +
-    `${e.wholeMeasure ? '' : `<type>${type}</type>${'<dot/>'.repeat(dots)}`}</note>`
+    `${e.wholeMeasure ? '' : `<type>${type}</type>${'<dot/>'.repeat(dots)}${timeModification(e.tupletRatio)}`}</note>`
   )
 }
 
