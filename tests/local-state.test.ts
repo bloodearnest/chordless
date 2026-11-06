@@ -145,6 +145,18 @@ describe('what a setlist keeps on this device', () => {
       }
     })
 
+    it('are read from the field they had before they were called annotations, and moved when saved', () => {
+      localStorage.setItem(
+        'state-s1',
+        JSON.stringify({ v: 2, sections: {}, capos: {}, notes: { ub: [annotation] } })
+      )
+      expect(loadSetlistAnnotations('s1', songs[1])).to.deep.equal([annotation])
+      saveSetlistAnnotations('s1', songs[0], [annotation], songs)
+      const stored = JSON.parse(localStorage.getItem('state-s1') as string)
+      expect('notes' in stored).to.equal(false)
+      expect(Object.keys(stored.annotations).sort()).to.deep.equal(['ua', 'ub'])
+    })
+
     it('are forgotten for a song when none are left', () => {
       saveSetlistAnnotations('s1', songs[0], [annotation], songs)
       saveSetlistAnnotations('s1', songs[0], [], songs)
