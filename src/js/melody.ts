@@ -17,8 +17,10 @@ export interface MelodyNote {
   midi: number
   /** Quarter notes from the start of the measure */
   start: number
-  /** Written length in quarter notes, dots and tuplets included */
+  /** Length in quarter notes as it sounds: dots and tuplets included */
   duration: number
+  /** A tuplet's ratio (normal over actual: 2/3 for a triplet), 1 when the note is not in one */
+  tupletRatio: number
   /** Ties to the note after it / from the note before it */
   tieStart: boolean
   tieStop: boolean
@@ -35,6 +37,7 @@ export interface MelodyRest {
   id: string
   start: number
   duration: number
+  tupletRatio: number
   /** A rest that fills the whole measure */
   wholeMeasure: boolean
   cue: boolean
