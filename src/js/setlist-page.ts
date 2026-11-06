@@ -599,6 +599,8 @@ export class SetlistPage {
       this.sections.applyAll()
       this.annotations.refreshAll()
 
+      // Keep where the annotations shared with everyone are, if the chart has changed under them
+      await this.annotations.healShared()
       // Stamp the setlist as modified (each edit saved itself as it was made)
       await this.editSetlist(() => undefined)
     }
@@ -1056,6 +1058,7 @@ export class SetlistPage {
         } else {
           // (each edit saved itself as it was made: this stamps the setlist as modified)
           leaveEditMode(this.root, appHeader, async () => {
+            await this.annotations.healShared()
             await this.editSetlist(() => undefined)
           })
           // Refresh song sections immediately so their controls begin fading out in sync

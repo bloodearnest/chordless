@@ -112,6 +112,15 @@ describe('describing what a setlist changed', () => {
       )
     })
 
+    it('treats a song with no note text as one with none, and says when the older note text arrives', () => {
+      const bare = { ...song('a'), notes: undefined } as unknown as SetlistEntry
+      assert.deepEqual(describe_(setlist([bare]), setlist([{ ...song('a'), notes: '' }])), [])
+      assert.deepEqual(describe_(setlist([{ ...song('a'), notes: '' }]), setlist([bare])), [])
+      assert.deepEqual(describe_(setlist([bare]), setlist([{ ...song('a'), notes: 'x' }])), [
+        'A: notes changed',
+      ])
+    })
+
     it('treats a song with no annotations as one with none', () => {
       const bare = { ...song('a'), annotations: undefined } as unknown as SetlistEntry
       assert.deepEqual(describe_(setlist([bare]), setlist([{ ...song('a'), annotations: [] }])), [])

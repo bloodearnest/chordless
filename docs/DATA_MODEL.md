@@ -50,7 +50,8 @@ The `chordpro` object store mirrors chord text:
 
 ### Song Versioning
 
-Songs are immutable - any edit creates a new variant with a new UUID. This provides:
+A chart can be fixed in place (`overwriteSong`, `docs/CHART_EDITOR.md`: a typo, a wrong chord), and the
+fix reaches other devices by sync. An arrangement is a new variant with a new UUID. Variants provide:
 
 - Each variant links back to the song it was copied from via `variant_of`
 - Multiple variants of the same song (same deterministic id) can exist within a space
@@ -86,7 +87,9 @@ Each song in the setlist has metadata specific to this setlist:
 - songUuid: the specific variant uuid chosen for this setlist
 - key: transposition/key override for this setlist (optional)
 - tempo: tempo override for this setlist (optional)
-- notes: performance notes for this song in this setlist
+- notes: performance notes for this song in this setlist (older, plain text)
+- annotations: the annotations on its chart shared with everyone who has the setlist (optional;
+  `docs/ANNOTATIONS.md`). The user's own are kept on the device, not here
 
 Setlists also store sync metadata: `fileRef`, `fileModified`, `lastSyncedAt`,
 `_lastSyncHash`. These fields are updated whenever a setlist is uploaded/downloaded from Drive.

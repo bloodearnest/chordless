@@ -171,14 +171,25 @@ export interface ChordProRecord {
 // ==================== Annotations on a chart (docs/ANNOTATIONS.md) ====================
 
 /**
- * Where on a song an annotation sits: its structure, never a pixel, and never a chord or a variant's uuid,
- * so it survives transposing, hidden chords, other screen sizes and an edited chart
+ * Where on a song an annotation sits: its structure, never a pixel and never a chord, so it survives
+ * transposing, hidden chords, other screen sizes, and (found again by the text around it, see
+ * annotations/anchor.ts) a chart that is edited
  */
 export type AnnotationAnchor =
   | { kind: 'song' }
-  /** A section's title: `nth` counts the sections with the same label, from 0 */
-  | { kind: 'section'; label: string | null; nth: number }
-  /** A spot in a lyric line: `offset` characters into the line's lyrics (chords left out), and the text either side */
+  /**
+   * A section's title: `nth` counts the sections with the same label, from 0. `sectionHead` is the
+   * section's first line of lyrics, to find it again if it is renamed or moved
+   */
+  | { kind: 'section'; label: string | null; nth: number; sectionHead?: string }
+  /**
+   * A spot in a lyric line: `offset` characters into the line's lyrics (chords left out), and the text
+   * either side. So that the place can be found again after the chart is edited (it is fixed in place
+   * and the fix arrives by sync, on devices that never saw the old text), it also keeps a snapshot:
+   * the whole line (`lineText`), the lines just above and below it, which of several identical lines
+   * it is (`occ`, from 0) and the section's first line. All of those are cut short, and optional
+   * (an anchor made before they were kept has none, and gets them when it is found)
+   */
   | {
       kind: 'text'
       label: string | null
@@ -187,6 +198,11 @@ export type AnnotationAnchor =
       offset: number
       before: string
       after: string
+      lineText?: string
+      prevLine?: string
+      nextLine?: string
+      occ?: number
+      sectionHead?: string
     }
 
 /** Typed text, or (not built yet) a drawing, which is private to one musician and never synced or shared */

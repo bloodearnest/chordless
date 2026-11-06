@@ -24,15 +24,43 @@ An annotation is attached to the song's *structure*, never to a pixel, so it lan
 any width, zoom or device.
 
 - `song`: the whole song.
-- `section`: a section title, by label and which occurrence of that label (`nth`).
+- `section`: a section title, by label and which occurrence of that label (`nth`), and the section's
+  first line of lyrics (`sectionHead`).
 - `text`: a spot in a lyric line: section, line index, character offset into the line's lyrics
-  (chords stripped), and about 12 characters of text either side.
+  (chords stripped), about 12 characters of text either side, and a **snapshot** of the line: the whole
+  line (`lineText`), the lines just above and below it (`prevLine`, `nextLine`), which of several
+  identical lines it is (`occ`), and the section's first line. All are cut short and optional.
 
-Anchors do not use chords, so transposing, Nashville numbers, a capo or hidden chords cannot move a
-annotation. Songs are immutable (an edit is a new variant), so anchors do not use the variant's uuid
-either. Re-finding an annotation on a changed chart: exact section and line, with the text around it
-checked; else search that text in the section; else the section; else the annotation is **orphaned**
-and shown in the song-level strip with a marker. An annotation is never silently lost.
+Anchors do not use chords, so transposing, Nashville numbers, a capo or hidden chords cannot move an
+annotation. The snapshot holds a line of lyrics: it is kept only where the annotation is kept (the
+user's browser, their own Drive, a share link), never by Chordless's own servers.
+
+## Following edits to the chart
+
+A chart is **fixed in place** (`overwriteSong`, `CHART_EDITOR.md`), and the fix reaches other devices
+by sync, with no record of what it was before; and a song's setlists each have their own annotations,
+some shared and some on other devices. So an annotation cannot be moved by hooking the edit. It finds
+its place again from what it keeps and the chart as it is (`annotations/anchor.ts`):
+
+1. The line most like the kept `lineText`, in any section: exact, else by how alike the words are
+   (a reworded line, a word added or taken away, a line moved, split or joined). Ties go to the one
+   whose neighbours match `prevLine`/`nextLine`, then which of the identical lines it was (`occ`),
+   then the nearest to where it was. A section renamed or renumbered is found by its lines.
+2. Within the line: the same place if the line is unchanged; else the text either side of the spot; else
+   the word it was at; else the same word by number.
+3. If its line is gone, its section (a guess); if that is gone too, it is **orphaned** and shown in the
+   strip of annotations with no place, marked. Never dropped.
+
+**Healing.** When it is found for sure somewhere other than where it is kept, or is kept without a
+snapshot (annotations made before they were kept), its anchor is rebuilt from the chart as it is, so
+the next edit starts from here and a run of small edits does not wear the match away. A guess is
+never kept: undoing the edit finds the line again.
+- The user's own are healed when the setlist is drawn (this device only, so nothing is sent).
+- Those shared with everyone are in the setlist, so they are healed by someone who can write it, when
+  they finish editing, and not by every device that sees the fix; the others find their place the same
+  way from what is kept, without writing. A reader never writes.
+- The setlist page draws the setlist again when it loads and when a sync changes the setlist; it does
+  not yet watch the chart for a fix made while it is open.
 
 ## Layout
 
