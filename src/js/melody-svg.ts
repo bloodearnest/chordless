@@ -79,6 +79,16 @@ function textOf(e: El): string {
   return (e.text + e.children.map(textOf).join('')).replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * What follows a syllable: a short drawn bar is a hyphen (the word goes on), a long one the extender
+ * of a syllable held over several notes. The extender is the word's own last syllable, so it is '_'
+ */
+function connectorOf(verse: El): string {
+  const bar = all(verse, (c) => c.name === 'rect')[0]
+  if (!bar) return ''
+  return Number(bar.attrs.width) > 150 ? '_' : '-'
+}
+
 /** A `<use>`d glyph: its SMuFL code ("E0A4") and where it is placed */
 interface Glyph {
   code: string
@@ -326,7 +336,7 @@ export function readMelodySvg(svgs: string[], stats?: ReadStats): Melody {
                 alter = ACCIDENTAL[ag.code] as number
                 measureAlters.set(dia, alter)
               }
-              const sylls = byClass(note, 'verse').map((v) => textOf(v))
+              const sylls = byClass(note, 'verse').map((v) => textOf(v) + connectorOf(v))
               const step = STEPS[stepIndex] as (typeof STEPS)[number]
               events.push({
                 kind: 'note',

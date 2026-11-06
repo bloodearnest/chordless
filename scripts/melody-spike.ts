@@ -148,6 +148,30 @@ for (const n of notes) {
 console.log(`midi: ${midi.length} notes; ${pitchOk}/${pitchChecked} of ours match a MIDI note at the same time and pitch`)
 for (const d of pitchBad.slice(0, 8)) console.log(`  ${d}`)
 
+// Lyrics: the words the notes carry against the words of the chart (--cho file)
+const cho = args.indexOf('--cho')
+if (cho >= 0 && args[cho + 1]) {
+  const chart = readFileSync(args[cho + 1] as string, 'utf8')
+    .replace(/\{[^}]*\}/g, ' ')
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/ - /g, '')
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z']/g, '')
+  const chartWords = new Set(chart.split(/\s+/).map(norm).filter(Boolean))
+  const words: string[] = []
+  let cur = ''
+  for (const n of notes) {
+    const s = n.syllables[0] ?? ''
+    if (!s || /^\d+\.$/.test(s)) continue
+    cur += s.replace(/[-_]$/, '')
+    if (!s.endsWith('-')) {
+      words.push(cur)
+      cur = ''
+    }
+  }
+  const missing = words.filter((w) => !chartWords.has(norm(w)))
+  console.log(`lyrics: ${words.length - missing.length}/${words.length} words of verse 1 are in the chart${missing.length ? `; not: ${[...new Set(missing)].slice(0, 12).join(' ')}` : ''}`)
+}
+
 if (args.includes('--dump')) {
   for (const m of melody.measures) {
     const body = m.voices.map((v) => v.map((e) => (e.kind === 'rest' ? `r${e.duration}` : `${e.step}${e.alter ? (e.alter > 0 ? '#' : 'b') : ''}${e.octave}:${e.duration}${e.tieStart ? '~' : ''}${e.syllables[0] ?? ''}${e.cue ? '(c)' : ''}`)).join(' ')).join(' | ')
