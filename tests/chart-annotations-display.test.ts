@@ -74,32 +74,6 @@ describe('annotations on a chart', () => {
     )
   })
 
-  it('sit above their word, with the chord between, and take no width', async () => {
-    const sources = putAnnotation(
-      noSources(),
-      annotation('build', textAnchor(parsed.sections, 0, 0, 8)),
-      'private'
-    )
-    const { sections } = await show(annotationsBySection(parsed.sections, sources))
-    const root = sections[0].shadowRoot as ShadowRoot
-    const shownAnnotation = root.querySelector('.segment-annotations .annotation') as HTMLElement
-    const segment = shownAnnotation.closest('.chord-segment') as HTMLElement
-    expect(text(shownAnnotation)).to.equal('build')
-    expect(text(segment.querySelector('.lyrics'))).to.equal('grace')
-    expect(shownAnnotation.classList.contains('shared')).to.equal(false)
-    const chord = segment.querySelector('.chord') as HTMLElement
-    expect(shownAnnotation.getBoundingClientRect().bottom).to.be.at.most(
-      chord.getBoundingClientRect().top + 1
-    )
-    expect(
-      Math.abs(shownAnnotation.getBoundingClientRect().left - segment.getBoundingClientRect().left)
-    ).to.be.lessThan(2)
-    // (it does not push the next words along)
-    const lyrics = root.querySelector('.chord-line')
-    expect(lyrics?.classList.contains('has-annotations')).to.equal(true)
-    expect(getComputedStyle(shownAnnotation.parentElement as Element).position).to.equal('absolute')
-  })
-
   it('cut a word list in the middle of a segment, keeping the lyrics whole', async () => {
     const sources = putAnnotation(
       noSources(),
@@ -206,20 +180,175 @@ describe('annotations on a chart', () => {
       const [a, b] = annotations.map(each => each.getBoundingClientRect())
       expect(a.right).to.be.at.most(b.left)
     })
+  })
 
-    it('puts what does not fit in a row above, and makes room for it', async () => {
-      const { line, annotations } = await narrow(
-        [0, 'quietly at first'],
-        [8, 'then build up slowly'],
-        [14, 'all drop out']
+  describe('on the chord row', () => {
+    const frames = async (n = 5) => {
+      for (let i = 0; i < n; i++) await new Promise(resolve => requestAnimationFrame(resolve))
+    }
+    const wide = new ChordProParser().parse(
+      '{title: A}\n{key: G}\n\n{comment: Verse}\n[G]Amazing [C]grace [D]how sweet the sound'
+    )
+
+    /** The chart laid out at `width` with its text sizes (the test page has no stylesheet), with these annotations */
+    async function laidOut(
+      chart: typeof wide,
+      spots: [number, string][],
+      { width = 360, hide }: { width?: number; hide?: string } = {}
+    ) {
+      let sources = noSources()
+      for (const [offset, words] of spots) {
+        const made = {
+          ...annotation(words, textAnchor(chart.sections, 0, 0, offset)),
+          body: { kind: 'text', text: words },
+        } as ChartAnnotation
+        sources = putAnnotation(sources, made, 'private')
+      }
+      const wrapper = await fixture<HTMLElement>(
+        html`<div style="width: ${width}px; --font-lyrics: 21px; --font-chords: 19px; --font-annotation: 18px"></div>`
+      )
+      const display = document.createElement('song-display') as SongDisplay
+      wrapper.append(display)
+      display.parsed = chart
+      display.annotations = annotationsBySection(chart.sections, sources)
+      await display.updateComplete
+      const section = display.shadowRoot?.querySelector('song-section') as SongSection
+      if (hide) section.hideMode = hide as never
+      await section.updateComplete
+      await frames()
+      const root = section.shadowRoot as ShadowRoot
+      const line = root.querySelector('.chord-line') as HTMLElement
+      const rect = (el: Element) => el.getBoundingClientRect()
+      return {
+        line,
+        lineRect: rect(line),
+        annotations: Array.from(root.querySelectorAll<HTMLElement>('.segment-annotations')).map(
+          rect
+        ),
+        segments: Array.from(root.querySelectorAll<HTMLElement>('.segment-annotations')).map(each =>
+          rect(each.closest('.chord-segment') as Element)
+        ),
+        chords: Array.from(root.querySelectorAll('.chord:not(.chord-empty)')).map(each =>
+          rect(each.querySelector('chord-display') ?? each)
+        ),
+        lyrics: Array.from(root.querySelectorAll('.lyrics')).map(rect),
+      }
+    }
+
+    it('sit level with the chords, after the chord at their word, and overlap none', async () => {
+      const { line, annotations, chords, lyrics } = await laidOut(wide, [[8, 'build']])
+      expect(line.classList.contains('annotations-on-chords')).to.equal(true)
+      expect(line.classList.contains('has-annotations')).to.equal(false)
+      const [at] = annotations
+      const [, second] = chords // C, over "grace"
+      // level with the chord row: no lower than the chords, and above the lyrics
+      expect(at.top).to.be.at.least(chords[0].top - 3)
+      expect(at.bottom).to.be.at.most(lyrics[0].top + 2)
+      expect(at.left).to.be.at.least(second.right - 1)
+      for (const chord of chords)
+        expect(at.left >= chord.right - 1 || at.right <= chord.left + 1).to.equal(true)
+    })
+
+    it('stay at their word when it has no chord', async () => {
+      const chart = new ChordProParser().parse(
+        '{title: A}\n{key: G}\n\n{comment: Verse}\n[G]Amazing grace how [D]sweet'
+      )
+      const { annotations, segments } = await laidOut(chart, [[14, 'build']])
+      // (the word is a piece of the line of its own, and the annotation starts where it does)
+      expect(Math.abs(annotations[0].left - segments[0].left)).to.be.lessThan(2)
+    })
+
+    it('push the next chord right by what they need, and no more, and it comes back with them gone', async () => {
+      const without = await laidOut(wide, [])
+      const idle = without.chords[2].left
+      const some = await laidOut(wide, [[8, 'softly, pad only']])
+      const [at] = some.annotations
+      const [, , next] = some.chords
+      expect(next.left).to.be.greaterThan(idle + 5)
+      // (it clears the chord with the gap that was asked for, not by a lot more)
+      expect(at.right).to.be.at.most(next.left)
+      expect(next.left - at.right).to.be.lessThan(14)
+      const short = await laidOut(wide, [[8, 'ok']])
+      expect(short.chords[2].left).to.be.closeTo(idle, 1)
+    })
+
+    it('spend no height: the line is about as tall as it is without them', async () => {
+      // (wide enough that nothing wraps: a push that makes a line wrap does cost a row)
+      const without = await laidOut(wide, [], { width: 600 })
+      const some = await laidOut(
+        wide,
+        [
+          [8, 'softly'],
+          [0, 'quiet'],
+        ],
+        { width: 600 }
+      )
+      expect(some.lineRect.height - without.lineRect.height).to.be.lessThan(8)
+      expect(some.lineRect.height).to.be.at.least(without.lineRect.height)
+    })
+
+    it('keep a row of their own where the chords are hidden, or the line has none', async () => {
+      const hidden = await laidOut(wide, [[8, 'build']], { hide: 'chords' })
+      expect(hidden.line.classList.contains('has-annotations')).to.equal(true)
+      expect(hidden.line.classList.contains('annotations-on-chords')).to.equal(false)
+      const lyricsOnly = new ChordProParser().parse(
+        '{title: A}\n{key: G}\n\n{comment: Verse}\nAmazing grace how sweet'
+      )
+      const plain = await laidOut(lyricsOnly, [[8, 'build']])
+      expect(plain.line.classList.contains('has-annotations')).to.equal(true)
+      expect(plain.line.classList.contains('annotations-on-chords')).to.equal(false)
+      expect(plain.annotations[0].bottom).to.be.at.most(plain.lyrics[0].top + 1)
+    })
+
+    it('keep their own row, one higher for each that cannot share it, and wrap one wider than the line', async () => {
+      const { line, annotations } = await laidOut(
+        wide,
+        [
+          [0, 'quietly at first'],
+          [8, 'then build up slowly'],
+          [14, 'all drop out'],
+        ],
+        { width: 300, hide: 'chords' }
       )
       expect(line.style.getPropertyValue('--annotation-rows')).to.equal('2')
-      const tops = new Set(annotations.map(each => Math.round(each.getBoundingClientRect().top)))
-      expect(tops.size).to.equal(2)
-      const first = annotations
-        .map(each => each.getBoundingClientRect())
-        .sort((a, b) => a.top - b.top)[0]
-      expect(first.top).to.be.at.least(line.getBoundingClientRect().top - 1)
+      expect(new Set(annotations.map(each => Math.round(each.top))).size).to.equal(2)
+      const long =
+        'an annotation much too long to fit on a line of a narrow phone at all, it goes over more lines'
+      const wrapped = await laidOut(wide, [[8, long]], { width: 300, hide: 'chords' })
+      expect(wrapped.annotations[0].width).to.be.at.most(wrapped.lineRect.width + 1)
+      expect(wrapped.annotations[0].height).to.be.greaterThan(annotations[0].height * 1.5)
+    })
+
+    it('share the row where only the chords are shown', async () => {
+      const { line, annotations, chords } = await laidOut(wide, [[8, 'build']], { hide: 'lyrics' })
+      expect(line.classList.contains('annotations-on-chords')).to.equal(true)
+      expect(annotations[0].top).to.be.at.least(chords[0].top - 3)
+    })
+
+    it('go in a row above only when they cannot fit, and make room for it', async () => {
+      const long = 'an annotation much too long to fit on the chord row of a narrow phone at all'
+      const { line, annotations, chords } = await laidOut(wide, [[8, long]], { width: 300 })
+      // (as many rows as the annotation has lines, set in the line's width)
+      expect(Number(line.style.getPropertyValue('--annotation-above'))).to.be.at.least(1)
+      expect(annotations[0].bottom).to.be.at.most(chords[0].top + 1)
+      expect(annotations[0].top).to.be.at.least(line.getBoundingClientRect().top - 1)
+      const plain = await laidOut(wide, [[8, 'short']])
+      expect(plain.line.style.getPropertyValue('--annotation-above')).to.equal('')
+    })
+
+    it('are laid out again, and the chords pulled back, when the line is widened', async () => {
+      const { line, annotations, chords } = await laidOut(wide, [[8, 'softly, pad only']], {
+        width: 200,
+      })
+      const wrapper = (line.getRootNode() as ShadowRoot).host
+      const host = (wrapper.getRootNode() as ShadowRoot).host.parentElement as HTMLElement
+      host.style.width = '500px'
+      await frames()
+      expect(annotations[0].right).to.be.at.most(line.getBoundingClientRect().right + 1)
+      const again = Array.from(
+        (line.getRootNode() as ShadowRoot).querySelectorAll('.chord:not(.chord-empty)')
+      )
+      expect(again.length).to.equal(chords.length)
     })
   })
 

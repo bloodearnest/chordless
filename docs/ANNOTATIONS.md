@@ -64,16 +64,26 @@ never kept: undoing the edit finds the line again.
 
 ## Layout
 
-Annotations are laid out with the chords, not on top of them.
+Annotations are laid out with the chords, and spend no height where there are chords.
 
 - A section annotation sits in the slot right of the section title; the row wraps rather than colliding
   with the show/hide controls.
-- A line annotation is a row at the top of the chord-segment column at its anchor, above the chord, with
-  no width of its own (it spills like a chord does). Units align at their bottoms, so only the visual
-  line that holds an annotation grows taller, and it works when a line wraps.
-- After layout, a small pass measures the annotations on each line and pushes them back inside the right
-  edge and apart from each other (re-run on resize, font scale, hide mode and transposition). The
-  floor is Safari 17.4 / Chrome 120, so there is no CSS anchor positioning.
+- **A line annotation is in the chord row**, level with the chords, starting at its word. If the word has
+  a chord it starts just after that chord; if an earlier chord's text reaches over the word, after that.
+  It never overlaps a chord or another annotation. The row is as tall as the taller of a chord and an
+  annotation (a few pixels), so a line with annotations is about as tall as one without.
+- If it would run into the next chord, that chord and everything after it on the row are **pushed right
+  by just the shortfall** (extra width after the piece before the chord). Nothing is pushed when there
+  is room (over chordless words, or at the end of the line). A push can change where the line wraps,
+  so the row is measured again, up to six times, until nothing needs pushing.
+- Where there is no chord row (chords hidden, or a line with no chords), an annotation has a row of
+  its own above the lyrics: the only place height is spent.
+- A last resort, rare: one that cannot fit the row (wider than the line, no room left at its end, or a
+  push of more than 40% of the line) goes in a row above, or wraps if wider than the line.
+- Done with `annotations/pack.ts` (pure: `placeOnChordRow`, and `packAnnotations` for a row of its
+  own) and `annotations/nudge.ts` (measures, writes, repeats), after layout and again on resize, font
+  scale, hide mode, transposition and when the font loads. The floor is Safari 17.4 / Chrome 120, so
+  there is no CSS anchor positioning.
 - Hidden and collapsed sections hide their annotations. Annotations are shown in lyrics-only and chords-only modes.
 
 Typed annotations use a bundled handwriting font. Private annotations are in a pencil colour, shared ones in a
