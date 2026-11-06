@@ -167,12 +167,23 @@ Transposing is the notes moved by the interval and respelled for the new key, wh
 ## The terms
 
 What CCLI's agreements say about keeping and transposing a lead sheet. This is a reading of the
-text, not legal advice, and only of the US agreement: the CCLI Master Terms of Agreement
-(`store.ccli.com/download/CCLI_terms_of_agreement_us`, linked from `us.ccli.com/terms`; it holds the
-Church Copyright License, which SongSelect's terms (§6.10) are subject to, and the SongSelect Terms
-of Use, updated 2026-10-30), read on 2026-11-05. The UK has a different Music Reproduction Licence
-and different terms; they are not read. Neither are the ccli.com site's own terms of use, which
-might say something about automated access.
+text, not legal advice. It is of the CCLI Master Terms of Agreement, US
+(`store.ccli.com/download/CCLI_terms_of_agreement_us`, linked from `us.ccli.com/terms`) and UK
+(`.../CCLI_terms_of_agreement_en`, linked from `uk.ccli.com/terms`), read on 2026-11-05 and 06. It
+holds the Church Copyright License, which SongSelect's terms (§6.10) are subject to, and the
+SongSelect Terms of Use, updated 2026-10-30. **The UK agreement is the US one with British spelling:**
+compared clause by clause, the only differences are that the UK text lacks the definition of
+"Territory" (§2.16 in the US text, still used in the UK one), has no US phone number, and adds a
+paragraph that third-party licences sold through CCLI (the CLA and PRS/PPL ones, below) are on
+those parties' own terms. Section numbers below are the same in both, and so are §3, §10.5, §12
+and the SongSelect TOU. Both still say Oregon law and courts. The ccli.com website terms of use (the
+same for the UK and US sites, Washington law) say nothing about scripts, scraping or automated
+access. Two UK licences sit beside it and do not change the above: the CLA Church Licence (copying
+from books, journals and periodicals; it does not mention music, hymns or lyrics) and the PRS/PPL
+TheMusicLicence (playing and performing music at premises, with the right to copy reserved,
+clause 1.2). The second is who covers performance in the UK, so playing audio in a service is
+a PRS/PPL question and not a CCLI one, which the practice-only rule below stays clear of.
+`songselect.ccli.com`'s own terms are the SongSelect TOU in the Master Terms.
 
 - **Keeping a faithful copy for the church's own use is what the Church Copyright License lists.**
   §3.1.4 allows copying songs "into and from computerized storage and retrieval software", and the
@@ -216,8 +227,9 @@ might say something about automated access.
   that is known, the preview is for what the person could download, and is not stored or sent
   anywhere: it is a check on the PDF's reading, or an equivalent source, not a way round the count.
 - **Not decided here:** whether a preview call is counted; whether a missing tier is shown the
-  preview (an account on a chord-sheet-only tier would tell); the ccli.com site terms; the UK
-  terms. CCLI can be asked in writing, and a yes would settle all of it.
+  preview (an account on a chord-sheet-only tier would tell). Neither agreement says anything about
+  scripts calling SongSelect's own endpoints, for or against. CCLI can be asked in writing, and a
+  yes would settle all of it.
 
 ## Uses, once it exists
 
