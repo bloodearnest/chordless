@@ -11,7 +11,8 @@
  * this SongSelect tab opened before), fetches the song's ChordPro meanwhile
  * (using the user's SongSelect login), then the song's lead sheet in the chart's key, for its
  * melody range (docs/RANGE.md), waits for CHORDLESS_READY, and posts CHORDLESS_IMPORT, or
- * CHORDLESS_IMPORT_FAILED if the download failed, or SongSelect has no ChordPro for the song. A lead sheet that cannot be had never stops
+ * CHORDLESS_IMPORT_FAILED if the download failed, or SongSelect has neither a ChordPro nor lyrics for the song (with
+ * lyrics only, it posts the song's details for Chordless to make a chart of). A lead sheet that cannot be had never stops
  * the song: the import goes without it. See song-import.ts.
  */
 /**
@@ -33,7 +34,7 @@ export interface SongSelectPage {
   ): Promise<{
     ok: boolean
     status: number
-    json(): Promise<{ payload?: string }>
+    json(): Promise<{ payload?: unknown }>
     arrayBuffer(): Promise<ArrayBuffer>
   }>
   setTimeout(handler: () => void, ms: number): unknown
@@ -53,6 +54,7 @@ export async function importFromSongSelect(
     return
   }
   const songNumber = urlMatch[1]
+  const slug = page.location.href.match(/\/songs\/\d+\/([^/?#]+)/)?.[1] ?? ''
   const title = page.document.querySelector('h1')?.textContent?.trim()
   // The key picked on the chord sheet page, as SongSelect's own download would use. Elsewhere
   // there is none, and SongSelect gives the song's default key (the page text has other
@@ -87,17 +89,34 @@ export async function importFromSongSelect(
       { headers: { accept: '*/*', 'client-locale': 'en-GB' }, credentials: 'include' }
     )
     if (!response.ok) throw new Error(`SongSelect download failed: ${response.status}`)
-    const chordproText = (await response.json()).payload
+    let chordproText = (await response.json()).payload as string | undefined
     if (!chordproText?.trim()) throw new Error('Empty ChordPro file. Do you have access?')
     // SongSelect answers a song it has no ChordPro for with a sentence, as if it were the chart:
-    // a chart has a directive ({title: …}) or a chord ([G])
+    // a chart has a directive ({title: …}) or a chord ([G]). Then the song's lyrics, which its page
+    // has, go to Chordless to be made into a chart (lyrics-chordpro.ts)
+    let songDetails: { defaultKey?: string[]; lyrics?: unknown[] } | undefined
     if (!/\{\s*[a-z_]+\s*:/i.test(chordproText) && !/\[[A-G][^\]]*\]/.test(chordproText)) {
-      throw new Error(
-        `SongSelect has no ChordPro chart for this song (it said "${chordproText.trim().slice(0, 60)}"). ` +
-          'Add the song by pasting its chart or choosing a file.'
-      )
+      const said = chordproText.trim().slice(0, 60)
+      try {
+        const details = await page.fetch(
+          `https://songselect.ccli.com/api/GetSongDetails?songNumber=${songNumber}&slug=${slug}`,
+          { headers: { accept: '*/*', 'client-locale': 'en-GB' }, credentials: 'include' }
+        )
+        if (details.ok) songDetails = (await details.json()).payload as typeof songDetails
+      } catch {
+        // no lyrics either: the error below
+      }
+      if (!songDetails?.lyrics?.length) {
+        throw new Error(
+          `SongSelect has no ChordPro chart for this song (it said "${said}"). ` +
+            'Add the song by pasting its chart or choosing a file.'
+        )
+      }
+      chordproText = ''
     }
-    const chartKey: string | undefined = chordproText.match(/\{key:\s*([^}\s]+)\s*\}/i)?.[1]
+    // (a lyrics-only chart is made with the song's default key)
+    const chartKey: string | undefined =
+      chordproText.match(/\{key:\s*([^}\s]+)\s*\}/i)?.[1] ?? songDetails?.defaultKey?.[0]
 
     // The lead sheet, in the same key, so its notes are in the chart's key. It is the PDF itself,
     // or JSON with the PDF in base64 as its payload, like the ChordPro; anything else is no lead sheet
@@ -125,6 +144,7 @@ export async function importFromSongSelect(
       type: 'CHORDLESS_IMPORT',
       data: {
         chordproText,
+        ...(songDetails && { songDetails }),
         metadata: {
           ccliNumber: songNumber,
           title,
