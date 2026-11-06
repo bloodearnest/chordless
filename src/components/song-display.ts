@@ -1,13 +1,13 @@
 import { css, html, LitElement, nothing } from 'lit'
 import './song-section.ts'
 import { ContextConsumer } from '@lit/context'
+import { attachAnnotations, type ChartAnnotations } from '../js/annotations/shown.ts'
 import type { ChartSection, ParsedChart } from '../js/data-types.ts'
 import { displayPreferencesContext } from '../js/display-preferences.ts'
-import { attachNotes, type ChartNotes } from '../js/notes/shown.ts'
 import { isEditMode } from '../js/setlist/edit-mode-ui.ts'
 import { transposeKeyName } from '../js/transpose.ts'
-import { noteStyles, renderNotes } from './chart-note.ts'
-import { NoteRequestEvent } from './song-section.ts'
+import { annotationStyles, renderAnnotations } from './chart-annotation.ts'
+import { AnnotationRequestEvent } from './song-section.ts'
 
 /** How chords are shown before the page has said */
 const NO_DISPLAY_PREFERENCES = { nashville: false, unicodeAccidentals: false }
@@ -28,25 +28,25 @@ export class SongDisplay extends LitElement {
     songIndex: { type: Number, attribute: 'song-index' },
     /** @type {number} Current capo value */
     capo: { type: Number },
-    /** The song's notes, placed on its sections (docs/NOTES.md) */
-    notes: { attribute: false },
+    /** The song's annotations, placed on its sections (docs/ANNOTATIONS.md) */
+    annotations: { attribute: false },
   }
 
   declare parsed: ParsedChart | null
   declare songIndex: number
   declare capo: number
-  declare notes: ChartNotes | null
+  declare annotations: ChartAnnotations | null
 
   _display: ContextConsumer<typeof displayPreferencesContext, SongDisplay>
 
   static override styles = [
-    noteStyles,
+    annotationStyles,
     css`
       :host {
         display: block;
       }
 
-      .song-notes {
+      .song-annotations {
         display: flex;
         flex-wrap: wrap;
         align-items: baseline;
@@ -54,22 +54,22 @@ export class SongDisplay extends LitElement {
         margin: 0 0.5rem 0.25rem;
       }
 
-      .song-notes .note {
+      .song-annotations .annotation {
         -webkit-user-select: none;
         user-select: none;
       }
 
-      .song-notes.editing .note {
+      .song-annotations.editing .annotation {
         cursor: pointer;
       }
 
-      .add-song-note {
-        border: 1px dashed var(--note-private-color);
+      .add-song-annotation {
+        border: 1px dashed var(--annotation-private-color);
         border-radius: 6px;
         background: none;
-        color: var(--note-private-color);
-        font-family: var(--font-family-note);
-        font-size: var(--font-note);
+        color: var(--annotation-private-color);
+        font-family: var(--font-family-annotation);
+        font-size: var(--font-annotation);
         padding: 0 0.5em;
         cursor: pointer;
       }
@@ -81,7 +81,7 @@ export class SongDisplay extends LitElement {
     this.parsed = null
     this.songIndex = 0
     this.capo = 0
-    this.notes = null
+    this.annotations = null
     // How chords are shown (Nashville numbers, unicode accidentals), passed
     // down to the sections; re-renders when a preference changes
     this._display = new ContextConsumer(this, {
@@ -99,16 +99,16 @@ export class SongDisplay extends LitElement {
       this._renderSection(section, index)
     )
 
-    const song = this.notes?.song ?? []
+    const song = this.annotations?.song ?? []
     const editing = isEditMode()
     return html`${
       song.length || editing
-        ? html`<div class=${editing ? 'song-notes editing' : 'song-notes'} @click=${this._onSongNoteClick}>
-              ${song.map(note => renderNotes([note], note.orphan))}
+        ? html`<div class=${editing ? 'song-annotations editing' : 'song-annotations'} @click=${this._onSongAnnotationClick}>
+              ${song.map(annotation => renderAnnotations([annotation], annotation.orphan))}
               ${
                 editing
-                  ? html`<button class="add-song-note" @click=${this._onAddSongNote}>
-                      + Note on the whole song
+                  ? html`<button class="add-song-annotation" @click=${this._onAddSongAnnotation}>
+                      + Annotation on the whole song
                     </button>`
                   : nothing
               }
@@ -117,23 +117,23 @@ export class SongDisplay extends LitElement {
     }${sections}`
   }
 
-  /** Edit mode: a note of the song's is tapped to change it */
-  _onSongNoteClick(event: Event): void {
+  /** Edit mode: an annotation of the song's is tapped to change it */
+  _onSongAnnotationClick(event: Event): void {
     if (!isEditMode()) return
-    const note = (event.target as HTMLElement).closest<HTMLElement>('[data-note-id]')
-    if (!note) return
+    const annotation = (event.target as HTMLElement).closest<HTMLElement>('[data-annotation-id]')
+    if (!annotation) return
     this.dispatchEvent(
-      new NoteRequestEvent(
+      new AnnotationRequestEvent(
         { songIndex: this.songIndex, sectionIndex: 0 },
-        { place: 'song', noteId: note.dataset.noteId },
-        note
+        { place: 'song', annotationId: annotation.dataset.annotationId },
+        annotation
       )
     )
   }
 
-  _onAddSongNote(event: Event): void {
+  _onAddSongAnnotation(event: Event): void {
     this.dispatchEvent(
-      new NoteRequestEvent(
+      new AnnotationRequestEvent(
         { songIndex: this.songIndex, sectionIndex: 0 },
         { place: 'song' },
         event.currentTarget as HTMLElement
@@ -151,8 +151,8 @@ export class SongDisplay extends LitElement {
     const capoKey = capoValue > 0 && displayKey ? transposeKeyName(displayKey, -capoValue) : ''
     return html`
       <song-section
-        .lines=${attachNotes(section.lines, this.notes?.sections[index]?.lines ?? [])}
-        .titleNotes=${this.notes?.sections[index]?.title ?? []}
+        .lines=${attachAnnotations(section.lines, this.annotations?.sections[index]?.lines ?? [])}
+        .titleAnnotations=${this.annotations?.sections[index]?.title ?? []}
         .label=${section.label || ''}
         .note=${section.note || ''}
         .songIndex=${this.songIndex}

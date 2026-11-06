@@ -1,9 +1,9 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { classMap } from 'lit/directives/class-map.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
-import type { ChartLine, ChartSegment, HideMode, ShownNote } from '../js/data-types.ts'
-import { listenForLongPress } from '../js/notes/long-press.ts'
-import { nudgeLine } from '../js/notes/nudge.ts'
+import { listenForLongPress } from '../js/annotations/long-press.ts'
+import { nudgeLine } from '../js/annotations/nudge.ts'
+import type { ChartLine, ChartSegment, HideMode, ShownAnnotation } from '../js/data-types.ts'
 import { groupSegmentsIntoUnits } from '../js/utils/chart-line-units.ts'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
 import {
@@ -13,7 +13,7 @@ import {
 } from '../js/utils/lyrics-normalizer.ts'
 import type { BarGroupData, Measure } from './bar-group.ts'
 import './bar-group.ts'
-import { noteStyles, renderNotes } from './chart-note.ts'
+import { annotationStyles, renderAnnotations } from './chart-annotation.ts'
 import './chord-display.ts'
 
 /** A Show option or the collapse button was pressed: action is show-all, show-lyrics, show-chords, show-none or collapse */
@@ -31,32 +31,37 @@ export class SectionActionEvent extends Event {
 }
 
 /**
- * A spot on the chart was pressed in edit mode, or a note on it tapped: the place for the note
- * editor to open at (docs/NOTES.md). `place` is the section's title, a word (the line and about
- * where in the line's lyrics), or the song as a whole (sent by the song-display). `noteId` is set when an existing note was tapped.
+ * A spot on the chart was pressed in edit mode, or an annotation on it tapped: the place for the annotation
+ * editor to open at (docs/ANNOTATIONS.md). `place` is the section's title, a word (the line and about
+ * where in the line's lyrics), or the song as a whole (sent by the song-display). `annotationId` is set when an existing annotation was tapped.
  */
-export class NoteRequestEvent extends Event {
-  static readonly type = 'song-section:note-request'
+export class AnnotationRequestEvent extends Event {
+  static readonly type = 'song-section:annotation-request'
   readonly songIndex: number
   readonly sectionIndex: number
   readonly place: 'title' | 'text' | 'song'
   readonly line: number
   readonly offset: number
-  readonly noteId: string | undefined
+  readonly annotationId: string | undefined
   /** What was pressed, for the editor to open beside */
   readonly element: HTMLElement
   constructor(
     section: { songIndex: number; sectionIndex: number },
-    where: { place: 'title' | 'text' | 'song'; line?: number; offset?: number; noteId?: string },
+    where: {
+      place: 'title' | 'text' | 'song'
+      line?: number
+      offset?: number
+      annotationId?: string
+    },
     element: HTMLElement
   ) {
-    super(NoteRequestEvent.type, { bubbles: true, composed: true })
+    super(AnnotationRequestEvent.type, { bubbles: true, composed: true })
     this.songIndex = section.songIndex
     this.sectionIndex = section.sectionIndex
     this.place = where.place
     this.line = where.line ?? 0
     this.offset = where.offset ?? 0
-    this.noteId = where.noteId
+    this.annotationId = where.annotationId
     this.element = element
   }
 }
@@ -107,8 +112,8 @@ export class SongSection extends LitElement {
     label: { type: String, attribute: 'label' },
     /** @type {string} Text shown after the label, e.g. "(first time a cappella)" */
     note: { type: String, attribute: 'note' },
-    /** Notes on the section's title (docs/NOTES.md) */
-    titleNotes: { attribute: false },
+    /** Annotations on the section's title (docs/ANNOTATIONS.md) */
+    titleAnnotations: { attribute: false },
     /** @type {Array<{segments: Array<{chord: string, lyrics: string}>}>} Parsed chord/lyric lines */
     lines: { attribute: false },
     /** @type {boolean} Display chords as Nashville numbers */
@@ -131,7 +136,7 @@ export class SongSection extends LitElement {
   declare isHidden: boolean
   declare label: string
   declare note: string
-  declare titleNotes: ShownNote[]
+  declare titleAnnotations: ShownAnnotation[]
   declare displayAsNashville: boolean
   declare unicodeAccidentals: boolean
   declare displayKey: string
@@ -145,7 +150,7 @@ export class SongSection extends LitElement {
   _hasAnyLyrics: boolean
 
   static override styles = [
-    noteStyles,
+    annotationStyles,
     css`
     .song-section-wrapper {
       padding: 0;
@@ -412,54 +417,54 @@ export class SongSection extends LitElement {
       flex-wrap: wrap;
     }
 
-    /* A line with a note has a row of room above each of its rows, for the notes to sit in */
-    .song-section-wrapper .chord-line.has-notes {
-      --note-row: calc(var(--font-note) * 1.1);
-      padding-top: calc(var(--note-row) * var(--note-rows, 1));
-      row-gap: calc(var(--note-row) * var(--note-rows, 1));
+    /* A line with an annotation has a row of room above each of its rows, for the annotations to sit in */
+    .song-section-wrapper .chord-line.has-annotations {
+      --annotation-row: calc(var(--font-annotation) * 1.1);
+      padding-top: calc(var(--annotation-row) * var(--annotation-rows, 1));
+      row-gap: calc(var(--annotation-row) * var(--annotation-rows, 1));
     }
 
-    /* The notes at a spot sit above its chord and take no width, as a spilling chord does */
+    /* The annotations at a spot sit above its chord and take no width, as a spilling chord does */
     .song-section-wrapper .chord-segment {
       position: relative;
     }
 
-    .song-section-wrapper .segment-notes {
+    .song-section-wrapper .segment-annotations {
       position: absolute;
       left: 0;
       bottom: 100%;
-      /* (a line box of the notes' own, not the line's: its strut would make the row taller than room was made for) */
-      font-size: var(--font-note);
+      /* (a line box of the annotations' own, not the line's: its strut would make the row taller than room was made for) */
+      font-size: var(--font-annotation);
       line-height: 1.05;
       white-space: nowrap;
       pointer-events: none;
     }
 
-    /* In edit mode a word or a title can be long-pressed for a note, and a note tapped to change it */
-    :host([edit-mode]) [data-note-target],
-    :host([edit-mode]) .note {
+    /* In edit mode a word or a title can be long-pressed for an annotation, and an annotation tapped to change it */
+    :host([edit-mode]) [data-annotation-target],
+    :host([edit-mode]) .annotation {
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
     }
 
-    :host([edit-mode]) .note {
+    :host([edit-mode]) .annotation {
       cursor: pointer;
     }
 
-    :host([edit-mode]) .segment-notes {
+    :host([edit-mode]) .segment-annotations {
       pointer-events: auto;
     }
 
-    :host([edit-mode]) .chord-segment[data-note-target]:hover,
-    :host([edit-mode]) .chord-segment[data-note-target]:focus-visible,
+    :host([edit-mode]) .chord-segment[data-annotation-target]:hover,
+    :host([edit-mode]) .chord-segment[data-annotation-target]:focus-visible,
     :host([edit-mode]) .section-title:hover {
-      outline: 1px dashed var(--note-private-color);
+      outline: 1px dashed var(--annotation-private-color);
       outline-offset: 2px;
       border-radius: 3px;
     }
 
-    .song-section-wrapper .plain-notes {
+    .song-section-wrapper .plain-annotations {
       margin-bottom: 0.1rem;
     }
 
@@ -478,7 +483,7 @@ export class SongSection extends LitElement {
       padding-right: 0.5em;
     }
 
-    .song-section-wrapper.chords-hidden .chord-segment.chord-only:not(.has-note) {
+    .song-section-wrapper.chords-hidden .chord-segment.chord-only:not(.has-annotation) {
       display: none;
     }
 
@@ -550,7 +555,7 @@ export class SongSection extends LitElement {
     this.isHidden = false
     this.label = ''
     this.note = ''
-    this.titleNotes = []
+    this.titleAnnotations = []
     this._lines = undefined // Private storage for lines
     this._contentBlocks = []
     this._hasAnyChords = false
@@ -626,13 +631,13 @@ export class SongSection extends LitElement {
     return 'none'
   }
 
-  /** In edit mode: a long press on a word or the title, or a tap on a note, asks for the note editor */
+  /** In edit mode: a long press on a word or the title, or a tap on an annotation, asks for the annotation editor */
   override firstUpdated() {
     const root = this.renderRoot
     const where = (event: Event): HTMLElement | null => {
       const path = event.composedPath()
       const hit = path.find(
-        node => node instanceof HTMLElement && node.dataset.noteTarget !== undefined
+        node => node instanceof HTMLElement && node.dataset.annotationTarget !== undefined
       )
       if (hit) return hit as HTMLElement
       // The keyboard is on the title's <summary>
@@ -640,16 +645,17 @@ export class SongSection extends LitElement {
         node => node instanceof HTMLElement && node.matches('summary.section-label')
       )
       return (
-        (summary as HTMLElement | undefined)?.querySelector('[data-note-target="title"]') ?? null
+        (summary as HTMLElement | undefined)?.querySelector('[data-annotation-target="title"]') ??
+        null
       )
     }
     listenForLongPress(root, {
       enabled: () => this.editMode,
       targetOf: where,
       onPress: element => {
-        const place = element.dataset.noteTarget === 'title' ? 'title' : 'text'
+        const place = element.dataset.annotationTarget === 'title' ? 'title' : 'text'
         this.dispatchEvent(
-          new NoteRequestEvent(
+          new AnnotationRequestEvent(
             this,
             {
               place,
@@ -667,26 +673,28 @@ export class SongSection extends LitElement {
       'click',
       event => {
         if (!this.editMode) return
-        const note = event
+        const annotation = event
           .composedPath()
-          .find(node => node instanceof HTMLElement && node.dataset.noteId !== undefined) as
+          .find(node => node instanceof HTMLElement && node.dataset.annotationId !== undefined) as
           | HTMLElement
           | undefined
-        if (!note) return
+        if (!annotation) return
         // (before the title's own click, which would collapse the section)
         event.stopPropagation()
         event.preventDefault()
-        const target = note.closest('.chord-segment') as HTMLElement | null
+        const target = annotation.closest('.chord-segment') as HTMLElement | null
         this.dispatchEvent(
-          new NoteRequestEvent(
+          new AnnotationRequestEvent(
             this,
             {
               place: target ? 'text' : 'title',
-              line: Number((note.closest('.chord-line') as HTMLElement | null)?.dataset.line ?? 0),
+              line: Number(
+                (annotation.closest('.chord-line') as HTMLElement | null)?.dataset.line ?? 0
+              ),
               offset: Number(target?.dataset.offset ?? 0),
-              noteId: note.dataset.noteId,
+              annotationId: annotation.dataset.annotationId,
             },
-            note
+            annotation
           )
         )
       },
@@ -694,24 +702,28 @@ export class SongSection extends LitElement {
     )
   }
 
-  #noteLines: ResizeObserver | undefined
-  #noteFrame = 0
+  #annotationLines: ResizeObserver | undefined
+  #annotationFrame = 0
 
-  /** The notes are placed once the text is laid out, and again when the line is (a new width, text size, or a font that arrived) */
+  /** The annotations are placed once the text is laid out, and again when the line is (a new width, text size, or a font that arrived) */
   override updated() {
-    const lines = Array.from(this.renderRoot.querySelectorAll<HTMLElement>('.chord-line.has-notes'))
-    this.#noteLines?.disconnect()
+    const lines = Array.from(
+      this.renderRoot.querySelectorAll<HTMLElement>('.chord-line.has-annotations')
+    )
+    this.#annotationLines?.disconnect()
     if (!lines.length) return
-    this.#noteLines ??= new ResizeObserver(() => this.#placeNotes())
-    for (const line of lines) this.#noteLines.observe(line)
-    this.#placeNotes()
-    void document.fonts?.ready.then(() => this.#placeNotes())
+    this.#annotationLines ??= new ResizeObserver(() => this.#placeAnnotations())
+    for (const line of lines) this.#annotationLines.observe(line)
+    this.#placeAnnotations()
+    void document.fonts?.ready.then(() => this.#placeAnnotations())
   }
 
-  #placeNotes() {
-    cancelAnimationFrame(this.#noteFrame)
-    this.#noteFrame = requestAnimationFrame(() => {
-      for (const line of this.renderRoot.querySelectorAll<HTMLElement>('.chord-line.has-notes')) {
+  #placeAnnotations() {
+    cancelAnimationFrame(this.#annotationFrame)
+    this.#annotationFrame = requestAnimationFrame(() => {
+      for (const line of this.renderRoot.querySelectorAll<HTMLElement>(
+        '.chord-line.has-annotations'
+      )) {
         nudgeLine(line)
       }
     })
@@ -719,8 +731,8 @@ export class SongSection extends LitElement {
 
   override disconnectedCallback() {
     super.disconnectedCallback()
-    this.#noteLines?.disconnect()
-    cancelAnimationFrame(this.#noteFrame)
+    this.#annotationLines?.disconnect()
+    cancelAnimationFrame(this.#annotationFrame)
   }
 
   /** @inheritdoc */
@@ -774,9 +786,9 @@ export class SongSection extends LitElement {
         <summary class="section-label" @click=${this._onSummaryClick}>
           <div class="section-header">
             <div class="section-title-wrapper">
-              <h3 class="section-title" data-note-target="title">${label}</h3>
+              <h3 class="section-title" data-annotation-target="title">${label}</h3>
               ${this.note ? html`<span class="section-note">${this.note}</span>` : ''}
-              ${renderNotes(this.titleNotes)}
+              ${renderAnnotations(this.titleAnnotations)}
               ${this._renderCollapseToggle()}
             </div>
             ${this._renderControls()}
@@ -790,7 +802,7 @@ export class SongSection extends LitElement {
   _renderPlainSection() {
     return html`
       <div class="song-section">
-        ${this.titleNotes?.length ? html`<div class="plain-notes">${renderNotes(this.titleNotes)}</div>` : nothing}
+        ${this.titleAnnotations?.length ? html`<div class="plain-annotations">${renderAnnotations(this.titleAnnotations)}</div>` : nothing}
         <div class="section-content">${this._renderContent()}</div>
       </div>
     `
@@ -920,7 +932,7 @@ export class SongSection extends LitElement {
 
     return html`
       <div
-        class=${classMap({ 'chord-line': true, 'has-notes': shown.some(segment => segment.notes?.length) })}
+        class=${classMap({ 'chord-line': true, 'has-annotations': shown.some(segment => segment.annotations?.length) })}
         data-line-index=${index}
         data-line=${lineIndex}
       >
@@ -946,7 +958,7 @@ export class SongSection extends LitElement {
       'chord-segment': true,
       'chord-only': !hasLyrics,
       'chord-spills': chordSpills && hasLyrics,
-      'has-note': !!segment.notes?.length,
+      'has-annotation': !!segment.annotations?.length,
     })
 
     // If the line has no chords at all, don't render chord placeholders
@@ -955,13 +967,13 @@ export class SongSection extends LitElement {
     return html`
       <span
         class=${classes}
-        data-note-target="text"
+        data-annotation-target="text"
         data-offset=${segment.offset}
         tabindex=${this.editMode && hasLyrics ? '0' : nothing}
       >
         ${
-          segment.notes?.length
-            ? html`<span class="segment-notes">${renderNotes(segment.notes)}</span>`
+          segment.annotations?.length
+            ? html`<span class="segment-annotations">${renderAnnotations(segment.annotations)}</span>`
             : nothing
         }
         ${
@@ -1136,8 +1148,8 @@ export class SongSection extends LitElement {
     let hasBar = false
     for (const segment of line.segments) {
       const hasLyrics = segment.lyrics && segment.lyrics.trim().length > 0
-      // (a note is drawn on a line, not in a group of bars)
-      if (hasLyrics || segment.notes?.length) return false
+      // (an annotation is drawn on a line, not in a group of bars)
+      if (hasLyrics || segment.annotations?.length) return false
       if (segment.chord && isBarMarker(segment.chord)) {
         hasBar = true
       }
@@ -1201,6 +1213,6 @@ declare global {
   interface GlobalEventHandlersEventMap {
     [SectionActionEvent.type]: SectionActionEvent
     [SectionToggleEvent.type]: SectionToggleEvent
-    [NoteRequestEvent.type]: NoteRequestEvent
+    [AnnotationRequestEvent.type]: AnnotationRequestEvent
   }
 }

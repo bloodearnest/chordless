@@ -1,17 +1,17 @@
 /**
- * Where a note sits on a chart, and finding that place again (docs/NOTES.md). An anchor names a
+ * Where a annotation sits on a chart, and finding that place again (docs/ANNOTATIONS.md). An anchor names a
  * section by label and a spot by the lyrics around it, so it holds across transposing, hidden
  * chords and screen sizes; if the chart changed under it, the text around it is searched for, and
- * a note that cannot be placed is orphaned, never dropped.
+ * a annotation that cannot be placed is orphaned, never dropped.
  */
-import type { ChartNote, ChartSection, NoteAnchor } from '../data-types.ts'
+import type { AnnotationAnchor, ChartAnnotation, ChartSection } from '../data-types.ts'
 
 /** How many characters of lyrics either side of a spot an anchor remembers */
 const CONTEXT = 12
 
 /** The lyrics of a line as one string, chords left out */
 export function lineLyrics(section: ChartSection, line: number): string {
-  return section.lines[line]?.segments.map((s) => s.lyrics).join('') ?? ''
+  return section.lines[line]?.segments.map(s => s.lyrics).join('') ?? ''
 }
 
 function nthOfLabel(sections: ChartSection[], index: number): number {
@@ -32,7 +32,7 @@ function findSection(sections: ChartSection[], label: string | null, nth: number
 }
 
 /** The anchor for a section's title */
-export function sectionAnchor(sections: ChartSection[], section: number): NoteAnchor {
+export function sectionAnchor(sections: ChartSection[], section: number): AnnotationAnchor {
   return {
     kind: 'section',
     label: (sections[section] as ChartSection).label,
@@ -41,7 +41,12 @@ export function sectionAnchor(sections: ChartSection[], section: number): NoteAn
 }
 
 /** The anchor for a spot `offset` characters into a line's lyrics */
-export function textAnchor(sections: ChartSection[], section: number, line: number, offset: number): NoteAnchor {
+export function textAnchor(
+  sections: ChartSection[],
+  section: number,
+  line: number,
+  offset: number
+): AnnotationAnchor {
   const text = lineLyrics(sections[section] as ChartSection, line)
   const at = Math.max(0, Math.min(offset, text.length))
   return {
@@ -56,7 +61,7 @@ export function textAnchor(sections: ChartSection[], section: number, line: numb
 }
 
 /**
- * The nearest place in a line a note can sensibly start, to an approximate offset: the start of a
+ * The nearest place in a line a annotation can sensibly start, to an approximate offset: the start of a
  * word, or of a segment (where a chord is). Offsets worked out from lyrics as drawn (with the
  * chords hidden, hyphens and spaces are folded) can be a few characters off the chart's own.
  */
@@ -78,15 +83,15 @@ export function snapOffset(section: ChartSection, line: number, approx: number):
   return Math.min(best, text.length)
 }
 
-/** Where a note has been placed on the chart as it is now */
+/** Where a annotation has been placed on the chart as it is now */
 export type Placement =
   | { place: 'song' }
   | { place: 'section'; section: number }
   | { place: 'text'; section: number; line: number; offset: number }
-  /** Its place is gone from the chart: shown with the song's notes, marked */
+  /** Its place is gone from the chart: shown with the song's annotations, marked */
   | { place: 'orphan' }
 
-type TextAnchor = Extract<NoteAnchor, { kind: 'text' }>
+type TextAnchor = Extract<AnnotationAnchor, { kind: 'text' }>
 
 /** Whether `anchor` still reads true at `offset` of `text` */
 function holdsAt(text: string, offset: number, anchor: TextAnchor): boolean {
@@ -98,21 +103,29 @@ function holdsAt(text: string, offset: number, anchor: TextAnchor): boolean {
 }
 
 /** Searches one section's lines for the anchor's text, the line nearest the old one first */
-function searchSection(section: ChartSection, sectionIndex: number, anchor: TextAnchor): Placement | null {
+function searchSection(
+  section: ChartSection,
+  sectionIndex: number,
+  anchor: TextAnchor
+): Placement | null {
   const wanted = anchor.before + anchor.after
   if (!wanted) return null
-  const lines = section.lines.map((_, i) => i).sort((a, b) => Math.abs(a - anchor.line) - Math.abs(b - anchor.line))
+  const lines = section.lines
+    .map((_, i) => i)
+    .sort((a, b) => Math.abs(a - anchor.line) - Math.abs(b - anchor.line))
   for (const line of lines) {
     const at = lineLyrics(section, line).indexOf(wanted)
-    if (at >= 0) return { place: 'text', section: sectionIndex, line, offset: at + anchor.before.length }
+    if (at >= 0)
+      return { place: 'text', section: sectionIndex, line, offset: at + anchor.before.length }
   }
   return null
 }
 
-export function resolveAnchor(sections: ChartSection[], anchor: NoteAnchor): Placement {
+export function resolveAnchor(sections: ChartSection[], anchor: AnnotationAnchor): Placement {
   if (anchor.kind === 'song') return { place: 'song' }
   const found = findSection(sections, anchor.label, anchor.nth)
-  if (anchor.kind === 'section') return found >= 0 ? { place: 'section', section: found } : { place: 'orphan' }
+  if (anchor.kind === 'section')
+    return found >= 0 ? { place: 'section', section: found } : { place: 'orphan' }
 
   const section = sections[found]
   if (section) {
@@ -132,11 +145,17 @@ export function resolveAnchor(sections: ChartSection[], anchor: NoteAnchor): Pla
   return section ? { place: 'section', section: found } : { place: 'orphan' }
 }
 
-export interface PlacedNote {
-  note: ChartNote
+export interface PlacedAnnotation {
+  annotation: ChartAnnotation
   placement: Placement
 }
 
-export function placeNotes(sections: ChartSection[], notes: ChartNote[]): PlacedNote[] {
-  return notes.map((note) => ({ note, placement: resolveAnchor(sections, note.anchor) }))
+export function placeAnnotations(
+  sections: ChartSection[],
+  annotations: ChartAnnotation[]
+): PlacedAnnotation[] {
+  return annotations.map(annotation => ({
+    annotation,
+    placement: resolveAnchor(sections, annotation.anchor),
+  }))
 }

@@ -1,10 +1,13 @@
 import { expect, fixture, html } from '@open-wc/testing'
-import '../src/components/note-editor.ts'
-import type { NoteEditor, NoteEditorRequest } from '../src/components/note-editor.ts'
+import '../src/components/annotation-editor.ts'
+import type {
+  AnnotationEditor,
+  AnnotationEditorRequest,
+} from '../src/components/annotation-editor.ts'
 
 const { describe, it } = window
 
-const request = (set: Partial<NoteEditorRequest> = {}): NoteEditorRequest => ({
+const request = (set: Partial<AnnotationEditorRequest> = {}): AnnotationEditorRequest => ({
   anchorElement: document.body,
   about: '“grace”',
   text: '',
@@ -14,9 +17,9 @@ const request = (set: Partial<NoteEditorRequest> = {}): NoteEditorRequest => ({
   ...set,
 })
 
-describe('note-editor', () => {
-  async function open(set: Partial<NoteEditorRequest> = {}) {
-    const editor = await fixture<NoteEditor>(html`<note-editor></note-editor>`)
+describe('annotation-editor', () => {
+  async function open(set: Partial<AnnotationEditorRequest> = {}) {
+    const editor = await fixture<AnnotationEditor>(html`<annotation-editor></annotation-editor>`)
     const answer = editor.edit(request(set))
     await editor.updateComplete
     const root = editor.shadowRoot as ShadowRoot
@@ -39,10 +42,10 @@ describe('note-editor', () => {
     text.dispatchEvent(new Event('input'))
   }
 
-  it('opens on a new note for this setlist and just the user, and answers with what was written', async () => {
+  it('opens on a new annotation for this setlist and just the user, and answers with what was written', async () => {
     const { answer, dialog, text, radio, button } = await open()
     expect(dialog.open).to.equal(true)
-    expect(dialog.getAttribute('aria-label')).to.equal('Note')
+    expect(dialog.getAttribute('aria-label')).to.equal('Annotation')
     expect(radio('This setlist').checked).to.equal(true)
     expect(radio('Just me').checked).to.equal(true)
     expect(button('Delete')).to.equal(undefined)
@@ -65,7 +68,7 @@ describe('note-editor', () => {
     expect(await second.answer).to.equal(null)
   })
 
-  it('edits an existing note as it is, and can delete it', async () => {
+  it('edits an existing annotation as it is, and can delete it', async () => {
     const { answer, text, radio, button } = await open({
       isNew: false,
       text: 'repeat 4×',
@@ -77,7 +80,7 @@ describe('note-editor', () => {
     expect(await answer).to.deep.equal({ action: 'delete' })
   })
 
-  it('shares only for those who can, and only a note for this setlist', async () => {
+  it('shares only for those who can, and only a annotation for this setlist', async () => {
     const reader = await open({ canShare: false })
     expect(reader.radio('The team').disabled).to.equal(true)
     expect(reader.dialog.textContent).to.contain('Only people who can edit the setlist')

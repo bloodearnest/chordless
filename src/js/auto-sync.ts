@@ -180,8 +180,8 @@ export class AutoSync {
    */
   #onDataChange = (event: Event): void => {
     const { change } = event as DataChangeEvent
-    // Private notes never leave the device: nothing to send
-    if (change.origin !== 'local' || change.remote || change.kind === 'note') return
+    // Private annotations never leave the device: nothing to send
+    if (change.origin !== 'local' || change.remote || change.kind === 'annotation') return
     this.#unsent = true
     this.#nudge()
   }

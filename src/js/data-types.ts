@@ -10,8 +10,8 @@ import type { TeamRole } from './team-roles.ts'
 export interface ChartSegment {
   chord: string
   lyrics: string
-  /** Notes that sit at the start of this segment, put there to be drawn (never by the parser) */
-  notes?: ShownNote[]
+  /** Annotations that sit at the start of this segment, put there to be drawn (never by the parser) */
+  annotations?: ShownAnnotation[]
   /** Where it starts in the line's lyrics, put there to be drawn (never by the parser) */
   offset?: number
   /** Set by transposeSong */
@@ -168,13 +168,13 @@ export interface ChordProRecord {
   lastModified?: number | string
 }
 
-// ==================== Notes on a chart (docs/NOTES.md) ====================
+// ==================== Annotations on a chart (docs/ANNOTATIONS.md) ====================
 
 /**
- * Where on a song a note sits: its structure, never a pixel, and never a chord or a variant's uuid,
+ * Where on a song an annotation sits: its structure, never a pixel, and never a chord or a variant's uuid,
  * so it survives transposing, hidden chords, other screen sizes and an edited chart
  */
-export type NoteAnchor =
+export type AnnotationAnchor =
   | { kind: 'song' }
   /** A section's title: `nth` counts the sections with the same label, from 0 */
   | { kind: 'section'; label: string | null; nth: number }
@@ -190,29 +190,29 @@ export type NoteAnchor =
     }
 
 /** Typed text, or (not built yet) a drawing, which is private to one musician and never synced or shared */
-export type NoteBody =
+export type AnnotationBody =
   | { kind: 'text'; text: string }
   | { kind: 'ink'; strokes: number[][]; w: number; h: number }
 
-export interface ChartNote {
+export interface ChartAnnotation {
   id: string
-  anchor: NoteAnchor
-  body: NoteBody
-  /** The person (an id in `people`) who made a shared note */
+  anchor: AnnotationAnchor
+  body: AnnotationBody
+  /** The person (an id in `people`) who made a shared annotation */
   createdBy?: string
   /** ISO time of the last change */
   modified: string
 }
 
-/** A note as it is drawn: its text, and whether it is shared with the team (else private, drawn in pencil) */
-export interface ShownNote {
+/** An annotation as it is drawn: its text, and whether it is shared with the team (else private, drawn in pencil) */
+export interface ShownAnnotation {
   id: string
   text: string
   shared: boolean
 }
 
-/** A note that can travel with a setlist: text only */
-export type SharedChartNote = ChartNote & { body: { kind: 'text'; text: string } }
+/** An annotation that can travel with a setlist: text only */
+export type SharedChartAnnotation = ChartAnnotation & { body: { kind: 'text'; text: string } }
 
 /** A song in a setlist: a reference, with this setlist's key and tempo for it */
 export interface SetlistEntry {
@@ -222,8 +222,8 @@ export interface SetlistEntry {
   key: string | null
   tempo: number | null
   notes: string
-  /** Notes on the chart that everyone with the setlist sees (docs/NOTES.md) */
-  annotations?: SharedChartNote[]
+  /** Annotations on the chart that everyone with the setlist sees (docs/ANNOTATIONS.md) */
+  annotations?: SharedChartAnnotation[]
   /** This setlist's own edited ChordPro text for the song, if it has one */
   chordproEdits?: string
 }

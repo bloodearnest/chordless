@@ -81,43 +81,51 @@ describe('describing what a setlist changed', () => {
     assert.deepEqual(describe_(setlist([], { name: '' }), noName), [])
   })
 
-  describe('notes', () => {
-    const note = (id: string, text: string) => ({
+  describe('annotations', () => {
+    const annotation = (id: string, text: string) => ({
       id,
       anchor: { kind: 'song' as const },
       body: { kind: 'text' as const, text },
       modified: '',
     })
-    const withNotes = (...notes: ReturnType<typeof note>[]) =>
-      setlist([song('a', { annotations: notes }), song('b')])
+    const withAnnotations = (...annotations: ReturnType<typeof annotation>[]) =>
+      setlist([song('a', { annotations }), song('b')])
 
-    it('says when a song’s notes changed: added, edited, removed, or the older note text', () => {
-      const none = withNotes()
-      assert.deepEqual(describe_(none, withNotes(note('1', 'softly'))), ['A: notes changed'])
-      assert.deepEqual(describe_(withNotes(note('1', 'softly')), withNotes(note('1', 'loudly'))), [
-        'A: notes changed',
+    it('says when a song’s annotations changed: added, edited or removed; and when its older note text did', () => {
+      const none = withAnnotations()
+      assert.deepEqual(describe_(none, withAnnotations(annotation('1', 'softly'))), [
+        'A: annotations changed',
       ])
-      assert.deepEqual(describe_(withNotes(note('1', 'softly')), none), ['A: notes changed'])
+      assert.deepEqual(
+        describe_(
+          withAnnotations(annotation('1', 'softly')),
+          withAnnotations(annotation('1', 'loudly'))
+        ),
+        ['A: annotations changed']
+      )
+      assert.deepEqual(describe_(withAnnotations(annotation('1', 'softly')), none), [
+        'A: annotations changed',
+      ])
       assert.deepEqual(
         describe_(setlist([song('a', { notes: 'x' })]), setlist([song('a', { notes: 'y' })])),
         ['A: notes changed']
       )
     })
 
-    it('treats a song with no notes field as one with none', () => {
-      const bare = { ...song('a'), notes: undefined } as unknown as SetlistEntry
-      assert.deepEqual(describe_(setlist([bare]), setlist([{ ...song('a'), notes: '' }])), [])
+    it('treats a song with no annotations as one with none', () => {
+      const bare = { ...song('a'), annotations: undefined } as unknown as SetlistEntry
+      assert.deepEqual(describe_(setlist([bare]), setlist([{ ...song('a'), annotations: [] }])), [])
     })
 
-    it('says nothing for the same notes in another order, or for none to none', () => {
+    it('says nothing for the same annotations in another order, or for none to none', () => {
       assert.deepEqual(
         describe_(
-          withNotes(note('1', 'a'), note('2', 'b')),
-          withNotes(note('2', 'b'), note('1', 'a'))
+          withAnnotations(annotation('1', 'a'), annotation('2', 'b')),
+          withAnnotations(annotation('2', 'b'), annotation('1', 'a'))
         ),
         []
       )
-      assert.deepEqual(describe_(withNotes(), setlist([song('a'), song('b')])), [])
+      assert.deepEqual(describe_(withAnnotations(), setlist([song('a'), song('b')])), [])
     })
   })
 })

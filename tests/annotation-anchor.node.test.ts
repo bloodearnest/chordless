@@ -1,17 +1,17 @@
 /**
- * Where notes sit on a chart and finding the place again (src/js/notes/anchor.ts): by section
- * label and the lyrics around a spot, so an edited chart moves a note rather than losing it.
+ * Where annotations sit on a chart and finding the place again (src/js/annotations/anchor.ts): by section
+ * label and the lyrics around a spot, so an edited chart moves a annotation rather than losing it.
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import type { ChartSection } from '../src/js/data-types.ts'
 import {
-  placeNotes,
+  placeAnnotations,
   resolveAnchor,
   sectionAnchor,
   snapOffset,
   textAnchor,
-} from '../src/js/notes/anchor.ts'
+} from '../src/js/annotations/anchor.ts'
+import type { ChartSection } from '../src/js/data-types.ts'
 
 const section = (label: string | null, ...lines: string[][]): ChartSection => ({
   type: 'section',
@@ -46,11 +46,11 @@ test('the second section with the same label is found as the second', () => {
   assert.deepEqual(resolveAnchor(chart, sectionAnchor(chart, 2)), { place: 'section', section: 2 })
 })
 
-test('a song note is the song', () => {
+test('a song annotation is the song', () => {
   assert.deepEqual(resolveAnchor(chart, { kind: 'song' }), { place: 'song' })
 })
 
-test('an edited line moves the note with its text', () => {
+test('an edited line moves the annotation with its text', () => {
   const anchor = textAnchor(chart, 0, 1, 4)
   const edited = [
     section('Verse', ['A new first line'], ['the sound that saved']),
@@ -89,7 +89,7 @@ test('text gone from a section that is still there falls back to the section', (
   assert.deepEqual(resolveAnchor(rewritten, anchor), { place: 'section', section: 1 })
 })
 
-test('a note whose section and text are both gone is orphaned, not dropped', () => {
+test('a annotation whose section and text are both gone is orphaned, not dropped', () => {
   assert.deepEqual(resolveAnchor([chart[0] as ChartSection], textAnchor(chart, 1, 0, 3)), {
     place: 'orphan',
   })
@@ -110,15 +110,15 @@ test('a spot on a blank line that is gone falls back to its section: there is no
   )
 })
 
-test('an offset past the end is clamped, and a blank line still holds its note', () => {
+test('an offset past the end is clamped, and a blank line still holds its annotation', () => {
   const blank = [section('Intro', [''])]
   const anchor = textAnchor(blank, 0, 0, 40)
   assert.equal(anchor.kind === 'text' && anchor.offset, 0)
   assert.deepEqual(resolveAnchor(blank, anchor), { place: 'text', section: 0, line: 0, offset: 0 })
 })
 
-test('every note is placed, in the order given', () => {
-  const notes = [
+test('every annotation is placed, in the order given', () => {
+  const annotations = [
     {
       id: 'a',
       anchor: sectionAnchor(chart, 1),
@@ -128,7 +128,10 @@ test('every note is placed, in the order given', () => {
     { id: 'b', anchor: { kind: 'song' }, body: { kind: 'text', text: 'fast' }, modified: '' },
   ] as const
   assert.deepEqual(
-    placeNotes(chart, [...notes]).map(({ note, placement }) => [note.id, placement.place]),
+    placeAnnotations(chart, [...annotations]).map(({ annotation, placement }) => [
+      annotation.id,
+      placement.place,
+    ]),
     [
       ['a', 'section'],
       ['b', 'song'],

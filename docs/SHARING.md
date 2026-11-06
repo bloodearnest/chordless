@@ -92,9 +92,9 @@ What's encrypted. Everything a recipient needs, and nothing about the space:
 ```
 
 - The chart text is included, not song ids.
-- A song's shared notes (`docs/NOTES.md`) are in `annotations`, only when it has some (so a share of a
-  setlist without notes keeps its hash). A receiver keeps only the well formed text notes of them. The
-  sender's private notes and any drawings are never in a bundle.
+- A song's shared annotations (`docs/ANNOTATIONS.md`) are in `annotations`, only when it has some (so a share of
+  a setlist without annotations keeps its hash). A receiver keeps only the well formed text annotations of them.
+  The sender's private annotations and any drawings are never in a bundle.
 - Not included: space ids, Drive ids, leaders' emails and ids (the bundle has the leader's name only) and sync
   fields.
 - A typical setlist (4–6 songs) is 10–15 KB of ChordPro, about 3–4 KB compressed.
@@ -173,7 +173,7 @@ Two new steps in `SyncManager.sync()`, after setlists and songs are pushed:
      and update the same Drive file with `updateFile`. The link doesn't change.
    - Save the new `bundleHash`, and `expires` if the date changed.
 
-   The bundle changes when songs are added, removed or reordered, when a key or note
+   The bundle changes when songs are added, removed or reordered, when a key, note or annotation
    changes, and when one of its charts is edited.
 2. **Clean up shares.** List `shares/`, and revoke the public permission of, and then move to the Drive trash, every file whose
    `expires` has passed, or whose setlist doesn't exist or has no `share` pointing at

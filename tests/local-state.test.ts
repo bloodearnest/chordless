@@ -1,11 +1,11 @@
 import { expect } from '@open-wc/testing'
 import {
   clearSetlistLocalState,
+  loadSetlistAnnotations,
   loadSetlistLocalState,
-  loadSetlistNotes,
   loadSongCapo,
+  saveSetlistAnnotations,
   saveSetlistLocalState,
-  saveSetlistNotes,
 } from '../src/js/setlist/local-state.ts'
 
 const songs = [
@@ -107,8 +107,8 @@ describe('what a setlist keeps on this device', () => {
     expect(localStorage.getItem('state-s1')).to.equal(null)
   })
 
-  describe('private notes', () => {
-    const note = {
+  describe('private annotations', () => {
+    const annotation = {
       id: 'n1',
       anchor: { kind: 'song' },
       body: { kind: 'text', text: 'drop out' },
@@ -121,16 +121,16 @@ describe('what a setlist keeps on this device', () => {
         { sectionState: { 1: { 0: hidden } }, capoValues: { 0: 2 } },
         songs
       )
-      saveSetlistNotes('s1', songs[1], [note], songs)
-      expect(loadSetlistNotes('s1', songs[1])).to.deep.equal([note])
-      expect(loadSetlistNotes('s1', songs[0])).to.deep.equal([])
+      saveSetlistAnnotations('s1', songs[1], [annotation], songs)
+      expect(loadSetlistAnnotations('s1', songs[1])).to.deep.equal([annotation])
+      expect(loadSetlistAnnotations('s1', songs[0])).to.deep.equal([])
       expect(loadSetlistLocalState('s1', songs)).to.deep.equal({
         sectionState: { 1: { 0: hidden } },
         capoValues: { 0: 2 },
       })
       // and the sections saved after do not lose them
       saveSetlistLocalState('s1', { sectionState: {}, capoValues: {} }, songs)
-      expect(loadSetlistNotes('s1', songs[1])).to.deep.equal([note])
+      expect(loadSetlistAnnotations('s1', songs[1])).to.deep.equal([annotation])
     })
 
     it('carry on when they cannot be kept, as when storage is full', () => {
@@ -139,16 +139,16 @@ describe('what a setlist keeps on this device', () => {
         throw new DOMException('full', 'QuotaExceededError')
       }
       try {
-        expect(() => saveSetlistNotes('s1', songs[0], [note], songs)).to.not.throw()
+        expect(() => saveSetlistAnnotations('s1', songs[0], [annotation], songs)).to.not.throw()
       } finally {
         Storage.prototype.setItem = realSetItem
       }
     })
 
     it('are forgotten for a song when none are left', () => {
-      saveSetlistNotes('s1', songs[0], [note], songs)
-      saveSetlistNotes('s1', songs[0], [], songs)
-      expect(loadSetlistNotes('s1', songs[0])).to.deep.equal([])
+      saveSetlistAnnotations('s1', songs[0], [annotation], songs)
+      saveSetlistAnnotations('s1', songs[0], [], songs)
+      expect(loadSetlistAnnotations('s1', songs[0])).to.deep.equal([])
     })
 
     it('keep what was kept by place when the state is first saved by song', () => {
@@ -156,7 +156,7 @@ describe('what a setlist keeps on this device', () => {
         'state-s1',
         JSON.stringify({ sectionState: { 1: { 0: hidden } }, capo: { 2: 5 } })
       )
-      saveSetlistNotes('s1', songs[0], [note], songs)
+      saveSetlistAnnotations('s1', songs[0], [annotation], songs)
       expect(loadSetlistLocalState('s1', songs)).to.deep.equal({
         sectionState: { 1: { 0: hidden } },
         capoValues: { 2: 5 },

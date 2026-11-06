@@ -49,13 +49,13 @@ export class CapoPreferenceEvent extends Event {
     this.enabled = enabled
   }
 }
-/** Which notes on a chart to show changed (sent on window) */
-export class NotesPreferenceEvent extends Event {
-  static readonly type = 'preferences:notes-changed'
+/** Which annotations on a chart to show changed (sent on window) */
+export class AnnotationsPreferenceEvent extends Event {
+  static readonly type = 'preferences:annotations-changed'
   readonly shared: boolean
   readonly mine: boolean
   constructor(shared: boolean, mine: boolean) {
-    super(NotesPreferenceEvent.type)
+    super(AnnotationsPreferenceEvent.type)
     this.shared = shared
     this.mine = mine
   }
@@ -176,15 +176,15 @@ const capo = definePreference<boolean>({
   changed: on => new CapoPreferenceEvent(on),
 })
 
-// Notes on a chart (docs/NOTES.md): both kinds shown unless turned off
-const showSharedNotes = definePreference<boolean>({
-  keys: ['show_shared_notes'],
+// Annotations on a chart (docs/ANNOTATIONS.md): both kinds shown unless turned off
+const showSharedAnnotations = definePreference<boolean>({
+  keys: ['show_shared_annotations'],
   read: ([stored]) => stored !== 'false',
   write: on => (on ? 'true' : 'false'),
   blocked: true,
 })
-const showMyNotes = definePreference<boolean>({
-  keys: ['show_my_notes'],
+const showMyAnnotations = definePreference<boolean>({
+  keys: ['show_my_annotations'],
   read: ([stored]) => stored !== 'false',
   write: on => (on ? 'true' : 'false'),
   blocked: true,
@@ -256,15 +256,15 @@ export const getSectionDefaults = (): SectionDefaults => sectionDefaults.get()
 export const getCapoPreference = (): boolean => capo.get()
 export const setCapoPreference = (value: boolean) => capo.set(!!value)
 
-/** Which notes on a chart are shown: those shared with the team, and the user's own */
-export const getNotesPreference = (): { shared: boolean; mine: boolean } => ({
-  shared: showSharedNotes.get(),
-  mine: showMyNotes.get(),
+/** Which annotations on a chart are shown: those shared with everyone, and the user's own */
+export const getAnnotationsPreference = (): { shared: boolean; mine: boolean } => ({
+  shared: showSharedAnnotations.get(),
+  mine: showMyAnnotations.get(),
 })
-export function setNotesPreference(which: 'shared' | 'mine', on: boolean) {
-  ;(which === 'shared' ? showSharedNotes : showMyNotes).set(on)
-  const { shared, mine } = getNotesPreference()
-  window.dispatchEvent(new NotesPreferenceEvent(shared, mine))
+export function setAnnotationsPreference(which: 'shared' | 'mine', on: boolean) {
+  ;(which === 'shared' ? showSharedAnnotations : showMyAnnotations).set(on)
+  const { shared, mine } = getAnnotationsPreference()
+  window.dispatchEvent(new AnnotationsPreferenceEvent(shared, mine))
 }
 
 /** Whether to keep the screen awake while a setlist is open: on unless the user turned it off */
@@ -294,7 +294,7 @@ declare global {
     [AccidentalsPreferenceEvent.type]: AccidentalsPreferenceEvent
     [SectionDefaultsEvent.type]: SectionDefaultsEvent
     [CapoPreferenceEvent.type]: CapoPreferenceEvent
-    [NotesPreferenceEvent.type]: NotesPreferenceEvent
+    [AnnotationsPreferenceEvent.type]: AnnotationsPreferenceEvent
   }
 }
 

@@ -32,7 +32,7 @@ export function groupSegmentsIntoUnits(
       consumed = gap.length
     }
     if (!lyrics) {
-      if (segment.chord || segment.notes?.length) pieces.push({ ...segment, lyrics })
+      if (segment.chord || segment.annotations?.length) pieces.push({ ...segment, lyrics })
       continue
     }
     // (every character is a space or not, so non-empty lyrics always match)

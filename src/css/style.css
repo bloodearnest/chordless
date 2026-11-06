@@ -1,4 +1,4 @@
-/* The handwriting notes on a chart are set in (docs/NOTES.md); bundled, so it works offline */
+/* The handwriting annotations on a chart are set in (docs/ANNOTATIONS.md); bundled, so it works offline */
 @import '@fontsource/caveat/latin-500.css';
 @import '@fontsource/caveat/latin-ext-500.css';
 
@@ -65,8 +65,8 @@ app-modal:not(:defined) {
   --color-danger: #e74c3c;
   --color-info: #2980b9;
   --chord-color: #2980b9;
-  --note-private-color: #4f5b66;
-  --note-shared-color: #b8431f;
+  --annotation-private-color: #4f5b66;
+  --annotation-shared-color: #b8431f;
   --border-color: #d5dbdb;
   --border-light: #ecf0f1;
   --overlay-bg: rgba(0, 0, 0, 0.7);
@@ -113,8 +113,8 @@ app-modal:not(:defined) {
   /* Semantic font sizes for different content types */
   --font-lyrics: var(--font-base);
   --font-chords: calc(var(--font-base) * 0.9);
-  --font-note: calc(var(--font-base) * 1.05);
-  --font-family-note: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
+  --font-annotation: calc(var(--font-base) * 1.05);
+  --font-family-annotation: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
   --font-ui: calc(var(--font-base) * 0.8);
   --font-ui-small: calc(var(--font-base) * 0.7);
   --font-icon: var(--font-ui); /* Icon/symbol text (buttons, etc.) */

@@ -1,18 +1,17 @@
 /**
  * What differs between two versions of a setlist, in words, for a message: the songs added and
- * removed, a different order, and a song's key, tempo or notes. Pure, so a setlist that arrives some
+ * removed, a different order, and a song's key, tempo, notes or annotations. Pure, so a setlist that arrives some
  * other way (a future live push from the leader) can be described the same way.
  */
 import type { Setlist, SetlistEntry } from '../data-types.ts'
 
-/** A song's notes as one string, so the same notes in any order are the same */
-const notesOf = (entry: SetlistEntry) =>
-  JSON.stringify([
-    entry.notes ?? '',
+/** A song's annotations as one string, so the same annotations in any order are the same */
+const annotationsOf = (entry: SetlistEntry) =>
+  JSON.stringify(
     (entry.annotations ?? [])
-      .map(note => [note.id, JSON.stringify(note.anchor), note.body.text])
-      .sort(),
-  ])
+      .map(annotation => [annotation.id, JSON.stringify(annotation.anchor), annotation.body.text])
+      .sort()
+  )
 
 const DETAILS = ['date', 'time', 'type', 'name', 'leaderId'] as const
 
@@ -22,7 +21,7 @@ const keyOf = (entry: SetlistEntry) => entry.songId
 /**
  * What `after` has that `before` does not, as short phrases: "+ Song" (added), "− Song"
  * (removed), "order changed", "Song: key G → A", "Song: 90 → 100 BPM", "Song: notes changed",
- * "details changed".
+ * "Song: annotations changed", "details changed".
  * Empty if the two are the same.
  */
 export function describeSetlistChange(
@@ -52,7 +51,11 @@ export function describeSetlistChange(
     if ((earlier.tempo ?? null) !== (entry.tempo ?? null)) {
       changes.push(`${titleOf(entry)}: ${earlier.tempo ?? '—'} → ${entry.tempo ?? '—'} BPM`)
     }
-    if (notesOf(earlier) !== notesOf(entry)) changes.push(`${titleOf(entry)}: notes changed`)
+    if ((earlier.notes ?? '') !== (entry.notes ?? ''))
+      changes.push(`${titleOf(entry)}: notes changed`)
+    if (annotationsOf(earlier) !== annotationsOf(entry)) {
+      changes.push(`${titleOf(entry)}: annotations changed`)
+    }
   }
 
   if (DETAILS.some(field => (before[field] ?? '') !== (after[field] ?? ''))) {

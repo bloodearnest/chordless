@@ -1,38 +1,38 @@
 import { css, html, LitElement } from 'lit'
 import { ref } from 'lit/directives/ref.js'
+import type { AnnotationKind } from '../js/annotations/store.ts'
 import { DialogPopup } from '../js/dialog-popup.ts'
-import type { NoteKind } from '../js/notes/store.ts'
 import { frameBounds } from '../js/utils/frame.ts'
 import { buttonStyles, fieldStyles } from './shared-styles.ts'
 
-/** What the note editor is asked to edit */
-export interface NoteEditorRequest {
+/** What the annotation editor is asked to edit */
+export interface AnnotationEditorRequest {
   /** What it opens beside */
   anchorElement: HTMLElement
-  /** What the note is on: “grace”, or “Chorus” */
+  /** What the annotation is on: “grace”, or “Chorus” */
   about: string
   text: string
-  kind: NoteKind
-  /** The user can share a note with the team (else "The team" is off, with the reason) */
+  kind: AnnotationKind
+  /** The user can share a annotation with the team (else "The team" is off, with the reason) */
   canShare: boolean
-  /** A note that is not made yet: there is nothing to delete */
+  /** A annotation that is not made yet: there is nothing to delete */
   isNew: boolean
 }
 
-/** What was chosen: kept as this (a note with no text is deleted), or deleted; null if closed without either */
-export type NoteEditorResult =
-  | { action: 'save'; text: string; kind: NoteKind }
+/** What was chosen: kept as this (a annotation with no text is deleted), or deleted; null if closed without either */
+export type AnnotationEditorResult =
+  | { action: 'save'; text: string; kind: AnnotationKind }
   | { action: 'delete' }
   | null
 
 /**
- * The editor for a note (docs/NOTES.md): its words, where it is shown (this setlist, or this song
+ * The editor for a annotation (docs/ANNOTATIONS.md): its words, where it is shown (this setlist, or this song
  * wherever it is) and who sees it (just me, or the team). A popup in a modal <dialog> beside what
  * was pressed; on a narrow screen it sits at the top, clear of the on-screen keyboard.
  *
  *   const result = await editor.edit({ anchorElement, about: '“grace”', … })
  */
-export class NoteEditor extends LitElement {
+export class AnnotationEditor extends LitElement {
   static override properties = {
     _request: { state: true },
     _text: { state: true },
@@ -40,14 +40,14 @@ export class NoteEditor extends LitElement {
     _reach: { state: true },
   }
 
-  declare _request: NoteEditorRequest | null
+  declare _request: AnnotationEditorRequest | null
   declare _text: string
-  declare _scope: NoteKind['scope']
-  declare _reach: NoteKind['reach']
+  declare _scope: AnnotationKind['scope']
+  declare _reach: AnnotationKind['reach']
 
   #popup = new DialogPopup(this, { position: dialog => this.#place(dialog) })
-  #settle: ((result: NoteEditorResult) => void) | null = null
-  #answer: NoteEditorResult = null
+  #settle: ((result: AnnotationEditorResult) => void) | null = null
+  #answer: AnnotationEditorResult = null
 
   static override styles = [
     buttonStyles,
@@ -168,7 +168,7 @@ export class NoteEditor extends LitElement {
   }
 
   /** Open it; resolves when it is closed */
-  edit(request: NoteEditorRequest): Promise<NoteEditorResult> {
+  edit(request: AnnotationEditorRequest): Promise<AnnotationEditorResult> {
     this.#settle?.(null)
     this._request = request
     this._text = request.text
@@ -201,7 +201,7 @@ export class NoteEditor extends LitElement {
     dialog.style.left = `${Math.max(frame.left + 8, Math.min(target.left, frame.right - width - 8))}px`
   }
 
-  #finish(result: NoteEditorResult) {
+  #finish(result: AnnotationEditorResult) {
     this.#answer = result
     this.#popup.close()
   }
@@ -223,18 +223,18 @@ export class NoteEditor extends LitElement {
     })
   }
 
-  /** Shared notes are for this setlist: the team's copy is the setlist's */
-  #canChoose(reach: NoteKind['reach']): boolean {
+  /** Shared annotations are for this setlist: the team's copy is the setlist's */
+  #canChoose(reach: AnnotationKind['reach']): boolean {
     return reach === 'private' || (Boolean(this._request?.canShare) && this._scope === 'setlist')
   }
 
   #choose(field: '_scope' | '_reach', value: string) {
     if (field === '_scope') {
-      this._scope = value as NoteKind['scope']
+      this._scope = value as AnnotationKind['scope']
       // (what is only for the setlist's own cannot be kept for the song)
       if (this._scope === 'song') this._reach = 'private'
     } else {
-      this._reach = value as NoteKind['reach']
+      this._reach = value as AnnotationKind['reach']
     }
   }
 
@@ -242,23 +242,23 @@ export class NoteEditor extends LitElement {
     const request = this._request
     if (!request) return html``
     const sharingWhy = !request.canShare
-      ? 'Only people who can edit the setlist can share a note.'
+      ? 'Only people who can edit the setlist can share a annotation.'
       : this._scope === 'song'
-        ? 'A note kept for the song is only yours; notes shared with the team belong to a setlist.'
+        ? 'A annotation kept for the song is only yours; annotations shared with the team belong to a setlist.'
         : ''
     return html`
       <dialog
         ${ref(this.#popup.ref)}
-        aria-label="Note"
+        aria-label="Annotation"
         @click=${this.#popup.onClick}
         @close=${this.#closed}
       >
-        <h2>${request.isNew ? 'New note' : 'Note'} on ${request.about}</h2>
+        <h2>${request.isNew ? 'New annotation' : 'Annotation'} on ${request.about}</h2>
         <textarea
           class="field"
           rows="3"
           maxlength="280"
-          aria-label="Note text"
+          aria-label="Annotation text"
           placeholder="e.g. quietly, drop out, repeat 4×"
           .value=${this._text}
           @input=${(event: Event) => {
@@ -320,10 +320,10 @@ export class NoteEditor extends LitElement {
   }
 }
 
-customElements.define('note-editor', NoteEditor)
+customElements.define('annotation-editor', AnnotationEditor)
 
 declare global {
   interface HTMLElementTagNameMap {
-    'note-editor': NoteEditor
+    'annotation-editor': AnnotationEditor
   }
 }
