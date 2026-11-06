@@ -274,6 +274,8 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
     // Notes and rests, voice by voice, in the order they are drawn
     const measureAlters = new Map<number, number>()
     const voices: MelodyEvent[][] = []
+    /** Where an event is on the page, when the source says (the PDF's drawing does): lines of different voices are lined up by it */
+    const xOf = new Map<MelodyEvent, number>()
     const headXs: { x: number; start: number }[] = []
     for (const layer of byClass(staff, 'layer')) {
       const events: MelodyEvent[] = []
@@ -300,6 +302,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
             if (whole && dur === 4) dur = measureLen
             else dur = dur * dotFactor(dots) * tupletRatio
             events.push({ kind: 'rest', id: c.attrs.id ?? '', start: t, duration: dur, wholeMeasure: whole, cue: g.scale < 0.65 })
+            if (c.attrs['data-x']) xOf.set(events[events.length - 1] as MelodyEvent, Number(c.attrs['data-x']))
             t += dur
           } else if (is(c, 'chord') || is(c, 'note')) {
             const notes = is(c, 'chord') ? byClass(c, 'note') : [c]
@@ -360,6 +363,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
                 syllables: sylls,
                 withPrevious: !first,
               })
+              if (owner.attrs['data-x']) xOf.set(events[events.length - 1] as MelodyEvent, Number(owner.attrs['data-x']))
               headXs.push({ x: hg.x, start: t })
               heads.push({ sys: systemIndex, x: hg.x + (HEAD_WIDTH * hg.scale) / 2, y: hg.y, note: events[events.length - 1] as MelodyNote })
               first = false
@@ -371,9 +375,13 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
       walk(layer, 1, null)
     }
 
+    const aligned = voices.length > 1 && voices.every((v) => v.every((e) => xOf.has(e))) ? alignVoices(voices, xOf) : null
     const voiceLengths = voices.map((v) => end(v))
     const total = Math.max(0, ...voiceLengths)
-    const full = voiceLengths.length > 0 && voiceLengths.every((l) => Math.abs(l - measureLen) < 1e-6)
+    // The sung line has to add up; an instrumental one in cue size may stop short (the PDF draws no spacer rests) but not run over
+    const sung = voices.findIndex((v) => v.some((e) => !e.cue))
+    const main = aligned ?? voiceLengths[sung < 0 ? 0 : sung] ?? 0
+    const full = voiceLengths.length > 0 && Math.abs(main - measureLen) < 1e-6 && voiceLengths.every((l) => l <= measureLen + 1e-6)
 
     // Chord symbols sit above the beat they belong to: the nearest head along the staff
     const chords: MelodyChord[] = byClass(m, 'harm').flatMap((h) => {
@@ -447,14 +455,36 @@ function tupletFactor(t: El): number {
   return normal / actual
 }
 
-/** How many beams join a stem at `x`: the beam polygons that run across it */
+/**
+ * How many beams join a stem at `x`: the beam polygons that run across it. A sloped secondary beam
+ * is drawn in pieces, one between each pair of stems, that meet end to end; they are one beam.
+ */
 function beamLevels(beam: El, x: number): number {
-  let levels = 0
-  for (const p of beam.children.filter((c) => c.name === 'polygon')) {
-    const xs = (p.attrs.points ?? '').split(/\s+/).map((pt) => Number(pt.split(',')[0]))
-    if (xs.length && Math.min(...xs) - 25 <= x && x <= Math.max(...xs) + 25) levels++
+  interface P {
+    x0: number
+    x1: number
+    yLeft: number
+    yRight: number
+    chain: number
   }
-  return levels
+  const polys: P[] = beam.children
+    .filter((c) => c.name === 'polygon')
+    .flatMap((p) => {
+      const pts = (p.attrs.points ?? '').split(/\s+/).map((pt) => pt.split(',').map(Number) as [number, number])
+      if (pts.length < 4) return []
+      const [tl, tr] = pts as [[number, number], [number, number]]
+      return [{ x0: Math.min(tl[0], tr[0]), x1: Math.max(tl[0], tr[0]), yLeft: tl[1], yRight: tr[1], chain: 0 }]
+    })
+  polys.sort((a, b) => a.x0 - b.x0)
+  polys.forEach((p, i) => {
+    p.chain = i
+  })
+  for (const a of polys)
+    for (const b of polys)
+      if (a !== b && Math.abs(a.x1 - b.x0) < 8 && Math.abs(a.yRight - b.yLeft) < 12) b.chain = a.chain
+  const chains = new Set<number>()
+  for (const p of polys) if (p.x0 - 25 <= x && x <= p.x1 + 25) chains.add(p.chain)
+  return chains.size
 }
 
 function barlineOf(b: El | undefined): MelodyMeasure['barline'] {
@@ -507,4 +537,31 @@ function tieNotes(raws: Raw[], heads: Head[], warnings: string[]) {
       if (!a && !b) warnings.push(`tie ${tie.attrs.id} joins no heads`)
     }
   }
+}
+
+/**
+ * Lines up the voices of a measure that were drawn without spacer rests (the PDF's drawing has none),
+ * by where each event is on the page: events at the same place start together, and the next place
+ * is when the first of the events still sounding ends. The line that is sung and one in cue size
+ * that runs with it, or takes over from its rests, come out as one timeline. Returns when it ends.
+ */
+function alignVoices(voices: MelodyEvent[][], xOf: Map<MelodyEvent, number>): number {
+  const all = voices.flatMap((v) => v).sort((a, b) => (xOf.get(a) as number) - (xOf.get(b) as number))
+  const sounding: MelodyEvent[] = []
+  let time = 0
+  let latest = 0
+  for (let i = 0; i < all.length; ) {
+    const x0 = xOf.get(all[i] as MelodyEvent) as number
+    let j = i
+    while (j < all.length && (xOf.get(all[j] as MelodyEvent) as number) - x0 < 40) j++
+    for (const e of all.slice(i, j)) {
+      e.start = time
+      sounding.push(e)
+      latest = Math.max(latest, time + e.duration)
+    }
+    const ends = sounding.map((e) => e.start + e.duration).filter((end) => end > time + 1e-9)
+    time = ends.length ? Math.min(...ends) : latest
+    i = j
+  }
+  return latest
 }

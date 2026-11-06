@@ -37,7 +37,9 @@ const spell = (n: MelodyNote) => `${n.step}${n.alter > 0 ? '#' : n.alter < 0 ? '
 
 const args = process.argv.slice(2)
 const target = args[0] as string
-if (statSync(target).isDirectory()) {
+if (!import.meta.main) {
+  // imported for readPdf
+} else if (statSync(target).isDirectory()) {
   let songs = 0
   let measures = 0
   let full = 0
