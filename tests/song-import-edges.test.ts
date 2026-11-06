@@ -50,7 +50,14 @@ describe('song-import: corners', () => {
     const element = await importer()
     const title = unique('Lyrics only')
     await element.receive({
-      lyricsText: `${title}\n\nVerse 1\nWords here\n\nChorus\nMore words\n\nA Writer\nCCLI Song #9\n© 2024 Music`,
+      songDetails: {
+        title,
+        ccliSongNumber: '9',
+        lyrics: [
+          { partLabel: 'Verse 1', lyrics: 'Words here | More words' },
+          { partLabel: 'Chorus', lyrics: 'Sing it' },
+        ],
+      },
       metadata: { title },
       source: 'songselect',
     })
@@ -59,7 +66,7 @@ describe('song-import: corners', () => {
     expect(item.chordproText).to.contain('{ccli: 9}')
     expect(item.song.title).to.equal(title)
     // and lyrics that are not lyrics are no song
-    await element.receive({ lyricsText: 'Just a title' })
+    await element.receive({ songDetails: { title: 'Just a title' } })
     expect(element._error).to.contain('No songs to import')
   })
 

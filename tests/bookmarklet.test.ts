@@ -41,6 +41,9 @@ describe('bookmarkletUrl', () => {
 /** What the lead sheet request gets: nothing (SongSelect says no), the PDF, the PDF as JSON, or what is no PDF */
 type LeadSheet = 'none' | 'pdf' | 'json' | 'html' | 'error'
 
+/** What the song details request gets: nothing, a failure, or the song's details */
+type SongDetailsReply = 'none' | 'error' | { defaultKey?: string[]; lyrics?: unknown[] }
+
 const PDF = '%PDF-1.4 a lead sheet'
 const bytesOf = (text: string) => new TextEncoder().encode(text)
 
@@ -57,6 +60,7 @@ describe('importFromSongSelect', () => {
       | Error,
     popupBlocked = false,
     leadSheet = 'none' as LeadSheet,
+    details = 'none' as SongDetailsReply,
   } = {}) {
     const log: any[][] = []
     const listeners = new Set<(event: any) => void>()
@@ -95,6 +99,15 @@ describe('importFromSongSelect', () => {
             status: leadSheet === 'none' ? 403 : 200,
             json: async () => JSON.parse(body),
             arrayBuffer: async () => bytesOf(body).buffer,
+          }
+        }
+        if (url.includes('GetSongDetails')) {
+          if (details === 'error') throw new Error('offline')
+          return {
+            ok: details !== 'none',
+            status: details === 'none' ? 403 : 200,
+            json: async () => ({ payload: details }),
+            arrayBuffer: async () => new ArrayBuffer(0),
           }
         }
         if (download instanceof Error) throw download
@@ -239,6 +252,51 @@ describe('importFromSongSelect', () => {
     expect(sent.type).to.equal('CHORDLESS_IMPORT_FAILED')
     expect(sent.data.message).to.contain('no ChordPro chart')
     expect(sent.data.message).to.contain('no chordPro for this song')
+  })
+
+  it('sends the lyrics for Chordless to make a chart of, when SongSelect has no ChordPro for the song', async () => {
+    const lyrics = [{ partLabel: 'Verse 1', lyrics: 'Words | More' }]
+    const page = fakePage({
+      download: { ok: true, payload: 'no chordPro for this song' },
+      details: { defaultKey: ['Bb'], lyrics },
+      leadSheet: 'pdf',
+    })
+    await run(page)
+    expect(
+      page.log.map(entry => entry[1]).filter(url => String(url).includes('GetSongDetails'))
+    ).to.deep.equal([
+      'https://songselect.ccli.com/api/GetSongDetails?songNumber=1234567&slug=test-song',
+    ])
+    // and the lead sheet is asked for in the default key, for the melody's range
+    expect(page.log.some(entry => String(entry[1]).includes('transposeKey=Bb'))).to.equal(true)
+    const sent = must(page.log.at(-1))[1]
+    expect(sent.type).to.equal('CHORDLESS_IMPORT')
+    expect(sent.data.chordproText).to.equal('')
+    expect(sent.data.songDetails).to.deep.equal({ defaultKey: ['Bb'], lyrics })
+    expect(sent.data.metadata).to.include({ ccliNumber: '1234567', key: 'Bb' })
+  })
+
+  it('asks for the details without a slug when the address has none', async () => {
+    const page = fakePage({
+      download: { ok: true, payload: 'no chordPro for this song' },
+      details: { lyrics: [{}] },
+    })
+    page.location.href = 'https://songselect.ccli.com/songs/1234567'
+    await run(page)
+    expect(page.log.map(entry => entry[1])).to.include(
+      'https://songselect.ccli.com/api/GetSongDetails?songNumber=1234567&slug='
+    )
+  })
+
+  it('fails as before when there are no lyrics either', async () => {
+    for (const details of ['none', 'error', {}] as SongDetailsReply[]) {
+      const page = fakePage({
+        download: { ok: true, payload: 'no chordPro for this song' },
+        details,
+      })
+      await run(page)
+      expect(must(page.log.at(-1))[1].type).to.equal('CHORDLESS_IMPORT_FAILED')
+    }
   })
 
   it('asks for a SongSelect page when run on another site, and opens nothing', async () => {

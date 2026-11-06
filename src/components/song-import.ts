@@ -29,7 +29,7 @@ import {
   originOfChart,
   sourceToImprove,
 } from '../js/library-repair.ts'
-import { lyricsToChordpro } from '../js/lyrics-chordpro.ts'
+import { type SongDetails, songDetailsToChordpro } from '../js/lyrics-chordpro.ts'
 import { ChordProParser } from '../js/parser.ts'
 import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../js/people.ts'
 import {
@@ -93,8 +93,8 @@ const isPdf = (file: File) => file.type === 'application/pdf' || /\.pdf$/i.test(
 export interface IncomingSong {
   name?: string
   chordproText?: string
-  /** SongSelect's lyrics for a song it has no ChordPro for: made into a minimal chart (lyrics-chordpro.ts) */
-  lyricsText?: string
+  /** SongSelect's details for a song it has no ChordPro for: its lyrics are made into a minimal chart (lyrics-chordpro.ts) */
+  songDetails?: SongDetails
   metadata?: { title?: string; ccliNumber?: string | null }
   source?: string
   /** Why it cannot be imported, if it cannot */
@@ -983,14 +983,14 @@ export class SongImport extends LitElement {
       const importUser = (await getSignedInUser())?.name
       for (const {
         chordproText: chartText = '',
-        lyricsText,
+        songDetails,
         metadata = {},
         source,
         name,
         skip,
         leadSheet,
       } of songs) {
-        const incomingText = chartText || (lyricsText && lyricsToChordpro(lyricsText)) || ''
+        const incomingText = chartText || (songDetails && songDetailsToChordpro(songDetails)) || ''
         if (skip || !incomingText.trim()) {
           skipped.push(`${name}: ${skip || 'empty'}`)
           continue
