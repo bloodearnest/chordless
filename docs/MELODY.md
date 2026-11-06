@@ -21,6 +21,10 @@ that, and do more with it: transpose the notes, analyse them, show them, play th
 - **Show it.** Musicians want to see the melody to check the vocal line or the instrumental one.
   Rendered from our own notes it can be shown in the key the setlist uses, which the downloaded PDF
   (one key) cannot.
+- **Transposing it offline, on the fly, is the main reason to keep the notes.** SongSelect
+  transposes on its server (`GetSongLeadPreview` takes a `transposeKey`; the PDF is downloaded in
+  one key), so a key change means a new download and the network. Held as notes, it is the same
+  move the chords make, with no request, and it is one download per song instead of one per key.
 - **Songs with no SongSelect lead sheet.** A MusicXML file from another source (an arranger, a
   public-domain hymn) could be imported the same way.
 
@@ -47,6 +51,27 @@ PDF by IronPdf. The engraving is deterministic: the same notehead is the same pa
 
 This is not optical music recognition of a scan, which is hard. It is reading vector drawing with a
 small vocabulary of exact shapes, which is a lookup and some geometry.
+
+Checked again on the Holy Forever download in the Bb key (3 pages, A4) against its
+`GetSongLeadPreview` response, with the PDF read through `mutool` and a small content-stream script:
+
+- **The notes are paths, not text.** The music font's glyphs appear as text in the PDF for only four
+  code points in the whole song (one of them 40 times; what they are was not looked up); every
+  notehead is the same filled path at a different `cm` translation. The staff lines are stroked two-point paths (5 per staff,
+  about 4.6 pt apart at this scale), so a pitch is a notehead's height against its staff, the clef
+  and the key signature.
+- **The counts agree three ways.** The commonest filled shape is 118, 141 and 103 times on the three
+  pages: 362 noteheads. The timemap names 362 distinct note ids. The MIDI has 299 note-ons (pitches
+  F3 to Eb5, one track). The 63 missing are probably the second halves of ties, which a MIDI
+  merges; not yet checked note by note.
+- **Chords lose their flats in the text layer.** `pdftotext` reads `Eb2` as `E2` and `Bb/D` as
+  `B/D`: the flat is not in the font's text mapping. The chords must be read from their glyph shapes,
+  or taken from the chart's own ChordPro (`[Eb2]`, `[Bb/D]`), which has them whole. The chart is
+  the safer source, and the PDF's chord row is then a check on the alignment.
+- **Corpus.** A local export holds 137 lead sheet PDFs beside 141 ChordPro files (IronPdf
+  throughout, 1 to 6 pages), and 134 embed the music font. The 3 that do not are worth looking at
+  first; they have not been opened. The export is copyrighted and carries the church's licence
+  number: it stays out of git, and is a local corpus for the spike, not a fixture.
 
 ## A better source than the PDF: the page's own SVG
 
@@ -139,6 +164,61 @@ Transposing is the notes moved by the interval and respelled for the new key, wh
 - It is derived data: it can be thrown away and read again from a PDF or a MusicXML file, so it is
   safe to lose, and need not be in exports.
 
+## The terms
+
+What CCLI's agreements say about keeping and transposing a lead sheet. This is a reading of the
+text, not legal advice, and only of the US agreement: the CCLI Master Terms of Agreement
+(`store.ccli.com/download/CCLI_terms_of_agreement_us`, linked from `us.ccli.com/terms`; it holds the
+Church Copyright License, which SongSelect's terms (§6.10) are subject to, and the SongSelect Terms
+of Use, updated 2026-10-30), read on 2026-11-05. The UK has a different Music Reproduction Licence
+and different terms; they are not read. Neither are the ccli.com site's own terms of use, which
+might say something about automated access.
+
+- **Keeping a faithful copy for the church's own use is what the Church Copyright License lists.**
+  §3.1.4 allows copying songs "into and from computerized storage and retrieval software", and the
+  SongSelect Service is "online access to and download of Digital Fixations", a Lead Sheet being one.
+  Reading the downloaded sheet into notes and storing it in the user's Drive is a copy of that
+  sheet in another encoding, as the ChordPro is for the chord sheet.
+- **Transposing is a copy in another key, not an arrangement.** SongSelect itself offers the key
+  (the bookmarklet already passes the one picked on the page; `GetSongLeadPreview` takes
+  `transposeKey`). The TOU lists "modify" among what is not allowed (§6.3), but a subscriber's key
+  change is the Service's own function, and it is deterministic: nothing is added.
+- **The notes stay read-only apart from the key.** Editing the melody would be an arrangement, and
+  §3.1.2 allows those only "to the extent no published version is available" and only if the rights
+  in the arrangement stay with the owner. A published lead sheet is what we read, so that clause
+  does not cover it. The same goes for **notation made up from the MIDI alone** (no notation
+  source), which is a new engraving of the melody and not a copy: do not use the MIDI as the source
+  of the notes, only as a check on them and as the pitch for playing.
+- **The notice travels with it (§10.5, and TOU §6.9, "will not remove or obscure any notice or
+  legend").** On reproducing a song the church is to include the title, writers and copyright
+  notice, "Used by Permission. CCLI License #…". It is not limited to projection, and a copy in
+  computerized storage is a Copy (§2.8). The lead sheet's own page header and footer carry all of it
+  (title, writers, `CCLI Song #`, the copyright, "For use solely with the SongSelect® Terms of Use",
+  and the church's `CCLI License #`), and the chart keeps the same as `{ccli}`, `{ccli_license}`,
+  `{copyright}` and `{footer}`. A `Melody` view or export must show the notice from those, in every
+  key. The song info already shows them; they should be at the foot of the melody too.
+- **Only the licensed church.** §3.1.7 allows copies for people in the congregation, §3.2.2 no
+  distribution outside services and activities, §12 no sublicensing, and the TOU (§6.3, §6.6, §6.7)
+  keeps the Service to the church's staff and volunteers. So a team space is for one church's
+  team (asking for a CCLI licence when a team is made is an attestation, which is as far as the app
+  can go), a team that spans churches is not, and the melody is in no share link (already so, above).
+  §10.4 asks for all copies to be destroyed if the licence lapses; the app cannot, and the help can
+  say so.
+- **Playing it is for practice and rehearsal, never in a service.** §3.2.3 leaves performing out of
+  the licence, and CCLI sells a separate Rehearsal License for sharing recordings with the worship
+  team to learn from. A MIDI is not a Master Recording, so that is not the same thing, but the
+  intent is the same, and the help should say "practice, not for use in a service".
+- **Downloads are what is counted.** A song costs one download either way; reading it once and
+  transposing here is fewer than one per key. The two ways of getting the notes differ here: the
+  PDF download is counted and checked against the subscription's tier like any other. The preview
+  call may not be, and may be shown to a tier that has no lead sheets (the TOU's §6.4 speaks of
+  subscriptions that "grant the right to print Lead Sheet, Chord Sheet and/or Hymn Sheet"). Until
+  that is known, the preview is for what the person could download, and is not stored or sent
+  anywhere: it is a check on the PDF's reading, or an equivalent source, not a way round the count.
+- **Not decided here:** whether a preview call is counted; whether a missing tier is shown the
+  preview (an account on a chord-sheet-only tier would tell); the ccli.com site terms; the UK
+  terms. CCLI can be asked in writing, and a yes would settle all of it.
+
 ## Uses, once it exists
 
 - The range (`x_chordless_range`) is **derived** from it, so the PDF reader's range and the new one
@@ -149,8 +229,12 @@ Transposing is the notes moved by the interval and respelled for the new key, wh
 - **View**: a "Melody" view in the key in use, rendered by OpenSheetMusicDisplay or Verovio (each a
   dependency to add as a reviewed change; Verovio is WebAssembly, several MB, and engraves the
   same way SongSelect does, so a transposed sheet looks like the original). Lazy loaded, and never
-  on the path of the lyrics screen.
-- **Play it**: the melody as notes, for finding the starting pitch. Small, and only if wanted.
+  on the path of the lyrics screen. Whichever it is, the chord symbols should be written into the
+  MusicXML as `<harmony>` from our own transposer, so Nashville numbers and spelling are the app's
+  and not the renderer's; whether OpenSheetMusicDisplay transposes `<harmony>` correctly (Eb to Bb)
+  is not known, and is the first thing to try. The notice (above) goes under it.
+- **Play it**: the melody as notes, for finding the starting pitch and for practice. Small, and
+  only if wanted.
 - **Export** to MusicXML for a band that wants to open it in their own software.
 
 ## Risks
@@ -161,6 +245,11 @@ Transposing is the notes moved by the interval and respelled for the new key, wh
   synthetic PDFs drawn by `tests/melody-pdf.ts`. The renderer is Verovio, so public-domain tunes
   (a hymn as MusicXML) rendered by Verovio, as SVG or as PDF, would give fixtures made the way the
   real ones are, without being anyone's song. Verovio would be a dev dependency (a reviewed change).
+  The real ones, a local export of PDFs and charts, are a corpus for the spike and for scoring the
+  reader, kept out of git (they carry the church's licence number as well as the songs).
+- **A copy without its notice.** A reader or view that keeps the notes and drops the header and
+  footer would break §10.5 (see "The terms"). The `Melody` keeps the notice text, and a test fails
+  if a rendered sheet lacks it.
 - **A wrong tune that looks right.** The measure sum is the guard; a note one step off in pitch
   passes it, so pitch has the existing checks (the key signature against the chart's key, the lyric
   rule) and the import page keeps showing what was found, with its place on the PDF.
@@ -171,27 +260,43 @@ Transposing is the notes moved by the interval and respelled for the new key, wh
 
 1. ~~What does `GetSongLeadPreview` return?~~ SVG pages, a MIDI and a timemap (above). Still to
    check: how it varies by song (several voices? repeats played out or not? pickup bars?), and
-   what the time map gives for ties and chords (362 ids against 299 MIDI notes on one song).
+   what the time map gives for ties and chords (362 ids against 299 MIDI notes on one song; the 63
+   are probably tied notes, which has to be confirmed note by note).
 2. ~~Is it Verovio?~~ Yes: its SVG classes and the music font say so (above).
 3. **How are repeats and endings drawn**, and what does a lead sheet with a coda look like? The
    SVG should say by class, from a few more songs than the two probed.
 4. **May a script outside SongSelect's own pages call the preview?** The bookmarklet runs on
    SongSelect with the person's login, as for the PDF, so it should be the same; the backfill
-   script's pacing applies to it.
-5. **Keep the PDF as well?** Not needed if the view renders from the notes.
+   script's pacing applies to it. The agreements read so far do not forbid it, but say nothing for
+   it either; whether the call is counted as a download, and whether it is gated by tier, is open
+   (see "The terms"), and decides whether the preview may be a source or only a check.
+5. **Keep the PDF as well?** Not needed if the view renders from the notes. Keeping it is a copy of
+   the sheet the licence already lets the church hold (§3.1.4), so it is not forbidden; it would
+   be a fallback if a reading is wrong, but is one more thing in the Drive and the key it was
+   downloaded in.
+6. **Which source is the one**: the PDF (a counted, tier-checked download, with the notice on it, but
+   needs the harder reader) or the preview's SVG (a DOM walk, with the notes given, but with the
+   counting and tier question above). The reader for the PDF is needed either way for a PDF
+   downloaded by hand, so the spike can score both on the same songs.
 
 ## Steps
 
 0. **Spike (a few days).** Answer question 1 first. Then on four or five real lead sheets read the
    lengths and rests (from the SVG if it is there, else the PDF) and check every measure against the
    time signature; say how many measures pass. Stop here if it does not reach nearly every measure
-   of nearly every song.
+   of nearly every song. Run it over the local corpus of 137 PDFs and score pitch and start time
+   against each one's MIDI where a preview is to hand, and open the 3 PDFs with no music font first.
 1. **The reader and the `Melody`**, behind `readMelodyRange`'s place: the range comes from it, the
    import page says what was read, and a song it cannot read keeps today's result. Tests from
-   fixtures that are not copyrighted.
+   fixtures that are not copyrighted. The notice text is kept with the notes from the start.
 2. **MusicXML out and in**, and the storage and sync of the `Melody` beside the chart.
 3. **Analysis in the key picker**, and the voice preference.
 4. **The view** (and playing it), if the band wants it.
+
+Reading a PDF's notes reverses what `docs/EMAIL_IMPORT.md` says today ("PDFs are never imported as
+charts": a PDF from an email or a share is read for its metadata only). That stays true for those:
+the notes would come only from a lead sheet the person downloaded or imported themselves, and that
+page and the help text change in the step that ships it.
 
 Each step is a pull request that leaves the app working; the first two change nothing a person
 sees except a better range and a "how it was read" that can show the whole line.
