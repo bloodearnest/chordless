@@ -63,6 +63,11 @@ export class AnnotationEditor extends LitElement {
         margin: 0;
         padding: 1rem;
         width: min(22rem, calc(100vw - 1rem));
+        max-width: calc(100vw - 1rem);
+        /* (never taller than the screen, or the on-screen keyboard's: the buttons stay reachable) */
+        max-height: calc(100dvh - 4rem);
+        overflow-x: hidden;
+        overflow-y: auto;
         box-sizing: border-box;
         background: var(--modal-bg, white);
         color: var(--text-color, #1a1a1a);
@@ -144,11 +149,20 @@ export class AnnotationEditor extends LitElement {
         opacity: 0.75;
       }
 
+      /* Delete alone on the left, Cancel and Done together on the right; on a very narrow screen
+         Delete takes a row of its own rather than crowding the other two off the edge */
       .actions {
         display: flex;
-        gap: 0.5rem;
+        flex-wrap: wrap;
+        align-items: center;
         justify-content: flex-end;
+        gap: 0.5rem;
         margin-top: 1rem;
+      }
+
+      .actions .btn {
+        padding: 0.55rem 0.9rem;
+        font-size: var(--font-ui-small);
       }
 
       .actions .delete {

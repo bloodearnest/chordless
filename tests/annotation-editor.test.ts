@@ -173,4 +173,25 @@ describe('annotation-editor', () => {
       }
     })
   })
+
+  describe('with an annotation to delete', () => {
+    it('keeps all three buttons inside the dialog, which does not overflow sideways', async () => {
+      const { dialog } = await open({ isNew: false, text: 'repeat 4×', kind: 'shared' })
+      const box = dialog.getBoundingClientRect()
+      const buttons = Array.from(dialog.querySelectorAll<HTMLButtonElement>('.actions button'))
+      expect(buttons.map(each => each.textContent?.trim())).to.deep.equal([
+        'Delete',
+        'Cancel',
+        'Done',
+      ])
+      for (const button of buttons) {
+        const at = button.getBoundingClientRect()
+        expect(at.left, button.textContent ?? '').to.be.at.least(box.left)
+        expect(at.right, button.textContent ?? '').to.be.at.most(box.right)
+        expect(at.bottom, button.textContent ?? '').to.be.at.most(box.bottom)
+      }
+      expect(dialog.scrollWidth).to.be.at.most(dialog.clientWidth)
+      dialog.close()
+    })
+  })
 })

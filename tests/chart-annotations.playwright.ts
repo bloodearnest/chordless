@@ -4,6 +4,7 @@
 
 import type { Page } from '@playwright/test'
 import { enterEditMode, expect, fromDB, seedSong, test } from './fixtures.ts'
+import { must } from './must.ts'
 
 const SETLIST = 'annotations-setlist'
 
@@ -140,4 +141,29 @@ test.describe('Annotations on a chart', () => {
     })
     await expect(shownAnnotations(page)).toHaveText(['softly'])
   })
+
+  for (const width of [320, 360, 390]) {
+    test(`the editor fits a ${width}px wide phone, with Delete showing`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 640 })
+      await openSong(page)
+      await enterEditMode(page)
+      await hold(page, 'grace')
+      await writeAnnotation(page, 'softly')
+      await editor(page).getByRole('button', { name: 'Done' }).click()
+      await shownAnnotations(page).first().click()
+      const dialog = editor(page)
+      await expect(dialog.getByRole('button', { name: 'Delete' })).toBeVisible()
+
+      const box = must(await dialog.boundingBox())
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(width)
+      for (const name of ['Delete', 'Cancel', 'Done']) {
+        const at = must(await dialog.getByRole('button', { name }).boundingBox())
+        expect(at.x, name).toBeGreaterThanOrEqual(box.x)
+        expect(at.x + at.width, name).toBeLessThanOrEqual(box.x + box.width)
+        expect(at.y + at.height, name).toBeLessThanOrEqual(box.y + box.height)
+      }
+      expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+    })
+  }
 })
