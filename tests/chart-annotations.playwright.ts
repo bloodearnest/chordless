@@ -49,11 +49,17 @@ test.describe('Annotations on a chart', () => {
     await expect(editor(page)).toBeHidden()
 
     await expect(shownAnnotations(page)).toHaveText(['softly'])
-    // Over the word it is on, and not in the setlist that is shared
-    const wordBox = await word(page, 'grace').boundingBox()
-    const annotationBox = await shownAnnotations(page).first().boundingBox()
-    expect(annotationBox?.y).toBeLessThan(wordBox?.y ?? 0)
-    expect(Math.abs((annotationBox?.x ?? 0) - (wordBox?.x ?? 0))).toBeLessThan(40)
+    // On the chord row, level with the chord at its word and just after it, over the word, and not in the setlist that is shared
+    // (it is placed a frame after it is drawn)
+    await expect(async () => {
+      const wordBox = must(await word(page, 'grace').locator('.lyrics').boundingBox())
+      const chordBox = must(await word(page, 'grace').locator('.chord chord-display').boundingBox())
+      const annotationBox = must(await shownAnnotations(page).first().boundingBox())
+      expect(annotationBox.y).toBeLessThan(wordBox.y)
+      expect(annotationBox.y).toBeGreaterThanOrEqual(chordBox.y - 4)
+      expect(annotationBox.y + annotationBox.height).toBeLessThanOrEqual(wordBox.y + 4)
+      expect(annotationBox.x).toBeGreaterThanOrEqual(chordBox.x + chordBox.width - 8)
+    }).toPass()
     const setlist = await fromDB(page, 'getSetlist', SETLIST)
     expect(JSON.stringify(setlist)).not.toContain('softly')
     expect(await page.evaluate(id => localStorage.getItem(`state-${id}`), SETLIST)).toContain(

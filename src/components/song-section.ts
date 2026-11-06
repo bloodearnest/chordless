@@ -83,6 +83,9 @@ type ContentBlock =
   | { type: 'bar-group'; data: BarGroupData }
   | { type: 'line'; line: ChartLine; lineIndex: number }
 
+/** The lines with annotations on them: on the chord row, or in a row of their own */
+const ANNOTATED_LINES = '.chord-line.has-annotations, .chord-line.annotations-on-chords'
+
 /** A segment as rendered; hiding chords marks which join the word before them */
 type RenderedSegment = ChartSegment & { __joinWithPrev?: boolean }
 
@@ -424,7 +427,27 @@ export class SongSection extends LitElement {
       row-gap: calc(var(--annotation-row) * var(--annotation-rows, 1));
     }
 
-    /* The annotations at a spot sit above its chord and take no width, as a spilling chord does */
+    /*
+     * Where the chords are shown the annotations share their row, which spends no height: the row is as
+     * tall as the taller of a chord and an annotation, and a row above is made only for one that cannot
+     * fit (--annotation-above, set when they are placed)
+     */
+    .song-section-wrapper .chord-line.annotations-on-chords {
+      --annotation-row: calc(var(--font-annotation) * 1.1);
+      padding-top: calc(var(--annotation-row) * var(--annotation-above, 0));
+      row-gap: calc(var(--annotation-row) * var(--annotation-above, 0));
+    }
+
+    .song-section-wrapper .chord-line.annotations-on-chords .chord {
+      min-height: var(--annotation-row);
+    }
+
+    .song-section-wrapper .chord-line.annotations-on-chords .segment-annotations {
+      top: 0;
+      bottom: auto;
+    }
+
+    /* The annotations at a spot take no width, as a spilling chord does; on their own row, they sit above its chord */
     .song-section-wrapper .chord-segment {
       position: relative;
     }
@@ -462,6 +485,11 @@ export class SongSection extends LitElement {
       outline: 1px dashed var(--annotation-private-color);
       outline-offset: 2px;
       border-radius: 3px;
+    }
+
+    /* One wider than the line is set in the line's width, over more lines (the annotation itself does not wrap otherwise) */
+    .song-section-wrapper .segment-annotations.wrap .annotation {
+      white-space: normal;
     }
 
     .song-section-wrapper .plain-annotations {
@@ -707,9 +735,7 @@ export class SongSection extends LitElement {
 
   /** The annotations are placed once the text is laid out, and again when the line is (a new width, text size, or a font that arrived) */
   override updated() {
-    const lines = Array.from(
-      this.renderRoot.querySelectorAll<HTMLElement>('.chord-line.has-annotations')
-    )
+    const lines = Array.from(this.renderRoot.querySelectorAll<HTMLElement>(ANNOTATED_LINES))
     this.#annotationLines?.disconnect()
     if (!lines.length) return
     this.#annotationLines ??= new ResizeObserver(() => this.#placeAnnotations())
@@ -721,9 +747,7 @@ export class SongSection extends LitElement {
   #placeAnnotations() {
     cancelAnimationFrame(this.#annotationFrame)
     this.#annotationFrame = requestAnimationFrame(() => {
-      for (const line of this.renderRoot.querySelectorAll<HTMLElement>(
-        '.chord-line.has-annotations'
-      )) {
+      for (const line of this.renderRoot.querySelectorAll<HTMLElement>(ANNOTATED_LINES)) {
         nudgeLine(line)
       }
     })
@@ -930,9 +954,16 @@ export class SongSection extends LitElement {
       ? groupSegmentsIntoUnits(shown, { reserveChords: this.hideMode !== 'chords' })
       : shown.map(segment => [segment])
 
+    // An annotation shares the chord row where there is one, to save the height of a row of its own
+    const hasAnnotations = shown.some(segment => segment.annotations?.length)
+    const chordRow = lineHasChords && this.hideMode !== 'chords'
     return html`
       <div
-        class=${classMap({ 'chord-line': true, 'has-annotations': shown.some(segment => segment.annotations?.length) })}
+        class=${classMap({
+          'chord-line': true,
+          'has-annotations': hasAnnotations && !chordRow,
+          'annotations-on-chords': hasAnnotations && chordRow,
+        })}
         data-line-index=${index}
         data-line=${lineIndex}
       >
