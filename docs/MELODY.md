@@ -308,17 +308,17 @@ data, only the grouping and the glyph names are lost (check: `mutool draw -F svg
   staff-line units. `melody-pdf.ts` rebuilds Verovio's own tree from the page (measure, staff, layer, note, beam,
   tuplet) and hands it to the same reader as the SVG, so the two readers cannot disagree about meaning.
   The PDF reading of Holy Forever is the SVG reading: 362 of 362 notes the same in pitch, length and tie.
-- **Corpus: 137 PDFs, 8,410 measures, 8,264 (98.3%) add up.** Of the 146 that do not: 56 are a first or last measure
-  (pickups and a last bar completing one: legitimate, a first measure shorter than the bar is not a failure); about 44 are
-  other short measures to look at (probably endings or a pickup after a repeat); 30 are a cue voice
+- **Corpus: 137 PDFs, 8,410 measures, 8,264 (98.3%) add up.** Of the 146 that do not: 55 are a first or last measure
+  (pickups and a last bar completing one: legitimate; a first measure shorter than the bar is not a failure); 35 are
+  other short measures to look at (probably the bar after a repeat or ending); 30 are a cue voice
   that Verovio moved sideways to clear a second, so the sweep that lines voices up by x puts it a column off;
-  15 are `3277849` (the Fsharp one, some unread construction: look at it first); 9 are another cue case. `107 of 137
-  songs` have no failing measure but the first or last. Key signature agrees with the chart's `{key}` in
-  137 of 137 sheets (the relative minor counted), and the time signature in every sheet that has a `{time}`.
+  16 are one construction in `3277849` (the F# one: look at it first); 10 are other cue cases. 109 of 137
+  songs have no failing measure but the first or last. The key signature agrees with the chart's `{key}` in
+  137 of 137 sheets (the relative minor counted), and the time signature in all 133 whose chart has a `{time}`.
 - **The 3 PDFs that do not embed the music font** (`185883`, `2098033`, `3359080`) read as well as any, since the notes
   never needed the font: all their measures add up.
 - **Against the existing range reader** (`melody-range.ts`, a different way: ellipses in the page by size and
-  lyrics): the lowest and highest sung note agree for 126 of 137 sheets. The 11 differences are where this reader
+  lyrics): the lowest and highest sung note agree for 125 of 137 sheets. The 12 differences are where this reader
   counts a full-size note the old one drops for having no lyric under its measure (a bass line, an instrumental
   bar: 7123436 has a 49 against 64) and accidentals the old one does not read (a flat or sharp apex: one semitone).
   The PDF reader here does not read lyrics yet (the SVG's are in the `verse` elements; the PDF's are text
