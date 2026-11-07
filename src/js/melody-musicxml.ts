@@ -7,7 +7,14 @@ import type { Melody, MelodyEvent, MelodyNote } from './melody.ts'
 
 const DIVISIONS = 24 // per quarter: whole divisions for 16ths, 32nds, and triplets of them
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+/** For text and for attribute values: quotes are escaped too, since a chord's text goes in an attribute */
+const esc = (s: string) =>
+  s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
 
 const TYPES: [number, string][] = [
   [4, 'whole'],
