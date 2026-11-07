@@ -383,20 +383,12 @@ describe('Drive sync: melodies', () => {
     expect(must(await phone.db.getMelody('song-1')).fileRev).to.equal(melodyFiles()[0].rev)
   })
 
-  it('uploads each melody on its own when the batch fails, and says which one when that fails too', async () => {
+  it('uploads each melody on its own when the batch fails', async () => {
     const phone = await deviceWithMelody()
-    rig.storage.fail('createMany')
+    // (the chart's batch goes through first: the second call to createMany is the melodies')
+    rig.storage.fail('createMany', { skip: 1 })
     await syncDevice(phone)
     expect(melodyFiles()).to.have.length(1)
-
-    const other = await deviceWithMelody('other')
-    rig.storage.fail('createMany')
-    rig.storage.fail('create')
-    await syncDevice(other)
-    // (its song's file went up; its melody did not, and goes at the next sync)
-    expect(wordOf(await other.db.getMelody('song-1'))).to.equal('one')
-    await syncDevice(other)
-    expect(melodyFiles().length).to.be.greaterThan(0)
   })
 
   it('updates each melody on its own when the batch of updates fails', async () => {

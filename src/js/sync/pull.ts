@@ -593,19 +593,17 @@ interface MelodyDownload {
 }
 
 /**
- * Pull the melodies from Drive: the MusicXML files in the songs folder whose properties say they
+ * Pull the melodies from Drive: the MusicXML files among `files` (the songs folder's) whose properties say they
  * are a song's melody (`type: 'melody'`, linked to the chart by `songUuid`). A melody is derived
  * data, and a conflict, as for the chart, is Drive's version. A file that is not MusicXML we can
  * read is left, and tried again at the next full sync.
  */
 export async function pullMelodies(
   run: SyncRun,
-  progressCallback: ProgressCallback | null = null,
-  files?: StoredFile[]
+  progressCallback: ProgressCallback | null,
+  files: StoredFile[]
 ): Promise<void> {
-  const driveFiles = (files ?? (await run.space.list('songs'))).filter(
-    file => file.props.type === 'melody'
-  )
+  const driveFiles = files.filter(file => file.props.type === 'melody')
   const latestByUuid = new Map<string, { file: StoredFile; props: Record<string, string> }>()
   for (const file of driveFiles) {
     // A melody deleted here, whose file could not be put in the trash yet, is not to come back
