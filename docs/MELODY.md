@@ -368,11 +368,21 @@ under it: each measure under it gets `ending` with `start`/`stop`/`closed`. Musi
 signs (the difference is songs that repeat to the top, and one that starts with a sign and ends without),
 and every sheet's endings have as many starts as stops; the measure sums are as before (8264 of 8410).
 
+**Jumps: D.S., D.C., segno, coda, Fine (read from the PDF alone).** They are italic words over the staff and two
+characters of the music font in the text (U+E047 segno, U+E048 coda), so there is no glyph to name. Each
+measure gets `directions`: `segno`, `coda`, `to-coda` ("2nd time to Coda" has `time: 2`), `fine`, `da-segno`
+and `da-capo` (with `al: 'coda' | 'fine'`), and `text` for any other instruction ("Play 3 times", "(4x)",
+"(2nd x a cappella)", "(To Ch.)": kept as written, for the structure work to read). A direction goes to the measure
+its text ends over (D.S. is set against the barline). MusicXML gets `<direction>` with `<segno/>`/`<coda/>` or the
+words, and `<sound segno/coda/tocoda/dalsegno/dacapo/fine>`. Over the corpus: 93 of 137 sheets have one; every D.S. has a
+segno, every "al Coda" has a "to Coda" and a coda, and every "al Fine" a Fine. The jumps are not followed
+yet: expanding the sheet into the order it is played is the structure work (`structureOf`).
+
 **Not done, in the order of how much it matters:**
 
 1. (Done: the SVG reader, the XML parser and the time-map and MIDI scoring are in `scripts/`; `src/` has only the PDF route.)
-2. (Done: repeats and endings, below. Not read: D.S., D.C. and coda text and signs; they are words and a sign,
-   not lines, and no sheet in the corpus has been checked for them.)
+2. (Done: repeats, endings and the D.S./D.C./coda signs and words, above. Not done: following them, to give the
+   order a song is played in.)
 3. A second full-size voice. (A cue line drawn a head's width aside to clear a sung note a second or a unison away is
    now one place with it: 8273 of 8410 measures add up, from 8264; what is left of the 30 is the same line when it is
    shifted by more than that, or the F# construction in `3277849`.)
@@ -387,8 +397,8 @@ and every sheet's endings have as many starts as stops; the measure sums are as 
    than one preview.
 2. ~~Is it Verovio?~~ Yes: its SVG classes and the music font say so (above).
 3. ~~How are repeats and endings drawn?~~ In the PDF: dots beside a thick line, and a line with hooks and the
-   numbers under it (above). What a lead sheet with a coda looks like is still not looked at: it is text
-   ("D.C. al Coda", "2nd time to Coda") and a coda sign.
+   numbers under it (above). A coda is italic words ("D.C. al Coda", "2nd time to Coda") and a sign character of the
+   music font (above).
 4. **May a script outside SongSelect's own pages call the preview?** The bookmarklet runs on
    SongSelect with the person's login, as for the PDF, so it should be the same; the backfill
    script's pacing applies to it. The agreements read so far do not forbid it, but say nothing for

@@ -14,6 +14,8 @@
  * Input is the page as SVG text (what `mutool draw -F svg` writes: for the spike; in the app the same
  * shapes come from pdf.js's drawing operations, as `melody-range.ts` already reads them).
  */
+
+import { parseDirection } from './melody-directions.ts'
 import { GLYPHS } from './melody-glyphs.ts'
 import { absolutePath, shapeHash } from './melody-path.ts'
 import type { El } from './melody-read.ts'
@@ -805,6 +807,7 @@ function placeText(
     bold: r.bold,
     italic: r.italic,
     text: r.text.replace(/^[\ue000-\uf8ff]+/, '').trim(),
+    raw: r.text,
   }))
   const top = Math.min(...staves.map(s => s.ys[0] as number))
   const bottom = Math.max(...staves.map(s => s.ys[4] as number))
@@ -874,6 +877,57 @@ function placeText(
     perStaff
       .get(s)
       ?.marks.push(group('harm', [node2('text', { x: num(r.x0), y: num(r.y) }, [], r.text)]))
+  // Directions: italic words on a line are one instruction ("2nd time to Coda"), and a sign is a lone
+  // character of the music font over the staff; each goes to the measure it ends over
+  const dirAt = (s: Staff & { sys: number }, x: number) =>
+    staves.find(o => o.sys === s.sys && inX(o, x)) ?? s
+  const directions: { s: Staff & { sys: number }; text: string }[] = []
+  const italics = marks.filter(m => m.r.italic && !m.r.bold).sort((p, q) => p.r.x0 - q.r.x0)
+  const usedItalic = new Set<(typeof italics)[number]>()
+  for (const first of italics) {
+    if (usedItalic.has(first)) continue
+    usedItalic.add(first)
+    let text = first.r.raw
+    let end = first.r.x1
+    for (const next of italics) {
+      if (
+        usedItalic.has(next) ||
+        Math.abs(next.r.y - first.r.y) > 30 ||
+        next.r.x0 < end - 5 ||
+        next.r.x0 - end > 250
+      )
+        continue
+      usedItalic.add(next)
+      text += ` ${next.r.raw}`
+      end = next.r.x1
+    }
+    directions.push({ s: dirAt(first.s as Staff & { sys: number }, end - 100), text })
+  }
+  for (const u of units) {
+    if (!/^[\ue047\ue048]+$/.test(u.raw.trim())) continue
+    const above = staves
+      .filter(
+        s =>
+          inX(s, u.x0 + 100) && u.y < (s.ys[0] as number) + 200 && (s.ys[0] as number) - u.y < 2600
+      )
+      .sort((p, q) => (p.ys[0] as number) - (q.ys[0] as number))[0]
+    if (above) directions.push({ s: above, text: u.raw })
+  }
+  const dirSeen = new Set<string>()
+  for (const { s, text } of directions) {
+    const d = parseDirection(text)
+    // (the coda's sign and its label are one direction, and so are a segno's)
+    const sign = d?.kind === 'segno' || d?.kind === 'coda'
+    const key = `${staves.indexOf(s)}|${d?.kind}|${d?.time}|${sign ? '' : d?.text}`
+    if (!d || dirSeen.has(key)) continue
+    dirSeen.add(key)
+    const el = group('dir')
+    el.attrs['data-kind'] = d.kind
+    el.attrs['data-al'] = d.al ?? ''
+    el.attrs['data-time'] = d.time === null ? '' : String(d.time)
+    el.attrs['data-text'] = d.text
+    perStaff.get(s)?.marks.push(el)
+  }
   // Bold words on a line next to each other are one name; the box can run over a barline, so join before placing
   const used = new Set<(typeof bold)[number]>()
   for (const first of bold) {

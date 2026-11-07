@@ -3,7 +3,7 @@
  * web renderer reads (`docs/MELODY.md`, "The format"). Chord symbols are `<harmony>`, written from
  * our own text so the app's spelling stays the app's; sections are rehearsal marks.
  */
-import type { Melody, MelodyEvent, MelodyMeasure, MelodyNote } from './melody.ts'
+import type { Melody, MelodyDirection, MelodyEvent, MelodyMeasure, MelodyNote } from './melody.ts'
 
 const DIVISIONS = 24 // per quarter: whole divisions for 16ths, 32nds, and triplets of them
 
@@ -95,6 +95,27 @@ function restXml(e: Extract<MelodyEvent, { kind: 'rest' }>, voice: number): stri
   )
 }
 
+/** A sign or instruction over a measure: the sign or the words, and what the player does about it as `<sound>` */
+function directionXml(d: MelodyDirection): string {
+  const words = `<words>${esc(d.text)}</words>`
+  const sound =
+    d.kind === 'segno'
+      ? '<sound segno="segno"/>'
+      : d.kind === 'coda'
+        ? '<sound coda="coda"/>'
+        : d.kind === 'to-coda'
+          ? '<sound tocoda="coda"/>'
+          : d.kind === 'fine'
+            ? '<sound fine="yes"/>'
+            : d.kind === 'da-segno'
+              ? '<sound dalsegno="segno"/>'
+              : d.kind === 'da-capo'
+                ? '<sound dacapo="yes"/>'
+                : ''
+  const type = d.kind === 'segno' ? '<segno/>' : d.kind === 'coda' ? '<coda/>' : words
+  return `<direction placement="above"><direction-type>${type}</direction-type>${sound}</direction>`
+}
+
 /** The barline at the start of a measure: a repeat sign and the start of a numbered ending, when there are any */
 function leftBarline(m: MelodyMeasure): string {
   const ending = m.ending?.start
@@ -162,6 +183,7 @@ export function writeMusicXml(melody: Melody): string {
       out.push(
         `<direction placement="above"><direction-type><words/></direction-type><sound tempo="${m.tempo}"/></direction>`
       )
+    for (const d of m.directions) out.push(directionXml(d))
     // Chord symbols come first in their measure's first voice, placed by <forward>/<backup> to their beat
     const chords = [...m.chords].sort((a, b) => a.start - b.start)
     m.voices.forEach((v, vi) => {
