@@ -31,9 +31,14 @@
     "branches": 50,
     "functions": 20
   },
-  "src/js/melody-render.ts": {
+  "src/js/melody-render-engine.ts": {
     "lines": 1,
     "branches": 0,
+    "functions": 1
+  },
+  "src/js/melody-render.ts": {
+    "lines": 6,
+    "branches": 2,
     "functions": 1
   },
   "src/js/melody-structure.ts": {
@@ -51,6 +56,12 @@
     "lines": 0,
     "branches": 6,
     "functions": 0
+  },
+  "src/js/verovio-worker.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 20
   },
   "worker/src/index.ts": {
     "lines": 0,

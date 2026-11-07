@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import type { Melody, MelodyNote } from '../src/js/melody.ts'
 import { midiOf } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
-import { renderMelody } from '../src/js/melody-render.ts'
+import { renderMelodyHere } from '../src/js/melody-render-engine.ts'
 
 const note = (step: MelodyNote['step'], start: number, syllable: string): MelodyNote => ({
   kind: 'note',
@@ -47,7 +47,7 @@ const melody: Melody = {
 
 describe('engraving a melody with Verovio', () => {
   it('turns our MusicXML into SVG with the staff, the notes and the words', async () => {
-    const out = await renderMelody(writeMusicXml(melody))
+    const out = await renderMelodyHere(writeMusicXml(melody))
     assert.ok(out)
     assert.equal(out.pages.length, 1)
     const svg = out.pages[0] as string
@@ -57,6 +57,6 @@ describe('engraving a melody with Verovio', () => {
   })
 
   it('says null for what is not MusicXML', async () => {
-    assert.equal(await renderMelody('this is not music'), null)
+    assert.equal(await renderMelodyHere('this is not music'), null)
   })
 })

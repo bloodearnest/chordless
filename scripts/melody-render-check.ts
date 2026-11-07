@@ -10,7 +10,7 @@ import { readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Melody } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
-import { renderMelody } from '../src/js/melody-render.ts'
+import { renderMelodyHere } from '../src/js/melody-render-engine.ts'
 import { transposeMelody } from '../src/js/melody-transpose.ts'
 import { transposeKeyName } from '../src/js/transpose.ts'
 import { readPdf } from './melody-pdf-spike.ts'
@@ -92,7 +92,7 @@ for (const f of readdirSync(dir)
   songs++
   const { melody } = readPdf(join(dir, f))
   const xml = writeMusicXml(melody)
-  const out = await renderMelody(xml)
+  const out = await renderMelodyHere(xml)
   if (!out) {
     bad.push(`${id} Verovio could not read the MusicXML`)
     continue
@@ -118,7 +118,7 @@ for (const f of readdirSync(dir)
   // and moved three semitones up: the MusicXML of a transposed melody, with its new key and spelling
   const from = MAJOR[(melody.measures[0]?.fifths ?? 0) + 7] as string
   const moved = transposeMelody(melody, from, transposeKeyName(from, 3))
-  const movedOut = await renderMelody(writeMusicXml(moved))
+  const movedOut = await renderMelodyHere(writeMusicXml(moved))
   if (movedOut) {
     const x = notesOf(moved)
     const y = new Set(notesOf(readMelodySvg(movedOut.pages)))

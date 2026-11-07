@@ -338,7 +338,7 @@ tuplets (`time-modification`), lyrics with syllabic and extend, `<harmony>` (roo
 **Rendering with Verovio (the engraver SongSelect uses; `src/js/melody-render.ts`).** The sheet's SVG was written
 by Verovio 6.0.1, so that exact version is the dependency (`verovio@6.0.1`, pinned; `renderMelody(musicXml)`
 gives one SVG a page). It is WebAssembly embedded in a 6.4 MB JavaScript module (`verovio/wasm`) with a 14 KB wrapper
-(`verovio/esm`), imported only on first use. `scripts/melody-render-check.ts` is the test of the MusicXML: write it
+(`verovio/esm`), imported only on first use, in a worker (below). `scripts/melody-render-check.ts` is the test of the MusicXML: write it
 from each PDF, engrave it, read Verovio's SVG back with the SVG reader, and compare with what went in.
 
 - **All 137 sheets render, with no messages from Verovio. 8,410 of 8,410 measures, 35,396 of 35,396 notes
@@ -353,14 +353,19 @@ from each PDF, engrave it, read Verovio's SVG back with the SVG reader, and comp
 - The page looks like a lead sheet: chord symbols (with our text, "Eb2"), boxed sections, the hyphens and
   underscores of the lyrics, ties, cue notes small, repeat and ending signs. It is not SongSelect's layout to
   the pixel (their page and spacing options are not known), and this shows no title or notice yet.
-- **Wired for the app (the owner agreed to the licence and the policy change), though no view imports it yet.** The page's
-  Content-Security-Policy has `'wasm-unsafe-eval'` in `script-src` (WebAssembly needs it; `eval` stays blocked). A
-  build with a temporary import gave `assets/verovio-module-<hash>.js`, 7.2 MB (2.2 MB compressed), which the
-  service worker leaves out of its precache (`NOT_PRECACHED`, like the PDF reader). In Chromium, under the policy
-  as written, it instantiates with no violations, and without the new token it fails with the CSP's CompileError.
+- **Wired for the app (the owner agreed to the licence and the policy), though no view imports it yet.** Verovio runs in a
+  **worker** (`verovio-worker.ts`; the page asks it through `renderMelody` in `melody-render.ts`, and Node calls the
+  engine, `melody-render-engine.ts`, directly). WebAssembly needs `'wasm-unsafe-eval'`, and the page's policy does not
+  have it: a worker has the policy of its own response, so `public/_headers` gives the files named `verovio-*` (the worker
+  and its modules) a policy of their own, `default-src 'none'; script-src 'self' 'wasm-unsafe-eval'` (with a `!` line to take
+  off the page's policy first, as two policies on one file are both enforced). The 7 MB module is also compiled off the
+  thread the lyrics scroll on. The files are not precached (`NOT_PRECACHED`, like the PDF reader).
+  Checked on a real build with a temporary import: the page's policy has no `wasm-unsafe-eval`, the three `verovio-*`
+  files have only the tight one, a sheet is engraved with no violations, and without the `_headers` rule the worker fails
+  with the policy's CompileError. A browser unit test runs `renderMelody` through a real worker. When the view lands, add the
+  `built` test that does the same on the build (the build has no Verovio files to find until something imports it).
   Verovio is **LGPL-3.0-or-later**: it stays an unmodified chunk of its own, and `/licences.html` (linked from the terms
-  and privacy pages) has the notice, the source and the full LGPL and GPL texts (`public/licences/`). When the view lands, add the
-  `built` test that imports the chunk under the policy (the build has no chunk to find until something imports it).
+  and privacy pages) has the notice, the source and the full LGPL and GPL texts (`public/licences/`).
 - "Does OpenSheetMusicDisplay transpose `<harmony>` correctly" no longer matters: it is not used.
 
 **Text and pdf.js (second round, from the PDF alone).** `src/js/melody-pdfjs.ts` reads a lead sheet PDF with
