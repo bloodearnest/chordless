@@ -13,7 +13,7 @@
   },
   "src/js/melody-musicxml.ts": {
     "lines": 2,
-    "branches": 26,
+    "branches": 25,
     "functions": 0
   },
   "src/js/melody-path.ts": {
@@ -43,6 +43,11 @@
     "branches": 0,
     "functions": 0,
     "unloaded": 0
+  },
+  "src/js/transpose.ts": {
+    "lines": 0,
+    "branches": 6,
+    "functions": 0
   },
   "worker/src/index.ts": {
     "lines": 0,
