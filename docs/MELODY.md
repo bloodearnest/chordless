@@ -139,13 +139,16 @@ Two layers, and not one.
 
 1. **Inside the app: a small typed `Melody`**, not XML: measures, each with notes `{ midi, step,
    alter, octave, start, duration, tied, syllable, cue }`, plus key, time signature, tempo,
-   sections, chord symbols. Analysis, transposing and the range derive from it, and it is a few KB
-   as JSON (the PDF is 130 to 170 KB).
-2. **MusicXML 4.0 (partwise) at the edges**, written from the `Melody` for export and for the
-   renderer, and read into it for import. It is the interchange format every notation program and
-   every web renderer speaks. It is verbose (30 to 80 KB for a song), so it is not what is kept.
-   MEI is the other candidate (it is what Verovio uses); MusicXML is the one other programs open.
-   MIDI is not enough: it has no spelling (F# or Gb), no lyrics, no sections.
+   sections, chord symbols. Analysis, transposing, the range and the play order derive from it. As
+   JSON it is not small: 68 KB at the median and 164 KB at most over the 137 sheets (the PDF is 125 KB),
+   and 18 KB median if the ids, `midi` and every default are left out.
+2. **MusicXML 4.0 (partwise) is the file that is kept, and the edge**: written from the `Melody`
+   (`melody-musicxml.ts`) and read into it (`melody-musicxml-read.ts`), for the renderer, for export and
+   import, and as the file in Drive. It is the interchange format every notation program speaks, so
+   the user's file stays one they can open without us, and there is one format at the edge, not two. It is
+   62 KB at the median (151 KB at most) and 3 KB gzipped. MEI is the other candidate (it is what Verovio
+   uses); MusicXML is the one other programs open. MIDI is not enough: it has no spelling (F# or Gb), no
+   lyrics, no sections.
 
 Transposing is the notes moved by the interval and respelled for the new key, which
 `transposeNote`/`noteName` already do for chords. Nothing else about the song changes.
@@ -161,15 +164,25 @@ as the chord transposer spells them. The range is of the sung notes: cue notes a
 
 - **Not in the chart.** A directive could hold the range (it does); the melody is kilobytes and
   would make the chart unreadable in the editor.
-- **A file beside the chart**, per chart (a variant has its own), in the key the chart is in. It
-  goes through the same storage and sync as the chart (`docs/STORAGE_API.md`): the user's browser
-  and the user's, or their team space owner's, Drive. A new kind of file there is the largest part
-  of the work after the reader.
+- **A MusicXML file beside the chart in Drive**, per chart (a variant has its own), in the key the chart
+  is in, linked to its chart by `appProperties` (`type: 'melody'`, the chart's `songId` and `songUuid`, `spaceId`,
+  `appVersion`, a format version) like the chart's own. It goes through the same storage and sync as the
+  chart (`docs/STORAGE_API.md`): the user's browser and the user's, or their team space owner's, Drive.
+  Older clients already ignore it: the pull skips a file in `songs` whose `type` is not `chordpro`
+  (`sync/pull.ts`). To settle: what happens to the file when its chart is trashed or merged (an orphan),
+  and which of the chart's ids survives a merge.
+- **On the device, the parsed `Melody`**, in an IndexedDB store of its own (`melodies`, keyed by the chart's id,
+  with the file's `fileRef`, `fileRev` and `fileModified` as the chart's records have), not in `songs` or
+  `chordpro`: it is 18 to 70 KB a song and only the Melody view wants it. It is read again from the file
+  when the file's `rev` changes, and only the original key is kept: other keys are `transposeMelody`.
+- **Compression:** the file is plain MusicXML. It gzips to 3 KB, but a gzipped file is opaque in Drive and the
+  storage interface is text only; a format property on the file lets `json.gz`-style packing come later without a
+  migration. Do not rely on Drive or the transport to compress it.
 - **The copyright rule holds** (`CLAUDE.md`): the notes and lyrics are the song's, so they live
   only in the user's browser and Drive, never on the Worker, never in a share link, never in
   telemetry. A share carries the setlist; the receiver imports their own.
 - It is derived data: it can be thrown away and read again from a PDF or a MusicXML file, so it is
-  safe to lose, and need not be in exports.
+  safe to lose, and need not be in exports (the MusicXML file is itself an export).
 
 ## The terms
 
@@ -367,6 +380,22 @@ from each PDF, engrave it, read Verovio's SVG back with the SVG reader, and comp
   Verovio is **LGPL-3.0-or-later**: it stays an unmodified chunk of its own, and `/licences.html` (linked from the terms
   and privacy pages) has the notice, the source and the full LGPL and GPL texts (`public/licences/`).
 - "Does OpenSheetMusicDisplay transpose `<harmony>` correctly" no longer matters: it is not used.
+
+**Reading MusicXML back (`src/js/melody-musicxml-read.ts`, with `src/js/xml.ts`).** The file that is kept has
+to give the melody again, so `readMusicXml(writeMusicXml(melody))` is checked field by field over the corpus
+(`scripts/melody-xml-roundtrip.ts`: every note's pitch, start, length, tuplet bracket, ties, cue flag and
+lyrics; chords with their beat; section, tempo, key and time; barline, repeat, ending and directions; each measure's length
+and whether it is full). **136 of 137 songs and 8,407 of 8,410 measures are exact**; the 3 are a whole-measure rest in
+one song whose length (24/11 of a beat, from a misread time signature) MusicXML's whole divisions cannot hold. What is not kept, and
+so not compared: the ids of the sheet's own elements, a lyric that is only a verse number, the lyrics of a cue
+note, a plain barline (no barline), the words of a segno or coda sign, and how the events are grouped into voices.
+The check found four defects in the writer, now mended: a line that comes in late needs `<forward>`; a chord inside a
+held note, or after the last note, is reached with `<backup>` or `<forward>` and back; a voice that holds two
+overlapping lines is written as voices of their own; and the order of a chord and a late line. It reads
+what other programs write too (a DOCTYPE, comments, CDATA, pretty-printed text, grace notes skipped, `<chord/>`,
+voices by `<backup>`), but only from our own files has it been checked exactly; real files from MuseScore, Sibelius and
+Dorico are the next test. `xml.ts` reads no DTD and expands no entity of its own, so a file cannot reach outside
+itself. The Verovio check (above) still gives 35,396 of 35,396 notes after these changes.
 
 **Text and pdf.js (second round, from the PDF alone).** `src/js/melody-pdfjs.ts` reads a lead sheet PDF with
 pdf.js (as `melody-range.ts` does) and needs nothing else: the preview is only the oracle it was developed against.

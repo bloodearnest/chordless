@@ -3,7 +3,14 @@
  * web renderer reads (`docs/MELODY.md`, "The format"). Chord symbols are `<harmony>`, written from
  * our own text so the app's spelling stays the app's; sections are rehearsal marks.
  */
-import type { Melody, MelodyDirection, MelodyEvent, MelodyMeasure, MelodyNote } from './melody.ts'
+import type {
+  Melody,
+  MelodyChord,
+  MelodyDirection,
+  MelodyEvent,
+  MelodyMeasure,
+  MelodyNote,
+} from './melody.ts'
 
 const DIVISIONS = 24 // per quarter: whole divisions for 16ths, 32nds, and triplets of them
 
@@ -210,6 +217,30 @@ function rightBarline(m: MelodyMeasure): string {
   return `<barline location="right">${style ? `<bar-style>${style}</bar-style>` : ''}${ending}${repeat}</barline>`
 }
 
+/**
+ * A voice as lines that do not overlap. A MusicXML voice is one line of notes in time; a sheet's voice
+ * can hold two that run together (a cue line over another), which are written as voices of their own. A
+ * note that sounds with the one before it (a chord) stays with it.
+ */
+function lanesOf(voice: MelodyEvent[]): MelodyEvent[][] {
+  const lanes: { events: MelodyEvent[]; end: number }[] = []
+  let current: { events: MelodyEvent[]; end: number } | undefined
+  for (const e of voice) {
+    const at = Math.round(e.start * DIVISIONS)
+    const chord = e.kind === 'note' && e.withPrevious
+    if (!chord || !current) {
+      current = lanes.find(l => l.end <= at)
+      if (!current) {
+        current = { events: [], end: 0 }
+        lanes.push(current)
+      }
+    }
+    current.events.push(e)
+    if (!chord) current.end = at + Math.round(e.duration * DIVISIONS)
+  }
+  return lanes.map(l => l.events)
+}
+
 export function writeMusicXml(melody: Melody): string {
   const out: string[] = []
   out.push('<?xml version="1.0" encoding="UTF-8"?>')
@@ -262,7 +293,7 @@ export function writeMusicXml(melody: Melody): string {
     let cursor = 0
     const accidentals = new Accidentals(m.fifths, carried)
     const tiedOn = new Map<string, number>()
-    m.voices.forEach((v, vi) => {
+    m.voices.flatMap(lanesOf).forEach((v, vi) => {
       if (vi > 0) {
         out.push(`<backup><duration>${cursor}</duration></backup>`)
         cursor = 0
@@ -271,12 +302,29 @@ export function writeMusicXml(melody: Melody): string {
       for (const e of v) {
         const at = Math.round(e.start * DIVISIONS)
         const sounds = e.kind === 'rest' || !e.withPrevious
+        // A chord symbol goes at its own place: a late voice has a gap before it, and a chord that falls in
+        // the gap is written there (a <forward> to it, then the symbol), not after the gap
+        while (vi === 0 && chords[0] && chords[0].start <= e.start + 1e-6) {
+          const symbol = chords.shift() as MelodyChord
+          const place = Math.round(symbol.start * DIVISIONS)
+          if (sounds && place > cursor && place <= at) {
+            out.push(`<forward><duration>${place - cursor}</duration></forward>`)
+            cursor = place
+          } else if (place < cursor) {
+            // (a chord that falls inside a held note: back to it, and on again after)
+            out.push(
+              `<backup><duration>${cursor - place}</duration></backup>`,
+              harmony(symbol.text),
+              `<forward><duration>${cursor - place}</duration></forward>`
+            )
+            continue
+          }
+          out.push(harmony(symbol.text))
+        }
         if (sounds && at > cursor) {
           out.push(`<forward><duration>${at - cursor}</duration></forward>`)
           cursor = at
         }
-        while (vi === 0 && chords[0] && chords[0].start <= e.start + 1e-6)
-          out.push(harmony((chords.shift() as { text: string }).text))
         if (e.kind === 'rest') {
           out.push(restXml(e, vi + 1))
           prev = undefined
@@ -287,7 +335,19 @@ export function writeMusicXml(melody: Melody): string {
         }
         if (sounds) cursor += Math.round(e.duration * DIVISIONS)
       }
-      if (vi === 0) for (const c of chords) out.push(harmony(c.text))
+      // chords after the last note of the line: out to each one and back to where the line ended
+      if (vi === 0)
+        for (const c of chords) {
+          const delta = Math.round(c.start * DIVISIONS) - cursor
+          const [there, back] = delta > 0 ? ['forward', 'backup'] : ['backup', 'forward']
+          if (delta === 0) out.push(harmony(c.text))
+          else
+            out.push(
+              `<${there}><duration>${Math.abs(delta)}</duration></${there}>`,
+              harmony(c.text),
+              `<${back}><duration>${Math.abs(delta)}</duration></${back}>`
+            )
+        }
     })
     carried = tiedOn
     const right = rightBarline(m)
