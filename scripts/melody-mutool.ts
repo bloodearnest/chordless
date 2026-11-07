@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DrawItem, TextRun } from '../src/js/melody-pdf.ts'
 import type { El } from '../src/js/melody-read.ts'
-import { parseXml } from './melody-xml.ts'
+import { parseXml } from '../src/js/xml.ts'
 
 /** The paths of a page from `mutool draw -F svg` */
 export function drawingFromSvg(svg: string): DrawItem[] {
@@ -32,7 +32,7 @@ export function drawingFromSvg(svg: string): DrawItem[] {
       walk(c, defs)
     }
   }
-  walk(parseXml(svg), false)
+  walk(parseXml(svg) as El, false)
   return items
 }
 
@@ -79,7 +79,7 @@ export function textRunsFromStext(xml: string): TextRun[] {
       if (cur) runs.push(cur)
     } else e.children.forEach(walk)
   }
-  walk(parseXml(xml))
+  walk(parseXml(xml) as El)
   return runs
 }
 
