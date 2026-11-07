@@ -45,6 +45,9 @@ export default defineConfig(({ command, isPreview }) => {
       // third large chunk still warns.
       chunkSizeWarningLimit: 7300,
     },
+    // Workers are modules (the page makes them with `type: 'module'`), so their code can be split and Verovio's
+    // stays a chunk of its own. The default, an IIFE, cannot import on demand.
+    worker: { format: 'es' },
     // The app, and the policy and licence pages (documents: they link the same stylesheet and theme).
     // For the browser's build only: the Worker's has its own entry.
     environments: {

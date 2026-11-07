@@ -1,76 +1,55 @@
 /**
- * Engraves a melody as sheet music, with Verovio: the renderer SongSelect itself uses for its lead
- * sheets (docs/MELODY.md), so a sheet made here looks like theirs. It takes the MusicXML that
- * `writeMusicXml` makes and gives SVG, one string a page.
- *
- * Verovio is WebAssembly in a 6 MB module, so it is only imported when a sheet is first rendered,
- * and its toolkit is kept for the next one.
+ * Engraves a melody as sheet music, in a worker: `docs/MELODY.md`, "Rendering with Verovio". The page
+ * gives MusicXML (from `writeMusicXml`) and gets SVG, one string a page. Verovio itself runs in
+ * `verovio-worker.ts`, which is made on the first call and kept for the next, so the page never
+ * compiles the WebAssembly (and its Content-Security-Policy need not allow that) and the 7 MB module is
+ * not parsed on the thread the lyrics scroll on.
  */
+import type { RenderedMelody, RenderOptions } from './melody-render-engine.ts'
+import type { RenderReply, RenderRequest } from './verovio-worker.ts'
 
-/** What the toolkit of `verovio/esm` has that is used here */
-interface Toolkit {
-  setOptions(options: Record<string, unknown>): void
-  loadData(data: string): boolean
-  getPageCount(): number
-  renderToSVG(page: number): string
-  getLog(): string
-  destroy(): void
+export type { RenderedMelody, RenderOptions }
+
+interface Pending {
+  resolve(result: RenderedMelody | null): void
+  reject(error: Error): void
 }
 
-let toolkit: Promise<Toolkit> | null = null
+let worker: Worker | null = null
+let nextId = 1
+const pending = new Map<number, Pending>()
 
-function load(): Promise<Toolkit> {
-  toolkit ??= (async () => {
-    const [{ default: createModule }, { VerovioToolkit, enableLogToBuffer }] = await Promise.all([
-      import('verovio/wasm'),
-      import('verovio/esm'),
-    ])
-    const module = await createModule()
-    // (what it says about a file goes to `getLog`, not to the console)
-    enableLogToBuffer(1, module)
-    return new VerovioToolkit(module) as Toolkit
-  })()
-  // (a failed load is tried again next time, not kept)
-  toolkit.catch(() => {
-    toolkit = null
-  })
-  return toolkit
+function start(): Worker {
+  if (worker) return worker
+  const made = new Worker(new URL('./verovio-worker.ts', import.meta.url), { type: 'module' })
+  made.onmessage = ({ data }: MessageEvent<RenderReply>) => {
+    const waiting = pending.get(data.id)
+    if (!waiting) return
+    pending.delete(data.id)
+    if ('error' in data) waiting.reject(new Error(data.error))
+    else waiting.resolve(data.result)
+  }
+  // A worker that fails (the file did not load, or the policy refused it) fails what waits on it, and
+  // the next call makes a new one
+  made.onerror = event => {
+    const error = new Error(event.message || 'The sheet music engraver did not start')
+    for (const waiting of pending.values()) waiting.reject(error)
+    pending.clear()
+    made.terminate()
+    if (worker === made) worker = null
+  }
+  worker = made
+  return made
 }
 
-export interface RenderOptions {
-  /** The width of a page, in the toolkit's units (a tenth of a millimetre at scale 100); 2100 is A4 */
-  pageWidth?: number
-  /** Percent: 100 is the size SongSelect prints at the width above */
-  scale?: number
-}
-
-export interface RenderedMelody {
-  /** One SVG document a page */
-  pages: string[]
-  /** What the toolkit said about the file: warnings of anything it could not read */
-  log: string
-}
-
-/** The MusicXML as SVG pages, or null if Verovio could not read it (the log is in `renderMelodyLog`) */
-export async function renderMelody(
+/** The MusicXML as SVG pages, or null if Verovio could not read it. Rejects if the worker fails */
+export function renderMelody(
   musicXml: string,
   options: RenderOptions = {}
 ): Promise<RenderedMelody | null> {
-  const tk = await load()
-  tk.setOptions({
-    pageWidth: options.pageWidth ?? 2100,
-    scale: options.scale ?? 40,
-    // the page is as tall as the music, so a view scrolls it and no page ends mid-song
-    adjustPageHeight: true,
-    // (a section box is centred on its barline, so the first one needs room to its left)
-    pageMarginLeft: 120,
-    footer: 'none',
-    header: 'none',
-    svgViewBox: true,
-    svgRemoveXlink: true,
+  return new Promise((resolve, reject) => {
+    const id = nextId++
+    pending.set(id, { resolve, reject })
+    start().postMessage({ id, musicXml, options } satisfies RenderRequest)
   })
-  if (!tk.loadData(musicXml)) return null
-  const pages: string[] = []
-  for (let page = 1; page <= tk.getPageCount(); page++) pages.push(tk.renderToSVG(page))
-  return { pages, log: tk.getLog() }
 }

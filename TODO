@@ -243,6 +243,18 @@ storage/sync
 - the Content-Security-Policy is enforced (public/_headers). Not yet checked: the service worker's
   own fetches (its violations are not in the page console: chrome://serviceworker-internals or the
   worker's DevTools), and Safari
+  Tightening it further (raised 2026-11-07, after the Verovio worker took `'wasm-unsafe-eval'` off the page):
+  - drop `style-src-attr 'unsafe-inline'`, the loosest directive left: it is only for the 26 `style="..."`
+    attributes in 14 files (grep `style="` in src/). Static ones become classes. A style set through the DOM
+    (`element.style`, or Lit's `styleMap`) is not blocked, so the dynamic ones (the media player's rotate and
+    translate) move to that; a `style="...${x}"` binding sets an attribute and is blocked. Check that
+    Google's sign-in button works without it
+  - Trusted Types: `require-trusted-types-for 'script'`, so a string cannot reach `innerHTML` and the like.
+    The app has one `innerHTML = ''` (song-view-manager.ts) and Lit has its own policy (`lit-html`); the risk is
+    Google's sign-in and Picker scripts, which may need policies of their own. Try it as
+    `Content-Security-Policy-Report-Only` first and see what is reported
+  - `upgrade-insecure-requests` (nothing is http: it costs nothing), and a `report-to` so a violation on a
+    device is heard of (it would go through the Worker's telemetry route; the privacy policy would need a line)
 - test song import on real devices, on the live site: file import and paste on Android and iPad,
   the bookmarklet on Android Chrome, and whether the phone/tablet tip shows on the bookmarklet page
 - user-facing Drive health check / cleanup (idea): turn src/dev/drive-audit.html into an

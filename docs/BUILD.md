@@ -95,7 +95,7 @@ The policy is enforced (`Content-Security-Policy`): the browser blocks what it d
 logs "Refused to ..." in the console. To trial a change without blocking, send it as
 `Content-Security-Policy-Report-Only` and watch the console. The `built` test opens every view and
 fails on a violation. What the policy allows, and why, is in the comment at the top of the file.
-When the app starts using a new host, add it there; the service worker script gets the same
+A worker has the policy of its own response, not the page's, so a file that needs something the page does not allow (Verovio's WebAssembly) gets a rule of its own in the file, taking the page's policy off first with a `!` line (two policies on one file are both enforced). When the app starts using a new host, add it there; the service worker script gets the same
 header, so its `connect-src` must cover what it fetches.
 
 Below the floor (`.browserslistrc`), `public/floor.js` replaces the page with a plain "Please update your device" message and stops it loading the app. It is a classic script in syntax any browser parses, and tests `scrollend` (the check that sets the floor), `:has()` and `structuredClone`. "Try it anyway" is remembered in localStorage, so a wrong guess never locks anyone out.
