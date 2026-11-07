@@ -150,6 +150,13 @@ Two layers, and not one.
 Transposing is the notes moved by the interval and respelled for the new key, which
 `transposeNote`/`noteName` already do for chords. Nothing else about the song changes.
 
+`transposeMelody` (`src/js/melody-transpose.ts`) does it. The notes go through `shiftNearGreen`, the same
+rule as the key picker: a key is a pitch class, so of the shift and the octave either side of it the one
+that sits least outside the green range wins, and a sheet and the picker never show different octaves. The
+chords take the plain nearest interval (they have no octave) through `transposeChord`. Notes are spelled
+with `noteName`, so a sharp key gets sharps and a flat key flats; the unusual keys (F# major's E#) are spelled
+as the chord transposer spells them. The range is of the sung notes: cue notes are not counted.
+
 ## Where it is kept
 
 - **Not in the chart.** A directive could hold the range (it does); the melody is kilobytes and
