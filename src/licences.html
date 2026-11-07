@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="The open source software Chordless uses, and its licences" />
+    <meta name="theme-color" content="#2c3e50" />
+    <link rel="icon" type="image/svg+xml" href="/icons/favicon-light.svg" />
+    <title>Chordless open source licences</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/document.css" />
+  </head>
+  <body>
+    <header class="doc-header"><a href="/">Chordless</a></header>
+    <main class="doc">
+      <h1>Open source licences</h1>
+      <p>
+        Chordless is built on open source software. The pieces whose licences ask for a notice, or
+        for the source to be available, are here.
+      </p>
+
+      <h2>Verovio</h2>
+      <p>
+        The sheet music in Chordless's melody view is engraved by
+        <a href="https://www.verovio.org/">Verovio</a>, version 6.0.1, copyright © Laurent Pugin
+        and others (RISM Digital Center and contributors). It is free software under the
+        <a href="/licences/lgpl-3.0.txt">GNU Lesser General Public License, version 3 or any later
+        version</a>, which refers to the
+        <a href="/licences/gpl-3.0.txt">GNU General Public License, version 3</a>. Both are copied
+        here in full.
+      </p>
+      <ul>
+        <li>
+          <strong>Source.</strong> Verovio's source code, for this version, is at
+          <a href="https://github.com/rism-digital/verovio">github.com/rism-digital/verovio</a>
+          (version 6.0.1), and the package Chordless uses is
+          <a href="https://www.npmjs.com/package/verovio/v/6.0.1">verovio 6.0.1 on npm</a>.
+        </li>
+        <li>
+          <strong>Unmodified.</strong> Chordless uses Verovio as it is released and has not changed
+          it. It is a file of its own, loaded only when a sheet is first shown, and is not mixed
+          into the rest of the app's code, so another build of Verovio can be loaded in its place.
+          To use a modified Verovio with Chordless, or for anything else about this, write to
+          <a href="mailto:bloodearnest@gmail.com">bloodearnest@gmail.com</a>.
+        </li>
+        <li>
+          <strong>Music font.</strong> The notation glyphs are Leipzig, which is part of Verovio,
+          under the <a href="https://openfontlicense.org/">SIL Open Font License 1.1</a>.
+        </li>
+      </ul>
+
+      <p><a href="/terms.html">Terms of service</a> · <a href="/privacy.html">Privacy policy</a></p>
+    </main>
+    <script type="module" src="/js/theme-manager.ts"></script>
+  </body>
+</html>
