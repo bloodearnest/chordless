@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { readMelodySvg } from '../scripts/melody-xml.ts'
-import type { Melody, MelodyNote } from '../src/js/melody.ts'
+import type { Melody, MelodyEvent, MelodyNote } from '../src/js/melody.ts'
 import { midiOf } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { absolutePath, shapeHash } from '../src/js/melody-path.ts'
@@ -264,5 +264,28 @@ describe('transposing a melody', () => {
     assert.equal(transposeMelody(t, 'C', 'H'), t)
     assert.equal(fifthsOfKey('Em'), 1)
     assert.equal(fifthsOfKey('F#'), 6)
+    assert.equal(fifthsOfKey('F♯'), 6)
+    assert.equal(fifthsOfKey('B♭m'), -5)
+  })
+
+  it('keeps rests, takes a melody with no sung note as it is, and moves a minor key', () => {
+    const rest: MelodyEvent = {
+      kind: 'rest',
+      id: 'r',
+      start: 1,
+      duration: 1,
+      tupletRatio: 1,
+      wholeMeasure: false,
+      cue: false,
+    }
+    const t = tune([note('E', 4)], 'Em')
+    t.measures[0].voices[0].push(rest)
+    const out = transposeMelody(t, 'Em', 'Am')
+    assert.equal(out.measures[0].voices[0][1], rest)
+    assert.equal(out.measures[0].fifths, 0)
+    assert.equal(out.measures[0].chords[0].text, 'Am')
+    const cueOnly = tune([note('E', 2, 0, true)], 'Em')
+    assert.equal(melodyRange(cueOnly), null)
+    assert.equal(transposeMelody(cueOnly, 'Em', 'Gm').measures[0].fifths, -2)
   })
 })
