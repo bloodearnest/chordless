@@ -88,11 +88,11 @@ const firstByClass = (e: El, cls: string) => byClass(e, cls)[0]
 
 /**
  * A chord symbol's text. The flat after a root ("Eb") is drawn in the music font as a private use
- * character (U+EA64 in these sheets, which is the only one seen); the sharp is assumed to be the next code
+ * character: U+EA64 is the flat and U+EA66 the sharp (seen in the PDFs' text; the preview SVG only has flats)
  */
 const CHORD_ACCIDENTAL: Record<string, string> = {
   '\uea64': 'b',
-  '\uea65': '#',
+  '\uea66': '#',
   '\ue260': 'b',
   '\ue262': '#',
 }

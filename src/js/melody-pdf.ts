@@ -734,7 +734,7 @@ function placeText(
     size: r.size / u.a,
     bold: r.bold,
     italic: r.italic,
-    text: r.text.replace(/\ue1d5/g, '').trim(),
+    text: r.text.replace(/^[\ue000-\uf8ff]+/, '').trim(),
   }))
   const top = Math.min(...staves.map(s => s.ys[0] as number))
   const bottom = Math.max(...staves.map(s => s.ys[4] as number))
@@ -743,12 +743,17 @@ function placeText(
   const rows = new Map<Staff, number[]>()
   const lyrics: { s: Staff & { sys: number }; r: (typeof units)[number] }[] = []
   const marks: { s: Staff; r: (typeof units)[number] }[] = []
+  // Words that can be a lyric or a chord: each is kept with the staff above it and the staff below
+  const between: {
+    r: (typeof units)[number]
+    above: Staff & { sys: number }
+    below: Staff | undefined
+  }[] = []
   for (const r of units) {
-    if (!r.text || r.size < 300 || r.size > 450 || r.y < top - 1500) {
+    if (!r.text || r.size < 370 || r.size > 440 || r.y < top - 1500) {
       left.push(r)
       continue
     }
-    // above a staff: the nearest one below the word; below: the nearest above
     const below = staves
       .filter(
         s =>
@@ -760,17 +765,37 @@ function placeText(
     const above = staves
       .filter(
         s =>
-          inX(s, (r.x0 + r.x1) / 2) && r.y > (s.ys[4] as number) && r.y - (s.ys[4] as number) < 3300
+          inX(s, (r.x0 + r.x1) / 2) && r.y > (s.ys[4] as number) && r.y - (s.ys[4] as number) < 5400
       )
       .sort((p, q) => (q.ys[4] as number) - (p.ys[4] as number))[0]
-    // a word between two systems is a chord of the lower or a lyric of the upper: the nearer staff has it
-    const nearBelow = below ? (below.ys[0] as number) - r.y : Infinity
-    const nearAbove = above ? r.y - (above.ys[4] as number) : Infinity
-    if (below && nearBelow < nearAbove) marks.push({ s: below, r })
-    else if (above) {
-      lyrics.push({ s: above, r })
-      rows.set(above, [...(rows.get(above) ?? []), r.y])
-    } else left.push(r)
+    // bold and italic words are never lyrics: a section name, the tempo, a direction
+    if ((r.bold || r.italic || !above) && below) marks.push({ s: below, r })
+    else if (r.bold || r.italic || !above) left.push(r)
+    else between.push({ r, above, below })
+  }
+  // Under a system the rows run: the lyrics, one row for a verse, 580 units apart, the first near the staff, and then
+  // (if the next system has chords) the row of chords, set apart. So from the top: a row within 2000 of the staff
+  // starts the lyrics, and each row 640 or less below the last is another verse.
+  const bySystem = new Map<number, typeof between>()
+  for (const w of between) bySystem.set(w.above.sys, [...(bySystem.get(w.above.sys) ?? []), w])
+  for (const [, ws] of bySystem) {
+    const bottomOf = ws[0]?.above.ys[4] as number
+    const ys = [...new Set(ws.map(w => Math.round(w.r.y / 40) * 40))].sort((a, b) => a - b)
+    const lyricYs = new Set<number>()
+    let prev: number | null = null
+    for (const y of ys) {
+      if (prev === null ? y - bottomOf <= 2000 : y - prev <= 640) {
+        lyricYs.add(y)
+        prev = y
+      } else break
+    }
+    for (const w of ws) {
+      if (lyricYs.has(Math.round(w.r.y / 40) * 40)) {
+        lyrics.push({ s: w.above, r: w.r })
+        rows.set(w.above, [...(rows.get(w.above) ?? []), w.r.y])
+      } else if (w.below) marks.push({ s: w.below, r: w.r })
+      else left.push(w.r)
+    }
   }
   // Marks: chords are regular, a section name bold (its words joined), the tempo "=72"
   const bold = marks.filter(m => m.r.bold).sort((p, q) => p.r.x0 - q.r.x0)
@@ -802,7 +827,7 @@ function placeText(
       perStaff
         .get(first.s)
         ?.marks.push(group('tempo', [node2('text', { x: num(first.r.x0) }, [], text)]))
-    else if (!/^\d+$/.test(text))
+    else if (!/^\(?[\d,\s]+\)?$/.test(text))
       perStaff
         .get(first.s)
         ?.marks.push(group('reh', [node2('text', { x: num(first.r.x0) }, [], text)])) // a bare number is the ending's
@@ -885,15 +910,6 @@ function attachSyllables(syls: Syl[], notes: { x: number; el: El; cue: boolean }
   if (!words.length || !sung.length) return
   const rows = Math.max(...syls.map(s => s.row)) + 1
   const SKIP = 600
-  console.log(
-    'syls',
-    words
-      .filter(s => s.row === 0)
-      .map(s => `${s.text}@${Math.round((s.x0 + s.x1) / 2)}`)
-      .join(' '),
-    '| heads',
-    sung.map(n => Math.round(n.x)).join(' ')
-  )
   const mine = new Map<El, Syl[]>()
   for (let row = 0; row < rows; row++) {
     const ss = words.filter(s => s.row === row).sort((p, q) => p.x0 - q.x0)
