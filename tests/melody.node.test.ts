@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import { readMelodySvg } from '../scripts/melody-xml.ts'
 import type { Melody, MelodyEvent, MelodyNote } from '../src/js/melody.ts'
 import { midiOf } from '../src/js/melody.ts'
+import { parseDirection } from '../src/js/melody-directions.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { absolutePath, shapeHash } from '../src/js/melody-path.ts'
 import { type Glyph, type Line, type Staff, signsOf } from '../src/js/melody-pdf.ts'
@@ -133,6 +134,7 @@ describe('MusicXML of a hand-built melody', () => {
         ],
         section: 'VERSE 1',
         barline: 'single' as const,
+        directions: [],
         repeatStart: false,
         ending: null,
         length: 4,
@@ -193,6 +195,92 @@ describe('lining up a cue line with the sung one', () => {
   })
 })
 
+describe('jump directions', () => {
+  it('reads D.S. and D.C. with the place they go to, a segno and a coda from their signs', () => {
+    const d = (text: string) => parseDirection(text)
+    assert.deepEqual(d('D.S. al Coda'), {
+      kind: 'da-segno',
+      al: 'coda',
+      time: null,
+      text: 'D.S. al Coda',
+    })
+    assert.deepEqual(d('D.C. al Fine'), {
+      kind: 'da-capo',
+      al: 'fine',
+      time: null,
+      text: 'D.C. al Fine',
+    })
+    assert.equal(d('D.S.')?.al, null)
+    assert.equal(d('Fine')?.kind, 'fine')
+    assert.equal(d('\ue047')?.kind, 'segno')
+    assert.equal(d('\ue048')?.kind, 'coda')
+    assert.equal(d('Coda')?.kind, 'coda')
+    assert.equal(d('Segno')?.kind, 'segno')
+  })
+
+  it('reads "2nd time to Coda" with its pass, and keeps plain instructions as text', () => {
+    assert.deepEqual(parseDirection('2nd time to Coda\ue048'), {
+      kind: 'to-coda',
+      al: null,
+      time: 2,
+      text: '2nd time to Coda',
+    })
+    assert.deepEqual(parseDirection('Play 3 times'), {
+      kind: 'text',
+      al: null,
+      time: null,
+      text: 'Play 3 times',
+    })
+    assert.equal(parseDirection('(2nd x a cappella)')?.kind, 'text')
+    assert.equal(parseDirection('13'), null)
+    assert.equal(parseDirection('  '), null)
+    assert.equal(parseDirection('\ue1d5'), null)
+  })
+
+  it('writes them as MusicXML directions with their sound', () => {
+    const xml = writeMusicXml({
+      title: null,
+      notice: [],
+      measures: [
+        {
+          number: 1,
+          voices: [[]],
+          chords: [],
+          section: null,
+          barline: 'single',
+          directions: [
+            { kind: 'segno', al: null, time: null, text: '' },
+            { kind: 'to-coda', al: null, time: 2, text: '2nd time to Coda' },
+            { kind: 'da-segno', al: 'coda', time: null, text: 'D.S. al "Coda"' },
+            { kind: 'da-capo', al: null, time: null, text: 'D.C.' },
+            { kind: 'fine', al: null, time: null, text: 'Fine' },
+            { kind: 'coda', al: null, time: null, text: '' },
+            { kind: 'text', al: null, time: null, text: 'Play 3 times' },
+          ],
+          repeatStart: false,
+          ending: null,
+          length: 4,
+          full: true,
+          fifths: 0,
+          beats: 4,
+          beatType: 4,
+          tempo: null,
+        },
+      ],
+    })
+    assert.match(xml, /<segno\/><\/direction-type><sound segno="segno"\/>/)
+    assert.match(xml, /<coda\/><\/direction-type><sound coda="coda"\/>/)
+    assert.match(xml, /<words>2nd time to Coda<\/words><\/direction-type><sound tocoda="coda"\/>/)
+    assert.match(
+      xml,
+      /<words>D\.S\. al &quot;Coda&quot;<\/words><\/direction-type><sound dalsegno="segno"\/>/
+    )
+    assert.match(xml, /<sound dacapo="yes"\/>/)
+    assert.match(xml, /<sound fine="yes"\/>/)
+    assert.match(xml, /<words>Play 3 times<\/words><\/direction-type><\/direction>/)
+  })
+})
+
 describe('transposing a melody', () => {
   const note = (step: MelodyNote['step'], octave: number, alter = 0, cue = false): MelodyNote => ({
     kind: 'note',
@@ -220,6 +308,7 @@ describe('transposing a melody', () => {
         chords: [{ start: 0, text: chord }],
         section: null,
         barline: 'single',
+        directions: [],
         repeatStart: false,
         ending: null,
         length: 4,
@@ -401,6 +490,7 @@ describe('repeat signs and endings on a page', () => {
       chords: [],
       section: null,
       barline: 'single' as const,
+      directions: [],
       repeatStart: false,
       ending: null,
       length: 4,

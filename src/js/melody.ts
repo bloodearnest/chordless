@@ -62,6 +62,18 @@ export interface MelodyEnding {
   closed: boolean
 }
 
+/** A sign or an instruction over a measure that changes where the player goes next, or how many times */
+export interface MelodyDirection {
+  /** `da-segno` is "D.S." and `da-capo` "D.C."; `to-coda` is where to jump to the coda sign; `text` is any other instruction */
+  kind: 'segno' | 'coda' | 'to-coda' | 'fine' | 'da-segno' | 'da-capo' | 'text'
+  /** "al Coda" / "al Fine" after a D.S. or D.C. */
+  al: 'coda' | 'fine' | null
+  /** "2nd time to Coda": only on this pass (2); null when it applies on every one */
+  time: number | null
+  /** The words as written, without the music font's signs */
+  text: string
+}
+
 export interface MelodyMeasure {
   /** The number the sheet prints, counted from 1 (a pickup is 0 when the sheet says so) */
   number: number
@@ -74,6 +86,8 @@ export interface MelodyMeasure {
   barline: 'single' | 'double' | 'final' | 'repeat-end' | 'dashed' | 'none'
   /** The measure opens with a repeat sign (a thick line and dots on its left edge): play from here again */
   repeatStart: boolean
+  /** Signs and instructions over the measure: segno, coda, D.S., D.C., Fine, "Play 3 times" */
+  directions: MelodyDirection[]
   /** The numbered ending ("1", "2", "2,3") whose bracket this measure is under, if any */
   ending: MelodyEnding | null
   /** Sum of the voices' lengths, checked against the time signature */

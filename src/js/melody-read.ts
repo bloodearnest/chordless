@@ -13,6 +13,7 @@
 import {
   type Melody,
   type MelodyChord,
+  type MelodyDirection,
   type MelodyEvent,
   type MelodyMeasure,
   type MelodyNote,
@@ -438,6 +439,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
       chords,
       section: reh ? textOf(reh) : null,
       barline: barlineOf(barLines[barLines.length - 1]),
+      directions: byClass(m, 'dir').map(directionOf),
       repeatStart: !!firstByClass(m, 'repeatStart'),
       ending: endingOf(firstByClass(m, 'ending')),
       length: total,
@@ -536,6 +538,16 @@ function beamLevels(beam: El, x: number): number {
   const chains = new Set<number>()
   for (const p of polys) if (p.x0 - 25 <= x && x <= p.x1 + 25) chains.add(p.chain)
   return chains.size
+}
+
+/** A direction the page reader found over this measure, as it said what it is */
+function directionOf(e: El): MelodyDirection {
+  return {
+    kind: e.attrs['data-kind'] as MelodyDirection['kind'],
+    al: (e.attrs['data-al'] || null) as MelodyDirection['al'],
+    time: e.attrs['data-time'] ? Number(e.attrs['data-time']) : null,
+    text: e.attrs['data-text'] ?? '',
+  }
 }
 
 /** A numbered ending the page reader found over this measure (the preview's SVG has no such element) */

@@ -16,7 +16,7 @@
     "functions": 0
   },
   "src/js/melody-pdf.ts": {
-    "lines": 807,
+    "lines": 859,
     "branches": 8,
     "functions": 14
   },
@@ -27,9 +27,9 @@
     "unloaded": 193
   },
   "src/js/melody-read.ts": {
-    "lines": 168,
+    "lines": 176,
     "branches": 50,
-    "functions": 18
+    "functions": 19
   },
   "src/js/telemetry/start.ts": {
     "lines": 0,
