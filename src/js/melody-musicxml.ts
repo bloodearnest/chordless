@@ -63,7 +63,69 @@ function timeModification(ratio: number): string {
   return ''
 }
 
-function noteXml(n: MelodyNote, voice: number, prev: MelodyNote | undefined): string {
+const SHARP_ORDER = ['F', 'C', 'G', 'D', 'A', 'E', 'B']
+const FLAT_ORDER = ['B', 'E', 'A', 'D', 'G', 'C', 'F']
+
+/** The alteration each note name has from the key signature: F is sharp in G major */
+function keyAlters(fifths: number): Record<string, number> {
+  const out: Record<string, number> = {}
+  const order = fifths >= 0 ? SHARP_ORDER : FLAT_ORDER
+  for (const step of order.slice(0, Math.abs(fifths))) out[step] = fifths >= 0 ? 1 : -1
+  return out
+}
+
+const ACCIDENTAL_NAMES: Record<number, string> = {
+  '-2': 'flat-flat',
+  '-1': 'flat',
+  0: 'natural',
+  1: 'sharp',
+  2: 'double-sharp',
+}
+
+/**
+ * The accidentals a measure prints, by the usual rule: a note is marked when its alteration is not the
+ * one in force, which is the key signature's at the start of the measure and then the last one given
+ * to that note name in that octave. A note tied from the last measure keeps its alteration unmarked.
+ * Verovio, like other engravers, prints an accidental only when the MusicXML names one: `<alter>`
+ * is how it sounds.
+ */
+class Accidentals {
+  private readonly key: Record<string, number>
+  private readonly carried: Map<string, number>
+  private readonly inForce = new Map<string, number>()
+  constructor(fifths: number, carried: Map<string, number>) {
+    this.key = keyAlters(fifths)
+    this.carried = carried
+  }
+
+  /** The `<accidental>` element for a note, or '' where none is printed */
+  of(n: MelodyNote): string {
+    const at = `${n.step}${n.octave}`
+    const carried = n.tieStop ? this.carried.get(at) : undefined
+    const current = this.inForce.get(at) ?? carried ?? this.key[n.step] ?? 0
+    this.inForce.set(at, n.alter)
+    if (n.alter === current) return ''
+    return `<accidental>${ACCIDENTAL_NAMES[n.alter] ?? ''}</accidental>`
+  }
+
+  /** The alterations of the notes tied on out of this measure, for the next to carry */
+  carryOn(n: MelodyNote, into: Map<string, number>): void {
+    if (n.tieStart) into.set(`${n.step}${n.octave}`, n.alter)
+  }
+}
+
+/** `<notations>` for a note or rest: its ties, and the tuplet bracket it opens or closes */
+function notations(ties: string, e: { tuplet?: 'start' | 'stop' }): string {
+  const bracket = e.tuplet ? `<tuplet type="${e.tuplet}" bracket="yes"/>` : ''
+  return ties || bracket ? `<notations>${ties}${bracket}</notations>` : ''
+}
+
+function noteXml(
+  n: MelodyNote,
+  voice: number,
+  prev: MelodyNote | undefined,
+  accidental = ''
+): string {
   const { type, dots } = typeOf(n.duration / n.tupletRatio)
   const lyrics = n.syllables
     .map((raw, i) => {
@@ -80,8 +142,11 @@ function noteXml(n: MelodyNote, voice: number, prev: MelodyNote | undefined): st
     `<pitch><step>${n.step}</step>${n.alter ? `<alter>${n.alter}</alter>` : ''}<octave>${n.octave}</octave></pitch>` +
     `<duration>${Math.round(n.duration * DIVISIONS)}</duration>` +
     `${n.tieStop ? '<tie type="stop"/>' : ''}${n.tieStart ? '<tie type="start"/>' : ''}` +
-    `<voice>${voice}</voice><type>${type}</type>${'<dot/>'.repeat(dots)}${timeModification(n.tupletRatio)}` +
-    `${n.tieStop || n.tieStart ? `<notations>${n.tieStop ? '<tied type="stop"/>' : ''}${n.tieStart ? '<tied type="start"/>' : ''}</notations>` : ''}` +
+    `<voice>${voice}</voice><type>${type}</type>${'<dot/>'.repeat(dots)}${accidental}${timeModification(n.tupletRatio)}` +
+    notations(
+      `${n.tieStop ? '<tied type="stop"/>' : ''}${n.tieStart ? '<tied type="start"/>' : ''}`,
+      n
+    ) +
     `${n.cue ? '' : lyrics}</note>`
   )
 }
@@ -91,7 +156,8 @@ function restXml(e: Extract<MelodyEvent, { kind: 'rest' }>, voice: number): stri
   return (
     `<note>${e.cue ? '<cue/>' : ''}<rest${e.wholeMeasure ? ' measure="yes"' : ''}/>` +
     `<duration>${Math.round(e.duration * DIVISIONS)}</duration><voice>${voice}</voice>` +
-    `${e.wholeMeasure ? '' : `<type>${type}</type>${'<dot/>'.repeat(dots)}${timeModification(e.tupletRatio)}`}</note>`
+    `${e.wholeMeasure ? '' : `<type>${type}</type>${'<dot/>'.repeat(dots)}${timeModification(e.tupletRatio)}`}` +
+    `${notations('', e)}</note>`
   )
 }
 
@@ -155,9 +221,13 @@ export function writeMusicXml(melody: Melody): string {
   out.push(
     `<identification>${melody.notice.map(n => `<rights>${esc(n)}</rights>`).join('')}</identification>`
   )
-  out.push('<part-list><score-part id="P1"><part-name>Melody</part-name></score-part></part-list>')
+  out.push(
+    '<part-list><score-part id="P1"><part-name print-object="no">Melody</part-name></score-part></part-list>'
+  )
   out.push('<part id="P1">')
   let last: { fifths: number; beats: number; beatType: number } | null = null
+  // alterations of notes tied across the barline
+  let carried = new Map<string, number>()
   melody.measures.forEach((m, mi) => {
     out.push(`<measure number="${m.number}"${!m.full && mi === 0 ? ' implicit="yes"' : ''}>`)
     if (
@@ -186,23 +256,40 @@ export function writeMusicXml(melody: Melody): string {
     for (const d of m.directions) out.push(directionXml(d))
     // Chord symbols come first in their measure's first voice, placed by <forward>/<backup> to their beat
     const chords = [...m.chords].sort((a, b) => a.start - b.start)
+    // Where the voice is in the measure, in divisions: a line drawn with no spacer rests (a cue line
+    // that comes in late) is moved to where its notes start, with <forward>, and the next voice goes
+    // back to the start with <backup> by as far as the last one went
+    let cursor = 0
+    const accidentals = new Accidentals(m.fifths, carried)
+    const tiedOn = new Map<string, number>()
     m.voices.forEach((v, vi) => {
-      if (vi > 0)
-        out.push(`<backup><duration>${Math.round(m.length * DIVISIONS)}</duration></backup>`)
+      if (vi > 0) {
+        out.push(`<backup><duration>${cursor}</duration></backup>`)
+        cursor = 0
+      }
       let prev: MelodyNote | undefined
       for (const e of v) {
+        const at = Math.round(e.start * DIVISIONS)
+        const sounds = e.kind === 'rest' || !e.withPrevious
+        if (sounds && at > cursor) {
+          out.push(`<forward><duration>${at - cursor}</duration></forward>`)
+          cursor = at
+        }
         while (vi === 0 && chords[0] && chords[0].start <= e.start + 1e-6)
           out.push(harmony((chords.shift() as { text: string }).text))
         if (e.kind === 'rest') {
           out.push(restXml(e, vi + 1))
           prev = undefined
         } else {
-          out.push(noteXml(e, vi + 1, prev))
+          out.push(noteXml(e, vi + 1, prev, accidentals.of(e)))
+          accidentals.carryOn(e, tiedOn)
           prev = e
         }
+        if (sounds) cursor += Math.round(e.duration * DIVISIONS)
       }
       if (vi === 0) for (const c of chords) out.push(harmony(c.text))
     })
+    carried = tiedOn
     const right = rightBarline(m)
     if (right) out.push(right)
     out.push('</measure>')

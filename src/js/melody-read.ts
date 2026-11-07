@@ -293,8 +293,17 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
       const walk = (parent: El, tupletRatio: number, beams: El | null) => {
         for (const c of parent.children) {
           if (is(c, 'beam')) walk(c, tupletRatio, c)
-          else if (is(c, 'tuplet')) walk(c, tupletRatio * tupletFactor(c), beams)
-          else if (is(c, 'graceGrp')) continue
+          else if (is(c, 'tuplet')) {
+            const before = events.length
+            walk(c, tupletRatio * tupletFactor(c), beams)
+            // the bracket runs from its first event to its last (a chord is one event: its first head)
+            const under = events.slice(before).filter(e => e.kind === 'rest' || !e.withPrevious)
+            const [first, last] = [under[0], under[under.length - 1]]
+            if (first && last && first !== last) {
+              first.tuplet = 'start'
+              last.tuplet = 'stop'
+            }
+          } else if (is(c, 'graceGrp')) continue
           else if (is(c, 'rest') || is(c, 'mRest')) {
             const g = glyphs(c)[0]
             const dots = dotCount(c)

@@ -17,3 +17,15 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env?: ImportMetaEnv
 }
+
+// Verovio ships no types; these are the two modules melody-render.ts imports
+declare module 'verovio/wasm' {
+  const createModule: () => Promise<unknown>
+  export default createModule
+}
+declare module 'verovio/esm' {
+  export class VerovioToolkit {
+    constructor(module: unknown)
+  }
+  export function enableLogToBuffer(value: number, module: unknown): void
+}

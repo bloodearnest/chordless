@@ -6,8 +6,8 @@
     "unloaded": 0
   },
   "src/js/melody-musicxml.ts": {
-    "lines": 1,
-    "branches": 24,
+    "lines": 0,
+    "branches": 17,
     "functions": 0
   },
   "src/js/melody-path.ts": {
@@ -27,9 +27,14 @@
     "unloaded": 193
   },
   "src/js/melody-read.ts": {
-    "lines": 176,
+    "lines": 185,
     "branches": 50,
-    "functions": 19
+    "functions": 20
+  },
+  "src/js/melody-render.ts": {
+    "lines": 1,
+    "branches": 0,
+    "functions": 1
   },
   "src/js/melody-structure.ts": {
     "lines": 0,
