@@ -2,8 +2,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Melody, MelodyNote } from '../src/js/melody.ts'
 import { pdfPageToTree } from '../src/js/melody-pdf.ts'
-import { type ReadStats, readMelodySvg, readMelodyTrees } from '../src/js/melody-svg.ts'
+import { type ReadStats, readMelodyTrees } from '../src/js/melody-read.ts'
 import { mutoolPages } from './melody-mutool.ts'
+import { readMelodySvg } from './melody-xml.ts'
 
 export function readPdf(file: string): { melody: Melody; stats: ReadStats } {
   const stats = { warnings: [] as string[] } as ReadStats

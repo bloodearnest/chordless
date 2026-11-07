@@ -270,9 +270,10 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
 
 ## Spike results
 
-Step 0 was done on 2026-11-06 (branch `claude/melody-spike`): `src/js/melody-svg.ts` (the SVG reader),
-`melody-pdf.ts` (the PDF reader), `melody-musicxml.ts` (the writer), `melody.ts` (the `Melody` type),
-`scripts/melody-spike.ts` and `scripts/melody-pdf-spike.ts` (the scoring), `tests/melody.node.test.ts`.
+Step 0 was done on 2026-11-06 (branch `claude/melody-spike`): `src/js/melody-read.ts` (the shared reader of Verovio's tree),
+`melody-pdf.ts` and `melody-pdfjs.ts` (the PDF reader), `melody-musicxml.ts` (the writer), `melody.ts` (the `Melody` type),
+`scripts/melody-xml.ts` (the preview SVG, the oracle: nothing in `src/` uses it), `scripts/melody-spike.ts`,
+`scripts/melody-pdf-spike.ts` and `scripts/melody-mutool.ts` (the scoring), `tests/melody.node.test.ts`.
 Tested on the Holy Forever preview (`preview.json`) and on all 137 PDFs of the local corpus, none of which is in git.
 **The answer to "stop here if it does not reach nearly every measure of nearly every song" is that it does.**
 
@@ -352,8 +353,7 @@ pdf.js (as `melody-range.ts` does) and needs nothing else: the preview is only t
 
 **Not done, in the order of how much it matters:**
 
-1. Taking the SVG reader and the time-map and MIDI scoring out of `src/` (`readMelodySvg`, the XML parser) so
-   nothing there depends on the preview: they are only the oracle. `readMelodyTrees` stays and is the shared reader.
+1. (Done: the SVG reader, the XML parser and the time-map and MIDI scoring are in `scripts/`; `src/` has only the PDF route.)
 2. Repeats and endings. Repeat dots are the glyph U+E1E7 in pairs on the middle line, at the end (before a
    barline) or the start (after one) of a staff, and endings are a bracket plus text; neither is yet read, so
    the `barline` field is a guess and a repeat is not in the MusicXML.

@@ -6,7 +6,7 @@
 import { getDocumentProxy, getResolvedPDFJS } from 'unpdf'
 import type { Melody } from './melody.ts'
 import { type DrawItem, pdfPageToTree, type TextRun } from './melody-pdf.ts'
-import { type El, type ReadStats, readMelodyTrees } from './melody-svg.ts'
+import { type El, type ReadStats, readMelodyTrees } from './melody-read.ts'
 
 type Matrix = [number, number, number, number, number, number]
 

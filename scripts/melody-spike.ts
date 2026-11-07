@@ -7,7 +7,8 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { MelodyNote } from '../src/js/melody.ts'
-import { type ReadStats, readMelodySvg } from '../src/js/melody-svg.ts'
+import type { ReadStats } from '../src/js/melody-read.ts'
+import { readMelodySvg } from './melody-xml.ts'
 
 interface TimeEvent {
   on: string[] | null

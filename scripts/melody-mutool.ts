@@ -8,7 +8,8 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DrawItem, TextRun } from '../src/js/melody-pdf.ts'
-import { type El, parseXml } from '../src/js/melody-svg.ts'
+import type { El } from '../src/js/melody-read.ts'
+import { parseXml } from './melody-xml.ts'
 
 /** The paths of a page from `mutool draw -F svg` */
 export function drawingFromSvg(svg: string): DrawItem[] {
