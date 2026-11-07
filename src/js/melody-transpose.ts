@@ -4,14 +4,14 @@
  * as the chart's do. Nothing else about the song changes.
  *
  * A key is a pitch class, so the same key can be had an octave up or down. The notes go where the
- * sung melody lands nearest the green range (`shiftNearGreen`, as the key picker shows), and the
+ * sung melody lands nearest the green range (`octaveNearGreen`, as the key picker shows), and the
  * chords take the plain nearest interval, since they have no octave.
  */
 import { noteName, semitonesBetween } from './chart-range.ts'
 import type { Melody, MelodyEvent, MelodyNote } from './melody.ts'
 import { midiOf } from './melody.ts'
 import { transposeChord } from './transpose.ts'
-import { type NoteRange, shiftNearGreen } from './voice-range.ts'
+import { type NoteRange, octaveNearGreen } from './voice-range.ts'
 
 const FIFTHS_OF_LETTER = { F: -1, C: 0, G: 1, D: 2, A: 3, E: 4, B: 5 } as const
 
@@ -56,7 +56,10 @@ export function transposeMelody(melody: Melody, from: string, to: string): Melod
   if (fifths === null || fifthsOfKey(from) === null) return melody
   const nearest = semitonesBetween(from, to)
   const range = melodyRange(melody)
-  const shift = range ? shiftNearGreen(range, nearest) : nearest
+  // (the range in the new key by the nearest interval, then taken to the octave nearest the green)
+  const shift = range
+    ? octaveNearGreen({ low: range.low + nearest, high: range.high + nearest }).low - range.low
+    : nearest
   const move = (e: MelodyEvent): MelodyEvent =>
     e.kind === 'note' ? respell(e, e.midi + shift, to) : e
   return {

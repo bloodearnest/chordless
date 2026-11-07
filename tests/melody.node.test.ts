@@ -250,11 +250,11 @@ describe('transposing a melody', () => {
       (low.measures[0].voices[0] as MelodyNote[]).map(n => n.midi),
       [62, 69]
     )
-    // and a high tune comes down: C6 to G6 in C, to D, is down ten, not up two
+    // and a high tune comes down: C6 to G6 in C, to D, is down twenty-two, not up two
     const high = transposeMelody(tune([note('C', 6), note('G', 6)], 'C'), 'C', 'D')
     assert.deepEqual(
       (high.measures[0].voices[0] as MelodyNote[]).map(n => n.midi),
-      [74, 81]
+      [62, 69]
     )
   })
 
