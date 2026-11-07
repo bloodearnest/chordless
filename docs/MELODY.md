@@ -245,13 +245,11 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
 - **Key picker**: per key, the time-weighted position of the notes, the longest held high note,
   and where a section starts to climb; the colours stay (green, yellow, red) but say why.
 - **A voice preference**: choose the voices the band has and the picker rates keys for them.
-- **View**: a "Melody" view in the key in use, rendered by OpenSheetMusicDisplay or Verovio (each a
-  dependency to add as a reviewed change; Verovio is WebAssembly, several MB, and engraves the
-  same way SongSelect does, so a transposed sheet looks like the original). Lazy loaded, and never
-  on the path of the lyrics screen. Whichever it is, the chord symbols should be written into the
-  MusicXML as `<harmony>` from our own transposer, so Nashville numbers and spelling are the app's
-  and not the renderer's; whether OpenSheetMusicDisplay transposes `<harmony>` correctly (Eb to Bb)
-  is not known, and is the first thing to try. The notice (above) goes under it.
+- **View**: a "Melody" view in the key in use, rendered by **Verovio**, the engraver SongSelect uses
+  (chosen; see "Rendering with Verovio" in the spike results), so a transposed sheet looks like
+  the original. Lazy loaded, and never on the path of the lyrics screen. The chord symbols are
+  written into the MusicXML as `<harmony>` from our own transposer, so Nashville numbers and spelling
+  are the app's and not the renderer's. The notice (above) goes under it.
 - **Play it**: the melody as notes, for finding the starting pitch and for practice. Small, and
   only if wanted.
 - **Export** to MusicXML for a band that wants to open it in their own software.
@@ -335,8 +333,32 @@ data, only the grouping and the glyph names are lost (check: `mutool draw -F svg
 **Written: MusicXML 4.0 (partwise).** Pitch spelling, durations in 24 divisions to the quarter note, dots, ties,
 tuplets (`time-modification`), lyrics with syllabic and extend, `<harmony>` (root, kind with the original text as
 `text`, bass), rehearsal marks for sections, tempo, key, time, the notice as `<rights>`. Well formed
-(`xmllint`) and ordered by the schema, but **not opened in a renderer**: no Verovio or OpenSheetMusicDisplay in
-the checkout (a dependency to add for step 4), so "does OSMD transpose `<harmony>` correctly" is still open.
+(`xmllint`) and ordered by the schema, and **opened in Verovio** (next).
+
+**Rendering with Verovio (the engraver SongSelect uses; `src/js/melody-render.ts`).** The sheet's SVG was written
+by Verovio 6.0.1, so that exact version is the dependency (`verovio@6.0.1`, pinned; `renderMelody(musicXml)`
+gives one SVG a page). It is WebAssembly embedded in a 6.4 MB JavaScript module (`verovio/wasm`) with a 14 KB wrapper
+(`verovio/esm`), imported only on first use. `scripts/melody-render-check.ts` is the test of the MusicXML: write it
+from each PDF, engrave it, read Verovio's SVG back with the SVG reader, and compare with what went in.
+
+- **All 137 sheets render, with no messages from Verovio. 8,410 of 8,410 measures, 35,396 of 35,396 notes
+  (measure, pitch, length), and the syllables of every song come back the same.** The same again for each
+  song moved three semitones up with `transposeMelody` (new key signature and spelling): 35,396 of 35,396.
+- It found three things the MusicXML lacked, all of them invisible in the sound and plain on the page: Verovio prints an
+  accidental only when told (`<accidental>`: now written by the usual rule, from the key signature, the
+  measure and octave, with a tied note's carried over the barline); a tuplet needs `<tuplet type="start|stop">`
+  as well as `time-modification` (the reader now keeps where a bracket starts and stops: `tuplet` on the first
+  and last event); and a line that comes in late (a cue line over a rest, drawn by SongSelect with no spacer) needs
+  `<forward>` to start where it does. The part name is hidden and the page has room on the left for a boxed section name.
+- The page looks like a lead sheet: chord symbols (with our text, "Eb2"), boxed sections, the hyphens and
+  underscores of the lyrics, ties, cue notes small, repeat and ending signs. It is not SongSelect's layout to
+  the pixel (their page and spacing options are not known), and this shows no title or notice yet.
+- **Before the app uses it** (not done here; nothing in `src/` imports it yet): the page's Content-Security-Policy
+  (`public/_headers`) has `script-src 'self'` and no `'wasm-unsafe-eval'`, which WebAssembly needs; the service worker
+  precaches every built file, so the Verovio chunk goes in `NOT_PRECACHED` (cached when first used, as the PDF
+  reader is); and the licence is **LGPL-3.0-or-later**, so it should stay an unmodified chunk of its own
+  with its notice in the app's licences, and the licence needs a decision from the owner.
+- "Does OpenSheetMusicDisplay transpose `<harmony>` correctly" no longer matters: it is not used.
 
 **Text and pdf.js (second round, from the PDF alone).** `src/js/melody-pdfjs.ts` reads a lead sheet PDF with
 pdf.js (as `melody-range.ts` does) and needs nothing else: the preview is only the oracle it was developed against.

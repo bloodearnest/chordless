@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { readMelodySvg } from '../scripts/melody-xml.ts'
-import type { Melody, MelodyEvent, MelodyNote } from '../src/js/melody.ts'
+import type { Melody, MelodyEvent, MelodyMeasure, MelodyNote } from '../src/js/melody.ts'
 import { midiOf } from '../src/js/melody.ts'
 import { parseDirection } from '../src/js/melody-directions.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
@@ -192,6 +192,101 @@ describe('lining up a cue line with the sung one', () => {
     // a cue head a bar further along is not beside anything: it stays a place of its own
     const far = svg.replace(/data-x="1830"/, 'data-x="2400"')
     assert.notEqual(readMelodySvg([far]).measures[0]?.length, 4)
+  })
+})
+
+describe('MusicXML for an engraver', () => {
+  const note = (
+    step: MelodyNote['step'],
+    alter: number,
+    over: Partial<MelodyNote> = {}
+  ): MelodyNote => ({
+    kind: 'note',
+    id: `${step}${alter}`,
+    step,
+    alter,
+    octave: 4,
+    midi: midiOf(step, alter, 4),
+    start: 0,
+    duration: 1,
+    tupletRatio: 1,
+    tieStart: false,
+    tieStop: false,
+    cue: false,
+    syllables: [],
+    withPrevious: false,
+    ...over,
+  })
+  const measure = (fifths: number, events: MelodyMeasure['voices'][number]): MelodyMeasure => ({
+    number: 1,
+    voices: [events],
+    chords: [],
+    section: null,
+    barline: 'single',
+    directions: [],
+    repeatStart: false,
+    ending: null,
+    length: 4,
+    full: true,
+    fifths,
+    beats: 4,
+    beatType: 4,
+    tempo: null,
+  })
+  const write = (...measures: MelodyMeasure[]) =>
+    writeMusicXml({ title: null, notice: [], measures })
+
+  it('prints an accidental only where the alteration is not the one in force', () => {
+    // G major: F is sharp already. F#, then F natural (marked), then F natural again (not), then Bb (marked)
+    const xml = write(
+      measure(1, [
+        note('F', 1, { start: 0 }),
+        note('F', 0, { start: 1 }),
+        note('F', 0, { start: 2 }),
+        note('B', -1, { start: 3 }),
+      ])
+    )
+    assert.deepEqual(xml.match(/<accidental>[a-z-]+<\/accidental>/g), [
+      '<accidental>natural</accidental>',
+      '<accidental>flat</accidental>',
+    ])
+    // the next measure starts from the key again
+    const two = write(measure(1, [note('F', 0)]), measure(1, [note('F', 1)]))
+    assert.equal((two.match(/<accidental>/g) ?? []).length, 1)
+  })
+
+  it("carries a tied note's accidental over the barline unmarked", () => {
+    const xml = write(
+      measure(0, [note('G', 1, { tieStart: true })]),
+      measure(0, [note('G', 1, { tieStop: true })])
+    )
+    assert.equal((xml.match(/<accidental>sharp<\/accidental>/g) ?? []).length, 1)
+  })
+
+  it('goes back to the start of the measure for a second voice, by as far as the first went', () => {
+    const m = measure(0, [note('C', 0, { duration: 4 })])
+    m.voices.push([note('E', 0, { cue: true, duration: 2 })])
+    const xml = write(m)
+    assert.match(
+      xml,
+      /<duration>96<\/duration><voice>1<\/voice>[\s\S]*<backup><duration>96<\/duration><\/backup>/
+    )
+    // a ratio that is no tuplet of whole notes is written as plain notes rather than a wrong one
+    const odd = write(measure(0, [note('C', 0, { tupletRatio: 0.3137 })]))
+    assert.doesNotMatch(odd, /time-modification/)
+  })
+
+  it('opens and closes a tuplet bracket, and moves a late line forward to where it starts', () => {
+    const xml = write(
+      measure(0, [
+        note('C', 0, { start: 1, duration: 2 / 3, tupletRatio: 2 / 3, tuplet: 'start' }),
+        note('D', 0, { start: 1 + 2 / 3, duration: 2 / 3, tupletRatio: 2 / 3 }),
+        note('E', 0, { start: 1 + 4 / 3, duration: 2 / 3, tupletRatio: 2 / 3, tuplet: 'stop' }),
+      ])
+    )
+    assert.match(xml, /<forward><duration>24<\/duration><\/forward>/)
+    assert.match(xml, /<notations><tuplet type="start" bracket="yes"\/><\/notations>/)
+    assert.match(xml, /<notations><tuplet type="stop" bracket="yes"\/><\/notations>/)
   })
 })
 

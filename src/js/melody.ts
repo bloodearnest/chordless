@@ -21,6 +21,8 @@ export interface MelodyNote {
   duration: number
   /** A tuplet's ratio (normal over actual: 2/3 for a triplet), 1 when the note is not in one */
   tupletRatio: number
+  /** Where a tuplet bracket starts and stops (on the first and the last event under it) */
+  tuplet?: 'start' | 'stop'
   /** Ties to the note after it / from the note before it */
   tieStart: boolean
   tieStop: boolean
@@ -38,6 +40,8 @@ export interface MelodyRest {
   start: number
   duration: number
   tupletRatio: number
+  /** Where a tuplet bracket starts and stops (on the first and the last event under it) */
+  tuplet?: 'start' | 'stop'
   /** A rest that fills the whole measure */
   wholeMeasure: boolean
   cue: boolean
