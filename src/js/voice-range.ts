@@ -80,21 +80,20 @@ export function rangeStatus(range: NoteRange, semitones = 0): RangeCheck {
 }
 
 /**
- * The shift to a key, in the octave where the melody lands nearest the green range: a key is a
- * pitch class, so the same key can be had an octave up or down, and the picker should show the
- * one a singer would use. `semitones` is the shift by the nearest way round (up or down by at
- * most six); the octave either side of it is also tried, and the one that sits least outside the
- * green limits wins. A tie goes to the shift nearest the chart's own key, and the chart's own key
- * (no shift) is the chart as written.
+ * The range moved by whole octaves to where it sits nearest the green range. A lead sheet's
+ * octave is often wrong (SongSelect prints some a whole octave out), so a range is kept as it was
+ * read, for fidelity, and this decides where to take it when it is used: only the notes' names
+ * are relied on. A tie goes to the move nearest the range as it is.
  */
-export function shiftNearGreen(range: NoteRange, semitones: number): number {
-  if (semitones === 0) return 0
+export function octaveNearGreen(range: NoteRange): NoteRange {
   const outside = (shift: number) =>
     Math.max(0, RANGE_LIMITS.low.green - (range.low + shift)) +
     Math.max(0, range.high + shift - RANGE_LIMITS.high.green)
-  let best = semitones
-  for (const candidate of [semitones - 12, semitones + 12]) {
-    if (outside(candidate) < outside(best)) best = candidate
+  let best = 0
+  for (let octaves = 1; octaves <= 3; octaves++) {
+    for (const shift of [-12 * octaves, 12 * octaves]) {
+      if (outside(shift) < outside(best)) best = shift
+    }
   }
-  return best
+  return { low: range.low + best, high: range.high + best }
 }

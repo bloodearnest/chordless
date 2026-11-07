@@ -79,6 +79,12 @@ describe('song-info', () => {
       expect(text(info)).to.contain('in range')
     })
 
+    it('keeps the range as the chart says it, and judges the octave nearest the green', async () => {
+      const info = await show({ song: ranged({}, { x_chordless_range: 'D5-E6' }) })
+      expect(text(info)).to.contain('D5–E6 in G')
+      expect(text(info)).to.contain('an octave lower')
+    })
+
     it('offers to add one when the chart says none, and says nothing with no key to write it in', async () => {
       const none = text(await show({ song: ranged({}, { x_chordless_range: '' }) }))
       expect(none).to.contain('Melody Range')

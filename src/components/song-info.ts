@@ -8,7 +8,7 @@ import {
 } from '../js/chart-range.ts'
 import type { SongWithContent } from '../js/data-types.ts'
 import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.ts'
-import { describeRange, type NoteRange, rangeStatus } from '../js/voice-range.ts'
+import { describeRange, type NoteRange, octaveNearGreen, rangeStatus } from '../js/voice-range.ts'
 import { rangeBadge, rangeBadgeStyles } from './range-badge.ts'
 import { buttonStyles } from './shared-styles.ts'
 
@@ -411,13 +411,16 @@ export class SongInfo extends LitElement {
     }
     const span = rangeSpan(range, key)
     const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
-    const note = describeRange(rangeStatus(range))
+    // (the range is kept as it was read, and used in the octave nearest the green, as the key picker does)
+    const used = octaveNearGreen(range)
+    const note = describeRange(rangeStatus(used))
+    const octaves = (used.low - range.low) / 12
     return html`
       <div class="modal-info-item">
         <div class="modal-info-label">Melody Range</div>
         <div class="modal-info-value range-line">
           <span>${noteName(range.low, key)}–${noteName(range.high, key)}${chartKey ? ` in ${chartKey}` : ''}</span>
-          ${chartKey ? html`${rangeBadge(note)}<span>${note.words || 'in range'}</span>` : ''}
+          ${chartKey ? html`${rangeBadge(note)}<span>${note.words || 'in range'}${octaves ? `, ${Math.abs(octaves) === 1 ? 'an octave' : `${Math.abs(octaves)} octaves`} ${octaves < 0 ? 'lower' : 'higher'}` : ''}</span>` : ''}
           ${key ? html`<button class="btn" type="button" @click=${() => this._editRange(range)}>Edit</button>` : ''}
         </div>
         <div class="modal-info-value">
