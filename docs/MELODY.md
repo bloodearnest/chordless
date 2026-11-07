@@ -353,11 +353,14 @@ from each PDF, engrave it, read Verovio's SVG back with the SVG reader, and comp
 - The page looks like a lead sheet: chord symbols (with our text, "Eb2"), boxed sections, the hyphens and
   underscores of the lyrics, ties, cue notes small, repeat and ending signs. It is not SongSelect's layout to
   the pixel (their page and spacing options are not known), and this shows no title or notice yet.
-- **Before the app uses it** (not done here; nothing in `src/` imports it yet): the page's Content-Security-Policy
-  (`public/_headers`) has `script-src 'self'` and no `'wasm-unsafe-eval'`, which WebAssembly needs; the service worker
-  precaches every built file, so the Verovio chunk goes in `NOT_PRECACHED` (cached when first used, as the PDF
-  reader is); and the licence is **LGPL-3.0-or-later**, so it should stay an unmodified chunk of its own
-  with its notice in the app's licences, and the licence needs a decision from the owner.
+- **Wired for the app (the owner agreed to the licence and the policy change), though no view imports it yet.** The page's
+  Content-Security-Policy has `'wasm-unsafe-eval'` in `script-src` (WebAssembly needs it; `eval` stays blocked). A
+  build with a temporary import gave `assets/verovio-module-<hash>.js`, 7.2 MB (2.2 MB compressed), which the
+  service worker leaves out of its precache (`NOT_PRECACHED`, like the PDF reader). In Chromium, under the policy
+  as written, it instantiates with no violations, and without the new token it fails with the CSP's CompileError.
+  Verovio is **LGPL-3.0-or-later**: it stays an unmodified chunk of its own, and `/licences.html` (linked from the terms
+  and privacy pages) has the notice, the source and the full LGPL and GPL texts (`public/licences/`). When the view lands, add the
+  `built` test that imports the chunk under the policy (the build has no chunk to find until something imports it).
 - "Does OpenSheetMusicDisplay transpose `<harmony>` correctly" no longer matters: it is not used.
 
 **Text and pdf.js (second round, from the PDF alone).** `src/js/melody-pdfjs.ts` reads a lead sheet PDF with

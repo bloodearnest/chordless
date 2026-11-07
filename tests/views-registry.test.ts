@@ -71,7 +71,7 @@ describe('the about page', () => {
     expect(element.querySelector('app-about')).to.not.equal(null)
     expect(
       Array.from(element.querySelectorAll('a'), link => link.getAttribute('href'))
-    ).to.deep.equal(['/contact', '/privacy.html', '/terms.html'])
+    ).to.deep.equal(['/contact', '/privacy.html', '/terms.html', '/licences.html'])
     element.remove()
   })
 })
