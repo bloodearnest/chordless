@@ -2,9 +2,17 @@
  * The push of a Drive sync: what is new or changed on this device goes up to Drive, new files
  * and changed ones each in batches (the storage decides how a batch is sent).
  */
-import type { ChordProRecord, Person, Setlist, SongFileProps, SongRecord } from '../data-types.ts'
+import type {
+  ChordProRecord,
+  MelodyRecord,
+  Person,
+  Setlist,
+  SongFileProps,
+  SongRecord,
+} from '../data-types.ts'
 import {
   fileInput,
+  melodyFileMetadata,
   personFileMetadata,
   setlistFileMetadata,
   songFileDetails,
@@ -12,10 +20,12 @@ import {
   updateInput,
 } from '../drive-metadata.ts'
 import { leaderName } from '../leaders.ts'
+import { writeMusicXml } from '../melody-musicxml.ts'
 import type { WriteResult } from '../storage/types.ts'
 import { hashText } from '../utils/hash.ts'
 import {
   driveMarkers,
+  melodyHasLocalChanges,
   setlistHasLocalChanges,
   setlistKey,
   songHasLocalChanges,
@@ -530,4 +540,118 @@ export async function pushSongVariant(
     console.error(`[DriveSync] Failed to push song ${song.id}/${songUuidOf(song)}:`, error)
     throw error
   }
+}
+
+/** A melody and the song it belongs to: what is uploaded for it */
+interface MelodyUpload {
+  record: MelodyRecord
+  song: SongRecord
+  /** The MusicXML, as it is written once (its hash is what is recorded as synced) */
+  body: string
+}
+
+/** Record on a melody that Drive now holds this MusicXML in this file (if it stored it intact) */
+function recordMelodyUpload(upload: MelodyUpload, { file, intact }: WriteResult) {
+  const { record, body } = upload
+  record.fileRef = file.ref
+  Object.assign(record, driveMarkers(file))
+  if (intact) {
+    record.lastSyncedAt = new Date().toISOString()
+    record.syncedContentHash = hashText(body)
+  }
+}
+
+/**
+ * Push the melodies: a MusicXML file in the songs folder for each melody that is new, or made
+ * again here, linked to its song by its properties. A melody whose song is not on this device is
+ * left (it was pulled for a song that has not come yet, or the song was deleted).
+ */
+export async function pushMelodies(
+  run: SyncRun,
+  progressCallback: ProgressCallback | null = null
+): Promise<void> {
+  const created: MelodyUpload[] = []
+  const updated: MelodyUpload[] = []
+  const songs = new Map((await run.db.getAllSongs()).map(song => [songUuidOf(song), song]))
+  for (const record of await run.db.getAllMelodies()) {
+    const song = songs.get(record.uuid)
+    if (!song) continue
+    const gone = !!record.fileRef && !run.fileExistsInDrive(record.fileRef)
+    if (record.fileRef && !gone && !melodyHasLocalChanges(record)) continue
+    const upload = { record, song, body: writeMusicXml(record.melody) }
+    if (record.fileRef && !gone) updated.push(upload)
+    else {
+      // (its file is gone from Drive, or it never had one: a new file)
+      record.fileRef = null
+      record.fileRev = null
+      record.fileModified = null
+      created.push(upload)
+    }
+  }
+  const total = created.length + updated.length
+  if (total === 0) return
+  const report = (uploaded: number) =>
+    progressCallback?.({
+      stage: 'pushing',
+      message: `Uploaded ${uploaded}/${total} melodies`,
+      current: uploaded,
+      total,
+    })
+  report(0)
+
+  const metadata = (upload: MelodyUpload) =>
+    melodyFileMetadata(upload.record, upload.song, { spaceId: run.spaceId })
+  const recordBatch = async (batch: MelodyUpload[], results: (WriteResult | null)[]) => {
+    const saved: MelodyRecord[] = []
+    batch.forEach((upload, j) => {
+      const result = results[j]
+      if (!result) return
+      recordMelodyUpload(upload, result)
+      saved.push(upload.record)
+    })
+    if (saved.length > 0) await run.db.saveMelodiesSent(saved)
+    return saved.length
+  }
+  const uploadOne = async (upload: MelodyUpload) => {
+    const result = upload.record.fileRef
+      ? await run.space.update(
+          upload.record.fileRef,
+          updateInput(metadata(upload), 'melody'),
+          upload.body
+        )
+      : await run.space.create('songs', fileInput(metadata(upload)), upload.body)
+    recordMelodyUpload(upload, result)
+    await run.db.saveMelodiesSent([upload.record])
+  }
+  const describe = ({ record }: MelodyUpload) => `the melody of song ${record.uuid}`
+
+  const uploaded = await uploadInBatches(created, BATCH_SIZE, {
+    uploadBatch: async batch =>
+      recordBatch(
+        batch,
+        await run.space.createMany(
+          'songs',
+          batch.map(upload => ({ input: fileInput(metadata(upload)), body: upload.body }))
+        )
+      ),
+    uploadOne,
+    describe,
+    onProgress: report,
+  })
+  await uploadInBatches(updated, BATCH_SIZE, {
+    uploadBatch: async batch =>
+      recordBatch(
+        batch,
+        await run.space.updateMany(
+          batch.map(upload => ({
+            ref: upload.record.fileRef as string,
+            input: updateInput(metadata(upload), 'melody'),
+            body: upload.body,
+          }))
+        )
+      ),
+    uploadOne,
+    describe,
+    onProgress: count => report(uploaded + count),
+  })
 }

@@ -9,7 +9,14 @@
  * it can't go stale here.
  */
 
-import type { ChordProRecord, ParsedChart, Person, Setlist, SongRecord } from './data-types.ts'
+import type {
+  ChordProRecord,
+  MelodyRecord,
+  ParsedChart,
+  Person,
+  Setlist,
+  SongRecord,
+} from './data-types.ts'
 import { ChordProParser } from './parser.ts'
 import { songSource } from './song-source.ts'
 import type { FileInput } from './storage/types.ts'
@@ -200,6 +207,40 @@ export function songFileMetadata(
   }
 }
 
+/** The version of the melody file's shape, in its properties: what a reader checks before it reads */
+export const MELODY_FORMAT = '1'
+
+/** The file name of a song's melody: its chart's name without the extension, then `.melody.musicxml` */
+export function melodyFilename(title: string, ccliNumber?: string | null): string {
+  return `${chordproFilename(title, ccliNumber).replace(/\.txt$/, '')}.melody.musicxml`
+}
+
+/**
+ * Metadata for a song's melody file, which sits in the same folder as its chart and is linked to it
+ * by `songUuid` (and `songId`) like the chart's own properties. The key it is written in is here,
+ * as the MusicXML has a key signature and not the key's name.
+ */
+export function melodyFileMetadata(
+  record: Pick<MelodyRecord, 'uuid' | 'key'>,
+  song: Pick<SongRecord, 'id' | 'title' | 'ccliNumber'>,
+  { spaceId }: FileMetadataOptions
+): DriveFileMetadata {
+  return {
+    name: melodyFilename(song.title || 'Untitled', song.ccliNumber),
+    // (the type MusicXML files are given: Drive shows it as a file other programs open)
+    mimeType: 'application/vnd.recordare.musicxml+xml',
+    appProperties: {
+      type: 'melody',
+      spaceId: spaceId || '',
+      songUuid: record.uuid,
+      songId: song.id,
+      key: record.key ?? '',
+      melodyFormat: MELODY_FORMAT,
+      appVersion: APP_VERSION,
+    },
+  }
+}
+
 /**
  * Metadata for updating an existing file: name and appProperties (not mimeType,
  * which doesn't change), with retired appProperties removed.
@@ -212,7 +253,7 @@ export function fileInput({ name, mimeType, appProperties }: DriveFileMetadata):
 /** What the storage API updates a file with: see forUpdate */
 export function updateInput(
   metadata: DriveFileMetadata,
-  kind: 'setlist' | 'song' | 'share'
+  kind: 'setlist' | 'song' | 'share' | 'melody'
 ): FileInput {
   return {
     type: metadata.mimeType,
@@ -223,7 +264,7 @@ export function updateInput(
 
 export function forUpdate(
   { name, appProperties }: Pick<DriveFileMetadata, 'name' | 'appProperties'>,
-  kind: 'setlist' | 'song' | 'share'
+  kind: 'setlist' | 'song' | 'share' | 'melody'
 ): { name: string; appProperties: Record<string, string | null> } {
   const retired =
     kind === 'setlist' ? RETIRED_SETLIST_PROPERTIES : kind === 'song' ? RETIRED_SONG_PROPERTIES : []

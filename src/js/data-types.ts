@@ -2,6 +2,7 @@
  * The shapes of the data Chordless parses and stores. docs/DATA_MODEL.md describes them in
  * prose; these are what the code checks against. Types only: nothing here exists at runtime.
  */
+import type { Melody } from './melody.ts'
 import type { TeamRole } from './team-roles.ts'
 
 // ==================== A parsed chart (ChordProParser) ====================
@@ -134,8 +135,31 @@ export interface SongRecord {
 export interface PendingDeletion {
   /** The file's ref (a Drive file id) */
   ref: string
-  kind: 'song' | 'setlist'
+  kind: 'song' | 'setlist' | 'melody'
   deletedAt: string
+}
+
+/**
+ * The melody of a song (docs/MELODY.md): the notes of its lead sheet, kept beside its chart. One a
+ * song (a variant has its own), keyed by the song's uuid. In Drive it is a MusicXML file in the
+ * space's `songs` folder, linked to the chart by its properties; here it is the parsed `Melody`.
+ */
+export interface MelodyRecord {
+  /** The uuid of the song it belongs to */
+  uuid: string
+  melody: Melody
+  /** The key the melody is written in, as the chart names it (the sheet has a key signature, not a name) */
+  key: string | null
+  createdDate: string
+  modifiedDate: string
+  /** Hash of the MusicXML this melody is written as: it differs from `syncedContentHash` when it changed here */
+  contentHash: string
+  /** What it keeps of its file, as the chart's record does (docs/SYNC_ARCHITECTURE.md) */
+  fileRef?: string | null
+  fileRev?: string | null
+  fileModified?: string | null
+  lastSyncedAt?: string | null
+  syncedContentHash?: string | null
 }
 
 /** A song as it is passed to be saved: tempos may still be a chart's text */
