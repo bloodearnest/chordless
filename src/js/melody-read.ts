@@ -438,6 +438,8 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
       chords,
       section: reh ? textOf(reh) : null,
       barline: barlineOf(barLines[barLines.length - 1]),
+      repeatStart: !!firstByClass(m, 'repeatStart'),
+      ending: endingOf(firstByClass(m, 'ending')),
       length: total,
       full,
       fifths,
@@ -536,8 +538,22 @@ function beamLevels(beam: El, x: number): number {
   return chains.size
 }
 
+/** A numbered ending the page reader found over this measure (the preview's SVG has no such element) */
+function endingOf(e: El | undefined): MelodyMeasure['ending'] {
+  if (!e) return null
+  return {
+    label: e.attrs['data-label'] ?? '',
+    start: e.attrs['data-start'] === '1',
+    stop: e.attrs['data-stop'] === '1',
+    closed: e.attrs['data-closed'] === '1',
+  }
+}
+
 function barlineOf(b: El | undefined): MelodyMeasure['barline'] {
   if (!b) return 'none'
+  // (the page reader says what it saw: lines and dots by their places, not by their kind)
+  const said = b.attrs['data-bar']
+  if (said) return said as MelodyMeasure['barline']
   const lines = all(b, c => c.name === 'path').length
   const dots = all(b, c => c.name === 'ellipse' || c.name === 'circle').length
   if (dots) return 'repeat-end'

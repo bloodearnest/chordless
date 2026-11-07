@@ -5,15 +5,9 @@
     "functions": 0,
     "unloaded": 0
   },
-  "src/js/melody-glyphs.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 0,
-    "unloaded": 32
-  },
   "src/js/melody-musicxml.ts": {
-    "lines": 2,
-    "branches": 25,
+    "lines": 1,
+    "branches": 24,
     "functions": 0
   },
   "src/js/melody-path.ts": {
@@ -22,10 +16,9 @@
     "functions": 0
   },
   "src/js/melody-pdf.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 0,
-    "unloaded": 687
+    "lines": 807,
+    "branches": 8,
+    "functions": 14
   },
   "src/js/melody-pdfjs.ts": {
     "lines": 0,
@@ -34,8 +27,8 @@
     "unloaded": 193
   },
   "src/js/melody-read.ts": {
-    "lines": 184,
-    "branches": 47,
+    "lines": 188,
+    "branches": 48,
     "functions": 20
   },
   "src/js/telemetry/start.ts": {

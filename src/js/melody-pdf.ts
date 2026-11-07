@@ -18,14 +18,14 @@ import { GLYPHS } from './melody-glyphs.ts'
 import { absolutePath, shapeHash } from './melody-path.ts'
 import type { El } from './melody-read.ts'
 
-interface Line {
+export interface Line {
   x1: number
   y1: number
   x2: number
   y2: number
   width: number
 }
-interface Glyph {
+export interface Glyph {
   code: string
   x: number
   y: number
@@ -291,6 +291,8 @@ export function pdfPageToTree(
     if (s) perStaff.get(s)?.curves.push(c)
   }
 
+  const marks = signsOf(staves, lines, glyphs, runs, { a: ua, e: ue, f: uf })
+
   const page = group('page-margin')
   const words = placeText(runs, staves, bars, { a: ua, e: ue, f: uf })
   if (words.header) page.children.push(words.header)
@@ -309,6 +311,7 @@ export function pdfPageToTree(
           ...(perStaff.get(s) as NonNullable<ReturnType<typeof perStaff.get>>),
           tuplets: tupletsOf.get(s) ?? [],
           words: words.perStaff.get(s) ?? { marks: [], syls: [] },
+          signs: marks.get(s) ?? { bar: 'single', repeatStart: false, ending: null },
         },
         warnings
       )
@@ -318,10 +321,115 @@ export function pdfPageToTree(
   return node('svg', {}, [page])
 }
 
-interface Staff {
+export interface Staff {
   x0: number
   x1: number
   ys: number[]
+}
+
+/** What a measure's edges and the line over it say: how it ends, whether it starts a repeat, its numbered ending */
+export interface StaffSigns {
+  bar: 'single' | 'double' | 'final' | 'repeat-end'
+  repeatStart: boolean
+  ending: { label: string; start: boolean; stop: boolean; closed: boolean } | null
+}
+
+/** A barline is this thick (in the drawing's units) or thinner; a thick one is the heavy line of a final or repeat bar */
+const THICK = 60
+/** A repeat's dots are this near the bar they belong to */
+const DOTS_NEAR = 450
+
+/**
+ * Repeat signs and numbered endings, read from where the lines and dots sit.
+ * A repeat is dots beside a thick line: dots before it end a repeat (":|"), dots after it start one
+ * ("|:"). A start sign at the end of a system belongs to the measure that follows. An ending is a
+ * line over the staff with a hook down at its left end (and at its right if it is closed), and the
+ * numbers it is for written under it.
+ */
+export function signsOf(
+  staves: (Staff & { sys: number })[],
+  lines: Line[],
+  glyphs: Glyph[],
+  runs: TextRun[],
+  unit: { a: number; e: number; f: number }
+): Map<Staff, StaffSigns> {
+  const out = new Map<Staff, StaffSigns>()
+  for (const s of staves) out.set(s, { bar: 'single', repeatStart: false, ending: null })
+  const signs = (s: Staff) => out.get(s) as StaffSigns
+  const top = (s: Staff) => s.ys[0] as number
+  const bottom = (s: Staff) => s.ys[4] as number
+
+  // Barlines: lines as tall as the staff, thin or thick
+  const verticals = lines.filter(l => l.x1 === l.x2 && l.width >= 22 && l.width < 200)
+  const barsOf = (s: Staff) =>
+    verticals.filter(
+      l =>
+        Math.abs(Math.min(l.y1, l.y2) - top(s)) < 2 &&
+        Math.abs(Math.max(l.y1, l.y2) - bottom(s)) < 2
+    )
+
+  const startsAtEnd = new Set<Staff>()
+  for (const d of glyphs.filter(g => g.code === 'E1E7')) {
+    const i = staves.findIndex(s => d.x >= s.x0 && d.x < s.x1 && d.y > top(s) && d.y < bottom(s))
+    const s = staves[i]
+    if (!s) continue
+    const thick = barsOf(s)
+      .filter(l => l.width >= THICK && Math.abs(l.x1 - d.x) < DOTS_NEAR)
+      .sort((p, q) => Math.abs(p.x1 - d.x) - Math.abs(q.x1 - d.x))[0]
+    if (!thick) continue
+    if (thick.x1 > d.x) signs(s).bar = 'repeat-end'
+    else if (d.x > s.x1 - DOTS_NEAR) {
+      // ("|:" drawn at the end of a system: the repeat is the next measure's)
+      startsAtEnd.add(s)
+      const next = staves[i + 1]
+      if (next) signs(next).repeatStart = true
+    } else signs(s).repeatStart = true
+  }
+  for (const s of staves) {
+    const here = signs(s)
+    if (here.bar === 'repeat-end') continue
+    const window = startsAtEnd.has(s) ? 30 : 200
+    const bars = barsOf(s).filter(l => l.x1 >= s.x1 - window && l.x1 <= s.x1 + 50)
+    if (bars.some(l => l.width >= THICK)) here.bar = 'final'
+    else if (new Set(bars.map(l => Math.round(l.x1))).size >= 2) here.bar = 'double'
+  }
+
+  // Endings: a line over the staff, a hook down at its left end, and the numbers under it
+  const hooks = lines.filter(l => l.x1 === l.x2 && l.width >= 10 && l.width <= 16)
+  const labels = runs
+    .filter(r => r.size >= 9 && /^\d+(\s*,\s*\d+)*$/.test(r.text.trim()))
+    .map(r => ({
+      x: (r.x0 - unit.e) / unit.a,
+      y: (r.y - unit.f) / unit.a,
+      text: r.text.replace(/\s+/g, ''),
+    }))
+  for (const l of lines) {
+    if (l.y1 !== l.y2 || l.width < 10 || l.width > 16 || l.x2 - l.x1 < 600) continue
+    const hookAt = (x: number) =>
+      hooks.some(h => Math.abs(h.x1 - x) < 2 && Math.abs(Math.min(h.y1, h.y2) - l.y1) < 2)
+    if (!hookAt(l.x1)) continue
+    const label = labels.find(
+      t => t.x >= l.x1 && t.x < l.x1 + 700 && t.y > l.y1 && t.y < l.y1 + 700
+    )
+    if (!label) continue
+    const closed = hookAt(l.x2)
+    for (const s of staves) {
+      if (l.y1 > top(s) - 100 || l.y1 < top(s) - 1800) continue
+      // (a system's first measure begins with its clef and key, so a bracket starts further in)
+      const opening = !staves.some(o => o.sys === s.sys && o.x0 < s.x0)
+      const starts = l.x1 >= s.x0 - 200 && l.x1 <= s.x0 + (opening ? 3000 : 200)
+      if (s.x1 < l.x1 + 200 || s.x0 > l.x2 - 200) continue
+      if (s.x0 < l.x1 - 200 && !starts && s.x1 > l.x2 + 200) continue
+      signs(s).ending = {
+        label: label.text,
+        start: starts,
+        // (the bracket stops short of a repeat's or a final bar, which is more than one line)
+        stop: l.x2 >= s.x1 - 600 && l.x2 <= s.x1 + 200,
+        closed,
+      }
+    }
+  }
+  return out
 }
 
 function buildMeasure(
@@ -329,6 +437,7 @@ function buildMeasure(
   c: {
     tuplets: { x: number; y: number; from: number | null; to: number | null; g: Glyph }[]
     words: StaffWords
+    signs: StaffSigns
     glyphs: Glyph[]
     stems: Line[]
     dots: { x: number; y: number }[]
@@ -343,6 +452,18 @@ function buildMeasure(
     s.ys.map(y => node('path', { d: `M${s.x0} ${y} L${s.x1} ${y}` }))
   )
   const measure = group('measure', [staffEl])
+  const bar = group('barLine')
+  bar.attrs['data-bar'] = c.signs.bar
+  measure.children.push(bar)
+  if (c.signs.repeatStart) measure.children.push(group('repeatStart'))
+  if (c.signs.ending) {
+    const e = group('ending')
+    e.attrs['data-label'] = c.signs.ending.label
+    e.attrs['data-start'] = c.signs.ending.start ? '1' : '0'
+    e.attrs['data-stop'] = c.signs.ending.stop ? '1' : '0'
+    e.attrs['data-closed'] = c.signs.ending.closed ? '1' : '0'
+    measure.children.push(e)
+  }
 
   const heads = c.glyphs.filter(g => HEADS.has(g.code))
   const rests = c.glyphs.filter(g => RESTS.has(g.code))
