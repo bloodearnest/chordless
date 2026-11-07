@@ -2,7 +2,7 @@
  * Whether a record has changes that are not in Drive, and what a record keeps of its Drive
  * file. No state: the sync's pull, push and reset all ask.
  */
-import type { ChordProRecord, Setlist, SongRecord } from '../data-types.ts'
+import type { ChordProRecord, MelodyRecord, Setlist, SongRecord } from '../data-types.ts'
 import type { StoredFile } from '../storage/types.ts'
 import { hashText } from '../utils/hash.ts'
 import { setlistContentHash } from './setlist-hash.ts'
@@ -72,4 +72,12 @@ export function songHasLocalChanges(song: SongRecord, chordproFile: ChordProReco
     return false
   }
   return song.fileProps?.contentHash !== chordproFile.contentHash
+}
+
+/**
+ * Whether a melody has changes that are not in Drive: never uploaded, or made again since its last
+ * sync (its MusicXML hashes to something else). Ignores whether its Drive file still exists.
+ */
+export function melodyHasLocalChanges(record: MelodyRecord): boolean {
+  return !record.fileRef || record.contentHash !== record.syncedContentHash
 }

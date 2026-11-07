@@ -6,15 +6,17 @@
  * docs/SPACES.md, "Read-only: local edits are never blocked".
  */
 
-import type { Person, Setlist, SongInput, SongRecord } from '../data-types.ts'
+import type { MelodyRecord, Person, Setlist, SongInput, SongRecord } from '../data-types.ts'
 import { withNumericTempos } from '../db.ts'
 import { adoptLegacyLeader, type Leaders } from '../leaders.ts'
+import { readMusicXml } from '../melody-musicxml-read.ts'
 import { songSource } from '../song-source.ts'
 import { chartFields, chartIdentity } from '../song-utils.ts'
 import type { StoredFile } from '../storage/types.ts'
 import { hashText } from '../utils/hash.ts'
 import {
   driveMarkers,
+  melodyHasLocalChanges,
   setlistHasLocalChanges,
   setlistIdOf,
   songHasLocalChanges,
@@ -580,4 +582,122 @@ async function downloadSong(
   }
 
   await run.db.saveSong(songRecord)
+}
+
+/** A melody file in Drive that a pull has decided to download */
+interface MelodyDownload {
+  uuid: string
+  file: StoredFile
+  props: Record<string, string>
+  local: MelodyRecord | undefined
+}
+
+/**
+ * Pull the melodies from Drive: the MusicXML files in the songs folder whose properties say they
+ * are a song's melody (`type: 'melody'`, linked to the chart by `songUuid`). A melody is derived
+ * data, and a conflict, as for the chart, is Drive's version. A file that is not MusicXML we can
+ * read is left, and tried again at the next full sync.
+ */
+export async function pullMelodies(
+  run: SyncRun,
+  progressCallback: ProgressCallback | null = null,
+  files?: StoredFile[]
+): Promise<void> {
+  const driveFiles = (files ?? (await run.space.list('songs'))).filter(
+    file => file.props.type === 'melody'
+  )
+  const latestByUuid = new Map<string, { file: StoredFile; props: Record<string, string> }>()
+  for (const file of driveFiles) {
+    // A melody deleted here, whose file could not be put in the trash yet, is not to come back
+    if (run.pendingDeletedRefs.has(file.ref)) continue
+    const uuid = file.props.songUuid
+    if (!uuid) continue
+    const existing = latestByUuid.get(uuid)
+    const modified = (f: StoredFile) => new Date(f.modified || f.created || 0).getTime()
+    if (existing && modified(file) <= modified(existing.file)) continue
+    latestByUuid.set(uuid, { file, props: file.props })
+  }
+  run.liveMelodyUuids = new Set(latestByUuid.keys())
+
+  const downloads: MelodyDownload[] = []
+  for (const [uuid, { file, props }] of latestByUuid) {
+    const local = await run.db.getMelody(uuid)
+    const changedInDrive = !local || local.fileRef !== file.ref || local.fileRev !== file.rev
+    if (!changedInDrive) continue
+    // (a user who can only read keeps what they changed here)
+    if (local && run.readOnly && melodyHasLocalChanges(local) && local.fileRef === file.ref) {
+      run.heldBack++
+      continue
+    }
+    downloads.push({ uuid, file, props, local })
+  }
+  if (downloads.length === 0) return
+
+  let downloaded = 0
+  progressCallback?.({
+    stage: 'pulling',
+    message: `Downloading ${downloads.length} melodies...`,
+    current: 0,
+    total: downloads.length,
+  })
+  await inBatches(
+    run.space,
+    downloads,
+    item => item.file.ref,
+    (item, text) => downloadMelody(run, item, text),
+    results => {
+      const succeeded = results.filter(result => result.status === 'fulfilled').length
+      downloaded += succeeded
+      if (succeeded > 0) {
+        progressCallback?.({
+          stage: 'pulling',
+          message: `Downloaded ${downloaded}/${downloads.length} melodies`,
+          current: downloaded,
+          total: downloads.length,
+        })
+      }
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          run.downloadsFailed = true
+          console.error('[DriveSync] Failed to download a melody:', result.reason)
+        }
+      }
+    }
+  )
+}
+
+async function downloadMelody(
+  run: SyncRun,
+  { uuid, file, props, local }: MelodyDownload,
+  text: string
+): Promise<void> {
+  const hash = hashText(text)
+  const now = new Date().toISOString()
+  // The same file as this device last synced (a record from before the file's checksum was kept):
+  // not a change in Drive, so what was edited here stays
+  if (local && local.fileRef === file.ref && local.syncedContentHash === hash) {
+    await run.db.saveMelody({ ...local, ...driveMarkers(file) })
+    return
+  }
+  if (local && melodyHasLocalChanges(local)) {
+    // Changed here and in Drive. As for a chart, Drive wins.
+    console.warn(`[DriveSync] ⚠️ Conflict for the melody of song ${uuid}, keeping Drive's version`)
+  }
+  const melody = readMusicXml(text)
+  if (!melody) {
+    console.warn(`[DriveSync] ${file.name} is not MusicXML Chordless can read: left as it is`)
+    return
+  }
+  await run.db.saveMelody({
+    uuid,
+    melody,
+    key: props.key || local?.key || null,
+    createdDate: local?.createdDate ?? file.created ?? now,
+    modifiedDate: file.modified ?? now,
+    contentHash: hash,
+    ...driveMarkers(file),
+    fileRef: file.ref,
+    lastSyncedAt: now,
+    syncedContentHash: hash,
+  })
 }
