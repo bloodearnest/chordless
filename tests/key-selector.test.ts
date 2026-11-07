@@ -160,6 +160,15 @@ describe('key-selector', () => {
       expect(outOf('G')).to.deep.equal(['G3', 'F#5']) // both
     })
 
+    it('takes a range printed an octave too high to the octave nearest the green, in every key', async () => {
+      // Praise as SongSelect prints it, A4–A5 in A: the chart's own key and its neighbours
+      await withRange({ low: 69, high: 81 }, 'A')
+      const notesOf = (key: string) => must(optionOf(key)?.querySelector('.option-notes'))
+      expect(notesOf('A').textContent).to.equal('A3–A4')
+      expect(notesOf('G').textContent).to.equal('G3–G4')
+      expect(notesOf('E').textContent).to.equal('E4–E5')
+    })
+
     it('shows no notes when there is no range', async () => {
       await withRange(null)
       expect(selector.shadowRoot.querySelector('.option-notes')).to.equal(null)
