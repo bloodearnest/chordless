@@ -31,6 +31,11 @@
     "branches": 50,
     "functions": 19
   },
+  "src/js/melody-structure.ts": {
+    "lines": 0,
+    "branches": 7,
+    "functions": 0
+  },
   "src/js/telemetry/start.ts": {
     "lines": 0,
     "branches": 0,

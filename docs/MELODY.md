@@ -378,6 +378,24 @@ words, and `<sound segno/coda/tocoda/dalsegno/dacapo/fine>`. Over the corpus: 93
 segno, every "al Coda" has a "to Coda" and a coda, and every "al Fine" a Fine. The jumps are not followed
 yet: expanding the sheet into the order it is played is the structure work (`structureOf`).
 
+**Structure: the order a sheet is played in, matched to the chart (`melody-structure.ts`).** `playOrder` follows
+repeats (twice, or "Play 3 times" / "(4x)"), numbered endings (by pass), and D.S./D.C. al Coda/Fine with the
+usual conventions (repeats not taken again after a jump; only the last ending after one; "to Coda" taken on the
+way through after a jump). `playSteps` groups that into goes at each boxed section. `matchChart` finds the
+ChordPro section for each step **by the lyrics** (the sheet's words for the verse of that pass against each chart
+section's, as word pairs; identical sections go to the first not used, so a chorus sung twice is Chorus 1 then
+Chorus 2), and by name where a step has no words. A section with several verses written under it (a strophic
+hymn) is read with `matchVerses`. Holy Forever comes out as: Intro, Verse 1, Pre-Chorus, Chorus 1, Verse 2,
+Chorus 1, Chorus 2, Pre-Chorus (twice, with its endings), then D.S. back to the chorus and across to the tag:
+which is what the sheet says and the chart's order alone cannot.
+Scored on the corpus against the ChordPro (`scripts/melody-structure-check.ts`; a chart section with at least eight words
+counts): 91 of 137 songs have every lyric section of the chart placed, in the chart's order; 118 have all of
+them placed; 100 are in the chart's order. The rest are mostly real differences: the sheet's order is not the
+chart's (a chorus first, a verse repeated by a D.S., "Chorus 1a/1b" split differently), a chart section the sheet
+leaves out ("Ending", "Instrumental"), and choruses whose words are the same, so which one is which is a guess.
+It is the publisher's arrangement, a default to offer the leader and not a truth; a song's step list is what the
+setlist's structure feature would show first, with the chart's order as the fallback where there is no sheet.
+
 **Not done, in the order of how much it matters:**
 
 1. (Done: the SVG reader, the XML parser and the time-map and MIDI scoring are in `scripts/`; `src/` has only the PDF route.)
