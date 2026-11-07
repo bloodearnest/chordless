@@ -1027,10 +1027,12 @@ export class SyncManager {
 
       // Pull songs (chordpro files)
       progressCallback?.({ stage: 'pulling', message: 'Checking songs...', current: 0, total: 1 })
-      await pullSongs(run, progressCallback)
+      // (the songs folder is listed once: it holds the melodies beside the charts)
+      const songFolder = await run.space.list('songs')
+      await pullSongs(run, progressCallback, songFolder)
 
       // Pull melodies (the MusicXML files beside the charts)
-      await pullMelodies(run, progressCallback)
+      await pullMelodies(run, progressCallback, songFolder)
       return run.report()
     })
   }

@@ -164,19 +164,23 @@ as the chord transposer spells them. The range is of the sung notes: cue notes a
 
 - **Not in the chart.** A directive could hold the range (it does); the melody is kilobytes and
   would make the chart unreadable in the editor.
-- **A MusicXML file beside the chart in Drive**, per chart (a variant has its own), in the key the chart
-  is in, linked to its chart by `appProperties` (`type: 'melody'`, the chart's `songId` and `songUuid`, `spaceId`,
-  `appVersion`, a format version) like the chart's own. It goes through the same storage and sync as the
-  chart (`docs/STORAGE_API.md`): the user's browser and the user's, or their team space owner's, Drive.
-  Older clients already ignore it: the pull skips a file in `songs` whose `type` is not `chordpro`
-  (`sync/pull.ts`). To settle: what happens to the file when its chart is trashed or merged (an orphan),
-  and which of the chart's ids survives a merge.
-- **On the device, the parsed `Melody`**, in an IndexedDB store of its own (`melodies`, keyed by the chart's id,
-  with the file's `fileRef`, `fileRev` and `fileModified` as the chart's records have), not in `songs` or
-  `chordpro`: it is 18 to 70 KB a song and only the Melody view wants it. It is read again from the file
-  when the file's `rev` changes, and only the original key is kept: other keys are `transposeMelody`.
+- **A MusicXML file beside the chart in Drive** (built: PR "sync a song's melody"), per chart (a variant has its own),
+  in the key the chart is in, linked to its chart by `appProperties` (`type: 'melody'`, `songUuid` and `songId`, `key`,
+  `melodyFormat`, `spaceId`, `appVersion`) like the chart's own, named `<title>[-<ccli>].melody.musicxml`. It goes
+  through the same storage and sync as the chart (`docs/STORAGE_API.md`, `docs/SYNC_ARCHITECTURE.md`, "Melodies"): the
+  user's browser and the user's, or their team space owner's, Drive. Older clients ignore it: the pull skips a file in
+  `songs` whose `type` is not `chordpro`. Deleting a song deletes its melody and puts its file in the trash (a melody
+  whose chart was deleted in Drive is cleaned up by the next full sync). **Not settled:** merging two variants
+  (`library-repair`, `song-versions`) deletes the one that goes, so its melody goes with it; the kept variant does not
+  get it. Move it across when the merge learns of melodies.
+- **On the device, the parsed `Melody`**, in an IndexedDB store of its own (`melodies`, since database version 13, keyed
+  by the song's uuid, with the file's `fileRef`, `fileRev` and `fileModified` as the chart's records have; `MelodyRecord`
+  in `data-types.ts`), not in `songs` or `chordpro`: it is 18 to 70 KB a song and only the Melody view wants it. It is read
+  again from the file when the file's `rev` changes, and only the original key is kept: other keys are
+  `transposeMelody`. `contentHash` (of the MusicXML it is written as) is how a change made here is found without writing
+  the file; `melodyRecord(uuid, melody, key)` makes a record with it.
 - **Compression:** the file is plain MusicXML. It gzips to 3 KB, but a gzipped file is opaque in Drive and the
-  storage interface is text only; a format property on the file lets `json.gz`-style packing come later without a
+  storage interface is text only; a format property on the file lets gzip packing come later without a
   migration. Do not rely on Drive or the transport to compress it.
 - **The copyright rule holds** (`CLAUDE.md`): the notes and lyrics are the song's, so they live
   only in the user's browser and Drive, never on the Worker, never in a share link, never in

@@ -12,6 +12,7 @@ database named exactly after its `spaceId` containing these object stores:
 3. `setlists` – setlist documents
 4. `setlist_local` – local-only per-user state (not synced)
 5. `people` – who leads the setlists (`docs/IDENTITIES.md`; since database version 10)
+6. `melodies` – the notes of a song's lead sheet, one a song (`docs/MELODY.md`; since database version 13)
 
 Drive sync stores JSON/ChordPro files inside the space’s Google Drive folder
 and tracks Drive metadata (`fileRef`, `fileModified`, `lastSyncedAt`, `_lastSyncHash`, etc.)
@@ -47,6 +48,20 @@ The `chordpro` object store mirrors chord text:
 - `content`: raw chordpro text
 - `contentHash`: hash used for deduping + sync comparisons
 - `lastModified`: timestamp of last edit (used when comparing with Drive)
+
+### Melodies Store
+
+The `melodies` object store (`MelodyRecord`) keeps the melody of a song, keyed by the song's `uuid` (a
+variant has its own). Derived data: it can be read again from a lead sheet PDF or a MusicXML file.
+
+- `melody`: the parsed `Melody` (`src/js/melody.ts`): measures, notes, lyrics, chord symbols, directions
+- `key`: the key the melody is written in, as the chart names it (the MusicXML has a key signature, not a name)
+- `contentHash`: hash of the MusicXML the melody is written as, so a change made here is found without writing it
+- `createdDate`, `modifiedDate`
+- Sync metadata as the chart's: `fileRef`, `fileRev`, `fileModified`, `lastSyncedAt`, `syncedContentHash`
+
+In Drive it is a MusicXML file in the space's `songs` folder beside its chart, linked to it by `songUuid` in the
+file's properties (`type: 'melody'`). Deleting a song deletes its melody and puts the melody's file in the Drive trash.
 
 ### Song Versioning
 
