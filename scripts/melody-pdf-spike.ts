@@ -10,19 +10,24 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Melody, MelodyNote } from '../src/js/melody.ts'
-import { pdfPageToTree } from '../src/js/melody-pdf.ts'
+import { pdfPageToTree, type TextRun, textRunsFromStext } from '../src/js/melody-pdf.ts'
 import { type ReadStats, readMelodySvg, readMelodyTrees } from '../src/js/melody-svg.ts'
 
-/** The pages of a PDF as SVG text, by mutool */
-function pdfPages(file: string): string[] {
+/** The pages of a PDF as the drawing (SVG text) and the words, by mutool */
+function pdfPages(file: string): { svg: string; runs: TextRun[] }[] {
   const dir = mkdtempSync(join(tmpdir(), 'melody-'))
   try {
     execFileSync('mutool', ['draw', '-F', 'svg', '-o', join(dir, 'p-%d.svg'), file], {
       stdio: 'ignore',
     })
-    return readdirSync(dir)
-      .sort((a, b) => parseInt(a.slice(2), 10) - parseInt(b.slice(2), 10))
-      .map(f => readFileSync(join(dir, f), 'utf8'))
+    execFileSync('mutool', ['draw', '-F', 'stext', '-o', join(dir, 't-%d.xml'), file], {
+      stdio: 'ignore',
+    })
+    const n = readdirSync(dir).filter(f => f.endsWith('.svg')).length
+    return Array.from({ length: n }, (_, i) => ({
+      svg: readFileSync(join(dir, `p-${i + 1}.svg`), 'utf8'),
+      runs: textRunsFromStext(readFileSync(join(dir, `t-${i + 1}.xml`), 'utf8')),
+    }))
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -30,12 +35,18 @@ function pdfPages(file: string): string[] {
 
 export function readPdf(file: string): { melody: Melody; stats: ReadStats } {
   const stats = { warnings: [] as string[] } as ReadStats
-  const trees = pdfPages(file).flatMap(p => pdfPageToTree(p, stats.warnings) ?? [])
+  const trees = pdfPages(file).flatMap(p => pdfPageToTree(p.svg, stats.warnings, p.runs) ?? [])
   return { melody: readMelodyTrees(trees, stats), stats }
 }
 
+/** The notes in the order they sound (voices are only a reading detail), the lower of a chord first */
 const notesOf = (m: Melody) =>
-  m.measures.flatMap(x => x.voices.flat().filter((e): e is MelodyNote => e.kind === 'note'))
+  m.measures.flatMap(x =>
+    x.voices
+      .flat()
+      .filter((e): e is MelodyNote => e.kind === 'note')
+      .sort((p, q) => p.start - q.start || p.midi - q.midi)
+  )
 const spell = (n: MelodyNote) =>
   `${n.step}${n.alter > 0 ? '#' : n.alter < 0 ? 'b' : ''}${n.octave}:${n.duration}${n.cue ? 'c' : ''}`
 
@@ -95,6 +106,44 @@ if (!import.meta.main) {
           `#${i}: pdf ${spell(a[i] as MelodyNote)}${(a[i] as MelodyNote).tieStart ? '~' : ''} svg ${spell(b[i] as MelodyNote)}${(b[i] as MelodyNote).tieStart ? '~' : ''}`
         )
     }
+    // The words: syllables on the notes (the first two verses), chords and sections by measure
+    let syl = 0
+    let sylSame = 0
+    const sylBad: string[] = []
+    for (let i = 0; i < Math.min(a.length, b.length); i++)
+      for (let v = 0; v < 2; v++) {
+        const x = (a[i] as MelodyNote).syllables[v] ?? ''
+        const y = (b[i] as MelodyNote).syllables[v] ?? ''
+        if (!x && !y) continue
+        syl++
+        if (x === y) sylSame++
+        else if (sylBad.length < 8) sylBad.push(`#${i} verse ${v + 1}: pdf "${x}" svg "${y}"`)
+      }
+    console.log(`syllables (verses 1 and 2): ${sylSame}/${syl} the same, with their hyphens`)
+    for (const x of sylBad) console.log(`  ${x}`)
+    const chords = (m: Melody) =>
+      m.measures.map(x => x.chords.map(c => `${c.text}@${c.start}`).join(' '))
+    const ca = chords(melody)
+    const cb = chords(ref)
+    const cBad = ca.flatMap((x, i) =>
+      x === cb[i] ? [] : [`measure ${i + 1}: pdf [${x}] svg [${cb[i]}]`]
+    )
+    console.log(
+      `chords: ${ca.length - cBad.length}/${ca.length} measures the same, symbol and beat`
+    )
+    for (const x of cBad.slice(0, 6)) console.log(`  ${x}`)
+    const sec = (m: Melody) => m.measures.map(x => `${x.section ?? ''}|${x.tempo ?? ''}`)
+    const sa = sec(melody)
+    const sb = sec(ref)
+    const sBad = sa.flatMap((x, i) =>
+      x === sb[i] ? [] : [`measure ${i + 1}: pdf ${x} svg ${sb[i]}`]
+    )
+    console.log(`sections and tempo: ${sa.length - sBad.length}/${sa.length} measures the same`)
+    for (const x of sBad.slice(0, 6)) console.log(`  ${x}`)
+    console.log(`title: pdf "${melody.title}" svg "${ref.title}"`)
+    console.log(
+      `notice: pdf ${JSON.stringify(melody.notice)}\n        svg ${JSON.stringify(ref.notice)}`
+    )
     console.log(
       `against the preview's SVG: ${a.length} notes against ${b.length}; ${same} the same pitch, length and tie`
     )

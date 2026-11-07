@@ -333,7 +333,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
     const voices: MelodyEvent[][] = []
     /** Where an event is on the page, when the source says (the PDF's drawing does): lines of different voices are lined up by it */
     const xOf = new Map<MelodyEvent, number>()
-    const headXs: { x: number; start: number }[] = []
+    const headXs: { x: number; ev: MelodyEvent }[] = []
     for (const layer of byClass(staff, 'layer')) {
       const events: MelodyEvent[] = []
       let t = 0
@@ -369,6 +369,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
             })
             if (c.attrs['data-x'])
               xOf.set(events[events.length - 1] as MelodyEvent, Number(c.attrs['data-x']))
+            headXs.push({ x: g.x, ev: events[events.length - 1] as MelodyEvent })
             t += dur
           } else if (is(c, 'chord') || is(c, 'note')) {
             const notes = is(c, 'chord') ? byClass(c, 'note') : [c]
@@ -412,7 +413,9 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
                 alter = ACCIDENTAL[ag.code] as number
                 measureAlters.set(dia, alter)
               }
-              const sylls = byClass(note, 'verse').map(v => textOf(v) + connectorOf(v))
+              const sylls = byClass(note, 'verse').map(
+                v => textOf(v).replace(/^\d+\.\s*/, '') + connectorOf(v)
+              )
               const step = STEPS[stepIndex] as (typeof STEPS)[number]
               events.push({
                 kind: 'note',
@@ -432,7 +435,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
               })
               if (owner.attrs['data-x'])
                 xOf.set(events[events.length - 1] as MelodyEvent, Number(owner.attrs['data-x']))
-              headXs.push({ x: hg.x, start: t })
+              headXs.push({ x: hg.x, ev: events[events.length - 1] as MelodyEvent })
               heads.push({
                 sys: systemIndex,
                 x: hg.x + (HEAD_WIDTH * hg.scale) / 2,
@@ -469,11 +472,11 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
       const tx = firstByClass(h, 'text')
       const x = Number(h.children[0]?.attrs.x ?? tx?.attrs.x ?? 0)
       if (!text) return []
-      const near = headXs.reduce<{ x: number; start: number } | null>(
+      const near = headXs.reduce<{ x: number; ev: MelodyEvent } | null>(
         (b, c) => (!b || Math.abs(c.x - x) < Math.abs(b.x - x) ? c : b),
         null
       )
-      return [{ start: near ? near.start : 0, text }]
+      return [{ start: near ? near.ev.start : 0, text }]
     })
 
     const reh = firstByClass(m, 'reh')
