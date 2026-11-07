@@ -40,6 +40,64 @@ interface Poly {
   d: string
 }
 
+/** A word of the page's text, in the PDF's points: where it starts and ends, its baseline, its size, and its font's weight */
+export interface TextRun {
+  x0: number
+  x1: number
+  y: number
+  size: number
+  bold: boolean
+  italic: boolean
+  text: string
+}
+
+/**
+ * The words on a page from `mutool draw -F stext`: a line's characters split at its spaces. The music
+ * font's characters (a chord's flat) stay in the word they are in. In the app these come from pdf.js's
+ * text content, which has the same pieces.
+ */
+export function textRunsFromStext(xml: string): TextRun[] {
+  const runs: TextRun[] = []
+  const walk = (e: El) => {
+    if (e.name === 'line') {
+      let cur: TextRun | null = null
+      for (const font of e.children) {
+        const name = font.attrs.name ?? ''
+        const size = Number(font.attrs.size)
+        for (const ch of font.children) {
+          const q = (ch.attrs.quad ?? '').split(' ').map(Number)
+          const c = ch.attrs.c ?? ''
+          if (c === ' ' || c === '\u00a0') {
+            if (cur) runs.push(cur)
+            cur = null
+            continue
+          }
+          if (!cur)
+            cur = {
+              x0: q[0] as number,
+              x1: q[2] as number,
+              y: Number(ch.attrs.y),
+              size,
+              bold: /Bold/i.test(name),
+              italic: /Italic|Oblique/i.test(name),
+              text: '',
+            }
+          cur.text += c
+          cur.x1 = q[2] as number
+          if (!/Leipzig/i.test(name)) {
+            cur.bold = /Bold/i.test(name)
+            cur.italic = /Italic|Oblique/i.test(name)
+            cur.size = size
+          }
+        }
+      }
+      if (cur) runs.push(cur)
+    } else e.children.forEach(walk)
+  }
+  walk(parseXml(xml))
+  return runs
+}
+
 let counter = 0
 const node = (name: string, attrs: Record<string, string>, children: El[] = []): El => ({
   name,
@@ -67,12 +125,14 @@ const isDigit = (c: string) => /^E08[0-9AB]$/.test(c)
 const IGNORED = new Set(['E4C0', 'E4C1', 'E07A', 'E1E7', 'E887'])
 
 /** One page of the PDF's drawing as the tree `readMelodyTrees` reads, or null if no staff is found */
-export function pdfPageToTree(svg: string, warnings: string[]): El | null {
+export function pdfPageToTree(svg: string, warnings: string[], runs: TextRun[] = []): El | null {
   const root = parseXml(svg)
   const lines: Line[] = []
   const hooks: { hookX: number; endX: number; y: number }[] = []
   const glyphs: Glyph[] = []
   const polys: Poly[] = []
+  /** Short bars: the hyphens and extenders between syllables */
+  const bars: Poly[] = []
   const dots: { x: number; y: number }[] = []
   const curves: { d: string; minX: number; maxX: number; minY: number; maxY: number }[] = []
 
@@ -250,8 +310,12 @@ export function pdfPageToTree(svg: string, warnings: string[]): El | null {
   }
   for (const d of dots) perStaff.get(staffFor(d.x, d.y) as Staff)?.dots.push(d)
   for (const p of polys) {
-    const s = staffFor((p.minX + p.maxX) / 2, (p.minY + p.maxY) / 2)
-    if (s && p.maxY - p.minY >= 50) perStaff.get(s)?.polys.push(p) // a beam, not a hyphen
+    if (p.maxY - p.minY < 50) {
+      bars.push(p)
+      continue
+    }
+    const s = staffFor((p.minX + p.maxX) / 2, (p.minY + p.maxY) / 2) // a beam
+    if (s) perStaff.get(s)?.polys.push(p)
   }
   const tupletsOf = new Map<
     Staff,
@@ -279,6 +343,9 @@ export function pdfPageToTree(svg: string, warnings: string[]): El | null {
   }
 
   const page = group('page-margin')
+  const words = placeText(runs, staves, bars, { a: ua, e: ue, f: uf })
+  if (words.header) page.children.push(words.header)
+  if (words.footer) page.children.push(words.footer)
   const systems: El[] = []
   for (const s of staves) {
     let sysEl = systems[s.sys]
@@ -292,6 +359,7 @@ export function pdfPageToTree(svg: string, warnings: string[]): El | null {
         {
           ...(perStaff.get(s) as NonNullable<ReturnType<typeof perStaff.get>>),
           tuplets: tupletsOf.get(s) ?? [],
+          words: words.perStaff.get(s) ?? { marks: [], syls: [] },
         },
         warnings
       )
@@ -311,6 +379,7 @@ function buildMeasure(
   s: Staff,
   c: {
     tuplets: { x: number; y: number; from: number | null; to: number | null; g: Glyph }[]
+    words: StaffWords
     glyphs: Glyph[]
     stems: Line[]
     dots: { x: number; y: number }[]
@@ -410,9 +479,15 @@ function buildMeasure(
     const st = stemOf(h)
     byStem.set(st, [...(byStem.get(st) ?? []), h])
   }
+  const noteEls: { x: number; el: El; cue: boolean }[] = []
   for (const [st, hs] of byStem) {
     const makeNote = (h: Glyph, own: El[]): El => {
       const note = group('note', [group('notehead', [useOf(h)]), ...own])
+      noteEls.push({
+        x: h.x + ((HEAD_WIDTH[h.code] ?? 314) * h.scale) / 2,
+        el: note,
+        cue: h.scale < 0.65,
+      })
       const acc = noteAcc.find(
         a => Math.abs(a.y - h.y) < 2.5 * space && a.x < h.x && h.x - a.x < 700 && !a.used
       )
@@ -573,6 +648,10 @@ function buildMeasure(
   const voices = [items.filter(i => !i.cue), items.filter(i => i.cue)].filter(v => v.length)
   for (const v of voices) staffEl.children.push(buildLayer(v))
 
+  // Words: the chords, section and tempo marks sit in the measure; each syllable goes to the head it is under
+  for (const m of c.words.marks) measure.children.push(m)
+  attachSyllables(c.words.syls, noteEls)
+
   // Curves that join two heads are ties (the reader checks the pitches)
   for (const cv of c.curves) measure.children.push(group('tie', [node('path', { d: cv.d })]))
 
@@ -611,4 +690,261 @@ function keyAccidentalRun(a: Glyph, all: Glyph[], space: number): boolean {
 function polyPoints(d: string): string {
   const { points } = absolutePath(d)
   return points.map(p => `${num(p[0] as number)},${num(p[1] as number)}`).join(' ')
+}
+
+/** A syllable of the lyrics, in the drawing's units, with the verse row it is on and what is drawn after it */
+interface Syl {
+  x0: number
+  x1: number
+  row: number
+  text: string
+  connector: '' | 'hyphen' | 'extender'
+}
+
+/** What the text of a page puts on one staff: marks go in the measure (chords, section, tempo) and syllables go on notes */
+interface StaffWords {
+  marks: El[]
+  syls: Syl[]
+}
+
+function node2(name: string, attrs: Record<string, string>, children: El[], text: string): El {
+  return { name, attrs, children, text }
+}
+
+const textEl = (text: string, x: number, y: number) =>
+  node2('text', { class: 'text', x: num(x), y: num(y) }, [], text)
+
+/**
+ * Puts the page's words where Verovio had them: above a staff the regular 405-unit words are chord
+ * symbols, bold ones a section name (in its box) or the tempo, and below it they are lyrics, a row for each
+ * verse. What is left on the page above the first staff or below the last is the title and the notice.
+ */
+function placeText(
+  runs: TextRun[],
+  staves: (Staff & { sys: number })[],
+  bars: Poly[],
+  u: { a: number; e: number; f: number }
+): { perStaff: Map<Staff, StaffWords>; header: El | null; footer: El | null } {
+  const perStaff = new Map<Staff, StaffWords>()
+  for (const s of staves) perStaff.set(s, { marks: [], syls: [] })
+  const units = runs.map(r => ({
+    x0: (r.x0 - u.e) / u.a,
+    x1: (r.x1 - u.e) / u.a,
+    y: (r.y - u.f) / u.a,
+    size: r.size / u.a,
+    bold: r.bold,
+    italic: r.italic,
+    text: r.text.replace(/\ue1d5/g, '').trim(),
+  }))
+  const top = Math.min(...staves.map(s => s.ys[0] as number))
+  const bottom = Math.max(...staves.map(s => s.ys[4] as number))
+  const inX = (s: Staff, x: number) => x >= s.x0 - 1 && x < s.x1
+  const left: typeof units = []
+  const rows = new Map<Staff, number[]>()
+  const lyrics: { s: Staff & { sys: number }; r: (typeof units)[number] }[] = []
+  const marks: { s: Staff; r: (typeof units)[number] }[] = []
+  for (const r of units) {
+    if (!r.text || r.size < 300 || r.size > 450 || r.y < top - 1500) {
+      left.push(r)
+      continue
+    }
+    // above a staff: the nearest one below the word; below: the nearest above
+    const below = staves
+      .filter(
+        s =>
+          inX(s, r.x0 + (r.bold ? 100 : 0)) &&
+          r.y < (s.ys[0] as number) + 60 &&
+          (s.ys[0] as number) - r.y < 1900
+      )
+      .sort((p, q) => (p.ys[0] as number) - (q.ys[0] as number))[0]
+    const above = staves
+      .filter(
+        s =>
+          inX(s, (r.x0 + r.x1) / 2) && r.y > (s.ys[4] as number) && r.y - (s.ys[4] as number) < 3300
+      )
+      .sort((p, q) => (q.ys[4] as number) - (p.ys[4] as number))[0]
+    // a word between two systems is a chord of the lower or a lyric of the upper: the nearer staff has it
+    const nearBelow = below ? (below.ys[0] as number) - r.y : Infinity
+    const nearAbove = above ? r.y - (above.ys[4] as number) : Infinity
+    if (below && nearBelow < nearAbove) marks.push({ s: below, r })
+    else if (above) {
+      lyrics.push({ s: above, r })
+      rows.set(above, [...(rows.get(above) ?? []), r.y])
+    } else left.push(r)
+  }
+  // Marks: chords are regular, a section name bold (its words joined), the tempo "=72"
+  const bold = marks.filter(m => m.r.bold).sort((p, q) => p.r.x0 - q.r.x0)
+  const chordMarks = marks.filter(m => !m.r.bold && !m.r.italic)
+  for (const { s, r } of chordMarks)
+    perStaff
+      .get(s)
+      ?.marks.push(group('harm', [node2('text', { x: num(r.x0), y: num(r.y) }, [], r.text)]))
+  // Bold words on a line next to each other are one name; the box can run over a barline, so join before placing
+  const used = new Set<(typeof bold)[number]>()
+  for (const first of bold) {
+    if (used.has(first)) continue
+    used.add(first)
+    let text = first.r.text
+    let end = first.r.x1
+    for (const next of bold) {
+      if (
+        used.has(next) ||
+        Math.abs(next.r.y - first.r.y) > 30 ||
+        next.r.x0 < end - 5 ||
+        next.r.x0 - end > 250
+      )
+        continue
+      used.add(next)
+      text += ` ${next.r.text}`
+      end = next.r.x1
+    }
+    if (/^=\s*\d+$/.test(text))
+      perStaff
+        .get(first.s)
+        ?.marks.push(group('tempo', [node2('text', { x: num(first.r.x0) }, [], text)]))
+    else if (!/^\d+$/.test(text))
+      perStaff
+        .get(first.s)
+        ?.marks.push(group('reh', [node2('text', { x: num(first.r.x0) }, [], text)])) // a bare number is the ending's
+  }
+  // Lyrics: a row of baselines for each verse under a system; a bar after a syllable is its hyphen or extender
+  const systemRows = new Map<number, number[]>()
+  for (const [s, ys] of rows) {
+    const list = systemRows.get((s as Staff & { sys: number }).sys) ?? []
+    for (const y of ys) if (!list.some(v => Math.abs(v - y) < 60)) list.push(y)
+    systemRows.set(
+      (s as Staff & { sys: number }).sys,
+      list.sort((a, b) => a - b)
+    )
+  }
+  for (const { s, r } of lyrics) {
+    const list = systemRows.get((s as Staff & { sys: number }).sys) as number[]
+    const row = list.findIndex(v => Math.abs(v - r.y) < 60)
+    // the bar sits between this syllable and the next on its row (a hyphen is centred in the gap)
+    const next = lyrics
+      .filter(o => o.s.sys === s.sys && Math.abs(o.r.y - r.y) < 60 && o.r.x0 > r.x0 + 1)
+      .reduce((m, o) => Math.min(m, o.r.x0), r.x1 + 1500)
+    const bar = bars.find(
+      b =>
+        b.minX >= r.x1 - 40 && b.minX < next && Math.abs((b.minY + b.maxY) / 2 - (r.y - 70)) < 120
+    )
+    perStaff.get(s)?.syls.push({
+      x0: r.x0,
+      x1: r.x1,
+      row,
+      text: r.text,
+      connector: bar ? (bar.maxX - bar.minX > 150 ? 'extender' : 'hyphen') : '',
+    })
+  }
+  // The title is the biggest word above the first staff; the rest above, and the words below the last, are the notice
+  const head = left.filter(r => r.y < top - 1500).sort((a, b) => a.y - b.y || a.x0 - b.x0)
+  const foot = left
+    .filter(r => r.y > bottom + 1500 && r.size < 330)
+    .sort((a, b) => a.y - b.y || a.x0 - b.x0)
+  const lines = (rs: typeof units) => {
+    const out: { y: number; x: number; text: string }[] = []
+    for (const r of rs) {
+      const l = out.find(o => Math.abs(o.y - r.y) < 30)
+      if (l) l.text += ` ${r.text}`
+      else out.push({ y: r.y, x: r.x0, text: r.text })
+    }
+    return out
+  }
+  const bigHead = head.reduce<(typeof units)[number] | null>(
+    (b, r) => (!b || r.size > b.size ? r : b),
+    null
+  )
+  const headEl =
+    bigHead && bigHead.size > 550
+      ? group('pgHead', [
+          ...lines(
+            head.filter(r => r === bigHead || (bigHead && Math.abs(r.y - bigHead.y) < 30))
+          ).map(l => textEl(l.text, l.x, l.y)),
+          ...lines(head.filter(r => !(bigHead && Math.abs(r.y - bigHead.y) < 30))).map(l =>
+            textEl(l.text, l.x, l.y)
+          ),
+        ])
+      : null
+  const footEl = foot.length
+    ? group(
+        'pgFoot',
+        lines(foot).map(l => textEl(l.text, l.x, l.y))
+      )
+    : null
+  return { perStaff, header: headEl, footer: footEl }
+}
+
+/**
+ * Each verse row's syllables go to the heads in order: the syllables left to right to the heads left to
+ * right, with the least total distance between a syllable and its head (a syllable under a tied note, or a
+ * note with no word, is skipped). Each row is a `verse` of its own on the note, as the SVG has it.
+ */
+function attachSyllables(syls: Syl[], notes: { x: number; el: El; cue: boolean }[]) {
+  const sung = notes.filter(n => !n.cue).sort((p, q) => p.x - q.x)
+  const words = syls.filter(s => !/^\d+\.$/.test(s.text))
+  if (!words.length || !sung.length) return
+  const rows = Math.max(...syls.map(s => s.row)) + 1
+  const SKIP = 600
+  console.log(
+    'syls',
+    words
+      .filter(s => s.row === 0)
+      .map(s => `${s.text}@${Math.round((s.x0 + s.x1) / 2)}`)
+      .join(' '),
+    '| heads',
+    sung.map(n => Math.round(n.x)).join(' ')
+  )
+  const mine = new Map<El, Syl[]>()
+  for (let row = 0; row < rows; row++) {
+    const ss = words.filter(s => s.row === row).sort((p, q) => p.x0 - q.x0)
+    // a syllable starts a little left of its head: its first letter is under the head's left edge
+    const LEFT = 150
+    const cost = (i: number, j: number) =>
+      Math.abs((ss[i] as Syl).x0 - ((sung[j] as (typeof sung)[number]).x - LEFT))
+    // best[i][j]: the least cost of placing the first i syllables among the first j heads
+    const best: number[][] = Array.from({ length: ss.length + 1 }, () =>
+      new Array<number>(sung.length + 1).fill(Infinity)
+    )
+    for (let j = 0; j <= sung.length; j++) (best[0] as number[])[j] = 0
+    for (let i = 1; i <= ss.length; i++)
+      for (let j = 0; j <= sung.length; j++) {
+        let b = ((best[i - 1] as number[])[j] as number) + SKIP // the syllable is left without a head
+        if (j > 0) {
+          b = Math.min(
+            b,
+            (best[i] as number[])[j - 1] as number,
+            ((best[i - 1] as number[])[j - 1] as number) + cost(i - 1, j - 1)
+          )
+        }
+        ;(best[i] as number[])[j] = b
+      }
+    // walk back
+    let i = ss.length
+    let j = sung.length
+    while (i > 0 && j >= 0) {
+      const here = (best[i] as number[])[j] as number
+      if (
+        j > 0 &&
+        Math.abs(here - (((best[i - 1] as number[])[j - 1] as number) + cost(i - 1, j - 1))) < 1e-9
+      ) {
+        const el = (sung[j - 1] as (typeof sung)[number]).el
+        mine.set(el, [...(mine.get(el) ?? []), ss[i - 1] as Syl])
+        i--
+        j--
+      } else if (j > 0 && Math.abs(here - ((best[i] as number[])[j - 1] as number)) < 1e-9) j--
+      else i--
+    }
+  }
+  for (const [el, list] of mine) {
+    for (let row = 0; row < rows; row++) {
+      const s = list.find(x => x.row === row)
+      const syl = group('syl', [
+        node2('text', {}, [], s?.text ?? ''),
+        ...(s?.connector
+          ? [node('rect', { width: s.connector === 'extender' ? '300' : '98', height: '22' })]
+          : []),
+      ])
+      el.children.push(group('verse', [syl]))
+    }
+  }
 }
