@@ -68,6 +68,9 @@ words). A song with no range, or no key to measure it from, shows the picker as 
 - **Only while choosing.** The badges are in the list of keys, where a key is chosen (the key in
   use is marked there too). The picker's button, and the key shown once chosen, are plain: the fit
   is for choosing, and then it gets out of the way.
+- **The octave nearest the green.** A key can be had an octave up or down, so each key's notes are
+  shown in the octave that sits nearest the green range (`shiftNearGreen`), not the nearest to the
+  chart's key, which flipped an octave at an arbitrary key. The chart's own key is as written.
 - **A hint, never a gate.** A red key can be chosen as any other can.
 - **Where.** The library's song view, the setlist's song settings, and the key on a song's card in
   edit mode. Each key's distance shown is from the key in use, as it always was; the range is

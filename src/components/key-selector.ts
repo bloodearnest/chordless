@@ -1,5 +1,5 @@
 import { noteName, semitonesBetween } from '../js/chart-range.ts'
-import { describeRange, type NoteRange, rangeStatus } from '../js/voice-range.ts'
+import { describeRange, type NoteRange, rangeStatus, shiftNearGreen } from '../js/voice-range.ts'
 import { OptionPicker, type PickerOption } from './option-picker.ts'
 
 /** A different key was chosen; value is the key */
@@ -75,8 +75,9 @@ export class KeySelector extends OptionPicker<string> {
         hint: offset === 0 ? '' : `${offset > 0 ? '+' : '-'}${Math.abs(offset)}`,
       }
       if (this.range && this.rangeKey) {
-        // (the range is the chart's, in its own key: each key is a shift from there)
-        const shift = semitonesBetween(this.rangeKey, key)
+        // (the range is the chart's, in its own key: each key is a shift from there, in the octave
+        // nearest the green range)
+        const shift = shiftNearGreen(this.range, semitonesBetween(this.rangeKey, key))
         option.range = describeRange(rangeStatus(this.range, shift))
         // the notes it comes to in this key, to show what the colour means
         option.notes = {

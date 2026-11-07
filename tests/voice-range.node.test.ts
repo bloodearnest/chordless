@@ -8,6 +8,7 @@ import {
   type NoteRange,
   type RangeStatus,
   rangeStatus,
+  shiftNearGreen,
 } from '../src/js/voice-range.ts'
 
 const SEMITONES: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
@@ -132,4 +133,16 @@ test('an end that is red says too, an end that is yellow does not, and both ends
   assert.equal(describeRange(rangeStatus(range('F#3', 'D5'))).words, 'high, too low')
   assert.equal(describeRange(rangeStatus(range('A#3', 'D5'))).words, 'high, low')
   assert.equal(describeRange(rangeStatus(range('F#3', 'F#5'))).words, 'too high, too low')
+})
+
+test('a key is shown in the octave nearest the green range, not the nearest to the chart key', () => {
+  // written in A, A4 to A5: D is five semitones up by the near way, which is D5 to D6, a long way
+  // above the green; the octave below (seven down) is D4 to D5, almost all of it green
+  const inA = range('A4', 'A5')
+  assert.equal(shiftNearGreen(inA, 5), -7)
+  // Eb is six down by the near way (Eb4 to Eb5) and stays
+  assert.equal(shiftNearGreen(inA, -6), -6)
+  // already nearest: no change
+  assert.equal(shiftNearGreen(inA, 0), 0)
+  assert.equal(shiftNearGreen(inA, -5), -5)
 })

@@ -78,3 +78,23 @@ export function rangeStatus(range: NoteRange, semitones = 0): RangeCheck {
   const status = ORDER[Math.max(ORDER.indexOf(lowStatus), ORDER.indexOf(highStatus))]
   return { status, low: lowStatus, high: highStatus }
 }
+
+/**
+ * The shift to a key, in the octave where the melody lands nearest the green range: a key is a
+ * pitch class, so the same key can be had an octave up or down, and the picker should show the
+ * one a singer would use. `semitones` is the shift by the nearest way round (up or down by at
+ * most six); the octave either side of it is also tried, and the one that sits least outside the
+ * green limits wins. A tie goes to the shift nearest the chart's own key, and the chart's own key
+ * (no shift) is the chart as written.
+ */
+export function shiftNearGreen(range: NoteRange, semitones: number): number {
+  if (semitones === 0) return 0
+  const outside = (shift: number) =>
+    Math.max(0, RANGE_LIMITS.low.green - (range.low + shift)) +
+    Math.max(0, range.high + shift - RANGE_LIMITS.high.green)
+  let best = semitones
+  for (const candidate of [semitones - 12, semitones + 12]) {
+    if (outside(candidate) < outside(best)) best = candidate
+  }
+  return best
+}
