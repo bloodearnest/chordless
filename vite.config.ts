@@ -39,19 +39,20 @@ export default defineConfig(({ command, isPreview }) => {
       outDir: '../dist',
       emptyOutDir: true,
       target: TARGET,
-      // The one chunk over the default 500 kB is pdf.js (1.6 MB), already its own lazily loaded
-      // chunk and not precached (see NOT_PRECACHED): it is as split as it can be. The limit is
-      // just above it, so a second large chunk still warns.
-      chunkSizeWarningLimit: 1700,
+      // The chunks over the default 500 kB are pdf.js (1.6 MB) and Verovio (7.2 MB, 2.2 MB compressed:
+      // WebAssembly in the module), each already its own lazily loaded chunk and not precached (see
+      // NOT_PRECACHED): they are as split as they can be. The limit is just above them, so a
+      // third large chunk still warns.
+      chunkSizeWarningLimit: 7300,
     },
-    // The app, and the two policy pages (documents: they link the same stylesheet and theme).
+    // The app, and the policy and licence pages (documents: they link the same stylesheet and theme).
     // For the browser's build only: the Worker's has its own entry.
     environments: {
       client: {
         build: {
           rollupOptions: {
             input: Object.fromEntries(
-              ['index', 'privacy', 'terms'].map(page => [
+              ['index', 'privacy', 'terms', 'licences'].map(page => [
                 page,
                 fileURLToPath(new URL(`./src/${page}.html`, import.meta.url)),
               ])

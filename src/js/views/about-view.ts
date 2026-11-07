@@ -20,7 +20,8 @@ export class AboutView extends PageView {
         <p style="margin: 2rem 1rem">
           <a href="/contact">Contact</a> ·
           <a href="/privacy.html" rel="external">Privacy policy</a> ·
-          <a href="/terms.html" rel="external">Terms of service</a>
+          <a href="/terms.html" rel="external">Terms of service</a> ·
+          <a href="/licences.html" rel="external">Open source licences</a>
         </p>
       </main>
     `

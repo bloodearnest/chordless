@@ -50,9 +50,9 @@ needs are unusual:
   the shell (`/`) too, at once, so a slow or hung network can't hold up an app that is already on
   the device. It is never replaced, so it always matches the cached files; a new version comes as a
   new worker. (Without a precache, in dev, the shell is fetched from the network first.)
-- **Not precached:** the worker, source maps, the PDF reader and the Help pictures (`public/help/`,
+- **Not precached:** the worker, source maps, the PDF reader, Verovio (the melody view's engraver, 7.2 MB) and the Help pictures (`public/help/`,
   240 KB): the app is normally online, and what has to work offline is the core, setlist navigation.
-  Those two are cached when first fetched, in `runtime-v1`. Pad audio, and
+  Those are cached when first fetched, in `runtime-v1`. Pad audio, and
   other things fetched while running, go in `runtime-v1` and `padsets-cache-v1`, which survive
   an update.
 
