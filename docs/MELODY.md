@@ -1,6 +1,6 @@
 # The melody as music: lead sheet to MusicXML
 
-**A plan, not built.** Today a lead sheet is read for one thing, the lowest and highest sung note
+**A plan, with a spike built** (see "Spike results"). Today a lead sheet is read for one thing, the lowest and highest sung note
 (`src/js/melody-range.ts`, `docs/RANGE.md`), and the PDF is then thrown away. This asks whether to
 read the whole melody (pitches, lengths, rests, lyrics, chords, sections) into a music format, keep
 that, and do more with it: transpose the notes, analyse them, show them, play them.
@@ -268,15 +268,90 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
 - **Effort.** The reader is weeks, not days, and the storage is a design of its own. Neither is
   needed for the range, which works now.
 
+## Spike results
+
+Step 0 was done on 2026-11-06 (branch `claude/melody-spike`): `src/js/melody-svg.ts` (the SVG reader),
+`melody-pdf.ts` (the PDF reader), `melody-musicxml.ts` (the writer), `melody.ts` (the `Melody` type),
+`scripts/melody-spike.ts` and `scripts/melody-pdf-spike.ts` (the scoring), `tests/melody.node.test.ts`.
+Tested on the Holy Forever preview (`preview.json`) and on all 137 PDFs of the local corpus, none of which is in git.
+**The answer to "stop here if it does not reach nearly every measure of nearly every song" is that it does.**
+
+**From the preview's SVG (Holy Forever, 3 pages): all of it.**
+
+- 362 notes and 82 rests read; 61 of 62 measures add up to the time signature, and the 62nd is the
+  3-beat pickup. The reader is a walk of Verovio's tree and is about 450 lines; a note's length is its head
+  glyph, its flag or beams, and its dots, and a rest's is its glyph.
+- Against the time map: all 362 note ids are found and all 362 have the same length.
+- Against the MIDI: all 299 note-ons match one of our notes at the same time and pitch. The other 63 notes of
+  the 362 are exactly the 63 tie continuations, so the guess above (the MIDI merges ties) is right, and the
+  tie reader finds every one. A tie that runs off the end of a system is drawn only on the first system, so the
+  reader carries it to the first head of the next.
+- Lyrics: all 187 words of verse 1, rebuilt from the syllables and their hyphen marks, are in the chart's text.
+  A syllable is followed by a drawn bar (`<rect>`): short is a hyphen, long is the extender of a held syllable.
+- Chords: the flat in a chord symbol is a private use character of the music font (U+EA64), which is why the
+  PDF's text loses it. No sharp appeared in this song, so U+EA65 for it is a guess.
+- **The cue notes are in the MIDI** (the intro and the harmony line above a few bars). They are in the same
+  layer as the sung notes, so a harmony line is a `chord` of a sung head and a cue head sharing a stem.
+
+**The PDF is the same drawing, and it is simpler than the plan said.** IronPdf keeps the SVG's own units and path
+data, only the grouping and the glyph names are lost (check: `mutool draw -F svg` of the Holy Forever PDF has
+"M0 3237H4939" for a staff line, the same numbers as the SVG).
+
+- **All the music in the 137 PDFs is 31 distinct glyph shapes** (plus lines and circles). Each glyph is a flipped
+  filled path whose data is the font's outline, so a hash of the path (`melody-path.ts`, `shapeHash`) names it.
+  The table (`melody-glyphs.ts`) came from the glyph definitions in the preview SVG (9 shapes, named) and, for the
+  other 22, from looking at a sheet of the shapes: both heads, whole/half/16th rests and flags, the sharp and the
+  natural, the digits 2 3 5 6 8, cut time, F clef, fermatas, the repeat dots, an x head. There is no
+  shape recognition and no tolerance to tune. A new shape is a "glyph not read" warning and a measure that does
+  not pass, not a wrong tune.
+- **The hard part is the grouping** (which stem, flag, dot and accidental goes with which head): geometry in
+  staff-line units. `melody-pdf.ts` rebuilds Verovio's own tree from the page (measure, staff, layer, note, beam,
+  tuplet) and hands it to the same reader as the SVG, so the two readers cannot disagree about meaning.
+  The PDF reading of Holy Forever is the SVG reading: 362 of 362 notes the same in pitch, length and tie.
+- **Corpus: 137 PDFs, 8,410 measures, 8,264 (98.3%) add up.** Of the 146 that do not: 56 are a first or last measure
+  (pickups and a last bar completing one: legitimate, a first measure shorter than the bar is not a failure); about 44 are
+  other short measures to look at (probably endings or a pickup after a repeat); 30 are a cue voice
+  that Verovio moved sideways to clear a second, so the sweep that lines voices up by x puts it a column off;
+  15 are `3277849` (the Fsharp one, some unread construction: look at it first); 9 are another cue case. `107 of 137
+  songs` have no failing measure but the first or last. Key signature agrees with the chart's `{key}` in
+  137 of 137 sheets (the relative minor counted), and the time signature in every sheet that has a `{time}`.
+- **The 3 PDFs that do not embed the music font** (`185883`, `2098033`, `3359080`) read as well as any, since the notes
+  never needed the font: all their measures add up.
+- **Against the existing range reader** (`melody-range.ts`, a different way: ellipses in the page by size and
+  lyrics): the lowest and highest sung note agree for 126 of 137 sheets. The 11 differences are where this reader
+  counts a full-size note the old one drops for having no lyric under its measure (a bass line, an instrumental
+  bar: 7123436 has a 49 against 64) and accidentals the old one does not read (a flat or sharp apex: one semitone).
+  The PDF reader here does not read lyrics yet (the SVG's are in the `verse` elements; the PDF's are text
+  positions to match to heads by x), and with them the old rule would apply to it too.
+
+**Written: MusicXML 4.0 (partwise).** Pitch spelling, durations in 24 divisions to the quarter note, dots, ties,
+tuplets (`time-modification`), lyrics with syllabic and extend, `<harmony>` (root, kind with the original text as
+`text`, bass), rehearsal marks for sections, tempo, key, time, the notice as `<rights>`. Well formed
+(`xmllint`) and ordered by the schema, but **not opened in a renderer**: no Verovio or OpenSheetMusicDisplay in
+the checkout (a dependency to add for step 4), so "does OSMD transpose `<harmony>` correctly" is still open.
+
+**Not done, in the order of how much it matters:**
+
+1. Lyrics, chords, sections and the notice from the PDF (positions of text to heads, with the chart's chords
+   as the source of the flats). The SVG has them all.
+2. Repeats and endings. Repeat dots are the glyph U+E1E7 in pairs on the middle line, at the end (before a
+   barline) or the start (after one) of a staff, and endings are a bracket plus text; neither is yet read, so
+   the `barline` field is a guess and a repeat is not in the MusicXML.
+3. A second full-size voice, and a cue line displaced to clear a second (see the corpus numbers).
+4. Meter changes inside a song are read (the digits start a measure) but none was checked.
+5. Whole-measure and multi-measure rests of the `multiRest` kind, grace notes: not seen in the corpus.
+
 ## Open questions
 
-1. ~~What does `GetSongLeadPreview` return?~~ SVG pages, a MIDI and a timemap (above). Still to
-   check: how it varies by song (several voices? repeats played out or not? pickup bars?), and
-   what the time map gives for ties and chords (362 ids against 299 MIDI notes on one song; the 63
-   are probably tied notes, which has to be confirmed note by note).
+1. ~~What does `GetSongLeadPreview` return?~~ SVG pages, a MIDI and a timemap (above). Checked on
+   Holy Forever: the 63 ids with no MIDI note are exactly the tie continuations, and the MIDI includes the
+   cue notes. Still to check: how it varies by song (several voices? repeats played out or not?), on more
+   than one preview.
 2. ~~Is it Verovio?~~ Yes: its SVG classes and the music font say so (above).
-3. **How are repeats and endings drawn**, and what does a lead sheet with a coda look like? The
-   SVG should say by class, from a few more songs than the two probed.
+3. **How are repeats and endings drawn**, and what does a lead sheet with a coda look like? In the
+   PDF: repeat dots are a glyph pair and endings a bracket and a number (see the spike's "Not done"); a coda is
+   text ("D.C. al Coda", "2nd time to Coda") and a coda sign (not yet looked at). The SVG classes
+   (`voltaBracket`, `ending`) should say outright; only one preview, with no ending, has been read.
 4. **May a script outside SongSelect's own pages call the preview?** The bookmarklet runs on
    SongSelect with the person's login, as for the PDF, so it should be the same; the backfill
    script's pacing applies to it. The agreements read so far do not forbid it, but say nothing for
@@ -293,7 +368,7 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
 
 ## Steps
 
-0. **Spike (a few days).** Answer question 1 first. Then on four or five real lead sheets read the
+0. **Spike (done: see "Spike results").** Answer question 1 first. Then on four or five real lead sheets read the
    lengths and rests (from the SVG if it is there, else the PDF) and check every measure against the
    time signature; say how many measures pass. Stop here if it does not reach nearly every measure
    of nearly every song. Run it over the local corpus of 137 PDFs and score pitch and start time
