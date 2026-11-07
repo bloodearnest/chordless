@@ -5,6 +5,39 @@
     "functions": 0,
     "unloaded": 0
   },
+  "src/js/melody-glyphs.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 32
+  },
+  "src/js/melody-musicxml.ts": {
+    "lines": 2,
+    "branches": 26,
+    "functions": 0
+  },
+  "src/js/melody-path.ts": {
+    "lines": 0,
+    "branches": 6,
+    "functions": 0
+  },
+  "src/js/melody-pdf.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 687
+  },
+  "src/js/melody-pdfjs.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 193
+  },
+  "src/js/melody-read.ts": {
+    "lines": 184,
+    "branches": 47,
+    "functions": 20
+  },
   "src/js/telemetry/start.ts": {
     "lines": 0,
     "branches": 0,

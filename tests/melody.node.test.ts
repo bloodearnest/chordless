@@ -81,3 +81,84 @@ describe('shape names', () => {
     assert.equal(shapeHash(a.key), shapeHash(b.key))
   })
 })
+
+describe('MusicXML of a hand-built melody', () => {
+  const note = (over: Record<string, unknown>) => ({
+    kind: 'note' as const,
+    id: 'n',
+    step: 'B' as const,
+    alter: -1,
+    octave: 4,
+    midi: 70,
+    start: 0,
+    duration: 1,
+    tupletRatio: 1,
+    tieStart: false,
+    tieStop: false,
+    cue: false,
+    syllables: [] as string[],
+    withPrevious: false,
+    ...over,
+  })
+  const melody = {
+    title: 'A & B',
+    notice: ['CCLI Song # 1'],
+    measures: [
+      {
+        number: 1,
+        voices: [
+          [
+            note({ syllables: ['ho-'], tieStart: true }),
+            note({ start: 1, syllables: ['ly_'], tieStop: true }),
+            note({ start: 2, duration: 2 / 3, tupletRatio: 2 / 3, step: 'C', alter: 1 }),
+            {
+              kind: 'rest' as const,
+              id: 'r',
+              start: 2.67,
+              duration: 1.33,
+              tupletRatio: 1,
+              wholeMeasure: false,
+              cue: false,
+            },
+          ],
+        ],
+        chords: [
+          { start: 0, text: 'Bb/D' },
+          { start: 2, text: 'F#m7' },
+        ],
+        section: 'VERSE 1',
+        barline: 'single' as const,
+        length: 4,
+        full: true,
+        fifths: -2,
+        beats: 4,
+        beatType: 4,
+        tempo: 72,
+      },
+    ],
+  }
+
+  it('writes ties, lyrics with their syllabic, a triplet, chords and the section', () => {
+    const xml = writeMusicXml(melody)
+    assert.match(xml, /<work-title>A &amp; B<\/work-title>/)
+    assert.match(xml, /<tie type="start"\/>/)
+    assert.match(xml, /<syllabic>begin<\/syllabic><text>ho<\/text>/)
+    assert.match(xml, /<syllabic>end<\/syllabic><text>ly<\/text><extend\/>/)
+    assert.match(xml, /<actual-notes>3<\/actual-notes><normal-notes>2<\/normal-notes>/)
+    assert.match(
+      xml,
+      /<root-step>B<\/root-step><root-alter>-1<\/root-alter>.*<bass-step>D<\/bass-step>/
+    )
+    assert.match(xml, /<rehearsal>VERSE 1<\/rehearsal>/)
+    assert.match(xml, /<sound tempo="72"\/>/)
+    assert.match(xml, /<rights>CCLI Song # 1<\/rights>/)
+  })
+})
+
+describe('path normalising', () => {
+  it('takes smooth curves, horizontals and verticals as absolute curves and lines', () => {
+    const smooth = absolutePath('M0 0c10 0 20 10 20 20s10 10 20 0h5v5z')
+    assert.match(smooth.key, /^M0,0 C10,0,20,10,20,20 C20,30,30,30,40,20 L45,20 L45,25 Z$/)
+    assert.equal(smooth.box.maxX, 45)
+  })
+})
