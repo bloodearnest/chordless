@@ -17,7 +17,7 @@ import { build, type Plugin } from 'vite'
 
 const FILE = 'service-worker.js'
 // Never precached: the worker itself, Cloudflare's asset filter and headers file (which it
-// reads and does not serve), source maps, and the PDF reader (1.6 MB, for the one case of a PDF
+// reads and does not serve), source maps, and the PDF reader (1.6 MB, and the melody reader that goes with it, for the one case of a PDF
 // shared to the app: the worker caches it when it is first fetched), Verovio (7.2 MB, the melody view's
 // engraver: the same), the iOS startup images (iOS
 // reads them itself when the app is launched from the home screen) and the Help pictures (public/help:
@@ -28,7 +28,7 @@ const NOT_PRECACHED = (path: string) =>
   path === '.assetsignore' ||
   path === '_headers' ||
   path.endsWith('.map') ||
-  /^assets\/pdfjs-/.test(path) ||
+  /^assets\/(melody-)?pdfjs-/.test(path) ||
   /^assets\/verovio-/.test(path) ||
   path.startsWith('help/') ||
   path.startsWith('icons/splash/')
