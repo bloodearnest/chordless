@@ -70,7 +70,7 @@
   },
   "src/js/xml.ts": {
     "lines": 0,
-    "branches": 2,
+    "branches": 4,
     "functions": 0
   },
   "worker/src/index.ts": {

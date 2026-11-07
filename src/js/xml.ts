@@ -26,14 +26,15 @@ function decode(s: string): string {
   })
 }
 
-// One token: a comment, CDATA, a declaration or DOCTYPE (with an internal subset in brackets, which
-// is skipped), a tag with its attributes, or text
+// One token: a comment, CDATA, a processing instruction, the start of a DOCTYPE (its end is found by
+// `endOfDoctype`: a pattern for its bracketed subset can backtrack without end on a file made to), a tag
+// with its attributes, or text
 const TOKEN = new RegExp(
   [
     '<!--[\\s\\S]*?-->',
     '<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>',
     '<\\?[\\s\\S]*?\\?>',
-    '<!DOCTYPE(?:[^>\\[]|\\[[\\s\\S]*?\\])*>',
+    '<!DOCTYPE',
     '<(\\/?)([\\w:.-]+)((?:\\s+[\\w:.-]+\\s*=\\s*(?:"[^"]*"|\'[^\']*\'))*)\\s*(\\/?)>',
     '([^<]+)',
   ].join('|'),
@@ -41,11 +42,27 @@ const TOKEN = new RegExp(
 )
 const ATTRIBUTE = /([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
 
+/** Where a DOCTYPE that starts at `from` ends, past its `>`: an internal subset in brackets is skipped, and one that is not closed ends the document */
+function endOfDoctype(xml: string, from: number): number {
+  const bracket = xml.indexOf('[', from)
+  const close = xml.indexOf('>', from)
+  if (bracket === -1 || (close !== -1 && close < bracket))
+    return close === -1 ? xml.length : close + 1
+  const subsetEnd = xml.indexOf(']', bracket)
+  const end = subsetEnd === -1 ? -1 : xml.indexOf('>', subsetEnd)
+  return end === -1 ? xml.length : end + 1
+}
+
 /** The root element of the document, or undefined if it has none */
 export function parseXml(xml: string): El | undefined {
   const root: El = { name: '#root', attrs: {}, children: [], text: '' }
   const stack = [root]
-  for (const m of xml.matchAll(TOKEN)) {
+  TOKEN.lastIndex = 0
+  for (let m = TOKEN.exec(xml); m; m = TOKEN.exec(xml)) {
+    if (m[0] === '<!DOCTYPE') {
+      TOKEN.lastIndex = endOfDoctype(xml, TOKEN.lastIndex)
+      continue
+    }
     const top = stack[stack.length - 1] as El
     const [, cdata, closing, name, attrs, selfClosing, text] = m
     if (cdata !== undefined) {
@@ -53,7 +70,7 @@ export function parseXml(xml: string): El | undefined {
     } else if (text !== undefined) {
       if (text.trim()) top.text += decode(text)
     } else if (name === undefined) {
-      // a comment, declaration, DOCTYPE or processing instruction
+      // a comment or processing instruction
     } else if (closing) {
       if (stack.length > 1) stack.pop()
     } else {

@@ -26,6 +26,20 @@ describe('the XML reader', () => {
     assert.equal(root?.text, '&e;')
   })
 
+  it('does not take long over a DOCTYPE made to make a pattern backtrack', () => {
+    const started = Date.now()
+    // (an internal subset of many "][" and no closing ">": a pattern for it can try the splits for ever)
+    for (const xml of [
+      `<!DOCTYPE [${'][ '.repeat(3000)}`,
+      `<!DOCTYPE x [${'][ '.repeat(3000)}]`,
+      `<!DOCTYPE x [${'][ '.repeat(3000)}] <a/>`,
+    ])
+      assert.equal(parseXml(xml), undefined)
+    assert.equal(parseXml('<!DOCTYPE x [ <!ENTITY a "b"> ]><a>ok</a>')?.text, 'ok')
+    assert.equal(parseXml('<!DOCTYPE a><a>ok</a>')?.text, 'ok')
+    assert.ok(Date.now() - started < 500, 'parsing took too long')
+  })
+
   it('says nothing for a document with no element, and leaves a number that is no character', () => {
     assert.equal(parseXml('<?xml version="1.0"?>'), undefined)
     assert.equal(parseXml('<a>&#1114112;</a>')?.text, '&#1114112;')
