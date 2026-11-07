@@ -1,6 +1,6 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import { SongImportedEvent } from '../src/components/song-import.ts'
-import { createSetlist, getCurrentDB, normalizeTitle } from '../src/js/db.ts'
+import { ChordlessDB, createSetlist, getCurrentDB, normalizeTitle } from '../src/js/db.ts'
 import { offerIncoming } from '../src/js/incoming-songs.ts'
 import { createSong } from '../src/js/song-utils.ts'
 import { makeSong } from './builders.ts'
@@ -97,6 +97,7 @@ describe('song-import: corners', () => {
           return read(pdf)
         },
       })
+      element.loadMelodyPdfReader = async () => ({ readMelodyPdf: async () => null })
       return { element, reads }
     }
 
@@ -175,6 +176,26 @@ describe('song-import: corners', () => {
       expect(await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)).to.not.equal(
         undefined
       )
+    })
+
+    it('still imports the chart when the melody cannot be saved', async () => {
+      const element = await importerKeeping(async () => notesOf())
+      const db = ChordlessDB.prototype
+      const saveMelody = db.saveMelody
+      db.saveMelody = async () => {
+        throw new Error('disk full')
+      }
+      try {
+        await element.receive({
+          chordproText: chart(unique('Not saved')),
+          source: 'songselect',
+          leadSheet: leadSheet(),
+        })
+      } finally {
+        db.saveMelody = saveMelody
+      }
+      expect(element._imports).to.have.length(1)
+      expect(await element._db.getMelody(element._imports[0].song.uuid)).to.equal(undefined)
     })
 
     it('keeps no melody from a sheet in another key, or one that cannot be read, and still imports the chart', async () => {
@@ -547,6 +568,7 @@ describe('song-import: corners', () => {
             return range ? read(range) : null
           },
         })
+        element.loadMelodyPdfReader = async () => ({ readMelodyPdf: async () => null })
         return element
       }
       const rangeIn = (element: any, index: number) =>
@@ -668,6 +690,7 @@ describe('song-import: corners', () => {
       const element = await importer()
       const reader = await element.loadMelodyReader()
       expect(reader.readMelodyRange).to.be.a('function')
+      expect((await element.loadMelodyPdfReader()).readMelodyPdf).to.be.a('function')
     })
 
     it('comes from the bookmarklet in its message', async () => {
