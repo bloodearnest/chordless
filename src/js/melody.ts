@@ -51,6 +51,17 @@ export interface MelodyChord {
   text: string
 }
 
+/** A numbered ending's bracket, as it covers one measure of it */
+export interface MelodyEnding {
+  /** What the bracket says: "1", "2" or "2,3" */
+  label: string
+  /** This is the measure the bracket starts over / ends over */
+  start: boolean
+  stop: boolean
+  /** The bracket has a hook down at its right end; an open one (the last ending) does not */
+  closed: boolean
+}
+
 export interface MelodyMeasure {
   /** The number the sheet prints, counted from 1 (a pickup is 0 when the sheet says so) */
   number: number
@@ -60,15 +71,11 @@ export interface MelodyMeasure {
   /** A boxed section name that starts here ("INTRO", "VERSE 1") */
   section: string | null
   /** The barline that closes the measure */
-  barline:
-    | 'single'
-    | 'double'
-    | 'final'
-    | 'repeat-end'
-    | 'repeat-start'
-    | 'repeat-both'
-    | 'dashed'
-    | 'none'
+  barline: 'single' | 'double' | 'final' | 'repeat-end' | 'dashed' | 'none'
+  /** The measure opens with a repeat sign (a thick line and dots on its left edge): play from here again */
+  repeatStart: boolean
+  /** The numbered ending ("1", "2", "2,3") whose bracket this measure is under, if any */
+  ending: MelodyEnding | null
   /** Sum of the voices' lengths, checked against the time signature */
   length: number
   /** The measure holds as much as the time signature says (a pickup or last measure may not) */

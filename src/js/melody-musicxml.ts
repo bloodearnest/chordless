@@ -3,7 +3,7 @@
  * web renderer reads (`docs/MELODY.md`, "The format"). Chord symbols are `<harmony>`, written from
  * our own text so the app's spelling stays the app's; sections are rehearsal marks.
  */
-import type { Melody, MelodyEvent, MelodyNote } from './melody.ts'
+import type { Melody, MelodyEvent, MelodyMeasure, MelodyNote } from './melody.ts'
 
 const DIVISIONS = 24 // per quarter: whole divisions for 16ths, 32nds, and triplets of them
 
@@ -95,6 +95,34 @@ function restXml(e: Extract<MelodyEvent, { kind: 'rest' }>, voice: number): stri
   )
 }
 
+/** The barline at the start of a measure: a repeat sign and the start of a numbered ending, when there are any */
+function leftBarline(m: MelodyMeasure): string {
+  const ending = m.ending?.start
+    ? `<ending number="${esc(m.ending.label.replace(/,/g, ', '))}" type="start">${esc(m.ending.label)}.</ending>`
+    : ''
+  if (!m.repeatStart && !ending) return ''
+  return `<barline location="left">${m.repeatStart ? '<bar-style>heavy-light</bar-style>' : ''}${ending}${m.repeatStart ? '<repeat direction="forward"/>' : ''}</barline>`
+}
+
+/** The barline at the end of a measure; a plain one is the default and is not written */
+function rightBarline(m: MelodyMeasure): string {
+  const style =
+    m.barline === 'double'
+      ? 'light-light'
+      : m.barline === 'final' || m.barline === 'repeat-end'
+        ? 'light-heavy'
+        : m.barline === 'dashed'
+          ? 'dashed'
+          : ''
+  // (an ending that ends here is closed by a hook; the last, open one is "discontinue")
+  const ending = m.ending?.stop
+    ? `<ending number="${esc(m.ending.label.replace(/,/g, ', '))}" type="${m.ending.closed ? 'stop' : 'discontinue'}"/>`
+    : ''
+  const repeat = m.barline === 'repeat-end' ? '<repeat direction="backward"/>' : ''
+  if (!style && !ending && !repeat) return ''
+  return `<barline location="right">${style ? `<bar-style>${style}</bar-style>` : ''}${ending}${repeat}</barline>`
+}
+
 export function writeMusicXml(melody: Melody): string {
   const out: string[] = []
   out.push('<?xml version="1.0" encoding="UTF-8"?>')
@@ -124,6 +152,8 @@ export function writeMusicXml(melody: Melody): string {
       )
       last = m
     }
+    const left = leftBarline(m)
+    if (left) out.push(left)
     if (m.section)
       out.push(
         `<direction placement="above"><direction-type><rehearsal>${esc(m.section)}</rehearsal></direction-type></direction>`
@@ -151,6 +181,8 @@ export function writeMusicXml(melody: Melody): string {
       }
       if (vi === 0) for (const c of chords) out.push(harmony(c.text))
     })
+    const right = rightBarline(m)
+    if (right) out.push(right)
     out.push('</measure>')
   })
   out.push('</part>')

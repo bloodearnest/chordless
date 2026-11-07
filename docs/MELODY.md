@@ -358,12 +358,21 @@ pdf.js (as `melody-range.ts` does) and needs nothing else: the preview is only t
 - **The chart is useful as a check, and could correct** a reading (word boundaries, the flats), but nothing
   needs it: a PDF imported alone reads the same.
 
+**Repeats and endings (read from the PDF alone).** A repeat is dots beside a thick line (a 90-unit stroke
+as tall as the staff; a thin barline is 27): dots before the thick line end a repeat (`barline: 'repeat-end'`),
+dots after it start one (`repeatStart` on the measure), and a start sign drawn at the end of a system is the next
+measure's. A double bar is two thin lines and a final bar a thin and a thick. An ending is a 13-unit line over the
+staff with a hook down at its left end (and at its right if it is closed), the numbers ("1", "2,3") written
+under it: each measure under it gets `ending` with `start`/`stop`/`closed`. MusicXML gets the `<barline>`s with
+`<repeat>` and `<ending>` (an open last ending is `discontinue`). Over the 137 sheets: 319 start signs, 324 end
+signs (the difference is songs that repeat to the top, and one that starts with a sign and ends without),
+and every sheet's endings have as many starts as stops; the measure sums are as before (8264 of 8410).
+
 **Not done, in the order of how much it matters:**
 
 1. (Done: the SVG reader, the XML parser and the time-map and MIDI scoring are in `scripts/`; `src/` has only the PDF route.)
-2. Repeats and endings. Repeat dots are the glyph U+E1E7 in pairs on the middle line, at the end (before a
-   barline) or the start (after one) of a staff, and endings are a bracket plus text; neither is yet read, so
-   the `barline` field is a guess and a repeat is not in the MusicXML.
+2. (Done: repeats and endings, below. Not read: D.S., D.C. and coda text and signs; they are words and a sign,
+   not lines, and no sheet in the corpus has been checked for them.)
 3. A second full-size voice, and a cue line displaced to clear a second (see the corpus numbers).
 4. Meter changes inside a song are read (the digits start a measure) but none was checked.
 5. Whole-measure and multi-measure rests of the `multiRest` kind, grace notes: not seen in the corpus.
@@ -375,10 +384,9 @@ pdf.js (as `melody-range.ts` does) and needs nothing else: the preview is only t
    cue notes. Still to check: how it varies by song (several voices? repeats played out or not?), on more
    than one preview.
 2. ~~Is it Verovio?~~ Yes: its SVG classes and the music font say so (above).
-3. **How are repeats and endings drawn**, and what does a lead sheet with a coda look like? In the
-   PDF: repeat dots are a glyph pair and endings a bracket and a number (see the spike's "Not done"); a coda is
-   text ("D.C. al Coda", "2nd time to Coda") and a coda sign (not yet looked at). The SVG classes
-   (`voltaBracket`, `ending`) should say outright; only one preview, with no ending, has been read.
+3. ~~How are repeats and endings drawn?~~ In the PDF: dots beside a thick line, and a line with hooks and the
+   numbers under it (above). What a lead sheet with a coda looks like is still not looked at: it is text
+   ("D.C. al Coda", "2nd time to Coda") and a coda sign.
 4. **May a script outside SongSelect's own pages call the preview?** The bookmarklet runs on
    SongSelect with the person's login, as for the PDF, so it should be the same; the backfill
    script's pacing applies to it. The agreements read so far do not forbid it, but say nothing for

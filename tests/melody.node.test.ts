@@ -5,6 +5,7 @@ import type { Melody, MelodyEvent, MelodyNote } from '../src/js/melody.ts'
 import { midiOf } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { absolutePath, shapeHash } from '../src/js/melody-path.ts'
+import { type Glyph, type Line, type Staff, signsOf } from '../src/js/melody-pdf.ts'
 import { fifthsOfKey, melodyRange, transposeMelody } from '../src/js/melody-transpose.ts'
 
 /** One measure of 4/4 in the shape Verovio writes, drawn with the glyphs named, as a lead sheet's SVG is */
@@ -132,6 +133,8 @@ describe('MusicXML of a hand-built melody', () => {
         ],
         section: 'VERSE 1',
         barline: 'single' as const,
+        repeatStart: false,
+        ending: null,
         length: 4,
         full: true,
         fifths: -2,
@@ -197,6 +200,8 @@ describe('transposing a melody', () => {
         chords: [{ start: 0, text: chord }],
         section: null,
         barline: 'single',
+        repeatStart: false,
+        ending: null,
         length: 4,
         full: true,
         fifths: 1,
@@ -287,5 +292,128 @@ describe('transposing a melody', () => {
     const cueOnly = tune([note('E', 2, 0, true)], 'Em')
     assert.equal(melodyRange(cueOnly), null)
     assert.equal(transposeMelody(cueOnly, 'Em', 'Gm').measures[0].fifths, -2)
+  })
+})
+
+describe('repeat signs and endings on a page', () => {
+  const staff = (x0: number, x1: number, top: number, sys = 0): Staff & { sys: number } => ({
+    x0,
+    x1,
+    ys: [0, 1, 2, 3, 4].map(i => top + i * 180),
+    sys,
+  })
+  const bar = (x: number, top: number, width = 27): Line => ({
+    x1: x,
+    y1: top,
+    x2: x,
+    y2: top + 720,
+    width,
+  })
+  const dots = (x: number, top: number): Glyph[] =>
+    [top + 270, top + 450].map(y => ({ code: 'E1E7', x, y, scale: 1, used: false }))
+  const unit = { a: 1, e: 0, f: 0 }
+  const run = (text: string, x: number, y: number) => ({
+    text,
+    x0: x,
+    x1: x + 100,
+    y,
+    size: 10,
+    bold: false,
+    italic: false,
+  })
+
+  it('reads dots before a thick line as the end of a repeat, and a double or final bar', () => {
+    const [a, b, c] = [staff(0, 4000, 1000), staff(4000, 8000, 1000), staff(8000, 12000, 1000)]
+    const lines = [
+      bar(3800, 1000), // thin
+      bar(3900, 1000, 90), // thick: dots before it
+      bar(7928, 1000),
+      bar(8000, 1000), // two thin ones
+      bar(11900, 1000),
+      bar(12000, 1000, 90), // thin then thick, no dots: final
+    ]
+    const signs = signsOf([a, b, c], lines, dots(3600, 1000), [], unit)
+    assert.equal(signs.get(a)?.bar, 'repeat-end')
+    assert.equal(signs.get(b)?.bar, 'double')
+    assert.equal(signs.get(c)?.bar, 'final')
+    assert.equal(signs.get(a)?.repeatStart, false)
+  })
+
+  it('reads dots after a thick line as the start of a repeat, on the next system when at the end of one', () => {
+    const [a, b] = [staff(0, 4000, 1000, 0), staff(0, 4000, 3000, 1)]
+    // |: in the middle of a measure's left edge, and one drawn at the end of the first system
+    const lines = [bar(3700, 1000, 90), bar(3800, 1000), bar(4000, 1000)]
+    const signs = signsOf([a, b], lines, dots(3860, 1000), [], unit)
+    assert.equal(signs.get(a)?.repeatStart, false)
+    assert.equal(signs.get(b)?.repeatStart, true)
+    assert.equal(signs.get(a)?.bar, 'single')
+    const left = signsOf([b], [bar(300, 3000, 90), bar(400, 3000)], dots(460, 3000), [], unit)
+    assert.equal(left.get(b)?.repeatStart, true)
+  })
+
+  it('reads a numbered ending: a line over the measures, a hook down at its left and right ends', () => {
+    const [a, b, c] = [staff(0, 4000, 3000), staff(4000, 8000, 3000), staff(8000, 12000, 3000)]
+    const line = (x1: number, x2: number): Line => ({ x1, y1: 2000, x2, y2: 2000, width: 13 })
+    const hook = (x: number): Line => ({ x1: x, y1: 2000, x2: x, y2: 2328, width: 13 })
+    const lines = [
+      line(4000, 7900),
+      hook(4000),
+      hook(7900), // closed: "1"
+      line(8000, 12000),
+      hook(8000), // open: "2,3"
+    ]
+    const runs = [run('1', 4073, 2328), run('2, 3', 8073, 2328), run('7', 100, 2328)]
+    const signs = signsOf([a, b, c], lines, [], runs, unit)
+    assert.equal(signs.get(a)?.ending, null)
+    assert.deepEqual(signs.get(b)?.ending, { label: '1', start: true, stop: true, closed: true })
+    assert.deepEqual(signs.get(c)?.ending, {
+      label: '2,3',
+      start: true,
+      stop: true,
+      closed: false,
+    })
+  })
+
+  it('writes repeats and endings as MusicXML barlines', () => {
+    const measure = (over: object) => ({
+      number: 1,
+      voices: [[]],
+      chords: [],
+      section: null,
+      barline: 'single' as const,
+      repeatStart: false,
+      ending: null,
+      length: 4,
+      full: true,
+      fifths: 0,
+      beats: 4,
+      beatType: 4,
+      tempo: null,
+      ...over,
+    })
+    const xml = writeMusicXml({
+      title: null,
+      notice: [],
+      measures: [
+        measure({ repeatStart: true }),
+        measure({
+          barline: 'repeat-end',
+          ending: { label: '1', start: true, stop: true, closed: true },
+        }),
+        measure({
+          barline: 'final',
+          ending: { label: '2,3', start: true, stop: true, closed: false },
+        }),
+        measure({ barline: 'double' }),
+      ],
+    })
+    assert.match(
+      xml,
+      /<barline location="left"><bar-style>heavy-light<\/bar-style><repeat direction="forward"\/>/
+    )
+    assert.match(xml, /<ending number="1" type="start">1\.<\/ending><\/barline>/)
+    assert.match(xml, /<ending number="1" type="stop"\/><repeat direction="backward"\/>/)
+    assert.match(xml, /<ending number="2, 3" type="discontinue"\/>/)
+    assert.match(xml, /<bar-style>light-light<\/bar-style>/)
   })
 })
