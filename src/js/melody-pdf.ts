@@ -1,6 +1,6 @@
 /**
  * Reads a SongSelect lead sheet PDF's drawing into the tree the preview's SVG gives
- * (`melody-svg.ts` reads that), so the lengths, pitches and measure sums are worked out in one place.
+ * (`melody-read.ts` reads that), so the lengths, pitches and measure sums are worked out in one place.
  *
  * The PDF is IronPdf printing the same Verovio SVG, so its drawing keeps the SVG's own units and
  * path data. What it loses is the grouping and the names: a notehead is a filled shape, not a
@@ -16,7 +16,7 @@
  */
 import { GLYPHS } from './melody-glyphs.ts'
 import { absolutePath, shapeHash } from './melody-path.ts'
-import type { El } from './melody-svg.ts'
+import type { El } from './melody-read.ts'
 
 interface Line {
   x1: number
