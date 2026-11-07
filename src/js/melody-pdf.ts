@@ -800,7 +800,9 @@ function placeText(
       .reduce((m, o) => Math.min(m, o.r.x0), r.x1 + 1500)
     const bar = bars.find(
       b =>
-        b.minX >= r.x1 - 40 && b.minX < next && Math.abs((b.minY + b.maxY) / 2 - (r.y - 70)) < 120
+        b.minX >= r.x0 + 0.3 * (r.x1 - r.x0) &&
+        b.minX < next &&
+        Math.abs((b.minY + b.maxY) / 2 - (r.y - 70)) < 120
     )
     perStaff.get(s)?.syls.push({
       x0: r.x0,

@@ -330,10 +330,30 @@ tuplets (`time-modification`), lyrics with syllabic and extend, `<harmony>` (roo
 (`xmllint`) and ordered by the schema, but **not opened in a renderer**: no Verovio or OpenSheetMusicDisplay in
 the checkout (a dependency to add for step 4), so "does OSMD transpose `<harmony>` correctly" is still open.
 
+**Text and pdf.js (second round, from the PDF alone).** `src/js/melody-pdfjs.ts` reads a lead sheet PDF with
+pdf.js (as `melody-range.ts` does) and needs nothing else: the preview is only the oracle it was developed against.
+
+- **Words are read from the PDF.** Each character is its own text operation, so the words are rebuilt from the
+  text objects (pdf.js's joined text items run far-apart syllables together). The fonts' names (needs
+  `fontExtraProperties: true`) say which words are bold (sections, tempo). The chord flat and sharp are the music
+  font's U+EA64 and U+EA66 (a sharp seen at last).
+- **Lyric rows are told from chord rows by their spacing**: under a system the first row within 2,000 units of
+  the staff starts the lyrics and each row within 640 of the last is another verse; any other word above the next
+  staff is a chord. Hyphens and extenders are the short and long bars drawn after a syllable.
+- **Against the preview (Holy Forever, PDF only):** syllables with their hyphens 279 of 280, chords 62 of 62
+  measures (symbol and beat), sections and tempo 62 of 62, title and notice the same, notes 362 of 362.
+- **Against the ChordPro charts (all 137):** 98.6% of the sung words (all verses) are words of the chart, 99.0%
+  of the chord symbols are chords of the chart (the rest are spelled differently there, such as `A2` for `Asus2`); the
+  section names the chart also has are 84.8% (the sheet says `VERSE`, the chart `Verse 1`: not an error).
+- **pdf.js against mutool:** 127 of 137 PDFs give the identical melody, text included; all 8,264 measures that add up
+  do so either way. The ten differences are chord-text joins.
+- **The chart is useful as a check, and could correct** a reading (word boundaries, the flats), but nothing
+  needs it: a PDF imported alone reads the same.
+
 **Not done, in the order of how much it matters:**
 
-1. Lyrics, chords, sections and the notice from the PDF (positions of text to heads, with the chart's chords
-   as the source of the flats). The SVG has them all.
+1. Taking the SVG reader and the time-map and MIDI scoring out of `src/` (`readMelodySvg`, the XML parser) so
+   nothing there depends on the preview: they are only the oracle. `readMelodyTrees` stays and is the shared reader.
 2. Repeats and endings. Repeat dots are the glyph U+E1E7 in pairs on the middle line, at the end (before a
    barline) or the start (after one) of a staff, and endings are a bracket plus text; neither is yet read, so
    the `barline` field is a guess and a repeat is not in the MusicXML.
