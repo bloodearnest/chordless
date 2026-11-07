@@ -571,6 +571,10 @@ interface Head {
   note: MelodyNote
 }
 
+/** A head drawn beside a neighbour a second away is moved sideways by this much at most */
+const DISPLACED = 340
+const WIDE_DISPLACED = 420
+
 /** A solid head is about this wide, in the music font's units (an em is 1000) */
 const HEAD_WIDTH = 314
 
@@ -615,22 +619,54 @@ function tieNotes(raws: Raw[], heads: Head[], warnings: string[]) {
  * that runs with it, or takes over from its rests, come out as one timeline. Returns when it ends.
  */
 function alignVoices(voices: MelodyEvent[][], xOf: Map<MelodyEvent, number>): number {
-  const all = voices.flat().sort((a, b) => (xOf.get(a) as number) - (xOf.get(b) as number))
+  const voiceOf = new Map<MelodyEvent, number>()
+  voices.forEach((v, i) => {
+    for (const e of v) voiceOf.set(e, i)
+  })
+  const x = (e: MelodyEvent) => xOf.get(e) as number
+  const all = voices.flat().sort((a, b) => x(a) - x(b))
+  // Events at one place; a head drawn beside a neighbour a second away is shifted by a head's
+  // width, so the cue line and the sung line that meet there are one place too
+  const places: MelodyEvent[][] = []
+  for (const e of all) {
+    const last = places[places.length - 1]
+    const first = last?.[0]
+    if (last && first && x(e) - x(first) < 40) last.push(e)
+    else places.push([e])
+  }
+  const midiOf = (e: MelodyEvent) => (e.kind === 'note' ? e.midi : null)
+  const beside = (a: MelodyEvent[], b: MelodyEvent[]) => {
+    const gap = x(b[0] as MelodyEvent) - x(a[0] as MelodyEvent)
+    if (gap > WIDE_DISPLACED) return false
+    // from different voices only, and one of them cue size, and a second or a unison apart
+    if (a.some(e => b.some(o => voiceOf.get(e) === voiceOf.get(o)))) return false
+    return a.some(e =>
+      b.some(o => {
+        const p = midiOf(e)
+        const q = midiOf(o)
+        if (e.cue === o.cue || p === null || q === null) return false
+        // (a unison is shifted less than a second, which has the stems to clear too)
+        return Math.abs(p - q) <= 2 && gap <= (p === q ? DISPLACED : WIDE_DISPLACED)
+      })
+    )
+  }
+  for (let i = 0; i + 1 < places.length; ) {
+    if (beside(places[i] as MelodyEvent[], places[i + 1] as MelodyEvent[])) {
+      ;(places[i] as MelodyEvent[]).push(...(places[i + 1] as MelodyEvent[]))
+      places.splice(i + 1, 1)
+    } else i++
+  }
   const sounding: MelodyEvent[] = []
   let time = 0
   let latest = 0
-  for (let i = 0; i < all.length; ) {
-    const x0 = xOf.get(all[i] as MelodyEvent) as number
-    let j = i
-    while (j < all.length && (xOf.get(all[j] as MelodyEvent) as number) - x0 < 40) j++
-    for (const e of all.slice(i, j)) {
+  for (const place of places) {
+    for (const e of place) {
       e.start = time
       sounding.push(e)
       latest = Math.max(latest, time + e.duration)
     }
     const ends = sounding.map(e => e.start + e.duration).filter(end => end > time + 1e-9)
     time = ends.length ? Math.min(...ends) : latest
-    i = j
   }
   return latest
 }
