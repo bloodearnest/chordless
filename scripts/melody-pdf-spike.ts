@@ -1,41 +1,13 @@
-/**
- * Spike for docs/MELODY.md: read lead sheet PDFs into melodies and check every measure against its
- * time signature. With a preview's JSON it also compares the PDF's reading with the SVG's, note by note.
- *
- *   node scripts/melody-pdf-spike.ts export/7201044-lead-Bb.pdf [--compare preview.json] [--dump]
- *   node scripts/melody-pdf-spike.ts export/            (every PDF in a folder, one line each)
- */
-import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Melody, MelodyNote } from '../src/js/melody.ts'
-import { pdfPageToTree, type TextRun, textRunsFromStext } from '../src/js/melody-pdf.ts'
+import { pdfPageToTree } from '../src/js/melody-pdf.ts'
 import { type ReadStats, readMelodySvg, readMelodyTrees } from '../src/js/melody-svg.ts'
-
-/** The pages of a PDF as the drawing (SVG text) and the words, by mutool */
-function pdfPages(file: string): { svg: string; runs: TextRun[] }[] {
-  const dir = mkdtempSync(join(tmpdir(), 'melody-'))
-  try {
-    execFileSync('mutool', ['draw', '-F', 'svg', '-o', join(dir, 'p-%d.svg'), file], {
-      stdio: 'ignore',
-    })
-    execFileSync('mutool', ['draw', '-F', 'stext', '-o', join(dir, 't-%d.xml'), file], {
-      stdio: 'ignore',
-    })
-    const n = readdirSync(dir).filter(f => f.endsWith('.svg')).length
-    return Array.from({ length: n }, (_, i) => ({
-      svg: readFileSync(join(dir, `p-${i + 1}.svg`), 'utf8'),
-      runs: textRunsFromStext(readFileSync(join(dir, `t-${i + 1}.xml`), 'utf8')),
-    }))
-  } finally {
-    rmSync(dir, { recursive: true, force: true })
-  }
-}
+import { mutoolPages } from './melody-mutool.ts'
 
 export function readPdf(file: string): { melody: Melody; stats: ReadStats } {
   const stats = { warnings: [] as string[] } as ReadStats
-  const trees = pdfPages(file).flatMap(p => pdfPageToTree(p.svg, stats.warnings, p.runs) ?? [])
+  const trees = mutoolPages(file).flatMap(p => pdfPageToTree(p.items, stats.warnings, p.runs) ?? [])
   return { melody: readMelodyTrees(trees, stats), stats }
 }
 

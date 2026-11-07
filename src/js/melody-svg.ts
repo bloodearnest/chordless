@@ -648,7 +648,7 @@ function tieNotes(raws: Raw[], heads: Head[], warnings: string[]) {
  * that runs with it, or takes over from its rests, come out as one timeline. Returns when it ends.
  */
 function alignVoices(voices: MelodyEvent[][], xOf: Map<MelodyEvent, number>): number {
-  const all = voices.flatMap(v => v).sort((a, b) => (xOf.get(a) as number) - (xOf.get(b) as number))
+  const all = voices.flat().sort((a, b) => (xOf.get(a) as number) - (xOf.get(b) as number))
   const sounding: MelodyEvent[] = []
   let time = 0
   let latest = 0

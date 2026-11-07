@@ -16,7 +16,7 @@
  */
 import { GLYPHS } from './melody-glyphs.ts'
 import { absolutePath, shapeHash } from './melody-path.ts'
-import { type El, parseXml } from './melody-svg.ts'
+import type { El } from './melody-svg.ts'
 
 interface Line {
   x1: number
@@ -51,53 +51,6 @@ export interface TextRun {
   text: string
 }
 
-/**
- * The words on a page from `mutool draw -F stext`: a line's characters split at its spaces. The music
- * font's characters (a chord's flat) stay in the word they are in. In the app these come from pdf.js's
- * text content, which has the same pieces.
- */
-export function textRunsFromStext(xml: string): TextRun[] {
-  const runs: TextRun[] = []
-  const walk = (e: El) => {
-    if (e.name === 'line') {
-      let cur: TextRun | null = null
-      for (const font of e.children) {
-        const name = font.attrs.name ?? ''
-        const size = Number(font.attrs.size)
-        for (const ch of font.children) {
-          const q = (ch.attrs.quad ?? '').split(' ').map(Number)
-          const c = ch.attrs.c ?? ''
-          if (c === ' ' || c === '\u00a0') {
-            if (cur) runs.push(cur)
-            cur = null
-            continue
-          }
-          if (!cur)
-            cur = {
-              x0: q[0] as number,
-              x1: q[2] as number,
-              y: Number(ch.attrs.y),
-              size,
-              bold: /Bold/i.test(name),
-              italic: /Italic|Oblique/i.test(name),
-              text: '',
-            }
-          cur.text += c
-          cur.x1 = q[2] as number
-          if (!/Leipzig/i.test(name)) {
-            cur.bold = /Bold/i.test(name)
-            cur.italic = /Italic|Oblique/i.test(name)
-            cur.size = size
-          }
-        }
-      }
-      if (cur) runs.push(cur)
-    } else e.children.forEach(walk)
-  }
-  walk(parseXml(xml))
-  return runs
-}
-
 let counter = 0
 const node = (name: string, attrs: Record<string, string>, children: El[] = []): El => ({
   name,
@@ -125,8 +78,25 @@ const isDigit = (c: string) => /^E08[0-9AB]$/.test(c)
 const IGNORED = new Set(['E4C0', 'E4C1', 'E07A', 'E1E7', 'E887'])
 
 /** One page of the PDF's drawing as the tree `readMelodyTrees` reads, or null if no staff is found */
-export function pdfPageToTree(svg: string, warnings: string[], runs: TextRun[] = []): El | null {
-  const root = parseXml(svg)
+/** A shape the page paints: its path data (the font's units for a glyph), the matrix in force, and whether it is stroked (a line) or filled */
+export interface DrawItem {
+  d: string
+  /** The matrix that puts the path on the page, y down (a, d, e, f: nothing here is rotated or skewed) */
+  m: { a: number; d: number; e: number; f: number }
+  stroked: boolean
+  /** The line width in the path's own units, for a stroke */
+  width: number
+}
+
+/**
+ * One page of the PDF's drawing as the tree `readMelodyTrees` reads, or null if no staff is found.
+ * `items` and `runs` come from `melody-pdfjs.ts` in the app (and from `mutool` in the spike's scripts).
+ */
+export function pdfPageToTree(
+  items: DrawItem[],
+  warnings: string[],
+  runs: TextRun[] = []
+): El | null {
   const lines: Line[] = []
   const hooks: { hookX: number; endX: number; y: number }[] = []
   const glyphs: Glyph[] = []
@@ -137,43 +107,22 @@ export function pdfPageToTree(svg: string, warnings: string[], runs: TextRun[] =
   const curves: { d: string; minX: number; maxX: number; minY: number; maxY: number }[] = []
 
   // The units of the original drawing: the staff lines are the stroked horizontals with the commonest matrix
-  type M = { a: number; d: number; e: number; f: number }
-  const matrices: M[] = []
-  const items: { el: El; m: M }[] = []
-  const walk = (e: El, inDefs: boolean) => {
-    for (const c of e.children) {
-      const defs = inDefs || c.name === 'defs' || c.name === 'clipPath'
-      if (c.name === 'path' && !defs && !c.attrs.id) {
-        const mm = /matrix\(([^)]*)\)/.exec(c.attrs.transform ?? '')
-        if (mm) {
-          const v = (mm[1] as string).split(/[ ,]+/).map(Number)
-          items.push({
-            el: c,
-            m: { a: v[0] as number, d: v[3] as number, e: v[4] as number, f: v[5] as number },
-          })
-        }
-      }
-      walk(c, defs)
-    }
-  }
-  walk(root, false)
-  // the unit matrix: the one most stroked straight lines are drawn in
   const votes = new Map<string, number>()
-  for (const { el, m } of items)
-    if (el.attrs.stroke && m.d > 0)
-      votes.set(`${m.a}|${m.e}|${m.f}`, (votes.get(`${m.a}|${m.e}|${m.f}`) ?? 0) + 1)
+  for (const { stroked, m } of items) {
+    const key = `${m.a}|${m.e}|${m.f}`
+    if (stroked && m.d > 0) votes.set(key, (votes.get(key) ?? 0) + 1)
+  }
   const best = [...votes].sort((a, b) => b[1] - a[1])[0]
   if (!best) return null
   const [ua, ue, uf] = best[0].split('|').map(Number) as [number, number, number]
-  void matrices
+  /** The matrix is the drawing's own (a stretch of it may come out a little off in the last digit) */
+  const inUnits = (a: number) => Math.abs(a - ua) <= ua * 1e-5
 
-  for (const { el, m } of items) {
-    const stroked = !!el.attrs.stroke
+  for (const { d, m, stroked, width: w } of items) {
     if (stroked) {
-      const w = Number(el.attrs['stroke-width'] ?? 0)
-      if (w <= 1) continue // the hairline mutool draws over every filled shape
-      if (Math.abs(m.a - ua) > 1e-9 || m.d <= 0) continue
-      const p = absolutePath(el.attrs.d ?? '')
+      if (w <= 1) continue // the hairline drawn over a filled shape
+      if (!inUnits(m.a) || m.d <= 0) continue
+      const p = absolutePath(d)
       if (p.points.length === 3) {
         // a tuplet bracket's half: a hook down at one end and the line across
         const [a, b, c] = p.points as [number[], number[], number[]]
@@ -191,7 +140,7 @@ export function pdfPageToTree(svg: string, warnings: string[], runs: TextRun[] =
       }
       continue
     }
-    const p = absolutePath(el.attrs.d ?? '')
+    const p = absolutePath(d)
     if (m.d < 0) {
       // a glyph: named by its shape; its origin in the drawing's units
       const code = GLYPHS[shapeHash(p.key)]
@@ -209,7 +158,7 @@ export function pdfPageToTree(svg: string, warnings: string[], runs: TextRun[] =
         continue
       }
       glyphs.push(g)
-    } else if (Math.abs(m.a - ua) < 1e-9) {
+    } else if (inUnits(m.a)) {
       const { box } = p
       const w = box.maxX - box.minX
       const h = box.maxY - box.minY
@@ -218,7 +167,7 @@ export function pdfPageToTree(svg: string, warnings: string[], runs: TextRun[] =
         dots.push({ x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 })
       else if (hasCurve)
         curves.push({
-          d: el.attrs.d ?? '',
+          d,
           minX: box.minX,
           maxX: box.maxX,
           minY: box.minY,
@@ -230,7 +179,7 @@ export function pdfPageToTree(svg: string, warnings: string[], runs: TextRun[] =
           maxX: box.maxX,
           minY: box.minY,
           maxY: box.maxY,
-          d: el.attrs.d ?? '',
+          d,
         })
     }
   }
