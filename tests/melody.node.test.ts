@@ -173,6 +173,26 @@ describe('path normalising', () => {
   })
 })
 
+describe('lining up a cue line with the sung one', () => {
+  it('puts a cue head drawn a head aside to clear a second in the same place as the sung one', () => {
+    // sung quarters, and cue quarters a second below each, drawn 330 to the right: one bar of four, not eight
+    const head = (id: string, x: number, step: number, scale: number, drawnAt: number) =>
+      `<g id="${id}" class="note" data-x="${drawnAt}"><g class="notehead"><use xlink:href="#E0A4-x" transform="translate(${x}, ${3957 - step * 90}) scale(${scale}, ${scale})" /></g></g>`
+    const sung = [0, 1, 2, 3].map(i => head(`s${i}`, 1500 + i * 700, 4 + i, 0.72, 1500 + i * 700))
+    const cue = [0, 1, 2, 3].map(i => head(`c${i}`, 1830 + i * 700, 3 + i, 0.5, 1830 + i * 700))
+    const svg = sheet('').replace(
+      '<g class="layer"></g>',
+      `<g class="layer">${sung.join('')}</g><g class="layer">${cue.join('')}</g>`
+    )
+    const melody = readMelodySvg([svg])
+    assert.equal(melody.measures[0]?.length, 4)
+    assert.equal(melody.measures[0]?.full, true)
+    // a cue head a bar further along is not beside anything: it stays a place of its own
+    const far = svg.replace(/data-x="1830"/, 'data-x="2400"')
+    assert.notEqual(readMelodySvg([far]).measures[0]?.length, 4)
+  })
+})
+
 describe('transposing a melody', () => {
   const note = (step: MelodyNote['step'], octave: number, alter = 0, cue = false): MelodyNote => ({
     kind: 'note',

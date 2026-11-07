@@ -373,7 +373,9 @@ and every sheet's endings have as many starts as stops; the measure sums are as 
 1. (Done: the SVG reader, the XML parser and the time-map and MIDI scoring are in `scripts/`; `src/` has only the PDF route.)
 2. (Done: repeats and endings, below. Not read: D.S., D.C. and coda text and signs; they are words and a sign,
    not lines, and no sheet in the corpus has been checked for them.)
-3. A second full-size voice, and a cue line displaced to clear a second (see the corpus numbers).
+3. A second full-size voice. (A cue line drawn a head's width aside to clear a sung note a second or a unison away is
+   now one place with it: 8273 of 8410 measures add up, from 8264; what is left of the 30 is the same line when it is
+   shifted by more than that, or the F# construction in `3277849`.)
 4. Meter changes inside a song are read (the digits start a measure) but none was checked.
 5. Whole-measure and multi-measure rests of the `multiRest` kind, grace notes: not seen in the corpus.
 

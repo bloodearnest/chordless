@@ -27,9 +27,9 @@
     "unloaded": 193
   },
   "src/js/melody-read.ts": {
-    "lines": 188,
-    "branches": 48,
-    "functions": 20
+    "lines": 168,
+    "branches": 50,
+    "functions": 18
   },
   "src/js/telemetry/start.ts": {
     "lines": 0,
