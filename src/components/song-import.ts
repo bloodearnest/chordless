@@ -54,7 +54,9 @@ import type {
   SetlistDetailsSaveEvent,
 } from './setlist-details-form.ts'
 import './setlist-details-form.ts'
+import type { Melody } from '../js/melody.ts'
 import type { MelodyRead } from '../js/melody-range.ts'
+import { melodyRecord } from '../js/melody-record.ts'
 import { goTo, loadPage } from '../js/navigation.ts'
 import { describeOrigin, SONGSELECT } from '../js/song-source.ts'
 import { ensureCurrentSpace, setCurrentSpace } from '../js/space.ts'
@@ -146,6 +148,8 @@ interface ImportItem {
   leadSheet?: LeadSheetOutcome
   /** What was read from it, to show how */
   melody?: MelodyRead
+  /** Its whole melody, in the chart's key, to be kept with the song the chart goes to (docs/MELODY.md) */
+  notes?: { melody: Melody; key: string }
   /** Where the chart came from, and who is importing it */
   source?: string
   importUser?: string
@@ -664,6 +668,11 @@ export class SongImport extends LitElement {
     readMelodyRange(pdf: ArrayBuffer): Promise<MelodyRead | null>
   }> = () => import('../js/melody-range.ts')
 
+  /** Loads the reader of a lead sheet's whole melody: notes, words, chords and structure (a test gives its own) */
+  loadMelodyPdfReader: () => Promise<{
+    readMelodyPdf(pdf: ArrayBuffer): Promise<Melody | null>
+  }> = () => import('../js/melody-pdfjs.ts')
+
   constructor() {
     super()
     this._paste = createRef()
@@ -995,7 +1004,7 @@ export class SongImport extends LitElement {
           skipped.push(`${name}: ${skip || 'empty'}`)
           continue
         }
-        const { chordproText, outcome, melody } = await this._chartWithRange(
+        const { chordproText, outcome, melody, notes } = await this._chartWithRange(
           incomingText,
           leadSheet
         )
@@ -1014,7 +1023,10 @@ export class SongImport extends LitElement {
             { ccliNumber, title, importSource: origin, importUser },
             db
           ))
-        if (!existing) this._created.push(song)
+        if (!existing) {
+          this._created.push(song)
+          await this._keepMelody(song, notes)
+        }
         const item: ImportItem = {
           song,
           chordproText,
@@ -1022,6 +1034,7 @@ export class SongImport extends LitElement {
           choice: null,
           leadSheet: outcome,
           melody,
+          notes,
           source: origin,
           importUser,
         }
@@ -1077,25 +1090,63 @@ export class SongImport extends LitElement {
   async _chartWithRange(
     chordproText: string,
     leadSheet: unknown
-  ): Promise<{ chordproText: string; outcome?: LeadSheetOutcome; melody?: MelodyRead }> {
+  ): Promise<{
+    chordproText: string
+    outcome?: LeadSheetOutcome
+    melody?: MelodyRead
+    notes?: { melody: Melody; key: string }
+  }> {
     const key = keyOfChart(chordproText)
     if (!(leadSheet instanceof ArrayBuffer) || leadSheet.byteLength > MAX_LEAD_SHEET) {
       return { chordproText }
     }
-    // (a chart with a range of its own keeps it; one with no key has nothing to put the notes in)
-    if (!key || rangeOfChart(chordproText)) return { chordproText }
+    // (one with no key has nothing to put the notes in)
+    if (!key) return { chordproText }
+    const hasRange = Boolean(rangeOfChart(chordproText))
     this._progress = 'Reading the lead sheet…'
     try {
+      // (a chart with a range of its own keeps it, so its range is not read again)
+      if (hasRange) return { chordproText, notes: await this._readNotes(leadSheet, key) }
       const melody = await (await this.loadMelodyReader()).readMelodyRange(leadSheet)
       if (!melody) return { chordproText, outcome: 'no-melody' }
       // its notes are only the chart's if it is in the chart's key
       if (!signatureMatchesKey(melody.keySignature, key)) {
         return { chordproText, outcome: 'other-key', melody }
       }
-      return { chordproText: withRange(chordproText, melody, key), outcome: 'read', melody }
+      const notes = await this._readNotes(leadSheet, key)
+      return { chordproText: withRange(chordproText, melody, key), outcome: 'read', melody, notes }
     } catch (error) {
       console.warn('[Import] Could not read the melody of the lead sheet:', error)
       return { chordproText, outcome: 'unreadable' }
+    }
+  }
+
+  /** The whole melody of the lead sheet; failing to read it leaves the song without one, never without its chart */
+  async _readNotes(
+    leadSheet: ArrayBuffer,
+    key: string
+  ): Promise<{ melody: Melody; key: string } | undefined> {
+    try {
+      const melody = await (await this.loadMelodyPdfReader()).readMelodyPdf(leadSheet.slice(0))
+      // (its notes are only the chart's if it is in the chart's key)
+      return melody && signatureMatchesKey(melody.measures[0]?.fifths ?? 0, key)
+        ? { melody, key }
+        : undefined
+    } catch (error) {
+      console.warn('[Import] Could not read the notes of the lead sheet:', error)
+      return undefined
+    }
+  }
+
+  /** Keep the melody with the song (replacing the one it had), to be synced beside the chart */
+  async _keepMelody(song: SongRecord, notes?: { melody: Melody; key: string }): Promise<void> {
+    if (!notes) return
+    const db = this._database()
+    try {
+      const previous = await db.getMelody(song.uuid)
+      await db.saveMelody(melodyRecord(song.uuid, notes.melody, notes.key, previous))
+    } catch (error) {
+      console.warn('[Import] Could not keep the melody:', error)
     }
   }
 
@@ -1551,6 +1602,8 @@ export class SongImport extends LitElement {
           // (the library's chart stays the song the setlists see; the new variant is its own)
           song = await importAsVariant(item.song.uuid, item.chordproText, incoming, label, db)
         }
+        // (the melody goes with the chart that was taken: not when the library's own stays)
+        if (item.pick !== 'use-existing') await this._keepMelody(song, item.notes)
         this._applied = true
         this._setChoice(item, item.pick, song)
       } catch (error) {

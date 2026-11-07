@@ -513,5 +513,14 @@ charts": a PDF from an email or a share is read for its metadata only). That sta
 the notes would come only from a lead sheet the person downloaded or imported themselves, and that
 page and the help text change in the step that ships it.
 
+**Import keeps the melody (built).** `song-import` reads a lead sheet twice, as it always read the range: `readMelodyRange`
+for the range and its page, and `readMelodyPdf` for the whole `Melody`. The melody is saved (`melodyRecord`, in the
+`melodies` store, synced as in "Syncing") for the song the chart goes to: a new song, the library's song when the chart
+updates it, the new song of an import as original or as variant, and not when the library's own chart stays
+(`use-existing`). It is kept only when the sheet is in the chart's key (its first measure's key signature against the
+chart's `{key}`), as the range is; a sheet in another key, or one `readMelodyPdf` cannot read, leaves the song with its
+chart and no melody. A chart that has a range already keeps it, and its range is not read again, but the melody is
+still kept. Nothing yet shows the melody or says on the page that it was kept.
+
 Each step is a pull request that leaves the app working; the first two change nothing a person
 sees except a better range and a "how it was read" that can show the whole line.

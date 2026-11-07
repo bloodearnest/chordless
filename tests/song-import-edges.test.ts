@@ -120,6 +120,78 @@ describe('song-import: corners', () => {
       expect(await said(element)).to.contain('Melody range D4–E5 in C, from the lead sheet.')
     })
 
+    /** A melody as the whole-sheet reader gives it: one empty measure, in the key of `fifths` */
+    const notesOf = (fifths = 0) => ({
+      title: 'T',
+      notice: [],
+      measures: [
+        {
+          number: 1,
+          voices: [[]],
+          chords: [],
+          section: null,
+          barline: 'single',
+          directions: [],
+          repeatStart: false,
+          ending: null,
+          length: 4,
+          full: true,
+          fifths,
+          beats: 4,
+          beatType: 4,
+          tempo: null,
+        },
+      ],
+    })
+
+    /** An importer whose readers are stand-ins: the range, and the whole melody */
+    async function importerKeeping(notes: () => Promise<unknown>) {
+      const { element } = await importerReading(async () => read())
+      element.loadMelodyPdfReader = async () => ({ readMelodyPdf: notes })
+      return element
+    }
+
+    it('keeps the whole melody with a new song, in the chart key', async () => {
+      const element = await importerKeeping(async () => notesOf())
+      await element.receive({
+        chordproText: chart(unique('Kept')),
+        source: 'songselect',
+        leadSheet: leadSheet(),
+      })
+      const record = await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)
+      expect(record?.key).to.equal('C')
+      expect(record?.melody.measures).to.have.length(1)
+    })
+
+    it('keeps the melody of a chart that has a range already, and does not read the range again', async () => {
+      const { element, reads } = await importerReading(async () => read())
+      element.loadMelodyPdfReader = async () => ({ readMelodyPdf: async () => notesOf() })
+      await element.receive({
+        chordproText: `{title: ${unique('Ranged')}}\n{key: C}\n{x_chordless_range: D4-E5}\n\n[C]Hello`,
+        source: 'songselect',
+        leadSheet: leadSheet(),
+      })
+      expect(reads).to.have.length(0)
+      expect(await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)).to.not.equal(
+        undefined
+      )
+    })
+
+    it('keeps no melody from a sheet in another key, or one that cannot be read, and still imports the chart', async () => {
+      for (const notes of [async () => notesOf(1), async () => Promise.reject(new Error('bad'))]) {
+        const element = await importerKeeping(notes)
+        await element.receive({
+          chordproText: chart(unique('No melody')),
+          source: 'songselect',
+          leadSheet: leadSheet(),
+        })
+        expect(element._imports).to.have.length(1)
+        expect(await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)).to.equal(
+          undefined
+        )
+      }
+    })
+
     it('says so on the page when the lead sheet had no melody, or could not be read', async () => {
       const cases: [() => Promise<unknown>, string][] = [
         [async () => null, 'The lead sheet had no melody to read, so there is no range.'],
