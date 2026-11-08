@@ -13,14 +13,12 @@ import type { MusicalMetadataDisplay } from '../../components/musical-metadata-d
 import type { SetlistDiffers } from '../../components/setlist-differs.ts'
 import type { SetlistShare } from '../../components/setlist-share.ts'
 import type { SongSettingsPopover } from '../../components/song-settings-popover.ts'
-import { rangeOfMetadata } from '../chart-range.ts'
 import type { Setlist } from '../data-types.ts'
 import { type ChordlessDB, SETLIST_TYPES } from '../db.ts'
 import { leaderName } from '../leaders.ts'
 import { getLive, isLiveSetlist } from '../live.ts'
 import { getLiveSyncStatus } from '../live-sync-status.ts'
 import { wantsMediaPlayer } from '../media-player-loader.ts'
-import { songMelody } from '../melody-analysis.ts'
 import { listPadSets } from '../pad-set-service.ts'
 import { buildUrl, type Route } from '../router.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
@@ -282,22 +280,11 @@ export class SetlistHeader {
     keySelector.value = key
     keySelector.keys = getAvailableKeys(key)
     keySelector.originalKey = this.#song?.originalKey ?? ''
-    // (the melody's range is in the chart's own key)
-    keySelector.range = rangeOfMetadata(this.#song?.parsed.metadata)
-    keySelector.rangeKey = this.#song?.originalKey ?? ''
-    // (and the melody's, when the chart has no range of its own)
+    // (the chart's range, in its own key, or the melody's when it has none)
     const song = this.#song
-    if (song && !keySelector.range)
-      void this.host
-        ._database()
-        .getMelody(song._setlistEntry.songUuid)
-        .then(record => {
-          const found = songMelody(song.parsed.metadata, record)
-          if (found && this.#song === song) {
-            keySelector.range = found.range
-            keySelector.rangeKey = found.rangeKey
-          }
-        })
+    keySelector.showRangeOf(song?.parsed.metadata, song?.originalKey ?? '', async () =>
+      song ? this.host._database().getMelody(song._setlistEntry.songUuid) : undefined
+    )
     keySelector.editMode = isEditMode()
   }
 

@@ -13,8 +13,6 @@ import type { PropertyValues } from 'lit'
 import { html, nothing } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import type { AppHeader } from '../../components/app-header.ts'
-import type { MelodySheet } from '../../components/melody-sheet.ts'
-import { rangeOfMetadata } from '../chart-range.ts'
 import '../../components/app-header.ts'
 import type { AppModal } from '../../components/app-modal.ts'
 import '../../components/app-modal.ts'
@@ -41,7 +39,7 @@ import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../da
 import { watchData } from '../data-watcher.ts'
 import { getCurrentDB } from '../db.ts'
 import { filterByPlace, loadLeftOut, placesOf, saveLeftOut } from '../library-spaces.ts'
-import { melodyOfRecord, songMelody } from '../melody-analysis.ts'
+import { melodyWithKey, showMelody } from '../melody-shown.ts'
 import { goTo } from '../navigation.ts'
 import {
   addToLibrary,
@@ -177,28 +175,17 @@ export class LibraryView extends PageView {
     const header = this.querySelector<AppHeader>('#library-app-header')
     const content = this.#content.value?.querySelector<HTMLElement>('.song-content')
     if (!song || !header) return
-    const record = await (await getCurrentDB()).getMelody(song.uuid)
-    const melody = record && melodyOfRecord(record)
+    const found = melodyWithKey(await (await getCurrentDB()).getMelody(song.uuid), song.originalKey)
     // (the song may have changed while this was read)
     if (this.#song !== song) return
-    header.showMelodyToggle = Boolean(melody)
-    if (!melody) this.#melodyOn = false
+    header.showMelodyToggle = Boolean(found)
+    if (!found) this.#melodyOn = false
     header.melodyMode = this.#melodyOn
-    const display = content?.querySelector<HTMLElement>('song-display')
-    const sheet = content?.querySelector<MelodySheet>('melody-sheet')
-    if (!this.#melodyOn || !melody || !record || !content) {
-      if (sheet) sheet.hidden = true
-      if (display) display.style.display = ''
-      return
-    }
-    await import('../../components/melody-sheet.ts')
-    const shown = sheet ?? document.createElement('melody-sheet')
-    shown.melody = melody
-    shown.melodyKey = record.key || song.originalKey || ''
-    shown.songKey = this.#key || shown.melodyKey
-    shown.hidden = false
-    if (!sheet) content.appendChild(shown)
-    if (display) display.style.display = 'none'
+    if (!content) return
+    await showMelody(
+      content,
+      this.#melodyOn && found ? { ...found, songKey: this.#key || found.key } : null
+    )
   }
 
   override disconnectedCallback(): void {
@@ -454,21 +441,11 @@ export class LibraryView extends PageView {
     keySelector.value = selectedKey
     keySelector.keys = getAvailableKeys(selectedKey)
     keySelector.originalKey = (this.#song?.originalKey || this.#parsed?.metadata?.key) as string
-    // (the melody's range is in the chart's own key)
-    keySelector.range = rangeOfMetadata(this.#parsed?.metadata)
-    keySelector.rangeKey = this.#parsed?.metadata?.key as string
-    // (and the melody's, when the chart has no range of its own)
-    const song = this.#song
-    if (song && !keySelector.range)
-      void getCurrentDB()
-        .then(db => db.getMelody(song.uuid))
-        .then(record => {
-          const found = songMelody(this.#parsed?.metadata, record)
-          if (found && this.#song === song) {
-            keySelector.range = found.range
-            keySelector.rangeKey = found.rangeKey
-          }
-        })
+    // (the chart's range, in its own key, or the melody's when it has none)
+    const uuid = this.#song?.uuid
+    keySelector.showRangeOf(this.#parsed?.metadata, this.#parsed?.metadata?.key ?? '', async () =>
+      uuid ? (await getCurrentDB()).getMelody(uuid) : undefined
+    )
     // The key is saved with the song, which a user who can only read can't change
     keySelector.editMode = this.#editMode
   }
