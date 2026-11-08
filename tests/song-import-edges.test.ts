@@ -165,6 +165,59 @@ describe('song-import: corners', () => {
       expect(readMusicXml(record?.xml ?? '')?.measures).to.have.length(1)
     })
 
+    it('says on the page that the melody is kept, or why only the range is', async () => {
+      const element = await importerKeeping(async () => notesOf())
+      await element.receive({
+        chordproText: chart(unique('Said kept')),
+        source: 'songselect',
+        leadSheet: leadSheet(),
+      })
+      expect(await said(element)).to.contain("The lead sheet's melody is kept with the song.")
+
+      // a sheet whose notes are in another key is read for its range only
+      const other = await importerKeeping(async () => notesOf(1))
+      await other.receive({
+        chordproText: chart(unique('Said not kept')),
+        source: 'songselect',
+        leadSheet: leadSheet(),
+      })
+      const shown = await said(other)
+      expect(shown).to.contain('notes could not be kept in full, so only the range was')
+      expect(shown).to.not.contain('is kept with the song')
+
+      // and when saving it fails, the page does not say it is kept
+      const failing = await importerKeeping(async () => notesOf())
+      const db = ChordlessDB.prototype
+      const saveMelody = db.saveMelody
+      db.saveMelody = async () => {
+        throw new Error('disk full')
+      }
+      try {
+        await failing.receive({
+          chordproText: chart(unique('Said unsaved')),
+          source: 'songselect',
+          leadSheet: leadSheet(),
+        })
+      } finally {
+        db.saveMelody = saveMelody
+      }
+      expect(await said(failing)).to.contain('melody could not be saved')
+    })
+
+    it("says the library's chart stays, and its lead sheet melody is not kept, when that is the choice", async () => {
+      const element = await importerKeeping(async () => notesOf())
+      const item = {
+        isDuplicate: true,
+        choice: 'use-existing',
+        notes: { melody: notesOf(), key: 'C' },
+      }
+      expect(element._melodyKept(item)).to.contain('is not kept')
+      expect(element._melodyKept({ ...item, choice: null, pick: 'update' })).to.contain('is kept')
+      expect(element._melodyKept({ ...item, notes: undefined, leadSheet: 'no-melody' })).to.equal(
+        ''
+      )
+    })
+
     it('keeps the melody of a chart that has a range already, and does not read the range again', async () => {
       const { element, reads } = await importerReading(async () => read())
       element.loadMelodyPdfReader = async () => ({ readMelodyPdf: async () => notesOf() })
