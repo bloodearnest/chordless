@@ -72,7 +72,7 @@ describe('the setlist page: header, menu and keys', () => {
         return false
       }
       overview.dispatchEvent(new OverviewSongDeleteEvent(0))
-      await wait(10)
+      await waitUntil(() => asked === 1)
       expect(asked).to.equal(1)
       expect($('#delete-song-title')?.textContent).to.equal('Alpha')
       overview.dispatchEvent(new OverviewSongDeleteEvent(99))
@@ -89,7 +89,7 @@ describe('the setlist page: header, menu and keys', () => {
     it('changes the key of a song when told to', async () => {
       const setlist = await rig.open()
       must(rig.page.overview.component).dispatchEvent(new OverviewSongKeyChangeEvent(0, 'A'))
-      await wait(100)
+      await waitUntil(async () => must(await rig.db.getSetlist(setlist.id)).songs[0].key === 'A')
       expect(must(await rig.db.getSetlist(setlist.id)).songs[0].key).to.equal('A')
       must(rig.page.overview.component).dispatchEvent(new OverviewSongKeyChangeEvent(0, ''))
     })
@@ -97,7 +97,7 @@ describe('the setlist page: header, menu and keys', () => {
     it('changes the tempo of a song when told to', async () => {
       const setlist = await rig.open()
       must(rig.page.overview.component).dispatchEvent(new OverviewSongBpmChangeEvent(0, 88))
-      await wait(100)
+      await waitUntil(async () => must(await rig.db.getSetlist(setlist.id)).songs[0].tempo === 88)
       expect(must(await rig.db.getSetlist(setlist.id)).songs[0].tempo).to.equal(88)
     })
 
@@ -647,12 +647,12 @@ describe('the setlist page: header, menu and keys', () => {
         shownSetlists.push(setlist)
       }
       header().dispatchEvent(new HeaderInfoClickEvent())
-      await wait(30)
+      await waitUntil(() => shownSetlists.length === 1)
       expect(shownSetlists).to.have.length(1)
       rig.page.showSong(0, true)
       await rig.page.header.show(rig.page.songs[0], true)
       header().dispatchEvent(new HeaderInfoClickEvent())
-      await wait(30)
+      await waitUntil(() => shownSongs.length === 1)
       expect(shownSongs).to.have.length(1)
       expect(shownSongs[0][0]).to.equal(rig.page.songs[0].songId)
     })

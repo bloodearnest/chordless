@@ -1,4 +1,4 @@
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { LitElement } from 'lit'
 import { announceDataChange, type DataChange } from '../src/js/data-changes.ts'
 import { watchData } from '../src/js/data-watcher.ts'
@@ -42,7 +42,9 @@ describe('DataWatcher', () => {
   it('is told once, with the changes, when writes of the kinds it shows stop for a moment', async () => {
     announce('song')
     announce('chart', { ids: ['c'] })
-    await wait(100)
+    await waitUntil(() => element.heard.length === 1)
+    // (and no more after it)
+    await nothingFor()
     expect(element.heard).to.have.length(1)
     expect(element.heard[0].map(change => change.kind)).to.deep.equal(['song', 'chart'])
   })
@@ -56,7 +58,7 @@ describe('DataWatcher', () => {
 
   it('is told of the page’s own writes, and of another tab’s, as of any other', async () => {
     announce('song', { origin: 'local' })
-    await wait(100)
+    await waitUntil(() => element.heard.length === 1)
     expect(element.heard).to.have.length(1)
   })
 

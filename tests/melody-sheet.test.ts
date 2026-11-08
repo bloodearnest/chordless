@@ -2,7 +2,6 @@ import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import { type MelodySheet, MelodySheetErrorEvent } from '../src/components/melody-sheet.ts'
 import '../src/components/melody-sheet.ts'
 import { sampleMelody } from './melody-sample.ts'
-import { wait } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -61,7 +60,7 @@ describe('melody-sheet', () => {
     await waitUntil(() => !(sheet._pages.length && notes(sheet) === 0), undefined, {
       timeout: 5000,
     })
-    await wait(300)
+    await waitUntil(() => asked > 2)
     expect(asked).to.be.greaterThan(2)
     expect(notes(sheet)).to.equal(3)
   })

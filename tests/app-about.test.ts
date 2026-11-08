@@ -103,7 +103,7 @@ describe('app-about', () => {
       }) as typeof appUpdate.check)
       el = await show()
       el.shadowRoot?.querySelector<HTMLButtonElement>('.actions .btn')?.click()
-      await wait(20)
+      await waitUntil(() => checks === 1)
       expect(checks).to.equal(1)
     })
 
@@ -140,7 +140,7 @@ describe('app-about', () => {
       expect(renders).to.equal(1)
       el.remove()
       window.dispatchEvent(new AppUpdateChangeEvent(false))
-      await wait(10)
+      await waitUntil(() => renders === 1)
       expect(renders).to.equal(1)
     })
   })
@@ -209,7 +209,7 @@ describe('app-about', () => {
       el.remove()
       running = { version: 'v-later', released: '' }
       navigator.serviceWorker.dispatchEvent(new Event('controllerchange'))
-      await wait(30)
+      await waitUntil(() => el._running?.version === 'v-claimed')
       expect(el._running?.version, 'a page that is gone does not ask').to.equal('v-claimed')
     })
 

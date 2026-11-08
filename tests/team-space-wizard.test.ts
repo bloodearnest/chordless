@@ -20,7 +20,7 @@ import {
 import { makeEntry, makeSetlist } from './builders.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -265,7 +265,7 @@ describe('team-space-wizard', () => {
     await until(() => text().includes('Church Drive'), 'the folder is shown')
     page.pick = async () => null
     button('Choose a different folder').click()
-    await wait(50)
+    await waitUntil(() => text().includes('Church Drive'))
     expect(text()).to.contain('Church Drive')
     expect(page.shadowRoot?.querySelector('.error')).to.equal(null)
   })

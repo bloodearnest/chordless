@@ -2,7 +2,7 @@
  * Signing in: loading Google's script, the code client, the exchange at the Worker, and what is
  * kept. (Tokens and the stored user are in google-auth.test.ts.)
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import {
   authorizeWithGoogle,
   connectDrive,
@@ -13,7 +13,7 @@ import {
   initGoogleAuth,
 } from '../src/js/google-auth.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -127,7 +127,7 @@ describe('google-auth: signing in', () => {
       respondTo = () =>
         json({ blob: 'blob-1', access_token: 'tok', expires_in: 3600, id_token: 'idt', user: null })
       const result = await authorizeWithGoogle()
-      await wait(20)
+      await waitUntil(() => fetches[0].url === '/oauth/callback')
       expect(fetches[0].url).to.equal('/oauth/callback')
       expect(fetches[0].body).to.deep.equal({
         code: 'the-code',

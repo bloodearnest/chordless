@@ -33,13 +33,16 @@ describe('the setlist page: corners', () => {
     rig.root.append(edit, normal)
     header().dispatchEvent(new EditModeToggleEvent())
     expect(edit.style.display).to.equal('')
-    await wait(300)
+    await waitUntil(
+      () => edit.classList.contains('fade-in') && normal.classList.contains('fade-complete'),
+      'the controls to fade'
+    )
     expect(edit.classList.contains('fade-in')).to.equal(true)
     expect(normal.classList.contains('fade-complete')).to.equal(true)
     header().dispatchEvent(new EditModeToggleEvent())
     expect(edit.classList.contains('fade-in')).to.equal(false)
     expect(normal.classList.contains('fade-complete')).to.equal(false)
-    await wait(400)
+    await waitUntil(() => edit.style.display === 'none')
     expect(edit.style.display).to.equal('none')
   })
 
@@ -96,7 +99,7 @@ describe('the setlist page: corners', () => {
     const list = must($$<HTMLElement>('#add-song-results song-list')[0])
     const song = await getSongWithContent(rig.songs[2].uuid, rig.db)
     list.dispatchEvent(new SongSelectEvent(song, 0, new Event('click')))
-    await wait(100)
+    await waitUntil(() => rig.page.songs.map(entry => entry.title).includes('Charlie'))
     expect(rig.page.songs.map(entry => entry.title)).to.include('Charlie')
     rig.page._addSongModal.close()
   })

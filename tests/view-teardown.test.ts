@@ -4,7 +4,7 @@
  * in the shell's menu. Each view is mounted and unmounted a few times, and the
  * app must look as it did before.
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/nav-menu.ts'
 import { getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
@@ -271,7 +271,7 @@ describe('views leave nothing behind', () => {
 
     view.route = { name: 'setlist', setlistId: seeded.setlistId, songIndex: 0 }
     await view.updateComplete
-    await wait(100)
+    await waitUntil(() => menu.songs.length === 1)
     expect(menu.songs.length).to.equal(1)
     view.remove()
   })
