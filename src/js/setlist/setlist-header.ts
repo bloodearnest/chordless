@@ -20,6 +20,7 @@ import { leaderName } from '../leaders.ts'
 import { getLive, isLiveSetlist } from '../live.ts'
 import { getLiveSyncStatus } from '../live-sync-status.ts'
 import { wantsMediaPlayer } from '../media-player-loader.ts'
+import { songMelody } from '../melody-analysis.ts'
 import { listPadSets } from '../pad-set-service.ts'
 import { buildUrl, type Route } from '../router.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
@@ -259,6 +260,19 @@ export class SetlistHeader {
     // (the melody's range is in the chart's own key)
     keySelector.range = rangeOfMetadata(this.#song?.parsed.metadata)
     keySelector.rangeKey = this.#song?.originalKey ?? ''
+    // (and the melody's, when the chart has no range of its own)
+    const song = this.#song
+    if (song && !keySelector.range)
+      void this.host
+        ._database()
+        .getMelody(song._setlistEntry.songUuid)
+        .then(record => {
+          const found = songMelody(song.parsed.metadata, record)
+          if (found && this.#song === song) {
+            keySelector.range = found.range
+            keySelector.rangeKey = found.rangeKey
+          }
+        })
     keySelector.editMode = isEditMode()
   }
 

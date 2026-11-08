@@ -59,6 +59,7 @@ function fakeDb() {
       const song = must(Object.values(songs).find(each => each.chordproFileId === id))
       return { content: song.chordpro ?? `{title: ${song.title}}` }
     },
+    getMelody: async () => undefined,
     getSongUsageFromSetlists: async id => {
       if (id === 'slow') await wait(100)
       if (id === 'fast') {

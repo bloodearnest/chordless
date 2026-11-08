@@ -4,6 +4,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { formatRange } from '../js/chart-range.ts'
 import type { SongWithContent } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
+import type { SongMelody } from '../js/melody-analysis.ts'
 import { toast } from '../js/toast.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -34,6 +35,8 @@ interface InfoData {
   song: SongWithContent | null
   appearances: Appearance[]
   loading: boolean
+  /** The range and the beats on its ends, worked out from the song's melody */
+  melody?: SongMelody | null
 }
 
 /**
@@ -63,7 +66,10 @@ export class SongInfoDialog extends LitElement {
   _modal: Ref<AppModal>
   /** What show() was asked for, to load the song again after a change */
   _shown: [string, string] | null = null
-  _load: Task<[string, string], { song: SongWithContent; appearances: Appearance[] }>
+  _load: Task<
+    [string, string],
+    { song: SongWithContent; appearances: Appearance[]; melody: SongMelody | null }
+  >
 
   constructor() {
     super()
@@ -82,8 +88,11 @@ export class SongInfoDialog extends LitElement {
           getSongById(songId, db),
           db.getSongUsageFromSetlists(songId),
         ])
+        const { songMelody } = await import('../js/melody-analysis.ts')
+        const record = await db.getMelody(song.uuid)
         signal.throwIfAborted()
         return {
+          melody: songMelody(song.parsed?.metadata, record),
           song: { ...song, title: title || song.title },
           appearances: usage.map(entry => ({
             setlistId: entry.setlistId,
@@ -165,12 +174,18 @@ export class SongInfoDialog extends LitElement {
     this._modal.value?.show()
   }
 
-  _renderInfo({ song = null, appearances = [], loading = false }: Partial<InfoData>) {
+  _renderInfo({
+    song = null,
+    appearances = [],
+    loading = false,
+    melody = null,
+  }: Partial<InfoData>) {
     return html`
       <song-info
         .song=${song}
         .appearances=${appearances}
         .loading=${loading}
+        .melody=${melody}
         @song-info:range-change=${(event: SongRangeChangeEvent) => this._saveRange(event)}
       ></song-info>
       ${

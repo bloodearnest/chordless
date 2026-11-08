@@ -93,6 +93,14 @@ ask of a singer?), where semitones, which are kept for being exact, are not how 
 octaves are too coarse (nearly every song is an octave to an octave and a half). The notes are
 written pitch: men sing the melody an octave down.
 
+**How long the song sits there.** When the song has a melody (`docs/MELODY.md`), a line under the width says
+how many beats (quarter notes) the song spends on its highest and its lowest note, over the whole song as played:
+repeats and endings followed, a tie's notes added, cue notes left out ("Highest E5: 3½ beats; lowest D4: 1 beat").
+A high note held for a long time tires a singer more than one touched once. This is worked out from the stored score
+each time (`src/js/melody-analysis.ts`; the parse is cached by the score's hash), and is not written to the chart.
+The range itself is the chart's `x_chordless_range` if it has one (the person's, or what an import wrote), else the
+melody's own; the dialog and the key picker both use it.
+
 ## Giving a whole library its ranges
 
 A library imported before lead sheets were read can be brought up to date in one pass, without
