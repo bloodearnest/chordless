@@ -1,9 +1,11 @@
 // The production build (npm run build, served by vite preview): what the dev server can't show.
 
 import { readdirSync, readFileSync } from 'node:fs'
+import { makeSong } from './builders.ts'
 import { linkFor } from './email-link-for.ts'
 import { expect, test, waitForServiceWorker } from './fixtures.ts'
 import { email } from './make-email.ts'
+import { sampleRecord } from './melody-sample.ts'
 import { must } from './must.ts'
 
 // Every view the router has, by the URL that shows it
@@ -161,6 +163,63 @@ test('every view runs with no Content-Security-Policy violations', async ({ page
     await expect(page.locator(view), path).toBeVisible()
   }
   expect(violations).toEqual([])
+})
+
+test('the melody sheet is engraved under the page policy, by a worker with a policy of its own', async ({
+  page,
+  request,
+}) => {
+  const violations = await collectViolations(page)
+  await page.goto('/')
+  await waitForServiceWorker(page)
+  // (the built app has no module paths to import, so the records go straight into its database)
+  const chordpro = {
+    id: 'chordpro-built-melody',
+    content: '{title: Built Melody Song}\n{key: G}\n\n[G]Amazing [C]grace',
+    contentHash: 'built',
+    lastModified: Date.now(),
+  }
+  const song = makeSong({
+    uuid: 'built-melody-song',
+    id: 'title-built-melody-song',
+    title: 'Built Melody Song',
+    titleNormalized: 'builtmelodysong',
+    chordproFileId: chordpro.id,
+  })
+  const melody = sampleRecord(song.uuid, 'G')
+  await page.evaluate(
+    async ({ chordpro, song, melody }) => {
+      const space = localStorage.getItem('current-space-id') as string
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(space, 14)
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      const tx = db.transaction(['chordpro', 'songs', 'melodies'], 'readwrite')
+      tx.objectStore('chordpro').put(chordpro)
+      tx.objectStore('songs').put(song)
+      tx.objectStore('melodies').put(melody)
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = resolve
+        tx.onerror = () => reject(tx.error)
+      })
+      db.close()
+    },
+    { chordpro, song, melody }
+  )
+
+  await page.goto(`/songs/${song.uuid}?melody`)
+  // (Verovio is WebAssembly, which the page's own policy does not allow: the worker has its own)
+  await expect(page.locator('melody-sheet .notehead')).toHaveCount(3)
+  expect(violations).toEqual([])
+
+  // The page's policy has no wasm-unsafe-eval; the worker's files have only the tight one
+  const page_ = (await request.get('/')).headers()['content-security-policy']
+  expect(page_).not.toContain('wasm-unsafe-eval')
+  const worker = readdirSync('dist/client/assets').find(name => /^verovio-worker-/.test(name))
+  expect(worker).toBeDefined()
+  const policy = (await request.get(`/assets/${worker}`)).headers()['content-security-policy']
+  expect(policy).toBe("default-src 'none'; script-src 'self' 'wasm-unsafe-eval'")
 })
 
 test('the real app is named Chordless, not the dev name', { tag: '@logic' }, async ({
