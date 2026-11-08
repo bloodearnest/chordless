@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import { rangeOfMetadata } from '../js/chart-range.ts'
 import type { ParsedChart } from '../js/data-types.ts'
+import { type SongMelody, songMelody } from '../js/melody-analysis.ts'
 import { formatArtistNames } from '../js/song-utils.ts'
 import { getWeeksAgo } from '../js/utils/date-utils.ts'
 import { lyricSnippet, matchedFields, normalizeTerm } from '../js/utils/song-filter.ts'
@@ -22,6 +23,8 @@ export interface SongCardSong {
     tempo?: string | number | null
     timeSignature?: string | null
   } | null
+  /** In a setlist: the entry it is, which names the song (its melody is looked up by that) */
+  _setlistEntry?: { songUuid: string }
   /** In a setlist: the key it is in, and the key the chart was written in */
   currentKey?: string
   originalKey?: string | null
@@ -117,6 +120,7 @@ export class SongCard extends LitElement {
     variant: { type: String, reflect: true },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
     search: { type: String },
+    _melody: { state: true },
   }
 
   declare song: SongCardSong | null
@@ -124,6 +128,8 @@ export class SongCard extends LitElement {
   declare editMode: boolean
   /** The library search the song matched: its matches are marked, and a lyrics match is quoted */
   declare search: string
+  /** The range of the song's melody, worked out when the key picker is shown (edit mode in a setlist) */
+  declare _melody: SongMelody | null
 
   contextMenuHandler?: (e: Event) => void
 
@@ -407,6 +413,25 @@ export class SongCard extends LitElement {
     this.variant = 'library'
     this.editMode = false
     this.search = ''
+    this._melody = null
+  }
+
+  override willUpdate(changed: Map<string, unknown>): void {
+    if (changed.has('editMode') || changed.has('song')) void this._loadMelody()
+  }
+
+  /** The melody's range for the key picker, which is only on show in edit mode (and a setlist's song names its melody) */
+  async _loadMelody(): Promise<void> {
+    const song = this.song
+    const uuid = song?._setlistEntry?.songUuid
+    if (!this.editMode || !uuid) {
+      this._melody = null
+      return
+    }
+    const { getCurrentDB } = await import('../js/db.ts')
+    const record = await (await getCurrentDB()).getMelody(uuid)
+    // (the card may have been given another song while this was read)
+    if (this.song === song) this._melody = songMelody(song?.parsed?.metadata, record)
   }
 
   override render() {
@@ -590,8 +615,8 @@ export class SongCard extends LitElement {
           .value=${currentKey ?? '-'}
           .keys=${keys}
           .originalKey=${this.song?.originalKey ?? ''}
-          .range=${rangeOfMetadata(this.song?.parsed?.metadata)}
-          .rangeKey=${this.song?.originalKey ?? this.song?.parsed?.metadata?.key ?? ''}
+          .range=${this._melody?.range ?? rangeOfMetadata(this.song?.parsed?.metadata)}
+          .rangeKey=${this._melody?.rangeKey || (this.song?.originalKey ?? this.song?.parsed?.metadata?.key ?? '')}
           .editMode=${this.editMode}
           @key-selector:change=${this._handleKeyEditChange}
         ></key-selector>

@@ -98,6 +98,7 @@ how many beats (quarter notes) the song spends on its highest and its lowest not
 repeats and endings followed, a tie's notes added, cue notes left out ("Highest E5: 3½ beats; lowest D4: 1 beat").
 A high note held for a long time tires a singer more than one touched once. This is worked out from the stored score
 each time (`src/js/melody-analysis.ts`; the parse is cached by the score's hash), and is not written to the chart.
+The song cards' key pickers (a setlist's edit mode) look the melody up when the card is in edit mode, and not for a list as it is shown, so no score is parsed for a song whose picker is not on screen.
 The range itself is the chart's `x_chordless_range` if it has one (the person's, or what an import wrote), else the
 melody's own; the dialog and the key picker both use it.
 

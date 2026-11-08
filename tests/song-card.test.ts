@@ -9,8 +9,11 @@ import {
   SongCardKeyChangeEvent,
   type SongCardSong,
 } from '../src/components/song-card.ts'
+import { getCurrentDB } from '../src/js/db.ts'
 import { ChordProParser } from '../src/js/parser.ts'
+import { sampleRecord } from './melody-sample.ts'
 import { must } from './must.ts'
+import { wait } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -136,6 +139,40 @@ describe('song-card', () => {
       const badge = must(keyA?.querySelector('.range-badge'))
       expect(badge.classList.contains('tone-red')).to.equal(true)
       expect(badge.getAttribute('data-direction')).to.equal('high')
+    })
+
+    it('gives the key picker the range of the song’s melody when the chart says none', async () => {
+      const db = await getCurrentDB()
+      const uuid = `melody-${crypto.randomUUID()}`
+      await db.saveMelody(sampleRecord(uuid, 'G'))
+      try {
+        const parsed = new ChordProParser().parse('{title: Washed}\n{key: G}\n[G]Washed')
+        const inList = song({
+          currentKey: 'A',
+          originalKey: 'G',
+          parsed,
+          _setlistEntry: { songUuid: uuid },
+        })
+        const picker = async (card: SongCard) =>
+          must(card.shadowRoot?.querySelector<KeySelector>('key-selector'))
+        const card = await show({ song: inList, editMode: true })
+        for (let i = 0; i < 50 && !(await picker(card)).range; i++) await wait(20)
+        expect((await picker(card)).range).to.deep.equal({ low: 60, high: 67 })
+        expect((await picker(card)).rangeKey).to.equal('G')
+
+        // not in edit mode the picker is not on show, so nothing is looked up
+        const plain = await show({ song: inList })
+        await wait(50)
+        expect((await picker(plain)).range).to.equal(null)
+
+        // and a card given another song while the melody was read does not take its range
+        const moved = await show({ song: inList, editMode: true })
+        moved.song = song({ currentKey: 'A', originalKey: 'G', parsed })
+        await wait(100)
+        expect((await picker(moved)).range).to.equal(null)
+      } finally {
+        await db.deleteMelody(uuid, { remember: false })
+      }
     })
 
     it('has no range for the key picker when the chart says none, and takes the key from the chart if need be', async () => {
