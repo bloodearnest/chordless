@@ -62,16 +62,20 @@ export const TEST_SPACE = { name: 'Test Church', id: 'org-test-church' }
 /**
  * Fake setInterval/setTimeout (and their clears) that only move when the test says so, for code
  * that fades or waits in real time. `await clock.tick(ms)` runs every timer that falls due in
- * the next ms, in order, letting promises settle between them. Call `uninstall()` when done
- * (Mocha keeps its own references, so it is not affected while installed).
+ * the next ms, in order, letting promises settle between them; `tick(0)` lets what is queued now
+ * run (a `wait` or `settle` would never end while these are in). With `date`, `Date.now()` moves
+ * with the clock too, for code that measures how long something took. Call `uninstall()` when
+ * done (Mocha keeps its own references, so it is not affected while installed).
  */
-export function installFakeTimers() {
+export function installFakeTimers({ date = false }: { date?: boolean } = {}) {
   const real = {
     setInterval: window.setInterval,
     setTimeout: window.setTimeout,
     clearInterval: window.clearInterval,
     clearTimeout: window.clearTimeout,
   }
+  const realNow = Date.now
+  const startedAt = realNow()
   type Timer = { at: number; every: number | null; callback: () => void }
   const timers = new Map<number, Timer>()
   let now = 0
@@ -88,6 +92,7 @@ export function installFakeTimers() {
   fake.clearTimeout = fake.clearInterval = (id: number) => {
     timers.delete(id)
   }
+  if (date) Date.now = () => startedAt + now
 
   const settlePromises = async () => {
     for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -118,6 +123,7 @@ export function installFakeTimers() {
     },
     uninstall() {
       Object.assign(window, real)
+      Date.now = realNow
     },
   }
 }
