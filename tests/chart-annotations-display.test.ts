@@ -7,19 +7,13 @@ import { annotationsBySection } from '../src/js/annotations/shown.ts'
 import { noSources, putAnnotation } from '../src/js/annotations/store.ts'
 import type { ChartAnnotation } from '../src/js/data-types.ts'
 import { ChordProParser } from '../src/js/parser.ts'
+import { makeAnnotation } from './builders.ts'
 
 const { describe, it } = window
 
 const parsed = new ChordProParser().parse(
   '{title: A}\n{key: G}\n\n{comment: Verse}\n[G]Amazing [C]grace how sweet\n\n{comment: Chorus}\n[D]Oh how free'
 )
-
-const annotation = (id: string, anchor: ChartAnnotation['anchor']): ChartAnnotation => ({
-  id,
-  anchor,
-  body: { kind: 'text', text: id },
-  modified: '',
-})
 
 async function show(annotations: ReturnType<typeof annotationsBySection>, hideMode?: string) {
   const display = await fixture<SongDisplay>(html`<song-display></song-display>`)
@@ -42,7 +36,7 @@ describe('annotations on a chart', () => {
   it('sit right of a section’s title, in the title row', async () => {
     const sources = putAnnotation(
       noSources(),
-      annotation('softly', sectionAnchor(parsed.sections, 1)),
+      makeAnnotation('softly', sectionAnchor(parsed.sections, 1)),
       'shared'
     )
     const { sections } = await show(annotationsBySection(parsed.sections, sources))
@@ -60,7 +54,7 @@ describe('annotations on a chart', () => {
     const plain = new ChordProParser().parse('{title: A}\n{key: G}\n\n[G]Amazing grace')
     const sources = putAnnotation(
       noSources(),
-      annotation('intro', sectionAnchor(plain.sections, 0)),
+      makeAnnotation('intro', sectionAnchor(plain.sections, 0)),
       'private'
     )
     const display = await fixture<SongDisplay>(html`<song-display></song-display>`)
@@ -77,7 +71,7 @@ describe('annotations on a chart', () => {
   it('cut a word list in the middle of a segment, keeping the lyrics whole', async () => {
     const sources = putAnnotation(
       noSources(),
-      annotation('here', textAnchor(parsed.sections, 0, 0, 14)),
+      makeAnnotation('here', textAnchor(parsed.sections, 0, 0, 14)),
       'private'
     )
     const { sections } = await show(annotationsBySection(parsed.sections, sources))
@@ -92,7 +86,7 @@ describe('annotations on a chart', () => {
   it('are still there when the chords are hidden', async () => {
     const sources = putAnnotation(
       noSources(),
-      annotation('build', textAnchor(parsed.sections, 0, 0, 8)),
+      makeAnnotation('build', textAnchor(parsed.sections, 0, 0, 8)),
       'private'
     )
     const { sections } = await show(annotationsBySection(parsed.sections, sources), 'chords')
@@ -104,10 +98,10 @@ describe('annotations on a chart', () => {
   })
 
   it('for the whole song, or whose place is gone, show above the sections, the latter marked', async () => {
-    let sources = putAnnotation(noSources(), annotation('slowly', { kind: 'song' }), 'private')
+    let sources = putAnnotation(noSources(), makeAnnotation('slowly', { kind: 'song' }), 'private')
     sources = putAnnotation(
       sources,
-      annotation('lost', { kind: 'section', label: 'Bridge', nth: 0 }),
+      makeAnnotation('lost', { kind: 'section', label: 'Bridge', nth: 0 }),
       'private'
     )
     const { display } = await show(annotationsBySection(parsed.sections, sources))
@@ -128,7 +122,7 @@ describe('annotations on a chart', () => {
       let sources = noSources()
       for (const [offset, words] of annotations) {
         const made = {
-          ...annotation(words, textAnchor(parsed.sections, 0, 0, offset)),
+          ...makeAnnotation(words, textAnchor(parsed.sections, 0, 0, offset)),
           body: { kind: 'text', text: words },
         } as ChartAnnotation
         sources = putAnnotation(sources, made, 'private')
@@ -199,7 +193,7 @@ describe('annotations on a chart', () => {
       let sources = noSources()
       for (const [offset, words] of spots) {
         const made = {
-          ...annotation(words, textAnchor(chart.sections, 0, 0, offset)),
+          ...makeAnnotation(words, textAnchor(chart.sections, 0, 0, offset)),
           body: { kind: 'text', text: words },
         } as ChartAnnotation
         sources = putAnnotation(sources, made, 'private')
@@ -439,12 +433,12 @@ describe('annotations on a chart', () => {
     it('asks for the editor on an annotation that is tapped, with its id, and does not collapse the section', async () => {
       let sources = putAnnotation(
         noSources(),
-        annotation('spot', textAnchor(labelled.sections, 0, 0, 8)),
+        makeAnnotation('spot', textAnchor(labelled.sections, 0, 0, 8)),
         'private'
       )
       sources = putAnnotation(
         sources,
-        annotation('head', sectionAnchor(labelled.sections, 0)),
+        makeAnnotation('head', sectionAnchor(labelled.sections, 0)),
         'private'
       )
       const { root, section, requests } = await editing(sources)
@@ -464,7 +458,7 @@ describe('annotations on a chart', () => {
     it('does nothing for a hold or a tap when not editing', async () => {
       const sources = putAnnotation(
         noSources(),
-        annotation('spot', textAnchor(labelled.sections, 0, 0, 8)),
+        makeAnnotation('spot', textAnchor(labelled.sections, 0, 0, 8)),
         'private'
       )
       const { section, root, requests } = await editing(sources)
@@ -480,7 +474,11 @@ describe('annotations on a chart', () => {
     it('has a place in the song’s strip for an annotation on the whole song, and one to start it', async () => {
       document.body.classList.add('edit-mode')
       try {
-        const sources = putAnnotation(noSources(), annotation('whole', { kind: 'song' }), 'private')
+        const sources = putAnnotation(
+          noSources(),
+          makeAnnotation('whole', { kind: 'song' }),
+          'private'
+        )
         const { display, requests } = await editing(sources)
         await display.updateComplete
         const strip = display.shadowRoot as ShadowRoot
@@ -500,7 +498,11 @@ describe('annotations on a chart', () => {
     })
 
     it('leaves a song’s strip alone when not editing: taps do nothing, and with no annotations there is none', async () => {
-      const sources = putAnnotation(noSources(), annotation('whole', { kind: 'song' }), 'private')
+      const sources = putAnnotation(
+        noSources(),
+        makeAnnotation('whole', { kind: 'song' }),
+        'private'
+      )
       const { display, requests } = await editing(sources)
       ;(
         (display.shadowRoot as ShadowRoot).querySelector(

@@ -16,7 +16,8 @@ import {
 } from '../src/js/annotations/anchor.ts'
 import { healSources } from '../src/js/annotations/heal.ts'
 import { noSources } from '../src/js/annotations/store.ts'
-import type { AnnotationAnchor, ChartAnnotation, ChartSection } from '../src/js/data-types.ts'
+import type { AnnotationAnchor, ChartSection } from '../src/js/data-types.ts'
+import { makeAnnotation } from './builders.ts'
 
 /** A section of lines, each a list of lyric pieces (a chord over each) */
 const section = (label: string | null, ...lines: (string | string[])[]): ChartSection => ({
@@ -43,13 +44,6 @@ const placed = (sections: ChartSection[], anchor: AnnotationAnchor) => {
 }
 const sure = (sections: ChartSection[], anchor: AnnotationAnchor) =>
   resolveAnchor(sections, anchor).sure
-
-const annotation = (id: string, anchor: AnnotationAnchor): ChartAnnotation => ({
-  id,
-  anchor,
-  body: { kind: 'text', text: id },
-  modified: '',
-})
 
 test('a spot is remembered by its lyrics, not by its chords, with a snapshot of its line', () => {
   const anchor = textAnchor(chart, 0, 0, 8)
@@ -87,8 +81,8 @@ test('a song annotation is the song', () => {
 
 test('an unchanged chart leaves nothing to heal', () => {
   const found = placeAnnotations(chart, [
-    annotation('a', textAnchor(chart, 0, 1, 4)),
-    annotation('b', sectionAnchor(chart, 1)),
+    makeAnnotation('a', textAnchor(chart, 0, 1, 4)),
+    makeAnnotation('b', sectionAnchor(chart, 1)),
   ])
   assert.deepEqual(
     found.map(each => each.healed),
@@ -215,7 +209,7 @@ test('a line that is gone falls back to its section, not for sure, and is found 
   assert.deepEqual(placed(rewritten, anchor), { place: 'section', section: 1 })
   assert.equal(sure(rewritten, anchor), false)
   // (nothing is rebuilt from a guess, so what is kept still finds the line when it is restored)
-  assert.equal(placeAnnotations(rewritten, [annotation('a', anchor)])[0]?.healed, undefined)
+  assert.equal(placeAnnotations(rewritten, [makeAnnotation('a', anchor)])[0]?.healed, undefined)
   assert.deepEqual(placed(chart, anchor), { place: 'text', section: 1, line: 0, offset: 3 })
 })
 
@@ -244,7 +238,7 @@ test('an annotation made before snapshots is found by the text around it, and he
     ...chart.slice(1),
   ]
   assert.deepEqual(placed(added, old), { place: 'text', section: 0, line: 1, offset: 8 })
-  const [found] = placeAnnotations(added, [annotation('a', old)])
+  const [found] = placeAnnotations(added, [makeAnnotation('a', old)])
   assert.deepEqual(found?.healed, textAnchor(added, 0, 1, 8))
   // and a legacy anchor that does not hold anywhere is the section, not for sure
   assert.deepEqual(placed([section('Verse', 'nothing alike')], old), {
@@ -275,7 +269,10 @@ test('healSources rebuilds only the kinds it is asked to, and says nothing when 
     section('Verse', 'A new first line', ['Amazing ', 'grace how sweet'], 'the sound that saved'),
     ...chart.slice(1),
   ]
-  const sources = { shared: [annotation('s', anchor) as never], private: [annotation('p', anchor)] }
+  const sources = {
+    shared: [makeAnnotation('s', anchor) as never],
+    private: [makeAnnotation('p', anchor)],
+  }
   const privateOnly = healSources(added, sources, ['private'])
   assert.equal(privateOnly?.shared, sources.shared)
   assert.equal(((privateOnly?.private[0]?.anchor ?? {}) as { line?: number }).line, 2)
@@ -347,8 +344,8 @@ test('an approximate spot snaps to the nearest start of a word or segment', () =
 
 test('every annotation is placed, in the order given', () => {
   const found = placeAnnotations(chart, [
-    annotation('a', sectionAnchor(chart, 1)),
-    annotation('b', { kind: 'song' }),
+    makeAnnotation('a', sectionAnchor(chart, 1)),
+    makeAnnotation('b', { kind: 'song' }),
   ])
   assert.deepEqual(
     found.map(({ annotation: each, placement }) => [each.id, placement.place]),
@@ -433,7 +430,10 @@ test('healing keeps the annotations that did not move as they are', () => {
     section('Verse', 'A new first line', ['Amazing ', 'grace how sweet'], 'the sound that saved'),
     ...chart.slice(1),
   ]
-  const sources = { shared: [], private: [annotation('moved', anchor), annotation('still', still)] }
+  const sources = {
+    shared: [],
+    private: [makeAnnotation('moved', anchor), makeAnnotation('still', still)],
+  }
   const healed = healSources(added, sources, ['private'])
   assert.equal(healed?.private[1], sources.private[1])
   assert.notEqual(healed?.private[0], sources.private[0])

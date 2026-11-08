@@ -17,31 +17,26 @@ import {
 } from '../src/js/annotations/store.ts'
 import type { ChartAnnotation, Setlist, SetlistEntry } from '../src/js/data-types.ts'
 import { setlistContentHash } from '../src/js/sync/setlist-hash.ts'
+import { makeAnnotation } from './builders.ts'
 
-const annotation = (id: string, text = id): ChartAnnotation => ({
-  id,
-  anchor: { kind: 'song' },
-  body: { kind: 'text', text },
-  modified: '2026-11-01T00:00:00Z',
-})
 const ink: ChartAnnotation = {
-  ...annotation('ink'),
+  ...makeAnnotation('ink'),
   body: { kind: 'ink', strokes: [[0, 0, 1, 1]], w: 10, h: 10 },
 }
 
 test('an annotation goes where its kind says, and moves between kinds keeping its id', () => {
-  let s = putAnnotation(noSources(), annotation('a'), 'private')
+  let s = putAnnotation(noSources(), makeAnnotation('a'), 'private')
   assert.deepEqual(
     s.private.map(each => each.id),
     ['a']
   )
-  s = putAnnotation(s, annotation('a', 'edited'), 'shared')
+  s = putAnnotation(s, makeAnnotation('a', { kind: 'song' }, 'edited'), 'shared')
   assert.deepEqual(s.private, [])
   assert.deepEqual(
     s.shared.map(each => each.body),
     [{ kind: 'text', text: 'edited' }]
   )
-  s = putAnnotation(s, annotation('a'), 'private')
+  s = putAnnotation(s, makeAnnotation('a'), 'private')
   assert.deepEqual(s.shared, [])
   assert.deepEqual(
     s.private.map(each => each.id),
@@ -50,8 +45,8 @@ test('an annotation goes where its kind says, and moves between kinds keeping it
 })
 
 test('the place an annotation is not moved from is left as it was (same array), so only changes are written', () => {
-  const before = putAnnotation(noSources(), annotation('a'), 'private')
-  const after = putAnnotation(before, annotation('b'), 'shared')
+  const before = putAnnotation(noSources(), makeAnnotation('a'), 'private')
+  const after = putAnnotation(before, makeAnnotation('b'), 'shared')
   assert.deepEqual(changedSources(before, after), ['shared'])
   assert.deepEqual(changedSources(before, before), [])
   assert.deepEqual(changedSources(after, removeAnnotation(after, 'a')), ['private'])
@@ -61,15 +56,15 @@ test('shared annotations are text only: a drawing is refused, and stays private'
   assert.throws(() => putAnnotation(noSources(), ink, 'shared'))
   assert.doesNotThrow(() => putAnnotation(noSources(), ink, 'private'))
   assert.equal(kindAllowed('shared', ink, true), false)
-  assert.equal(kindAllowed('shared', annotation('a'), false), false)
-  assert.equal(kindAllowed('shared', annotation('a'), true), true)
+  assert.equal(kindAllowed('shared', makeAnnotation('a'), false), false)
+  assert.equal(kindAllowed('shared', makeAnnotation('a'), true), true)
   assert.equal(kindAllowed('private', ink, false), true)
 })
 
 test('every annotation shows once, with the kind it is kept as', () => {
   const s = {
-    shared: [annotation('a') as never],
-    private: [annotation('a'), annotation('b')],
+    shared: [makeAnnotation('a') as never],
+    private: [makeAnnotation('a'), makeAnnotation('b')],
   }
   assert.deepEqual(
     allAnnotations(s).map(({ annotation: each, kind }) => [each.id, kind]),
@@ -104,7 +99,7 @@ test('an entry with no shared annotations is left as it was, so its hash does no
   const before = JSON.stringify(entry)
   withAnnotations(entry, [])
   assert.equal(JSON.stringify(entry), before)
-  withAnnotations(entry, [annotation('a') as never])
+  withAnnotations(entry, [makeAnnotation('a') as never])
   assert.equal(entry.annotations?.length, 1)
   withAnnotations(entry, [])
   assert.equal(JSON.stringify(entry), before)
@@ -121,7 +116,7 @@ test('a shared annotation changes the setlist’s content hash, so it syncs', ()
   } as SetlistEntry
   const setlist = { id: 'x', date: '2026-11-01', songs: [entry] } as unknown as Setlist
   const before = setlistContentHash(setlist)
-  withAnnotations(entry, [annotation('a') as never])
+  withAnnotations(entry, [makeAnnotation('a') as never])
   assert.notEqual(setlistContentHash(setlist), before)
 })
 

@@ -7,16 +7,11 @@ import { test } from 'node:test'
 import { sectionAnchor, textAnchor } from '../src/js/annotations/anchor.ts'
 import { annotationsBySection, attachAnnotations } from '../src/js/annotations/shown.ts'
 import { noSources, putAnnotation } from '../src/js/annotations/store.ts'
-import type { ChartAnnotation, ChartLine, ChartSection } from '../src/js/data-types.ts'
+import type { ChartLine, ChartSection } from '../src/js/data-types.ts'
+import { makeAnnotation } from './builders.ts'
 
 const line = (...parts: [string, string][]): ChartLine => ({
   segments: parts.map(([chord, lyrics]) => ({ chord, lyrics })),
-})
-const annotation = (id: string, anchor: ChartAnnotation['anchor'], text = id): ChartAnnotation => ({
-  id,
-  anchor,
-  body: { kind: 'text', text },
-  modified: '',
 })
 const shown = (id: string, shared = false) => ({ id, text: id, shared })
 const sections: ChartSection[] = [
@@ -103,10 +98,14 @@ test('a blank line takes an annotation on a segment of its own, and the chart’
 })
 
 test('annotations are placed on titles, lines, the song and (when their place is gone) the song, marked', () => {
-  let s = putAnnotation(noSources(), annotation('title', sectionAnchor(sections, 1)), 'shared')
-  s = putAnnotation(s, annotation('spot', textAnchor(sections, 1, 1, 0)), 'private')
-  s = putAnnotation(s, annotation('whole', { kind: 'song' }), 'private')
-  s = putAnnotation(s, annotation('lost', { kind: 'section', label: 'Bridge', nth: 0 }), 'private')
+  let s = putAnnotation(noSources(), makeAnnotation('title', sectionAnchor(sections, 1)), 'shared')
+  s = putAnnotation(s, makeAnnotation('spot', textAnchor(sections, 1, 1, 0)), 'private')
+  s = putAnnotation(s, makeAnnotation('whole', { kind: 'song' }), 'private')
+  s = putAnnotation(
+    s,
+    makeAnnotation('lost', { kind: 'section', label: 'Bridge', nth: 0 }),
+    'private'
+  )
   const placed = annotationsBySection(sections, s)
   assert.deepEqual(placed.sections[1].title, [shown('title', true)])
   assert.deepEqual(placed.sections[1].lines, [{ line: 1, offset: 0, annotation: shown('spot') }])
@@ -115,11 +114,11 @@ test('annotations are placed on titles, lines, the song and (when their place is
 })
 
 test('annotations can be left out by who they are from, and drawings are not drawn yet', () => {
-  let s = putAnnotation(noSources(), annotation('team', { kind: 'song' }), 'shared')
-  s = putAnnotation(s, annotation('mine', { kind: 'song' }), 'private')
+  let s = putAnnotation(noSources(), makeAnnotation('team', { kind: 'song' }), 'shared')
+  s = putAnnotation(s, makeAnnotation('mine', { kind: 'song' }), 'private')
   s = putAnnotation(
     s,
-    { ...annotation('ink', { kind: 'song' }), body: { kind: 'ink', strokes: [], w: 1, h: 1 } },
+    { ...makeAnnotation('ink', { kind: 'song' }), body: { kind: 'ink', strokes: [], w: 1, h: 1 } },
     'private'
   )
   assert.deepEqual(
