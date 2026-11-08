@@ -7,7 +7,6 @@ import {
 import type { AppModal } from '../components/app-modal.ts'
 import { CapoChangeEvent, type CapoSelector } from '../components/capo-selector.ts'
 import { KeyChangeEvent, type KeySelector } from '../components/key-selector.ts'
-import type { MelodySheet } from '../components/melody-sheet.ts'
 import {
   type MusicalMetadataDisplay,
   SongSettingsClickEvent,
@@ -39,7 +38,7 @@ import { leaderName } from './leaders.ts'
 import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
 import { LiveSyncStatusEvent } from './live-sync-status.ts'
 import type { Melody } from './melody.ts'
-import { melodyOfRecord } from './melody-analysis.ts'
+import { melodyWithKey, showMelody } from './melody-shown.ts'
 import { goTo, setPageTitle } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
@@ -1465,9 +1464,10 @@ export class SetlistPage {
 
   /** The song's melody and the key it is written in, or null when it has none (docs/MELODY.md) */
   async melodyOf(song: RuntimeSong): Promise<{ melody: Melody; key: string } | null> {
-    const record = await this._database().getMelody(song._setlistEntry.songUuid)
-    const melody = record && melodyOfRecord(record)
-    return melody && record ? { melody, key: record.key || song.originalKey || '' } : null
+    return melodyWithKey(
+      await this._database().getMelody(song._setlistEntry.songUuid),
+      song.originalKey
+    )
   }
 
   /**
@@ -1495,26 +1495,10 @@ export class SetlistPage {
     const song = this.songs[index]
     const content = this.root.querySelector<HTMLElement>(`#song-${index} .song-content`)
     if (!song || !content) return
-    const display = content.querySelector<HTMLElement>('song-display')
-    const sheet = content.querySelector<MelodySheet>('melody-sheet')
-    const lyrics = () => {
-      if (sheet) sheet.hidden = true
-      if (display) display.style.display = ''
-    }
-    if (!this._melodyOn.has(index)) return lyrics()
-    const found = await this.melodyOf(song)
-    if (!found) {
-      this._melodyOn.delete(index)
-      return lyrics()
-    }
-    await import('../components/melody-sheet.ts')
-    const shown = sheet ?? document.createElement('melody-sheet')
-    shown.melody = found.melody
-    shown.melodyKey = found.key
-    shown.songKey = song.currentKey ?? found.key
-    shown.hidden = false
-    if (!sheet) content.appendChild(shown)
-    if (display) display.style.display = 'none'
+    const found = this._melodyOn.has(index) ? await this.melodyOf(song) : null
+    // (a song with no melody stays in its lyrics)
+    if (!found) this._melodyOn.delete(index)
+    await showMelody(content, found && { ...found, songKey: song.currentKey ?? found.key })
   }
 
   _updateSongDisplayCapo(songIndex: number, capoValue: unknown) {

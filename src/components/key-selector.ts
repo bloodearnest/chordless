@@ -1,3 +1,6 @@
+import { rangeOfMetadata } from '../js/chart-range.ts'
+import type { ChartMetadata, MelodyRecord } from '../js/data-types.ts'
+import { songMelody } from '../js/melody-analysis.ts'
 import { noteName, semitonesBetween } from '../js/pitch.ts'
 import { describeRange, type NoteRange, octaveNearGreen, rangeStatus } from '../js/voice-range.ts'
 import { OptionPicker, type PickerOption } from './option-picker.ts'
@@ -47,6 +50,9 @@ export class KeySelector extends OptionPicker<string> {
   declare range: NoteRange | null
   declare rangeKey: string
 
+  /** Counts the songs asked for by `showRangeOf`, so an answer for an earlier one is dropped */
+  #asked = 0
+
   constructor() {
     super()
     this.label = 'Key'
@@ -55,6 +61,28 @@ export class KeySelector extends OptionPicker<string> {
     this.originalKey = ''
     this.range = null
     this.rangeKey = ''
+  }
+
+  /**
+   * Show a song's range: its chart's (in `chartKey`), or, when the chart has none, its melody's,
+   * which `melody` looks up. Asking again, for this song or another, drops an answer still to come.
+   */
+  showRangeOf(
+    metadata: ChartMetadata | undefined,
+    chartKey: string,
+    melody: () => Promise<MelodyRecord | undefined>
+  ): void {
+    const asked = ++this.#asked
+    this.range = rangeOfMetadata(metadata)
+    this.rangeKey = chartKey
+    if (this.range) return
+    void melody().then(record => {
+      const found = songMelody(metadata, record)
+      if (found && asked === this.#asked) {
+        this.range = found.range
+        this.rangeKey = found.rangeKey
+      }
+    })
   }
 
   override _displayValue(): string {

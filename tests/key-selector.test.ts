@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import '../src/components/key-selector.ts'
+import { sampleRecord } from './melody-sample.ts'
 import { must } from './must.ts'
 import { A11Y, settle } from './test-helpers.ts'
 
@@ -308,5 +309,42 @@ describe('key-selector, with no key', () => {
     expect(selector._displayValue()).to.equal('-')
     selector.value = 'G'
     expect(selector._displayValue()).to.equal('G')
+  })
+  describe('the range of a song', () => {
+    let selector: any
+    async function setUp() {
+      selector = document.createElement('key-selector')
+      document.body.appendChild(selector)
+      await selector.updateComplete
+    }
+    afterEach(() => selector?.remove())
+
+    it("is the chart's, with no melody looked up", async () => {
+      await setUp()
+      let looked = false
+      selector.showRangeOf({ key: 'G', x_chordless_range: 'D4-E5' }, 'G', async () => {
+        looked = true
+        return undefined
+      })
+      expect(selector.range).to.deep.equal({ low: 62, high: 76 })
+      expect(selector.rangeKey).to.equal('G')
+      expect(looked).to.equal(false)
+    })
+
+    it("is the melody's when the chart has none, and an answer for a song since left is dropped", async () => {
+      await setUp()
+      let answer: (record: unknown) => void = () => {}
+      selector.showRangeOf({ key: 'C' }, 'C', () => new Promise(resolve => (answer = resolve)))
+      expect(selector.range).to.equal(null)
+      const first = answer
+      // another song, also with no range, whose melody comes first
+      selector.showRangeOf({ key: 'D' }, 'D', async () => sampleRecord('song-d', 'D'))
+      await settle()
+      expect(selector.range).to.deep.equal({ low: 60, high: 67 })
+      expect(selector.rangeKey).to.equal('D')
+      first(sampleRecord('song-c', 'C'))
+      await settle()
+      expect(selector.rangeKey).to.equal('D')
+    })
   })
 })
