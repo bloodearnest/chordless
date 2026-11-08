@@ -53,4 +53,76 @@ describe('.mxl', () => {
     assert.equal(await readMelodyFile(new TextEncoder().encode(SCORE)), SCORE)
     assert.equal(await readMelodyFile(new TextEncoder().encode(`\uFEFF${SCORE}`)), SCORE)
   })
+
+  /** A zip of these files, written the plain way: each entry stored (method 0) unless it says another */
+  function zipOf(files: { name: string; data: Uint8Array; method?: number }[]): Uint8Array {
+    const name = (file: { name: string }) => new TextEncoder().encode(file.name)
+    const locals = files.map(file => {
+      const header = new DataView(new ArrayBuffer(30))
+      header.setUint32(0, 0x04034b50, true)
+      header.setUint16(8, file.method ?? 0, true)
+      header.setUint32(18, file.data.length, true)
+      header.setUint32(22, file.data.length, true)
+      header.setUint16(26, name(file).length, true)
+      return Buffer.concat([new Uint8Array(header.buffer), name(file), file.data])
+    })
+    const centrals: Buffer[] = []
+    let offset = 0
+    for (const [i, file] of files.entries()) {
+      const header = new DataView(new ArrayBuffer(46))
+      header.setUint32(0, 0x02014b50, true)
+      header.setUint16(10, file.method ?? 0, true)
+      header.setUint32(20, file.data.length, true)
+      header.setUint32(24, file.data.length, true)
+      header.setUint16(28, name(file).length, true)
+      header.setUint32(42, offset, true)
+      centrals.push(Buffer.concat([new Uint8Array(header.buffer), name(file)]))
+      offset += (locals[i] as Buffer).length
+    }
+    const central = Buffer.concat(centrals)
+    const end = new DataView(new ArrayBuffer(22))
+    end.setUint32(0, 0x06054b50, true)
+    end.setUint16(10, files.length, true)
+    end.setUint32(12, central.length, true)
+    end.setUint32(16, offset, true)
+    return new Uint8Array(Buffer.concat([...locals, central, new Uint8Array(end.buffer)]))
+  }
+
+  it('reads a score stored without compression, and finds one when container.xml is missing', async () => {
+    const data = new TextEncoder().encode(SCORE)
+    assert.equal(await readMxl(zipOf([{ name: 'a/b.musicxml', data }])), SCORE)
+  })
+
+  it('has no score in a zip with none, with one it cannot unpack, or with one too large', async () => {
+    const data = new TextEncoder().encode(SCORE)
+    // (only container.xml: a file under META-INF is never the score)
+    assert.equal(await readMxl(zipOf([{ name: 'META-INF/container.xml', data }])), null)
+    assert.equal(await readMxl(zipOf([{ name: 'score.xml', data, method: 99 }])), null)
+    assert.equal(
+      await readMxl(zipOf([{ name: 'score.xml', data: new Uint8Array(17 * 1024 * 1024) }])),
+      null
+    )
+  })
+
+  it('has no score in a zip whose directory lies about where things are', async () => {
+    const good = bytes(DEFLATED)
+    const view = (b: Uint8Array) => new DataView(b.buffer)
+    const end = good.length - 22
+    const centralAt = view(good).getUint32(end + 16, true)
+    // the directory starts beyond the file
+    const beyond = good.slice()
+    view(beyond).setUint32(end + 16, good.length + 100, true)
+    assert.equal(await readMxl(beyond), null)
+    // a name longer than the file
+    const longName = good.slice()
+    view(longName).setUint16(centralAt + 28, 0xffff, true)
+    assert.equal(await readMxl(longName), null)
+    // every file starts beyond the file
+    const lost = good.slice()
+    for (let at = centralAt, i = 0; i < 3; i++) {
+      view(lost).setUint32(at + 42, good.length + 100, true)
+      at += 46 + view(good).getUint16(at + 28, true)
+    }
+    assert.equal(await readMxl(lost), null)
+  })
 })

@@ -39,6 +39,16 @@ describe('noting refs', () => {
     assert.equal(await state.owns(ref), true)
   })
 
+  test('reads go straight through, as text and as bytes', async () => {
+    const { space, direct } = await made()
+    const ref = await direct('Amazing Grace')
+    assert.equal(space.bytes, true)
+    assert.equal(new TextDecoder().decode(await space.readBytes(ref)), 'Amazing Grace text')
+    const read = await space.readManyBytes([ref, 'nothing'])
+    assert.equal(new TextDecoder().decode(read[0] as Uint8Array), 'Amazing Grace text')
+    assert.equal(read[1], null)
+  })
+
   test('an inventory notes every live file in the space, and none outside it', async () => {
     const { state, space, direct, other } = await made()
     const mine = await direct('A')
