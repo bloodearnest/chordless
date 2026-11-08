@@ -4,7 +4,7 @@
  * song-filter.test.ts, view-teardown.test.ts and the Playwright tests.)
  */
 
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import type { AppHeader } from '../src/components/app-header.ts'
 import type { AppModal } from '../src/components/app-modal.ts'
 import { KeyChangeEvent, type KeySelector } from '../src/components/key-selector.ts'
@@ -23,7 +23,7 @@ import '../src/js/views/library-view.ts'
 import type { LibraryView } from '../src/js/views/library-view.ts'
 import { makeSong } from './builders.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, settle, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, before, beforeEach, afterEach } = window
 
@@ -62,17 +62,14 @@ describe('the library view, with a song open', () => {
   const prefs = () => getSongUserPrefs(song.id, db.spaceId)
 
   /** Wait for something the view does a step after the last thing awaited */
-  async function until(condition: () => unknown, what: string) {
-    for (let i = 0; i < 100 && !condition(); i++) await wait(20)
-    expect(condition(), what).to.be.ok
-  }
+  const until = (condition: () => unknown, what: string) =>
+    waitUntil(condition, what, { interval: 20, timeout: 1500 })
 
   async function open(uuid = song.uuid) {
     view = document.createElement('library-view')
     view.route = { name: 'songs', songUuid: uuid }
     outlet.append(view)
     await until(() => sections().length === 3, 'the song to be shown')
-    await wait(50)
   }
 
   /** Turn edit mode on or off the way its button does */
@@ -319,11 +316,11 @@ describe('the library view, with a song open', () => {
       it('has no button for a song with no melody, and none once the song is closed', async () => {
         await db.deleteMelody(song.uuid, { remember: false })
         await open()
-        await wait(100)
+        await nothingFor()
         expect(toggle() ?? null).to.equal(null)
         await db.saveMelody(sampleRecord(song.uuid, 'G'))
         view.route = { name: 'songs' }
-        await wait(100)
+        await nothingFor()
         expect(toggle() ?? null).to.equal(null)
       })
     })
@@ -364,7 +361,7 @@ describe('the library view, with a song open', () => {
         view = document.createElement('library-view')
         view.route = { name: 'songs' }
         outlet.append(view)
-        await wait(100)
+        await view.updateComplete
         infoDialog().dispatchEvent(new SongRangeChangedEvent(song.id, 'D4-E5'))
       })
 
@@ -383,7 +380,7 @@ describe('the library view, with a song open', () => {
 
       control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('A'))
       await until(() => keyOf() === 'A', 'the song to be shown in A')
-      await wait(100)
+      await until(() => sections()[2]?.isHidden, 'the sections as they were set')
 
       expect(sections().map(s => [s.hideMode, s.isHidden])).to.deep.equal([
         ['none', false],
@@ -419,13 +416,19 @@ describe('the library view, with a song open', () => {
       section(1).dispatchEvent(new SectionActionEvent(0, 1, 'show-lyrics'))
       section(2).dispatchEvent(new SectionActionEvent(0, 2, 'show-none'))
       control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('A'))
-      await until(() => view.querySelector('song-display'), 'the song')
-      await wait(100)
+      await until(
+        () =>
+          view.querySelector<HTMLElement & { parsed: { metadata: { key: string } } }>(
+            'song-display'
+          )?.parsed.metadata.key === 'A',
+        'the song in A'
+      )
+      // (the song is drawn again in A, and its sections are put back as they were set)
+      await until(() => sections()[2]?.isHidden, 'the sections as they were set')
 
       toggleEditMode()
       await until(() => prefs()?.sectionDefaults, 'the sections to be saved')
-      await wait(100)
-      expect(must(await db.getSong(song.uuid)).key).to.equal('A')
+      await until(async () => (await db.getSong(song.uuid))?.key === 'A', 'the key to be saved')
 
       expect(prefs()?.sectionDefaults).to.deep.equal({
         1: { hideMode: 'chords', isCollapsed: false, isHidden: false },
@@ -500,8 +503,7 @@ describe('the library view, with a song open', () => {
       await answer(true)
 
       await until(() => sections()[1]?.hideMode === 'none', 'the section to be shown as it starts')
-      await wait(100)
-      expect(prefs()?.sectionDefaults).to.equal(undefined)
+      await until(() => prefs()?.sectionDefaults === undefined, 'the saved sections to go')
     })
 
     it('changes nothing when it is not confirmed', async () => {
@@ -518,7 +520,7 @@ describe('the library view, with a song open', () => {
 
       control('library-reset-button').click()
       await answer(false)
-      await wait(100)
+      await nothingFor()
 
       expect(
         view.querySelector<HTMLElement & { parsed: { metadata: { key: string } } }>('song-display')
@@ -531,7 +533,7 @@ describe('the library view, with a song open', () => {
     it('ignores a key change with no key', async () => {
       await open()
       control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent(''))
-      await wait(50)
+      await nothingFor()
       expect(
         view.querySelector<HTMLElement & { parsed: { metadata: { key: string } } }>('song-display')
           ?.parsed.metadata.key
@@ -552,14 +554,23 @@ describe('the library view, with a song open', () => {
       await open()
       toggleEditMode()
       control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('A'))
-      await wait(100)
+      await until(
+        () =>
+          view.querySelector<HTMLElement & { parsed: { metadata: { key: string } } }>(
+            'song-display'
+          )?.parsed.metadata.key === 'A',
+        'the song in A'
+      )
       const real = db.constructor.prototype.updateSong
+      let tried = false
       db.constructor.prototype.updateSong = async () => {
+        tried = true
         throw new Error('disk full')
       }
       try {
         toggleEditMode()
-        await wait(200)
+        await until(() => tried, 'the song to be saved')
+        await settle()
       } finally {
         db.constructor.prototype.updateSong = real
       }
@@ -574,7 +585,8 @@ describe('the library view, with a song open', () => {
       await until(() => modal.open, 'the question to be asked')
       await modal.updateComplete
       must(modal.shadowRoot?.querySelector<HTMLElement>('.modal-btn-confirm')).click()
-      await wait(200)
+      await until(() => !modal.open, 'the question to be answered')
+      await until(() => sections().length === 3, 'the song to be shown again')
       expect(sections()).to.have.length(3)
     })
 
@@ -587,23 +599,31 @@ describe('the library view, with a song open', () => {
       await until(() => modal.open, 'the question to be asked')
       await modal.updateComplete
       must(modal.shadowRoot?.querySelector<HTMLElement>('.modal-btn-confirm')).click()
-      await wait(200)
-      expect(control<KeySelector>('library-key-selector').value).to.equal('D')
+      await until(
+        () => control<KeySelector>('library-key-selector').value === 'D',
+        'the key to be the original'
+      )
     })
 
     it('does nothing when the song is closed while the reset is being asked', async () => {
       await open()
       toggleEditMode()
       control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('A'))
-      await wait(100)
+      await until(
+        () =>
+          view.querySelector<HTMLElement & { parsed: { metadata: { key: string } } }>(
+            'song-display'
+          )?.parsed.metadata.key === 'A',
+        'the song in A'
+      )
       control('library-reset-button').click()
       const modal = control<AppModal>('library-reset-confirm-modal')
       await until(() => modal.open, 'the question to be asked')
       view.route = { name: 'songs' }
-      await wait(100)
+      await until(() => !document.body.classList.contains('edit-mode'), 'the song to be closed')
       await modal.updateComplete
       must(modal.shadowRoot?.querySelector<HTMLElement>('.modal-btn-confirm')).click()
-      await wait(100)
+      await nothingFor()
       expect(control<KeySelector>('library-key-selector').value).to.equal('A')
     })
   })

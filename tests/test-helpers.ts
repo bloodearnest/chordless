@@ -31,10 +31,20 @@ export function suppressConsoleLogs() {
   })
 }
 
-/** Wait ms (0 lets queued tasks and promise callbacks run) */
+/**
+ * Wait ms (0 lets queued tasks and promise callbacks run). For a fake's own delay (a slow load):
+ * what a test waits for is waited for with `waitUntil`, and what must not happen with `nothingFor`.
+ */
 export const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
 export const settle = () => wait(0)
+
+/**
+ * Time for what should not happen to have happened, if it were going to: a test that something
+ * does not happen can only give it a while and look. Anything that should happen is waited for
+ * with `waitUntil` (docs/TESTING.md), never with this.
+ */
+export const nothingFor = (ms = 100) => wait(ms)
 
 /** A unique name, so tests sharing the browser's IndexedDB do not meet each other's data */
 export const uniqueName = () => crypto.randomUUID()

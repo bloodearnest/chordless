@@ -4,11 +4,11 @@ import { SongRangeChangeEvent } from '../src/components/song-info.ts'
 import { SongRangeChangedEvent } from '../src/components/song-info-dialog.ts'
 import { SongVersionsChangedEvent } from '../src/components/song-versions.ts'
 import { must } from './must.ts'
-import { A11Y, clearToasts, shownToast, wait } from './test-helpers.ts'
+import { A11Y, clearToasts, settle, shownToast } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
-/** A database with two songs; loading 'slow' takes a while */
+/** A database of songs; loading 'slow' waits until `releaseSlow()` */
 function fakeDb() {
   const songs: Record<
     string,
@@ -43,9 +43,14 @@ function fakeDb() {
   /** What saveChordPro was given, and a number of failures to give first */
   const saved: string[] = []
   const faults = { saveChordPro: 0 }
+  let releaseSlow: () => void = () => {}
+  const slowGate = new Promise<void>(resolve => {
+    releaseSlow = resolve
+  })
   return {
     saved,
     faults,
+    releaseSlow: () => releaseSlow(),
     saveChordPro: async (file: { id: string; content: string }) => {
       if (faults.saveChordPro-- > 0) throw new Error('disk full')
       saved.push(file.content)
@@ -61,7 +66,7 @@ function fakeDb() {
     },
     getMelody: async () => undefined,
     getSongUsageFromSetlists: async id => {
-      if (id === 'slow') await wait(100)
+      if (id === 'slow') await slowGate
       if (id === 'fast') {
         return [
           {
@@ -93,11 +98,22 @@ describe('song-info-dialog', () => {
 
   const modal = () => dialog.shadowRoot.querySelector('app-modal')
 
+  /** Once the song asked for is loaded (or could not be) and drawn */
+  async function loaded() {
+    await dialog._load.taskComplete.catch(() => {})
+    await dialog.updateComplete
+    await dialog.shadowRoot.querySelector('song-info')?.updateComplete
+  }
+
   it('shows the song it was last asked for, even if an earlier one loads later', async () => {
     await setUp()
     dialog.show('slow')
     dialog.show('fast')
-    await wait(200)
+    await loaded()
+    // (and the slow one comes in after it)
+    dialog.db.releaseSlow()
+    await settle()
+    await dialog.updateComplete
     expect(modal().heading).to.equal('Fast Song')
     expect(dialog.shadowRoot.querySelector('song-info').song.title).to.equal('Fast Song')
   })
@@ -109,7 +125,7 @@ describe('song-info-dialog', () => {
       closed++
     }
     await dialog.show('fast')
-    await wait(100)
+    await loaded()
     const versions = dialog.shadowRoot.querySelector('song-versions')
     versions.dispatchEvent(new SongVersionsChangedEvent())
     expect(closed).to.equal(0)
@@ -124,11 +140,12 @@ describe('song-info-dialog', () => {
     it('saves it in the chart, shows the song as it is now, and says so to the page', async () => {
       await setUp()
       await dialog.show('ranged')
-      await wait(100)
+      await loaded()
       const told: (string | null)[] = []
       dialog.addEventListener(SongRangeChangedEvent.type, event => told.push(event.value))
       infoOf().dispatchEvent(rangeChange({ low: 62, high: 76 }))
-      await wait(150)
+      await waitUntil(() => told.length > 0)
+      await loaded()
       expect(dialog.db.saved).to.have.length(1)
       expect(dialog.db.saved[0]).to.contain('{key: G}\n{x_chordless_range: D4-E5}')
       // (the song was loaded again: its chart says the range now)
@@ -140,9 +157,10 @@ describe('song-info-dialog', () => {
     it('tells the page there is none when it is taken away', async () => {
       await setUp()
       await dialog.show('ranged')
-      await wait(100)
+      await loaded()
       infoOf().dispatchEvent(rangeChange({ low: 62, high: 76 }))
-      await wait(150)
+      await waitUntil(() => dialog.db.saved.length > 0)
+      await loaded()
       const told: (string | null)[] = []
       let songId = ''
       dialog.addEventListener(SongRangeChangedEvent.type, event => {
@@ -150,7 +168,8 @@ describe('song-info-dialog', () => {
         songId = event.songId
       })
       infoOf().dispatchEvent(rangeChange(null))
-      await wait(150)
+      await waitUntil(() => told.length > 0)
+      await loaded()
       expect(told).to.deep.equal([null])
       expect(songId).to.equal('ranged')
       expect(infoOf().shadowRoot.textContent).to.contain('None yet')
@@ -160,12 +179,12 @@ describe('song-info-dialog', () => {
       clearToasts()
       await setUp()
       await dialog.show('ranged')
-      await wait(100)
+      await loaded()
       dialog.db.faults.saveChordPro = 1
       const told: (string | null)[] = []
       dialog.addEventListener(SongRangeChangedEvent.type, event => told.push(event.value))
       infoOf().dispatchEvent(rangeChange({ low: 62, high: 76 }))
-      await wait(100)
+      await waitUntil(() => shownToast())
       const toast = must(shownToast())
       expect(toast.kind).to.equal('error')
       expect(toast.message).to.equal("Couldn't save the melody range.")
@@ -173,7 +192,7 @@ describe('song-info-dialog', () => {
       expect(told).to.deep.equal([])
       // (trying again, which works now)
       must(toast.action).run()
-      await wait(150)
+      await waitUntil(() => told.length > 0)
       expect(dialog.db.saved).to.have.length(1)
       expect(told).to.deep.equal(['D4-E5'])
       clearToasts()
@@ -187,9 +206,13 @@ describe('song-info-dialog', () => {
       document.body.appendChild(dialog)
       await dialog.updateComplete
       await dialog.show(song.id)
-      await wait(200)
+      await loaded()
+      let told = false
+      dialog.addEventListener(SongRangeChangedEvent.type, () => {
+        told = true
+      })
       infoOf().dispatchEvent(new SongRangeChangeEvent(song.uuid, { low: 62, high: 76 }, 'G'))
-      await wait(200)
+      await waitUntil(() => told)
       const saved = await getSongWithContent(song.uuid)
       expect(saved.parsed.metadata.x_chordless_range).to.equal('D4-E5')
     })
@@ -200,7 +223,7 @@ describe('song-info-dialog', () => {
       const told: string[] = []
       dialog.addEventListener(SongRangeChangedEvent.type, event => told.push(event.songId))
       infoOf().dispatchEvent(rangeChange({ low: 62, high: 76 }))
-      await wait(100)
+      await waitUntil(() => told.length > 0)
       expect(dialog.db.saved).to.have.length(1)
       expect(told).to.deep.equal([''])
     })
@@ -209,7 +232,7 @@ describe('song-info-dialog', () => {
   it("shows the chart's CCLI number and trailer", async () => {
     await setUp()
     await dialog.show('credited')
-    await wait(100)
+    await loaded()
     const info = dialog.shadowRoot.querySelector('song-info').shadowRoot
     expect(info.querySelector('.modal-ccli').textContent).to.contain('7654321')
     expect(info.querySelector('.ccli-trailer').textContent).to.contain('A. Writer')
@@ -218,20 +241,20 @@ describe('song-info-dialog', () => {
   it("shows the chart's copyright, and no copyright line for a chart without one", async () => {
     await setUp()
     await dialog.show('credited')
-    await wait(100)
+    await loaded()
     const info = () => dialog.shadowRoot.querySelector('song-info').shadowRoot
     expect(info().textContent).to.contain('Copyright')
     expect(info().textContent).to.contain('Chords © 2026 A. Person')
 
     await dialog.show('fast')
-    await wait(100)
+    await loaded()
     expect(info().textContent).to.not.contain('Copyright')
   })
 
   it('shows no copyright line when the CCLI trailer says the same', async () => {
     await setUp()
     await dialog.show('repeated')
-    await wait(100)
+    await loaded()
     const info = dialog.shadowRoot.querySelector('song-info').shadowRoot
     expect(info.querySelector('.ccli-trailer').textContent).to.contain('A Publisher')
     expect(info.textContent).to.not.contain('Copyright')
@@ -240,7 +263,7 @@ describe('song-info-dialog', () => {
   it("says so when the song can't be loaded", async () => {
     await setUp()
     await dialog.show('missing')
-    await wait(50)
+    await loaded()
     const message = dialog.shadowRoot.querySelector('status-message')
     expect(message.state).to.equal('error')
     expect(message.detail).to.contain('Song not found')
@@ -249,7 +272,7 @@ describe('song-info-dialog', () => {
   it('lists where the song has been played, with the key and who led it', async () => {
     await setUp()
     await dialog.show('fast')
-    await wait(100)
+    await loaded()
     expect(dialog.shadowRoot.querySelector('song-info').appearances).to.deep.equal([
       {
         setlistId: 'setlist-1',
@@ -264,7 +287,7 @@ describe('song-info-dialog', () => {
   it('shows the title it is given in place of the song’s own', async () => {
     await setUp()
     await dialog.show('fast', { title: 'Fast Song (our version)' })
-    await wait(100)
+    await loaded()
     expect(modal().heading).to.equal('Fast Song (our version)')
   })
 
@@ -304,7 +327,7 @@ describe('song-info-dialog', () => {
   it('is accessible once loaded', async () => {
     await setUp()
     dialog.show('fast')
-    await wait(100)
+    await loaded()
     await expect(dialog).to.be.accessible(A11Y)
   })
 })
