@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import type { Melody, MelodyNote } from '../src/js/melody.ts'
 import { midiOf } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
-import { renderMelodyHere } from '../src/js/melody-render-engine.ts'
+import { renderMelodyHere, withoutStyle } from '../src/js/melody-render-engine.ts'
 
 const note = (step: MelodyNote['step'], start: number, syllable: string): MelodyNote => ({
   kind: 'note',
@@ -60,6 +60,15 @@ describe('engraving a melody with Verovio', () => {
     const out = await renderMelodyHere(writeMusicXml(melody))
     assert.ok(out)
     for (const page of out.pages) assert.doesNotMatch(page, /<style/i)
+  })
+
+  it('takes every <style> element out, including one made by taking another out', () => {
+    assert.equal(
+      withoutStyle('<svg><style>a{}</style><g/><style>b{}</style></svg>'),
+      '<svg><g/></svg>'
+    )
+    assert.equal(withoutStyle('<svg><sty<style>x</style>le>y</style></svg>'), '<svg></svg>')
+    assert.equal(withoutStyle('<svg><g/></svg>'), '<svg><g/></svg>')
   })
 
   it('says null for what is not MusicXML', async () => {

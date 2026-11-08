@@ -43,6 +43,20 @@ function load(): Promise<Toolkit> {
   return toolkit
 }
 
+/**
+ * The SVG without its <style> elements. Taken out until none is left, so that a pair made by taking
+ * one out (`<sty<style></style>le>`) cannot be left behind: Verovio escapes the words of a score, so
+ * the only one it writes is its own, but this does not rely on that.
+ */
+export function withoutStyle(svg: string): string {
+  let out = svg
+  for (let before = ''; before !== out; ) {
+    before = out
+    out = out.replace(/<style[\s\S]*?<\/style>/gi, '')
+  }
+  return out
+}
+
 export interface RenderOptions {
   /** The width of a page, in the toolkit's units (a tenth of a millimetre at scale 100); 2100 is A4 */
   pageWidth?: number
@@ -84,7 +98,7 @@ export async function renderMelodyHere(
   // (the page's policy allows no <style> element, so the few rules Verovio puts in each page are the
   // view's own: `melody-sheet.ts`)
   for (let page = 1; page <= tk.getPageCount(); page++) {
-    pages.push(tk.renderToSVG(page).replace(/<style[\s\S]*?<\/style>/g, ''))
+    pages.push(withoutStyle(tk.renderToSVG(page)))
   }
   return { pages, log: tk.getLog() }
 }
