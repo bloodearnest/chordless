@@ -21,7 +21,7 @@ import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../s
 import { makeEntry, makeImportedSong, makeSetlist } from './builders.ts'
 import { FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { deleteDatabase, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { deleteDatabase, nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
 import '../src/components/setlist-email-import.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -597,7 +597,7 @@ describe('setlist-email-import', () => {
         () => db.getAllSetlists().then(all => all.length === 1) as never,
         'the setlist'
       )
-      await wait(50)
+      await nothingFor(50)
       expect(visited).to.deep.equal([])
     })
 

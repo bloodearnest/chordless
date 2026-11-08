@@ -11,7 +11,7 @@ import { setRouter } from '../src/js/navigation.ts'
 import { createSong } from '../src/js/song-utils.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
 import '../src/components/song-import.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -93,7 +93,7 @@ describe('song-import: songs that arrive', () => {
       await open()
       importer.remove()
       offerIncoming({ files: [file('late.cho', chart('Too Late'))], text: '' })
-      await wait(50)
+      await nothingFor(50)
       expect((await db.getAllSongs()).length).to.equal(0)
     })
 

@@ -22,7 +22,7 @@ import {
 } from '../src/js/space.ts'
 import { LibraryView } from '../src/js/views/library-view.ts'
 import { must } from './must.ts'
-import { deleteDatabase, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { deleteDatabase, nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -317,7 +317,7 @@ describe('the library view', () => {
       must(view.querySelector('#library-app-header')).dispatchEvent(
         new CustomEvent('app-header:info-click')
       )
-      await wait(50)
+      await nothingFor(50)
       expect(shown).to.equal(0)
     })
 
@@ -461,7 +461,7 @@ describe('the library view', () => {
       must(view.querySelector('#library-app-header')).dispatchEvent(
         new CustomEvent('app-header:info-click')
       )
-      await wait(50)
+      await nothingFor(50)
       expect(shown).to.equal(0)
     })
 

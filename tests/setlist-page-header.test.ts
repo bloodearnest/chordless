@@ -36,7 +36,7 @@ import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { sampleRecord } from './melody-sample.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
-import { shownToast, wait } from './test-helpers.ts'
+import { nothingFor, shownToast, wait } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -342,16 +342,19 @@ describe('the setlist page: header, menu and keys', () => {
       expect(
         $('#key-selector') && ($('#key-selector') as unknown as { editMode: boolean }).editMode
       ).to.equal(true)
-      await wait(300)
-      expect(
-        $$('.normal-mode-control').every(el => el.classList.contains('fade-complete'))
-      ).to.equal(true)
+      await waitUntil(
+        () => $$('.normal-mode-control').every(el => el.classList.contains('fade-complete')),
+        'the controls to fade'
+      )
       const before = must(await rig.db.getSetlist(setlist.id)).modifiedDate
+      // (a clock tick, so a save now has a later time)
       await wait(5)
       header().dispatchEvent(new EditModeToggleEvent())
       expect(document.body.classList.contains('edit-mode')).to.equal(false)
-      await wait(400)
-      expect(must(await rig.db.getSetlist(setlist.id)).modifiedDate).to.not.equal(before)
+      await waitUntil(
+        async () => must(await rig.db.getSetlist(setlist.id)).modifiedDate !== before,
+        'the setlist to be saved'
+      )
     })
 
     it('lets a user who can only read change a song’s key too', async () => {
@@ -381,7 +384,7 @@ describe('the setlist page: header, menu and keys', () => {
       header().dispatchEvent(new EditModeToggleEvent())
       expect(press('Escape').defaultPrevented).to.equal(true)
       expect(document.body.classList.contains('edit-mode')).to.equal(false)
-      await wait(300)
+      await nothingFor(300)
       expect(press('Escape').defaultPrevented).to.equal(false)
     })
 
@@ -976,8 +979,10 @@ describe('the setlist page: header, menu and keys', () => {
       localStorage.setItem(`state-${setlist.id}`, '{}')
       must($<AppModal>('#delete-setlist-modal')).ask = async () => true
       dialog.dispatchEvent(new SetlistInfoDeleteEvent(setlist.id))
-      await wait(80)
-      expect(await rig.db.getSetlist(setlist.id)).to.equal(undefined)
+      await waitUntil(
+        async () => (await rig.db.getSetlist(setlist.id)) === undefined,
+        'the setlist to be deleted'
+      )
       expect(localStorage.getItem(`state-${setlist.id}`)).to.equal(null)
       expect(urls().at(-1)).to.equal('/')
     })

@@ -19,7 +19,7 @@ import { createExport } from '../src/js/space-export.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip } from './zip.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -484,7 +484,7 @@ describe('the export panel', () => {
     it('leaves out the pad sets when Drive cannot be asked', async () => {
       drive.failRequests({ method: 'GET', status: 500, times: 50 })
       const el = await mount({ signedIn: true })
-      await wait(100)
+      await nothingFor()
       expect(el.shadowRoot?.querySelector('#include-pads')).to.equal(null)
       // and when the user signs out
       el.signedIn = false
@@ -493,5 +493,3 @@ describe('the export panel', () => {
     })
   })
 })
-
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))

@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { listenForLongPress } from '../src/js/annotations/long-press.ts'
+import { nothingFor } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -62,7 +63,7 @@ describe('a long press', () => {
     word.dispatchEvent(pointer('pointermove', { clientX: 40 }))
     await wait(60)
     plain.dispatchEvent(pointer('pointerdown'))
-    await wait(60)
+    await nothingFor(60)
     expect(pressed).to.deep.equal([])
     done()
   })
@@ -70,14 +71,14 @@ describe('a long press', () => {
   it('does nothing when not enabled, and ignores a second finger and the mouse’s other buttons', async () => {
     const off = setup(false)
     off.word.dispatchEvent(pointer('pointerdown'))
-    await wait(60)
+    await nothingFor(60)
     expect(off.pressed).to.deep.equal([])
     off.done()
 
     const on = setup()
     on.word.dispatchEvent(pointer('pointerdown', { isPrimary: false }))
     on.word.dispatchEvent(pointer('pointerdown', { pointerType: 'mouse', button: 2 }))
-    await wait(60)
+    await nothingFor(60)
     expect(on.pressed).to.deep.equal([])
     on.done()
   })

@@ -23,7 +23,7 @@ import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -309,7 +309,7 @@ describe('space-card', () => {
       el.addEventListener(SpaceSwitchEvent.type, () => switched++)
       must(button(el, 'switch')).click()
       await answer(el, false)
-      await wait(50)
+      await nothingFor(50)
       expect(switched).to.equal(0)
     })
   })

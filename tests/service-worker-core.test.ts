@@ -11,7 +11,7 @@ import {
   type WorkerScope,
 } from '../src/js/service-worker-core.ts'
 import { SHARED_CACHE_NAME, takeShared } from '../src/js/shared-incoming.ts'
-import { deleteDatabase, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { deleteDatabase, nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -292,7 +292,7 @@ describe('the service worker', () => {
         start()
         fetchImpl = async () => new Response('nope', { status: 500 })
         expect((await fetchEvent('/css/a.css'))?.status).to.equal(500)
-        await wait(30)
+        await nothingFor(30)
         expect((await (await caches.open('cache-v1')).keys()).length).to.equal(0)
       })
 
@@ -337,7 +337,7 @@ describe('the service worker', () => {
         start({ precache: ['/'] })
         fetchImpl = async () => new Response('the shell')
         await textOf(await fetchEvent('/', { mode: 'navigate' }))
-        await wait(30)
+        await nothingFor(30)
         expect((await (await caches.open('cache-v1')).keys()).length).to.equal(0)
       })
 
@@ -353,7 +353,7 @@ describe('the service worker', () => {
         start()
         fetchImpl = async () => new Response('bad', { status: 502 })
         expect((await fetchEvent('/x', { mode: 'navigate' }))?.status).to.equal(502)
-        await wait(30)
+        await nothingFor(30)
         expect((await (await caches.open('cache-v1')).keys()).length).to.equal(0)
       })
 
@@ -399,7 +399,7 @@ describe('the service worker', () => {
         start()
         fetchImpl = async () => new Response('', { status: 500 })
         await fetchEvent('/icons/b.svg')
-        await wait(30)
+        await nothingFor(30)
         expect((await (await caches.open('runtime-v1')).keys()).length).to.equal(0)
       })
 

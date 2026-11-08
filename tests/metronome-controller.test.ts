@@ -1,5 +1,5 @@
-import { expect } from '@open-wc/testing'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { expect, waitUntil } from '@open-wc/testing'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -225,8 +225,7 @@ describe('MetronomeController, tracking the clicks that are sounding', () => {
   it('forgets a click once it has stopped sounding', async () => {
     const controller = make()
     expect(controller._activeOscillators).to.have.length(1)
-    await wait(80)
-    expect(controller._activeOscillators).to.have.length(0)
+    await waitUntil(() => controller._activeOscillators.length === 0, 'the click to stop sounding')
     controller.stop()
   })
 
@@ -234,7 +233,7 @@ describe('MetronomeController, tracking the clicks that are sounding', () => {
     const controller = make()
     controller.stop()
     expect(controller._activeOscillators).to.have.length(0)
-    await wait(80)
+    await nothingFor(80)
     expect(controller._activeOscillators).to.have.length(0)
   })
 })

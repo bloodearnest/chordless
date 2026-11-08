@@ -8,7 +8,7 @@ import { shareSetlistId } from '../src/js/share-receiver.ts'
 import '../src/js/views/share-view.ts'
 import type { ShareView } from '../src/js/views/share-view.ts'
 import { makeSetlist } from './builders.ts'
-import { deleteDatabase, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { deleteDatabase, nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -163,7 +163,7 @@ describe('the share view', () => {
     view.route = { name: 'share', fileId: 'file1', songIndex: -1 }
     window.history.replaceState(null, '', `${startUrl}#${KEY}`)
     outlet.append(view)
-    await wait(100)
+    await nothingFor()
     expect(asked).to.equal(0)
     expect(visited).to.deep.equal([])
   })
@@ -239,7 +239,7 @@ describe('the share view', () => {
       expect(view.captureViewState()).to.not.equal(null)
       view.route = { name: 'share', fileId: 'file1', songIndex: 0 }
       await view.updateComplete
-      await wait(50)
+      await nothingFor(50)
       expect(view.querySelector('#share-banner')).to.equal(null)
     })
 

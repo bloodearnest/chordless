@@ -24,7 +24,7 @@ import { loadSetlistLocalState } from '../src/js/setlist/local-state.ts'
 import { getSongUserPrefs, saveSongUserPrefs } from '../src/js/song-user-prefs.ts'
 import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { chartOf, must, useSetlistPage } from './setlist-page-harness.ts'
-import { wait } from './test-helpers.ts'
+import { nothingFor, wait } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -161,11 +161,9 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       expect(rig.page.sections.states[0][0].isCollapsed).to.equal(false)
 
       $('.song-container')?.dispatchEvent(new SectionToggleEvent(0, 1))
-      await wait(500)
-      expect(rig.page.sections.states[0][1].isCollapsed).to.equal(true)
+      await waitUntil(() => rig.page.sections.states[0][1].isCollapsed, 'the section to fold')
       $('.song-container')?.dispatchEvent(new SectionToggleEvent(0, 1))
-      await wait(500)
-      expect(rig.page.sections.states[0][1].isCollapsed).to.equal(false)
+      await waitUntil(() => !rig.page.sections.states[0][1].isCollapsed, 'the section to open')
     })
 
     it('do nothing for a section that is not there', async () => {
@@ -485,7 +483,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       const modal = must($<AppModal>('#reset-confirm-modal'))
       modal.ask = async () => false
       popover().dispatchEvent(new SongResetClickEvent())
-      await wait(30)
+      await nothingFor(30)
       expect(resets).to.equal(0)
       modal.ask = async () => true
       popover().dispatchEvent(new SongResetClickEvent())

@@ -25,7 +25,7 @@ import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -241,7 +241,7 @@ describe('space-manager', () => {
       const el = await page(mine.id)
       must(el.shadowRoot?.querySelector<HTMLButtonElement>('#delete')).click()
       await answer(el, 'Delete from this device?', false)
-      await wait(50)
+      await nothingFor(50)
       expect(gone).to.equal(0)
       expect(await getSpaceById(mine.id)).to.not.equal(undefined)
     })

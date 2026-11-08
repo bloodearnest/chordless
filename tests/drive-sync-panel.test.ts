@@ -16,7 +16,7 @@ import { createSyncOrchestrator } from '../src/js/sync-orchestrator.ts'
 import { makeSetlist } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -208,7 +208,7 @@ describe('drive-sync-panel', () => {
       const el = await show()
       must(el._resetModal.value as AppModal).ask = async () => false
       button(el, /Reset from Google Drive/)?.click()
-      await wait(100)
+      await nothingFor()
       expect(el.syncProgress).to.equal(null)
     })
 
@@ -260,7 +260,7 @@ describe('drive-sync-panel', () => {
       const el = await show()
       must(el._startOverModal.value as AppModal).ask = async () => false
       button(el, /Start over in Drive/)?.click()
-      await wait(100)
+      await nothingFor()
       expect(el.syncProgress).to.equal(null)
       expect(text(el)).to.contain('Drive folder not found')
     })
@@ -323,7 +323,7 @@ describe('drive-sync-panel', () => {
       const el = await show()
       must(el._replaceModal.value as AppModal).ask = async () => false
       button(el, /Replace with the copy in Drive/)?.click()
-      await wait(100)
+      await nothingFor()
       expect(el.syncProgress).to.equal(null)
       expect(text(el)).to.contain('Drive folder not found')
     })
