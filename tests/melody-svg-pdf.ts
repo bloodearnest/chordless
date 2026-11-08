@@ -342,8 +342,9 @@ function textOps(el: El, page: Page, pen: Pen) {
   for (const child of el.children) textOps(child, page, pen)
   const text = el.text.trim()
   if (text && !el.children.length) {
-    // (the PDF's own text space is y up, and the page is flipped to y down: flip the text back)
-    if (pen.moved) page.ops.push(`1 0 0 -1 ${n(pen.x)} ${n(pen.y)} Tm`)
+    // (the PDF's own text space is y up, and the page is flipped to y down: flip the text back,
+    // then move to the word from there, as many PDFs place their words)
+    if (pen.moved) page.ops.push('1 0 0 -1 0 0 Tm', `${n(pen.x)} ${n(-pen.y)} Td`)
     pen.moved = false
     let shown = ''
     for (const ch of text) {
@@ -353,7 +354,8 @@ function textOps(el: El, page: Page, pen: Pen) {
         shown += `\\${(page.music.get(ch) as number).toString(8).padStart(3, '0')}`
       }
     }
-    page.ops.push(`/${pen.font} ${n(pen.size)} Tf`, `(${shown}) Tj`)
+    // (shown with a kerning of nothing after it, as a PDF that kerns its words shows each)
+    page.ops.push(`/${pen.font} ${n(pen.size)} Tf`, `[(${shown}) 0] TJ`)
   }
   pen.size = was
   pen.font = wasFont

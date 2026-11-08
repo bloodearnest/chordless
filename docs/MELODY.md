@@ -296,10 +296,10 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
 
 - **SongSelect changes its renderer.** The shapes are the renderer's. Tests keep the failures
   visible (below), and the self-check turns a change into "could not read", not a wrong melody.
-- **Test data.** The real sheets are copyrighted and cannot be committed; today's tests use
-  synthetic PDFs drawn by `tests/melody-pdf.ts`. The renderer is Verovio, so public-domain tunes
-  (a hymn as MusicXML) rendered by Verovio, as SVG or as PDF, would give fixtures made the way the
-  real ones are, without being anyone's song. Verovio would be a dev dependency (a reviewed change).
+- **Test data.** The real sheets are copyrighted and cannot be committed; the tests engrave
+  melodies of their own with Verovio and print them as PDFs (`tests/melody-svg-pdf.ts`,
+  `tests/melody-pdf-roundtrip.node.test.ts`), so the fixtures are made the way the real ones are,
+  without being anyone's song.
   The real ones, a local export of PDFs and charts, are a corpus for the spike and for scoring the
   reader, kept out of git (they carry the church's licence number as well as the songs).
 - **A copy without its notice.** A reader or view that keeps the notes and drops the header and
