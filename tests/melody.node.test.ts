@@ -7,7 +7,8 @@ import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { absolutePath, shapeHash } from '../src/js/melody-path.ts'
 import { type Glyph, type Line, type Staff, signsOf } from '../src/js/melody-pdf.ts'
 import { melodyExtremes, melodyRange, transposeMelody } from '../src/js/melody-transpose.ts'
-import { fifthsOfKey, midiOf } from '../src/js/pitch.ts'
+import { fifthsOfKey, type Step } from '../src/js/pitch.ts'
+import { bar, melodyOf, note, rest } from './melody-build.ts'
 
 /** One measure of 4/4 in the shape Verovio writes, drawn with the glyphs named, as a lead sheet's SVG is */
 function sheet(notes: string, key = ''): string {
@@ -88,62 +89,29 @@ describe('shape names', () => {
 })
 
 describe('MusicXML of a hand-built melody', () => {
-  const note = (over: Record<string, unknown>) => ({
-    kind: 'note' as const,
-    id: 'n',
-    step: 'B' as const,
-    alter: -1,
-    octave: 4,
-    midi: 70,
-    start: 0,
-    duration: 1,
-    tupletRatio: 1,
-    tieStart: false,
-    tieStop: false,
-    cue: false,
-    syllables: [] as string[],
-    withPrevious: false,
-    ...over,
-  })
+  const bFlat = (over: Partial<MelodyNote>) => note('B', 4, { alter: -1, ...over })
   const melody = {
     title: 'A & B',
     notice: ['CCLI Song # 1'],
     measures: [
-      {
-        number: 1,
-        voices: [
-          [
-            note({ syllables: ['ho-'], tieStart: true }),
-            note({ start: 1, syllables: ['ly_'], tieStop: true }),
-            note({ start: 2, duration: 2 / 3, tupletRatio: 2 / 3, step: 'C', alter: 1 }),
-            {
-              kind: 'rest' as const,
-              id: 'r',
-              start: 2.67,
-              duration: 1.33,
-              tupletRatio: 1,
-              wholeMeasure: false,
-              cue: false,
-            },
+      bar(
+        [
+          bFlat({ syllables: ['ho-'], tieStart: true }),
+          bFlat({ start: 1, syllables: ['ly_'], tieStop: true }),
+          note('C', 4, { start: 2, duration: 2 / 3, tupletRatio: 2 / 3, alter: 1 }),
+          rest({ start: 2.67, duration: 1.33 }),
+        ],
+        {
+          chords: [
+            { start: 0, text: 'Bb/D' },
+            { start: 1, text: 'X"><evil/>' },
+            { start: 2, text: 'F#m7' },
           ],
-        ],
-        chords: [
-          { start: 0, text: 'Bb/D' },
-          { start: 1, text: 'X"><evil/>' },
-          { start: 2, text: 'F#m7' },
-        ],
-        section: 'VERSE 1',
-        barline: 'single' as const,
-        directions: [],
-        repeatStart: false,
-        ending: null,
-        length: 4,
-        full: true,
-        fifths: -2,
-        beats: 4,
-        beatType: 4,
-        tempo: 72,
-      },
+          section: 'VERSE 1',
+          fifths: -2,
+          tempo: 72,
+        }
+      ),
     ],
   }
 
@@ -196,54 +164,20 @@ describe('lining up a cue line with the sung one', () => {
 })
 
 describe('MusicXML for an engraver', () => {
-  const note = (
-    step: MelodyNote['step'],
-    alter: number,
-    over: Partial<MelodyNote> = {}
-  ): MelodyNote => ({
-    kind: 'note',
-    id: `${step}${alter}`,
-    step,
-    alter,
-    octave: 4,
-    midi: midiOf(step, alter, 4),
-    start: 0,
-    duration: 1,
-    tupletRatio: 1,
-    tieStart: false,
-    tieStop: false,
-    cue: false,
-    syllables: [],
-    withPrevious: false,
-    ...over,
-  })
-  const measure = (fifths: number, events: MelodyMeasure['voices'][number]): MelodyMeasure => ({
-    number: 1,
-    voices: [events],
-    chords: [],
-    section: null,
-    barline: 'single',
-    directions: [],
-    repeatStart: false,
-    ending: null,
-    length: 4,
-    full: true,
-    fifths,
-    beats: 4,
-    beatType: 4,
-    tempo: null,
-  })
-  const write = (...measures: MelodyMeasure[]) =>
-    writeMusicXml({ title: null, notice: [], measures })
+  /** A note in octave 4, sharp (1), natural (0) or flat (-1) */
+  const at = (step: Step, alter: number, over: Partial<MelodyNote> = {}) =>
+    note(step, 4, { alter, ...over })
+  const measure = (fifths: number, events: MelodyEvent[]) => bar(events, { fifths })
+  const write = (...measures: MelodyMeasure[]) => writeMusicXml(melodyOf(null, measures))
 
   it('prints an accidental only where the alteration is not the one in force', () => {
     // G major: F is sharp already. F#, then F natural (marked), then F natural again (not), then Bb (marked)
     const xml = write(
       measure(1, [
-        note('F', 1, { start: 0 }),
-        note('F', 0, { start: 1 }),
-        note('F', 0, { start: 2 }),
-        note('B', -1, { start: 3 }),
+        at('F', 1, { start: 0 }),
+        at('F', 0, { start: 1 }),
+        at('F', 0, { start: 2 }),
+        at('B', -1, { start: 3 }),
       ])
     )
     assert.deepEqual(xml.match(/<accidental>[a-z-]+<\/accidental>/g), [
@@ -251,37 +185,37 @@ describe('MusicXML for an engraver', () => {
       '<accidental>flat</accidental>',
     ])
     // the next measure starts from the key again
-    const two = write(measure(1, [note('F', 0)]), measure(1, [note('F', 1)]))
+    const two = write(measure(1, [at('F', 0)]), measure(1, [at('F', 1)]))
     assert.equal((two.match(/<accidental>/g) ?? []).length, 1)
   })
 
   it("carries a tied note's accidental over the barline unmarked", () => {
     const xml = write(
-      measure(0, [note('G', 1, { tieStart: true })]),
-      measure(0, [note('G', 1, { tieStop: true })])
+      measure(0, [at('G', 1, { tieStart: true })]),
+      measure(0, [at('G', 1, { tieStop: true })])
     )
     assert.equal((xml.match(/<accidental>sharp<\/accidental>/g) ?? []).length, 1)
   })
 
   it('goes back to the start of the measure for a second voice, by as far as the first went', () => {
-    const m = measure(0, [note('C', 0, { duration: 4 })])
-    m.voices.push([note('E', 0, { cue: true, duration: 2 })])
+    const m = measure(0, [at('C', 0, { duration: 4 })])
+    m.voices.push([at('E', 0, { cue: true, duration: 2 })])
     const xml = write(m)
     assert.match(
       xml,
       /<duration>96<\/duration><voice>1<\/voice>[\s\S]*<backup><duration>96<\/duration><\/backup>/
     )
     // a ratio that is no tuplet of whole notes is written as plain notes rather than a wrong one
-    const odd = write(measure(0, [note('C', 0, { tupletRatio: 0.3137 })]))
+    const odd = write(measure(0, [at('C', 0, { tupletRatio: 0.3137 })]))
     assert.doesNotMatch(odd, /time-modification/)
   })
 
   it('opens and closes a tuplet bracket, and moves a late line forward to where it starts', () => {
     const xml = write(
       measure(0, [
-        note('C', 0, { start: 1, duration: 2 / 3, tupletRatio: 2 / 3, tuplet: 'start' }),
-        note('D', 0, { start: 1 + 2 / 3, duration: 2 / 3, tupletRatio: 2 / 3 }),
-        note('E', 0, { start: 1 + 4 / 3, duration: 2 / 3, tupletRatio: 2 / 3, tuplet: 'stop' }),
+        at('C', 0, { start: 1, duration: 2 / 3, tupletRatio: 2 / 3, tuplet: 'start' }),
+        at('D', 0, { start: 1 + 2 / 3, duration: 2 / 3, tupletRatio: 2 / 3 }),
+        at('E', 0, { start: 1 + 4 / 3, duration: 2 / 3, tupletRatio: 2 / 3, tuplet: 'stop' }),
       ])
     )
     assert.match(xml, /<forward><duration>24<\/duration><\/forward>/)
@@ -341,16 +275,9 @@ describe('jump directions', () => {
   })
 
   it('writes them as MusicXML directions with their sound', () => {
-    const xml = writeMusicXml({
-      title: null,
-      notice: [],
-      measures: [
-        {
-          number: 1,
-          voices: [[]],
-          chords: [],
-          section: null,
-          barline: 'single',
+    const xml = writeMusicXml(
+      melodyOf(null, [
+        bar([], {
           directions: [
             { kind: 'segno', al: null, time: null, text: '' },
             { kind: 'to-coda', al: null, time: 2, text: '2nd time to Coda' },
@@ -360,17 +287,9 @@ describe('jump directions', () => {
             { kind: 'coda', al: null, time: null, text: '' },
             { kind: 'text', al: null, time: null, text: 'Play 3 times' },
           ],
-          repeatStart: false,
-          ending: null,
-          length: 4,
-          full: true,
-          fifths: 0,
-          beats: 4,
-          beatType: 4,
-          tempo: null,
-        },
-      ],
-    })
+        }),
+      ])
+    )
     assert.match(xml, /<segno\/><\/direction-type><sound segno="segno"\/>/)
     assert.match(xml, /<coda\/><\/direction-type><sound coda="coda"\/>/)
     assert.match(xml, /<words>2nd time to Coda<\/words><\/direction-type><sound tocoda="coda"\/>/)
@@ -385,44 +304,9 @@ describe('jump directions', () => {
 })
 
 describe('transposing a melody', () => {
-  const note = (step: MelodyNote['step'], octave: number, alter = 0, cue = false): MelodyNote => ({
-    kind: 'note',
-    id: `${step}${octave}`,
-    step,
-    alter,
-    octave,
-    midi: midiOf(step, alter, octave),
-    start: 0,
-    duration: 1,
-    tupletRatio: 1,
-    tieStart: false,
-    tieStop: false,
-    cue,
-    syllables: [],
-    withPrevious: false,
-  })
-  const tune = (notes: MelodyNote[], chord = 'G'): Melody => ({
-    title: null,
-    notice: [],
-    measures: [
-      {
-        number: 1,
-        voices: [notes],
-        chords: [{ start: 0, text: chord }],
-        section: null,
-        barline: 'single',
-        directions: [],
-        repeatStart: false,
-        ending: null,
-        length: 4,
-        full: true,
-        fifths: 1,
-        beats: 4,
-        beatType: 4,
-        tempo: null,
-      },
-    ],
-  })
+  const cue = (step: Step, octave: number) => note(step, octave, { cue: true })
+  const tune = (notes: MelodyNote[], chord = 'G'): Melody =>
+    melodyOf(null, [bar(notes, { fifths: 1, chords: [{ start: 0, text: chord }] })])
 
   it('moves the notes, respells them, and gives the key signature and chords of the new key', () => {
     // G major, D4 to B4, up a fourth to C: G4 to E5, already in the green
@@ -476,7 +360,7 @@ describe('transposing a melody', () => {
   })
 
   it('leaves cue notes out of the range, and the melody alone for a key it cannot read', () => {
-    const t = tune([note('C', 4), note('C', 2, 0, true)])
+    const t = tune([note('C', 4), cue('C', 2)])
     assert.deepEqual(melodyRange(t), { low: 60, high: 60 })
     assert.equal(transposeMelody(t, 'C', 'H'), t)
     assert.equal(fifthsOfKey('Em'), 1)
@@ -491,14 +375,14 @@ describe('transposing a melody', () => {
       note('C', 4),
       held,
       { ...note('G', 4), duration: 0.5, tieStop: true },
-      note('C', 2, 0, true),
+      cue('C', 2),
     ])
     assert.deepEqual(melodyExtremes(t), { low: 60, high: 67, lowBeats: 1, highBeats: 3 })
     // a repeat plays the measure twice
     t.measures[0].repeatStart = true
     t.measures[0].barline = 'repeat-end'
     assert.deepEqual(melodyExtremes(t), { low: 60, high: 67, lowBeats: 2, highBeats: 6 })
-    assert.equal(melodyExtremes(tune([note('E', 2, 0, true)])), null)
+    assert.equal(melodyExtremes(tune([cue('E', 2)])), null)
   })
 
   it('leaves out a full-size note in a bar with no lyric, unless it is tied over or the sheet has no lyrics', () => {
@@ -519,22 +403,14 @@ describe('transposing a melody', () => {
   })
 
   it('keeps rests, takes a melody with no sung note as it is, and moves a minor key', () => {
-    const rest: MelodyEvent = {
-      kind: 'rest',
-      id: 'r',
-      start: 1,
-      duration: 1,
-      tupletRatio: 1,
-      wholeMeasure: false,
-      cue: false,
-    }
+    const silence = rest({ start: 1 })
     const t = tune([note('E', 4)], 'Em')
-    t.measures[0].voices[0].push(rest)
+    t.measures[0].voices[0].push(silence)
     const out = transposeMelody(t, 'Em', 'Am')
-    assert.equal(out.measures[0].voices[0][1], rest)
+    assert.equal(out.measures[0].voices[0][1], silence)
     assert.equal(out.measures[0].fifths, 0)
     assert.equal(out.measures[0].chords[0].text, 'Am')
-    const cueOnly = tune([note('E', 2, 0, true)], 'Em')
+    const cueOnly = tune([cue('E', 2)], 'Em')
     assert.equal(melodyRange(cueOnly), null)
     assert.equal(transposeMelody(cueOnly, 'Em', 'Gm').measures[0].fifths, -2)
   })
@@ -547,7 +423,7 @@ describe('repeat signs and endings on a page', () => {
     ys: [0, 1, 2, 3, 4].map(i => top + i * 180),
     sys,
   })
-  const bar = (x: number, top: number, width = 27): Line => ({
+  const barLine = (x: number, top: number, width = 27): Line => ({
     x1: x,
     y1: top,
     x2: x,
@@ -570,12 +446,12 @@ describe('repeat signs and endings on a page', () => {
   it('reads dots before a thick line as the end of a repeat, and a double or final bar', () => {
     const [a, b, c] = [staff(0, 4000, 1000), staff(4000, 8000, 1000), staff(8000, 12000, 1000)]
     const lines = [
-      bar(3800, 1000), // thin
-      bar(3900, 1000, 90), // thick: dots before it
-      bar(7928, 1000),
-      bar(8000, 1000), // two thin ones
-      bar(11900, 1000),
-      bar(12000, 1000, 90), // thin then thick, no dots: final
+      barLine(3800, 1000), // thin
+      barLine(3900, 1000, 90), // thick: dots before it
+      barLine(7928, 1000),
+      barLine(8000, 1000), // two thin ones
+      barLine(11900, 1000),
+      barLine(12000, 1000, 90), // thin then thick, no dots: final
     ]
     const signs = signsOf([a, b, c], lines, dots(3600, 1000), [], unit)
     assert.equal(signs.get(a)?.bar, 'repeat-end')
@@ -587,12 +463,18 @@ describe('repeat signs and endings on a page', () => {
   it('reads dots after a thick line as the start of a repeat, on the next system when at the end of one', () => {
     const [a, b] = [staff(0, 4000, 1000, 0), staff(0, 4000, 3000, 1)]
     // |: in the middle of a measure's left edge, and one drawn at the end of the first system
-    const lines = [bar(3700, 1000, 90), bar(3800, 1000), bar(4000, 1000)]
+    const lines = [barLine(3700, 1000, 90), barLine(3800, 1000), barLine(4000, 1000)]
     const signs = signsOf([a, b], lines, dots(3860, 1000), [], unit)
     assert.equal(signs.get(a)?.repeatStart, false)
     assert.equal(signs.get(b)?.repeatStart, true)
     assert.equal(signs.get(a)?.bar, 'single')
-    const left = signsOf([b], [bar(300, 3000, 90), bar(400, 3000)], dots(460, 3000), [], unit)
+    const left = signsOf(
+      [b],
+      [barLine(300, 3000, 90), barLine(400, 3000)],
+      dots(460, 3000),
+      [],
+      unit
+    )
     assert.equal(left.get(b)?.repeatStart, true)
   })
 
@@ -620,27 +502,9 @@ describe('repeat signs and endings on a page', () => {
   })
 
   it('writes repeats and endings as MusicXML barlines', () => {
-    const measure = (over: object) => ({
-      number: 1,
-      voices: [[]],
-      chords: [],
-      section: null,
-      barline: 'single' as const,
-      directions: [],
-      repeatStart: false,
-      ending: null,
-      length: 4,
-      full: true,
-      fifths: 0,
-      beats: 4,
-      beatType: 4,
-      tempo: null,
-      ...over,
-    })
-    const xml = writeMusicXml({
-      title: null,
-      notice: [],
-      measures: [
+    const measure = (over: Partial<MelodyMeasure>) => bar([], over)
+    const xml = writeMusicXml(
+      melodyOf(null, [
         measure({ repeatStart: true }),
         measure({
           barline: 'repeat-end',
@@ -651,8 +515,8 @@ describe('repeat signs and endings on a page', () => {
           ending: { label: '2,3', start: true, stop: true, closed: false },
         }),
         measure({ barline: 'double' }),
-      ],
-    })
+      ])
+    )
     assert.match(
       xml,
       /<barline location="left"><bar-style>heavy-light<\/bar-style><repeat direction="forward"\/>/

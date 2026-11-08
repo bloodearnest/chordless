@@ -1,11 +1,77 @@
 /**
- * Melodies for the tests, written out short: each measure is a list of events, `C4:1:Ho-` a note
- * (pitch, beats, syllable) and `r:1` a rest. A pitch is a letter, an optional `#` or `b`, and an octave.
+ * Melodies for the tests. Written out short (`measure`): each measure is a list of events,
+ * `C4:1:Ho-` a note (pitch, beats, syllable) and `r:1` a rest; a pitch is a letter, an optional
+ * `#` or `b`, and an octave. Or one event or measure at a time with every field (`note`, `rest`,
+ * `bar`), for what the short form cannot say: give only what the test is about.
  */
-import type { Melody, MelodyDirection, MelodyEvent, MelodyMeasure } from '../src/js/melody.ts'
-import { midiOf } from '../src/js/pitch.ts'
+import type {
+  Melody,
+  MelodyDirection,
+  MelodyEvent,
+  MelodyMeasure,
+  MelodyNote,
+  MelodyRest,
+} from '../src/js/melody.ts'
+import { midiOf, type Step } from '../src/js/pitch.ts'
 
-const STEPS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const
+let ids = 0
+
+/** A quarter note at the start of the measure, sung to nothing, unless `over` says otherwise (its MIDI number follows `alter`) */
+export function note(step: Step, octave = 4, over: Partial<MelodyNote> = {}): MelodyNote {
+  const alter = over.alter ?? 0
+  return {
+    kind: 'note',
+    id: `n${ids++}`,
+    step,
+    alter,
+    octave,
+    midi: midiOf(step, alter, octave),
+    start: 0,
+    duration: 1,
+    tupletRatio: 1,
+    tieStart: false,
+    tieStop: false,
+    cue: false,
+    syllables: [''],
+    withPrevious: false,
+    ...over,
+  }
+}
+
+/** A quarter rest at the start of the measure, unless `over` says otherwise */
+export function rest(over: Partial<MelodyRest> = {}): MelodyRest {
+  return {
+    kind: 'rest',
+    id: `r${ids++}`,
+    start: 0,
+    duration: 1,
+    tupletRatio: 1,
+    wholeMeasure: false,
+    cue: false,
+    ...over,
+  }
+}
+
+/** Measure 1 of 4/4 in C with these events in one voice, full, unless `over` says otherwise */
+export function bar(events: MelodyEvent[], over: Partial<MelodyMeasure> = {}): MelodyMeasure {
+  return {
+    number: 1,
+    voices: [events],
+    chords: [],
+    section: null,
+    barline: 'single',
+    directions: [],
+    repeatStart: false,
+    ending: null,
+    length: 4,
+    full: true,
+    fifths: 0,
+    beats: 4,
+    beatType: 4,
+    tempo: null,
+    ...over,
+  }
+}
 
 export interface MeasureOptions {
   chords?: [start: number, text: string][]
@@ -20,8 +86,6 @@ export interface MeasureOptions {
   /** Tuplet brackets: the first event of the bracket and the last, by index */
   triplet?: [first: number, last: number]
 }
-
-let ids = 0
 
 /** One measure from its events: starts are worked out from the lengths */
 export function measure(
@@ -53,10 +117,10 @@ export function measure(
     return {
       kind: 'note',
       ...base,
-      step: step as (typeof STEPS)[number],
+      step: step as Step,
       alter,
       octave: Number(octave),
-      midi: midiOf(step as (typeof STEPS)[number], alter, Number(octave)),
+      midi: midiOf(step as Step, alter, Number(octave)),
       tieStart: false,
       tieStop: false,
       syllables: words.length ? [words.join(':')] : [''],
@@ -88,6 +152,7 @@ export function measure(
   }
 }
 
-export function melodyOf(title: string, measures: MelodyMeasure[]): Melody {
+/** A melody of these measures, with no notice */
+export function melodyOf(title: string | null, measures: MelodyMeasure[]): Melody {
   return { title, notice: [], measures }
 }

@@ -1,47 +1,19 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import type { Melody, MelodyNote } from '../src/js/melody.ts'
+import type { Melody } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { renderMelodyHere, withoutStyle } from '../src/js/melody-render-engine.ts'
-import { midiOf } from '../src/js/pitch.ts'
-
-const note = (step: MelodyNote['step'], start: number, syllable: string): MelodyNote => ({
-  kind: 'note',
-  id: `n${start}`,
-  step,
-  alter: 0,
-  octave: 4,
-  midi: midiOf(step, 0, 4),
-  start,
-  duration: 1,
-  tupletRatio: 1,
-  tieStart: false,
-  tieStop: false,
-  cue: false,
-  syllables: [syllable],
-  withPrevious: false,
-})
+import { measure } from './melody-build.ts'
 
 const melody: Melody = {
   title: 'A Song',
   notice: [],
   measures: [
-    {
-      number: 1,
-      voices: [[note('C', 0, 'Ho-'), note('D', 1, 'ly'), note('E', 2, 'is'), note('F', 3, 'He')]],
-      chords: [{ start: 0, text: 'C' }],
+    measure(1, ['C4:1:Ho-', 'D4:1:ly', 'E4:1:is', 'F4:1:He'], {
+      chords: [[0, 'C']],
       section: 'VERSE',
       barline: 'final',
-      directions: [],
-      repeatStart: false,
-      ending: null,
-      length: 4,
-      full: true,
-      fifths: 0,
-      beats: 4,
-      beatType: 4,
-      tempo: null,
-    },
+    }),
   ],
 }
 

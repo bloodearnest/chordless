@@ -2,10 +2,12 @@ import { expect, fixture, html } from '@open-wc/testing'
 import { SongImportedEvent } from '../src/components/song-import.ts'
 import { ChordlessDB, createSetlist, getCurrentDB, normalizeTitle } from '../src/js/db.ts'
 import { offerIncoming } from '../src/js/incoming-songs.ts'
+import type { MelodyEvent } from '../src/js/melody.ts'
 import { readMusicXml } from '../src/js/melody-musicxml-read.ts'
 import { createSong } from '../src/js/song-utils.ts'
 import { makeSong } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
+import { bar, note } from './melody-build.ts'
 import { must } from './must.ts'
 import { clearToasts, shownToast, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -73,38 +75,11 @@ describe('song-import: corners', () => {
 
   describe('a lead sheet', () => {
     const leadSheet = () => new TextEncoder().encode('%PDF-1.4 a lead sheet').buffer
-    const note = (midi: number, syllable = '', cue = false) => ({
-      kind: 'note',
-      id: `n${midi}`,
-      step: 'C',
-      alter: 0,
-      octave: 4,
-      midi,
-      start: 0,
-      duration: 1,
-      tupletRatio: 1,
-      tieStart: false,
-      tieStop: false,
-      cue,
-      syllables: [syllable],
-      withPrevious: false,
-    })
-    const bar = (number: number, notes: unknown[], fifths: number) => ({
-      number,
-      voices: [notes],
-      chords: [],
-      section: null,
-      barline: 'single',
-      directions: [],
-      repeatStart: false,
-      ending: null,
-      length: 4,
-      full: true,
-      fifths,
-      beats: 4,
-      beatType: 4,
-      tempo: null,
-    })
+    /** A note by its MIDI number (the reader goes by it), sung to `syllable` or none, small if `cue` */
+    const pitch = (midi: number, syllable = '', cue = false) =>
+      note('C', 4, { midi, syllables: [syllable], cue })
+    const at = (number: number, events: MelodyEvent[], fifths: number) =>
+      bar(events, { number, fifths })
     /**
      * The melody the reader gives for the sheet of a song in C, D4 to E5: the highest note and one
      * more sung in bar 1, the lowest in bar 2, and bar 3 with no lyric, its notes (lower still)
@@ -114,13 +89,13 @@ describe('song-import: corners', () => {
       title: 'T',
       notice: [],
       measures: [
-        bar(1, [note(high, 'Ho'), note(67, 'ly')], fifths),
-        bar(2, [note(low, 'Lord')], fifths),
-        bar(
+        at(1, [pitch(high, 'Ho'), pitch(67, 'ly')], fifths),
+        at(2, [pitch(low, 'Lord')], fifths),
+        at(
           3,
           [
-            ...Array.from({ length: unsung }, () => note(low - 2)),
-            ...Array.from({ length: instrumental }, () => note(low - 5, '', true)),
+            ...Array.from({ length: unsung }, () => pitch(low - 2)),
+            ...Array.from({ length: instrumental }, () => pitch(low - 5, '', true)),
           ],
           fifths
         ),
@@ -354,7 +329,7 @@ describe('song-import: corners', () => {
       const { element } = await importerReading(async () => ({
         title: 'T',
         notice: [],
-        measures: [bar(1, [note(62, 'Lord')], -2)],
+        measures: [at(1, [pitch(62, 'Lord')], -2)],
       }))
       await element.receive({
         chordproText: chart(unique('Singular')),
