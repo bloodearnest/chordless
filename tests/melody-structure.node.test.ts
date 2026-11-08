@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import type { Melody, MelodyDirection, MelodyMeasure } from '../src/js/melody.ts'
+import type { Melody, MelodyDirection } from '../src/js/melody.ts'
 import {
   lyricSimilarity,
   matchChart,
@@ -11,6 +11,7 @@ import {
   sheetSections,
   stepWords,
 } from '../src/js/melody-structure.ts'
+import { bar, melodyOf, note } from './melody-build.ts'
 
 interface Spec {
   section?: string
@@ -27,53 +28,32 @@ interface Spec {
 
 /** A melody of measures that are each a few notes; `words` and `notes` give their syllables */
 function melody(specs: Spec[]): Melody {
-  return {
-    title: null,
-    notice: [],
-    measures: specs.map(
-      (s, i): MelodyMeasure => ({
-        number: i + 1,
-        voices: [
-          (s.notes ?? s.words?.map(w => [w]) ?? [[]]).map((syllables, n) => ({
-            kind: 'note' as const,
-            id: `n${i}-${n}`,
-            step: 'C' as const,
-            alter: 0,
-            octave: 4,
-            midi: 60,
-            start: 0,
-            duration: 4,
-            tupletRatio: 1,
-            tieStart: false,
-            tieStop: false,
-            cue: false,
-            syllables,
-            withPrevious: false,
+  return melodyOf(
+    null,
+    specs.map((s, i) =>
+      bar(
+        (s.notes ?? s.words?.map(w => [w]) ?? [[]]).map(syllables =>
+          note('C', 4, { duration: 4, syllables })
+        ),
+        {
+          number: i + 1,
+          section: s.section ?? null,
+          barline: s.end ? 'repeat-end' : 'single',
+          directions: (s.dirs ?? []).map(d => ({
+            kind: 'text',
+            al: null,
+            time: null,
+            text: '',
+            ...d,
           })),
-        ],
-        chords: [],
-        section: s.section ?? null,
-        barline: s.end ? 'repeat-end' : 'single',
-        directions: (s.dirs ?? []).map(d => ({
-          kind: 'text',
-          al: null,
-          time: null,
-          text: '',
-          ...d,
-        })),
-        repeatStart: !!s.repeatStart,
-        ending: s.ending
-          ? { label: s.ending, start: s.endingStart !== false, stop: true, closed: false }
-          : null,
-        length: 4,
-        full: true,
-        fifths: 0,
-        beats: 4,
-        beatType: 4,
-        tempo: null,
-      })
-    ),
-  }
+          repeatStart: !!s.repeatStart,
+          ending: s.ending
+            ? { label: s.ending, start: s.endingStart !== false, stop: true, closed: false }
+            : null,
+        }
+      )
+    )
+  )
 }
 
 const played = (m: Melody) => playOrder(m).map(p => p.measure)

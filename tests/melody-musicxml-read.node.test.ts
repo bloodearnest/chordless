@@ -3,8 +3,9 @@ import { describe, it } from 'node:test'
 import type { Melody, MelodyEvent, MelodyMeasure, MelodyNote } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { readMusicXml } from '../src/js/melody-musicxml-read.ts'
-import { midiOf } from '../src/js/pitch.ts'
+import type { Step } from '../src/js/pitch.ts'
 import { parseXml } from '../src/js/xml.ts'
+import { bar, note } from './melody-build.ts'
 
 describe('the XML reader', () => {
   it('reads elements, attributes, text and entities, and skips what is not content', () => {
@@ -201,56 +202,22 @@ describe('reading MusicXML written by another program', () => {
 })
 
 describe('MusicXML as what is kept: written and read back', () => {
-  const note = (
-    step: MelodyNote['step'],
-    start: number,
-    over: Partial<MelodyNote> = {}
-  ): MelodyNote => ({
-    kind: 'note',
-    id: `${step}${start}`,
-    step,
-    alter: 0,
-    octave: 4,
-    midi: midiOf(step, 0, 4),
-    start,
-    duration: 1,
-    tupletRatio: 1,
-    tieStart: false,
-    tieStop: false,
-    cue: false,
-    syllables: [],
-    withPrevious: false,
-    ...over,
-  })
-  const measure = (over: Partial<MelodyMeasure>): MelodyMeasure => ({
-    number: 1,
-    voices: [[]],
-    chords: [],
-    section: null,
-    barline: 'single',
-    directions: [],
-    repeatStart: false,
-    ending: null,
-    length: 4,
-    full: true,
-    fifths: 0,
-    beats: 4,
-    beatType: 4,
-    tempo: null,
-    ...over,
-  })
+  /** A note in octave 4, at a start in the measure */
+  const at = (step: Step, start: number, over: Partial<MelodyNote> = {}) =>
+    note(step, 4, { start, ...over })
+  const measure = (over: Partial<MelodyMeasure>) => bar([], over)
   const back = (m: Melody) => readMusicXml(writeMusicXml(m)) as Melody
 
   it('keeps a chord inside a held note, a chord after the last note, and two lines in one voice', () => {
-    const whole = note('D', 0, { duration: 4 })
+    const whole = at('D', 0, { duration: 4 })
     const m = measure({
       voices: [
         [whole],
         // two lines that run together, which MusicXML holds as voices of their own
         [
-          note('A', 0, { cue: true, duration: 3 }),
-          note('B', 3, { cue: true }),
-          note('C', 0, { cue: true }),
+          at('A', 0, { cue: true, duration: 3 }),
+          at('B', 3, { cue: true }),
+          at('C', 0, { cue: true }),
         ],
       ],
       chords: [
@@ -276,10 +243,10 @@ describe('MusicXML as what is kept: written and read back', () => {
       directions: [{ kind: 'to-coda', al: null, time: 2, text: '2nd time to Coda' }],
       voices: [
         [
-          note('C', 1, { cue: true, alter: 1, midi: 61 }),
-          note('E', 2, { tupletRatio: 2 / 3, duration: 2 / 3, tuplet: 'start' }),
-          note('F', 2 + 2 / 3, { tupletRatio: 2 / 3, duration: 2 / 3 }),
-          note('G', 2 + 4 / 3, { tupletRatio: 2 / 3, duration: 2 / 3, tuplet: 'stop' }),
+          at('C', 1, { cue: true, alter: 1, midi: 61 }),
+          at('E', 2, { tupletRatio: 2 / 3, duration: 2 / 3, tuplet: 'start' }),
+          at('F', 2 + 2 / 3, { tupletRatio: 2 / 3, duration: 2 / 3 }),
+          at('G', 2 + 4 / 3, { tupletRatio: 2 / 3, duration: 2 / 3, tuplet: 'stop' }),
         ],
       ],
       length: 4,
@@ -290,7 +257,7 @@ describe('MusicXML as what is kept: written and read back', () => {
       barline: 'repeat-end',
       ending: { label: '1', start: true, stop: true, closed: true },
       directions: [{ kind: 'da-segno', al: 'coda', time: null, text: 'D.S. al Coda' }],
-      voices: [[note('A', 0, { duration: 4, syllables: ['Lord-', 'x'] })]],
+      voices: [[at('A', 0, { duration: 4, syllables: ['Lord-', 'x'] })]],
     })
     const read = back({ title: null, notice: [], measures: [first, second] }).measures
     const [a, b] = read as [MelodyMeasure, MelodyMeasure]

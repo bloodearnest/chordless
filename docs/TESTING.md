@@ -48,6 +48,10 @@ safety. To keep it that way:
 - Build records with `tests/builders.ts` (`makeSetlist({ date })`, `makeSong`, `makeEntry`,
   `makePadSet`, `makeChart`, `makeLocalState`) rather than partial literals cast with `as any`.
   A test that needs a record the app would never hold says so with `as unknown as T`.
+- Build melodies with `tests/melody-build.ts`: `measure(1, ['C4:1:Ho-', 'r:1'])` for the short form,
+  and `note('B', 4, { alter: -1 })`, `rest()` and `bar(events, { fifths: 1 })` for what it cannot
+  say, giving only the fields the test is about. `tests/melody-sample.ts` is a melody and its record,
+  ready made.
 - `must(await db.getSong(id)).title` (`tests/must.ts`) asserts a value is there and narrows it.
   Chai's `expect(x).to.exist` does not narrow. Not inside `page.evaluate`: that code runs in
   the page, where the helper does not exist.

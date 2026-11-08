@@ -1,12 +1,12 @@
 import { expect } from '@open-wc/testing'
 import type { MelodyRecord } from '../src/js/data-types.ts'
-import type { Melody, MelodyNote } from '../src/js/melody.ts'
+import type { Melody } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { readMusicXml } from '../src/js/melody-musicxml-read.ts'
 import { melodyRecord } from '../src/js/melody-record.ts'
 import { readMelodyFile, readMxl } from '../src/js/mxl.ts'
-import { midiOf } from '../src/js/pitch.ts'
 import { addSong, useSyncRig } from './drive-harness.ts'
+import { measure } from './melody-build.ts'
 import type { MemoryFile } from './memory-storage.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
@@ -17,42 +17,15 @@ suppressConsoleLogs()
 
 /** A melody of one bar of four notes, whose first lyric says which one it is */
 function melodyOf(word: string): Melody {
-  const note = (step: MelodyNote['step'], start: number, syllable: string): MelodyNote => ({
-    kind: 'note',
-    id: `${step}${start}`,
-    step,
-    alter: 0,
-    octave: 4,
-    midi: midiOf(step, 0, 4),
-    start,
-    duration: 1,
-    tupletRatio: 1,
-    tieStart: false,
-    tieStop: false,
-    cue: false,
-    syllables: [syllable],
-    withPrevious: false,
-  })
   return {
     title: null,
     notice: ['CCLI Song # 1'],
     measures: [
-      {
-        number: 1,
-        voices: [[note('G', 0, word), note('A', 1, 'b'), note('B', 2, 'c'), note('C', 3, 'd')]],
-        chords: [{ start: 0, text: 'G' }],
-        section: null,
+      measure(1, [`G4:1:${word}`, 'A4:1:b', 'B4:1:c', 'C4:1:d'], {
+        chords: [[0, 'G']],
         barline: 'final',
-        directions: [],
-        repeatStart: false,
-        ending: null,
-        length: 4,
-        full: true,
         fifths: 1,
-        beats: 4,
-        beatType: 4,
-        tempo: null,
-      },
+      }),
     ],
   }
 }

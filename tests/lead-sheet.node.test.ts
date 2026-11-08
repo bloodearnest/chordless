@@ -2,68 +2,24 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readOfMelody } from '../src/js/lead-sheet.ts'
-import type { Melody, MelodyEvent, MelodyMeasure, MelodyNote } from '../src/js/melody.ts'
-import { midiOf } from '../src/js/pitch.ts'
+import type { MelodyEvent } from '../src/js/melody.ts'
+import type { Step } from '../src/js/pitch.ts'
+import { bar, melodyOf, note, rest } from './melody-build.ts'
 
-const note = (
-  step: MelodyNote['step'],
-  octave: number,
-  syllable = '',
-  cue = false
-): MelodyNote => ({
-  kind: 'note',
-  id: `${step}${octave}`,
-  step,
-  alter: 0,
-  octave,
-  midi: midiOf(step, 0, octave),
-  start: 0,
-  duration: 1,
-  tupletRatio: 1,
-  tieStart: false,
-  tieStop: false,
-  cue,
-  syllables: [syllable],
-  withPrevious: false,
-})
-const bar = (number: number, notes: MelodyEvent[]): MelodyMeasure => ({
-  number,
-  voices: [notes],
-  chords: [],
-  section: null,
-  barline: 'single',
-  directions: [],
-  repeatStart: false,
-  ending: null,
-  length: 4,
-  full: true,
-  fifths: -1,
-  beats: 4,
-  beatType: 4,
-  tempo: null,
-})
-const sheet = (measures: MelodyMeasure[]): Melody => ({ title: null, notice: [], measures })
+/** A note sung to `syllable`, or none; `cue` for a small one */
+const sung = (step: Step, octave: number, syllable = '', cue = false) =>
+  note(step, octave, { syllables: [syllable], cue })
+/** A measure of a sheet in F (one flat), by the number the sheet prints */
+const at = (number: number, events: MelodyEvent[]) => bar(events, { number, fifths: -1 })
 
 test('the range of the sung notes, what was left out, and the bars of the two ends', () => {
   const read = readOfMelody(
-    sheet([
+    melodyOf(null, [
       // (a pickup, numbered 0 as the sheet prints it)
-      bar(0, [note('C', 2, '', true), note('C', 2, '', true)]),
-      bar(1, [
-        note('D', 4, 'Ho'),
-        {
-          kind: 'rest',
-          id: 'r',
-          start: 1,
-          duration: 1,
-          tupletRatio: 1,
-          wholeMeasure: false,
-          cue: false,
-        },
-        note('A', 5, 'ly'),
-      ]),
-      bar(2, [note('D', 4, 'ho'), note('A', 5, 'ly')]),
-      bar(3, [note('C', 6)]),
+      at(0, [sung('C', 2, '', true), sung('C', 2, '', true)]),
+      at(1, [sung('D', 4, 'Ho'), rest({ start: 1 }), sung('A', 5, 'ly')]),
+      at(2, [sung('D', 4, 'ho'), sung('A', 5, 'ly')]),
+      at(3, [sung('C', 6)]),
     ])
   )
   assert.deepEqual(read, {
@@ -80,6 +36,6 @@ test('the range of the sung notes, what was left out, and the bars of the two en
 })
 
 test('no range from a sheet with no sung note', () => {
-  assert.equal(readOfMelody(sheet([bar(1, [note('C', 4, '', true)])])), null)
-  assert.equal(readOfMelody(sheet([])), null)
+  assert.equal(readOfMelody(melodyOf(null, [at(1, [sung('C', 4, '', true)])])), null)
+  assert.equal(readOfMelody(melodyOf(null, [])), null)
 })
