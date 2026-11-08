@@ -2,6 +2,8 @@ import { expect, fixture, html } from '@open-wc/testing'
 import { type SongInfo, SongRangeChangeEvent } from '../src/components/song-info.ts'
 import '../src/components/song-info.ts'
 
+import { songMelody } from '../src/js/melody-analysis.ts'
+import { sampleRecord } from './melody-sample.ts'
 import { A11Y } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -12,7 +14,7 @@ const song = (over: Record<string, unknown> = {}) =>
   ({ title: 'Amazing Grace', metadata: {}, ...over }) as unknown as Song
 
 describe('song-info', () => {
-  async function show(set: Partial<Pick<SongInfo, 'song' | 'appearances' | 'loading'>>) {
+  async function show(set: Partial<Pick<SongInfo, 'song' | 'appearances' | 'loading' | 'melody'>>) {
     const info = await fixture<SongInfo>(html`<song-info></song-info>`)
     Object.assign(info, set)
     await info.updateComplete
@@ -51,6 +53,21 @@ describe('song-info', () => {
         ...over,
       })
     const badges = (info: SongInfo) => info.shadowRoot?.querySelectorAll('.range-badge') ?? []
+
+    it('says how long the song sits on its highest and lowest notes, when it has a melody', async () => {
+      const melody = songMelody({ key: 'G' } as never, sampleRecord('song-1', 'G'))
+      const shown = text(await show({ song: ranged({}, { x_chordless_range: '' }), melody }))
+      expect(shown).to.contain('Highest G4: 3 beats; lowest C4: 1 beat')
+      expect(text(await show({ song: ranged(), melody: null }))).to.not.contain('Highest')
+      // (a melody that does not say its key is named in the song's)
+      const unkeyed = songMelody({} as never, sampleRecord('song-1', null))
+      expect(text(await show({ song: ranged(), melody: unkeyed }))).to.contain(
+        'Highest G4: 3 beats'
+      )
+      // (with no key to name the notes in, nothing is said)
+      const keyless = ranged({ key: '', metadata: {} }, { key: '', x_chordless_range: 'D4-E5' })
+      expect(text(await show({ song: keyless, melody }))).to.not.contain('Highest')
+    })
 
     it('shows the lowest and highest note, how wide it is, and how it fits', async () => {
       const info = await show({ song: ranged() })
