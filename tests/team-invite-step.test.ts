@@ -3,14 +3,14 @@
  * sent to the Worker, and the links shown. The Worker is a fetch that answers from a table, and
  * the service worker that keeps the sign-in a fake one.
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/team-invite-step.ts'
 import type { TeamInviteStep } from '../src/components/team-invite-step.ts'
 import { leadersOf } from '../src/js/team-spaces.ts'
 import { makeSetlist } from './builders.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -141,7 +141,7 @@ describe('team-invite-step', () => {
     expect(text()).to.contain('Make 2 invites')
 
     button('Make 2 invites').click()
-    await wait(100)
+    await waitUntil(() => !page._busy, 'the invites to be made')
     await page.updateComplete
     expect(made.map(each => each.body)).to.deep.equal([
       { role: 'writer', email: 'ann@example.com' },
@@ -162,7 +162,7 @@ describe('team-invite-step', () => {
   it('copies a link, and says so', async () => {
     await open([{ name: 'Ann', email: 'ann@example.com' }])
     button('Make 1 invite').click()
-    await wait(100)
+    await waitUntil(() => !page._busy, 'the invites to be made')
     await page.updateComplete
     const written: string[] = []
     const real = navigator.clipboard.writeText.bind(navigator.clipboard)
@@ -171,7 +171,7 @@ describe('team-invite-step', () => {
     }
     try {
       button('Copy the link').click()
-      await wait(20)
+      await waitUntil(() => page._copied, 'the link to be copied')
       await page.updateComplete
     } finally {
       navigator.clipboard.writeText = real
@@ -183,7 +183,7 @@ describe('team-invite-step', () => {
   it('goes on without saying copied when the browser will not copy', async () => {
     await open([{ name: 'Ann', email: 'ann@example.com' }])
     button('Make 1 invite').click()
-    await wait(100)
+    await waitUntil(() => !page._busy, 'the invites to be made')
     await page.updateComplete
     const real = navigator.clipboard.writeText.bind(navigator.clipboard)
     navigator.clipboard.writeText = async () => {
@@ -191,7 +191,7 @@ describe('team-invite-step', () => {
     }
     try {
       button('Copy the link').click()
-      await wait(20)
+      await nothingFor(20)
       await page.updateComplete
     } finally {
       navigator.clipboard.writeText = real
@@ -213,14 +213,14 @@ describe('team-invite-step', () => {
 
     refuse = ['dan@example.com']
     button('Make 2 invites').click()
-    await wait(100)
+    await waitUntil(() => !page._busy, 'the invites to be made')
     await page.updateComplete
     expect(text()).to.contain('dan@example.com: Too many invites')
     expect(boxes().map(box => box.checked)).to.deep.equal([true]) // dan, still to try
 
     refuse = []
     button('Make 1 invite').click()
-    await wait(100)
+    await waitUntil(() => !page._busy, 'the invites to be made')
     await page.updateComplete
     expect(text()).to.not.contain('Too many invites')
     expect(page.shadowRoot?.querySelectorAll('input.link')).to.have.length(2)

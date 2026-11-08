@@ -13,7 +13,7 @@ import { normalizeTempoNote } from '../src/js/metronome-controller.ts'
 import { PadAudioController } from '../src/js/pad-audio-controller.ts'
 import { listPadSets, PadSetChangedEvent } from '../src/js/pad-set-service.ts'
 import { installFakeDrive } from './fake-drive.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -176,7 +176,7 @@ describe('the media player', () => {
         throw new Error('no audio')
       }
       document.dispatchEvent(settings({ doubleClickBelowBpm: 100 }))
-      await wait(10)
+      await nothingFor(10)
     })
 
     it('is opened, and closed by its own close and not one from inside it', async () => {
@@ -219,7 +219,7 @@ describe('the media player', () => {
         throw new Error('no pad')
       }
       await player._handlePadSetChange()
-      await wait(10)
+      await nothingFor(10)
     })
   })
 
@@ -276,7 +276,7 @@ describe('the media player', () => {
           metadata: { key: 'D', tempo: 100 },
         } as never)
       )
-      await wait(10)
+      await nothingFor(10)
     })
 
     it('draws again when the page changes, as that decides what it offers', async () => {
@@ -583,7 +583,7 @@ describe('the media player', () => {
       }
       player.currentKey = 'D'
       await player.updateComplete
-      await wait(10)
+      await nothingFor(10)
     })
 
     it('says so when the pad cannot be loaded as it starts up', async () => {
@@ -594,7 +594,7 @@ describe('the media player', () => {
         late.setAttribute('current-key', 'G')
         document.body.append(late)
         await late.updateComplete
-        await wait(10)
+        await nothingFor(10)
         late.remove()
       } finally {
         PadAudioController.prototype.loadPad = real
@@ -615,7 +615,7 @@ describe('the media player', () => {
         } as never)
       )
       await player._startSong()
-      await wait(10)
+      await nothingFor(10)
     })
 
     it('cannot fade in with no pads to fade', async () => {

@@ -1,4 +1,4 @@
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import { type SongVersions, SongVersionsChangedEvent } from '../src/components/song-versions.ts'
 import '../src/components/song-versions.ts'
 import type { SongRecord } from '../src/js/data-types.ts'
@@ -307,7 +307,6 @@ describe('song-versions', () => {
   })
 
   describe('deleting the only version, which is the song', () => {
-    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
     const entry = () => makeEntry({ songUuid: 'only', songId: 'ccli-1' })
 
     it('says how many setlists have it, and on confirming deletes it and says the song is gone', async () => {
@@ -316,7 +315,7 @@ describe('song-versions', () => {
       await db.saveSetlist(makeSetlist({ id: 'two', songs: [entry()] }))
       const el = await show()
       $(el, '.delete')?.click()
-      await wait(30)
+      await waitUntil(() => $(el, '.confirm'), 'the question to be asked')
       await el.updateComplete
       expect(text($(el, '.confirm'))).to.contain('Delete this song? It is in 2 setlists')
       let deleted: boolean | null = null
@@ -328,7 +327,7 @@ describe('song-versions', () => {
         { once: true }
       )
       $(el, '.confirm-delete')?.click()
-      for (let n = 0; n < 50 && deleted === null; n++) await wait(10)
+      await waitUntil(() => deleted !== null, 'the song to be deleted')
       expect(deleted).to.equal(true)
       expect(await db.getSong('only')).to.equal(undefined)
       expect(must(await db.getSetlist('one')).songs).to.deep.equal([])
@@ -339,7 +338,7 @@ describe('song-versions', () => {
       await add('only')
       const el = await show()
       $(el, '.delete')?.click()
-      await wait(30)
+      await waitUntil(() => $(el, '.confirm'), 'the question to be asked')
       await el.updateComplete
       expect(text($(el, '.confirm'))).to.not.contain('setlist')
       ;($(el, '.confirm .btn:not(.primary)') as HTMLElement).click()
@@ -347,7 +346,7 @@ describe('song-versions', () => {
 
       await db.saveSetlist(makeSetlist({ id: 'one', songs: [entry()] }))
       $(el, '.delete')?.click()
-      await wait(30)
+      await waitUntil(() => $(el, '.confirm'), 'the question to be asked')
       await el.updateComplete
       expect(text($(el, '.confirm'))).to.contain(
         'It is in 1 setlist and will be taken out of it, so it will no longer count as played there'
@@ -358,7 +357,7 @@ describe('song-versions', () => {
       await add('only')
       const el = await show()
       $(el, '.delete')?.click()
-      await wait(30)
+      await waitUntil(() => $(el, '.confirm'), 'the question to be asked')
       await el.updateComplete
       const real = db.deleteSong.bind(db)
       db.deleteSong = async () => {
@@ -366,7 +365,7 @@ describe('song-versions', () => {
       }
       try {
         $(el, '.confirm-delete')?.click()
-        await wait(50)
+        await waitUntil(() => shownToast(), 'the failure to be told')
       } finally {
         db.deleteSong = real
       }
