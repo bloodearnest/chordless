@@ -17,23 +17,23 @@
   },
   "src/js/melody-path.ts": {
     "lines": 0,
-    "branches": 6,
+    "branches": 3,
     "functions": 0
   },
   "src/js/melody-pdf.ts": {
-    "lines": 835,
-    "branches": 12,
-    "functions": 26
+    "lines": 100,
+    "branches": 61,
+    "functions": 31
   },
   "src/js/melody-pdfjs.ts": {
-    "lines": 18,
-    "branches": 13,
+    "lines": 11,
+    "branches": 7,
     "functions": 0
   },
   "src/js/melody-read.ts": {
-    "lines": 185,
-    "branches": 48,
-    "functions": 20
+    "lines": 101,
+    "branches": 43,
+    "functions": 10
   },
   "src/js/melody-render-engine.ts": {
     "lines": 1,

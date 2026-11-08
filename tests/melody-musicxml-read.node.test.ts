@@ -59,13 +59,11 @@ describe('reading MusicXML written by another program', () => {
 </score-partwise>`
 
   it('finds the title where a program put it when the score has no work title', () => {
-    const measure = '<measure number="1"><attributes><divisions>1</divisions></attributes></measure>'
+    const measure =
+      '<measure number="1"><attributes><divisions>1</divisions></attributes></measure>'
     const without = (xml: string) => xml.replace('<work><work-title>Hymn</work-title></work>', '')
     const credits = (words: string) => without(doc(measure, words))
-    assert.equal(
-      readMusicXml(credits('<movement-title>Moved</movement-title>'))?.title,
-      'Moved'
-    )
+    assert.equal(readMusicXml(credits('<movement-title>Moved</movement-title>'))?.title, 'Moved')
     assert.equal(
       readMusicXml(
         credits(
