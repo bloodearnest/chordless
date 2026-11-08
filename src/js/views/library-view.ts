@@ -13,6 +13,7 @@ import type { PropertyValues } from 'lit'
 import { html, nothing } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import type { AppHeader } from '../../components/app-header.ts'
+import type { MelodySheet } from '../../components/melody-sheet.ts'
 import { rangeOfMetadata } from '../chart-range.ts'
 import '../../components/app-header.ts'
 import type { AppModal } from '../../components/app-modal.ts'
@@ -40,7 +41,7 @@ import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../da
 import { watchData } from '../data-watcher.ts'
 import { getCurrentDB } from '../db.ts'
 import { filterByPlace, loadLeftOut, placesOf, saveLeftOut } from '../library-spaces.ts'
-import { songMelody } from '../melody-analysis.ts'
+import { melodyOfRecord, songMelody } from '../melody-analysis.ts'
 import { goTo } from '../navigation.ts'
 import {
   addToLibrary,
@@ -142,7 +143,62 @@ export class LibraryView extends PageView {
   }
 
   override updated(changed: PropertyValues<this>): void {
-    if (changed.has('route')) this.#syncSong()
+    if (changed.has('route')) {
+      void this.#syncSong()
+      this.#melodyFromRoute()
+    }
+  }
+
+  // ==================== Melody ====================
+
+  /** The open song is shown as its melody sheet and not its lyrics: `?melody` in the URL */
+  #melodyOn = false
+
+  /** A route that asks for the other mode (the button, a link, back) changes it, for the song that is open */
+  #melodyFromRoute(): void {
+    const on = Boolean(this.#route.melody)
+    if (!this.#route.songUuid || on === this.#melodyOn || !this.#song) return
+    this.#melodyOn = on
+    void this.#applyMelody()
+  }
+
+  #toggleMelody(): void {
+    const route = this.#route
+    if (!route.songUuid) return
+    this.#melodyOn = !this.#melodyOn
+    void this.#applyMelody()
+    const { melody: _was, ...rest } = route
+    goTo(buildUrl(this.#melodyOn ? { ...rest, melody: true } : rest), { replace: true })
+  }
+
+  /** Show the open song as what its mode says: the lyrics, or the melody sheet in the key it is shown in; and the button for it */
+  async #applyMelody(): Promise<void> {
+    const song = this.#song
+    const header = this.querySelector<AppHeader>('#library-app-header')
+    const content = this.#content.value?.querySelector<HTMLElement>('.song-content')
+    if (!song || !header) return
+    const record = await (await getCurrentDB()).getMelody(song.uuid)
+    const melody = record && melodyOfRecord(record)
+    // (the song may have changed while this was read)
+    if (this.#song !== song) return
+    header.showMelodyToggle = Boolean(melody)
+    if (!melody) this.#melodyOn = false
+    header.melodyMode = this.#melodyOn
+    const display = content?.querySelector<HTMLElement>('song-display')
+    const sheet = content?.querySelector<MelodySheet>('melody-sheet')
+    if (!this.#melodyOn || !melody || !record || !content) {
+      if (sheet) sheet.hidden = true
+      if (display) display.style.display = ''
+      return
+    }
+    await import('../../components/melody-sheet.ts')
+    const shown = sheet ?? document.createElement('melody-sheet')
+    shown.melody = melody
+    shown.melodyKey = record.key || song.originalKey || ''
+    shown.songKey = this.#key || shown.melodyKey
+    shown.hidden = false
+    if (!sheet) content.appendChild(shown)
+    if (display) display.style.display = 'none'
   }
 
   override disconnectedCallback(): void {
@@ -265,6 +321,7 @@ export class LibraryView extends PageView {
 
   async #viewSong(song: SongWithContent): Promise<void> {
     this.#song = song
+    this.#melodyOn = Boolean(this.#route.melody)
     this._source = song.source?.label ?? ''
     // Not the library's: nothing here changes it
     if (song.source) this.#setEditMode(false)
@@ -299,6 +356,12 @@ export class LibraryView extends PageView {
     this._heading = 'Song Library'
     this.#setEditMode(false)
     this.#song = null
+    this.#melodyOn = false
+    const header = this.querySelector<AppHeader>('#library-app-header')
+    if (header) {
+      header.showMelodyToggle = false
+      header.melodyMode = false
+    }
     this._source = ''
   }
 
@@ -309,6 +372,8 @@ export class LibraryView extends PageView {
     const db = await getCurrentDB()
     const model = createLibrarySongModel(song, db, db.spaceId)
     SongViewManager.initializeSongSections(content, model, { editMode: this.#editMode })
+    // (a song the library holds of another space has none of its melodies here, so none is shown)
+    await this.#applyMelody()
   }
 
   // ==================== Edit mode ====================
@@ -581,6 +646,7 @@ export class LibraryView extends PageView {
         show-edit-toggle
         show-info-button
         @app-header:edit-mode-toggle=${() => this.#toggleEditMode()}
+        @app-header:melody-toggle=${() => this.#toggleMelody()}
         @app-header:info-click=${() => this.#showInfo()}
       >
         <div slot="controls" class="header-controls-slot">

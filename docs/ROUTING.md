@@ -14,7 +14,7 @@ URLs are paths; the router doesn't use `#hashes` (a lint rule forbids them).
 | URL | Route | View |
 | --- | --- | --- |
 | `/`, `/?shared` (what was shared by link: `{ name: 'home', shared: true }`, its own view) | `home` | `home-view.js` |
-| `/songs`, `/songs?q=<search>`, `/songs/<uuid>` (`?melody` on a song: its melody sheet; not built for the library yet) | `songs` | `library-view.js` |
+| `/songs`, `/songs?q=<search>`, `/songs/<uuid>` (`?melody` on a song: its melody sheet) | `songs` | `library-view.js` |
 | `/setlist/<id>`, `/setlist/<id>/song/<n>`, `/setlist/<id>/song/<n>?melody` | `setlist` (`songIndex` -1 is the overview; `melody: true` is the song as its melody sheet) | `setlist-view.js` |
 | `/account` (Account and Teams, docs/ACCOUNT.md; `/storage` opens it too), `/account/new`, `/media`, `/contact`, `/preferences`, `/import-song`, `/import-setlist`, `/join` | by name | `*-view.js` |
 | anything else | `not-found` | `not-found-view.js` |

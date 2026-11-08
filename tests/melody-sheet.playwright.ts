@@ -56,3 +56,22 @@ test('a song with a melody can be shown as its sheet, and back to its lyrics', a
 
   expect(consoleErrors.filter(text => /Content Security Policy|wasm/i.test(text))).toEqual([])
 })
+
+test('the library shows a song as its sheet too, in its own key', async ({ page }) => {
+  await seedSong(page)
+  await page.evaluate(async xml => {
+    const { getCurrentDB } = await import('/js/db.ts')
+    const { melodyRecord } = await import('/js/melody-record.ts')
+    await (await getCurrentDB()).saveMelody(melodyRecord('info-test-song', xml, 'G'))
+  }, MUSIC_XML)
+  await page.goto('/songs/info-test-song')
+  await page.reload()
+  await page.getByRole('button', { name: 'Show the melody' }).click()
+  await expect(page.locator('melody-sheet .notehead')).toHaveCount(4)
+  await expect(page).toHaveURL(/\/songs\/info-test-song\?melody$/)
+  await page.reload()
+  await expect(page.locator('melody-sheet .notehead')).toHaveCount(4)
+  await page.getByRole('button', { name: 'Show the lyrics' }).click()
+  await expect(page.locator('melody-sheet')).toBeHidden()
+  await expect(page.locator('#library-song-content song-display')).toBeVisible()
+})

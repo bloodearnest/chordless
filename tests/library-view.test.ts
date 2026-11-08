@@ -8,6 +8,7 @@ import { expect } from '@open-wc/testing'
 import type { AppHeader } from '../src/components/app-header.ts'
 import type { AppModal } from '../src/components/app-modal.ts'
 import { KeyChangeEvent, type KeySelector } from '../src/components/key-selector.ts'
+import type { MelodySheet } from '../src/components/melody-sheet.ts'
 import { SongRangeChangedEvent } from '../src/components/song-info-dialog.ts'
 import {
   SectionActionEvent,
@@ -250,6 +251,81 @@ describe('the library view, with a song open', () => {
         view.querySelector<HTMLElement & { parsed: unknown }>('song-display')?.parsed
       )
       expect(text).to.contain('"A"')
+    })
+
+    describe('the melody sheet', () => {
+      const header = () => control<AppHeader>('library-app-header')
+      const toggle = () => header().shadowRoot?.querySelector<HTMLButtonElement>('.melody-toggle')
+      const sheet = () => view.querySelector<MelodySheet>('melody-sheet')
+      const lyrics = () => view.querySelector<HTMLElement>('song-display')
+      const visited: { url: string; replace?: boolean }[] = []
+
+      beforeEach(async () => {
+        visited.length = 0
+        setRouter({
+          navigate: async (url: string, options?: { replace?: boolean }) => {
+            visited.push({ url, replace: options?.replace })
+            return true
+          },
+        })
+        await db.saveMelody(sampleRecord(song.uuid, 'G'))
+      })
+      afterEach(async () => {
+        await db.deleteMelody(song.uuid, { remember: false })
+      })
+
+      it('has a button for a song with a melody, which shows the sheet in place of the lyrics and back', async () => {
+        await open()
+        await until(() => toggle(), 'the melody button')
+        expect(toggle()?.getAttribute('aria-pressed')).to.equal('false')
+        expect(sheet()).to.equal(null)
+
+        toggle()?.click()
+        await until(() => sheet(), 'the melody sheet')
+        expect(sheet()?.hidden).to.equal(false)
+        expect(lyrics()?.style.display).to.equal('none')
+        expect(visited.at(-1)).to.deep.equal({ url: `/songs/${song.uuid}?melody`, replace: true })
+        expect(toggle()?.getAttribute('aria-pressed')).to.equal('true')
+
+        toggle()?.click()
+        await until(() => sheet()?.hidden, 'the sheet to be put away')
+        expect(lyrics()?.style.display).to.equal('')
+        expect(visited.at(-1)).to.deep.equal({ url: `/songs/${song.uuid}`, replace: true })
+      })
+
+      it('is shown in the key the song is in, and engraved again for a new one', async () => {
+        await open()
+        await until(() => toggle(), 'the melody button')
+        toggle()?.click()
+        await until(() => sheet(), 'the melody sheet')
+        expect(sheet()?.songKey).to.equal('G')
+        control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('A'))
+        await until(() => sheet()?.songKey === 'A', 'the sheet in A')
+        expect(lyrics()?.style.display).to.equal('none')
+      })
+
+      it('follows the route: opened as the sheet, and moved to the lyrics and back by a link or Back', async () => {
+        view = document.createElement('library-view')
+        view.route = { name: 'songs', songUuid: song.uuid, melody: true }
+        outlet.append(view)
+        await until(() => sheet(), 'the song to open as its sheet')
+        expect(toggle()?.getAttribute('aria-pressed')).to.equal('true')
+        view.route = { name: 'songs', songUuid: song.uuid }
+        await until(() => sheet()?.hidden, 'the lyrics to come back')
+        view.route = { name: 'songs', songUuid: song.uuid, melody: true }
+        await until(() => sheet() && !sheet()?.hidden, 'the sheet to come back')
+      })
+
+      it('has no button for a song with no melody, and none once the song is closed', async () => {
+        await db.deleteMelody(song.uuid, { remember: false })
+        await open()
+        await wait(100)
+        expect(toggle() ?? null).to.equal(null)
+        await db.saveMelody(sampleRecord(song.uuid, 'G'))
+        view.route = { name: 'songs' }
+        await wait(100)
+        expect(toggle() ?? null).to.equal(null)
+      })
     })
 
     describe('the melody range', () => {
