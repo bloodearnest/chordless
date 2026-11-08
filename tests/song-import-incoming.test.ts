@@ -11,7 +11,7 @@ import { setRouter } from '../src/js/navigation.ts'
 import { createSong } from '../src/js/song-utils.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { must } from './must.ts'
-import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 import '../src/components/song-import.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -54,7 +54,6 @@ describe('song-import: songs that arrive', () => {
 
   async function open() {
     importer = await fixture<SongImport>(html`<song-import></song-import>`)
-    await wait(30)
     return importer
   }
   const text = () => importer.shadowRoot?.textContent?.replace(/\s+/g, ' ') ?? ''
@@ -86,6 +85,7 @@ describe('song-import: songs that arrive', () => {
 
     it('are nothing, when nothing is waiting', async () => {
       await open()
+      await nothingFor(30)
       expect(importer._state).to.equal('pick')
     })
 
