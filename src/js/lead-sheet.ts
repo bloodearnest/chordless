@@ -74,7 +74,8 @@ export function readOfMelody(melody: Melody): MelodyRead | null {
       }
   return {
     ...range,
-    keySignature: melody.measures[0]?.fifths ?? 0,
+    // (a note was sung, so there is a first measure)
+    keySignature: (melody.measures[0] as Melody['measures'][number]).fifths,
     notes,
     instrumental,
     unsung,

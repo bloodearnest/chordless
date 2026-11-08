@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readOfMelody } from '../src/js/lead-sheet.ts'
-import type { Melody, MelodyMeasure, MelodyNote } from '../src/js/melody.ts'
+import type { Melody, MelodyEvent, MelodyMeasure, MelodyNote } from '../src/js/melody.ts'
 import { midiOf } from '../src/js/pitch.ts'
 
 const note = (
@@ -26,7 +26,7 @@ const note = (
   syllables: [syllable],
   withPrevious: false,
 })
-const bar = (number: number, notes: MelodyNote[]): MelodyMeasure => ({
+const bar = (number: number, notes: MelodyEvent[]): MelodyMeasure => ({
   number,
   voices: [notes],
   chords: [],
@@ -49,7 +49,19 @@ test('the range of the sung notes, what was left out, and the bars of the two en
     sheet([
       // (a pickup, numbered 0 as the sheet prints it)
       bar(0, [note('C', 2, '', true), note('C', 2, '', true)]),
-      bar(1, [note('D', 4, 'Ho'), note('A', 5, 'ly')]),
+      bar(1, [
+        note('D', 4, 'Ho'),
+        {
+          kind: 'rest',
+          id: 'r',
+          start: 1,
+          duration: 1,
+          tupletRatio: 1,
+          wholeMeasure: false,
+          cue: false,
+        },
+        note('A', 5, 'ly'),
+      ]),
       bar(2, [note('D', 4, 'ho'), note('A', 5, 'ly')]),
       bar(3, [note('C', 6)]),
     ])
