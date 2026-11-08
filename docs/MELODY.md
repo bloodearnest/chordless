@@ -273,15 +273,15 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
 - **Key picker**: per key, the time-weighted position of the notes, the longest held high note,
   and where a section starts to climb; the colours stay (green, yellow, red) but say why.
 - **A voice preference**: choose the voices the band has and the picker rates keys for them.
-- **View (built for a setlist's songs; the library's song page is next)**: a melody button in the header (the `music` icon, beside edit and info; only for a
+- **View (built for a setlist's songs and the library's song page)**: a melody button in the header (the `music` icon, beside edit and info; only for a
   song that has a melody) switches *that song* between its lyrics and its sheet, in the section the song already has, so
   swiping or the arrow keys still move to the next song (which is in its own mode: the choice is per song, not carried over),
   and up and down scroll the sheet. The mode is in the URL as `?melody` (`docs/ROUTING.md`), a replace and not a new history
   entry, so a reload or a link keeps it; the sheet is `<melody-sheet>` (`src/components/melody-sheet.ts`), engraved in the key
   the song is shown in (a key change engraves it again, keeping the old sheet on show until the new one is ready), fitted to
   the width of the screen with almost no margin, and with a narrower page on a phone so the music is drawn larger. Verovio's
-  own `<style>` element is taken out of each page (the page's policy allows none) and its few rules are the component's. Not
-  yet: the library's song page, a `built` test of the worker under the real policy, and the beats of the high notes shown
+  own `<style>` element is taken out of each page (the page's policy allows none) and its few rules are the component's. The library's song page has the same button and `?melody` (`/songs/<uuid>?melody`); there it is the one song open. Not
+  yet: a `built` test of the worker under the real policy, and the beats of the high notes shown
   on it.
 - **View, as first planned**: a "Melody" view in the key in use, rendered by **Verovio**, the engraver SongSelect uses
   (chosen; see "Rendering with Verovio" in the spike results), so a transposed sheet looks like
