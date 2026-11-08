@@ -40,7 +40,7 @@ async function loaded(view) {
       (!view.route.songUuid || view.querySelector('.song-content')),
     'setlist-view': () => view.querySelector('setlist-overview'),
   }[view.localName]
-  for (let i = 0; ready && i < 100 && !ready(); i++) await wait(20)
+  if (ready) await waitUntil(ready, `${view.localName} to load`, { timeout: 2000 })
   await frames(2)
 }
 
