@@ -487,10 +487,15 @@ describe('the library view', () => {
       const song = await addChart(shared, BETA, ADD)
       await open({ name: 'songs', songUuid: song.uuid })
       const real = Object.getPrototypeOf(db).saveSong
-      Object.getPrototypeOf(db).saveSong = () => Promise.reject(new Error('disk full'))
+      let tried = false
+      Object.getPrototypeOf(db).saveSong = () => {
+        tried = true
+        return Promise.reject(new Error('disk full'))
+      }
       try {
         view.querySelector<HTMLButtonElement>('#add-to-library')?.click()
-        await wait(200)
+        await waitUntil(() => tried, 'the song to be copied')
+        await nothingFor(50)
       } finally {
         Object.getPrototypeOf(db).saveSong = real
       }

@@ -365,7 +365,10 @@ describe('the setlist page: header, menu and keys', () => {
       header().dispatchEvent(new EditModeToggleEvent())
       expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(true)
       header().dispatchEvent(new EditModeToggleEvent())
-      await wait(300)
+      // (left as it was: the controls faded back)
+      await waitUntil(() =>
+        $$('.normal-mode-control').every(el => el.classList.contains('fade-complete'))
+      )
     })
 
     it('has the capo selector editable too when the capo is on', async () => {
@@ -375,7 +378,10 @@ describe('the setlist page: header, menu and keys', () => {
       header().dispatchEvent(new EditModeToggleEvent())
       expect(($('#capo-selector') as unknown as { editMode: boolean }).editMode).to.equal(true)
       header().dispatchEvent(new EditModeToggleEvent())
-      await wait(300)
+      // (left as it was: the controls faded back)
+      await waitUntil(() =>
+        $$('.normal-mode-control').every(el => el.classList.contains('fade-complete'))
+      )
     })
 
     it('is left with Escape, and a song’s edits are saved by leaving it', async () => {
@@ -704,24 +710,19 @@ describe('the setlist page: header, menu and keys', () => {
       const sheetOf = (index: number) => rig.root.querySelector(`#song-${index} melody-sheet`)
       const lyricsOf = (index: number) =>
         rig.root.querySelector<HTMLElement>(`#song-${index} song-display`)
-      const until = async (condition: () => unknown) => {
-        await waitUntil(() => condition())
-      }
-      const settle = async () => {
-        for (let i = 0; i < 5; i++) await wait(20)
-        await rig.flush()
-      }
+      const until = (condition: () => unknown) => waitUntil(condition)
+      const pressed = () => toggle()?.getAttribute('aria-pressed')
 
       it('is there for a song with a melody and not for one without', async () => {
         await rig.db.saveMelody(sampleRecord(rig.songs[0].uuid, 'G'))
         await rig.open()
         rig.page.showSong(0, true)
         await rig.page.header.show(rig.page.songs[0], true)
-        await settle()
+        await until(() => toggle())
         expect(toggle()).to.not.equal(null)
         rig.page.showSong(1, true)
         await rig.page.header.show(rig.page.songs[1], true)
-        await settle()
+        await until(() => !toggle())
         expect(toggle()).to.equal(null)
         await rig.db.deleteMelody(rig.songs[0].uuid, { remember: false })
       })
@@ -734,10 +735,9 @@ describe('the setlist page: header, menu and keys', () => {
           rig.page.showSong(0, true)
           await rig.page.header.show(rig.page.songs[0], true)
           rig.page.currentSongIndex = 0
-          await settle()
+          await until(() => toggle())
           toggle()?.click()
-          await until(() => sheetOf(0))
-          await settle()
+          await until(() => sheetOf(0) && pressed() === 'true')
           expect(sheetOf(0)?.hasAttribute('hidden')).to.equal(false)
           expect(lyricsOf(0)?.style.display).to.equal('none')
           expect(rig.visited.at(-1)).to.deep.equal({
@@ -751,7 +751,7 @@ describe('the setlist page: header, menu and keys', () => {
           rig.page.showSong(1, true)
           rig.page.currentSongIndex = 1
           await rig.page.header.show(rig.page.songs[1], true)
-          await settle()
+          await until(() => pressed() === 'false')
           expect(toggle()?.getAttribute('aria-pressed')).to.equal('false')
           expect(rig.page.navigateTo(1)).to.not.equal(undefined)
           expect(rig.visited.at(-1)?.url).to.not.contain('melody')
@@ -762,9 +762,9 @@ describe('the setlist page: header, menu and keys', () => {
           rig.page.showSong(0, true)
           rig.page.currentSongIndex = 0
           await rig.page.header.show(rig.page.songs[0], true)
-          await settle()
+          await until(() => pressed() === 'true')
           toggle()?.click()
-          await settle()
+          await until(() => sheetOf(0)?.hasAttribute('hidden') && pressed() === 'false')
           expect(sheetOf(0)?.hasAttribute('hidden')).to.equal(true)
           expect(lyricsOf(0)?.style.display).to.equal('')
           expect(rig.visited.at(-1)?.url).to.not.contain('melody')
@@ -781,12 +781,11 @@ describe('the setlist page: header, menu and keys', () => {
           rig.page.showSong(0, true)
           rig.page.currentSongIndex = 0
           rig.page.routeChanged({ songIndex: 0, melody: true })
-          await until(() => sheetOf(0))
-          await settle()
+          await until(() => sheetOf(0) && lyricsOf(0)?.style.display === 'none')
           expect(sheetOf(0)).to.not.equal(null)
           expect(lyricsOf(0)?.style.display).to.equal('none')
           rig.page.routeChanged({ songIndex: 0 })
-          await settle()
+          await until(() => lyricsOf(0)?.style.display === '')
           expect(lyricsOf(0)?.style.display).to.equal('')
           // (another song's mode does not touch the header, which is for the song in view)
           await rig.page.setMelodyMode(1, true)
@@ -797,7 +796,7 @@ describe('the setlist page: header, menu and keys', () => {
           rig.page.routeChanged({ songIndex: 0 })
           // (a song with no melody stays in its lyrics)
           rig.page.routeChanged({ songIndex: 2, melody: true })
-          await settle()
+          await nothingFor()
           expect(sheetOf(2)).to.equal(null)
           expect(lyricsOf(2)?.style.display).to.equal('')
         } finally {

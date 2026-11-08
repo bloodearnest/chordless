@@ -21,7 +21,7 @@ import { type HomeView, sharedGroup } from '../src/js/views/home-view.ts'
 import { makeSetlist } from './builders.ts'
 import { FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { clearToasts, shownToast, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { clearToasts, shownToast, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -98,7 +98,6 @@ describe('the home view', () => {
     const loading = () =>
       !view.querySelector('#setlist-list') || view.querySelector('status-message[state="loading"]')
     await waitUntil(() => !loading(), undefined, { timeout: 5000 })
-    await wait(30)
   }
   const modal = () => must(view.querySelector<AppModal>('app-modal'))
   const form = () => must(view.querySelector<SetlistDetailsForm>('setlist-details-form'))
@@ -209,7 +208,10 @@ describe('the home view', () => {
       try {
         await open()
         view.querySelector<HTMLButtonElement>('#create-setlist-button')?.click()
-        await wait(150)
+        await waitUntil(
+          () => form().people.some(person => person.emails.includes('ann@example.com')),
+          'the people to be offered'
+        )
         const ann = must(form().people.find(person => person.emails.includes('ann@example.com')))
         expect(ann.name).to.equal('Ann Smith')
         expect(form().setlist?.leaderId).to.equal(ann.id)
@@ -222,7 +224,10 @@ describe('the home view', () => {
             leaderId: ann.id,
           })
         )
-        await wait(150)
+        await waitUntil(
+          async () => (await db.getAllSetlists()).length > 0,
+          'the setlist to be saved'
+        )
         const [saved] = await db.getAllSetlists()
         expect(saved.createdBy).to.equal('ann@example.com')
         expect(saved.leaderId).to.equal(ann.id)
@@ -263,7 +268,7 @@ describe('the home view', () => {
         expect(form().setlist?.leaderId).to.equal('')
 
         form().dispatchEvent(new SetlistDetailsIdentifyEvent('dee-at-work'))
-        await wait(150)
+        await waitUntil(() => form().meId === 'dee-at-work', 'the answer to be taken')
 
         expect(form().askWho).to.equal(false)
         expect(form().meId).to.equal('dee-at-work')
@@ -277,7 +282,7 @@ describe('the home view', () => {
     it('saves it, and goes to it', async () => {
       await open()
       view.querySelector<HTMLButtonElement>('#create-setlist-button')?.click()
-      await wait(100)
+      await waitUntil(() => modal().open, 'the form to be shown')
       form().dispatchEvent(
         new SetlistDetailsSaveEvent({
           date: '2026-11-01',
@@ -307,7 +312,7 @@ describe('the home view', () => {
             leaderId: '',
           })
         )
-        await wait(100)
+        await waitUntil(() => shownToast(), 'the failure to be told')
       } finally {
         Object.getPrototypeOf(db).saveSetlist = real
       }
@@ -333,13 +338,13 @@ describe('the home view', () => {
             leaderId: '',
           })
         )
-        await wait(100)
+        await waitUntil(() => shownToast(), 'the failure to be told')
       } finally {
         Object.getPrototypeOf(db).saveSetlist = real
       }
 
       must(shownToast()?.action).run()
-      await wait(200)
+      await waitUntil(() => visited.length > 0, 'the setlist to be made and gone to')
 
       expect(visited).to.have.length(1)
       expect(visited[0]).to.match(/^\/setlist\//)
