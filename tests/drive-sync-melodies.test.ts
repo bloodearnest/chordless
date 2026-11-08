@@ -574,4 +574,67 @@ describe('Drive sync: melodies', () => {
     expect(wordOf(await phone.db.getMelody('song-1'))).to.equal('one')
     expect(must(await phone.db.getMelody('song-1')).fileRev).to.equal(melodyFiles()[0].rev)
   })
+
+  it('leaves a zip it cannot read alone, as it leaves any file that is not MusicXML', async () => {
+    const phone = await deviceWithMelody()
+    await syncDevice(phone)
+    rig.storage.edit(melodyFiles()[0].ref, 'PK this begins like a zip and is not one')
+
+    const tablet = await makeDevice('tablet')
+    await syncDevice(tablet)
+    expect(await tablet.db.getMelody('song-1')).to.equal(undefined)
+  })
+
+  it('takes the newer of two files for a song whichever is listed first', async () => {
+    const phone = await deviceWithMelody()
+    await syncDevice(phone)
+    const original = melodyFiles()[0]
+    rig.storage.copyFile(original.ref, { ref: 'copy-2', props: { ...original.props } })
+    await wait(5)
+    // (the original is edited last, so the copy listed after it is the older)
+    rig.storage.edit(original.ref, writeMusicXml(melodyOf('latest')))
+
+    const tablet = await makeDevice('tablet')
+    await syncDevice(tablet)
+    expect(wordOf(await tablet.db.getMelody('song-1'))).to.equal('latest')
+  })
+
+  it('keeps the key it had when the file in Drive names none, and has none if it never had one', async () => {
+    const phone = await deviceWithMelody()
+    await syncDevice(phone)
+    const tablet = await makeDevice('tablet')
+    await syncDevice(tablet)
+    const original = melodyFiles()[0]
+    rig.storage.copyFile(original.ref, { ref: 'copy-3', props: { ...original.props, key: '' } })
+    await wait(5)
+    rig.storage.edit('copy-3', writeMusicXml(melodyOf('keyless')))
+    await syncDevice(tablet)
+    expect(wordOf(await tablet.db.getMelody('song-1'))).to.equal('keyless')
+    expect((await tablet.db.getMelody('song-1'))?.key).to.equal('G')
+
+    const watch = await makeDevice('watch')
+    await syncDevice(watch)
+    expect((await watch.db.getMelody('song-1'))?.key).to.equal(null)
+  })
+
+  describe('in a space that holds text only (updates)', () => {
+    it('updates the plain file in place, a batch at a time', async () => {
+      rig.storage.bytes = false
+      const phone = await deviceWithMelody()
+      await syncDevice(phone)
+      const ref = melodyFiles()[0].ref
+      await phone.db.saveMelody(
+        melodyRecord(
+          'song-1',
+          writeMusicXml(melodyOf('edited')),
+          'G',
+          must(await phone.db.getMelody('song-1'))
+        )
+      )
+      await syncDevice(phone)
+      expect(melodyFiles()).to.have.length(1)
+      expect(melodyFiles()[0].ref).to.equal(ref)
+      expect(melodyFiles()[0].content).to.equal(writeMusicXml(melodyOf('edited')))
+    })
+  })
 })
