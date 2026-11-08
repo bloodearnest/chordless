@@ -8,7 +8,7 @@ import { packAnnotations, placeOnChordRow, type RowItem } from '../src/js/annota
 
 const at = (...xs: [number, number][]) => xs.map(([x, w]) => ({ x, w }))
 const chord = (x: number, w: number, segment = 0): RowItem => ({ kind: 'chord', x, w, segment })
-const note = (x: number, w: number): RowItem => ({ kind: 'annotation', x, w })
+const annotation = (x: number, w: number): RowItem => ({ kind: 'annotation', x, w })
 
 test('annotations that fit stay where their words are, on the first row', () => {
   assert.deepEqual(packAnnotations(at([10, 50], [200, 40]), 400, 8), [
@@ -53,15 +53,15 @@ test('none is none', () => {
 })
 
 test('on the chord row: an annotation over a chordless word stays at its word', () => {
-  const placed = placeOnChordRow([chord(0, 20), note(60, 40), chord(200, 20, 3)], 400, 8)
+  const placed = placeOnChordRow([chord(0, 20), annotation(60, 40), chord(200, 20, 3)], 400, 8)
   assert.deepEqual(placed[1], { shift: 0, push: undefined, above: 0, wrap: false })
   assert.equal(placed[0], undefined)
 })
 
 test('on the chord row: one at a word that has a chord starts after that chord, whichever is listed first', () => {
   for (const items of [
-    [chord(0, 20), note(0, 50)],
-    [note(0, 50), chord(0, 20)],
+    [chord(0, 20), annotation(0, 50)],
+    [annotation(0, 50), chord(0, 20)],
   ]) {
     const placed = placeOnChordRow(items, 400, 8)
     const own = placed.find(each => each)
@@ -71,12 +71,12 @@ test('on the chord row: one at a word that has a chord starts after that chord, 
 })
 
 test('on the chord row: one under a chord that reaches over its word starts after it', () => {
-  const placed = placeOnChordRow([chord(0, 100), note(60, 40)], 400, 8)
+  const placed = placeOnChordRow([chord(0, 100), annotation(60, 40)], 400, 8)
   assert.equal(placed[1]?.shift, 48)
 })
 
 test('on the chord row: one that would run into the next chord pushes it, by the shortfall, after the piece before', () => {
-  const placed = placeOnChordRow([chord(0, 20, 1), note(0, 120), chord(100, 20, 3)], 400, 8)
+  const placed = placeOnChordRow([chord(0, 20, 1), annotation(0, 120), chord(100, 20, 3)], 400, 8)
   assert.deepEqual(placed[1], {
     shift: 28,
     push: { segment: 3, amount: 56 },
@@ -87,7 +87,7 @@ test('on the chord row: one that would run into the next chord pushes it, by the
 
 test('on the chord row: what is pushed moves what follows, so a later annotation is placed after it', () => {
   const placed = placeOnChordRow(
-    [chord(0, 20, 1), note(0, 120), chord(100, 20, 3), note(150, 30)],
+    [chord(0, 20, 1), annotation(0, 120), chord(100, 20, 3), annotation(150, 30)],
     400,
     8
   )
@@ -97,37 +97,37 @@ test('on the chord row: what is pushed moves what follows, so a later annotation
 })
 
 test('on the chord row: annotations near each other are kept apart', () => {
-  const placed = placeOnChordRow([chord(0, 20), note(0, 50), note(30, 50)], 400, 8)
+  const placed = placeOnChordRow([chord(0, 20), annotation(0, 50), annotation(30, 50)], 400, 8)
   assert.equal(placed[1]?.shift, 28)
   // the second starts where the first ends, and a gap
   assert.equal(placed[2]?.shift, 28 + 50 + 8 - 30)
 })
 
 test('on the chord row: near the end of the line, back from the edge if the chord before allows', () => {
-  const placed = placeOnChordRow([chord(0, 20), note(350, 80)], 400, 8)
+  const placed = placeOnChordRow([chord(0, 20), annotation(350, 80)], 400, 8)
   assert.equal(placed[1]?.shift, -30)
   assert.equal(placed[1]?.above, 0)
 })
 
 test('on the chord row: with no room at the line’s end, a row above', () => {
-  const placed = placeOnChordRow([chord(0, 380), note(350, 80)], 400, 8)
+  const placed = placeOnChordRow([chord(0, 380), annotation(350, 80)], 400, 8)
   assert.deepEqual(placed[1], { shift: -30, above: 1, wrap: false })
 })
 
 test('on the chord row: wider than the line, set in the line’s width in a row above', () => {
-  const placed = placeOnChordRow([chord(10, 20), note(40, 600)], 400, 8)
+  const placed = placeOnChordRow([chord(10, 20), annotation(40, 600)], 400, 8)
   assert.deepEqual(placed[1], { shift: -40, above: 1, wrap: true })
 })
 
 test('on the chord row: a push that is too much to ask of the words goes above instead', () => {
   // 300 wide would push the next chord by 200 of a 400 line
-  const placed = placeOnChordRow([chord(0, 20), note(0, 300), chord(100, 20, 2)], 400, 8)
+  const placed = placeOnChordRow([chord(0, 20), annotation(0, 300), chord(100, 20, 2)], 400, 8)
   assert.equal(placed[1]?.above, 1)
   assert.equal(placed[1]?.push, undefined)
 })
 
 test('on the chord row: several that cannot be in the row go in rows above, one higher each', () => {
-  const placed = placeOnChordRow([note(0, 600), note(0, 600)], 400, 8)
+  const placed = placeOnChordRow([annotation(0, 600), annotation(0, 600)], 400, 8)
   assert.deepEqual(
     placed.map(each => each?.above),
     [1, 2]

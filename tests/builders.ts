@@ -6,6 +6,7 @@
  */
 
 import type {
+  ChartAnnotation,
   ChartSection,
   ParsedChart,
   Setlist,
@@ -113,3 +114,10 @@ export const makeImportedSong = (
   notes: '',
   ...over,
 })
+
+/** An annotation saying `text` (its id unless given), on the whole song unless `anchor` puts it somewhere */
+export const makeAnnotation = (
+  id: string,
+  anchor: ChartAnnotation['anchor'] = { kind: 'song' },
+  text = id
+): ChartAnnotation => ({ id, anchor, body: { kind: 'text', text }, modified: NOW })

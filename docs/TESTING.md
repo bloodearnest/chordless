@@ -46,7 +46,7 @@ annotations, but everything the tests call is checked against the app's types, i
 safety. To keep it that way:
 
 - Build records with `tests/builders.ts` (`makeSetlist({ date })`, `makeSong`, `makeEntry`,
-  `makePadSet`, `makeChart`, `makeLocalState`) rather than partial literals cast with `as any`.
+  `makePadSet`, `makeChart`, `makeLocalState`, `makeAnnotation`) rather than partial literals cast with `as any`.
   A test that needs a record the app would never hold says so with `as unknown as T`.
 - Build melodies with `tests/melody-build.ts`: `measure(1, ['C4:1:Ho-', 'r:1'])` for the short form,
   and `note('B', 4, { alter: -1 })`, `rest()` and `bar(events, { fifths: 1 })` for what it cannot
