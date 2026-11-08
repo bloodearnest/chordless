@@ -24,7 +24,7 @@ import { loadSetlistLocalState } from '../src/js/setlist/local-state.ts'
 import { getSongUserPrefs, saveSongUserPrefs } from '../src/js/song-user-prefs.ts'
 import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { chartOf, must, useSetlistPage } from './setlist-page-harness.ts'
-import { nothingFor, settle, wait } from './test-helpers.ts'
+import { nothingFor, settle } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -472,7 +472,10 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       rig.page.showSong(0, true)
       localStorage.removeItem('media-settings')
       rig.page.header.showSongSettings()
-      await wait(50)
+      await waitUntil(
+        () => typeof popover().mediaAvailable === 'boolean',
+        'the media player looked for'
+      )
       expect(popover().mediaAvailable).to.be.a('boolean')
     })
 

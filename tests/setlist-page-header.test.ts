@@ -910,7 +910,12 @@ describe('the setlist page: header, menu and keys', () => {
       dialog.dispatchEvent(
         new SetlistInfoSaveEvent(rig.page.currentSetlistId as string, changes('Renamed'))
       )
-      await wait(50)
+      await waitUntil(
+        async () =>
+          must(await rig.db.getSetlist(rig.page.currentSetlistId as string)).name === 'Renamed' &&
+          reshown > 0,
+        'the setlist to be saved and shown again'
+      )
       expect(must(await rig.db.getSetlist(rig.page.currentSetlistId as string)).name).to.equal(
         'Renamed'
       )
