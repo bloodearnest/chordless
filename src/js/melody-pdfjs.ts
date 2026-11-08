@@ -1,6 +1,5 @@
 /**
- * Reads the melody out of a SongSelect lead sheet PDF, with pdf.js (through unpdf, as `melody-range.ts`
- * does): the page's paths and matrices from its operator list, its words from the text content, and
+ * Reads the melody out of a SongSelect lead sheet PDF, with pdf.js (through unpdf): the page's paths and matrices from its operator list, its words from the text content, and
  * from them `melody-pdf.ts` builds the notes. Needs nothing but the PDF.
  */
 import { getDocumentProxy, getResolvedPDFJS } from 'unpdf'

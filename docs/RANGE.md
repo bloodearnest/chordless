@@ -109,13 +109,14 @@ opening each song: docs/REIMPORT.md.
 
 ## Getting a range from a lead sheet
 
-`src/js/melody-range.ts`, `readMelodyRange(pdf)`: the notes of a SongSelect lead sheet are drawn
-shapes, so it reads them from the page (staves, noteheads, the key signature). Two signs say a note
-is not sung, and either leaves it out: it is drawn small (an instrumental line: an intro, a
-turnaround), or its measure has no lyric under it (a full-size instrumental line has none). It is
-the measure, not each note, that needs a lyric, as a run of notes on one syllable has the one. A
-sheet with no lyrics at all is read by size alone. See the header of that file for what it reads
-and does not.
+The lead sheet's whole melody is read once (`src/js/melody-pdfjs.ts`, docs/MELODY.md), and the range
+is its lowest and highest sung note (`readOfMelody` in `src/js/lead-sheet.ts`). Two signs say a note
+is not sung, and either leaves it out (`sungNotes` in `src/js/melody-transpose.ts`): it is drawn
+small (an instrumental line: an intro, a turnaround), or its measure has no lyric under it (a
+full-size instrumental line has none). It is the measure, not each note, that needs a lyric, as a
+run of notes on one syllable has the one (and a note tied over from a sung one is sung). A sheet
+with no lyrics at all is read by size alone. The page says how it was read: the bars and notes,
+what was left out, the key signature, and the bar the lowest and the highest note are in.
 
 The bookmarklet (`src/js/songselect-bookmarklet.ts`) fetches the lead sheet after the ChordPro,
 from `/api/GetSongLeadPdf?songNumber=…&transposeKey=<the chart's key>&…`, so its notes are in the
@@ -143,9 +144,9 @@ it), and one that is the same as the library's says so.
 
 **Checking the import.** The import page says what it found: the range and its key, or why there is
 none (no lead sheet came, it had no melody, it could not be read). Under it, "How the lead sheet was
-read" gives the pages and staves, the sung notes read and what was left out (small instrumental
+read" gives the bars, the sung notes read and what was left out (small instrumental
 notes, and notes with no lyric), the key
-signature, and where the lowest and highest notes are (page, and staff counted from the top), so
+signature, and the bar the lowest and the highest notes are in (as the sheet numbers them), so
 each can be found on the PDF and checked. The lead sheet's key signature is compared with the
 chart's `{key:}` (a minor key by its relative major, and by pitch, so D flat is C sharp): a sheet in
 another key is **not used**, as its notes would be out by the difference, and the page says so.

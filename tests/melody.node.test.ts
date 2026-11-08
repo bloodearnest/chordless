@@ -501,6 +501,23 @@ describe('transposing a melody', () => {
     assert.equal(melodyExtremes(tune([note('E', 2, 0, true)])), null)
   })
 
+  it('leaves out a full-size note in a bar with no lyric, unless it is tied over or the sheet has no lyrics', () => {
+    const sung = (n: MelodyNote, syllable: string): MelodyNote => ({ ...n, syllables: [syllable] })
+    const t = tune([sung(note('E', 4), 'Lord'), sung(note('G', 4), 'of')])
+    // an instrumental bar printed full size, lower and higher, and a sung G tied into it
+    t.measures.push({
+      ...t.measures[0],
+      number: 2,
+      voices: [[note('C', 3), note('C', 6), { ...note('G', 4), tieStop: true, duration: 3 }]],
+    })
+    assert.deepEqual(melodyRange(t), { low: 64, high: 67 })
+    assert.deepEqual(melodyExtremes(t), { low: 64, high: 67, lowBeats: 1, highBeats: 4 })
+    // a sheet with no words at all goes by size alone
+    const wordless = tune([note('E', 4)])
+    wordless.measures.push({ ...wordless.measures[0], number: 2, voices: [[note('C', 3)]] })
+    assert.deepEqual(melodyRange(wordless), { low: 48, high: 64 })
+  })
+
   it('keeps rests, takes a melody with no sung note as it is, and moves a minor key', () => {
     const rest: MelodyEvent = {
       kind: 'rest',

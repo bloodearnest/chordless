@@ -1,6 +1,6 @@
 /**
  * A lead sheet as a PDF, drawn the way SongSelect draws one (the staff lines, and every notehead,
- * sharp and flat a shape in the page's drawing, not text), for melody-range.node.test.ts. The real
+ * sharp and flat a shape in the page's drawing, not text), for melody-pdfjs.node.test.ts. The real
  * ones are CCLI's, which the repository does not keep.
  */
 

@@ -13,14 +13,29 @@ import { fifthsOfKey, midiOf, noteName, semitonesBetween } from './pitch.ts'
 import { transposeChord } from './transpose.ts'
 import { type NoteRange, octaveNearGreen } from './voice-range.ts'
 
-/** The lowest and highest sung note (cue notes are an instrumental line), or null if none is sung */
+/**
+ * Which notes are sung: not the cue-size ones (an instrumental line), nor a full-size one in a
+ * measure with no lyric under it (an intro or a turnaround printed full size), unless it is tied
+ * over from the measure before. A sheet with no lyrics at all has none to go by, so its full-size
+ * notes all count.
+ */
+export function sungNotes(melody: Melody): (measure: number, note: MelodyNote) => boolean {
+  const lyric = melody.measures.map(m =>
+    m.voices.some(voice => voice.some(e => e.kind === 'note' && e.syllables.some(Boolean)))
+  )
+  const anyLyric = lyric.includes(true)
+  return (measure, note) => !note.cue && (!anyLyric || lyric[measure] === true || note.tieStop)
+}
+
+/** The lowest and highest sung note (`sungNotes`), or null if none is sung */
 export function melodyRange(melody: Melody): NoteRange | null {
+  const sung = sungNotes(melody)
   let low = Number.POSITIVE_INFINITY
   let high = Number.NEGATIVE_INFINITY
-  for (const measure of melody.measures)
+  for (const [index, measure] of melody.measures.entries())
     for (const voice of measure.voices)
       for (const e of voice)
-        if (e.kind === 'note' && !e.cue) {
+        if (e.kind === 'note' && sung(index, e)) {
           low = Math.min(low, e.midi)
           high = Math.max(high, e.midi)
         }
@@ -36,19 +51,20 @@ export interface MelodyExtremes extends NoteRange {
 
 /**
  * The lowest and highest sung note, and the total length of them in quarter notes across the whole
- * song as played: the repeats and endings followed (`playOrder`), a tie's notes added up, cue notes
- * left out. A high note held a long time tires a singer more than one touched once. Null if no
+ * song as played: the repeats and endings followed (`playOrder`), a tie's notes added up, the notes
+ * not sung (`sungNotes`) left out. A high note held a long time tires a singer more than one touched once. Null if no
  * note is sung.
  */
 export function melodyExtremes(melody: Melody): MelodyExtremes | null {
   const range = melodyRange(melody)
   if (!range) return null
+  const sung = sungNotes(melody)
   let lowBeats = 0
   let highBeats = 0
   for (const { measure } of playOrder(melody))
     for (const voice of melody.measures[measure].voices)
       for (const e of voice)
-        if (e.kind === 'note' && !e.cue) {
+        if (e.kind === 'note' && sung(measure, e)) {
           if (e.midi === range.low) lowBeats += e.duration
           if (e.midi === range.high) highBeats += e.duration
         }

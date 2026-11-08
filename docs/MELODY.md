@@ -1,7 +1,7 @@
 # The melody as music: lead sheet to MusicXML
 
-**A plan, with a spike built** (see "Spike results"). Today a lead sheet is read for one thing, the lowest and highest sung note
-(`src/js/melody-range.ts`, `docs/RANGE.md`), and the PDF is then thrown away. This asks whether to
+**A plan, with a spike built** (see "Spike results"). A lead sheet used to be read for one thing, the lowest and highest sung note
+(`docs/RANGE.md`), and the PDF then thrown away; the range now comes from the melody read here. This asked whether to
 read the whole melody (pitches, lengths, rests, lyrics, chords, sections) into a music format, keep
 that, and do more with it: transpose the notes, analyse them, show them, play them.
 
@@ -361,7 +361,7 @@ data, only the grouping and the glyph names are lost (check: `mutool draw -F svg
   137 of 137 sheets (the relative minor counted), and the time signature in all 133 whose chart has a `{time}`.
 - **The 3 PDFs that do not embed the music font** (`185883`, `2098033`, `3359080`) read as well as any, since the notes
   never needed the font: all their measures add up.
-- **Against the existing range reader** (`melody-range.ts`, a different way: ellipses in the page by size and
+- **Against the range reader there was then** (`melody-range.ts`, since removed: the range is now the melody's, `sungNotes` in `melody-transpose.ts` leaving out a bar with no lyric as it did; a different way: ellipses in the page by size and
   lyrics): the lowest and highest sung note agree for 125 of 137 sheets. The 12 differences are where this reader
   counts a full-size note the old one drops for having no lyric under its measure (a bass line, an instrumental
   bar: 7123436 has a 49 against 64) and accidentals the old one does not read (a flat or sharp apex: one semitone).
@@ -423,7 +423,7 @@ Dorico are the next test. `xml.ts` reads no DTD and expands no entity of its own
 itself. The Verovio check (above) still gives 35,396 of 35,396 notes after these changes.
 
 **Text and pdf.js (second round, from the PDF alone).** `src/js/melody-pdfjs.ts` reads a lead sheet PDF with
-pdf.js (as `melody-range.ts` does) and needs nothing else: the preview is only the oracle it was developed against.
+pdf.js and needs nothing else: the preview is only the oracle it was developed against.
 
 - **Words are read from the PDF.** Each character is its own text operation, so the words are rebuilt from the
   text objects (pdf.js's joined text items run far-apart syllables together). The fonts' names (needs
@@ -522,7 +522,7 @@ setlist's structure feature would show first, with the chart's order as the fall
    time signature; say how many measures pass. Stop here if it does not reach nearly every measure
    of nearly every song. Run it over the local corpus of 137 PDFs and score pitch and start time
    against each one's MIDI where a preview is to hand, and open the 3 PDFs with no music font first.
-1. **The reader and the `Melody`**, behind `readMelodyRange`'s place: the range comes from it, the
+1. **The reader and the `Melody`**, in `readMelodyRange`'s place (done: it is gone): the range comes from it, the
    import page says what was read, and a song it cannot read keeps today's result. Tests from
    fixtures that are not copyrighted. The notice text is kept with the notes from the start.
 2. **MusicXML out and in**, and the storage and sync of the `Melody` beside the chart.
@@ -553,14 +553,14 @@ accidental of a tied note is not drawn on the second note, so a tie over a barli
 is sometimes read as a hyphen or missed. `readMusicXml` reads the title from a `credit` where there is no work title (MuseScore
 puts it there), and "Repeat 3x Last time to Coda" as the third pass.
 
-**Import keeps the melody (built).** `song-import` reads a lead sheet twice, as it always read the range: `readMelodyRange`
-for the range and its page, and `readMelodyPdf` for the whole `Melody`. The melody is saved (`melodyRecord`, in the
+**Import keeps the melody (built).** `song-import` reads a lead sheet once, with `readMelodyPdf`, for the whole `Melody`,
+and the range is that melody's sung notes (`readOfMelody`, `src/js/lead-sheet.ts`). The melody is saved (`melodyRecord`, in the
 `melodies` store, synced as in "Syncing") for the song the chart goes to: a new song, the library's song when the chart
 updates it, the new song of an import as original or as variant, and not when the library's own chart stays
 (`use-existing`). It is kept only when the sheet is in the chart's key (its first measure's key signature against the
 chart's `{key}`), as the range is; a sheet in another key, or one `readMelodyPdf` cannot read, leaves the song with its
-chart and no melody. A chart that has a range already keeps it, and its range is not read again, but the melody is
-still kept. The import page says it under the range: "The lead sheet's melody is kept with the song."; "The library's chart stays, so the lead sheet's melody is not kept." (a duplicate that is not updated); "…could not be saved"; or, for a sheet whose notes were not the chart's key, that only the range was kept. Nothing yet shows the melody itself.
+chart and no melody. A chart that has a range already keeps it, but the melody is
+still kept. The import page says it under the range: "The lead sheet's melody is kept with the song."; "The library's chart stays, so the lead sheet's melody is not kept." (a duplicate that is not updated); "…could not be saved". A sheet in another key gives neither, and the page says why.
 
 Each step is a pull request that leaves the app working; the first two change nothing a person
 sees except a better range and a "how it was read" that can show the whole line.
