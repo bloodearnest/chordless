@@ -10,15 +10,15 @@
  * signature, and the sheet's accidentals. Every measure is then added up against the time signature,
  * which is how a wrong reading shows.
  */
-import {
-  type Melody,
-  type MelodyChord,
-  type MelodyDirection,
-  type MelodyEvent,
-  type MelodyMeasure,
-  type MelodyNote,
-  midiOf,
+import type {
+  Melody,
+  MelodyChord,
+  MelodyDirection,
+  MelodyEvent,
+  MelodyMeasure,
+  MelodyNote,
 } from './melody.ts'
+import { keyAlters as alterationsOf, midiOf, STEPS, type Step } from './pitch.ts'
 
 export interface El {
   name: string
@@ -133,11 +133,6 @@ const FLAGS: Record<string, number> = {
   E247: 4,
 }
 
-/** Steps as C=0..B=6; the order accidentals are added to a key signature */
-const STEPS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const
-const FLAT_ORDER = [6, 2, 5, 1, 4, 0, 3]
-const SHARP_ORDER = [3, 0, 4, 1, 5, 2, 6]
-
 /** The diatonic number (octave * 7 + step) of the bottom staff line for a clef sitting on staff line `line` (1 is the bottom) */
 function bottomLine(clef: string, line: number): number | null {
   if (clef === 'E050') return 4 * 7 + 4 - 2 * (line - 1) // G clef: the line is G4
@@ -199,7 +194,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
   let beats = 4
   let beatType = 4
   let tempo: number | null = null
-  let keyAlters: number[] = [0, 0, 0, 0, 0, 0, 0]
+  let keyAlters = alterationsOf(0)
   let clef = { code: 'E050', line: 2 }
   let n = 0
 
@@ -236,16 +231,10 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
     const keySig = staff.children.find(c => is(c, 'keySig'))
     if (keySig) {
       const accs = glyphs(keySig)
-      keyAlters = [0, 0, 0, 0, 0, 0, 0]
       const flats = accs.filter(g => g.code === FLAT).length
       const sharps = accs.filter(g => g.code === SHARP).length
       fifths = sharps - flats
-      FLAT_ORDER.slice(0, flats).forEach(s => {
-        keyAlters[s] = -1
-      })
-      SHARP_ORDER.slice(0, sharps).forEach(s => {
-        keyAlters[s] = 1
-      })
+      keyAlters = alterationsOf(fifths)
     }
     const meter = staff.children.find(c => is(c, 'meterSig'))
     if (meter) {
@@ -367,7 +356,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
               const dia = bottomDia + Math.round((bottomY - hg.y) / half)
               const stepIndex = ((dia % 7) + 7) % 7
               const octave = Math.floor(dia / 7)
-              let alter = measureAlters.get(dia) ?? keyAlters[stepIndex] ?? 0
+              let alter = measureAlters.get(dia) ?? keyAlters[STEPS[stepIndex] as Step] ?? 0
               const acc = firstByClass(note, 'accid')
               const ag = acc ? glyphs(acc)[0] : undefined
               if (ag && ACCIDENTAL[ag.code] !== undefined) {
@@ -377,7 +366,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
               const sylls = byClass(note, 'verse').map(
                 v => textOf(v).replace(/^\d+\.\s*/, '') + connectorOf(v)
               )
-              const step = STEPS[stepIndex] as (typeof STEPS)[number]
+              const step = STEPS[stepIndex] as Step
               events.push({
                 kind: 'note',
                 id: note.attrs.id ?? '',

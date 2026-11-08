@@ -1,14 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
-import {
-  describeSignature,
-  HIGHEST_OFFERED,
-  LOWEST_OFFERED,
-  noteName,
-  rangeOfChart,
-  signatureMatchesKey,
-  withRange,
-} from '../js/chart-range.ts'
+import { HIGHEST_OFFERED, LOWEST_OFFERED, rangeOfChart, withRange } from '../js/chart-range.ts'
 import type { Person, Setlist, SongRecord, Space } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
 import {
@@ -59,6 +51,7 @@ import { writeMusicXml } from '../js/melody-musicxml.ts'
 import type { MelodyRead } from '../js/melody-range.ts'
 import { melodyRecord } from '../js/melody-record.ts'
 import { goTo, loadPage } from '../js/navigation.ts'
+import { describeSignature, noteName, signatureMatchesKey } from '../js/pitch.ts'
 import { describeOrigin, SONGSELECT } from '../js/song-source.ts'
 import { ensureCurrentSpace, setCurrentSpace } from '../js/space.ts'
 import { visibleSpaces } from '../js/space-tabs.ts'

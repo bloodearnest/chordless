@@ -18,9 +18,9 @@ import type {
   MelodyMeasure,
   MelodyNote,
 } from './melody.ts'
-import { midiOf } from './melody.ts'
 import { parseDirection } from './melody-directions.ts'
 import type { El } from './melody-read.ts'
+import { midiOf } from './pitch.ts'
 import { parseXml } from './xml.ts'
 
 const child = (e: El, name: string) => e.children.find(c => c.name === name)

@@ -3,7 +3,7 @@
  * (pitch, beats, syllable) and `r:1` a rest. A pitch is a letter, an optional `#` or `b`, and an octave.
  */
 import type { Melody, MelodyDirection, MelodyEvent, MelodyMeasure } from '../src/js/melody.ts'
-import { midiOf } from '../src/js/melody.ts'
+import { midiOf } from '../src/js/pitch.ts'
 
 const STEPS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const
 

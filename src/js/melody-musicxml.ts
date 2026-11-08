@@ -11,6 +11,7 @@ import type {
   MelodyMeasure,
   MelodyNote,
 } from './melody.ts'
+import { keyAlters } from './pitch.ts'
 
 const DIVISIONS = 24 // per quarter: whole divisions for 16ths, 32nds, and triplets of them
 
@@ -68,17 +69,6 @@ function timeModification(ratio: number): string {
       return `<time-modification><actual-notes>${Math.round(actual)}</actual-notes><normal-notes>${normal}</normal-notes></time-modification>`
   }
   return ''
-}
-
-const SHARP_ORDER = ['F', 'C', 'G', 'D', 'A', 'E', 'B']
-const FLAT_ORDER = ['B', 'E', 'A', 'D', 'G', 'C', 'F']
-
-/** The alteration each note name has from the key signature: F is sharp in G major */
-function keyAlters(fifths: number): Record<string, number> {
-  const out: Record<string, number> = {}
-  const order = fifths >= 0 ? SHARP_ORDER : FLAT_ORDER
-  for (const step of order.slice(0, Math.abs(fifths))) out[step] = fifths >= 0 ? 1 : -1
-  return out
 }
 
 const ACCIDENTAL_NAMES: Record<number, string> = {

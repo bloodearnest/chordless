@@ -6,7 +6,7 @@
  */
 import type { ChartMetadata } from './data-types.ts'
 import { keyOfChart } from './library-repair.ts'
-import { getKeyOffset, transposeNote } from './transpose.ts'
+import { alterOf, midiOf, noteName, type Step, semitonesBetween } from './pitch.ts'
 import type { NoteRange } from './voice-range.ts'
 
 const NAME = '[A-G][#b♯♭]?\\d'
@@ -14,29 +14,15 @@ const RANGE = new RegExp(`^\\s*(${NAME})\\s*[-–]\\s*(${NAME})\\s*$`)
 /** The whole line, so it can be replaced or removed with its line ending */
 const DIRECTIVE = /^[ \t]*\{[ \t]*x_chordless_range[ \t]*:([^}]*)\}[ \t]*(\r?\n)?/im
 
-const SEMITONES: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
-
 /** MIDI number of a note name like 'D4', 'F#5' or 'Bb3' (one that matched NAME) */
 function parseNote(name: string): number {
   const [, letter, accidental, octave] = /^([A-G])([#b♯♭]?)(\d)$/.exec(name) as RegExpExecArray
-  const shift = accidental === '#' || accidental === '♯' ? 1 : accidental ? -1 : 0
-  return 12 * (Number(octave) + 1) + SEMITONES[letter] + shift
+  return midiOf(letter as Step, alterOf(accidental), Number(octave))
 }
-
-/** A key written with flats (F and the flat keys, and D, G and C minor), so its notes are too */
-const FLAT_KEY = /^(?:[A-G]b|F)m?$|^(?:Dm|Gm|Cm)$/
 
 /** The notes a range's pickers offer: A2 to C6 (a singer's span), and wider if the range is */
 export const LOWEST_OFFERED = 45
 export const HIGHEST_OFFERED = 84
-
-/** A note's name in a key, with its octave: 'F#5' in G, 'Eb5' in Bb */
-export function noteName(midi: number, key: string): string {
-  const pitchClass = ((midi % 12) + 12) % 12
-  const name = transposeNote('C', pitchClass, FLAT_KEY.test(key), key) as string
-  // B is Cb in a very flat key, and that is an octave up in the number
-  return `${name}${Math.floor(midi / 12) - 1 + (name === 'Cb' ? 1 : 0)}`
-}
 
 /**
  * How wide a range is, in the scale tones it covers (D4 to E5 is nine: a 9th, counting the notes
@@ -79,77 +65,6 @@ export function parseRange(value: string): NoteRange | null {
 /** The range in a parsed chart's metadata, where its directives are (in the chart's own key) */
 export function rangeOfMetadata(metadata: ChartMetadata | undefined): NoteRange | null {
   return parseRange(String(metadata?.x_chordless_range ?? ''))
-}
-
-/** The major key, and its relative minor, of each key signature from seven flats to seven sharps */
-const MAJOR_OF_SIGNATURE = [
-  'Cb',
-  'Gb',
-  'Db',
-  'Ab',
-  'Eb',
-  'Bb',
-  'F',
-  'C',
-  'G',
-  'D',
-  'A',
-  'E',
-  'B',
-  'F#',
-  'C#',
-]
-const MINOR_OF_SIGNATURE = [
-  'Ab',
-  'Eb',
-  'Bb',
-  'F',
-  'C',
-  'G',
-  'D',
-  'A',
-  'E',
-  'B',
-  'F#',
-  'C#',
-  'G#',
-  'D#',
-  'A#',
-]
-
-/** A key signature in words: '1 sharp (G major or E minor)' */
-export function describeSignature(signature: number): string {
-  const count = Math.abs(signature)
-  const accidentals =
-    signature === 0
-      ? 'no sharps or flats'
-      : `${count} ${signature > 0 ? 'sharp' : 'flat'}${count > 1 ? 's' : ''}`
-  const at = Math.max(-7, Math.min(7, signature)) + 7
-  return `${accidentals} (${MAJOR_OF_SIGNATURE[at]} major or ${MINOR_OF_SIGNATURE[at]} minor)`
-}
-
-/**
- * Whether a key signature (sharps positive, flats negative) is a chart's key: the major key of
- * the signature, or the minor of the same, by pitch, so D flat and C sharp are the same. A key
- * that is not one to be read (no way to tell) is taken to match.
- */
-export function signatureMatchesKey(signature: number, key: string): boolean {
-  const [, letter, accidental, minor] = /^([A-G])([#b♯♭]?)(m|min|minor)?$/.exec(key.trim()) ?? []
-  if (!letter) return true
-  const shift = accidental === '#' || accidental === '♯' ? 1 : accidental ? -1 : 0
-  // the major key a minor one shares its signature with is a minor third up
-  const tonic = SEMITONES[letter] + shift + (minor ? 3 : 0)
-  const wanted = (((7 * signature) % 12) + 12) % 12
-  return ((tonic % 12) + 12) % 12 === wanted
-}
-
-/**
- * The semitones from one key to another by the nearest way round, as the key picker lists them:
- * G to A is up two, and B to C up one, not down eleven. A melody moved the long way would be an
- * octave out.
- */
-export function semitonesBetween(from: string, to: string): number {
-  return ((((getKeyOffset(from, to) + 6) % 12) + 12) % 12) - 6
 }
 
 /**

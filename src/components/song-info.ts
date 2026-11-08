@@ -1,13 +1,8 @@
 import { css, html, LitElement } from 'lit'
-import {
-  HIGHEST_OFFERED,
-  LOWEST_OFFERED,
-  noteName,
-  rangeOfMetadata,
-  rangeSpan,
-} from '../js/chart-range.ts'
+import { HIGHEST_OFFERED, LOWEST_OFFERED, rangeOfMetadata, rangeSpan } from '../js/chart-range.ts'
 import type { SongWithContent } from '../js/data-types.ts'
 import { formatBeats, type SongMelody } from '../js/melody-analysis.ts'
+import { noteName } from '../js/pitch.ts'
 import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.ts'
 import { describeRange, type NoteRange, octaveNearGreen, rangeStatus } from '../js/voice-range.ts'
 import { rangeBadge, rangeBadgeStyles } from './range-badge.ts'
