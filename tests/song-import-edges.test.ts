@@ -1,6 +1,6 @@
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect } from '@open-wc/testing'
 import { SongImportedEvent } from '../src/components/song-import.ts'
-import { ChordlessDB, createSetlist, getCurrentDB, normalizeTitle } from '../src/js/db.ts'
+import { createSetlist, getCurrentDB, normalizeTitle } from '../src/js/db.ts'
 import { offerIncoming } from '../src/js/incoming-songs.ts'
 import type { MelodyEvent } from '../src/js/melody.ts'
 import { readMusicXml } from '../src/js/melody-musicxml-read.ts'
@@ -9,6 +9,15 @@ import { makeSong } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { bar, note } from './melody-build.ts'
 import { must } from './must.ts'
+import {
+  $,
+  chart,
+  importer,
+  said,
+  unique,
+  waitFor,
+  whileMelodiesCannotBeSaved,
+} from './song-import-helpers.ts'
 import { clearToasts, shownToast, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
@@ -17,17 +26,6 @@ suppressConsoleLogs()
 
 /** The song-import page's remaining corners: messages, the opener, and what can go wrong */
 describe('song-import: corners', () => {
-  const unique = (name: string) => `${name} ${crypto.randomUUID().slice(0, 8)}`
-  const chart = (title: string, body = '[C]Hello') => `{title: ${title}}\n{key: C}\n\n${body}`
-  const importer = async (): Promise<any> => fixture(html`<song-import></song-import>`)
-  const $ = (element: any, selector: string) => element.shadowRoot.querySelector(selector)
-  const waitFor = async (check: () => unknown, timeout = 2000) => {
-    const start = Date.now()
-    while (!check()) {
-      if (Date.now() - start > timeout) throw new Error('Timed out waiting')
-      await new Promise(resolve => setTimeout(resolve, 10))
-    }
-  }
   const message = (data: unknown) =>
     window.dispatchEvent(
       new MessageEvent('message', { origin: 'https://songselect.ccli.com', data })
@@ -115,12 +113,6 @@ describe('song-import: corners', () => {
       return { element, reads }
     }
 
-    /** What the page says, as a person reads it */
-    const said = async (element: any) => {
-      await element.updateComplete
-      return element.shadowRoot.textContent.replace(/\s+/g, ' ')
-    }
-
     it('puts the melody range in the chart it came with, in the chart key', async () => {
       const { element, reads } = await importerReading(async () => read())
       await element.receive({
@@ -174,20 +166,13 @@ describe('song-import: corners', () => {
 
       // and when saving it fails, the page does not say it is kept
       const failing = await importerKeeping(async () => read())
-      const db = ChordlessDB.prototype
-      const saveMelody = db.saveMelody
-      db.saveMelody = async () => {
-        throw new Error('disk full')
-      }
-      try {
-        await failing.receive({
+      await whileMelodiesCannotBeSaved(() =>
+        failing.receive({
           chordproText: chart(unique('Said unsaved')),
           source: 'songselect',
           leadSheet: leadSheet(),
         })
-      } finally {
-        db.saveMelody = saveMelody
-      }
+      )
       expect(await said(failing)).to.contain('melody could not be saved')
     })
 
@@ -218,20 +203,13 @@ describe('song-import: corners', () => {
 
     it('still imports the chart when the melody cannot be saved', async () => {
       const element = await importerKeeping(async () => read())
-      const db = ChordlessDB.prototype
-      const saveMelody = db.saveMelody
-      db.saveMelody = async () => {
-        throw new Error('disk full')
-      }
-      try {
-        await element.receive({
+      await whileMelodiesCannotBeSaved(() =>
+        element.receive({
           chordproText: chart(unique('Not saved')),
           source: 'songselect',
           leadSheet: leadSheet(),
         })
-      } finally {
-        db.saveMelody = saveMelody
-      }
+      )
       expect(element._imports).to.have.length(1)
       expect(await element._db.getMelody(element._imports[0].song.uuid)).to.equal(undefined)
     })
@@ -349,10 +327,7 @@ describe('song-import: corners', () => {
       await createSong(`${text.replace('{key: C}', '{key: C}\n{x_chordless_range: D4-E5}')}`)
       await element.receive({ chordproText: text, source: 'songselect', leadSheet: leadSheet() })
       expect(element._imports[0].comparison.verdict).to.equal('identical')
-      const said = await element.updateComplete.then(() =>
-        element.shadowRoot.textContent.replace(/\s+/g, ' ')
-      )
-      expect(said).to.contain(
+      expect(await said(element)).to.contain(
         'An identical version of this song is already in your library, nothing to import.'
       )
       // (nothing to save, but a way on: to the library, said as that and not as saving)
@@ -763,11 +738,6 @@ describe('song-import: corners', () => {
         else Reflect.deleteProperty(window, 'opener')
       }
     }
-    const said = async (element: any) => {
-      await element.updateComplete
-      return element.shadowRoot.textContent.replace(/\s+/g, ' ')
-    }
-
     it('shows a spinner and what it is waiting for, and not the ways to import by hand', async () => {
       await opened(async () => {
         const element = await importer()

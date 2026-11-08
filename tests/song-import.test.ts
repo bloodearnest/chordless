@@ -1,4 +1,4 @@
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect } from '@open-wc/testing'
 import { SongImportedEvent } from '../src/components/song-import.ts'
 import type { SongRecord } from '../src/js/data-types.ts'
 import { createSetlist, getCurrentDB, openSpace } from '../src/js/db.ts'
@@ -12,6 +12,7 @@ import {
 } from '../src/js/space.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { must } from './must.ts'
+import { $, chart, importer, said, text, unique, waitFor } from './song-import-helpers.ts'
 import { A11Y, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -24,19 +25,10 @@ suppressConsoleLogs()
  * browser's real database, with a unique title per song so tests don't meet.
  */
 describe('song-import', () => {
-  const unique = name => `${name} ${crypto.randomUUID().slice(0, 8)}`
-  const chart = (title, body = '[C]Hello') => `{title: ${title}}\n{key: C}\n\n${body}`
-  const file = (name, content, type = '') => new File([content], name, { type })
-
-  async function importer() {
-    return fixture(html`<song-import></song-import>`)
-  }
-
-  const $ = (element, selector) => element.shadowRoot.querySelector(selector)
-  const text = element => element.shadowRoot.textContent.replace(/\s+/g, ' ')
+  const file = (name: string, content: string, type = '') => new File([content], name, { type })
 
   /** Resolves with the url the importer goes to when it's done, staying here */
-  function finished(element) {
+  function finished(element: HTMLElement): Promise<string> {
     return new Promise(resolve => {
       element.addEventListener(
         SongImportedEvent.type,
@@ -49,7 +41,7 @@ describe('song-import', () => {
     })
   }
 
-  async function paste(element, chordproText) {
+  async function paste(element: any, chordproText: string) {
     $(element, 'textarea').value = chordproText
     $(element, '.paste .add').click()
     await waitFor(() => element._state === 'choices' || element._error)
@@ -57,22 +49,22 @@ describe('song-import', () => {
   }
 
   /** Pick what to do with the duplicate, and do it */
-  async function choose(element, pick: string, { apply = true } = {}) {
+  async function choose(element: any, pick: string, { apply = true } = {}) {
     $(element, `.pick-${pick}`).click()
     await element.updateComplete
     if (apply) $(element, '.apply').click()
   }
 
-  async function songTitled(title) {
+  async function songTitled(title: string) {
     const db = await getCurrentDB()
     return (await db.getAllSongs()).find(song => song.title === title)
   }
 
   it('offers files, pasting, and the SongSelect bookmarklet, and is accessible', async () => {
     const element: any = await importer()
-    expect(text(element)).to.contain('Import ChordPro Files')
-    expect(text(element)).to.contain('Paste ChordPro')
-    expect(text(element)).to.contain('Import from SongSelect')
+    expect(await said(element)).to.contain('Import ChordPro Files')
+    expect(await said(element)).to.contain('Paste ChordPro')
+    expect(await said(element)).to.contain('Import from SongSelect')
     await expect(element).to.be.accessible(A11Y)
   })
 
@@ -102,7 +94,7 @@ describe('song-import', () => {
     const element: any = await importer()
     const title = unique('Pasted')
     await paste(element, chart(title))
-    expect(text(element)).to.contain(title)
+    expect(await said(element)).to.contain(title)
 
     const url = finished(element)
     $(element, '.library-only').click()
@@ -121,10 +113,10 @@ describe('song-import', () => {
     ])
     await element.updateComplete
     expect(element._imports).to.have.length(1)
-    expect(text(element)).to.contain(
+    expect(await said(element)).to.contain(
       'Not imported: backfill-manifest.json: a JSON file, not a ChordPro chart'
     )
-    expect(text(element)).to.contain('typed-as-json.cho: a JSON file')
+    expect(await said(element)).to.contain('typed-as-json.cho: a JSON file')
     expect(await songTitled('backfill-manifest')).to.equal(undefined)
   })
 
@@ -150,7 +142,7 @@ describe('song-import', () => {
     expect($(element, 'h2').textContent).to.contain('2 songs')
     expect($(element, '.songs').textContent).to.contain(first)
     expect($(element, '.songs').textContent).to.contain(second)
-    expect(text(element)).to.contain('Not imported: photo.png: not a text file')
+    expect(await said(element)).to.contain('Not imported: photo.png: not a text file')
     expect(must(await songTitled(second)).importSource).to.equal('file')
   })
 
@@ -163,7 +155,7 @@ describe('song-import', () => {
 
     const element: any = await importer()
     await paste(element, chart(title, '[A]Imported'))
-    expect(text(element)).to.contain('already exists in your library')
+    expect(await said(element)).to.contain('already exists in your library')
     await choose(element, 'use-existing')
     await waitFor(() => $(element, '.choices'))
 
@@ -201,7 +193,7 @@ describe('song-import', () => {
       file('b.cho', chart(unique('Brand new'))),
     ])
     await element.updateComplete
-    expect(text(element)).to.contain('1 of these songs is already in your library')
+    expect(await said(element)).to.contain('1 of these songs is already in your library')
     expect($(element, '.choices')).to.equal(null)
     await expect(element).to.be.accessible(A11Y)
 
@@ -255,7 +247,7 @@ describe('song-import', () => {
       expect(element._imports[0].comparison.verdict).to.equal('identical')
       expect(element._imports[0].sourceSet).to.equal(true)
       expect(await sourceOf(song.uuid)).to.equal('songselect')
-      expect(text(element)).to.contain(
+      expect(await said(element)).to.contain(
         'nothing to import. Its source is now recorded as SongSelect.'
       )
     })
@@ -269,7 +261,7 @@ describe('song-import', () => {
         file('a.cho', body),
         file('b.cho', fromSongSelect(unique('A new one'))),
       ])
-      expect(text(element)).to.contain(
+      expect(await said(element)).to.contain(
         'identical version already in library, now recorded as from SongSelect'
       )
     })
@@ -286,7 +278,7 @@ describe('song-import', () => {
         expect(element._imports[0].comparison.verdict).to.equal('identical')
         expect(element._imports[0].sourceSet, recorded).to.equal(undefined)
         expect(await sourceOf(song.uuid), recorded).to.equal(recorded)
-        expect(text(element)).to.not.contain('Its source is now')
+        expect(await said(element)).to.not.contain('Its source is now')
       }
     })
 
@@ -419,8 +411,8 @@ describe('song-import', () => {
       ])
       // (the other chords are not the library's: that is for the person to decide)
       expect(asked(element)).to.have.length(1)
-      expect(text(element)).to.contain('1 of these songs is already in your library')
-      expect(text(element)).to.contain('updated: the same song as in your library')
+      expect(await said(element)).to.contain('1 of these songs is already in your library')
+      expect(await said(element)).to.contain('updated: the same song as in your library')
       expect(await chartOf(library[0].uuid)).to.contain('{key: D}')
       expect(await chartOf(library[1].uuid)).to.contain('{tempo: 80}')
       expect(await chartOf(library[2].uuid)).to.contain('[G]Amazing grace')
@@ -498,7 +490,7 @@ describe('song-import', () => {
       await element.updateComplete
       expect(element._imports[0].auto).to.equal(undefined)
       expect(element._imports[0].pick).to.equal('use-existing')
-      expect(text(element)).to.contain('This song already exists in your library')
+      expect(await said(element)).to.contain('This song already exists in your library')
       expect(await chartOf(song.uuid)).to.not.contain('{tempo: 99}')
     })
 
@@ -522,9 +514,9 @@ describe('song-import', () => {
       const element: any = await importer()
       await element.importFiles(titles.map(title => file(`${title}.cho`, sameWords(title, 'D'))))
       await element.updateComplete
-      expect(text(element)).to.contain('For all of them:')
-      expect(text(element)).to.contain('Update all 3')
-      expect(text(element)).to.not.contain('that are the same song')
+      expect(await said(element)).to.contain('For all of them:')
+      expect(await said(element)).to.contain('Update all 3')
+      expect(await said(element)).to.not.contain('that are the same song')
       expect(picks(element)).to.deep.equal(['as-variant', 'as-variant', 'as-variant'])
       $(element, '.bulk-update-all').click()
       await element.updateComplete
@@ -586,7 +578,7 @@ describe('song-import', () => {
       await createSong(chart(title, '[G]Same'))
       const element: any = await importer()
       await paste(element, chart(title, '[G]Same'))
-      expect(text(element)).to.not.contain('already exists')
+      expect(await said(element)).to.not.contain('already exists')
       expect($(element, '.choices')).to.not.equal(null)
     })
 
@@ -595,7 +587,7 @@ describe('song-import', () => {
       await createSong(chart(title, '[G]Amazing grace'), { importUser: 'Simon' } as never)
       const element: any = await importer()
       await paste(element, chart(title, '[Am]Amazing grace'))
-      expect(text(element)).to.contain('The same words, with different chords')
+      expect(await said(element)).to.contain('The same words, with different chords')
       expect($(element, 'details').open).to.equal(true)
       expect($(element, 'chart-diff').shadowRoot.textContent).to.contain('Imported by Simon')
       expect($(element, '.pick-as-variant').checked).to.equal(true)
@@ -642,7 +634,7 @@ describe('song-import', () => {
       } as never)
       const element: any = await importer()
       await paste(element, `{title: ${title}}\n{key: C}\n{copyright: Someone}\n[C]Amazing grace`)
-      expect(text(element)).to.contain('The same words and chords, with other details')
+      expect(await said(element)).to.contain('The same words and chords, with other details')
       expect($(element, '.pick-use-existing').checked).to.equal(true)
       expect($(element, 'details').open).to.equal(false)
       const detail = $(element, 'chart-diff').shadowRoot.textContent
@@ -656,7 +648,7 @@ describe('song-import', () => {
       const element: any = await importer()
       await paste(element, chart(title, '[Am]Amazing grace'))
       await choose(element, 'as-original', { apply: false })
-      expect(text(element)).to.contain('Variant name for your current song')
+      expect(await said(element)).to.contain('Variant name for your current song')
       const input = $(element, '.variant-label')
       expect(input.value).to.equal('Alternate chords')
       input.value = 'Simon, capo 3'
@@ -682,7 +674,7 @@ describe('song-import', () => {
       await paste(element, chart(title, '[Am]Amazing grace'))
       expect($(element, '.pick-as-variant').checked).to.equal(true)
       await choose(element, 'as-variant', { apply: false })
-      expect(text(element)).to.contain('Variant name for the imported song')
+      expect(await said(element)).to.contain('Variant name for the imported song')
       const input = $(element, '.variant-label')
       input.value = 'Official'
       input.dispatchEvent(new Event('input'))
@@ -841,12 +833,3 @@ describe('song-import', () => {
     })
   })
 })
-
-/** Wait until check() is truthy (for the importer's database work) */
-async function waitFor(check, timeout = 2000) {
-  const start = Date.now()
-  while (!check()) {
-    if (Date.now() - start > timeout) throw new Error('Timed out waiting')
-    await new Promise(resolve => setTimeout(resolve, 10))
-  }
-}
