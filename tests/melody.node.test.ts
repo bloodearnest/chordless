@@ -320,6 +320,14 @@ describe('jump directions', () => {
       time: 2,
       text: '2nd time to Coda',
     })
+    // (the last of three is the third)
+    assert.deepEqual(parseDirection('Repeat 3x Last time to Coda'), {
+      kind: 'to-coda',
+      al: null,
+      time: 3,
+      text: 'Repeat 3x Last time to Coda',
+    })
+    assert.equal(parseDirection('Last time to Coda')?.time, null)
     assert.deepEqual(parseDirection('Play 3 times'), {
       kind: 'text',
       al: null,
