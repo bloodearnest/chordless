@@ -9,7 +9,7 @@
  * It does what Verovio writes and nothing more: `svg` with a viewBox, `g`, `use`, `path`, `rect`,
  * `polygon`, `text` and `tspan`, and the transforms `translate`, `scale` and `matrix`.
  */
-import type { El } from '../src/js/melody-read.ts'
+import type { El } from '../src/js/xml.ts'
 import { parseXml } from '../src/js/xml.ts'
 
 /** CSS pixels to PDF points */

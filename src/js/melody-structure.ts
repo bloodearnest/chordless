@@ -10,6 +10,7 @@
  * taken on the way through after a jump.
  */
 import type { Melody, MelodyMeasure } from './melody.ts'
+import { lyricWords } from './utils/lyric-words.ts'
 
 export interface SheetSection {
   name: string
@@ -157,13 +158,6 @@ export function playSteps(melody: Melody, order = playOrder(melody)): PlayStep[]
   return steps
 }
 
-const words = (text: string) =>
-  text
-    .toLowerCase()
-    .split(/\s+/)
-    .map(w => w.replace(/[^a-z']/g, ''))
-    .filter(Boolean)
-
 /**
  * The lyric words of a run of measures, for a verse (0 is the first). A verse the run has no words
  * for (the chorus a second time, written once) is read from the first.
@@ -178,7 +172,7 @@ export function stepWords(melody: Melody, step: PlayStep, verse = step.pass - 1)
             const syl = e.kind === 'note' && !e.cue ? e.syllables[v] : ''
             if (syl) text += syl.endsWith('-') ? syl.slice(0, -1) : `${syl} `
           }
-    return words(text)
+    return lyricWords(text)
   }
   const mine = read(verse)
   return mine.length || verse === 0 ? mine : read(0)
@@ -223,7 +217,7 @@ export function verseRows(melody: Melody, step: PlayStep): number {
 
 /** The chart sections the lyrics of every verse of a step say, best match first for each verse; null where none is near */
 export function matchVerses(melody: Melody, step: PlayStep, chart: ChartText[]): (string | null)[] {
-  const chartWords = chart.map(c => words(c.text))
+  const chartWords = chart.map(c => lyricWords(c.text))
   return Array.from({ length: Math.max(1, verseRows(melody, step)) }, (_, v) => {
     const mine = stepWords(melody, step, v)
     const scores = chartWords.map(w => lyricSimilarity(mine, w))
@@ -246,7 +240,7 @@ export interface Matched {
  */
 export function matchChart(melody: Melody, steps: PlayStep[], chart: ChartText[]): Matched[] {
   const sections = sheetSections(melody)
-  const chartWords = chart.map(c => words(c.text))
+  const chartWords = chart.map(c => lyricWords(c.text))
   const used = new Set<number>()
   return steps.map(step => {
     const mine = stepWords(melody, step)

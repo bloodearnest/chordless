@@ -19,14 +19,7 @@ import type {
   MelodyNote,
 } from './melody.ts'
 import { keyAlters as alterationsOf, midiOf, STEPS, type Step } from './pitch.ts'
-
-export interface El {
-  name: string
-  attrs: Record<string, string>
-  children: El[]
-  /** The text directly inside, in order, joined */
-  text: string
-}
+import type { El } from './xml.ts'
 
 const classes = (e: El) => (e.attrs.class ?? '').split(/\s+/)
 const is = (e: El, cls: string) => classes(e).includes(cls)
