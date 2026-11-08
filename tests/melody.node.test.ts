@@ -7,7 +7,12 @@ import { parseDirection } from '../src/js/melody-directions.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { absolutePath, shapeHash } from '../src/js/melody-path.ts'
 import { type Glyph, type Line, type Staff, signsOf } from '../src/js/melody-pdf.ts'
-import { fifthsOfKey, melodyRange, transposeMelody } from '../src/js/melody-transpose.ts'
+import {
+  fifthsOfKey,
+  melodyExtremes,
+  melodyRange,
+  transposeMelody,
+} from '../src/js/melody-transpose.ts'
 
 /** One measure of 4/4 in the shape Verovio writes, drawn with the glyphs named, as a lead sheet's SVG is */
 function sheet(notes: string, key = ''): string {
@@ -483,6 +488,22 @@ describe('transposing a melody', () => {
     assert.equal(fifthsOfKey('F#'), 6)
     assert.equal(fifthsOfKey('F♯'), 6)
     assert.equal(fifthsOfKey('B♭m'), -5)
+  })
+
+  it('totals the beats on the highest and lowest note across the song as played', () => {
+    const held = { ...note('G', 4), duration: 2.5 }
+    const t = tune([
+      note('C', 4),
+      held,
+      { ...note('G', 4), duration: 0.5, tieStop: true },
+      note('C', 2, 0, true),
+    ])
+    assert.deepEqual(melodyExtremes(t), { low: 60, high: 67, lowBeats: 1, highBeats: 3 })
+    // a repeat plays the measure twice
+    t.measures[0].repeatStart = true
+    t.measures[0].barline = 'repeat-end'
+    assert.deepEqual(melodyExtremes(t), { low: 60, high: 67, lowBeats: 2, highBeats: 6 })
+    assert.equal(melodyExtremes(tune([note('E', 2, 0, true)])), null)
   })
 
   it('keeps rests, takes a melody with no sung note as it is, and moves a minor key', () => {

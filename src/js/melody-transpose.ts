@@ -10,6 +10,7 @@
 import { noteName, semitonesBetween } from './chart-range.ts'
 import type { Melody, MelodyEvent, MelodyNote } from './melody.ts'
 import { midiOf } from './melody.ts'
+import { playOrder } from './melody-structure.ts'
 import { transposeChord } from './transpose.ts'
 import { type NoteRange, octaveNearGreen } from './voice-range.ts'
 
@@ -35,6 +36,34 @@ export function melodyRange(melody: Melody): NoteRange | null {
           high = Math.max(high, e.midi)
         }
   return low <= high ? { low, high } : null
+}
+
+/** The range, and how long the song sits on its two ends */
+export interface MelodyExtremes extends NoteRange {
+  /** Quarter notes sounding at the lowest / highest pitch, over the song as it is played */
+  lowBeats: number
+  highBeats: number
+}
+
+/**
+ * The lowest and highest sung note, and the total length of them in quarter notes across the whole
+ * song as played: the repeats and endings followed (`playOrder`), a tie's notes added up, cue notes
+ * left out. A high note held a long time tires a singer more than one touched once. Null if no
+ * note is sung.
+ */
+export function melodyExtremes(melody: Melody): MelodyExtremes | null {
+  const range = melodyRange(melody)
+  if (!range) return null
+  let lowBeats = 0
+  let highBeats = 0
+  for (const { measure } of playOrder(melody))
+    for (const voice of melody.measures[measure].voices)
+      for (const e of voice)
+        if (e.kind === 'note' && !e.cue) {
+          if (e.midi === range.low) lowBeats += e.duration
+          if (e.midi === range.high) highBeats += e.duration
+        }
+  return { ...range, lowBeats, highBeats }
 }
 
 /** The note at a new pitch, spelled in a key */
