@@ -442,9 +442,11 @@ export class LibraryView extends PageView {
     keySelector.keys = getAvailableKeys(selectedKey)
     keySelector.originalKey = (this.#song?.originalKey || this.#parsed?.metadata?.key) as string
     // (the chart's range, in its own key, or the melody's when it has none)
-    const uuid = this.#song?.uuid
-    keySelector.showRangeOf(this.#parsed?.metadata, this.#parsed?.metadata?.key ?? '', async () =>
-      uuid ? (await getCurrentDB()).getMelody(uuid) : undefined
+    // (a key is only shown for the song that is open)
+    const song = this.#song as SongWithContent
+    const metadata = this.#parsed?.metadata
+    keySelector.showRangeOf(metadata, metadata?.key as string, async () =>
+      (await getCurrentDB()).getMelody(song.uuid)
     )
     // The key is saved with the song, which a user who can only read can't change
     keySelector.editMode = this.#editMode
