@@ -73,32 +73,70 @@ describe('song-import: corners', () => {
 
   describe('a lead sheet', () => {
     const leadSheet = () => new TextEncoder().encode('%PDF-1.4 a lead sheet').buffer
-    /** What the reader gives for the sheet of a song in C, D4 to E5, as it reads it */
-    const read = (overrides = {}) => ({
-      low: 62,
-      high: 76,
-      keySignature: 0,
-      notes: 312,
-      instrumental: 31,
-      unsung: 7,
-      pages: 3,
-      staves: 19,
-      lowAt: { page: 2, staff: 3 },
-      highAt: { page: 1, staff: 2 },
-      ...overrides,
+    const note = (midi: number, syllable = '', cue = false) => ({
+      kind: 'note',
+      id: `n${midi}`,
+      step: 'C',
+      alter: 0,
+      octave: 4,
+      midi,
+      start: 0,
+      duration: 1,
+      tupletRatio: 1,
+      tieStart: false,
+      tieStop: false,
+      cue,
+      syllables: [syllable],
+      withPrevious: false,
+    })
+    const bar = (number: number, notes: unknown[], fifths: number) => ({
+      number,
+      voices: [notes],
+      chords: [],
+      section: null,
+      barline: 'single',
+      directions: [],
+      repeatStart: false,
+      ending: null,
+      length: 4,
+      full: true,
+      fifths,
+      beats: 4,
+      beatType: 4,
+      tempo: null,
+    })
+    /**
+     * The melody the reader gives for the sheet of a song in C, D4 to E5: the highest note and one
+     * more sung in bar 1, the lowest in bar 2, and bar 3 with no lyric, its notes (lower still)
+     * `unsung` and `instrumental` small ones
+     */
+    const read = ({ low = 62, high = 76, fifths = 0, instrumental = 2, unsung = 1 } = {}) => ({
+      title: 'T',
+      notice: [],
+      measures: [
+        bar(1, [note(high, 'Ho'), note(67, 'ly')], fifths),
+        bar(2, [note(low, 'Lord')], fifths),
+        bar(
+          3,
+          [
+            ...Array.from({ length: unsung }, () => note(low - 2)),
+            ...Array.from({ length: instrumental }, () => note(low - 5, '', true)),
+          ],
+          fifths
+        ),
+      ],
     })
 
     /** An importer whose melody reader is a stand-in, and a log of what it was asked to read */
     async function importerReading(read: (pdf: ArrayBuffer) => Promise<unknown>) {
       const element = await importer()
       const reads: ArrayBuffer[] = []
-      element.loadMelodyReader = async () => ({
-        readMelodyRange: async (pdf: ArrayBuffer) => {
+      element.loadMelodyPdfReader = async () => ({
+        readMelodyPdf: async (pdf: ArrayBuffer) => {
           reads.push(pdf)
           return read(pdf)
         },
       })
-      element.loadMelodyPdfReader = async () => ({ readMelodyPdf: async () => null })
       return { element, reads }
     }
 
@@ -122,39 +160,13 @@ describe('song-import: corners', () => {
       expect(await said(element)).to.contain('Melody range D4–E5 in C, from the lead sheet.')
     })
 
-    /** A melody as the whole-sheet reader gives it: one empty measure, in the key of `fifths` */
-    const notesOf = (fifths = 0) => ({
-      title: 'T',
-      notice: [],
-      measures: [
-        {
-          number: 1,
-          voices: [[]],
-          chords: [],
-          section: null,
-          barline: 'single',
-          directions: [],
-          repeatStart: false,
-          ending: null,
-          length: 4,
-          full: true,
-          fifths,
-          beats: 4,
-          beatType: 4,
-          tempo: null,
-        },
-      ],
-    })
-
-    /** An importer whose readers are stand-ins: the range, and the whole melody */
+    /** An importer whose reader gives `notes` */
     async function importerKeeping(notes: () => Promise<unknown>) {
-      const { element } = await importerReading(async () => read())
-      element.loadMelodyPdfReader = async () => ({ readMelodyPdf: notes })
-      return element
+      return (await importerReading(notes)).element
     }
 
     it('keeps the whole melody with a new song, in the chart key', async () => {
-      const element = await importerKeeping(async () => notesOf())
+      const element = await importerKeeping(async () => read())
       await element.receive({
         chordproText: chart(unique('Kept')),
         source: 'songselect',
@@ -162,11 +174,11 @@ describe('song-import: corners', () => {
       })
       const record = await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)
       expect(record?.key).to.equal('C')
-      expect(readMusicXml(record?.xml ?? '')?.measures).to.have.length(1)
+      expect(readMusicXml(record?.xml ?? '')?.measures).to.have.length(3)
     })
 
     it('says on the page that the melody is kept, or why only the range is', async () => {
-      const element = await importerKeeping(async () => notesOf())
+      const element = await importerKeeping(async () => read())
       await element.receive({
         chordproText: chart(unique('Said kept')),
         source: 'songselect',
@@ -174,19 +186,19 @@ describe('song-import: corners', () => {
       })
       expect(await said(element)).to.contain("The lead sheet's melody is kept with the song.")
 
-      // a sheet whose notes are in another key is read for its range only
-      const other = await importerKeeping(async () => notesOf(1))
+      // a sheet whose notes are in another key is not kept, and the page says why
+      const other = await importerKeeping(async () => read({ fifths: 1 }))
       await other.receive({
         chordproText: chart(unique('Said not kept')),
         source: 'songselect',
         leadSheet: leadSheet(),
       })
       const shown = await said(other)
-      expect(shown).to.contain('notes could not be kept in full, so only the range was')
+      expect(shown).to.contain('in another key than the chart')
       expect(shown).to.not.contain('is kept with the song')
 
       // and when saving it fails, the page does not say it is kept
-      const failing = await importerKeeping(async () => notesOf())
+      const failing = await importerKeeping(async () => read())
       const db = ChordlessDB.prototype
       const saveMelody = db.saveMelody
       db.saveMelody = async () => {
@@ -205,11 +217,11 @@ describe('song-import: corners', () => {
     })
 
     it("says the library's chart stays, and its lead sheet melody is not kept, when that is the choice", async () => {
-      const element = await importerKeeping(async () => notesOf())
+      const element = await importerKeeping(async () => read())
       const item = {
         isDuplicate: true,
         choice: 'use-existing',
-        notes: { melody: notesOf(), key: 'C' },
+        notes: { melody: read(), key: 'C' },
       }
       expect(element._melodyKept(item)).to.contain('is not kept')
       expect(element._melodyKept({ ...item, choice: null, pick: 'update' })).to.contain('is kept')
@@ -218,22 +230,19 @@ describe('song-import: corners', () => {
       )
     })
 
-    it('keeps the melody of a chart that has a range already, and does not read the range again', async () => {
-      const { element, reads } = await importerReading(async () => read())
-      element.loadMelodyPdfReader = async () => ({ readMelodyPdf: async () => notesOf() })
-      await element.receive({
-        chordproText: `{title: ${unique('Ranged')}}\n{key: C}\n{x_chordless_range: D4-E5}\n\n[C]Hello`,
-        source: 'songselect',
-        leadSheet: leadSheet(),
-      })
-      expect(reads).to.have.length(0)
+    it('keeps the melody of a chart that has a range already, and keeps its range, reading the sheet once', async () => {
+      const { element, reads } = await importerReading(async () => read({ low: 60 }))
+      const text = `{title: ${unique('Ranged')}}\n{key: C}\n{x_chordless_range: D4-E5}\n\n[C]Hello`
+      await element.receive({ chordproText: text, source: 'songselect', leadSheet: leadSheet() })
+      expect(reads).to.have.length(1)
+      expect(element._imports[0].chordproText).to.equal(text)
       expect(await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)).to.not.equal(
         undefined
       )
     })
 
     it('still imports the chart when the melody cannot be saved', async () => {
-      const element = await importerKeeping(async () => notesOf())
+      const element = await importerKeeping(async () => read())
       const db = ChordlessDB.prototype
       const saveMelody = db.saveMelody
       db.saveMelody = async () => {
@@ -253,7 +262,10 @@ describe('song-import: corners', () => {
     })
 
     it('keeps no melody from a sheet in another key, or one that cannot be read, and still imports the chart', async () => {
-      for (const notes of [async () => notesOf(1), async () => Promise.reject(new Error('bad'))]) {
+      for (const notes of [
+        async () => read({ fifths: 1 }),
+        async () => Promise.reject(new Error('bad')),
+      ]) {
         const element = await importerKeeping(notes)
         await element.receive({
           chordproText: chart(unique('No melody')),
@@ -288,7 +300,7 @@ describe('song-import: corners', () => {
 
     it('is not used when it is in another key than the chart, and says so', async () => {
       // the sheet has a sharp, and the chart is in C
-      const { element } = await importerReading(async () => read({ keySignature: 1 }))
+      const { element } = await importerReading(async () => read({ fifths: 1 }))
       const text = chart(unique('Another key'))
       await element.receive({ chordproText: text, source: 'songselect', leadSheet: leadSheet() })
       expect(element._imports[0].chordproText).to.equal(text)
@@ -298,7 +310,7 @@ describe('song-import: corners', () => {
     })
 
     it('is used when it is in the chart key, a minor chart with its relative major signature too', async () => {
-      const { element } = await importerReading(async () => read({ keySignature: 1 }))
+      const { element } = await importerReading(async () => read({ fifths: 1 }))
       const minor = `{title: ${unique('Minor')}}\n{key: Em}\n\n[Em]Hello`
       await element.receive({ chordproText: minor, source: 'songselect', leadSheet: leadSheet() })
       expect(element._imports[0].chordproText).to.contain('{x_chordless_range: D4-E5}')
@@ -314,13 +326,13 @@ describe('song-import: corners', () => {
       const text = await said(element)
       expect(text).to.contain('How the lead sheet was read')
       expect(text).to.contain(
-        '3 pages and 19 staves: 312 sung notes read, and left out 31 small instrumental notes and 7 notes with no lyric.'
+        '3 bars: 3 sung notes read, and left out 2 small instrumental notes and 1 note with no lyric.'
       )
       expect(text).to.contain(
         'Key signature: no sharps or flats (C major or A minor). The chart is in C.'
       )
-      expect(text).to.contain('Lowest note D4: page 2, staff 3 from the top.')
-      expect(text).to.contain('Highest note E5: page 1, staff 2 from the top.')
+      expect(text).to.contain('Lowest note D4: bar 2.')
+      expect(text).to.contain('Highest note E5: bar 1.')
     })
 
     it('says what it left out when that is only one kind, in the singular', async () => {
@@ -339,16 +351,18 @@ describe('song-import: corners', () => {
     })
 
     it('says how it was read in the singular, and when it is in another key', async () => {
-      const { element } = await importerReading(async () =>
-        read({ pages: 1, staves: 1, notes: 1, instrumental: 0, unsung: 0, keySignature: -2 })
-      )
+      const { element } = await importerReading(async () => ({
+        title: 'T',
+        notice: [],
+        measures: [bar(1, [note(62, 'Lord')], -2)],
+      }))
       await element.receive({
         chordproText: chart(unique('Singular')),
         source: 'songselect',
         leadSheet: leadSheet(),
       })
       const text = await said(element)
-      expect(text).to.contain('1 page and 1 staff: 1 sung note read.')
+      expect(text).to.contain('1 bar: 1 sung note read.')
       expect(text).to.not.contain('left out')
       expect(text).to.contain('Key signature: 2 flats (Bb major or G minor).')
     })
@@ -567,7 +581,7 @@ describe('song-import: corners', () => {
 
     it('imports the song without a range when the reader cannot be loaded', async () => {
       const element = await importer()
-      element.loadMelodyReader = async () => {
+      element.loadMelodyPdfReader = async () => {
         throw new Error('offline')
       }
       const text = chart(unique('No reader'))
@@ -575,14 +589,11 @@ describe('song-import: corners', () => {
       expect(element._imports[0].chordproText).to.equal(text)
     })
 
-    it('is not read when there is no key to put its notes in, or the chart has a range', async () => {
+    it('is not read when there is no key to put its notes in', async () => {
       const { element, reads } = await importerReading(async () => read())
       const noKey = `{title: ${unique('No key')}}\n\n[C]Hello`
       await element.receive({ chordproText: noKey, source: 'songselect', leadSheet: leadSheet() })
       expect(element._imports[0].chordproText).to.equal(noKey)
-      const ranged = `${chart(unique('Has a range'))}\n{x_chordless_range: E4-D5}`
-      await element.receive({ chordproText: ranged, source: 'songselect', leadSheet: leadSheet() })
-      expect(element._imports[0].chordproText).to.equal(ranged)
       expect(reads).to.have.length(0)
     })
 
@@ -616,13 +627,12 @@ describe('song-import: corners', () => {
         element.loadPdfReader = async () => ({
           readPdfText: async (bytes: ArrayBuffer) => texts[markerOf(bytes)] ?? '',
         })
-        element.loadMelodyReader = async () => ({
-          readMelodyRange: async (bytes: ArrayBuffer) => {
+        element.loadMelodyPdfReader = async () => ({
+          readMelodyPdf: async (bytes: ArrayBuffer) => {
             const range = ranges[markerOf(bytes)]
             return range ? read(range) : null
           },
         })
-        element.loadMelodyPdfReader = async () => ({ readMelodyPdf: async () => null })
         return element
       }
       const rangeIn = (element: any, index: number) =>
@@ -742,8 +752,6 @@ describe('song-import: corners', () => {
 
     it('is read by the real reader, which loads in the browser', async () => {
       const element = await importer()
-      const reader = await element.loadMelodyReader()
-      expect(reader.readMelodyRange).to.be.a('function')
       expect((await element.loadMelodyPdfReader()).readMelodyPdf).to.be.a('function')
     })
 
@@ -800,9 +808,9 @@ describe('song-import: corners', () => {
       await opened(async () => {
         const element = await importer()
         let finish: (value: unknown) => void = () => {}
-        element.loadMelodyReader = () =>
+        element.loadMelodyPdfReader = () =>
           new Promise(resolve => {
-            finish = () => resolve({ readMelodyRange: async () => null })
+            finish = () => resolve({ readMelodyPdf: async () => null })
           })
         message({
           type: 'CHORDLESS_IMPORT',

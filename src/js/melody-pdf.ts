@@ -12,7 +12,7 @@
  *   staff line per measure); a head, its stem, flag, dots and accidental are found by where they sit.
  *
  * Input is the page as SVG text (what `mutool draw -F svg` writes: for the spike; in the app the same
- * shapes come from pdf.js's drawing operations, as `melody-range.ts` already reads them).
+ * shapes come from pdf.js's drawing operations: `melody-pdfjs.ts`).
  */
 
 import { parseDirection } from './melody-directions.ts'
