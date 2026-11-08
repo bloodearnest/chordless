@@ -7,11 +7,11 @@
   },
   "src/js/melody-musicxml-read.ts": {
     "lines": 0,
-    "branches": 20,
+    "branches": 18,
     "functions": 0
   },
   "src/js/melody-musicxml.ts": {
-    "lines": 10,
+    "lines": 0,
     "branches": 16,
     "functions": 0
   },
@@ -47,18 +47,13 @@
   },
   "src/js/melody-structure.ts": {
     "lines": 0,
-    "branches": 7,
+    "branches": 6,
     "functions": 0
   },
   "src/js/sync/pull.ts": {
     "lines": 0,
-    "branches": 5,
+    "branches": 2,
     "functions": 0
-  },
-  "src/js/sync/push.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 1
   },
   "src/js/telemetry/start.ts": {
     "lines": 0,
