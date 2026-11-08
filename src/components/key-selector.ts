@@ -1,4 +1,4 @@
-import { noteName, semitonesBetween } from '../js/chart-range.ts'
+import { noteName, semitonesBetween } from '../js/pitch.ts'
 import { describeRange, type NoteRange, octaveNearGreen, rangeStatus } from '../js/voice-range.ts'
 import { OptionPicker, type PickerOption } from './option-picker.ts'
 

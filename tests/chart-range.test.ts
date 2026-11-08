@@ -3,17 +3,19 @@
  */
 import { expect } from '@open-wc/testing'
 import {
-  describeSignature,
   formatRange,
-  noteName,
   parseRange,
   rangeOfChart,
   rangeOfMetadata,
   rangeSpan,
-  semitonesBetween,
-  signatureMatchesKey,
   withRange,
 } from '../src/js/chart-range.ts'
+import {
+  describeSignature,
+  noteName,
+  semitonesBetween,
+  signatureMatchesKey,
+} from '../src/js/pitch.ts'
 import type { NoteRange } from '../src/js/voice-range.ts'
 
 const { describe, it } = window

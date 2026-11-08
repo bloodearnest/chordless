@@ -1,8 +1,8 @@
 /** A one-measure melody for tests (C4, then G4 held three beats): the MusicXML score, and a record of it */
 import type { Melody, MelodyNote } from '../src/js/melody.ts'
-import { midiOf } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { melodyRecord } from '../src/js/melody-record.ts'
+import { midiOf } from '../src/js/pitch.ts'
 
 const note = (
   step: MelodyNote['step'],

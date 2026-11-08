@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { Melody, MelodyEvent, MelodyMeasure, MelodyNote } from '../src/js/melody.ts'
-import { midiOf } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { readMusicXml } from '../src/js/melody-musicxml-read.ts'
+import { midiOf } from '../src/js/pitch.ts'
 import { parseXml } from '../src/js/xml.ts'
 
 describe('the XML reader', () => {

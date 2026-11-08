@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { Melody, MelodyNote } from '../src/js/melody.ts'
-import { midiOf } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { renderMelodyHere, withoutStyle } from '../src/js/melody-render-engine.ts'
+import { midiOf } from '../src/js/pitch.ts'
 
 const note = (step: MelodyNote['step'], start: number, syllable: string): MelodyNote => ({
   kind: 'note',

@@ -2,17 +2,12 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { readMelodySvg } from '../scripts/melody-xml.ts'
 import type { Melody, MelodyEvent, MelodyMeasure, MelodyNote } from '../src/js/melody.ts'
-import { midiOf } from '../src/js/melody.ts'
 import { parseDirection } from '../src/js/melody-directions.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { absolutePath, shapeHash } from '../src/js/melody-path.ts'
 import { type Glyph, type Line, type Staff, signsOf } from '../src/js/melody-pdf.ts'
-import {
-  fifthsOfKey,
-  melodyExtremes,
-  melodyRange,
-  transposeMelody,
-} from '../src/js/melody-transpose.ts'
+import { melodyExtremes, melodyRange, transposeMelody } from '../src/js/melody-transpose.ts'
+import { fifthsOfKey, midiOf } from '../src/js/pitch.ts'
 
 /** One measure of 4/4 in the shape Verovio writes, drawn with the glyphs named, as a lead sheet's SVG is */
 function sheet(notes: string, key = ''): string {

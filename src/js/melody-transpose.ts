@@ -7,22 +7,11 @@
  * sung melody lands nearest the green range (`octaveNearGreen`, as the key picker shows), and the
  * chords take the plain nearest interval, since they have no octave.
  */
-import { noteName, semitonesBetween } from './chart-range.ts'
 import type { Melody, MelodyEvent, MelodyNote } from './melody.ts'
-import { midiOf } from './melody.ts'
 import { playOrder } from './melody-structure.ts'
+import { fifthsOfKey, midiOf, noteName, semitonesBetween } from './pitch.ts'
 import { transposeChord } from './transpose.ts'
 import { type NoteRange, octaveNearGreen } from './voice-range.ts'
-
-const FIFTHS_OF_LETTER = { F: -1, C: 0, G: 1, D: 2, A: 3, E: 4, B: 5 } as const
-
-/** Key signature of a key name, sharps positive: 'Bb' is -2, 'Em' is 1. Null if it is not a key */
-export function fifthsOfKey(key: string): number | null {
-  const m = /^([A-G])([#b♯♭]?)(m|min|minor)?$/.exec(key.trim())
-  if (!m) return null
-  const alter = m[2] === '#' || m[2] === '♯' ? 1 : m[2] ? -1 : 0
-  return FIFTHS_OF_LETTER[m[1] as keyof typeof FIFTHS_OF_LETTER] + 7 * alter - (m[3] ? 3 : 0)
-}
 
 /** The lowest and highest sung note (cue notes are an instrumental line), or null if none is sung */
 export function melodyRange(melody: Melody): NoteRange | null {

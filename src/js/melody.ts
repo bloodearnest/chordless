@@ -6,12 +6,13 @@
  * Times are in quarter notes from the start of the measure. Pitch is spelled (step, alter, octave)
  * as the sheet spells it; `midi` is derived and kept because analysis and checks want the number.
  */
+import type { Step } from './pitch.ts'
 
 export interface MelodyNote {
   kind: 'note'
   /** The id of the note's element in the sheet's SVG (the preview's time map names the same ids) */
   id: string
-  step: 'C' | 'D' | 'E' | 'F' | 'G' | 'A' | 'B'
+  step: Step
   alter: number
   octave: number
   midi: number
@@ -111,10 +112,4 @@ export interface Melody {
   measures: MelodyMeasure[]
   /** The text under the music that has to travel with it: copyright, CCLI numbers (docs/MELODY.md, "The terms") */
   notice: string[]
-}
-
-const SEMITONE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 } as const
-
-export function midiOf(step: MelodyNote['step'], alter: number, octave: number): number {
-  return (octave + 1) * 12 + SEMITONE[step] + alter
 }
