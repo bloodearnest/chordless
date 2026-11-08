@@ -2,7 +2,7 @@
  * The media player's own controls: what it does with the settings, dragging it about, the volume
  * knobs, and what it shows. (Starting and stopping songs is in media-player-playback.test.ts.)
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/media-player.ts'
 import type { MediaPlayer } from '../src/components/media-player.ts'
 import { MediaSettingsChangeEvent } from '../src/components/media-player-settings.ts'
@@ -201,8 +201,7 @@ describe('the media player', () => {
       player.currentKey = 'G'
       player._padLoadFailed = true
       window.dispatchEvent(new PadSetChangedEvent({ id: 'drive-pads', name: 'Pads' }))
-      await wait(20)
-      expect(player._padLoadFailed).to.equal(false)
+      await waitUntil(() => !player._padLoadFailed, 'the pads to be looked up again')
       expect(pads.log).to.include('load G')
     })
 

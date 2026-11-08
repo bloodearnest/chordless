@@ -20,7 +20,7 @@ import {
 import { makeEntry, makeSetlist } from './builders.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -551,7 +551,7 @@ describe('team-space-wizard', () => {
       await fillForm()
       button('Create team space').click()
       await answer(false)
-      await wait(50)
+      await nothingFor(50)
       expect(requests.some(request => request.key === 'POST /api/spaces')).to.equal(false)
       expect(madeFolders).to.deep.equal([])
       expect(await inSource()).to.have.length(1)

@@ -17,7 +17,7 @@ import { createSpace, deleteSpace, getSpaceById, updateSpace } from '../src/js/s
 import type { TeamRole } from '../src/js/team-roles.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -196,7 +196,7 @@ describe('the team share panel', () => {
 
       remove().click()
       await answer(false)
-      await wait(50)
+      await nothingFor(50)
       expect(calls.some(call => call.key.startsWith('DELETE'))).to.equal(false)
 
       remove().click()
@@ -286,7 +286,7 @@ describe('the team share panel', () => {
       await open(mine)
       button('Stop sharing').click()
       await answer(false)
-      await wait(50)
+      await nothingFor(50)
       expect(changed).to.equal(0)
       expect((await getSpaceById(mine.id))?.team?.id).to.equal(TEAM)
     })
@@ -338,7 +338,7 @@ describe('the team share panel', () => {
       await until(() => text().includes('cat@example.com'), 'the people')
       button('Leave this Team').click()
       await answer(false)
-      await wait(50)
+      await nothingFor(50)
       expect(left).to.equal(0)
       expect(await getSpaceById(mine.id)).to.not.equal(undefined)
     })

@@ -13,7 +13,7 @@ import { getCurrentDB } from '../src/js/db.ts'
 import { ChordProParser } from '../src/js/parser.ts'
 import { sampleRecord } from './melody-sample.ts'
 import { must } from './must.ts'
-import { wait } from './test-helpers.ts'
+import { nothingFor } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -162,13 +162,13 @@ describe('song-card', () => {
 
         // not in edit mode the picker is not on show, so nothing is looked up
         const plain = await show({ song: inList })
-        await wait(50)
+        await nothingFor(50)
         expect((await picker(plain)).range).to.equal(null)
 
         // and a card given another song while the melody was read does not take its range
         const moved = await show({ song: inList, editMode: true })
         moved.song = song({ currentKey: 'A', originalKey: 'G', parsed })
-        await wait(100)
+        await nothingFor()
         expect((await picker(moved)).range).to.equal(null)
       } finally {
         await db.deleteMelody(uuid, { remember: false })

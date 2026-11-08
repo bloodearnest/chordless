@@ -27,7 +27,7 @@ import {
 } from '../src/js/space.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -204,7 +204,7 @@ describe('account-page', () => {
     it('does nothing for a space that is not on the list', async () => {
       const el = await page()
       el.dispatchEvent(new SpaceManageEvent('no-such-space'))
-      await wait(50)
+      await nothingFor(50)
       expect(modal(el).open).to.equal(false)
     })
   })
@@ -236,7 +236,7 @@ describe('account-page', () => {
     it('does nothing for a space that is not on the list', async () => {
       const el = await page()
       el.dispatchEvent(new SpaceLeadersEvent('no-such-space'))
-      await wait(50)
+      await nothingFor(50)
       expect(modal(el).open).to.equal(false)
     })
 
@@ -300,7 +300,7 @@ describe('account-page', () => {
       const first = await space('Mine')
       const el = await page()
       el.dispatchEvent(new SpaceUsersEvent(first.id))
-      await wait(50)
+      await nothingFor(50)
       expect(modal(el).open).to.equal(false)
     })
   })

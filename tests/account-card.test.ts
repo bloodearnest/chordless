@@ -9,7 +9,7 @@ import type { AppModal } from '../src/components/app-modal.ts'
 import '../src/components/account-card.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -298,7 +298,7 @@ describe('account-card', () => {
       await open()
       control('logout').click()
       await answerLogout(false)
-      await wait(100)
+      await nothingFor()
       expect(worker.stored).to.not.equal(undefined)
       expect(text()).to.contain('Google Drive connected')
       expect(revoked).to.deep.equal([])
@@ -308,7 +308,7 @@ describe('account-card', () => {
       await open()
       control('revoke').click()
       await answerLogout(false, 'Revoke access')
-      await wait(100)
+      await nothingFor()
       expect(worker.stored).to.not.equal(undefined)
       expect(revoked).to.deep.equal([])
     })

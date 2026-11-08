@@ -2,7 +2,7 @@
  * The setlist page's remaining corners: the controls that fade with edit mode, collapsing a
  * section, and the overview's drag and add-song wiring, driven as a user does.
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { EditModeToggleEvent } from '../src/components/app-header.ts'
 import { SongSettingsClickEvent } from '../src/components/musical-metadata-display.ts'
 import { SongSelectEvent } from '../src/components/song-list.ts'
@@ -13,7 +13,7 @@ import { setCapoPreference } from '../src/js/preferences.ts'
 import { SetlistPage } from '../src/js/setlist-page.ts'
 import { getSongWithContent } from '../src/js/song-utils.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
-import { wait } from './test-helpers.ts'
+import { nothingFor, wait } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -59,7 +59,7 @@ describe('the setlist page: corners', () => {
     await rig.open()
     rig.page.showSong(0, true)
     await rig.page.sections.setHideMode(0, 0, 'collapse')
-    await wait(500)
+    await nothingFor(500)
     expect(rig.errors).to.deep.equal([])
   })
 
@@ -114,8 +114,9 @@ describe('the setlist page: corners', () => {
     await rig.open()
     rig.page.scrollToSection('song-1', 1)
     expect(rig.page._isProgrammaticScroll).to.equal(true)
-    await wait(700)
-    expect(rig.page._isProgrammaticScroll).to.equal(false)
+    await waitUntil(() => !rig.page._isProgrammaticScroll, 'the scroll to be done', {
+      timeout: 1500,
+    })
   })
 
   it('keeps the overview’s cards draggable when it is drawn again while being edited', async () => {

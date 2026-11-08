@@ -3,7 +3,7 @@ import { LitElement } from 'lit'
 import { announceDataChange, type DataChange } from '../src/js/data-changes.ts'
 import { watchData } from '../src/js/data-watcher.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
-import { wait } from './test-helpers.ts'
+import { nothingFor, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -50,7 +50,7 @@ describe('DataWatcher', () => {
   it('is not told of other kinds, or of another space', async () => {
     announce('setlist')
     announce('song', { spaceId: 'another-space' })
-    await wait(100)
+    await nothingFor()
     expect(element.heard).to.have.length(0)
   })
 
@@ -65,7 +65,7 @@ describe('DataWatcher', () => {
     element.remove()
     await wait(100)
     announce('song')
-    await wait(100)
+    await nothingFor()
     expect(element.heard).to.have.length(0)
   })
 })
