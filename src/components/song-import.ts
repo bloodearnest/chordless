@@ -1,4 +1,4 @@
-import { css, html, LitElement } from 'lit'
+import { html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { HIGHEST_OFFERED, LOWEST_OFFERED, rangeOfChart, withRange } from '../js/chart-range.ts'
 import type { Person, Setlist, SongRecord, Space } from '../js/data-types.ts'
@@ -14,13 +14,7 @@ import { parseChartText, songOfChart } from '../js/email-setlist.ts'
 import { type LibrarySong, matchLibrary } from '../js/import-plan.ts'
 import { libraryForMatching } from '../js/import-setlist.ts'
 import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
-import {
-  type ChartComparison,
-  compareCharts,
-  keyOfChart,
-  originOfChart,
-  sourceToImprove,
-} from '../js/library-repair.ts'
+import { compareCharts, keyOfChart, originOfChart, sourceToImprove } from '../js/library-repair.ts'
 import { type SongDetails, songDetailsToChordpro } from '../js/lyrics-chordpro.ts'
 import { ChordProParser } from '../js/parser.ts'
 import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../js/people.ts'
@@ -40,22 +34,35 @@ import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './chart-diff.ts'
 import './songselect-help.ts'
-import type { ChartLabel } from './chart-diff.ts'
+import {
+  type DuplicateActions,
+  type DuplicateChoice,
+  type ImportItem,
+  isUnresolved,
+  renderDuplicates,
+  statusOf,
+  suggested,
+  updatesWithoutAsking,
+} from './import-duplicates.ts'
 import type {
   SetlistDetailsIdentifyEvent,
   SetlistDetailsSaveEvent,
 } from './setlist-details-form.ts'
 import './setlist-details-form.ts'
-import { type MelodyRead, readOfMelody } from '../js/lead-sheet.ts'
+import {
+  chartWithLeadSheet,
+  type KeptMelody,
+  keepMelody,
+  type LeadSheetRead,
+  type MelodyRead,
+} from '../js/lead-sheet.ts'
 import type { Melody } from '../js/melody.ts'
-import { writeMusicXml } from '../js/melody-musicxml.ts'
-import { melodyRecord } from '../js/melody-record.ts'
 import { goTo, loadPage } from '../js/navigation.ts'
-import { describeSignature, noteName, signatureMatchesKey } from '../js/pitch.ts'
-import { describeOrigin, SONGSELECT } from '../js/song-source.ts'
+import { describeSignature, noteName } from '../js/pitch.ts'
+import { SONGSELECT } from '../js/song-source.ts'
 import { ensureCurrentSpace, setCurrentSpace } from '../js/space.ts'
 import { visibleSpaces } from '../js/space-tabs.ts'
-import { buttonStyles, spinnerStyles } from './shared-styles.ts'
+import { songImportStyles } from './song-import-styles.ts'
 
 /** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */
 export class SongImportedEvent extends Event {
@@ -99,59 +106,8 @@ export interface IncomingSong {
   leadSheet?: ArrayBuffer
 }
 
-/**
- * What came of a lead sheet: its melody's range was put in the chart, it had no melody, it could
- * not be read, or it was in another key than the chart (so its notes would not be the chart's)
- */
-type LeadSheetOutcome = 'read' | 'no-melody' | 'unreadable' | 'other-key'
-
 /** Up to this many songs imported at once are listed; more are folded behind a count of what came of them */
 const MANY_SONGS = 8
-
-/** A lead sheet is about 130 KB: anything much bigger is not one */
-const MAX_LEAD_SHEET = 8 * 1024 * 1024
-
-/**
- * What to do with a chart of a song the library has: import it as the original (the library's
- * chart becomes a variant), import it as a variant (the library's stays the original), update
- * the library's chart with it, or not import it
- */
-type DuplicateChoice = 'as-original' | 'as-variant' | 'update' | 'use-existing'
-
-/** A song that was imported, and what to do if it was already in the library */
-interface ImportItem {
-  song: SongRecord
-  chordproText: string
-  isDuplicate: boolean
-  choice: DuplicateChoice | null
-  /** The library's chart, for a duplicate */
-  existingText?: string
-  /** How the chart compares with the one the library has, for a duplicate */
-  comparison?: ChartComparison
-  /** What is picked, not yet done: set when it is read, to the suggestion */
-  pick?: DuplicateChoice | null
-  /** The name of the chart that becomes a variant: the library's if imported as the original, else the imported one */
-  label?: string
-  /** The same chart as the library's, which only said it was a file: its source is now SongSelect */
-  sourceSet?: boolean
-  /** The same song as the library's: it was updated with no question asked */
-  auto?: boolean
-  /** Its range was set by the person, not read from a lead sheet */
-  rangeSetByHand?: boolean
-  /** What came of the lead sheet that came with it, if one did */
-  leadSheet?: LeadSheetOutcome
-  /** What was read from it, to show how */
-  melody?: MelodyRead
-  /** Its whole melody, in the chart's key, to be kept with the song the chart goes to (docs/MELODY.md) */
-  notes?: { melody: Melody; key: string }
-  /** Whether it was saved just now (a new song's); undefined while it waits on a choice about a song the library has */
-  melodySaved?: boolean
-  /** Where the chart came from, and who is importing it */
-  source?: string
-  importUser?: string
-  /** The key to play it in when added to a setlist (a shared chart's), else the song's own */
-  key?: string | null
-}
 
 /** "Amazing Grace.cho" -> "Amazing Grace" */
 function titleFromFileName(name: string): string {
@@ -231,429 +187,7 @@ export class SongImport extends LitElement {
   _newSetlistModalRef: Ref<AppModal>
   _db: ChordlessDB | null = null
 
-  static override styles = [
-    buttonStyles,
-    spinnerStyles,
-    css`
-    /* The page's own reset (* { margin: 0; padding: 0 }) beats :host, so the
-       spacing goes on .page */
-    :host {
-      display: block;
-      flex: 1;
-      min-height: 0;
-      overflow-y: auto;
-      color: var(--text-color);
-    }
-
-    .page {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 2rem 1rem;
-    }
-
-    .space-picker {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1rem;
-      font-size: var(--font-ui-small);
-    }
-
-    .space-picker select {
-      flex: 1;
-      padding: 0.4rem 0.6rem;
-      font: inherit;
-      border: 2px solid var(--border-light, #ecf0f1);
-      border-radius: 6px;
-      background-color: var(--bg-secondary, #f8f9fa);
-      color: var(--text-color);
-    }
-
-    .page.wide {
-      max-width: none;
-    }
-
-    .status {
-      text-align: center;
-      color: var(--text-secondary, #5f6b6d);
-    }
-
-    .status.error {
-      color: var(--color-danger, #e74c3c);
-    }
-
-    h2 {
-      margin: 0 0 1.5rem;
-      font-size: var(--font-ui);
-    }
-
-    /* The question of what to do with a duplicate: the theme's surface, with an info-coloured
-       edge (a decision, not a warning), so it reads in light and dark */
-    .duplicate {
-      background: var(--bg-secondary);
-      color: var(--text-color);
-      border: 1px solid var(--border-color);
-      border-left: 5px solid var(--color-info);
-      border-radius: 8px;
-      padding: 1.5rem;
-    }
-
-    .duplicate strong {
-      display: block;
-      margin-bottom: 0.75rem;
-    }
-
-    .duplicate p {
-      margin: 0 0 1rem;
-    }
-
-    .duplicate-actions {
-      display: flex;
-      gap: 0.75rem;
-      margin: 0.75rem 0;
-    }
-
-    .picks {
-      margin: 0.5rem 0;
-      padding: 0;
-      border: none;
-    }
-
-    .picks legend {
-      padding: 0;
-      font-size: var(--font-ui-small);
-      color: var(--text-secondary);
-    }
-
-    .pick {
-      display: flex;
-      gap: 0.6rem;
-      align-items: flex-start;
-      padding: 0.5rem 0.6rem;
-      margin-top: 0.4rem;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      cursor: pointer;
-    }
-
-    .pick:has(input:checked) {
-      border-color: var(--color-info);
-      background: color-mix(in srgb, var(--color-info) 12%, transparent);
-    }
-
-    .pick input {
-      margin-top: 0.25rem;
-    }
-
-    .pick .help {
-      display: block;
-      font-size: var(--font-ui-small);
-      color: var(--text-secondary);
-    }
-
-    .duplicate-actions .btn {
-      flex: 1;
-      font-size: var(--font-ui-small);
-    }
-
-    details.songselect {
-      margin-top: 1.5rem;
-    }
-
-    details.songselect summary {
-      cursor: pointer;
-      font-size: var(--font-ui);
-      color: var(--text-color);
-    }
-
-    details.songselect songselect-help {
-      margin-top: 1rem;
-    }
-
-    .choices {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .choice {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      padding: 1.5rem;
-      background: var(--bg-color, white);
-      color: var(--text-color);
-      border: 2px solid var(--border-light, #ecf0f1);
-      border-radius: 12px;
-      font: inherit;
-      text-align: left;
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    button.choice,
-    label.choice,
-    a.choice {
-      cursor: pointer;
-      transition:
-        border-color 0.2s,
-        background-color 0.2s;
-    }
-
-    a.choice {
-      text-decoration: none;
-    }
-
-    label.choice:focus-within {
-      outline: 2px solid var(--button-bg);
-    }
-
-    /* The whole label opens the picker; the input itself stays reachable by
-       keyboard and screen readers */
-    label.choice input {
-      position: absolute;
-      opacity: 0;
-      width: 1px;
-      height: 1px;
-    }
-
-    textarea {
-      display: block;
-      width: 100%;
-      box-sizing: border-box;
-      margin: 0.5rem 0;
-      padding: 0.5rem 0.75rem;
-      font-family: monospace;
-      font-size: var(--font-ui-small);
-      border: 2px solid var(--border-light, #ecf0f1);
-      border-radius: 6px;
-      background-color: var(--bg-secondary, #f8f9fa);
-      color: var(--text-color);
-      resize: vertical;
-    }
-
-    textarea:focus {
-      outline: none;
-      border-color: var(--button-bg);
-    }
-
-    .songs {
-      margin: 0 0 1.5rem;
-      padding-left: 1.5rem;
-    }
-
-    .songs li {
-      margin-bottom: 0.25rem;
-    }
-
-    .songs .subtitle {
-      display: inline;
-    }
-
-    /* what came of an import that had nothing to do: the result, so as big as the title */
-    .already {
-      margin: -0.75rem 0 1.25rem;
-      font-size: var(--font-ui);
-      font-weight: 700;
-    }
-
-    .songs-summary {
-      margin: 0 0 0.5rem;
-    }
-
-    .songs-detail {
-      margin-bottom: 1.5rem;
-    }
-
-    .songs-detail summary {
-      cursor: pointer;
-    }
-
-    .bulk-picks {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.5rem;
-      margin: 0.75rem 0;
-    }
-
-    .bookmarklet-wait {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1rem;
-      padding: 3rem 1rem;
-      text-align: center;
-    }
-
-    .bookmarklet-wait .spinner {
-      width: 2rem;
-      height: 2rem;
-    }
-
-    .range {
-      margin: 0.25rem 0;
-      font-size: var(--font-ui-small);
-      color: var(--text-secondary);
-    }
-
-    .range-set {
-      margin: 0.25rem 0 0.5rem;
-      font-size: var(--font-ui-small);
-    }
-
-    .range-set summary {
-      cursor: pointer;
-      color: var(--text-secondary);
-    }
-
-    .range-set .range-editor {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      gap: 1rem;
-      margin: 0.5rem 0;
-    }
-
-    .range-picker {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-
-    .range-picker select {
-      min-height: 2.5rem;
-      padding: 0 0.5rem;
-      font: inherit;
-      font-size: var(--font-ui);
-    }
-
-    /* (the danger colour, mixed toward the text colour: it reads on the light page and on the dark) */
-    .range-error {
-      color: color-mix(in srgb, var(--color-danger, #e74c3c) 65%, var(--text-color, #1a1a1a));
-    }
-
-    .range-how {
-      margin: 0.25rem 0 0.5rem;
-      font-size: var(--font-ui-small);
-      color: var(--text-secondary);
-    }
-
-    .range-how ul {
-      margin: 0.25rem 0;
-      padding-left: 1.25rem;
-    }
-
-    .status.error + .duplicate,
-    .status.error + .choices {
-      margin-top: 1rem;
-    }
-
-    .duplicate ul {
-      list-style: none;
-      margin: 0 0 1rem;
-      padding: 0;
-    }
-
-    .duplicate li {
-      padding: 0.5rem 0;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .label-field {
-      display: block;
-      margin: 0.5rem 0;
-      font-size: var(--font-ui-small);
-    }
-
-    .label-field input {
-      display: block;
-      width: 100%;
-      box-sizing: border-box;
-      margin-top: 0.25rem;
-      padding: 0.4rem 0.6rem;
-      font: inherit;
-      border: 2px solid var(--border-light, #ecf0f1);
-      border-radius: 6px;
-      background-color: var(--bg-secondary, #f8f9fa);
-      color: var(--text-color);
-    }
-
-    .verdict {
-      margin: 0.25rem 0;
-    }
-
-    .duplicate details {
-      margin: 0.5rem 0;
-    }
-
-    .duplicate li button {
-      padding: 0.4rem 0.75rem;
-    }
-
-    button.choice:hover,
-    label.choice:hover,
-    a.choice:hover {
-      background: var(--bg-secondary, #f8f9fa);
-      border-color: var(--button-bg);
-    }
-
-    .icon,
-    .title,
-    .subtitle {
-      display: block;
-    }
-
-    .icon {
-      font-size: var(--font-ui);
-      flex-shrink: 0;
-    }
-
-    .content {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .title {
-      font-size: var(--font-ui-small);
-      font-weight: 600;
-      margin-bottom: 0.25rem;
-    }
-
-    .subtitle {
-      font-size: var(--font-ui-small);
-      color: var(--text-secondary, #5f6b6d);
-    }
-
-    .setlist-picker {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-
-    select {
-      flex: 1;
-      min-width: 0;
-      padding: 0.5rem 0.75rem;
-      font-size: var(--font-ui-small);
-      border: 2px solid var(--border-light, #ecf0f1);
-      border-radius: 6px;
-      background-color: var(--bg-secondary, #f8f9fa);
-      color: var(--text-color);
-    }
-
-    select:focus {
-      outline: none;
-      border-color: var(--button-bg);
-    }
-
-    .add {
-      padding: 0.5rem 1.25rem;
-      font-size: var(--font-ui-small);
-    }
-  `,
-  ]
+  static override styles = songImportStyles
 
   /** Loads the PDF reader, which is large and wanted only for a shared PDF (a test gives its own) */
   loadPdfReader: () => Promise<{ readPdfText(pdf: ArrayBuffer): Promise<string> }> = () =>
@@ -1047,7 +581,7 @@ export class SongImport extends LitElement {
               })
               item.sourceSet = true
             }
-          } else item.pick = this._suggested(item)
+          } else item.pick = suggested(item)
         }
         imports.push(item)
       }
@@ -1063,7 +597,7 @@ export class SongImport extends LitElement {
       this._state = 'choices'
 
       // The same song as the library's is updated, with no question: there is nothing to decide
-      const same = imports.filter(item => this._updatesWithoutAsking(item))
+      const same = imports.filter(item => updatesWithoutAsking(item))
       for (const item of same) {
         item.pick = 'update'
         item.auto = true
@@ -1075,62 +609,17 @@ export class SongImport extends LitElement {
     }
   }
 
-  /**
-   * The chart with its melody's range in it, read from the song's lead sheet (docs/RANGE.md). The
-   * lead sheet is never kept, and one that cannot be read leaves the chart as it came: the song
-   * is imported without a range, and can be given one.
-   */
-  async _chartWithRange(
-    chordproText: string,
-    leadSheet: unknown
-  ): Promise<{
-    chordproText: string
-    outcome?: LeadSheetOutcome
-    melody?: MelodyRead
-    notes?: { melody: Melody; key: string }
-  }> {
-    const key = keyOfChart(chordproText)
-    if (!(leadSheet instanceof ArrayBuffer) || leadSheet.byteLength > MAX_LEAD_SHEET) {
-      return { chordproText }
-    }
-    // (one with no key has nothing to put the notes in)
-    if (!key) return { chordproText }
-    this._progress = 'Reading the lead sheet…'
-    let melody: Melody | null
-    try {
-      melody = await (await this.loadMelodyPdfReader()).readMelodyPdf(leadSheet.slice(0))
-    } catch (error) {
-      console.warn('[Import] Could not read the melody of the lead sheet:', error)
-      return rangeOfChart(chordproText) ? { chordproText } : { chordproText, outcome: 'unreadable' }
-    }
-    // (its notes are only the chart's if it is in the chart's key)
-    const inKey = melody !== null && signatureMatchesKey(melody.measures[0]?.fifths ?? 0, key)
-    const notes = melody && inKey ? { melody, key } : undefined
-    // (a chart with a range of its own keeps it)
-    if (rangeOfChart(chordproText)) return { chordproText, notes }
-    const read = melody && readOfMelody(melody)
-    if (!read) return { chordproText, outcome: 'no-melody' }
-    if (!inKey) return { chordproText, outcome: 'other-key', melody: read }
-    return {
-      chordproText: withRange(chordproText, read, key),
-      outcome: 'read',
-      melody: read,
-      notes,
-    }
+  /** The chart with its melody's range in it, from the song's lead sheet, and the melody to keep (lead-sheet.ts) */
+  _chartWithRange(chordproText: string, leadSheet: unknown): Promise<LeadSheetRead> {
+    return chartWithLeadSheet(chordproText, leadSheet, async pdf => {
+      this._progress = 'Reading the lead sheet…'
+      return (await this.loadMelodyPdfReader()).readMelodyPdf(pdf)
+    })
   }
 
   /** Keep the melody with the song (replacing the one it had), to be synced beside the chart */
-  async _keepMelody(song: SongRecord, notes?: { melody: Melody; key: string }): Promise<boolean> {
-    if (!notes) return false
-    const db = this._database()
-    try {
-      const previous = await db.getMelody(song.uuid)
-      await db.saveMelody(melodyRecord(song.uuid, writeMusicXml(notes.melody), notes.key, previous))
-      return true
-    } catch (error) {
-      console.warn('[Import] Could not keep the melody:', error)
-      return false
-    }
+  _keepMelody(song: SongRecord, notes?: KeptMelody): Promise<boolean> {
+    return notes ? keepMelody(this._database(), song.uuid, notes) : Promise.resolve(false)
   }
 
   /** A song already in the library, and the same chart: nothing is asked, so it says so */
@@ -1187,7 +676,7 @@ export class SongImport extends LitElement {
 
   /** Whether the page is about this one song, which is in the library as it is to stay, and has no range */
   _canSetRange(item: ImportItem): boolean {
-    return this._imports.length === 1 && !this._isUnresolved(item) && item.choice !== 'use-existing'
+    return this._imports.length === 1 && !isUnresolved(item) && item.choice !== 'use-existing'
   }
 
   /** Two pickers of notes (named as the key names them), for a song with no lead sheet to read them from */
@@ -1385,14 +874,14 @@ export class SongImport extends LitElement {
 
   override render() {
     // (the comparison of two charts wants the whole width)
-    const comparing = this._imports.some(item => this._isUnresolved(item))
+    const comparing = this._imports.some(item => isUnresolved(item))
     return html`<div class="page ${comparing ? 'wide' : ''}">${this._renderSpacePicker()}${this._renderUnmatched()}${this._renderState()}</div>`
   }
 
   _renderState() {
     if (this._state === 'pick') return this._renderPick()
     const several = this._imports.length > 1
-    const unresolved = this._imports.filter(item => this._isUnresolved(item))
+    const unresolved = this._imports.filter(item => isUnresolved(item))
     return html`
       <h2>✅ ${several ? `${this._imports.length} songs` : this._imports[0].song.title}</h2>
       ${this._applying ? html`<p class="status" role="status">${this._applying}</p>` : ''}
@@ -1403,7 +892,7 @@ export class SongImport extends LitElement {
           ? html`<p class="status error">Not imported: ${this._skipped.join(', ')}</p>`
           : ''
       }
-      ${unresolved.length ? this._renderDuplicates(unresolved) : this._renderChoices()}
+      ${unresolved.length ? renderDuplicates(unresolved, this._imports.length, this._duplicateActions) : this._renderChoices()}
       <app-modal ${ref(this._newSetlistModalRef)} heading="Create New Setlist">
         ${
           this._newSetlist
@@ -1509,27 +998,12 @@ export class SongImport extends LitElement {
   }
 
   /** What came of a song, in words, for the list of songs (and for the count of them) */
-  _statusOf(item: ImportItem): string {
-    const status: Record<string, string> = {
-      update: 'updated',
-      'as-original': 'imported as the original',
-      'as-variant': 'imported as a variant',
-      'use-existing': 'not imported',
-    }
-    if (!item.isDuplicate) return 'new'
-    if (item.auto && item.choice === 'update') return 'updated: the same song as in your library'
-    if (item.comparison?.verdict === 'identical') {
-      return `identical version already in library${item.sourceSet ? ', now recorded as from SongSelect' : ''}`
-    }
-    return (item.choice && status[item.choice]) || 'already in library'
-  }
-
   _renderSongList() {
     const list = html`
       <ol class="songs">
         ${this._imports.map(
           item =>
-            html`<li>${item.song.title} <span class="subtitle">${this._statusOf(item)}</span>${this._renderRange(item)}</li>`
+            html`<li>${item.song.title} <span class="subtitle">${statusOf(item)}</span>${this._renderRange(item)}</li>`
         )}
       </ol>
     `
@@ -1538,7 +1012,7 @@ export class SongImport extends LitElement {
     // (the setlist to add them to) would be many screens down, past a list of 140 songs
     const counts = new Map<string, number>()
     for (const item of this._imports) {
-      const status = this._statusOf(item)
+      const status = statusOf(item)
       counts.set(status, (counts.get(status) ?? 0) + 1)
     }
     const summary = [...counts].map(([status, count]) => `${count} ${status}`).join('; ')
@@ -1556,12 +1030,15 @@ export class SongImport extends LitElement {
    * time for each
    */
   _pickAll(pick: DuplicateChoice): void {
-    this._imports = this._imports.map(item => (this._isUnresolved(item) ? { ...item, pick } : item))
+    this._imports = this._imports.map(item => (isUnresolved(item) ? { ...item, pick } : item))
   }
 
-  /** A song the library has, with a choice to be made for it (not one that is being updated with no question) */
-  _isUnresolved(item: ImportItem): boolean {
-    return item.isDuplicate && !item.choice && !item.auto
+  /** What the choices about songs the library has do on this page */
+  _duplicateActions: DuplicateActions = {
+    pick: (item, pick) => this._pick(item, pick),
+    pickAll: pick => this._pickAll(pick),
+    apply: items => void this._applyPicks(items),
+    range: item => this._renderRange(item),
   }
 
   /** Pick what to do with one duplicate (done when "Import" is pressed) */
@@ -1613,193 +1090,6 @@ export class SongImport extends LitElement {
 
   _setChoice(item: ImportItem, choice: DuplicateChoice, song: SongRecord = item.song): void {
     this._imports = this._imports.map(i => (i === item ? { ...i, choice, song } : i))
-  }
-
-  /** Which choice to lead with, from how the charts differ; none when the words differ */
-  _suggested(item: ImportItem): DuplicateChoice | null {
-    switch (item.comparison?.verdict) {
-      case 'different-chords':
-        return 'as-variant'
-      case 'same-chart':
-      case 'other-key':
-        // (the same song, which is updated with no question unless the library's chart is the
-        // better authority: so what is asked about is whether to replace it)
-        return 'use-existing'
-      default:
-        return null
-    }
-  }
-
-  /** `alone`: the page is about this one song, so the comparison says its range (a list of songs does) */
-  /**
-   * Whether a song the library has is updated with no question: it is the same song (the same
-   * words and chords, whatever else differs, even the key), and the chart coming is no less the
-   * authority than the library's: a chart from SongSelect is not replaced by one that is not
-   */
-  _updatesWithoutAsking(item: ImportItem): boolean {
-    const verdict = item.comparison?.verdict
-    const sameSong = verdict === 'same-chart' || verdict === 'other-key'
-    const lesser = item.song.importSource === SONGSELECT && item.source !== SONGSELECT
-    return sameSong && !lesser
-  }
-
-  _renderDuplicate(item: ImportItem, index: number, alone: boolean) {
-    const { comparison } = item
-    /* v8 ignore next -- every duplicate is given its comparison when it is read */
-    const verdict = comparison?.verdict ?? 'different-words'
-    const sentence = {
-      identical: 'The same song.',
-      'same-chart': 'The same words and chords, with other details.',
-      'other-key': 'The same song in another key.',
-      'different-chords': 'The same words, with different chords.',
-      'different-words': 'Different words: another version or arrangement.',
-    }[verdict]
-    // (the library's chart, and the imported one)
-    const charts: [string, string] = [item.existingText as string, item.chordproText]
-    const labels: [ChartLabel, ChartLabel] = [
-      { heading: 'In your library', detail: describeOrigin(item.song) },
-      {
-        heading: 'Importing',
-        detail: describeOrigin({
-          importUser: item.importUser,
-          importDate: new Date().toISOString(),
-          importSource: item.source,
-        }),
-      },
-    ]
-    const options: { value: DuplicateChoice; title: string; help: string }[] = [
-      {
-        value: 'as-original',
-        title: 'Import as original song version',
-        help: 'The imported song becomes the original. Your current song is kept as a variant.',
-      },
-      {
-        value: 'as-variant',
-        title: 'Import as variant of original',
-        help: 'Your current song stays the original. The imported song is kept as a variant.',
-      },
-      {
-        value: 'update',
-        title: 'Update current song',
-        help: 'Replace your current song with the imported one, in its key. Setlists keep using it, and keep the keys they have it in.',
-      },
-      {
-        value: 'use-existing',
-        title: 'Do not import',
-        help: 'Keep your current song as it is.',
-      },
-    ]
-    const naming = item.pick === 'as-original' || item.pick === 'as-variant'
-    return html`
-      <p class="verdict">${sentence}</p>
-      ${alone ? this._renderRange(item) : ''}
-      <fieldset class="picks">
-        <legend>What to do with it</legend>
-        ${options.map(
-          ({ value, title, help }) => html`
-            <label class="pick">
-              <input
-                type="radio"
-                class="pick-${value}"
-                name="pick-${index}"
-                .checked=${item.pick === value}
-                @change=${() => this._pick(item, value)}
-              />
-              <span><strong>${title}</strong><span class="help">${help}</span></span>
-            </label>
-          `
-        )}
-      </fieldset>
-      ${
-        naming
-          ? html`
-            <label class="label-field">
-              ${item.pick === 'as-original' ? 'Variant name for your current song' : 'Variant name for the imported song'}
-              <input
-                class="variant-label"
-                type="text"
-                .value=${item.label ?? 'Alternate chords'}
-                @input=${(event: Event) => {
-                  item.label = (event.target as HTMLInputElement).value
-                }}
-              />
-            </label>
-          `
-          : ''
-      }
-      <div class="duplicate-actions">
-        <button
-          class="btn primary apply"
-          ?disabled=${!item.pick}
-          @click=${() => this._applyPicks([item])}
-        >
-          Import
-        </button>
-      </div>
-      <details ?open=${verdict === 'different-chords' || verdict === 'different-words'}>
-        <summary>Compare</summary>
-        <chart-diff
-          .charts=${charts}
-          .keys=${comparison?.keys}
-          .labels=${labels}
-        ></chart-diff>
-      </details>
-    `
-  }
-
-  _renderDuplicates(unresolved: ImportItem[]) {
-    const single = unresolved.length === 1 && this._imports.length === 1
-    return html`
-      <div class="duplicate">
-        <strong>
-          ${
-            single
-              ? 'This song already exists in your library'
-              : `${unresolved.length} of these songs ${unresolved.length > 1 ? 'are' : 'is'} already in your library`
-          }
-        </strong>
-        ${
-          single
-            ? ''
-            : html`
-              ${
-                unresolved.length > 1
-                  ? html`
-                    <div class="bulk-picks" role="group" aria-label="The same choice for all of them">
-                      <span>For all of them:</span>
-                      <button class="btn bulk-update-all" type="button" @click=${() => this._pickAll('update')}>
-                        Update all ${unresolved.length}
-                      </button>
-                      <button class="btn bulk-skip" type="button" @click=${() => this._pickAll('use-existing')}>
-                        Do not import any
-                      </button>
-                    </div>
-                  `
-                  : ''
-              }
-              <div class="duplicate-actions">
-                <button
-                  class="btn apply-all"
-                  ?disabled=${unresolved.some(item => !item.pick)}
-                  @click=${() => this._applyPicks(unresolved)}
-                >
-                  Import all with these choices
-                </button>
-              </div>
-            `
-        }
-        <ul>
-          ${unresolved.map(
-            (item, index) => html`
-              <li>
-                ${single ? '' : html`<strong>${item.song.title}</strong>`}
-                ${this._renderDuplicate(item, index, single)}
-              </li>
-            `
-          )}
-        </ul>
-      </div>
-    `
   }
 
   _renderChoices() {
