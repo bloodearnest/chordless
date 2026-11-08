@@ -7,7 +7,7 @@
  * space's database under a name of its own.
  */
 
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { render } from 'lit'
 import type { SongDisplay } from '../src/components/song-display.ts'
 import '../src/components/song-display.ts'
@@ -24,7 +24,7 @@ import { getSongUserPrefs } from '../src/js/song-user-prefs.ts'
 import { setlistTemplate } from '../src/js/views/setlist-view.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
-import { clearToasts, settle, shownToast, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { clearToasts, settle, shownToast, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, before, beforeEach, afterEach } = window
 
@@ -89,7 +89,7 @@ describe('the setlist page', () => {
 
   /** Wait for something to come true (the page saves in the background) */
   async function until(check: () => Promise<boolean>) {
-    for (let i = 0; i < 100 && !(await check()); i++) await wait(20)
+    await waitUntil(async () => await check(), undefined, { timeout: 2000 })
   }
 
   const asLibrarySong = (song: { uuid: string; id: string; title: string }, key = 'G') =>
@@ -713,7 +713,7 @@ describe('the setlist page', () => {
         const selector = must(root.querySelector<HTMLElement>('#capo-selector'))
 
         selector.dispatchEvent(new CapoChangeEvent(3))
-        for (let i = 0; i < 100 && capoOf(0) !== 3; i++) await wait(20)
+        await waitUntil(() => capoOf(0) === 3, undefined, { timeout: 2000 })
 
         expect(page.songs[0].currentCapo).to.equal(3)
         expect(capoOf(0)).to.equal(3)

@@ -688,7 +688,7 @@ describe('the setlist page: header, menu and keys', () => {
       rig.page.showSong(0, true)
       await rig.page.header.show(rig.page.songs[0], true)
       const picker = must($('#key-selector')) as unknown as KeySelector
-      for (let i = 0; i < 50 && !picker.range; i++) await wait(20)
+      await waitUntil(() => picker.range)
       expect(picker.range).to.deep.equal({ low: 60, high: 67 })
       expect(picker.rangeKey).to.equal('G')
     })
@@ -702,7 +702,7 @@ describe('the setlist page: header, menu and keys', () => {
       const lyricsOf = (index: number) =>
         rig.root.querySelector<HTMLElement>(`#song-${index} song-display`)
       const until = async (condition: () => unknown) => {
-        for (let i = 0; i < 40 && !condition(); i++) await wait(20)
+        await waitUntil(() => condition())
       }
       const settle = async () => {
         for (let i = 0; i < 5; i++) await wait(20)

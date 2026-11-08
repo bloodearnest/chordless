@@ -3,7 +3,7 @@
  * deleting from this device. The sign-in is the fake service worker's and Drive a
  * fake Drive.
  */
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import { SpaceImportedEvent } from '../src/components/space-export-panel.ts'
 import { SpaceGoneEvent, type SpaceManager } from '../src/components/space-manager.ts'
@@ -74,7 +74,7 @@ describe('space-manager', () => {
       html`<space-manager .spaceId=${spaceId}></space-manager>`
     )
     el.addEventListener(SpaceGoneEvent.type, () => gone++)
-    for (let i = 0; i < 100 && !el._summary && !el._missing; i++) await wait(20)
+    await waitUntil(() => el._summary || el._missing, undefined, { timeout: 2000 })
     await el.updateComplete
     return el
   }
@@ -86,7 +86,7 @@ describe('space-manager', () => {
 
   async function answer(el: SpaceManager, heading: string, confirm: boolean) {
     const modal = must(el.shadowRoot?.querySelector<AppModal>(`app-modal[heading="${heading}"]`))
-    for (let i = 0; i < 50 && !modal.open; i++) await wait(20)
+    await waitUntil(() => modal.open)
     await modal.updateComplete
     must(
       modal.shadowRoot?.querySelector<HTMLElement>(
@@ -222,7 +222,7 @@ describe('space-manager', () => {
       expect(modal.message).to.contain(`Delete "${mine.name}" from this device?`)
       expect(modal.message).to.contain('folder in Google Drive is not touched')
       expect(modal.message).to.not.contain('You stay in the Team')
-      for (let i = 0; i < 50 && gone === 0; i++) await wait(20)
+      await waitUntil(() => gone !== 0)
       expect(gone).to.equal(1)
       expect(await getSpaceById(mine.id)).to.equal(undefined)
       expect(await getSpaceById(other.id)).to.not.equal(undefined)
@@ -255,7 +255,7 @@ describe('space-manager', () => {
       try {
         must(el.shadowRoot?.querySelector<HTMLButtonElement>('#delete')).click()
         await answer(el, 'Delete from this device?', true)
-        for (let i = 0; i < 50 && !text(el).includes('disk full'); i++) await wait(20)
+        await waitUntil(() => text(el).includes('disk full'))
         expect(text(el)).to.contain('Failed to delete it: disk full')
         expect(gone).to.equal(0)
       } finally {
@@ -276,7 +276,7 @@ describe('space-manager', () => {
     })
     db.db?.close()
     el.shadowRoot?.querySelector('space-export-panel')?.dispatchEvent(new SpaceImportedEvent())
-    for (let i = 0; i < 50 && !text(el).includes('2 songs'); i++) await wait(20)
+    await waitUntil(() => text(el).includes('2 songs'))
     expect(text(el)).to.contain('2 songs')
   })
 
@@ -286,7 +286,7 @@ describe('space-manager', () => {
     const el = await page(one.id)
     expect(el._space?.name).to.equal(one.name)
     el.spaceId = two.id
-    for (let i = 0; i < 50 && el._space?.name !== two.name; i++) await wait(20)
+    await waitUntil(() => el._space?.name === two.name)
     expect(el._space?.name).to.equal(two.name)
   })
 })

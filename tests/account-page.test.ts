@@ -2,7 +2,7 @@
  * Account and Teams (account-page.ts): the account, then the spaces on this device with the one in
  * use first, switching, and the link that makes a Team. The sign-in is the fake service worker's.
  */
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import { AccountStateEvent } from '../src/components/account-card.ts'
 import type { AccountPage } from '../src/components/account-page.ts'
 import { type AppModal, ModalCloseEvent } from '../src/components/app-modal.ts'
@@ -57,7 +57,8 @@ describe('account-page', () => {
 
   async function page() {
     const el = await fixture<AccountPage>(html`<account-page></account-page>`)
-    for (let i = 0; i < 50 && el._spaces.length === 0; i++) await wait(20)
+    // (it loads the list as it is added: loading it again waits for one that is done)
+    await el.load()
     await el.updateComplete
     return el
   }
@@ -126,7 +127,7 @@ describe('account-page', () => {
       shown++
     }
     must(el.shadowRoot?.querySelector('space-card')).dispatchEvent(new SpaceSwitchEvent(second.id))
-    for (let i = 0; i < 50 && shown === 0; i++) await wait(20)
+    await waitUntil(() => shown !== 0)
     expect(shown).to.equal(1)
     expect(getCurrentSpace().id).to.equal(second.id)
   })
@@ -137,9 +138,7 @@ describe('account-page', () => {
     const renamed = `Renamed ${crypto.randomUUID().slice(0, 8)}`
     await renameSpace(first.id, renamed)
     must(el.shadowRoot?.querySelector('space-card')).dispatchEvent(new SpaceSyncedEvent())
-    for (let i = 0; i < 50 && !cards(el).some(card => card.space.name === renamed); i++) {
-      await wait(20)
-    }
+    await waitUntil(() => cards(el).some(card => card.space.name === renamed))
     expect(cards(el).some(card => card.space.name === renamed)).to.equal(true)
   })
 
@@ -150,7 +149,7 @@ describe('account-page', () => {
     async function manage(el: AccountPage, id: string) {
       const card = must(cards(el).find(each => each.space.id === id))
       card.dispatchEvent(new SpaceManageEvent(id))
-      for (let i = 0; i < 50 && !modal(el).open; i++) await wait(20)
+      await waitUntil(() => modal(el).open)
       await el.updateComplete
     }
 
@@ -174,9 +173,7 @@ describe('account-page', () => {
       const renamed = `Renamed ${crypto.randomUUID().slice(0, 8)}`
       await renameSpace(first.id, renamed)
       modal(el).close()
-      for (let i = 0; i < 50 && !cards(el).some(card => card.space.name === renamed); i++) {
-        await wait(20)
-      }
+      await waitUntil(() => cards(el).some(card => card.space.name === renamed))
       expect(manager(el)).to.equal(null)
       expect(cards(el).some(card => card.space.name === renamed)).to.equal(true)
     })
@@ -198,11 +195,9 @@ describe('account-page', () => {
       await manage(el, first.id)
       await deleteSpace(first.id)
       must(manager(el)).dispatchEvent(new SpaceGoneEvent())
-      for (let i = 0; i < 50 && modal(el).open; i++) await wait(20)
+      await waitUntil(() => !modal(el).open)
       expect(modal(el).open).to.equal(false)
-      for (let i = 0; i < 50 && cards(el).some(card => card.space.id === first.id); i++) {
-        await wait(20)
-      }
+      await waitUntil(() => !cards(el).some(card => card.space.id === first.id))
       expect(cards(el).some(card => card.space.id === first.id)).to.equal(false)
     })
 
@@ -221,7 +216,7 @@ describe('account-page', () => {
 
     async function showLeaders(el: AccountPage, id: string) {
       must(cards(el).find(each => each.space.id === id)).dispatchEvent(new SpaceLeadersEvent(id))
-      for (let i = 0; i < 50 && !modal(el).open; i++) await wait(20)
+      await waitUntil(() => modal(el).open)
       await el.updateComplete
     }
 
@@ -234,7 +229,7 @@ describe('account-page', () => {
       expect(modal(el).heading).to.equal(`${first.name}: leaders`)
       expect(people(el)?.spaceId).to.equal(first.id)
       modal(el).close()
-      for (let i = 0; i < 50 && people(el); i++) await wait(20)
+      await waitUntil(() => !people(el))
       expect(people(el)).to.equal(null)
     })
 
@@ -268,7 +263,7 @@ describe('account-page', () => {
 
     async function showUsers(el: AccountPage, id: string) {
       must(cards(el).find(each => each.space.id === id)).dispatchEvent(new SpaceUsersEvent(id))
-      for (let i = 0; i < 50 && !modal(el).open; i++) await wait(20)
+      await waitUntil(() => modal(el).open)
       await el.updateComplete
     }
 
@@ -288,7 +283,7 @@ describe('account-page', () => {
       const el = await page()
       await showUsers(el, first.id)
       modal(el).close()
-      for (let i = 0; i < 50 && panel(el); i++) await wait(20)
+      await waitUntil(() => !panel(el))
       expect(panel(el)).to.equal(null)
     })
 
@@ -297,7 +292,7 @@ describe('account-page', () => {
       const el = await page()
       await showUsers(el, first.id)
       must(panel(el)).dispatchEvent(new TeamShareLeftEvent())
-      for (let i = 0; i < 50 && modal(el).open; i++) await wait(20)
+      await waitUntil(() => !modal(el).open)
       expect(modal(el).open).to.equal(false)
     })
 
