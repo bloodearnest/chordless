@@ -151,6 +151,8 @@ interface ImportItem {
   melody?: MelodyRead
   /** Its whole melody, in the chart's key, to be kept with the song the chart goes to (docs/MELODY.md) */
   notes?: { melody: Melody; key: string }
+  /** Whether it was saved just now (a new song's); undefined while it waits on a choice about a song the library has */
+  melodySaved?: boolean
   /** Where the chart came from, and who is importing it */
   source?: string
   importUser?: string
@@ -1024,9 +1026,10 @@ export class SongImport extends LitElement {
             { ccliNumber, title, importSource: origin, importUser },
             db
           ))
+        let melodySaved: boolean | undefined
         if (!existing) {
           this._created.push(song)
-          await this._keepMelody(song, notes)
+          melodySaved = notes ? await this._keepMelody(song, notes) : undefined
         }
         const item: ImportItem = {
           song,
@@ -1036,6 +1039,7 @@ export class SongImport extends LitElement {
           leadSheet: outcome,
           melody,
           notes,
+          melodySaved,
           source: origin,
           importUser,
         }
@@ -1140,14 +1144,16 @@ export class SongImport extends LitElement {
   }
 
   /** Keep the melody with the song (replacing the one it had), to be synced beside the chart */
-  async _keepMelody(song: SongRecord, notes?: { melody: Melody; key: string }): Promise<void> {
-    if (!notes) return
+  async _keepMelody(song: SongRecord, notes?: { melody: Melody; key: string }): Promise<boolean> {
+    if (!notes) return false
     const db = this._database()
     try {
       const previous = await db.getMelody(song.uuid)
       await db.saveMelody(melodyRecord(song.uuid, writeMusicXml(notes.melody), notes.key, previous))
+      return true
     } catch (error) {
       console.warn('[Import] Could not keep the melody:', error)
+      return false
     }
   }
 
@@ -1185,7 +1191,23 @@ export class SongImport extends LitElement {
       text = 'No lead sheet came with this song, so there is no range.'
     }
     const settable = !range && key && this._canSetRange(item)
-    return html`${text ? html`<p class="range">${text}</p>` : ''}${text && melody && key ? this._renderHowRead(melody, key) : ''}${settable ? this._renderRangePickers(item, key) : ''}`
+    const kept = this._melodyKept(item)
+    return html`${text ? html`<p class="range">${text}</p>` : ''}${kept ? html`<p class="range">${kept}</p>` : ''}${text && melody && key ? this._renderHowRead(melody, key) : ''}${settable ? this._renderRangePickers(item, key) : ''}`
+  }
+
+  /** What the page says of the lead sheet's whole melody: kept with the song, or why it is not (docs/MELODY.md) */
+  _melodyKept(item: ImportItem): string {
+    if (item.melodySaved === false) {
+      return "The lead sheet's melody could not be saved, so the song has only its range."
+    }
+    if (item.notes) {
+      return item.isDuplicate && (item.choice ?? item.pick) === 'use-existing'
+        ? "The library's chart stays, so the lead sheet's melody is not kept."
+        : "The lead sheet's melody is kept with the song."
+    }
+    return item.leadSheet === 'read'
+      ? "The lead sheet's notes could not be kept in full, so only the range was."
+      : ''
   }
 
   /** Whether the page is about this one song, which is in the library as it is to stay, and has no range */

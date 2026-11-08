@@ -550,7 +550,7 @@ updates it, the new song of an import as original or as variant, and not when th
 (`use-existing`). It is kept only when the sheet is in the chart's key (its first measure's key signature against the
 chart's `{key}`), as the range is; a sheet in another key, or one `readMelodyPdf` cannot read, leaves the song with its
 chart and no melody. A chart that has a range already keeps it, and its range is not read again, but the melody is
-still kept. Nothing yet shows the melody or says on the page that it was kept.
+still kept. The import page says it under the range: "The lead sheet's melody is kept with the song."; "The library's chart stays, so the lead sheet's melody is not kept." (a duplicate that is not updated); "…could not be saved"; or, for a sheet whose notes were not the chart's key, that only the range was kept. Nothing yet shows the melody itself.
 
 Each step is a pull request that leaves the app working; the first two change nothing a person
 sees except a better range and a "how it was read" that can show the whole line.
