@@ -2,10 +2,12 @@ import {
   type AppHeader,
   EditModeToggleEvent,
   HeaderInfoClickEvent,
+  MelodyToggleEvent,
 } from '../components/app-header.ts'
 import type { AppModal } from '../components/app-modal.ts'
 import { CapoChangeEvent, type CapoSelector } from '../components/capo-selector.ts'
 import { KeyChangeEvent, type KeySelector } from '../components/key-selector.ts'
+import type { MelodySheet } from '../components/melody-sheet.ts'
 import {
   type MusicalMetadataDisplay,
   SongSettingsClickEvent,
@@ -36,6 +38,8 @@ import { type ChordlessDB, getCurrentDB, NO_CHANGE } from './db.ts'
 import { leaderName } from './leaders.ts'
 import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
 import { LiveSyncStatusEvent } from './live-sync-status.ts'
+import type { Melody } from './melody.ts'
+import { melodyOfRecord } from './melody-analysis.ts'
 import { goTo, setPageTitle } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
@@ -121,6 +125,8 @@ export class SetlistPage {
   /** The song the route names, until the setlist has been shown (then the page follows the route) */
   _initialSongIndex: number
   _starting = true
+  /** The songs shown as their melody sheet and not their lyrics, by place in the setlist: each song's own */
+  _melodyOn = new Set<number>()
   /** When the page was made, to say how long the setlist took to show */
   _createdAt = performance.now()
   _abort: AbortController
@@ -182,7 +188,12 @@ export class SetlistPage {
     this.root = root
     this._routeFor =
       routeFor ??
-      (index => ({ name: 'setlist', setlistId: this.currentSetlistId ?? '', songIndex: index }))
+      (index => ({
+        name: 'setlist',
+        setlistId: this._setlistId,
+        songIndex: index,
+        ...(this._melodyOn.has(index) ? { melody: true as const } : {}),
+      }))
     this._readOnly = readOnly
     this._restoredState = restoredState
     this._setlistId = setlistId
@@ -303,15 +314,23 @@ export class SetlistPage {
   }
 
   /** The route changed within this setlist: show the song it names */
-  routeChanged(route: { songIndex: number }) {
+  routeChanged(route: { songIndex: number; melody?: true }) {
     // (back, back: the route can move on while the setlist is still loading, and what is shown
     // when it has loaded is the route as it is then)
     if (this._starting) {
       this._initialSongIndex = route.songIndex
+      this._setMelodyOn(route.songIndex, route.melody)
       return
     }
     if (this._disposed || !this.currentSetlist) return
     const index = route.songIndex
+    if (
+      index >= 0 &&
+      index < this.songs.length &&
+      this._melodyOn.has(index) !== Boolean(route.melody)
+    ) {
+      void this.setMelodyMode(index, Boolean(route.melody), { fromRoute: true })
+    }
     const section = index >= 0 ? `song-${index}` : 'overview'
     // Already showing it, e.g. the route is catching up with a swipe
     if (section !== this._lastVisibleSection) {
@@ -462,6 +481,7 @@ export class SetlistPage {
         // Song is already visible from pre-render setup above
         this._lastVisibleSection = `song-${songIndex}`
         this.currentSongIndex = songIndex
+        void this.applyMelodyMode(songIndex)
         this.header.show(this.songs[songIndex], true) // true = instant, no animation
         this.exitEditMode()
         this.dispatchSongChange(this.songs[songIndex])
@@ -581,6 +601,7 @@ export class SetlistPage {
     this.overview.setEditMode(false)
 
     this.scrollToSection(`song-${index}`, index, instant)
+    void this.applyMelodyMode(index)
     // Update header with animation for programmatic navigation
     this.header.show(this.songs[index], false)
     this.exitEditMode()
@@ -1035,6 +1056,16 @@ export class SetlistPage {
     const appHeader = this.root.querySelector<AppHeader>('#app-header')
     if (!appHeader) return
 
+    // The melody button: this song as its melody sheet, or its lyrics
+    appHeader.addEventListener(
+      MelodyToggleEvent.type,
+      () => {
+        const index = this.currentSongIndex
+        if (index >= 0) void this.setMelodyMode(index, !this._melodyOn.has(index))
+      },
+      { signal }
+    )
+
     // Listen to the edit-mode-toggle event from app-header
     appHeader.addEventListener(
       EditModeToggleEvent.type,
@@ -1408,10 +1439,80 @@ export class SetlistPage {
       this.sections.applyAll(songSection)
     }
 
+    // The melody sheet, if the song is shown as one, is made again with the lyrics
+    await this.applyMelodyMode(songIndex)
+
     // Update header
     if (this.currentSongIndex === songIndex) {
       this.header.show(song)
     }
+  }
+
+  // ==================== Melody ====================
+
+  _setMelodyOn(index: number, on: boolean | undefined): void {
+    if (index < 0) return
+    if (on) this._melodyOn.add(index)
+    else this._melodyOn.delete(index)
+  }
+
+  /** Whether a song is shown as its melody sheet */
+  isMelodyOn(song: RuntimeSong): boolean {
+    return this._melodyOn.has(this.songs.indexOf(song))
+  }
+
+  /** The song's melody and the key it is written in, or null when it has none (docs/MELODY.md) */
+  async melodyOf(song: RuntimeSong): Promise<{ melody: Melody; key: string } | null> {
+    const record = await this._database().getMelody(song._setlistEntry.songUuid)
+    const melody = record && melodyOfRecord(record)
+    return melody && record ? { melody, key: record.key || song.originalKey || '' } : null
+  }
+
+  /**
+   * Show a song as its melody sheet, or as its lyrics again. It is the song's own: moving to
+   * another song leaves this one as it is. The route follows (a replace, so back does not step
+   * through each toggle), unless it is what asked.
+   */
+  async setMelodyMode(
+    index: number,
+    on: boolean,
+    { fromRoute = false }: { fromRoute?: boolean } = {}
+  ): Promise<void> {
+    this._setMelodyOn(index, on)
+    await this.applyMelodyMode(index)
+    if (index !== this.currentSongIndex) return
+    const song = this.songs[index]
+    // (a song with no melody stays in its lyrics, whatever asked)
+    const shown = this._melodyOn.has(index)
+    if (song) await this.header.showMelody(song)
+    if (!fromRoute || shown !== on) this.navigateTo(index, { replace: true })
+  }
+
+  /** Make the song's section show what its mode says: the lyrics, or the melody sheet in the song's key */
+  async applyMelodyMode(index: number): Promise<void> {
+    const song = this.songs[index]
+    const content = this.root.querySelector<HTMLElement>(`#song-${index} .song-content`)
+    if (!song || !content) return
+    const display = content.querySelector<HTMLElement>('song-display')
+    const sheet = content.querySelector<MelodySheet>('melody-sheet')
+    const lyrics = () => {
+      if (sheet) sheet.hidden = true
+      if (display) display.style.display = ''
+    }
+    if (!this._melodyOn.has(index)) return lyrics()
+    const found = await this.melodyOf(song)
+    if (!found) {
+      this._melodyOn.delete(index)
+      return lyrics()
+    }
+    await import('../components/melody-sheet.ts')
+    const shown = sheet ?? document.createElement('melody-sheet')
+    shown.melody = found.melody
+    shown.melodyKey = found.key
+    shown.songKey = song.currentKey ?? found.key
+    shown.hidden = false
+    if (!sheet) content.appendChild(shown)
+    if (display) display.style.display = 'none'
   }
 
   _updateSongDisplayCapo(songIndex: number, capoValue: unknown) {

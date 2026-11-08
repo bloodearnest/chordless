@@ -7,6 +7,7 @@
 
 import { rangeOfMetadata } from './chart-range.ts'
 import type { ChartMetadata, MelodyRecord } from './data-types.ts'
+import type { Melody } from './melody.ts'
 import { readMusicXml } from './melody-musicxml-read.ts'
 import { type MelodyExtremes, melodyExtremes } from './melody-transpose.ts'
 import type { NoteRange } from './voice-range.ts'
@@ -21,16 +22,26 @@ export interface SongMelody {
 }
 
 /** By the score's hash: the parse is 2 to 4 ms, and a list of songs asks for many */
-const cache = new Map<string, MelodyExtremes | null>()
+const parsed = new Map<string, Melody | null>()
+const extremes = new Map<string, MelodyExtremes | null>()
+
+/** The melody a record's score gives (null if it will not read), parsed once for a score */
+export function melodyOfRecord(record: MelodyRecord): Melody | null {
+  const hit = parsed.get(record.contentHash)
+  if (hit !== undefined) return hit
+  const melody = readMusicXml(record.xml)
+  parsed.set(record.contentHash, melody)
+  return melody
+}
 
 /** The lowest and highest note of a melody record, and the beats on each (null if it will not read or has no sung note) */
 export function extremesOf(record: MelodyRecord): MelodyExtremes | null {
-  const hit = cache.get(record.contentHash)
+  const hit = extremes.get(record.contentHash)
   if (hit !== undefined) return hit
-  const melody = readMusicXml(record.xml)
-  const extremes = melody ? melodyExtremes(melody) : null
-  cache.set(record.contentHash, extremes)
-  return extremes
+  const melody = melodyOfRecord(record)
+  const found = melody ? melodyExtremes(melody) : null
+  extremes.set(record.contentHash, found)
+  return found
 }
 
 /**
@@ -42,12 +53,12 @@ export function songMelody(
   record: MelodyRecord | undefined
 ): SongMelody | null {
   const chartKey = metadata?.key ?? ''
-  const extremes = record ? extremesOf(record) : null
+  const found = record ? extremesOf(record) : null
   const typed = rangeOfMetadata(metadata)
-  if (typed) return { range: typed, rangeKey: chartKey, extremes }
-  if (!extremes) return null
-  const { low, high } = extremes
-  return { range: { low, high }, rangeKey: record?.key || chartKey, extremes }
+  if (typed) return { range: typed, rangeKey: chartKey, extremes: found }
+  if (!found) return null
+  const { low, high } = found
+  return { range: { low, high }, rangeKey: record?.key || chartKey, extremes: found }
 }
 
 /** Quarter notes as people say them: "3", "2½", "¼" (to the nearest quarter), "0" for none */

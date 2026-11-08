@@ -54,9 +54,29 @@ describe('melody-sheet', () => {
   it('drops an engraving that was asked for before a newer one', async () => {
     const sheet = await shown({ melody: sampleMelody, melodyKey: 'C', songKey: 'C' })
     sheet.songKey = 'D'
+    await sheet.updateComplete
     sheet.songKey = 'E'
     await sheet.updateComplete
+    const asked = sheet._asked
+    for (let i = 0; i < 100 && sheet._pages.length && notes(sheet) === 0; i++) await wait(50)
     await wait(300)
-    expect(sheet._asked).to.be.greaterThan(1)
+    expect(asked).to.be.greaterThan(2)
+    expect(notes(sheet)).to.equal(3)
+  })
+
+  it('leaves the notes as written when the key it is to be shown in is not known, and draws a narrow page for a narrow space', async () => {
+    const unknown = await shown({ melody: sampleMelody, melodyKey: 'C', songKey: '' })
+    expect(notes(unknown)).to.equal(3)
+    const narrow = await fixture<MelodySheet>(
+      html`<melody-sheet style="width: 360px"></melody-sheet>`
+    )
+    Object.assign(narrow, { melody: sampleMelody, melodyKey: 'C', songKey: 'C' })
+    for (let i = 0; i < 100 && !narrow._pages.length; i++) await wait(50)
+    await narrow.updateComplete
+    expect(notes(narrow)).to.equal(3)
+    // (a narrower page is drawn larger once it is fitted to the width: its viewBox is narrower)
+    const viewBox = (sheet: MelodySheet) =>
+      Number(sheet.shadowRoot?.querySelector('svg')?.getAttribute('viewBox')?.split(' ')[2])
+    expect(viewBox(narrow)).to.be.lessThan(viewBox(unknown))
   })
 })

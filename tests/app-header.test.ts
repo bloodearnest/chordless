@@ -4,6 +4,7 @@ import {
   EditModeToggleEvent,
   HeaderInfoClickEvent,
   HeaderMenuClickEvent,
+  MelodyToggleEvent,
 } from '../src/components/app-header.ts'
 import { AppUpdateChangeEvent } from '../src/js/app-update.ts'
 import { wait } from './test-helpers.ts'
@@ -127,6 +128,26 @@ describe('app-header', () => {
       await icon.updateComplete
       expect(icon.shadowRoot?.querySelector('svg circle')).to.equal(null)
       expect(icon.shadowRoot?.querySelector('svg path')).to.not.equal(null)
+    })
+
+    it('has a melody button only when asked, which says what it will show and tells of being pressed', async () => {
+      const plain = await fixture<AppHeader>(html`<app-header heading="Page"></app-header>`)
+      expect(button(plain, '.melody-toggle')).to.equal(null)
+      const header = await fixture<AppHeader>(
+        html`<app-header heading="Page" show-melody-toggle></app-header>`
+      )
+      const toggle = must(button(header, '.melody-toggle'))
+      expect(toggle.getAttribute('aria-label')).to.equal('Show the melody')
+      expect(toggle.getAttribute('aria-pressed')).to.equal('false')
+      let pressed = 0
+      header.addEventListener(MelodyToggleEvent.type, () => pressed++)
+      toggle.click()
+      expect(pressed).to.equal(1)
+      header.melodyMode = true
+      await header.updateComplete
+      expect(toggle.getAttribute('aria-label')).to.equal('Show the lyrics')
+      expect(toggle.getAttribute('aria-pressed')).to.equal('true')
+      expect(toggle.classList.contains('active')).to.equal(true)
     })
 
     it('marks the edit button while in edit mode', async () => {

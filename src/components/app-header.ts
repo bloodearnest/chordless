@@ -23,6 +23,14 @@ export class EditModeToggleEvent extends Event {
   }
 }
 
+/** The melody button was pressed: show the song's melody sheet, or its lyrics again */
+export class MelodyToggleEvent extends Event {
+  static readonly type = 'app-header:melody-toggle'
+  constructor() {
+    super(MelodyToggleEvent.type, { bubbles: true, composed: true })
+  }
+}
+
 /** The info button was pressed */
 export class HeaderInfoClickEvent extends Event {
   static readonly type = 'app-header:info-click'
@@ -40,6 +48,8 @@ export class HeaderInfoClickEvent extends Event {
  * @property {String} title - The main title text to display
  * @property {Boolean} showEditToggle - Whether to show the edit mode toggle button
  * @property {Boolean} showInfoButton - Whether to show the info button
+ * @property {Boolean} showMelodyToggle - Whether to show the button that switches the song between its lyrics and its melody sheet
+ * @property {Boolean} melodyMode - Whether the song is shown as its melody sheet (the button is pressed)
  * @property {Boolean} editMode - Current edit mode state (for styling the toggle button)
  * @property {String} phoneHeading - The title on a phone, if shorter than `heading` (the top row has little room)
  * @property {String} subheading - On a phone, a row of its own under the top row (not shown wider)
@@ -69,6 +79,8 @@ export class AppHeader extends LitElement {
     heading: { type: String, attribute: 'heading' },
     showEditToggle: { type: Boolean, attribute: 'show-edit-toggle' },
     showInfoButton: { type: Boolean, attribute: 'show-info-button' },
+    showMelodyToggle: { type: Boolean, attribute: 'show-melody-toggle' },
+    melodyMode: { type: Boolean, attribute: 'melody-mode' },
     showLogo: { type: Boolean, attribute: 'show-logo' },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
     disableAnimation: { type: Boolean, attribute: 'disable-animation' },
@@ -83,6 +95,8 @@ export class AppHeader extends LitElement {
   declare heading: string
   declare showEditToggle: boolean
   declare showInfoButton: boolean
+  declare showMelodyToggle: boolean
+  declare melodyMode: boolean
   declare showLogo: boolean
   declare editMode: boolean
   declare disableAnimation: boolean
@@ -407,14 +421,16 @@ export class AppHeader extends LitElement {
       transform: scale(1.05);
     }
 
-    .edit-toggle.active {
+    .edit-toggle.active,
+    .melody-toggle.active {
       background-color: var(--button-bg, white);
       border-color: var(--button-bg, white);
       color: var(--header-bg, #3498db);
       box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
     }
 
-    .edit-toggle.active:hover {
+    .edit-toggle.active:hover,
+    .melody-toggle.active:hover {
       background-color: rgba(255, 255, 255, 0.9);
       border-color: rgba(255, 255, 255, 0.9);
       transform: scale(1.05);
@@ -427,6 +443,8 @@ export class AppHeader extends LitElement {
     this.heading = ''
     this.showEditToggle = false
     this.showInfoButton = false
+    this.showMelodyToggle = false
+    this.melodyMode = false
     this.showLogo = false
     this.editMode = false
     this.disableAnimation = false
@@ -565,6 +583,21 @@ export class AppHeader extends LitElement {
           <div class="header-icons">
             <slot name="tools"></slot>
             ${
+              this.showMelodyToggle
+                ? html`
+                  <button
+                    class="icon-button melody-toggle ${this.melodyMode ? 'active' : ''}"
+                    part="melody-toggle"
+                    @click=${this._handleMelodyToggle}
+                    aria-label=${this.melodyMode ? 'Show the lyrics' : 'Show the melody'}
+                    aria-pressed=${this.melodyMode ? 'true' : 'false'}
+                  >
+                    <app-icon name="music"></app-icon>
+                  </button>
+                `
+                : ''
+            }
+            ${
               this.showEditToggle
                 ? html`
                   <button
@@ -618,6 +651,10 @@ export class AppHeader extends LitElement {
     this.dispatchEvent(new EditModeToggleEvent())
   }
 
+  _handleMelodyToggle() {
+    this.dispatchEvent(new MelodyToggleEvent())
+  }
+
   _handleInfoClick() {
     this.dispatchEvent(new HeaderInfoClickEvent())
   }
@@ -636,6 +673,7 @@ declare global {
   interface GlobalEventHandlersEventMap {
     [HeaderMenuClickEvent.type]: HeaderMenuClickEvent
     [EditModeToggleEvent.type]: EditModeToggleEvent
+    [MelodyToggleEvent.type]: MelodyToggleEvent
     [HeaderInfoClickEvent.type]: HeaderInfoClickEvent
   }
 }

@@ -56,6 +56,12 @@ describe('engraving a melody with Verovio', () => {
     assert.equal((svg.match(/class="syl"/g) ?? []).length, 4)
   })
 
+  it('leaves no <style> element in the pages, which the page’s policy would not allow', async () => {
+    const out = await renderMelodyHere(writeMusicXml(melody))
+    assert.ok(out)
+    for (const page of out.pages) assert.doesNotMatch(page, /<style/i)
+  })
+
   it('says null for what is not MusicXML', async () => {
     assert.equal(await renderMelodyHere('this is not music'), null)
   })

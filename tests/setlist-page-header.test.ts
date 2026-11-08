@@ -693,6 +693,116 @@ describe('the setlist page: header, menu and keys', () => {
       expect(picker.rangeKey).to.equal('G')
     })
 
+    describe('the melody button', () => {
+      const toggle = () =>
+        rig.root
+          .querySelector<HTMLElement>('app-header')
+          ?.shadowRoot?.querySelector<HTMLButtonElement>('.melody-toggle')
+      const sheetOf = (index: number) => rig.root.querySelector(`#song-${index} melody-sheet`)
+      const lyricsOf = (index: number) =>
+        rig.root.querySelector<HTMLElement>(`#song-${index} song-display`)
+      const until = async (condition: () => unknown) => {
+        for (let i = 0; i < 40 && !condition(); i++) await wait(20)
+      }
+      const settle = async () => {
+        for (let i = 0; i < 5; i++) await wait(20)
+        await rig.flush()
+      }
+
+      it('is there for a song with a melody and not for one without', async () => {
+        await rig.db.saveMelody(sampleRecord(rig.songs[0].uuid, 'G'))
+        await rig.open()
+        rig.page.showSong(0, true)
+        await rig.page.header.show(rig.page.songs[0], true)
+        await settle()
+        expect(toggle()).to.not.equal(null)
+        rig.page.showSong(1, true)
+        await rig.page.header.show(rig.page.songs[1], true)
+        await settle()
+        expect(toggle()).to.equal(null)
+        await rig.db.deleteMelody(rig.songs[0].uuid, { remember: false })
+      })
+
+      it('shows the melody sheet in place of the lyrics, for this song alone, and follows the route', async () => {
+        await rig.db.saveMelody(sampleRecord(rig.songs[0].uuid, 'G'))
+        await rig.db.saveMelody(sampleRecord(rig.songs[1].uuid, 'G'))
+        try {
+          await rig.open()
+          rig.page.showSong(0, true)
+          await rig.page.header.show(rig.page.songs[0], true)
+          rig.page.currentSongIndex = 0
+          await settle()
+          toggle()?.click()
+          await until(() => sheetOf(0))
+          await settle()
+          expect(sheetOf(0)?.hasAttribute('hidden')).to.equal(false)
+          expect(lyricsOf(0)?.style.display).to.equal('none')
+          expect(rig.visited.at(-1)).to.deep.equal({
+            url: `/setlist/${rig.page.currentSetlistId}/song/0?melody`,
+            replace: true,
+          })
+          expect(toggle()?.getAttribute('aria-pressed')).to.equal('true')
+
+          // the next song is in its lyrics, and this one is as it was left
+          expect(sheetOf(1)).to.equal(null)
+          rig.page.showSong(1, true)
+          rig.page.currentSongIndex = 1
+          await rig.page.header.show(rig.page.songs[1], true)
+          await settle()
+          expect(toggle()?.getAttribute('aria-pressed')).to.equal('false')
+          expect(rig.page.navigateTo(1)).to.not.equal(undefined)
+          expect(rig.visited.at(-1)?.url).to.not.contain('melody')
+          rig.page.navigateTo(0)
+          expect(rig.visited.at(-1)?.url).to.contain('/song/0?melody')
+
+          // and back to the lyrics
+          rig.page.showSong(0, true)
+          rig.page.currentSongIndex = 0
+          await rig.page.header.show(rig.page.songs[0], true)
+          await settle()
+          toggle()?.click()
+          await settle()
+          expect(sheetOf(0)?.hasAttribute('hidden')).to.equal(true)
+          expect(lyricsOf(0)?.style.display).to.equal('')
+          expect(rig.visited.at(-1)?.url).to.not.contain('melody')
+        } finally {
+          await rig.db.deleteMelody(rig.songs[0].uuid, { remember: false })
+          await rig.db.deleteMelody(rig.songs[1].uuid, { remember: false })
+        }
+      })
+
+      it('follows a route that asks for the melody, and for the lyrics again', async () => {
+        await rig.db.saveMelody(sampleRecord(rig.songs[0].uuid, 'G'))
+        try {
+          await rig.open()
+          rig.page.showSong(0, true)
+          rig.page.currentSongIndex = 0
+          rig.page.routeChanged({ songIndex: 0, melody: true })
+          await until(() => sheetOf(0))
+          await settle()
+          expect(sheetOf(0)).to.not.equal(null)
+          expect(lyricsOf(0)?.style.display).to.equal('none')
+          rig.page.routeChanged({ songIndex: 0 })
+          await settle()
+          expect(lyricsOf(0)?.style.display).to.equal('')
+          // (another song's mode does not touch the header, which is for the song in view)
+          await rig.page.setMelodyMode(1, true)
+          expect(toggle()?.getAttribute('aria-pressed')).to.equal('false')
+          rig.page.songs[0].currentKey = undefined
+          rig.page.routeChanged({ songIndex: 0, melody: true })
+          await until(() => sheetOf(0))
+          rig.page.routeChanged({ songIndex: 0 })
+          // (a song with no melody stays in its lyrics)
+          rig.page.routeChanged({ songIndex: 2, melody: true })
+          await settle()
+          expect(sheetOf(2)).to.equal(null)
+          expect(lyricsOf(2)?.style.display).to.equal('')
+        } finally {
+          await rig.db.deleteMelody(rig.songs[0].uuid, { remember: false })
+        }
+      })
+    })
+
     it('does nothing for an info dialog that is not there', async () => {
       await rig.open()
       rig.root.querySelector('#song-info-dialog')?.remove()

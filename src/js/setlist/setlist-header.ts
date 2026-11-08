@@ -42,6 +42,10 @@ export interface HeaderHost {
   readonly currentSetlist: Setlist | undefined
   readonly _capoEnabled: boolean
   _database(): ChordlessDB
+  /** The song's melody and its key, or null when it has none */
+  melodyOf(song: RuntimeSong): Promise<unknown>
+  /** Whether the song is shown as its melody sheet */
+  isMelodyOn(song: RuntimeSong): boolean
   /** The route of a song of this setlist, or of its overview (-1) */
   _routeFor(songIndex: number): Route
 }
@@ -94,6 +98,7 @@ export class SetlistHeader {
     const subheading = onOverview ? currentSetlist.name || currentSetlist.type || '' : ''
 
     appHeader.showEditToggle = true
+    void this.showMelody(song)
     void this.#showSubheader(appHeader, onOverview ? currentSetlist : null)
     // (nothing to change)
     if (
@@ -116,6 +121,26 @@ export class SetlistHeader {
       appHeader.heading = title
       await this.#fadeControls(() => this.#showContent(song))
     }
+  }
+
+  /** The song the melody button was last worked out for, so a slow lookup for an earlier one is dropped */
+  #melodyFor: RuntimeSong | null = null
+
+  /** The melody button: there for a song that has a melody, pressed while it is shown as the sheet */
+  async showMelody(song: RuntimeSong | null): Promise<void> {
+    const appHeader = this.#find<AppHeader>('#app-header')
+    /* v8 ignore next -- the header is there whenever the page is */
+    if (!appHeader) return
+    this.#melodyFor = song
+    if (!song) {
+      appHeader.showMelodyToggle = false
+      appHeader.melodyMode = false
+      return
+    }
+    const found = await this.host.melodyOf(song)
+    if (this.#melodyFor !== song) return
+    appHeader.showMelodyToggle = Boolean(found)
+    appHeader.melodyMode = Boolean(found) && this.host.isMelodyOn(song)
   }
 
   /** The overview's second header says who leads the setlist and the kind of service; a song has none */
