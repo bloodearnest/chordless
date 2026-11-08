@@ -183,7 +183,7 @@ describe('account-page', () => {
       const el = await page()
       await manage(el, first.id)
       must(manager(el)).dispatchEvent(new ModalCloseEvent())
-      await wait(50)
+      await nothingFor(50)
       expect(modal(el).open).to.equal(true)
       expect(manager(el)).to.not.equal(null)
     })

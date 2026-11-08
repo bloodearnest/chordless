@@ -121,12 +121,12 @@ describe('the home view', () => {
 
     await db.saveSetlist(makeSetlist({ id: 'b', date: '2001-04-04' }))
     announceDataChange({ spaceId, kind: 'setlist', ids: ['b'], origin: 'sync' })
-    await wait(400)
+    await waitUntil(() => rows().length === 2, 'the setlist the sync saved')
     expect(rows()).to.have.members(['a', 'b'])
 
     await db.deleteSetlist('a')
     announceDataChange({ spaceId, kind: 'setlist', ids: ['a'], origin: 'sync' })
-    await wait(400)
+    await waitUntil(() => !rows().includes('a'), 'the setlist the sync removed to go')
     expect(rows()).to.deep.equal(['b'])
   })
 

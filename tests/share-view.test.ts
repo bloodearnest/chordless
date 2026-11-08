@@ -144,7 +144,7 @@ describe('the share view', () => {
     }
     view.route = { name: 'share', fileId: 'file1', songIndex: -1 }
     outlet.append(view)
-    await wait(100)
+    await waitUntil(() => opened.length > 0, 'the share to be opened')
     expect(opened).to.deep.equal([KEY])
     expect(owned).to.deep.equal([CODE])
     expect(takeLink('/s/file1')).to.equal(null)

@@ -13,7 +13,7 @@ import { setCapoPreference } from '../src/js/preferences.ts'
 import { SetlistPage } from '../src/js/setlist-page.ts'
 import { getSongWithContent } from '../src/js/song-utils.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
-import { nothingFor, wait } from './test-helpers.ts'
+import { nothingFor } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -88,7 +88,7 @@ describe('the setlist page: corners', () => {
     document.dispatchEvent(pointer('pointermove', card(2).getBoundingClientRect().bottom + 50))
     await rig.flush()
     document.dispatchEvent(pointer('pointerup', card(2).getBoundingClientRect().bottom + 50))
-    await wait(100)
+    await waitUntil(() => rig.page.songs[0]?.title === 'Bravo', 'the songs in their new order')
     expect(rig.page.songs.map(song => song.title)).to.deep.equal(['Bravo', 'Charlie', 'Alpha'])
     rig.page.overview.setEditMode(false)
   })

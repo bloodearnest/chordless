@@ -299,7 +299,7 @@ describe('space-card', () => {
       must(button(el, 'switch')).click()
       const modal = await answer(el, true)
       expect(modal.message).to.contain(`Switch to "${space.name}"?`)
-      await wait(50)
+      await waitUntil(() => switched.length > 0, 'the switch to be asked for')
       expect(switched).to.deep.equal([space.id])
     })
 
