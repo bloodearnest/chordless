@@ -23,7 +23,7 @@ import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -201,7 +201,7 @@ describe('space-card', () => {
     expect(text(el)).to.contain('1 song ·')
     const other = await make(`Other ${crypto.randomUUID().slice(0, 8)}`)
     el.space = other
-    await wait(100)
+    await waitUntil(() => el._summary, 'the other space to be counted')
     await el.updateComplete
     expect(el._summary).to.not.equal(null)
   })

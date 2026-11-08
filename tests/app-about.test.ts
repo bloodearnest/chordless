@@ -2,7 +2,7 @@ import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppAbout } from '../src/components/app-about.ts'
 import { AppUpdateChangeEvent, appUpdate } from '../src/js/app-update.ts'
 import { INSTALL_CHANGE_EVENT } from '../src/js/install.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { suppressConsoleLogs } from './test-helpers.ts'
 import '../src/components/app-about.ts'
 
 const { describe, it, afterEach } = window
@@ -34,7 +34,8 @@ describe('app-about', () => {
 
   const show = async () => {
     const el = await fixture<AppAbout>(html`<app-about></app-about>`)
-    await wait(30)
+    // (it loads as it is added: loading again waits for what that one reads to be read)
+    await el._load()
     await el.updateComplete
     return el
   }

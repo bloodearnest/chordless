@@ -3,7 +3,7 @@ import { LitElement } from 'lit'
 import { announceDataChange, type DataChange } from '../src/js/data-changes.ts'
 import { watchData } from '../src/js/data-watcher.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
-import { nothingFor, wait } from './test-helpers.ts'
+import { nothingFor } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -65,7 +65,7 @@ describe('DataWatcher', () => {
   it('stops when the page is left, even for a change heard just before', async () => {
     announce('song')
     element.remove()
-    await wait(100)
+    await nothingFor()
     announce('song')
     await nothingFor()
     expect(element.heard).to.have.length(0)

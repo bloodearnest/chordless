@@ -8,7 +8,7 @@ import { shareSetlistId } from '../src/js/share-receiver.ts'
 import '../src/js/views/share-view.ts'
 import type { ShareView } from '../src/js/views/share-view.ts'
 import { makeSetlist } from './builders.ts'
-import { deleteDatabase, nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { deleteDatabase, nothingFor, settle, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -58,16 +58,23 @@ describe('the share view', () => {
   ) {
     window.history.replaceState(null, '', `${startUrl}${hash}`)
     view = document.createElement('share-view')
+    let answered = false
     view.receiver = {
       ownSetlistFor: async () => own,
       openShare: async () => {
+        answered = true
         if (opening instanceof Error) throw opening
         return opening
       },
     }
     view.route = { name: 'share', fileId: 'file1', songIndex }
     outlet.append(view)
-    await wait(150)
+    // (asked, and what it answered shown: a page in its place, or why there is none)
+    await waitUntil(
+      () => visited.length > 0 || (answered && status()?.getAttribute('data-state') !== 'loading'),
+      'the share to be opened'
+    )
+    await settle()
     return view
   }
 
@@ -204,7 +211,7 @@ describe('the share view', () => {
     }
     window.addEventListener('unhandledrejection', onError)
     outlet.append(view)
-    await wait(100)
+    await waitUntil(() => errors.length > 0, 'the view to fail')
     window.removeEventListener('unhandledrejection', onError)
     expect(String(errors[0])).to.contain('no share route')
   })

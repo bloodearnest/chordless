@@ -1,4 +1,4 @@
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import {
   announceDataChange,
   type DataChange,
@@ -6,7 +6,7 @@ import {
   listenForOtherTabs,
   touches,
 } from '../src/js/data-changes.ts'
-import { wait } from './test-helpers.ts'
+import { nothingFor } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -51,7 +51,7 @@ describe('announcing a change', () => {
     const listener = (event: DataChangeEvent) => seen.push(event.change)
     window.addEventListener(DataChangeEvent.type, listener)
     announceDataChange({ spaceId: 'space', kind: 'song', ids: ['s'], origin: 'local' })
-    await wait(100)
+    await nothingFor()
     window.removeEventListener(DataChangeEvent.type, listener)
     expect(seen.map(change => change.remote)).to.deep.equal([false])
   })
@@ -69,7 +69,9 @@ describe('announcing a change', () => {
     })
     other.postMessage('not a change')
     other.postMessage(null)
-    await wait(100)
+    await waitUntil(() => seen.length > 0, 'the other tab to be heard')
+    // (and nothing of what was not a change)
+    await nothingFor(50)
     other.close()
     window.removeEventListener(DataChangeEvent.type, listener)
     expect(seen).to.deep.equal([

@@ -3,7 +3,7 @@
  * scope, a fake fetch, and the page's own Cache API under names of the test's own. The real
  * worker, installed in a browser, is in service-worker.playwright.ts.
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import * as AuthDB from '../src/js/auth-db.ts'
 import {
   startServiceWorker,
@@ -11,7 +11,7 @@ import {
   type WorkerScope,
 } from '../src/js/service-worker-core.ts'
 import { SHARED_CACHE_NAME, takeShared } from '../src/js/shared-incoming.ts'
-import { deleteDatabase, nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { deleteDatabase, nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -123,13 +123,8 @@ describe('the service worker', () => {
   const textOf = async (response: Response | null) => (await response?.text()) ?? null
 
   /** Wait for something that happens after the response, such as a cache write */
-  async function until(condition: () => Promise<boolean>) {
-    for (let i = 0; i < 100; i++) {
-      if (await condition()) return
-      await wait(10)
-    }
-    throw new Error('Timed out waiting')
-  }
+  const until = (condition: () => Promise<boolean>) =>
+    waitUntil(condition, 'Timed out waiting', { interval: 10 })
 
   describe('installing and activating', () => {
     it('precaches its files, and takes over at once the first time', async () => {
