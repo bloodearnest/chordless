@@ -21,7 +21,7 @@ import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../s
 import { makeEntry, makeImportedSong, makeSetlist } from './builders.ts'
 import { FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { deleteDatabase, nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { deleteDatabase, nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 import '../src/components/setlist-email-import.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -92,7 +92,6 @@ describe('setlist-email-import', () => {
     importer = await fixture<SetlistEmailImport>(
       html`<setlist-email-import></setlist-email-import>`
     )
-    await wait(30)
     return importer
   }
   /** Open it on an email to review */
