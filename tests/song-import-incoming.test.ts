@@ -150,7 +150,9 @@ describe('song-import: songs that arrive', () => {
       })
       await open()
       await choices()
-      await wait(50)
+      await waitUntil(() => importer._imports.length === 1)
+      // (and no second offer after it)
+      await nothingFor(50)
       expect(importer._imports).to.have.length(1)
     })
 
@@ -208,7 +210,7 @@ describe('song-import: songs that arrive', () => {
       await open()
       const input = must($('input[type="file"]')) as HTMLInputElement
       input.dispatchEvent(new Event('change'))
-      await wait(50)
+      await waitUntil(() => importer._state === 'pick')
       expect(importer._state).to.equal('pick')
     })
   })

@@ -1,5 +1,5 @@
 /** The view of a setlist someone shared by link, with a receiver that says what each link holds */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { offerLink, takeLink } from '../src/js/incoming-link.ts'
 import { setRouter } from '../src/js/navigation.ts'
@@ -94,7 +94,7 @@ describe('the share view', () => {
     }
     view.route = { name: 'share', fileId: 'file1', songIndex: -1 }
     outlet.append(view)
-    await wait(50)
+    await waitUntil(() => status()?.getAttribute('data-state') === 'loading')
     expect(status()?.getAttribute('data-state')).to.equal('loading')
     expect(view.textContent).to.not.contain('Go to Chordless')
   })
@@ -189,7 +189,7 @@ describe('the share view', () => {
     }
     view.route = { name: 'share', fileId: 'file1', songIndex: -1 }
     outlet.append(view)
-    await wait(100)
+    await waitUntil(() => closed === 1)
     expect(closed).to.equal(1)
   })
 

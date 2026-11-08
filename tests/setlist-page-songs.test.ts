@@ -24,7 +24,7 @@ import { loadSetlistLocalState } from '../src/js/setlist/local-state.ts'
 import { getSongUserPrefs, saveSongUserPrefs } from '../src/js/song-user-prefs.ts'
 import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { chartOf, must, useSetlistPage } from './setlist-page-harness.ts'
-import { nothingFor, wait } from './test-helpers.ts'
+import { nothingFor, settle, wait } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -124,13 +124,13 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     it('show chords, lyrics or both, as the action says, and again when it is pressed twice', async () => {
       await rig.open()
       act(0, 0, 'show-lyrics')
-      await wait(50)
+      await waitUntil(() => section(0, 0).hideMode === 'chords')
       expect(section(0, 0).hideMode).to.equal('chords')
       act(0, 0, 'show-chords')
-      await wait(50)
+      await waitUntil(() => section(0, 0).hideMode === 'lyrics')
       expect(section(0, 0).hideMode).to.equal('lyrics')
       act(0, 0, 'show-all')
-      await wait(50)
+      await waitUntil(() => section(0, 0).hideMode === 'none')
       expect(section(0, 0).hideMode).to.equal('none')
       await rig.page.sections.setHideMode(0, 0, 'chords')
       expect(rig.page.sections.states[0][0].hideMode).to.equal('chords')
@@ -184,7 +184,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
         saves++
       }
       act(0, 0, 'show-lyrics')
-      await wait(0)
+      await settle()
       expect(saves).to.equal(1)
     })
   })
@@ -353,7 +353,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       const setlist = await rig.open()
       rig.page.showSong(0, true)
       popover().dispatchEvent(new BpmChangeEvent(100))
-      await wait(150)
+      await waitUntil(async () => must(await rig.db.getSetlist(setlist.id)).songs[0].tempo === 100)
       expect(must(await rig.db.getSetlist(setlist.id)).songs[0].tempo).to.equal(100)
       expect(rig.page.songs[0].currentBPM).to.equal(100)
       expect(popover().bpmValue).to.equal(100)
@@ -377,7 +377,10 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       await rig.open()
       rig.page.showSong(0, true)
       $('#capo-selector')?.dispatchEvent(new CapoChangeEvent(4))
-      await wait(150)
+      await waitUntil(
+        () => ($('#song-0 song-display') as unknown as { capo: number } | null)?.capo === 4,
+        'the song shown with the capo'
+      )
       expect(rig.page.songs[0].currentCapo).to.equal(4)
       expect(($('#song-0 song-display') as unknown as { capo: number }).capo).to.equal(4)
       await rig.page.handleCapoChange(4)
@@ -487,7 +490,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       expect(resets).to.equal(0)
       modal.ask = async () => true
       popover().dispatchEvent(new SongResetClickEvent())
-      await wait(30)
+      await waitUntil(() => resets === 1)
       expect(resets).to.equal(1)
     })
   })

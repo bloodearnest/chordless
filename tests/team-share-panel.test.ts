@@ -17,7 +17,7 @@ import { createSpace, deleteSpace, getSpaceById, updateSpace } from '../src/js/s
 import type { TeamRole } from '../src/js/team-roles.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -255,7 +255,7 @@ describe('the team share panel', () => {
           value: { writeText: async () => Promise.reject(new Error('denied')) },
         })
         button('Copied').click()
-        await wait(50)
+        await waitUntil(() => text().includes('Copied'))
         expect(text()).to.contain('Copied')
       } finally {
         if (clipboard) Object.defineProperty(navigator, 'clipboard', clipboard)

@@ -184,7 +184,7 @@ describe('the home view', () => {
     it('opens a form with next Sunday’s service, led by the user', async () => {
       await open()
       view.querySelector<HTMLButtonElement>('#create-setlist-button')?.click()
-      await wait(100)
+      await waitUntil(() => modal().open === true)
       expect(modal().open).to.equal(true)
       expect(form().setlist?.time).to.equal('10:30')
       expect(new Date(`${form().setlist?.date}T12:00`).getDay()).to.equal(0)
@@ -258,7 +258,7 @@ describe('the home view', () => {
       try {
         await open()
         view.querySelector<HTMLButtonElement>('#create-setlist-button')?.click()
-        await wait(150)
+        await waitUntil(() => form().askWho === true)
         expect(form().askWho).to.equal(true)
         expect(form().setlist?.leaderId).to.equal('')
 
@@ -287,7 +287,7 @@ describe('the home view', () => {
           leaderId: '',
         })
       )
-      await wait(100)
+      await waitUntil(() => visited.length === 1)
       expect(visited).to.have.length(1)
       expect(visited[0]).to.match(/^\/setlist\//)
       expect((await db.getAllSetlists()).map(setlist => setlist.name)).to.deep.equal(['Created'])

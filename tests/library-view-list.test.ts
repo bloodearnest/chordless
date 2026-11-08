@@ -356,7 +356,7 @@ describe('the library view', () => {
       await view.updateComplete
       view.route = { name: 'songs' }
       await view.updateComplete
-      await wait(200)
+      await waitUntil(() => heading() === 'Song Library')
       expect(heading()).to.equal('Song Library')
       expect(visited).to.deep.equal([])
     })
@@ -393,14 +393,14 @@ describe('the library view', () => {
 
       chip(SHARED_DB_ID).click()
       await view.updateComplete
-      await wait(50)
+      await waitUntil(() => chip(SHARED_DB_ID).getAttribute('aria-pressed') === 'false')
       expect(chip(SHARED_DB_ID).getAttribute('aria-pressed')).to.equal('false')
       expect(titles()).to.have.length(1)
       expect(titles()[0]).to.contain('Alpha Song')
 
       chip(SHARED_DB_ID).click()
       await view.updateComplete
-      await wait(50)
+      await waitUntil(() => titles().length === 2)
       expect(titles()).to.have.length(2)
       expect(localStorage.getItem(KEY)).to.equal(null)
     })
@@ -424,7 +424,7 @@ describe('the library view', () => {
       await open()
       chip(spaceId).click()
       await view.updateComplete
-      await wait(50)
+      await waitUntil(() => titles().length === 1)
       expect(titles()).to.have.length(1)
       expect(titles()[0]).to.contain('Beta Song')
     })

@@ -20,7 +20,7 @@ import {
 import { makeSetlist } from './builders.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -414,7 +414,7 @@ describe('the join page', () => {
 
     page.remove()
     offerLink('/join', '#cut-short')
-    await wait(50)
+    await nothingFor(50)
     expect(takeLink('/join')).to.equal('#cut-short')
   })
 

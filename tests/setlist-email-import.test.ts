@@ -172,7 +172,7 @@ describe('setlist-email-import', () => {
       await open()
       importer.remove()
       offerLink('/import-setlist', '#whatever')
-      await wait(30)
+      await nothingFor(30)
       expect(takeLink('/import-setlist')).to.equal('#whatever')
     })
 
