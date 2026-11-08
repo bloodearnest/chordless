@@ -4,7 +4,7 @@
  * table, Google's sign-in window a stub, the folder chooser and Drive's folder call given in, and
  * the service worker that keeps the sign-in a fake one.
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/team-space-wizard.ts'
 import type { AppModal } from '../src/components/app-modal.ts'
 import type { TeamSpaceWizard } from '../src/components/team-space-wizard.ts'
@@ -65,7 +65,7 @@ describe('team-space-wizard', () => {
       )
     )
   async function until(condition: () => unknown, what: string) {
-    for (let i = 0; i < 100 && !condition(); i++) await wait(20)
+    await waitUntil(() => condition(), undefined, { timeout: 2000 })
     expect(
       condition(),
       `${what}: ${page?.shadowRoot?.textContent?.replace(/\s+/g, ' ').slice(0, 400)}`

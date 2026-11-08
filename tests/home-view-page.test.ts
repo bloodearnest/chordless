@@ -1,5 +1,5 @@
 /** The home page as it is shown: the setlists, the welcome card, and creating a setlist */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import type { SetlistDetailsForm } from '../src/components/setlist-details-form.ts'
 import {
@@ -97,7 +97,7 @@ describe('the home view', () => {
     // (the setlists load after it first draws)
     const loading = () =>
       !view.querySelector('#setlist-list') || view.querySelector('status-message[state="loading"]')
-    for (let i = 0; i < 250 && loading(); i++) await wait(20)
+    await waitUntil(() => !loading(), undefined, { timeout: 5000 })
     await wait(30)
   }
   const modal = () => must(view.querySelector<AppModal>('app-modal'))

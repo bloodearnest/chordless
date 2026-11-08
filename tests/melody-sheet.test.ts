@@ -1,4 +1,4 @@
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import { type MelodySheet, MelodySheetErrorEvent } from '../src/components/melody-sheet.ts'
 import '../src/components/melody-sheet.ts'
 import { sampleMelody } from './melody-sample.ts'
@@ -11,7 +11,7 @@ describe('melody-sheet', () => {
     const sheet = await fixture<MelodySheet>(html`<melody-sheet></melody-sheet>`)
     Object.assign(sheet, set)
     await sheet.updateComplete
-    for (let i = 0; i < 100 && !sheet._pages.length && !sheet._failed; i++) await wait(50)
+    await waitUntil(() => sheet._pages.length || sheet._failed, undefined, { timeout: 5000 })
     await sheet.updateComplete
     return sheet
   }
@@ -30,7 +30,7 @@ describe('melody-sheet', () => {
     const before = sheet._pages[0]
     sheet.songKey = 'D'
     await sheet.updateComplete
-    for (let i = 0; i < 100 && sheet._pages[0] === before; i++) await wait(50)
+    await waitUntil(() => sheet._pages[0] !== before, undefined, { timeout: 5000 })
     expect(sheet._pages[0]).to.not.equal(before)
     expect(notes(sheet)).to.equal(3)
   })
@@ -44,7 +44,7 @@ describe('melody-sheet', () => {
       html`<melody-sheet @melody-sheet:error=${() => (failed = true)}></melody-sheet>`
     )
     Object.assign(sheet, { melody: broken, melodyKey: 'C', songKey: 'C' })
-    for (let i = 0; i < 100 && !sheet._failed; i++) await wait(50)
+    await waitUntil(() => sheet._failed, undefined, { timeout: 5000 })
     await sheet.updateComplete
     expect(failed).to.equal(true)
     expect(sheet.shadowRoot?.textContent).to.contain('could not be shown')
@@ -58,7 +58,9 @@ describe('melody-sheet', () => {
     sheet.songKey = 'E'
     await sheet.updateComplete
     const asked = sheet._asked
-    for (let i = 0; i < 100 && sheet._pages.length && notes(sheet) === 0; i++) await wait(50)
+    await waitUntil(() => !(sheet._pages.length && notes(sheet) === 0), undefined, {
+      timeout: 5000,
+    })
     await wait(300)
     expect(asked).to.be.greaterThan(2)
     expect(notes(sheet)).to.equal(3)
@@ -71,7 +73,7 @@ describe('melody-sheet', () => {
       html`<melody-sheet style="width: 360px"></melody-sheet>`
     )
     Object.assign(narrow, { melody: sampleMelody, melodyKey: 'C', songKey: 'C' })
-    for (let i = 0; i < 100 && !narrow._pages.length; i++) await wait(50)
+    await waitUntil(() => narrow._pages.length, undefined, { timeout: 5000 })
     await narrow.updateComplete
     expect(notes(narrow)).to.equal(3)
     // (a narrower page is drawn larger once it is fitted to the width: its viewBox is narrower)

@@ -3,7 +3,7 @@
  * connecting Drive, logging out, and the tools under Manage. The service worker that keeps the
  * sign-in is a fake one (fake-auth-worker.ts).
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { type AccountCard, AccountStateEvent } from '../src/components/account-card.ts'
 import type { AppModal } from '../src/components/app-modal.ts'
 import '../src/components/account-card.ts'
@@ -28,7 +28,7 @@ describe('account-card', () => {
   const control = (id: string) => must(card.shadowRoot?.querySelector<HTMLButtonElement>(`#${id}`))
 
   async function until(condition: () => unknown, what: string) {
-    for (let i = 0; i < 100 && !condition(); i++) await wait(20)
+    await waitUntil(() => condition(), undefined, { timeout: 2000 })
     expect(condition(), what).to.be.ok
   }
 

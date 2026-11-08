@@ -1,4 +1,4 @@
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import '../src/components/song-card.ts'
 import { KeyChangeEvent, type KeySelector } from '../src/components/key-selector.ts'
 import {
@@ -156,7 +156,7 @@ describe('song-card', () => {
         const picker = async (card: SongCard) =>
           must(card.shadowRoot?.querySelector<KeySelector>('key-selector'))
         const card = await show({ song: inList, editMode: true })
-        for (let i = 0; i < 50 && !(await picker(card)).range; i++) await wait(20)
+        await waitUntil(async () => (await picker(card)).range)
         expect((await picker(card)).range).to.deep.equal({ low: 60, high: 67 })
         expect((await picker(card)).rangeKey).to.equal('G')
 

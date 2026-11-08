@@ -4,7 +4,7 @@
  * or the Worker cannot be reached. The Worker is a fetch that answers from a table, Google's
  * sign-in window a stub, and the service worker that keeps the sign-in a fake one.
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/team-join.ts'
 import { parseInvite, type TeamJoin } from '../src/components/team-join.ts'
 import { ChordlessDB } from '../src/js/db.ts'
@@ -90,7 +90,7 @@ describe('the join page', () => {
       )
     )
   async function until(condition: () => unknown, what: string) {
-    for (let i = 0; i < 100 && !condition(); i++) await wait(20)
+    await waitUntil(() => condition(), undefined, { timeout: 2000 })
     expect(condition(), what).to.be.ok
   }
 

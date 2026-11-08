@@ -1,4 +1,4 @@
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import '../src/components/space-tabs.ts'
 import { SpaceTabs } from '../src/components/space-tabs.ts'
 import { ChordlessDB } from '../src/js/db.ts'
@@ -124,8 +124,7 @@ describe('the tabs of the spaces on this device', () => {
         switched.push(id)
       }}
     ></space-tabs>`)
-    for (let i = 0; i < 50 && !tabs.shadowRoot?.querySelector('[role=tab]'); i++)
-      await new Promise(resolve => setTimeout(resolve, 20))
+    await waitUntil(() => tabs.shadowRoot?.querySelector('[role=tab]'))
     const found = [...(tabs.shadowRoot?.querySelectorAll<HTMLElement>('[role=tab]') ?? [])]
     expect(found.length).to.equal(2)
     expect(must(tabs.shadowRoot?.querySelector('[role=tablist]'))).to.exist
@@ -186,8 +185,7 @@ describe('the tabs of the spaces on this device', () => {
       }}
     ></space-tabs>`)
     const root = must(element.shadowRoot)
-    for (let i = 0; i < 50 && !root.querySelector('select'); i++)
-      await new Promise(resolve => setTimeout(resolve, 20))
+    await waitUntil(() => root.querySelector('select'))
     const tabs = [...root.querySelectorAll<HTMLElement>('[role=tab]')]
     expect(tabs.length).to.equal(MAX_TABS)
 

@@ -1,4 +1,4 @@
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { PadAudioController } from '../src/js/pad-audio-controller.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import {
@@ -627,9 +627,7 @@ describe('pad sets', () => {
         padSet
       )
       preloadPadKey('', padSet)
-      for (let i = 0; i < 40 && downloads().length < 3; i++) {
-        await new Promise(resolve => setTimeout(resolve, 20))
-      }
+      await waitUntil(() => downloads().length >= 3)
       expect(downloads()).to.have.length(3)
     })
   })

@@ -3,7 +3,7 @@
  * Drive. It is the form under the pad select on the media player page.
  */
 
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/pad-set-upload.ts'
 import { type PadSetUpload, PadSetUploadedEvent } from '../src/components/pad-set-upload.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
@@ -143,7 +143,7 @@ describe('the pad set upload', () => {
       expect(fileField().disabled).to.equal(true)
       expect(root().querySelector('progress')).to.not.equal(null)
 
-      for (let i = 0; i < 200 && uploaded === 0; i++) await wait(10)
+      await waitUntil(() => uploaded !== 0, undefined, { timeout: 2000 })
       await wait(20)
       await form.updateComplete
 
@@ -172,7 +172,7 @@ describe('the pad set upload', () => {
       await form.updateComplete
 
       submit()
-      for (let i = 0; i < 200 && !form._error; i++) await wait(10)
+      await waitUntil(() => form._error, undefined, { timeout: 2000 })
       await form.updateComplete
 
       expect(root().querySelector('.status-message.error')?.textContent).to.contain(

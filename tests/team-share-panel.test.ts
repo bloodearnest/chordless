@@ -4,7 +4,7 @@
  * Worker refuses. The Worker is a fetch that answers from a table, and the service worker that
  * keeps the sign-in a fake one.
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import '../src/components/team-share-panel.ts'
 import {
@@ -66,7 +66,7 @@ describe('the team share panel', () => {
       )
     )
   async function until(condition: () => unknown, what: string) {
-    for (let i = 0; i < 100 && !condition(); i++) await wait(20)
+    await waitUntil(() => condition(), undefined, { timeout: 2000 })
     expect(condition(), what).to.be.ok
   }
   /** Answer the question the panel asks */

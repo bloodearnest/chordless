@@ -2,7 +2,7 @@
  * One space's card on Account and Teams: what it says of the space, and its Sync and Switch. Drive
  * is a fake Drive, and the spaces are real ones in the spaces database.
  */
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import {
   type SpaceCard,
@@ -73,7 +73,7 @@ describe('space-card', () => {
     const el = await fixture<SpaceCard>(
       html`<space-card .space=${options.space ?? space} .signIn=${signIn} ?current=${options.current}></space-card>`
     )
-    for (let i = 0; i < 50 && !el._summary; i++) await wait(20)
+    await waitUntil(() => el._summary)
     await el.updateComplete
     return el
   }
@@ -243,7 +243,7 @@ describe('space-card', () => {
       let told = 0
       el.addEventListener(SpaceSyncedEvent.type, () => told++)
       must(button(el, 'sync')).click()
-      for (let i = 0; i < 150 && !text(el).includes('Synced Just now'); i++) await wait(20)
+      await waitUntil(() => text(el).includes('Synced Just now'), undefined, { timeout: 3000 })
       expect(text(el)).to.contain('Synced Just now')
       expect(told).to.equal(1)
       const files = drive.listFiles(file => Boolean(file.appProperties.setlistId))
@@ -254,7 +254,7 @@ describe('space-card', () => {
       const el = await card('signed-in')
       drive.failRequests({ status: 500, times: 100 })
       must(button(el, 'sync')).click()
-      for (let i = 0; i < 150 && !text(el).includes('Sync failed'); i++) await wait(20)
+      await waitUntil(() => text(el).includes('Sync failed'), undefined, { timeout: 3000 })
       expect(text(el)).to.contain('Sync failed')
       expect(must(button(el, 'sync')).disabled).to.equal(false)
     })
@@ -273,14 +273,14 @@ describe('space-card', () => {
       expect(text(el)).to.match(
         /Starting…|Syncing|Scanning|Checking|Downloading|Uploading|Initializing/
       )
-      for (let i = 0; i < 150 && el._syncing; i++) await wait(20)
+      await waitUntil(() => !el._syncing, undefined, { timeout: 3000 })
     })
   })
 
   describe('switching', () => {
     async function answer(el: SpaceCard, confirm: boolean) {
       const modal = must(el.shadowRoot?.querySelector<AppModal>('app-modal'))
-      for (let i = 0; i < 50 && !modal.open; i++) await wait(20)
+      await waitUntil(() => modal.open)
       await modal.updateComplete
       must(
         modal.shadowRoot?.querySelector<HTMLElement>(
