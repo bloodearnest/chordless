@@ -513,6 +513,25 @@ charts": a PDF from an email or a share is read for its metadata only). That sta
 the notes would come only from a lead sheet the person downloaded or imported themselves, and that
 page and the help text change in the step that ships it.
 
+**Synthetic lead sheets (built).** The real sheets are CCLI's and stay out of the repository, so the PDF reader is tested on
+sheets made from melodies written for the test: `tests/melody-build.ts` writes a `Melody` short (`C4:1:Ho-`),
+Verovio engraves it, `tests/melody-svg-pdf.ts` prints the SVG as a PDF, and `readMelodyPdf` has to read the melody that
+went in (`tests/melody-pdf-roundtrip.node.test.ts`; notes, lengths, rests, words, chords, sections, key signatures and
+accidentals, triplets, pickups, repeats, endings, segno/coda/D.S., several pages). The converter exists because a general
+SVG-to-PDF tool (`rsvg-convert`) bakes the placing into each glyph's coordinates, so the glyph hashes in `melody-glyphs.ts`
+no longer match. SongSelect's PDFs are IronPdf printing the same Verovio SVG, and the glyph outlines in them are Verovio's
+own (the three checked, clef, time signature and notehead, hash to the table's entries), so the converter keeps each glyph's
+path as Verovio draws it and puts it on the page with a matrix. Lines are stroked, noteheads and stems filled, words are
+Times text (a text with `text-anchor` is shifted by its width, which is how Verovio right-aligns "D.S. al Coda"), the
+accidentals in a chord symbol and the segno and coda signs are characters of an unembedded `Leipzig` font named by code point
+(as in the real ones, where the reader finds the segno as U+E047).
+
+Run over MusicXML from MuseScore (three lead sheets, kept locally), the same path found what the reader does not do, none
+of it the converter's: a triplet with no bracket in the MusicXML has no bracket on the page, so it is read as eighths; the
+accidental of a tied note is not drawn on the second note, so a tie over a barline loses its sharp; and a lyric's extender
+is sometimes read as a hyphen or missed. `readMusicXml` reads the title from a `credit` where there is no work title (MuseScore
+puts it there), and "Repeat 3x Last time to Coda" as the third pass.
+
 **Import keeps the melody (built).** `song-import` reads a lead sheet twice, as it always read the range: `readMelodyRange`
 for the range and its page, and `readMelodyPdf` for the whole `Melody`. The melody is saved (`melodyRecord`, in the
 `melodies` store, synced as in "Syncing") for the song the chart goes to: a new song, the library's song when the chart
