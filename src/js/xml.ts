@@ -6,7 +6,14 @@
  * of its own or an external one (there is no way to ask for one). It does not need the page's
  * `DOMParser`, so it runs in a worker and in Node alike.
  */
-import type { El } from './melody-read.ts'
+/** An element: its name, its attributes, its children, and its text */
+export interface El {
+  name: string
+  attrs: Record<string, string>
+  children: El[]
+  /** The text directly inside, in order, joined */
+  text: string
+}
 
 const ENTITIES: Record<string, string> = {
   amp: '&',

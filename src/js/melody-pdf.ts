@@ -18,7 +18,7 @@
 import { parseDirection } from './melody-directions.ts'
 import { GLYPHS } from './melody-glyphs.ts'
 import { absolutePath, shapeHash } from './melody-path.ts'
-import type { El } from './melody-read.ts'
+import type { El } from './xml.ts'
 
 export interface Line {
   x1: number

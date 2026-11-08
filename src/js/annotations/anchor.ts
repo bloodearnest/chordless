@@ -11,6 +11,7 @@
  * finds it again.
  */
 import type { AnnotationAnchor, ChartAnnotation, ChartSection } from '../data-types.ts'
+import { normalLyrics } from '../utils/lyric-words.ts'
 
 /** How many characters of lyrics either side of a spot an anchor remembers */
 const CONTEXT = 12
@@ -29,18 +30,10 @@ export function lineLyrics(section: ChartSection, line: number): string {
   return section.lines[line]?.segments.map(s => s.lyrics).join('') ?? ''
 }
 
-/** What is compared of a line: its words, whatever the case, the spaces and the marks between them */
-const normal = (text: string) =>
-  text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-
 /** How alike two lines are: 1 if they say the same, falling as more has to be changed to make one the other */
 export function similarity(a: string, b: string): number {
-  const x = normal(a)
-  const y = normal(b)
+  const x = normalLyrics(a)
+  const y = normalLyrics(b)
   if (x === y) return 1
   if (!x || !y) return 0
   let previous = Array.from({ length: y.length + 1 }, (_, i) => i)
@@ -65,16 +58,16 @@ const lineAt = (section: ChartSection, line: number) => lineLyrics(section, line
 function sectionHead(section: ChartSection): string {
   for (let i = 0; i < section.lines.length; i++) {
     const text = lineLyrics(section, i)
-    if (normal(text)) return text.slice(0, HEAD_CAP)
+    if (normalLyrics(text)) return text.slice(0, HEAD_CAP)
   }
   return ''
 }
 
 /** Which of the lines of a section that say the same this is, from 0 */
 function occurrence(section: ChartSection, line: number): number {
-  const key = normal(lineLyrics(section, line))
+  const key = normalLyrics(lineLyrics(section, line))
   let seen = 0
-  for (let i = 0; i < line; i++) if (normal(lineLyrics(section, i)) === key) seen++
+  for (let i = 0; i < line; i++) if (normalLyrics(lineLyrics(section, i)) === key) seen++
   return seen
 }
 
@@ -236,14 +229,14 @@ function bestLine(sections: ChartSection[], anchor: TextAnchor, own: number) {
     return value
   }
   const wanted = anchor.lineText as string
-  const wantedNormal = normal(wanted)
+  const wantedNormal = normalLyrics(wanted)
   let best: { section: number; line: number; score: number } | null = null
   for (const [si, section] of sections.entries()) {
     for (let li = 0; li < section.lines.length; li++) {
       const text = lineLyrics(section, li)
       const sim = Math.max(
         alike(wanted, text.slice(0, LINE_CAP)),
-        contained(wantedNormal, normal(text.slice(0, LINE_CAP)))
+        contained(wantedNormal, normalLyrics(text.slice(0, LINE_CAP)))
       )
       if (sim < SAME_LINE) continue
       let score = sim
