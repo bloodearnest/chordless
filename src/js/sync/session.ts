@@ -23,36 +23,58 @@ export const BATCH_SIZE = 50
 
 /**
  * Read the files of `items` BATCH_SIZE at a time (the storage decides how many it has in flight)
- * and do `work` on each with its text. `onGroup` hears how each batch went; an item whose file
+ * and do `work` on each with its content. `onGroup` hears how each batch went; an item whose file
  * could not be read is rejected, like one `work` failed on.
  */
-export async function inBatches<T, R>(
+async function inBatchesOf<T, C, R>(
+  read: (refs: string[]) => Promise<(C | null)[]>,
+  items: T[],
+  refOf: (item: T) => string,
+  work: (item: T, content: C) => Promise<R>,
+  onGroup: (results: PromiseSettledResult<R>[]) => void
+): Promise<void> {
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const batch = items.slice(i, i + BATCH_SIZE)
+    let contents: (C | null)[]
+    try {
+      contents = await read(batch.map(refOf))
+    } catch (error) {
+      console.error('[DriveSync] Reading a batch of files failed:', error)
+      contents = batch.map(() => null)
+    }
+    const results: PromiseSettledResult<R>[] = []
+    for (const [j, item] of batch.entries()) {
+      const content = contents[j]
+      results.push(
+        content === null || content === undefined
+          ? { status: 'rejected', reason: new Error(`Could not read ${refOf(item)}`) }
+          : (await Promise.allSettled([work(item, content)]))[0]
+      )
+    }
+    onGroup(results)
+  }
+}
+
+/** The files of `items` read as text: see inBatchesOf */
+export function inBatches<T, R>(
   space: SpaceStorage,
   items: T[],
   refOf: (item: T) => string,
   work: (item: T, text: string) => Promise<R>,
   onGroup: (results: PromiseSettledResult<R>[]) => void
 ): Promise<void> {
-  for (let i = 0; i < items.length; i += BATCH_SIZE) {
-    const batch = items.slice(i, i + BATCH_SIZE)
-    let texts: (string | null)[]
-    try {
-      texts = await space.readMany(batch.map(refOf))
-    } catch (error) {
-      console.error('[DriveSync] Reading a batch of files failed:', error)
-      texts = batch.map(() => null)
-    }
-    const results: PromiseSettledResult<R>[] = []
-    for (const [j, item] of batch.entries()) {
-      const text = texts[j]
-      results.push(
-        text === null
-          ? { status: 'rejected', reason: new Error(`Could not read ${refOf(item)}`) }
-          : (await Promise.allSettled([work(item, text)]))[0]
-      )
-    }
-    onGroup(results)
-  }
+  return inBatchesOf(refs => space.readMany(refs), items, refOf, work, onGroup)
+}
+
+/** The files of `items` read as bytes: see inBatchesOf */
+export function inBatchesOfBytes<T, R>(
+  space: SpaceStorage,
+  items: T[],
+  refOf: (item: T) => string,
+  work: (item: T, bytes: Uint8Array) => Promise<R>,
+  onGroup: (results: PromiseSettledResult<R>[]) => void
+): Promise<void> {
+  return inBatchesOf(refs => space.readManyBytes(refs), items, refOf, work, onGroup)
 }
 
 /** A setlist a pull replaced: what this device had, and what it has now */

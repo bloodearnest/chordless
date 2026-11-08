@@ -43,8 +43,11 @@ export function notingRefs(
       return refs
     },
     status: ref => space.status(ref),
+    bytes: space.bytes,
     readText: ref => space.readText(ref),
     readMany: refs => space.readMany(refs),
+    readBytes: ref => space.readBytes(ref),
+    readManyBytes: refs => space.readManyBytes(refs),
     async create(collection, input, body, options) {
       const result = await space.create(collection, input, body, options)
       await room.addRefs([result.file.ref])

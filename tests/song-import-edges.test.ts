@@ -2,6 +2,7 @@ import { expect, fixture, html } from '@open-wc/testing'
 import { SongImportedEvent } from '../src/components/song-import.ts'
 import { ChordlessDB, createSetlist, getCurrentDB, normalizeTitle } from '../src/js/db.ts'
 import { offerIncoming } from '../src/js/incoming-songs.ts'
+import { readMusicXml } from '../src/js/melody-musicxml-read.ts'
 import { createSong } from '../src/js/song-utils.ts'
 import { makeSong } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
@@ -161,7 +162,7 @@ describe('song-import: corners', () => {
       })
       const record = await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)
       expect(record?.key).to.equal('C')
-      expect(record?.melody.measures).to.have.length(1)
+      expect(readMusicXml(record?.xml ?? '')?.measures).to.have.length(1)
     })
 
     it('keeps the melody of a chart that has a range already, and does not read the range again', async () => {

@@ -139,9 +139,9 @@ Two layers, and not one.
 
 1. **Inside the app: a small typed `Melody`**, not XML: measures, each with notes `{ midi, step,
    alter, octave, start, duration, tied, syllable, cue }`, plus key, time signature, tempo,
-   sections, chord symbols. Analysis, transposing, the range and the play order derive from it. As
-   JSON it is not small: 68 KB at the median and 164 KB at most over the 137 sheets (the PDF is 125 KB),
-   and 18 KB median if the ids, `midi` and every default are left out.
+   sections, chord symbols. Analysis, transposing, the range and the play order derive from it. It is
+   what the PDF reader builds and what the score is parsed into when it is wanted, not what is stored (below).
+   As JSON it is not small: 68 KB at the median and 164 KB at most over the 137 sheets (the PDF is 125 KB).
 2. **MusicXML 4.0 (partwise) is the file that is kept, and the edge**: written from the `Melody`
    (`melody-musicxml.ts`) and read into it (`melody-musicxml-read.ts`), for the renderer, for export and
    import, and as the file in Drive. It is the interchange format every notation program speaks, so
@@ -166,22 +166,35 @@ as the chord transposer spells them. The range is of the sung notes: cue notes a
   would make the chart unreadable in the editor.
 - **A MusicXML file beside the chart in Drive** (built: PR "sync a song's melody"), per chart (a variant has its own),
   in the key the chart is in, linked to its chart by `appProperties` (`type: 'melody'`, `songUuid` and `songId`, `key`,
-  `melodyFormat`, `spaceId`, `appVersion`) like the chart's own, named `<title>[-<ccli>].melody.musicxml`. It goes
+  `melodyFormat`, `spaceId`, `appVersion`) like the chart's own, named `<title>[-<ccli>].melody.mxl`: an `.mxl`
+  (`src/js/mxl.ts`), the zipped MusicXML that MuseScore, Sibelius and Dorico write and open, `melodyFormat: '2'`. It goes
   through the same storage and sync as the chart (`docs/STORAGE_API.md`, `docs/SYNC_ARCHITECTURE.md`, "Melodies"): the
   user's browser and the user's, or their team space owner's, Drive. Older clients ignore it: the pull skips a file in
   `songs` whose `type` is not `chordpro`. Deleting a song deletes its melody and puts its file in the trash (a melody
   whose chart was deleted in Drive is cleaned up by the next full sync). **Not settled:** merging two variants
   (`library-repair`, `song-versions`) deletes the one that goes, so its melody goes with it; the kept variant does not
   get it. Move it across when the merge learns of melodies.
-- **On the device, the parsed `Melody`**, in an IndexedDB store of its own (`melodies`, since database version 13, keyed
+- **On the device, the MusicXML text**, in an IndexedDB store of its own (`melodies`, since database version 13, keyed
   by the song's uuid, with the file's `fileRef`, `fileRev` and `fileModified` as the chart's records have; `MelodyRecord`
-  in `data-types.ts`), not in `songs` or `chordpro`: it is 18 to 70 KB a song and only the Melody view wants it. It is read
-  again from the file when the file's `rev` changes, and only the original key is kept: other keys are
-  `transposeMelody`. `contentHash` (of the MusicXML it is written as) is how a change made here is found without writing
-  the file; `melodyRecord(uuid, melody, key)` makes a record with it.
-- **Compression:** the file is plain MusicXML. It gzips to 3 KB, but a gzipped file is opaque in Drive and the
-  storage interface is text only; a format property on the file lets gzip packing come later without a
-  migration. Do not rely on Drive or the transport to compress it.
+  in `data-types.ts`), not in `songs` or `chordpro`: it is 30 to 70 KB a song and only the Melody view wants it. It is
+  read again from the file when the file's `rev` changes, and only the original key is kept: other keys are
+  `transposeMelody`. **The score is kept, not its parse** (version 14; version 13 kept the parsed `Melody`, and its records are
+  cleared by the upgrade, being derived data). Parsing a score takes 2 to 4 ms on a desktop, so it is done when a song's
+  melody is wanted (the view, the key picker's analysis of the song in front of you), not for every song; a stored parse
+  would have to be migrated whenever the `Melody` type changes, and would keep what an older reader made of the score
+  after the reader improved. The score also goes straight to Verovio for the original key. `contentHash` (of the score) is
+  how a change made here is found; `melodyRecord(uuid, xml, key)` makes a record with it. The import step writes the
+  score once (`writeMusicXml`) and a pull stores what Drive had, once it is known to parse.
+- **Compression:** the file in Drive is an `.mxl`: 62 KB of MusicXML is 3 KB, so about 150 songs are 0.5 MB rather than 9 MB
+  to download on a new device or a first sync. Drive stores the bytes as sent and counts them, and the browser's
+  transport does not compress an upload, so it is done here, only at the edge: the device keeps the plain score.
+  `CompressionStream` and `DecompressionStream` do the deflate (in the browsers we support and in Node), and the zip
+  around it is written by hand with a fixed timestamp. **No churn:** change detection is the hash of the *score*, not of
+  the file, so a different deflate in another browser makes a different file (and a different `rev`) but never an upload:
+  the pull downloads it once, sees the same hash, and only records the file's markers. A melody is uploaded only when its
+  score changed. Reading takes either form: `.mxl`, or the plain `.melody.musicxml` the first version wrote (`melodyFormat:
+  '1'`), which is rewritten as an `.mxl` the next time the melody changes here. **A space that holds text only** (a team
+  space, until the Worker's routes take bytes: `SpaceStorage.bytes`) keeps the plain `.melody.musicxml` as before.
 - **The copyright rule holds** (`CLAUDE.md`): the notes and lyrics are the song's, so they live
   only in the user's browser and Drive, never on the Worker, never in a share link, never in
   telemetry. A share carries the setlist; the receiver imports their own.

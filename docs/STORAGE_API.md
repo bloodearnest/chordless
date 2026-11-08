@@ -30,6 +30,7 @@ people who lead setlists, one JSON file each: `docs/IDENTITIES.md`), and the `sh
 | `inventory()` | the refs of every live file in the space (finding records whose file has gone) |
 | `status(ref)` | a file wherever it is: `{trashed}`, or null if it does not exist |
 | `readText(ref)`, `readMany(refs)` | a file's text; many files' texts, one entry each in order, null for one that could not be read |
+| `bytes`, `readBytes(ref)`, `readManyBytes(refs)` | whether the space holds bytes as well as text (`create` and `update` take a `Uint8Array`; a team space, text-only for now, refuses one); a file's bytes, one entry each in order, null for one that could not be read. The melody's `.mxl` is the first file that is not text |
 | `changes` | the feed of what changed, or null for a backend with none: `start()` gives a position, `since(position)` the files now live in `songs` or `setlists` that changed after it, the refs that are gone (in the bin, deleted, or not in this space), and the next position. A position the backend has forgotten throws `ChangeTokenLost`: the sync then lists everything once. Drive's is `changes.list`; the team service passes it on to members (`/changes/start`, `/changes`), saying only of the space's own files that they are gone (docs/SYNC_ARCHITECTURE.md, "Incremental sync") |
 | `create`, `createMany`, `update`, `updateMany` | write; each says whether the backend stored exactly what was sent (`intact`). The `Many` forms give one entry per item in order, null for one that failed |
 

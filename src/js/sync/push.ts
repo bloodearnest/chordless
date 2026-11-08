@@ -20,7 +20,7 @@ import {
   updateInput,
 } from '../drive-metadata.ts'
 import { leaderName } from '../leaders.ts'
-import { writeMusicXml } from '../melody-musicxml.ts'
+import { writeMxl } from '../mxl.ts'
 import type { WriteResult } from '../storage/types.ts'
 import { hashText } from '../utils/hash.ts'
 import {
@@ -546,18 +546,19 @@ export async function pushSongVariant(
 interface MelodyUpload {
   record: MelodyRecord
   song: SongRecord
-  /** The MusicXML, as it is written once (its hash is what is recorded as synced) */
-  body: string
+  /** What is uploaded: the `.mxl`, or the plain MusicXML where the space holds text only */
+  body: Uint8Array | string
 }
 
 /** Record on a melody that Drive now holds this MusicXML in this file (if it stored it intact) */
 function recordMelodyUpload(upload: MelodyUpload, { file, intact }: WriteResult) {
-  const { record, body } = upload
+  const { record } = upload
   record.fileRef = file.ref
   Object.assign(record, driveMarkers(file))
   if (intact) {
     record.lastSyncedAt = new Date().toISOString()
-    record.syncedContentHash = hashText(body)
+    // (the hash is of the score, not of the file: the same score is the same however it is zipped)
+    record.syncedContentHash = record.contentHash
   }
 }
 
@@ -578,7 +579,11 @@ export async function pushMelodies(
     if (!song) continue
     const gone = !!record.fileRef && !run.fileExistsInDrive(record.fileRef)
     if (record.fileRef && !gone && !melodyHasLocalChanges(record)) continue
-    const upload = { record, song, body: writeMusicXml(record.melody) }
+    const upload = {
+      record,
+      song,
+      body: run.space.bytes ? await writeMxl(record.xml) : record.xml,
+    }
     if (record.fileRef && !gone) updated.push(upload)
     else {
       // (its file is gone from Drive, or it never had one: a new file)
@@ -600,7 +605,10 @@ export async function pushMelodies(
   report(0)
 
   const metadata = (upload: MelodyUpload) =>
-    melodyFileMetadata(upload.record, upload.song, { spaceId: run.spaceId })
+    melodyFileMetadata(upload.record, upload.song, {
+      spaceId: run.spaceId,
+      bytes: run.space.bytes,
+    })
   const recordBatch = async (batch: MelodyUpload[], results: (WriteResult | null)[]) => {
     const saved: MelodyRecord[] = []
     batch.forEach((upload, j) => {
@@ -612,27 +620,44 @@ export async function pushMelodies(
     if (saved.length > 0) await run.db.saveMelodiesSent(saved)
     return saved.length
   }
-  const uploadOne = async (upload: MelodyUpload) => {
-    const result = upload.record.fileRef
-      ? await run.space.update(
+  const write = (upload: MelodyUpload) =>
+    upload.record.fileRef
+      ? run.space.update(
           upload.record.fileRef,
           updateInput(metadata(upload), 'melody'),
           upload.body
         )
-      : await run.space.create('songs', fileInput(metadata(upload)), upload.body)
-    recordMelodyUpload(upload, result)
+      : run.space.create('songs', fileInput(metadata(upload)), upload.body)
+  const uploadOne = async (upload: MelodyUpload) => {
+    recordMelodyUpload(upload, await write(upload))
     await run.db.saveMelodiesSent([upload.record])
   }
+  // (a space that holds bytes has no batch call for them: one request a file, together, and one that
+  // failed is null, as in a batch)
+  const writeTogether = (batch: MelodyUpload[]) =>
+    Promise.all(
+      batch.map(upload =>
+        write(upload).catch(error => {
+          console.error(`[DriveSync] Failed to upload ${describe(upload)}:`, error)
+          return null
+        })
+      )
+    )
   const describe = ({ record }: MelodyUpload) => `the melody of song ${record.uuid}`
 
   const uploaded = await uploadInBatches(created, BATCH_SIZE, {
     uploadBatch: async batch =>
       recordBatch(
         batch,
-        await run.space.createMany(
-          'songs',
-          batch.map(upload => ({ input: fileInput(metadata(upload)), body: upload.body }))
-        )
+        run.space.bytes
+          ? await writeTogether(batch)
+          : await run.space.createMany(
+              'songs',
+              batch.map(upload => ({
+                input: fileInput(metadata(upload)),
+                body: upload.body as string,
+              }))
+            )
       ),
     uploadOne,
     describe,
@@ -642,13 +667,15 @@ export async function pushMelodies(
     uploadBatch: async batch =>
       recordBatch(
         batch,
-        await run.space.updateMany(
-          batch.map(upload => ({
-            ref: upload.record.fileRef as string,
-            input: updateInput(metadata(upload), 'melody'),
-            body: upload.body,
-          }))
-        )
+        run.space.bytes
+          ? await writeTogether(batch)
+          : await run.space.updateMany(
+              batch.map(upload => ({
+                ref: upload.record.fileRef as string,
+                input: updateInput(metadata(upload), 'melody'),
+                body: upload.body as string,
+              }))
+            )
       ),
     uploadOne,
     describe,

@@ -35,7 +35,8 @@ document and SETLIST_DELETION.md.
   ```
 
   Drive is the shared copy; each device syncs its local database with it. A song's melody (docs/MELODY.md) is
-  a third kind of file in `songs/`, a MusicXML file `<title>[-<ccli>].melody.musicxml` beside its chart.
+  a third kind of file in `songs/`, an `.mxl` (zipped MusicXML) `<title>[-<ccli>].melody.mxl` beside its chart (plain
+  `.melody.musicxml` in a space that holds text only).
 
 ### Layers
 
@@ -110,7 +111,8 @@ get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
 ### Melodies
 
 A song's melody syncs as a file of its own, with the rules of a chart: pulled when its file is new or its rev
-changed, pushed when it has no file or its MusicXML hashes to something other than what was last synced, Drive wins a
+changed, pushed when it has no file or its score hashes to something other than what was last synced (the hash is of the
+MusicXML, not of the file, so another deflate never causes an upload), Drive wins a
 conflict, and one a read-only user changed here is held back (`heldBack`). The pull reads the `songs/` listing once for
 both (`pullSongs`, then `pullMelodies`). What differs from a chart: it is derived data, so a file Chordless cannot read
 as MusicXML is left and tried again, and a melody whose file was deleted elsewhere and not made again here is simply
@@ -181,8 +183,8 @@ Every upload and update goes through it.
   relationships (`variantOf`, `isDefault`, `variantLabel`) and import provenance:
   what pull needs that the chart text doesn't contain.
 - **Melody** `appProperties`: `type: 'melody'`, `songUuid` and `songId` (the link to its chart), `spaceId`, `key` (the
-  key it is written in), `melodyFormat` (the shape of the file: `1`) and `appVersion`. The file is MusicXML
-  (`application/vnd.recordare.musicxml+xml`). Clients from before melodies skip a file in `songs/` whose `type`
+  key it is written in), `melodyFormat` (the shape of the file: `2` is an `.mxl`, `application/vnd.recordare.musicxml`; `1` is plain MusicXML,
+  `application/vnd.recordare.musicxml+xml`, which a text-only space keeps) and `appVersion`. Clients from before melodies skip a file in `songs/` whose `type`
   is not `chordpro`, so they ignore it.
 - Updates send name and `appProperties` with the content in one multipart request,
   so file names follow edits; retired properties from older versions are removed.

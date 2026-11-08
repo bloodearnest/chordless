@@ -1,5 +1,5 @@
 /**
- * MD5 of a string's UTF-8 bytes, as lower-case hex: the same value Google Drive reports as a
+ * MD5 of a string's UTF-8 bytes (or of bytes), as lower-case hex: the same value Google Drive reports as a
  * file's md5Checksum. WebCrypto has no MD5 (it is broken for security), but here it only checks
  * that Drive stored the bytes we sent, so it is fine.
  */
@@ -16,8 +16,8 @@ const CONSTANTS = Array.from(
   (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) | 0
 )
 
-export function md5Hex(text: string): string {
-  const bytes = new TextEncoder().encode(text)
+export function md5Hex(text: string | Uint8Array): string {
+  const bytes = typeof text === 'string' ? new TextEncoder().encode(text) : text
   const length = bytes.length
   // The bytes, a 1 bit, zeros, then the length in bits as 64 bits, to a multiple of 64 bytes
   const padded = new Uint8Array((((length + 8) >> 6) + 1) << 6)

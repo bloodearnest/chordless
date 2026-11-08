@@ -5,7 +5,9 @@ import { midiOf } from '../src/js/melody.ts'
 import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { readMusicXml } from '../src/js/melody-musicxml-read.ts'
 import { melodyRecord } from '../src/js/melody-record.ts'
+import { readMelodyFile, readMxl } from '../src/js/mxl.ts'
 import { addSong, useSyncRig } from './drive-harness.ts'
+import type { MemoryFile } from './memory-storage.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
 
@@ -57,9 +59,18 @@ function melodyOf(word: string): Melody {
 
 /** The first lyric of a melody record: which version of it this is */
 const wordOf = (record: MelodyRecord | undefined): string => {
-  const first = record?.melody.measures[0]?.voices[0]?.[0]
+  const first = record && readMusicXml(record.xml)?.measures[0]?.voices[0]?.[0]
   return first?.kind === 'note' ? (first.syllables[0] ?? '') : ''
 }
+
+/** A file's bytes as the fake keeps them: one character a byte for a file that was written as bytes */
+const bytesOf = (file: MemoryFile): Uint8Array =>
+  file.binary
+    ? Uint8Array.from(file.content, c => c.charCodeAt(0))
+    : new TextEncoder().encode(file.content)
+
+/** The MusicXML a melody file holds, whichever form it is in */
+const scoreOf = (file: MemoryFile) => readMelodyFile(bytesOf(file))
 
 describe('Drive sync: melodies', () => {
   const rig = useSyncRig()
@@ -75,27 +86,30 @@ describe('Drive sync: melodies', () => {
       title: 'Amazing Grace',
       content: '{title: Amazing Grace}',
     })
-    await device.db.saveMelody(melodyRecord('song-1', melodyOf(word), 'G'))
+    await device.db.saveMelody(melodyRecord('song-1', writeMusicXml(melodyOf(word)), 'G'))
     return device
   }
 
-  it('uploads a melody as a MusicXML file beside its chart, linked by its properties', async () => {
+  it('uploads a melody as an .mxl beside its chart, linked by its properties', async () => {
     const phone = await deviceWithMelody()
     await syncDevice(phone)
 
     const [file] = melodyFiles()
     expect(melodyFiles()).to.have.length(1)
-    expect(file.name).to.equal('amazing-grace.melody.musicxml')
+    expect(file.name).to.equal('amazing-grace.melody.mxl')
+    expect(file.type).to.equal('application/vnd.recordare.musicxml')
     expect(file.props).to.include({
       type: 'melody',
       songUuid: 'song-1',
       key: 'G',
-      melodyFormat: '1',
+      melodyFormat: '2',
     })
     // (beside the chart's own file, in the songs folder)
     expect(rig.storage.list(f => f.props.type === 'chordpro')).to.have.length(1)
-    expect(readMusicXml(file.content)?.measures).to.have.length(1)
-    expect(file.content).to.equal(writeMusicXml(melodyOf('one')))
+    // (zipped: a few KB, and the score inside is the one that was made)
+    expect(file.binary).to.equal(true)
+    expect(await readMxl(bytesOf(file))).to.equal(writeMusicXml(melodyOf('one')))
+    expect(readMusicXml((await scoreOf(file)) ?? '')?.measures).to.have.length(1)
     const record = must(await phone.db.getMelody('song-1'))
     expect(record.fileRef).to.equal(file.ref)
     expect(record.syncedContentHash).to.equal(record.contentHash)
@@ -113,7 +127,7 @@ describe('Drive sync: melodies', () => {
     expect(record.fileRef).to.equal(melodyFiles()[0].ref)
     expect(await tablet.db.getAllSongs()).to.have.length(1)
     // (the same melody on both, and nothing to send back)
-    expect(record.melody.measures[0]?.chords).to.deep.equal([{ start: 0, text: 'G' }])
+    expect(readMusicXml(record.xml)?.measures[0]?.chords).to.deep.equal([{ start: 0, text: 'G' }])
     rig.storage.clearCalls()
     await syncDevice(tablet)
     expect(rig.storage.writes()).to.deep.equal([])
@@ -127,7 +141,7 @@ describe('Drive sync: melodies', () => {
     const ref = melodyFiles()[0].ref
 
     const before = must(await phone.db.getMelody('song-1'))
-    await phone.db.saveMelody(melodyRecord('song-1', melodyOf('two'), 'G', before))
+    await phone.db.saveMelody(melodyRecord('song-1', writeMusicXml(melodyOf('two')), 'G', before))
     await syncDevice(phone)
     expect(melodyFiles()).to.have.length(1)
     expect(melodyFiles()[0].ref).to.equal(ref)
@@ -182,7 +196,7 @@ describe('Drive sync: melodies', () => {
     rig.storage.trash(old)
 
     const record = must(await phone.db.getMelody('song-1'))
-    await phone.db.saveMelody(melodyRecord('song-1', melodyOf('three'), 'G', record))
+    await phone.db.saveMelody(melodyRecord('song-1', writeMusicXml(melodyOf('three')), 'G', record))
     await syncDevice(phone)
 
     expect(melodyFiles()).to.have.length(1)
@@ -197,10 +211,20 @@ describe('Drive sync: melodies', () => {
     await syncDevice(tablet)
 
     await phone.db.saveMelody(
-      melodyRecord('song-1', melodyOf('phone'), 'G', must(await phone.db.getMelody('song-1')))
+      melodyRecord(
+        'song-1',
+        writeMusicXml(melodyOf('phone')),
+        'G',
+        must(await phone.db.getMelody('song-1'))
+      )
     )
     await tablet.db.saveMelody(
-      melodyRecord('song-1', melodyOf('tablet'), 'G', must(await tablet.db.getMelody('song-1')))
+      melodyRecord(
+        'song-1',
+        writeMusicXml(melodyOf('tablet')),
+        'G',
+        must(await tablet.db.getMelody('song-1'))
+      )
     )
     await syncDevice(phone)
     await syncDevice(tablet)
@@ -257,11 +281,21 @@ describe('Drive sync: melodies', () => {
 
     rig.storage.readOnly = true
     await member.db.saveMelody(
-      melodyRecord('song-1', melodyOf('mine'), 'G', must(await member.db.getMelody('song-1')))
+      melodyRecord(
+        'song-1',
+        writeMusicXml(melodyOf('mine')),
+        'G',
+        must(await member.db.getMelody('song-1'))
+      )
     )
     rig.storage.readOnly = false
     await leader.db.saveMelody(
-      melodyRecord('song-1', melodyOf('theirs'), 'G', must(await leader.db.getMelody('song-1')))
+      melodyRecord(
+        'song-1',
+        writeMusicXml(melodyOf('theirs')),
+        'G',
+        must(await leader.db.getMelody('song-1'))
+      )
     )
     await syncDevice(leader)
     rig.storage.readOnly = true
@@ -287,7 +321,7 @@ describe('Drive sync: melodies', () => {
     const phone = await deviceWithMelody()
     await syncDevice(phone)
     const tablet = await makeDevice('tablet')
-    rig.storage.fail('readText', { on: melodyFiles()[0].ref })
+    rig.storage.fail('readBytes', { on: melodyFiles()[0].ref })
 
     const report = await syncDevice(tablet)
     expect(report.downloadsFailed).to.equal(true)
@@ -312,14 +346,19 @@ describe('Drive sync: melodies', () => {
     const phone = await deviceWithMelody()
     await syncDevice(phone)
     await phone.db.saveMelody(
-      melodyRecord('song-1', melodyOf('next'), 'G', must(await phone.db.getMelody('song-1')))
+      melodyRecord(
+        'song-1',
+        writeMusicXml(melodyOf('next')),
+        'G',
+        must(await phone.db.getMelody('song-1'))
+      )
     )
     rig.storage.fail('update')
     await syncDevice(phone)
-    expect(melodyFiles()[0].content).to.equal(writeMusicXml(melodyOf('one')))
+    expect(await scoreOf(melodyFiles()[0])).to.equal(writeMusicXml(melodyOf('one')))
 
     await syncDevice(phone)
-    expect(melodyFiles()[0].content).to.equal(writeMusicXml(melodyOf('next')))
+    expect(await scoreOf(melodyFiles()[0])).to.equal(writeMusicXml(melodyOf('next')))
   })
 
   it('lets go of a melody file the feed names as gone, when the melody was made again here', async () => {
@@ -329,7 +368,12 @@ describe('Drive sync: melodies', () => {
     const ref = melodyFiles()[0].ref
     rig.storage.trash(ref)
     await phone.db.saveMelody(
-      melodyRecord('song-1', melodyOf('again'), 'G', must(await phone.db.getMelody('song-1')))
+      melodyRecord(
+        'song-1',
+        writeMusicXml(melodyOf('again')),
+        'G',
+        must(await phone.db.getMelody('song-1'))
+      )
     )
 
     await phone.sync.incrementalSync()
@@ -383,7 +427,8 @@ describe('Drive sync: melodies', () => {
     expect(must(await phone.db.getMelody('song-1')).fileRev).to.equal(melodyFiles()[0].rev)
   })
 
-  it('uploads each melody on its own when the batch fails', async () => {
+  it('uploads each melody on its own when the batch fails (in a space that holds text only)', async () => {
+    rig.storage.bytes = false
     const phone = await deviceWithMelody()
     // (the chart's batch goes through first: the second call to createMany is the melodies')
     rig.storage.fail('createMany', { skip: 1 })
@@ -391,20 +436,26 @@ describe('Drive sync: melodies', () => {
     expect(melodyFiles()).to.have.length(1)
   })
 
-  it('updates each melody on its own when the batch of updates fails', async () => {
+  it('updates each melody on its own when the batch of updates fails (in a space that holds text only)', async () => {
+    rig.storage.bytes = false
     const phone = await deviceWithMelody()
     await syncDevice(phone)
     await phone.db.saveMelody(
-      melodyRecord('song-1', melodyOf('single'), 'G', must(await phone.db.getMelody('song-1')))
+      melodyRecord(
+        'song-1',
+        writeMusicXml(melodyOf('single')),
+        'G',
+        must(await phone.db.getMelody('song-1'))
+      )
     )
     rig.storage.fail('updateMany')
     await syncDevice(phone)
-    expect(melodyFiles()[0].content).to.equal(writeMusicXml(melodyOf('single')))
+    expect(await scoreOf(melodyFiles()[0])).to.equal(writeMusicXml(melodyOf('single')))
   })
 
   it('leaves the melody of a song that is not here alone, and lists it among the unsent changes', async () => {
     const phone = await makeDevice('phone')
-    await phone.db.saveMelody(melodyRecord('ghost', melodyOf('boo'), null))
+    await phone.db.saveMelody(melodyRecord('ghost', writeMusicXml(melodyOf('boo')), null))
     expect((await phone.sync.findUnsyncedChanges()).filter(c => c.type === 'melody')).to.deep.equal(
       [{ type: 'melody', id: 'ghost', label: '' }]
     )
@@ -419,7 +470,12 @@ describe('Drive sync: melodies', () => {
     await syncDevice(tablet)
 
     await phone.db.saveMelody(
-      melodyRecord('song-1', melodyOf('feed'), 'G', must(await phone.db.getMelody('song-1')))
+      melodyRecord(
+        'song-1',
+        writeMusicXml(melodyOf('feed')),
+        'G',
+        must(await phone.db.getMelody('song-1'))
+      )
     )
     await phone.sync.incrementalSync()
     rig.storage.clearCalls()
@@ -447,5 +503,75 @@ describe('Drive sync: melodies', () => {
     await syncDevice(phone)
     await phone.sync.resetLocalFromDrive()
     expect(wordOf(await phone.db.getMelody('song-1'))).to.equal('one')
+  })
+
+  it('compresses the file: the score is far larger than what is in Drive', async () => {
+    const phone = await deviceWithMelody()
+    await syncDevice(phone)
+    const [file] = melodyFiles()
+    const score = writeMusicXml(melodyOf('one'))
+    expect(bytesOf(file).length).to.be.lessThan(score.length)
+  })
+
+  describe('in a space that holds text only', () => {
+    it('keeps the plain MusicXML, as the first version did, and another device reads it', async () => {
+      rig.storage.bytes = false
+      const phone = await deviceWithMelody()
+      await syncDevice(phone)
+      const [file] = melodyFiles()
+      expect(file.name).to.equal('amazing-grace.melody.musicxml')
+      expect(file.props.melodyFormat).to.equal('1')
+      expect(file.binary).to.equal(false)
+      expect(file.content).to.equal(writeMusicXml(melodyOf('one')))
+
+      const tablet = await makeDevice('tablet')
+      await syncDevice(tablet)
+      expect(wordOf(await tablet.db.getMelody('song-1'))).to.equal('one')
+    })
+  })
+
+  it('reads a plain MusicXML file, and writes it as an .mxl when the melody changes here', async () => {
+    rig.storage.bytes = false
+    const phone = await deviceWithMelody()
+    await syncDevice(phone)
+    const ref = melodyFiles()[0].ref
+
+    rig.storage.bytes = true
+    const tablet = await makeDevice('tablet')
+    await syncDevice(tablet)
+    expect(wordOf(await tablet.db.getMelody('song-1'))).to.equal('one')
+    // (nothing to send back: it is the same score)
+    rig.storage.clearCalls()
+    await syncDevice(tablet)
+    expect(rig.storage.writes()).to.deep.equal([])
+
+    await tablet.db.saveMelody(
+      melodyRecord(
+        'song-1',
+        writeMusicXml(melodyOf('two')),
+        'G',
+        must(await tablet.db.getMelody('song-1'))
+      )
+    )
+    await syncDevice(tablet)
+    const [file] = melodyFiles()
+    expect(file.ref).to.equal(ref)
+    expect(file.name).to.equal('amazing-grace.melody.mxl')
+    expect(file.props.melodyFormat).to.equal('2')
+    expect(await scoreOf(file)).to.equal(writeMusicXml(melodyOf('two')))
+  })
+
+  it('does not send a melody again because another device zipped the same score differently', async () => {
+    const phone = await deviceWithMelody()
+    await syncDevice(phone)
+    const [file] = melodyFiles()
+    // the same score as plain text, which is not the same bytes (as another deflate would make): another checksum
+    rig.storage.edit(file.ref, writeMusicXml(melodyOf('one')))
+
+    rig.storage.clearCalls()
+    await syncDevice(phone)
+    expect(rig.storage.writes()).to.deep.equal([])
+    expect(wordOf(await phone.db.getMelody('song-1'))).to.equal('one')
+    expect(must(await phone.db.getMelody('song-1')).fileRev).to.equal(melodyFiles()[0].rev)
   })
 })

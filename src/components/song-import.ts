@@ -55,6 +55,7 @@ import type {
 } from './setlist-details-form.ts'
 import './setlist-details-form.ts'
 import type { Melody } from '../js/melody.ts'
+import { writeMusicXml } from '../js/melody-musicxml.ts'
 import type { MelodyRead } from '../js/melody-range.ts'
 import { melodyRecord } from '../js/melody-record.ts'
 import { goTo, loadPage } from '../js/navigation.ts'
@@ -1144,7 +1145,7 @@ export class SongImport extends LitElement {
     const db = this._database()
     try {
       const previous = await db.getMelody(song.uuid)
-      await db.saveMelody(melodyRecord(song.uuid, notes.melody, notes.key, previous))
+      await db.saveMelody(melodyRecord(song.uuid, writeMusicXml(notes.melody), notes.key, previous))
     } catch (error) {
       console.warn('[Import] Could not keep the melody:', error)
     }

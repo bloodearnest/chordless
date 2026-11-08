@@ -101,7 +101,16 @@ export interface SpaceStorage {
   inventory(): Promise<Set<string>>
   /** A file or folder by ref, wherever it is; null if it does not exist */
   status(ref: string): Promise<FileStatus | null>
+  /**
+   * Whether the space holds bytes as well as text. A text-only space (a team's, for now) turns a
+   * file written as bytes away, so what is kept there is text.
+   */
+  readonly bytes: boolean
   readText(ref: string): Promise<string>
+  /** A file's bytes: what `create` and `update` were given, for a file that is not text */
+  readBytes(ref: string): Promise<Uint8Array>
+  /** `readMany`, for bytes: null for a file that could not be read */
+  readManyBytes(refs: string[]): Promise<(Uint8Array | null)[]>
   /**
    * Read several files at once. One entry per ref, in order: null for a file that could not be
    * read (gone, in the bin, or failed), so one bad file does not stop the others. A backend is free
