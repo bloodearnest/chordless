@@ -8,15 +8,15 @@
  * A route is a plain object (see Route):
  *   { name: 'home' }                          /
  *   { name: 'home', shared: true }            /?shared: the home page of what was shared by link
- *   { name: 'songs', songUuid?: string }     /songs, /songs/<song uuid>
+ *   { name: 'songs', songUuid?: string, melody?: true }  /songs, /songs/<song uuid> (?melody: the song's melody sheet, not its lyrics)
  *   { name: 'songs', search: string }        /songs?q=<search>: the list, searched
  *   { name: 'preferences' | 'account' | 'import-song' | 'import-setlist' | 'about' | 'contact' | 'join' | 'new-team-space' | 'media' }
  *                                             /account is Account and Teams (/storage still opens it);
  *                                             /account/new makes a team (team-space-wizard.ts)
  *                                             /join is a team space's invite link; the space and the
  *                                             code are in its #fragment, which routes ignore
- *   { name: 'setlist', setlistId, songIndex } /setlist/<id> (the overview, songIndex -1)
- *                                             /setlist/<id>/song/<n>
+ *   { name: 'setlist', setlistId, songIndex, melody?: true } /setlist/<id> (the overview, songIndex -1)
+ *                                             /setlist/<id>/song/<n>, and ?melody for the song's melody sheet
  *   { name: 'share', fileId, songIndex }     /s/<id> (a setlist shared by link, songIndex -1 for
  *                                             its overview) and /s/<id>/song/<n>. The key is in the
  *                                             URL's #fragment, which routes ignore.
@@ -39,8 +39,8 @@ export type PageName =
 export type Route =
   | { name: PageName }
   | { name: 'home'; shared: true }
-  | { name: 'songs'; songUuid?: string; search?: string }
-  | { name: 'setlist'; setlistId: string; songIndex: number }
+  | { name: 'songs'; songUuid?: string; search?: string; melody?: true }
+  | { name: 'setlist'; setlistId: string; songIndex: number; melody?: true }
   | { name: 'share'; fileId: string; songIndex: number }
   | { name: 'not-found'; path: string }
 
@@ -133,12 +133,22 @@ export function matchRoute(location: string | { pathname: string; search?: strin
     return { name: 'home', shared: true }
   if (page) return { name: page }
 
+  // A song can be shown as its melody sheet instead of its lyrics: ?melody
+  const melody = new URLSearchParams(search).has('melody')
   const librarySong = path.match(SONGS_SONG_PATH)
-  if (librarySong) return { name: 'songs', songUuid: decode(librarySong[1]) }
+  if (librarySong) {
+    const route = { name: 'songs' as const, songUuid: decode(librarySong[1]) }
+    return melody ? { ...route, melody: true } : route
+  }
 
   const setlistSong = path.match(SETLIST_SONG_PATH)
   if (setlistSong) {
-    return { name: 'setlist', setlistId: decode(setlistSong[1]), songIndex: Number(setlistSong[2]) }
+    const route = {
+      name: 'setlist' as const,
+      setlistId: decode(setlistSong[1]),
+      songIndex: Number(setlistSong[2]),
+    }
+    return melody ? { ...route, melody: true } : route
   }
 
   const setlist = path.match(SETLIST_PATH)
@@ -161,11 +171,15 @@ export function matchRoute(location: string | { pathname: string; search?: strin
 export function buildUrl(route: Route): string {
   switch (route.name) {
     case 'songs':
-      if (route.songUuid) return `/songs/${encodeURIComponent(route.songUuid)}`
+      if (route.songUuid) {
+        return `/songs/${encodeURIComponent(route.songUuid)}${route.melody ? '?melody' : ''}`
+      }
       return route.search ? `/songs?q=${encodeURIComponent(route.search)}` : '/songs'
     case 'setlist': {
       const base = `/setlist/${encodeURIComponent(route.setlistId)}`
-      return route.songIndex >= 0 ? `${base}/song/${route.songIndex}` : base
+      return route.songIndex >= 0
+        ? `${base}/song/${route.songIndex}${route.melody ? '?melody' : ''}`
+        : base
     }
     case 'share': {
       const base = `/s/${encodeURIComponent(route.fileId)}`

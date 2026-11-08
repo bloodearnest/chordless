@@ -70,6 +70,10 @@ export async function renderMelodyHere(
     adjustPageHeight: true,
     // (a section box is centred on its barline, so the first one needs room to its left)
     pageMarginLeft: 120,
+    // (the rest of the margin is not wanted: the page is fitted to the width of the screen)
+    pageMarginRight: 20,
+    pageMarginTop: 20,
+    pageMarginBottom: 20,
     footer: 'none',
     header: 'none',
     svgViewBox: true,
@@ -77,6 +81,10 @@ export async function renderMelodyHere(
   })
   if (!tk.loadData(musicXml)) return null
   const pages: string[] = []
-  for (let page = 1; page <= tk.getPageCount(); page++) pages.push(tk.renderToSVG(page))
+  // (the page's policy allows no <style> element, so the few rules Verovio puts in each page are the
+  // view's own: `melody-sheet.ts`)
+  for (let page = 1; page <= tk.getPageCount(); page++) {
+    pages.push(tk.renderToSVG(page).replace(/<style[\s\S]*?<\/style>/g, ''))
+  }
   return { pages, log: tk.getLog() }
 }

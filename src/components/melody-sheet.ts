@@ -52,9 +52,35 @@ export class MelodySheet extends LitElement {
   static override styles = css`
     :host {
       display: block;
-      overflow-y: auto;
+      /* (the player's controls float over the bottom of the page: the last line can be scrolled clear of them) */
+      padding-bottom: 6rem;
       background: var(--sheet-background, white);
       color: var(--sheet-text, black);
+    }
+    :host([hidden]) {
+      display: none;
+    }
+    /* what Verovio's own <style> says, which the page's policy would not allow in the SVG */
+    .page g.ending,
+    .page g.fing,
+    .page g.reh,
+    .page g.tempo {
+      font-weight: bold;
+    }
+    .page g.dir,
+    .page g.dynam,
+    .page g.mNum {
+      font-style: italic;
+    }
+    .page g.label {
+      font-weight: normal;
+    }
+    .page ellipse,
+    .page path,
+    .page polygon,
+    .page polyline,
+    .page rect {
+      stroke: currentColor;
     }
     .page svg {
       display: block;
@@ -98,18 +124,22 @@ export class MelodySheet extends LitElement {
     }
     const asked = ++this._asked
     try {
-      const shown = this.songKey && this.melodyKey ? this.songKey : this.melodyKey
+      // (a key that is not known leaves the notes as they were written)
       const moved =
-        shown && this.melodyKey ? transposeMelody(melody, this.melodyKey, shown) : melody
+        this.melodyKey && this.songKey
+          ? transposeMelody(melody, this.melodyKey, this.songKey)
+          : melody
       const narrow = this.clientWidth > 0 && this.clientWidth < NARROW_BELOW
       const result = await renderMelody(writeMusicXml(moved), {
         pageWidth: narrow ? NARROW_PAGE : WIDE_PAGE,
       })
       if (asked !== this._asked) return
+      /* v8 ignore next -- Verovio only gives null for MusicXML it cannot read, which writeMusicXml does not write */
       if (!result) throw new Error('The sheet music could not be read')
       this._pages = result.pages
       this._failed = false
     } catch (error) {
+      /* v8 ignore next -- an older engraving that fails after a newer one was asked for */
       if (asked !== this._asked) return
       console.error('[MelodySheet] Could not engrave the melody:', error)
       this._failed = true

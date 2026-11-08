@@ -126,6 +126,11 @@ describe('buildUrl', () => {
     [{ name: 'setlist', setlistId: 'abc', songIndex: 4 }, '/setlist/abc/song/4'],
     [{ name: 'setlist', setlistId: 'a b', songIndex: -1 }, '/setlist/a%20b'], // ids are encoded
     [{ name: 'setlist', setlistId: 'a b', songIndex: 7 }, '/setlist/a%20b/song/7'],
+    [
+      { name: 'setlist', setlistId: 'abc', songIndex: 4, melody: true },
+      '/setlist/abc/song/4?melody',
+    ],
+    [{ name: 'songs', songUuid: 'abc-123', melody: true }, '/songs/abc-123?melody'],
     [{ name: 'share', fileId: 'abc', songIndex: -1 }, '/s/abc'],
     [{ name: 'share', fileId: 'abc', songIndex: 3 }, '/s/abc/song/3'],
     [{ name: 'not-found', path: '/nope' }, '/nope'],
@@ -160,6 +165,11 @@ describe('historyAction', () => {
 
   it('pushes when going from the overview into a song', () => {
     expect(historyAction(overview, song(0))).to.equal('push')
+  })
+
+  it('replaces when a song is switched between its lyrics and its melody', () => {
+    expect(historyAction(song(0), { ...song(0), melody: true })).to.equal('replace')
+    expect(historyAction({ ...song(0), melody: true }, song(0))).to.equal('replace')
   })
 
   it('replaces when moving from song to song', () => {
