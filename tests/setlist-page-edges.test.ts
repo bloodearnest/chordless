@@ -149,6 +149,35 @@ describe('the setlist page: corners', () => {
     ])
   })
 
+  it('keeps a song shown as its melody sheet shown as that song when it is moved or another is removed', async () => {
+    await rig.open(4)
+    const alpha = rig.page.songs[0]
+    const charlie = rig.page.songs[2]
+    rig.page._melodyOn = new Set([0, 2])
+    await rig.page.moveSong(0, 3)
+    // (Alpha is last, Charlie one place up)
+    expect([...rig.page._melodyOn].sort()).to.deep.equal([1, 3])
+    expect(rig.page.isMelodyOn(alpha)).to.equal(true)
+    expect(rig.page.isMelodyOn(charlie)).to.equal(true)
+    // (a song removed before them moves them up, and one that was removed is forgotten)
+    await rig.page.deleteSongFromSetlist(0)
+    expect(rig.page._melodyOn.has(0)).to.equal(true)
+    expect([...rig.page._melodyOn].sort()).to.deep.equal([0, 2])
+    await rig.page.deleteSongFromSetlist(0)
+    expect([...rig.page._melodyOn]).to.deep.equal([1])
+  })
+
+  it('moves the melody sheets between with a song that is moved up the list', async () => {
+    await rig.open(4)
+    // (the ones between move down a place)
+    rig.page._melodyOn = new Set([0, 1, 2])
+    await rig.page.moveSong(2, 0)
+    expect([...rig.page._melodyOn].sort()).to.deep.equal([0, 1, 2])
+    rig.page._melodyOn = new Set([1])
+    await rig.page.moveSong(2, 0)
+    expect([...rig.page._melodyOn]).to.deep.equal([2])
+  })
+
   it('stops before it starts to draw when it is disposed first', async () => {
     await rig.open()
     const other = new SetlistPage({

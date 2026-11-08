@@ -1307,6 +1307,8 @@ export class SetlistPage {
     // Reorder runtime songs array
     const movedRuntimeSong = this.songs.splice(startIndex, 1)[0]
     this.songs.splice(newIndex, 0, movedRuntimeSong)
+    // (a song shown as its melody sheet is still that song where it now is)
+    this._melodyOn = new Set([...this._melodyOn].map(afterMove(startIndex, newIndex)))
 
     // What was set for each song (its sections shown, its capo) goes with it
     this.sections.states = renumberSongs(this.sections.states, afterMove(startIndex, newIndex))
@@ -1778,6 +1780,11 @@ export class SetlistPage {
       })
 
       // (what this device set for the songs after it is kept by song, so it moves up with them)
+      this._melodyOn = new Set(
+        [...this._melodyOn].flatMap(song =>
+          song === index ? [] : [song > index ? song - 1 : song]
+        )
+      )
       // Reload the setlist
       await this.renderSetlist(id)
     } catch (error) {
