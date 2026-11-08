@@ -10,7 +10,7 @@ import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import { listPadSets } from '../src/js/pad-set-service.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip } from './zip.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -144,7 +144,7 @@ describe('the pad set upload', () => {
       expect(root().querySelector('progress')).to.not.equal(null)
 
       await waitUntil(() => uploaded !== 0, undefined, { timeout: 2000 })
-      await wait(20)
+      await waitUntil(() => !root().querySelector('progress'), 'the upload to be done')
       await form.updateComplete
 
       expect(uploaded).to.equal(1)

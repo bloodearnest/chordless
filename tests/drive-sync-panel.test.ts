@@ -57,7 +57,8 @@ describe('drive-sync-panel', () => {
     const el = await fixture<DriveSyncPanel>(
       html`<drive-sync-panel .space=${space}></drive-sync-panel>`
     )
-    await wait(80)
+    // (it asks whether Drive can be synced with as it is added: asking again waits for an answer)
+    await el.checkSyncAvailability()
     await el.updateComplete
     return el
   }
@@ -247,9 +248,17 @@ describe('drive-sync-panel', () => {
       drive.files.delete(drive.findByPath([ROOT_FOLDER_NAME, name]).id)
     }
 
+    /** The panel, once it has found the folder gone */
+    async function showGone(connected = true) {
+      const el = await show(connected)
+      await waitUntil(() => el.folderProblem, 'the folder to be found gone')
+      await el.updateComplete
+      return el
+    }
+
     it('says so as soon as it is shown, with the way on', async () => {
       await afterFolderGone()
-      const el = await show()
+      const el = await showGone()
       expect(text(el)).to.contain('Drive folder not found')
       expect(text(el)).to.contain('safe on this device')
       expect(button(el, /Start over in Drive/)).to.not.equal(undefined)
@@ -257,7 +266,7 @@ describe('drive-sync-panel', () => {
 
     it('asks first, and does nothing when told not to', async () => {
       await afterFolderGone()
-      const el = await show()
+      const el = await showGone()
       must(el._startOverModal.value as AppModal).ask = async () => false
       button(el, /Start over in Drive/)?.click()
       await nothingFor()
@@ -268,7 +277,7 @@ describe('drive-sync-panel', () => {
     it('starts over in a new folder, and is ready to sync again', async function () {
       this.timeout(8000)
       await afterFolderGone()
-      const el = await show()
+      const el = await showGone()
       must(el._startOverModal.value as AppModal).ask = async () => true
       button(el, /Start over in Drive/)?.click()
       await waitUntil(() => text(el).includes('Started over in Drive'), 'it says it is done', {
@@ -285,7 +294,7 @@ describe('drive-sync-panel', () => {
     it('says what went wrong when starting over fails', async function () {
       this.timeout(8000)
       await afterFolderGone()
-      const el = await show()
+      const el = await showGone()
       must(el._startOverModal.value as AppModal).ask = async () => true
       must(drive).failRequests({ status: 500, times: 100 })
       button(el, /Start over in Drive/)?.click()
@@ -303,7 +312,7 @@ describe('drive-sync-panel', () => {
       const db = new ChordlessDB(must(id))
       await db.init()
       await db.saveSetlist(makeSetlist({ id: 'only-here', name: 'Only on this device' }))
-      const el = await show(false) // (keeping the Drive that has the folder)
+      const el = await showGone(false) // (keeping the Drive that has the folder)
       expect(text(el)).to.contain('Drive folder not found')
 
       must(el._replaceModal.value as AppModal).ask = async () => true
@@ -320,7 +329,7 @@ describe('drive-sync-panel', () => {
 
     it('asks first, and changes nothing when told not to', async () => {
       await afterFolderGone()
-      const el = await show()
+      const el = await showGone()
       must(el._replaceModal.value as AppModal).ask = async () => false
       button(el, /Replace with the copy in Drive/)?.click()
       await nothingFor()
@@ -331,7 +340,7 @@ describe('drive-sync-panel', () => {
     it('says so, and changes nothing, when there is no folder of its name to take it from', async function () {
       this.timeout(8000)
       await afterFolderGone()
-      const el = await show()
+      const el = await showGone()
       must(el._replaceModal.value as AppModal).ask = async () => true
       button(el, /Replace with the copy in Drive/)?.click()
       await waitUntil(() => text(el).includes('nothing was changed'), 'it says so', {
@@ -342,7 +351,7 @@ describe('drive-sync-panel', () => {
 
     it('does nothing while it is syncing, when replacing', async () => {
       await afterFolderGone()
-      const el = await show()
+      const el = await showGone()
       el.syncing = true
       await el._handleReplaceFromFolder()
       expect(el.syncProgress).to.equal(null)
@@ -350,7 +359,7 @@ describe('drive-sync-panel', () => {
 
     it('does nothing while it is syncing', async () => {
       await afterFolderGone()
-      const el = await show()
+      const el = await showGone()
       el.syncing = true
       await el._handleStartOver()
       expect(el.syncProgress).to.equal(null)
