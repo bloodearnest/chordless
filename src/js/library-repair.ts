@@ -18,7 +18,7 @@
  * database, so they can be checked on an export). Applying does.
  */
 
-import type { Setlist, SongRecord } from './data-types.ts'
+import type { MelodyRecord, Setlist, SongRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { lyricsOf } from './import-plan.ts'
 import { SONGSELECT, songSource } from './song-source.ts'
@@ -578,6 +578,31 @@ export interface RepairReport {
 }
 
 /**
+ * The chart is the same, so the melody read from a lead sheet is too: if the song kept has none and
+ * one that is going has, the melody moves to the one kept (the most recently changed, if several
+ * have). It is given no file, so the next sync uploads it beside the kept chart; the file it had
+ * goes in the trash with the song that is deleted.
+ */
+async function keepMelody(db: ChordlessDB, group: MergeGroup): Promise<void> {
+  if (await db.getMelody(group.keep.uuid)) return
+  const found = (await Promise.all(group.remove.map(record => db.getMelody(record.uuid)))).filter(
+    (melody): melody is MelodyRecord => !!melody
+  )
+  found.sort((a, b) => b.modifiedDate.localeCompare(a.modifiedDate))
+  const [melody] = found
+  if (!melody) return
+  await db.saveMelody({
+    ...melody,
+    uuid: group.keep.uuid,
+    fileRef: null,
+    fileRev: null,
+    fileModified: null,
+    lastSyncedAt: null,
+    syncedContentHash: null,
+  })
+}
+
+/**
  * Apply a plan: set the sources, then merge. The merged songs are deleted (their Drive files go in
  * the trash at the next sync) and the setlists that used them are changed to use the one kept.
  */
@@ -617,6 +642,7 @@ export async function applyRepair(db: ChordlessDB, plan: RepairPlan): Promise<Re
 
   for (const group of plan.merges) {
     const gone = new Set(group.remove.map(record => record.uuid))
+    await keepMelody(db, group)
     for (const record of group.remove) {
       await db.deleteSong(record.uuid)
       report.songsRemoved++

@@ -607,6 +607,54 @@ describe('repairing a library', () => {
     expect(must(await db.getSetlist('uses-june')).modifiedDate).to.equal('2026-10-11T10:00:00.000Z')
   })
 
+  it('moves the melody of a copy that goes to the song kept, as a new file to upload', async () => {
+    await duplicated()
+    const at = '2026-10-11T10:00:00.000Z'
+    await db.saveMelody({
+      uuid: 'may',
+      xml: '<score-partwise/>',
+      key: 'G',
+      createdDate: at,
+      modifiedDate: at,
+      contentHash: 'h1',
+      fileRef: 'drive-melody-may',
+      fileRev: 'r1',
+      fileModified: at,
+      lastSyncedAt: at,
+      syncedContentHash: 'h1',
+    })
+    await applyRepair(db, await planRepair(db, 'Simon Davy'))
+    expect(await db.getMelody('may')).to.equal(undefined)
+    const moved = must(await db.getMelody('june'))
+    expect(moved.xml).to.equal('<score-partwise/>')
+    expect(moved.contentHash).to.equal('h1')
+    // (still written in the key of the copy it came from, which is not the key of the song kept)
+    expect(moved.key).to.equal('G')
+    // (no file yet: the sync uploads it beside the chart that is kept)
+    expect(moved.fileRef).to.equal(null)
+    expect(moved.syncedContentHash).to.equal(null)
+    // (and the file the copy had goes in the trash)
+    expect((await db.getPendingDeletions()).map(each => each.ref)).to.include('drive-melody-may')
+  })
+
+  it('leaves the melody of the song kept alone', async () => {
+    await duplicated()
+    const at = '2026-10-11T10:00:00.000Z'
+    const melody = (uuid: string, xml: string) => ({
+      uuid,
+      xml,
+      key: 'A',
+      createdDate: at,
+      modifiedDate: at,
+      contentHash: xml,
+    })
+    await db.saveMelody(melody('may', '<may/>'))
+    await db.saveMelody(melody('june', '<june/>'))
+    await applyRepair(db, await planRepair(db, 'Simon Davy'))
+    expect(must(await db.getMelody('june')).xml).to.equal('<june/>')
+    expect(await db.getMelody('may')).to.equal(undefined)
+  })
+
   it('keeps showing the tempo an entry showed', async () => {
     await addSong('may', IN_G, { tempo: 90 })
     await addSong('june', IN_G, { tempo: 70 })

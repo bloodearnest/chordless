@@ -171,9 +171,7 @@ as the chord transposer spells them. The range is of the sung notes: cue notes a
   through the same storage and sync as the chart (`docs/STORAGE_API.md`, `docs/SYNC_ARCHITECTURE.md`, "Melodies"): the
   user's browser and the user's, or their team space owner's, Drive. Older clients ignore it: the pull skips a file in
   `songs` whose `type` is not `chordpro`. Deleting a song deletes its melody and puts its file in the trash (a melody
-  whose chart was deleted in Drive is cleaned up by the next full sync). **Not settled:** merging two variants
-  (`library-repair`, `song-versions`) deletes the one that goes, so its melody goes with it; the kept variant does not
-  get it. Move it across when the merge learns of melodies.
+  whose chart was deleted in Drive is cleaned up by the next full sync). **Merging copies** (`applyRepair`: the same chart imported twice) moves the melody of a copy that goes to the song kept, if that has none, as a new file to upload (the copy's file goes in the trash); the kept song's own melody is never replaced. It keeps its `key`, which may differ from the kept chart's. Linking a song as a variant of another (`linkSong`) deletes nothing, so each keeps its melody.
 - **On the device, the MusicXML text**, in an IndexedDB store of its own (`melodies`, since database version 13, keyed
   by the song's uuid, with the file's `fileRef`, `fileRev` and `fileModified` as the chart's records have; `MelodyRecord`
   in `data-types.ts`), not in `songs` or `chordpro`: it is 30 to 70 KB a song and only the Melody view wants it. It is
