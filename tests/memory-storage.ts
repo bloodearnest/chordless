@@ -79,6 +79,7 @@ export type StorageOp =
   | 'status'
   | 'readText'
   | 'readMany'
+  | 'readBytes'
   | 'create'
   | 'createMany'
   | 'update'
@@ -146,6 +147,8 @@ export class MemoryStorage implements StorageBackend {
   clockOffsetMs = 0
   /** The person can only read: every write is refused (403), and the root says so */
   readOnly = false
+  /** Whether spaces hold bytes as well as text; off, they are text-only like a team's, and refuse bytes */
+  bytes = true
   /** The root does not say whether the person may write */
   omitCapabilities = false
   /** The next n writes report another content than was sent, as if the backend stored other bytes */
@@ -575,6 +578,13 @@ async function contentOf(body: FileBody): Promise<Content> {
   return { content, binary: true }
 }
 
+/** What a text-only space (a team's) says to bytes */
+function refuseBytes(body: FileBody, holdsBytes: boolean): void {
+  if (!holdsBytes && typeof body !== 'string') {
+    throw new Error('A team space holds text only for now: this file is not text')
+  }
+}
+
 class MemorySpace implements SpaceStorage {
   readonly changes: ChangeFeed
   #storage: MemoryStorage
@@ -584,6 +594,11 @@ class MemorySpace implements SpaceStorage {
     this.#storage = storage
     this.#root = root
     this.changes = storage.feed(root)
+  }
+
+  async #content(body: FileBody): Promise<Content> {
+    refuseBytes(body, this.#storage.bytes)
+    return contentOf(body)
   }
 
   async members(): Promise<SpaceMember[]> {
@@ -616,6 +631,33 @@ class MemorySpace implements SpaceStorage {
     return file.content
   }
 
+  /** Whether this space holds bytes: a test of a text-only space (a team's) turns it off */
+  get bytes(): boolean {
+    return this.#storage.bytes
+  }
+
+  async readBytes(ref: string): Promise<Uint8Array> {
+    this.#storage.enter('readBytes', ref)
+    const file = this.#storage.files.get(ref)
+    if (!file || file.trashed) throw new StorageError(`File not found: ${ref}`, 404)
+    return file.binary
+      ? Uint8Array.from(file.content, c => c.charCodeAt(0))
+      : new TextEncoder().encode(file.content)
+  }
+
+  async readManyBytes(refs: string[]): Promise<(Uint8Array | null)[]> {
+    const out: (Uint8Array | null)[] = []
+    for (const ref of refs) {
+      try {
+        out.push(await this.readBytes(ref))
+      } catch (error) {
+        console.error('[MemoryStorage] Failed to read a file:', error)
+        out.push(null)
+      }
+    }
+    return out
+  }
+
   async readMany(refs: string[]): Promise<(string | null)[]> {
     this.#storage.enter('readMany')
     const texts: (string | null)[] = []
@@ -641,7 +683,7 @@ class MemorySpace implements SpaceStorage {
       this.#root,
       collection,
       input,
-      await contentOf(body),
+      await this.#content(body),
       undefined,
       options?.publicLink
     )
@@ -656,7 +698,7 @@ class MemorySpace implements SpaceStorage {
     for (const { input, body } of items) {
       try {
         this.#storage.enter('create', collection)
-        results.push(this.#storage.write(this.#root, collection, input, await contentOf(body)))
+        results.push(this.#storage.write(this.#root, collection, input, await this.#content(body)))
       } catch (error) {
         console.error('[MemoryStorage] Failed to create a file:', error)
         results.push(null)
@@ -687,7 +729,7 @@ class MemorySpace implements SpaceStorage {
       this.#root,
       file?.collection ?? 'setlists',
       input,
-      await contentOf(body),
+      await this.#content(body),
       ref
     )
   }

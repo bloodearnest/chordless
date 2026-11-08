@@ -129,6 +129,19 @@ class TeamSpace implements SpaceStorage {
     return this.#client.text(this.#id, { path: `/files/${encodeURIComponent(ref)}/text` })
   }
 
+  /** (text only for now: see the note on `textOf`) */
+  readonly bytes = false
+
+  async readBytes(ref: string): Promise<Uint8Array> {
+    return new TextEncoder().encode(await this.readText(ref))
+  }
+
+  async readManyBytes(refs: string[]): Promise<(Uint8Array | null)[]> {
+    return (await this.readMany(refs)).map(text =>
+      text === null ? null : new TextEncoder().encode(text)
+    )
+  }
+
   async readMany(refs: string[]): Promise<(string | null)[]> {
     if (refs.length === 0) return []
     const { texts } = await this.#client.json<{ texts: (string | null)[] }>(this.#id, {

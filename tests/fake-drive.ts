@@ -154,18 +154,18 @@ export class FakeDrive {
   }
 
   /** The checksum Drive reports for an upload: wrong while corruptUploads is counting down */
-  _checksum(content) {
+  _checksum(content, binary = false) {
     if (this.corruptUploads > 0) {
       this.corruptUploads--
-      return fakeChecksum(`${content} (corrupted)`)
+      return fakeChecksum(`${content} (corrupted)`, false)
     }
-    return fakeChecksum(content)
+    return fakeChecksum(content, binary)
   }
 
   _setContent(file, content, binary = false) {
     file.content = content
     file.binary = binary
-    file.md5Checksum = this._checksum(content)
+    file.md5Checksum = this._checksum(content, binary)
     file.modifiedTime = this.now()
     file.version++
     file.changeSeq = ++this.changeSeq
@@ -355,7 +355,7 @@ export class FakeDrive {
       permissions: [],
       binary,
       content,
-      md5Checksum: metadata.mimeType === FOLDER_MIME ? undefined : this._checksum(content),
+      md5Checksum: metadata.mimeType === FOLDER_MIME ? undefined : this._checksum(content, binary),
       changeSeq: ++this.changeSeq,
     }
     this.files.set(file.id, file)
@@ -585,9 +585,9 @@ function binaryStringToText(text: string) {
   return new TextDecoder().decode(binaryStringToBytes(text))
 }
 
-/** Drive's md5Checksum of a file's content: the MD5 of its UTF-8 bytes */
-function fakeChecksum(content) {
-  return md5Hex(content)
+/** Drive's md5Checksum of a file's content: the MD5 of its bytes (a text file's UTF-8; a binary one is kept a character a byte) */
+function fakeChecksum(content, binary) {
+  return md5Hex(binary ? binaryStringToBytes(content) : content)
 }
 
 function json(data, status = 200) {

@@ -24,7 +24,7 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 // NOTE: This now stores ALL space data in one database per space.
 // Space metadata is stored separately in the 'spaces' database.
 
-const DB_VERSION = 13
+const DB_VERSION = 14
 
 // Setlist types
 export const SETLIST_TYPES: Readonly<Record<string, string>> = {
@@ -1130,6 +1130,10 @@ function migrateRecords(transaction: IDBTransaction, oldVersion: number) {
     cursor.continue()
   }
   if (oldVersion < 10) migrateLeaders(transaction)
+  // Version 14: a melody is kept as its MusicXML, not parsed. The records of version 13 held the
+  // parse, and are derived data (a synced melody is pulled again; one not yet synced is read from its
+  // lead sheet again), so they are cleared rather than converted.
+  if (oldVersion === 13) transaction.objectStore('melodies').clear()
 }
 
 /**

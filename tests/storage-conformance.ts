@@ -30,7 +30,11 @@ const { describe, it, beforeEach } = window
 const input = (name: string, props: Record<string, string | null> = {}): FileInput => ({
   name,
   props,
-  type: name.endsWith('.json') ? 'application/json' : 'text/plain',
+  type: name.endsWith('.json')
+    ? 'application/json'
+    : name.endsWith('.bin')
+      ? 'application/octet-stream'
+      : 'text/plain',
 })
 
 /** A space's storage under test, with the ways of changing it behind its back that a test needs */
@@ -176,6 +180,39 @@ export function describeSpaceStorage(
           null,
         ])
         expect(await space.readMany([])).to.deep.equal([])
+      })
+
+      it('reads a text file as bytes too, in order, with null for one that is gone', async () => {
+        const a = await space.create('songs', input('a.txt'), 'é ♯')
+        const b = await space.create('songs', input('b.txt'), 'two')
+        expect(new TextDecoder().decode(await space.readBytes(a.file.ref))).to.equal('é ♯')
+        harness.remove(b.file.ref)
+        const read = await space.readManyBytes([a.file.ref, b.file.ref])
+        expect(new TextDecoder().decode(read[0] as Uint8Array)).to.equal('é ♯')
+        expect(read[1]).to.equal(null)
+        expect(await space.readManyBytes([])).to.deep.equal([])
+      })
+
+      it('holds bytes, byte for byte, if the space does; else turns them away', async () => {
+        const bytes = new Uint8Array([0, 1, 2, 250, 251, 252, 253, 254, 255, 10, 13, 80, 75])
+        const made = await Promise.resolve()
+          .then(() => space.create('songs', input('b.bin'), bytes))
+          .then(
+            made => made,
+            () => null
+          )
+        if (!space.bytes) {
+          expect(made).to.equal(null)
+          return
+        }
+        expect(made?.intact).to.equal(true)
+        const ref = must(made).file.ref
+        expect(Array.from(await space.readBytes(ref))).to.deep.equal(Array.from(bytes))
+        const more = new Uint8Array([255, 0, 255])
+        const updated = await space.update(ref, input('b.bin'), more)
+        expect(updated.intact).to.equal(true)
+        expect(updated.file.rev).to.not.equal(must(made).file.rev)
+        expect(Array.from(await space.readBytes(ref))).to.deep.equal(Array.from(more))
       })
 
       it('updates many files at once, in order, with null for one that is gone', async () => {

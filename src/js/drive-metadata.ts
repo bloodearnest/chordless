@@ -207,12 +207,19 @@ export function songFileMetadata(
   }
 }
 
-/** The version of the melody file's shape, in its properties: what a reader checks before it reads */
-export const MELODY_FORMAT = '1'
+/**
+ * The version of the melody file's shape, in its properties: what a reader checks before it reads.
+ * 1 is plain MusicXML (the first version, and what a text-only space keeps), 2 is an `.mxl`.
+ */
+export const MELODY_FORMAT = '2'
+export const MELODY_FORMAT_TEXT = '1'
 
-/** The file name of a song's melody: its chart's name without the extension, then `.melody.musicxml` */
-export function melodyFilename(title: string, ccliNumber?: string | null): string {
-  return `${chordproFilename(title, ccliNumber).replace(/\.txt$/, '')}.melody.musicxml`
+/**
+ * The file name of a song's melody: its chart's name without the extension, then `.melody.mxl`
+ * (or `.melody.musicxml` where the space holds text only)
+ */
+export function melodyFilename(title: string, ccliNumber?: string | null, bytes = true): string {
+  return `${chordproFilename(title, ccliNumber).replace(/\.txt$/, '')}.melody.${bytes ? 'mxl' : 'musicxml'}`
 }
 
 /**
@@ -223,19 +230,21 @@ export function melodyFilename(title: string, ccliNumber?: string | null): strin
 export function melodyFileMetadata(
   record: Pick<MelodyRecord, 'uuid' | 'key'>,
   song: Pick<SongRecord, 'id' | 'title' | 'ccliNumber'>,
-  { spaceId }: FileMetadataOptions
+  { spaceId, bytes = true }: FileMetadataOptions & { bytes?: boolean }
 ): DriveFileMetadata {
   return {
-    name: melodyFilename(song.title || 'Untitled', song.ccliNumber),
-    // (the type MusicXML files are given: Drive shows it as a file other programs open)
-    mimeType: 'application/vnd.recordare.musicxml+xml',
+    name: melodyFilename(song.title || 'Untitled', song.ccliNumber, bytes),
+    // (the types MusicXML files are given: Drive shows them as files other programs open)
+    mimeType: bytes
+      ? 'application/vnd.recordare.musicxml'
+      : 'application/vnd.recordare.musicxml+xml',
     appProperties: {
       type: 'melody',
       spaceId: spaceId || '',
       songUuid: record.uuid,
       songId: song.id,
       key: record.key ?? '',
-      melodyFormat: MELODY_FORMAT,
+      melodyFormat: bytes ? MELODY_FORMAT : MELODY_FORMAT_TEXT,
       appVersion: APP_VERSION,
     },
   }

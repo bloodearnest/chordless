@@ -10,6 +10,7 @@ import type { MelodyRecord, Person, Setlist, SongInput, SongRecord } from '../da
 import { withNumericTempos } from '../db.ts'
 import { adoptLegacyLeader, type Leaders } from '../leaders.ts'
 import { readMusicXml } from '../melody-musicxml-read.ts'
+import { readMelodyFile } from '../mxl.ts'
 import { songSource } from '../song-source.ts'
 import { chartFields, chartIdentity } from '../song-utils.ts'
 import type { StoredFile } from '../storage/types.ts'
@@ -22,7 +23,7 @@ import {
   songHasLocalChanges,
 } from './changes.ts'
 import { personContent, personContentHash, personHasLocalChanges } from './person-hash.ts'
-import { inBatches, type ProgressCallback, type SyncRun } from './session.ts'
+import { inBatches, inBatchesOfBytes, type ProgressCallback, type SyncRun } from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
 import { metadataOfProps, remoteMetadataChanges } from './song-metadata.ts'
 
@@ -638,11 +639,11 @@ export async function pullMelodies(
     current: 0,
     total: downloads.length,
   })
-  await inBatches(
+  await inBatchesOfBytes(
     run.space,
     downloads,
     item => item.file.ref,
-    (item, text) => downloadMelody(run, item, text),
+    (item, bytes) => downloadMelody(run, item, bytes),
     results => {
       const succeeded = results.filter(result => result.status === 'fulfilled').length
       downloaded += succeeded
@@ -667,9 +668,15 @@ export async function pullMelodies(
 async function downloadMelody(
   run: SyncRun,
   { uuid, file, props, local }: MelodyDownload,
-  text: string
+  bytes: Uint8Array
 ): Promise<void> {
-  const hash = hashText(text)
+  // (an .mxl, or the plain MusicXML the first version wrote, and a text-only space keeps)
+  const xml = await readMelodyFile(bytes)
+  if (xml === null) {
+    console.warn(`[DriveSync] ${file.name} is not MusicXML Chordless can read: left as it is`)
+    return
+  }
+  const hash = hashText(xml)
   const now = new Date().toISOString()
   // The same file as this device last synced (a record from before the file's checksum was kept):
   // not a change in Drive, so what was edited here stays
@@ -681,14 +688,14 @@ async function downloadMelody(
     // Changed here and in Drive. As for a chart, Drive wins.
     console.warn(`[DriveSync] ⚠️ Conflict for the melody of song ${uuid}, keeping Drive's version`)
   }
-  const melody = readMusicXml(text)
-  if (!melody) {
+  // (parsed once to know it can be, and not kept: it is parsed when it is wanted)
+  if (!readMusicXml(xml)) {
     console.warn(`[DriveSync] ${file.name} is not MusicXML Chordless can read: left as it is`)
     return
   }
   await run.db.saveMelody({
     uuid,
-    melody,
+    xml,
     key: props.key || local?.key || null,
     createdDate: local?.createdDate ?? file.created ?? now,
     modifiedDate: file.modified ?? now,

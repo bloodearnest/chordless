@@ -67,7 +67,8 @@ function contentTypeOf(type: string): string {
  * MD5 of the content. Drive reports none for some files, which are taken to be intact.
  */
 function holds(file: DriveFile, body: FileBody, what: string): boolean {
-  if (typeof body !== 'string' || !file.md5Checksum || md5Hex(body) === file.md5Checksum) {
+  const sent = typeof body === 'string' ? body : body instanceof Uint8Array ? body : null
+  if (sent === null || !file.md5Checksum || md5Hex(sent) === file.md5Checksum) {
     return true
   }
   console.error(
@@ -289,12 +290,22 @@ class DriveSpace implements SpaceStorage {
     return file ? { ...toStored(file), trashed: Boolean(file.trashed) } : null
   }
 
+  readonly bytes = true
+
   readText(ref: string): Promise<string> {
     return this.#api.downloadFile(ref)
   }
 
   readMany(refs: string[]): Promise<(string | null)[]> {
     return inGroups(refs, ref => this.readText(ref))
+  }
+
+  async readBytes(ref: string): Promise<Uint8Array> {
+    return new Uint8Array(await this.#api.downloadFileBinary(ref))
+  }
+
+  readManyBytes(refs: string[]): Promise<(Uint8Array | null)[]> {
+    return inGroups(refs, ref => this.readBytes(ref))
   }
 
   async create(
