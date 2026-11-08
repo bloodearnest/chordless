@@ -7,6 +7,7 @@ import {
   rangeSpan,
 } from '../js/chart-range.ts'
 import type { SongWithContent } from '../js/data-types.ts'
+import { formatBeats, type SongMelody } from '../js/melody-analysis.ts'
 import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.ts'
 import { describeRange, type NoteRange, octaveNearGreen, rangeStatus } from '../js/voice-range.ts'
 import { rangeBadge, rangeBadgeStyles } from './range-badge.ts'
@@ -55,6 +56,7 @@ export class SongInfo extends LitElement {
     song: { type: Object, attribute: false },
     appearances: { type: Array, attribute: false },
     loading: { type: Boolean },
+    melody: { attribute: false },
     _editingRange: { state: true },
     _low: { state: true },
     _high: { state: true },
@@ -63,6 +65,8 @@ export class SongInfo extends LitElement {
   declare song: SongWithContent | null
   declare appearances: Appearance[]
   declare loading: boolean
+  /** The range, and the beats on its ends, from the song's melody (the chart's own range wins) */
+  declare melody: SongMelody | null
   /** The melody range's pickers are open, with these notes (MIDI numbers) */
   declare _editingRange: boolean
   declare _low: number
@@ -265,6 +269,7 @@ export class SongInfo extends LitElement {
   constructor() {
     super()
     this.song = null
+    this.melody = null
     this.appearances = []
     this.loading = false
     this._editingRange = false
@@ -391,7 +396,7 @@ export class SongInfo extends LitElement {
    * behind edit mode: it changes the song's chart, not the setlist, and a person is able to.
    */
   _renderRange() {
-    const range = rangeOfMetadata(this.song?.parsed?.metadata)
+    const range = this.melody?.range ?? rangeOfMetadata(this.song?.parsed?.metadata)
     const chartKey = this.song?.parsed?.metadata?.key
     // the key the notes are in: the chart's, or for a chart with no key the record's (which it is given)
     const key = chartKey || this.song?.key || this.song?.originalKey || ''
@@ -426,6 +431,20 @@ export class SongInfo extends LitElement {
         <div class="modal-info-value">
           ${plural(span.notes, 'note')} wide (${plural(span.semitones, 'semitone')})
         </div>
+        ${this._renderExtremes(key)}
+      </div>
+    `
+  }
+
+  /** How long the song sits on its highest and lowest notes, in beats (quarter notes) over the whole song as played */
+  _renderExtremes(key: string) {
+    const extremes = this.melody?.extremes
+    if (!extremes || !key) return ''
+    const line = (word: string, midi: number, beats: number) =>
+      `${word} ${noteName(midi, this.melody?.rangeKey || key)}: ${formatBeats(beats)} ${beats === 1 ? 'beat' : 'beats'}`
+    return html`
+      <div class="modal-info-value">
+        ${line('Highest', extremes.high, extremes.highBeats)}; ${line('lowest', extremes.low, extremes.lowBeats)}
       </div>
     `
   }

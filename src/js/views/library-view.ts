@@ -40,6 +40,7 @@ import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../da
 import { watchData } from '../data-watcher.ts'
 import { getCurrentDB } from '../db.ts'
 import { filterByPlace, loadLeftOut, placesOf, saveLeftOut } from '../library-spaces.ts'
+import { songMelody } from '../melody-analysis.ts'
 import { goTo } from '../navigation.ts'
 import {
   addToLibrary,
@@ -391,6 +392,18 @@ export class LibraryView extends PageView {
     // (the melody's range is in the chart's own key)
     keySelector.range = rangeOfMetadata(this.#parsed?.metadata)
     keySelector.rangeKey = this.#parsed?.metadata?.key as string
+    // (and the melody's, when the chart has no range of its own)
+    const song = this.#song
+    if (song && !keySelector.range)
+      void getCurrentDB()
+        .then(db => db.getMelody(song.uuid))
+        .then(record => {
+          const found = songMelody(this.#parsed?.metadata, record)
+          if (found && this.#song === song) {
+            keySelector.range = found.range
+            keySelector.rangeKey = found.rangeKey
+          }
+        })
     // The key is saved with the song, which a user who can only read can't change
     keySelector.editMode = this.#editMode
   }
