@@ -96,12 +96,33 @@ function barlineOf(edges: Edges): MelodyMeasure['barline'] {
   return 'single'
 }
 
+/**
+ * The title of the score: the work's, else the movement's, else the credit printed as the title (a
+ * `credit-type` of title, or failing that the largest words on the page), which is where MuseScore
+ * puts it when the score was not given a work title
+ */
+function titleOf(root: El): string | null {
+  const named =
+    textOf(child(child(root, 'work') ?? root, 'work-title')) ||
+    textOf(child(root, 'movement-title'))
+  if (named) return named
+  const credits = kids(root, 'credit').flatMap(credit => {
+    const words = child(credit, 'credit-words')
+    const text = textOf(words)
+    if (!words || !text) return []
+    const isTitle = kids(credit, 'credit-type').some(type => textOf(type) === 'title')
+    return [{ text, isTitle, size: Number(words.attrs['font-size']) || 0 }]
+  })
+  const best = credits.find(credit => credit.isTitle) ?? credits.sort((a, b) => b.size - a.size)[0]
+  return best?.text ?? null
+}
+
 /** The melody of a MusicXML document, or null if it is not a partwise score with a part */
 export function readMusicXml(xml: string): Melody | null {
   const root = parseXml(xml)
   const part = root?.name === 'score-partwise' ? child(root, 'part') : undefined
   if (!root || !part) return null
-  const title = textOf(child(child(root, 'work') ?? root, 'work-title')) || null
+  const title = titleOf(root)
   const notice = kids(child(root, 'identification') ?? root, 'rights').map(r => r.text.trim())
 
   const measures: MelodyMeasure[] = []

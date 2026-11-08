@@ -16,7 +16,9 @@ export function parseDirection(raw: string): MelodyDirection | null {
   const alMatch = /\bal\s+(coda|fine)\b/i.exec(text)
   const al = alMatch ? (alMatch[1]?.toLowerCase() as 'coda' | 'fine') : null
   const timeMatch = /(\d+)(?:st|nd|rd|th)\s+time/i.exec(text)
-  const time = timeMatch ? Number(timeMatch[1]) : null
+  // ("Repeat 3x Last time to Coda": the last time is the third)
+  const lastTime = /\blast\s+time\b/i.test(text) ? /\brepeat\s+(\d+)\s*x/i.exec(text) : null
+  const time = timeMatch ? Number(timeMatch[1]) : lastTime ? Number(lastTime[1]) : null
   const make = (kind: MelodyDirection['kind']): MelodyDirection => ({
     kind,
     al: kind === 'da-segno' || kind === 'da-capo' ? al : null,
