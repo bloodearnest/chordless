@@ -1,12 +1,17 @@
 import { expect } from '@open-wc/testing'
 import { listenForLongPress } from '../src/js/annotations/long-press.ts'
-import { nothingFor } from './test-helpers.ts'
+import { installFakeTimers } from './test-helpers.ts'
 
-const { describe, it } = window
-
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+const { describe, it, beforeEach, afterEach } = window
 
 describe('a long press', () => {
+  // (the hold is timed: the clock is the test's, so it is never too slow)
+  let clock: ReturnType<typeof installFakeTimers>
+  beforeEach(() => {
+    clock = installFakeTimers({ date: true })
+  })
+  afterEach(() => clock.uninstall())
+
   function setup(enabled = true) {
     const root = document.createElement('div')
     root.innerHTML = '<span data-t id="word">grace</span><span id="plain">no</span>'
@@ -49,7 +54,7 @@ describe('a long press', () => {
   it('opens on what is held for long enough', async () => {
     const { word, pressed, done } = setup()
     word.dispatchEvent(pointer('pointerdown'))
-    await wait(60)
+    await clock.tick(60)
     expect(pressed).to.deep.equal(['word'])
     done()
   })
@@ -58,12 +63,12 @@ describe('a long press', () => {
     const { word, plain, pressed, done } = setup()
     word.dispatchEvent(pointer('pointerdown'))
     word.dispatchEvent(pointer('pointerup'))
-    await wait(60)
+    await clock.tick(60)
     word.dispatchEvent(pointer('pointerdown'))
     word.dispatchEvent(pointer('pointermove', { clientX: 40 }))
-    await wait(60)
+    await clock.tick(60)
     plain.dispatchEvent(pointer('pointerdown'))
-    await nothingFor(60)
+    await clock.tick(60)
     expect(pressed).to.deep.equal([])
     done()
   })
@@ -71,14 +76,14 @@ describe('a long press', () => {
   it('does nothing when not enabled, and ignores a second finger and the mouse’s other buttons', async () => {
     const off = setup(false)
     off.word.dispatchEvent(pointer('pointerdown'))
-    await nothingFor(60)
+    await clock.tick(60)
     expect(off.pressed).to.deep.equal([])
     off.done()
 
     const on = setup()
     on.word.dispatchEvent(pointer('pointerdown', { isPrimary: false }))
     on.word.dispatchEvent(pointer('pointerdown', { pointerType: 'mouse', button: 2 }))
-    await nothingFor(60)
+    await clock.tick(60)
     expect(on.pressed).to.deep.equal([])
     on.done()
   })
@@ -88,10 +93,10 @@ describe('a long press', () => {
     const clicks: number[] = []
     root.addEventListener('click', () => clicks.push(1))
     word.dispatchEvent(pointer('pointerdown'))
-    await wait(60)
+    await clock.tick(60)
     word.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     expect(clicks).to.deep.equal([])
-    await wait(750)
+    await clock.tick(750)
     word.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     expect(clicks).to.deep.equal([1])
     done()
@@ -101,7 +106,7 @@ describe('a long press', () => {
     const { word, pressed, done } = setup()
     word.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
     expect(pressed).to.deep.equal(['word'])
-    await wait(750)
+    await clock.tick(750)
     word.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true })
     )
@@ -114,7 +119,7 @@ describe('a long press', () => {
     expect(pressed).to.deep.equal(['word', 'word', 'word'])
     // a long touch: the timer, then the context menu the browser asks for after it
     word.dispatchEvent(pointer('pointerdown'))
-    await wait(60)
+    await clock.tick(60)
     word.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
     expect(pressed).to.have.length(4)
     done()
