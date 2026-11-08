@@ -1,56 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import type { Melody, MelodyNote } from '../src/js/melody.ts'
-import { midiOf } from '../src/js/melody.ts'
-import { formatBeats, songMelody } from '../src/js/melody-analysis.ts'
-import { writeMusicXml } from '../src/js/melody-musicxml.ts'
-import { melodyRecord } from '../src/js/melody-record.ts'
+import { extremesOf, formatBeats, songMelody } from '../src/js/melody-analysis.ts'
+import { sampleRecord } from './melody-sample.ts'
 
-const note = (
-  step: MelodyNote['step'],
-  octave: number,
-  start: number,
-  duration: number
-): MelodyNote => ({
-  kind: 'note',
-  id: `${step}${octave}-${start}`,
-  step,
-  alter: 0,
-  octave,
-  midi: midiOf(step, 0, octave),
-  start,
-  duration,
-  tupletRatio: 1,
-  tieStart: false,
-  tieStop: false,
-  cue: false,
-  syllables: ['la'],
-  withPrevious: false,
-})
-
-const melody: Melody = {
-  title: 'Test',
-  notice: [],
-  measures: [
-    {
-      number: 1,
-      voices: [[note('C', 4, 0, 1), note('G', 4, 1, 2.5), note('G', 4, 3.5, 0.5)]],
-      chords: [],
-      section: null,
-      barline: 'single',
-      directions: [],
-      repeatStart: false,
-      ending: null,
-      length: 4,
-      full: true,
-      fifths: 0,
-      beats: 4,
-      beatType: 4,
-      tempo: null,
-    },
-  ],
-}
-const record = melodyRecord('u1', writeMusicXml(melody), 'C')
+const record = sampleRecord('u1')
 
 describe('a song’s melody analysis', () => {
   it('reads the range and the beats on its ends from the stored score', () => {
@@ -72,6 +25,23 @@ describe('a song’s melody analysis', () => {
     const typed = songMelody({ key: 'C', x_chordless_range: 'A3-C5' } as never, undefined)
     assert.equal(typed?.extremes, null)
     assert.deepEqual(typed?.range, { low: 57, high: 72 })
+  })
+
+  it('takes the melody’s key, or the chart’s when it has none, and reads a score once', () => {
+    assert.equal(songMelody({ key: 'D' } as never, sampleRecord('u2', null))?.rangeKey, 'D')
+    assert.equal(songMelody({ key: 'D' } as never, sampleRecord('u3', 'G'))?.rangeKey, 'G')
+    assert.equal(songMelody({} as never, sampleRecord('u4', null))?.rangeKey, '')
+    assert.equal(extremesOf(record), extremesOf(record))
+  })
+
+  it('has no extremes for a score that will not read, and uses the typed range', () => {
+    const broken = { ...record, xml: 'not xml', contentHash: 'broken' }
+    assert.equal(extremesOf(broken), null)
+    assert.equal(songMelody({ key: 'C' } as never, broken), null)
+    assert.deepEqual(songMelody({ key: 'C', x_chordless_range: 'A3-C5' } as never, broken)?.range, {
+      low: 57,
+      high: 72,
+    })
   })
 
   it('says beats as people do', () => {

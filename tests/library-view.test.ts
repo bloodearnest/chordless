@@ -17,6 +17,7 @@ import {
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import { getSongUserPrefs } from '../src/js/song-user-prefs.ts'
+import { sampleRecord } from './melody-sample.ts'
 import '../src/js/views/library-view.ts'
 import type { LibraryView } from '../src/js/views/library-view.ts'
 import { makeSong } from './builders.ts'
@@ -264,6 +265,18 @@ describe('the library view, with a song open', () => {
         expect(selector().rangeKey).to.equal('G')
         infoDialog().dispatchEvent(new SongRangeChangedEvent(song.id, null))
         expect(selector().range).to.equal(null)
+      })
+
+      it('comes from the song’s melody when the chart has no range of its own', async () => {
+        await db.saveMelody(sampleRecord(song.uuid, 'G'))
+        try {
+          await open()
+          await until(() => selector().range, 'the melody’s range')
+          expect(selector().range).to.deep.equal({ low: 60, high: 67 })
+          expect(selector().rangeKey).to.equal('G')
+        } finally {
+          await db.deleteMelody(song.uuid, { remember: false })
+        }
       })
 
       it('is left alone when it is another song’s, or no song is open', async () => {

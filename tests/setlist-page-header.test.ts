@@ -34,6 +34,7 @@ import type { Person, Setlist } from '../src/js/data-types.ts'
 import { setCapoPreference } from '../src/js/preferences.ts'
 import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
+import { sampleRecord } from './melody-sample.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
 import { shownToast, wait } from './test-helpers.ts'
 
@@ -679,6 +680,17 @@ describe('the setlist page: header, menu and keys', () => {
       // (another song's is not this one's)
       dialog.dispatchEvent(new SongRangeChangedEvent('title-another-song', 'D4-E5'))
       expect(picker().range).to.equal(null)
+    })
+
+    it('gives the key picker the range of the song’s melody when the chart has none', async () => {
+      await rig.open()
+      await rig.db.saveMelody(sampleRecord(rig.songs[0].uuid, 'G'))
+      rig.page.showSong(0, true)
+      await rig.page.header.show(rig.page.songs[0], true)
+      const picker = must($('#key-selector')) as unknown as KeySelector
+      for (let i = 0; i < 50 && !picker.range; i++) await wait(20)
+      expect(picker.range).to.deep.equal({ low: 60, high: 67 })
+      expect(picker.rangeKey).to.equal('G')
     })
 
     it('does nothing for an info dialog that is not there', async () => {
