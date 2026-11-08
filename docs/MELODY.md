@@ -316,7 +316,7 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
 Step 0 was done on 2026-11-06 (branch `claude/melody-spike`): `src/js/melody-read.ts` (the shared reader of Verovio's tree),
 `melody-pdf.ts` and `melody-pdfjs.ts` (the PDF reader), `melody-musicxml.ts` (the writer), `melody.ts` (the `Melody` type),
 `scripts/melody-xml.ts` (the preview SVG, the oracle: nothing in `src/` uses it), `scripts/melody-spike.ts`,
-`scripts/melody-pdf-spike.ts` and `scripts/melody-mutool.ts` (the scoring), `tests/melody.node.test.ts`.
+`scripts/melody-pdf-spike.ts` and `scripts/melody-mutool.ts` (the scoring), and the tests named for each module (`tests/melody-read.node.test.ts`, `tests/melody-musicxml.node.test.ts`, ...).
 Tested on the Holy Forever preview (`preview.json`) and on all 137 PDFs of the local corpus, none of which is in git.
 **The answer to "stop here if it does not reach nearly every measure of nearly every song" is that it does.**
 
