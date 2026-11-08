@@ -280,8 +280,8 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
   entry, so a reload or a link keeps it; the sheet is `<melody-sheet>` (`src/components/melody-sheet.ts`), engraved in the key
   the song is shown in (a key change engraves it again, keeping the old sheet on show until the new one is ready), fitted to
   the width of the screen with almost no margin, and with a narrower page on a phone so the music is drawn larger. Verovio's
-  own `<style>` element is taken out of each page (the page's policy allows none) and its few rules are the component's. The library's song page has the same button and `?melody` (`/songs/<uuid>?melody`); there it is the one song open. Not
-  yet: a `built` test of the worker under the real policy, and the beats of the high notes shown
+  own `<style>` element is taken out of each page (the page's policy allows none) and its few rules are the component's. The library's song page has the same button and `?melody` (`/songs/<uuid>?melody`); there it is the one song open. A `built` test (`tests/built.playwright.ts`) engraves a sheet on the production build under the real policy, checks the worker file's own policy, and fails without the `_headers` rule. Not
+  yet: the beats of the high notes shown
   on it.
 - **View, as first planned**: a "Melody" view in the key in use, rendered by **Verovio**, the engraver SongSelect uses
   (chosen; see "Rendering with Verovio" in the spike results), so a transposed sheet looks like
@@ -401,7 +401,7 @@ from each PDF, engrave it, read Verovio's SVG back with the SVG reader, and comp
   Checked on a real build with a temporary import: the page's policy has no `wasm-unsafe-eval`, the three `verovio-*`
   files have only the tight one, a sheet is engraved with no violations, and without the `_headers` rule the worker fails
   with the policy's CompileError. A browser unit test runs `renderMelody` through a real worker. When the view lands, add the
-  `built` test that does the same on the build (the build has no Verovio files to find until something imports it).
+  `built` test that does the same on the build (done: it seeds the build's database directly, as it has no module paths to import).
   Verovio is **LGPL-3.0-or-later**: it stays an unmodified chunk of its own, and `/licences.html` (linked from the terms
   and privacy pages) has the notice, the source and the full LGPL and GPL texts (`public/licences/`).
 - "Does OpenSheetMusicDisplay transpose `<harmony>` correctly" no longer matters: it is not used.
