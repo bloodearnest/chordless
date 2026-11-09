@@ -283,7 +283,7 @@ export class SetlistHeader {
     // (the chart's range, in its own key, or the melody's when it has none)
     const song = this.#song
     keySelector.showRangeOf(song?.parsed.metadata, song?.originalKey ?? '', async () =>
-      song ? this.host._database().getMelody(song._setlistEntry.songUuid) : undefined
+      song ? this.host._database().getScore(song._setlistEntry.songUuid) : undefined
     )
     keySelector.editMode = isEditMode()
   }

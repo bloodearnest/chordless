@@ -14,6 +14,7 @@
 
 import type { Space, SpaceMember } from './data-types.ts'
 import { ChordlessDB, getCurrentDB } from './db.ts'
+import { isScoreFile } from './drive-metadata.ts'
 import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { ChordProParser } from './parser.ts'
 import { syncShares } from './share-manager.ts'
@@ -23,13 +24,13 @@ import { driveStorage } from './storage/browser-drive.ts'
 import { storageFor } from './storage/space-storage.ts'
 import type { RootInfo, SpaceStorage, StorageBackend } from './storage/types.ts'
 import {
-  melodyHasLocalChanges,
+  scoreHasLocalChanges,
   setlistHasLocalChanges,
   songHasLocalChanges,
   songUuidOf,
 } from './sync/changes.ts'
-import { pullMelodies, pullPeople, pullSetlists, pullSongs } from './sync/pull.ts'
-import { pushMelodies, pushPeople, pushSetlists, pushSongs } from './sync/push.ts'
+import { pullPeople, pullScores, pullSetlists, pullSongs } from './sync/pull.ts'
+import { pushPeople, pushScores, pushSetlists, pushSongs } from './sync/push.ts'
 
 export type { ProgressCallback, SyncProgress } from './sync/session.ts'
 
@@ -40,7 +41,7 @@ import { errorMessage } from './utils/errors.ts'
 
 /** A local setlist or song with changes that are not in Drive */
 export interface UnsyncedChange {
-  type: 'setlist' | 'song' | 'melody'
+  type: 'setlist' | 'song' | 'score'
   id: string
   label: string
 }
@@ -401,7 +402,7 @@ export class SyncManager {
     const records = [
       ...(await this.db.getAllSetlists()),
       ...(await this.db.getAllSongs()),
-      ...(await this.db.getAllMelodies()),
+      ...(await this.db.getAllScores()),
     ]
     return records.some(record => record.fileRef)
   }
@@ -494,9 +495,9 @@ export class SyncManager {
       }
 
       // A melody whose file was deleted elsewhere, and not made again here, is deleted here too
-      await this.removeMelodiesDeletedInDrive(run)
+      await this.removeScoresDeletedInDrive(run)
       // and one whose song is not here (the chart was deleted in Drive) goes, with its file
-      if (!run.downloadsFailed && listed) await this.removeOrphanMelodies()
+      if (!run.downloadsFailed && listed) await this.removeOrphanScores()
 
       // Share links: update the live ones and end the finished ones, which changes setlists,
       // so before they are pushed
@@ -607,13 +608,13 @@ export class SyncManager {
       if (songs.length > 0) await pullSongs(run, progressCallback, songs)
       else run.liveSongUuids = new Set()
       // (the songs folder holds the melodies too: the files of this feed that are one)
-      const melodies = songs.filter(file => file.props.type === 'melody')
-      if (melodies.length > 0) await pullMelodies(run, progressCallback, melodies)
-      else run.liveMelodyUuids = new Set()
+      const melodies = songs.filter(file => isScoreFile(file.props))
+      if (melodies.length > 0) await pullScores(run, progressCallback, melodies)
+      else run.liveScoreUuids = new Set()
       if (changes.gone.length > 0) {
         await this.removeSetlistsDeletedInDrive(run)
         await this.removeSongsDeletedInDrive(run)
-        await this.removeMelodiesDeletedInDrive(run)
+        await this.removeScoresDeletedInDrive(run)
         // What is left of them was edited here. The feed says a file is gone once, so the record
         // lets go of it now, or a later sync would update a file in the bin
         await this.#unlinkEditedGone(new Set(changes.gone))
@@ -659,8 +660,8 @@ export class SyncManager {
       const chart = await this.db.getChordPro(song.chordproFileId)
       if (!chart || songHasLocalChanges(song, chart)) edited.add(song.fileRef)
     }
-    for (const record of await this.db.getAllMelodies()) {
-      if (record.fileRef && gone.has(record.fileRef) && melodyHasLocalChanges(record))
+    for (const record of await this.db.getAllScores()) {
+      if (record.fileRef && gone.has(record.fileRef) && scoreHasLocalChanges(record))
         edited.add(record.fileRef)
     }
     if (edited.size > 0) await this.db.unlinkFiles(edited)
@@ -723,14 +724,14 @@ export class SyncManager {
    * deleted elsewhere: delete it here too. One made here is kept, and goes back with the push.
    * @returns how many were removed
    */
-  async removeMelodiesDeletedInDrive(run: SyncRun): Promise<number> {
-    const live = run.liveMelodyUuids
+  async removeScoresDeletedInDrive(run: SyncRun): Promise<number> {
+    const live = run.liveScoreUuids
     if (!run.knowsWhatIsGone || !live) return 0
     let removed = 0
-    for (const record of await this.db.getAllMelodies()) {
+    for (const record of await this.db.getAllScores()) {
       if (!record.fileRef || run.fileExistsInDrive(record.fileRef)) continue
-      if (live.has(record.uuid) || melodyHasLocalChanges(record)) continue
-      await this.db.deleteMelody(record.uuid, { remember: false })
+      if (live.has(record.uuid) || scoreHasLocalChanges(record)) continue
+      await this.db.deleteScore(record.uuid, { remember: false })
       removed++
     }
     return removed
@@ -741,12 +742,12 @@ export class SyncManager {
    * chart was deleted in Drive, and left its melody. They are deleted, and their files go in the
    * Drive trash. Only a full sync that read every file asks, so a song still to come is not lost.
    */
-  async removeOrphanMelodies(): Promise<number> {
+  async removeOrphanScores(): Promise<number> {
     const songs = new Set((await this.db.getAllSongs()).map(song => songUuidOf(song)))
     let removed = 0
-    for (const record of await this.db.getAllMelodies()) {
+    for (const record of await this.db.getAllScores()) {
       if (songs.has(record.uuid)) continue
-      await this.db.deleteMelody(record.uuid)
+      await this.db.deleteScore(record.uuid)
       removed++
     }
     return removed
@@ -863,7 +864,7 @@ export class SyncManager {
     const missing = [
       ...(await this.db.getAllSetlists()),
       ...(await this.db.getAllSongs()),
-      ...(await this.db.getAllMelodies()),
+      ...(await this.db.getAllScores()),
     ].filter(record => record.fileRef && !run.fileExistsInDrive(record.fileRef))
 
     let elsewhere = 0
@@ -993,10 +994,10 @@ export class SyncManager {
         unsynced.push({ type: 'song', id: songUuidOf(song), label: song.title || '' })
       }
     }
-    for (const record of await this.db.getAllMelodies()) {
-      if (melodyHasLocalChanges(record)) {
+    for (const record of await this.db.getAllScores()) {
+      if (scoreHasLocalChanges(record)) {
         const song = await this.db.getSong(record.uuid)
-        unsynced.push({ type: 'melody', id: record.uuid, label: song?.title ?? '' })
+        unsynced.push({ type: 'score', id: record.uuid, label: song?.title ?? '' })
       }
     }
     for (const entry of await this.db.getPendingDeletions()) {
@@ -1032,7 +1033,7 @@ export class SyncManager {
       await pullSongs(run, progressCallback, songFolder)
 
       // Pull melodies (the MusicXML files beside the charts)
-      await pullMelodies(run, progressCallback, songFolder)
+      await pullScores(run, progressCallback, songFolder)
       return run.report()
     })
   }
@@ -1089,7 +1090,7 @@ export class SyncManager {
     await pushSongs(run, progressCallback)
 
     // Push melodies (MusicXML files beside the charts)
-    await pushMelodies(run, progressCallback)
+    await pushScores(run, progressCallback)
   }
 }
 

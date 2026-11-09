@@ -134,7 +134,7 @@ export interface SongRecord {
 export interface PendingDeletion {
   /** The file's ref (a Drive file id) */
   ref: string
-  kind: 'song' | 'setlist' | 'melody'
+  kind: 'song' | 'setlist' | 'score'
   deletedAt: string
 }
 
@@ -145,7 +145,7 @@ export interface PendingDeletion {
  * zipped); here it is the MusicXML text, parsed when it is wanted (`readMusicXml`), as that is a few
  * milliseconds and a stored parse would go stale as the reader improves.
  */
-export interface MelodyRecord {
+export interface ScoreRecord {
   /** The uuid of the song it belongs to */
   uuid: string
   /** The MusicXML score */
@@ -162,6 +162,11 @@ export interface MelodyRecord {
   fileModified?: string | null
   lastSyncedAt?: string | null
   syncedContentHash?: string | null
+  /**
+   * Its file in Drive still has the properties and name from before the rename (`type: 'melody'`,
+   * `.melody.mxl`): the next sync that can write gives it the new ones, and clears this
+   */
+  legacyFile?: boolean
 }
 
 /** A song as it is passed to be saved: tempos may still be a chart's text */

@@ -175,7 +175,7 @@ export class LibraryView extends PageView {
     const header = this.querySelector<AppHeader>('#library-app-header')
     const content = this.#content.value?.querySelector<HTMLElement>('.song-content')
     if (!song || !header) return
-    const found = scoreWithKey(await (await getCurrentDB()).getMelody(song.uuid), song.originalKey)
+    const found = scoreWithKey(await (await getCurrentDB()).getScore(song.uuid), song.originalKey)
     // (the song may have changed while this was read)
     if (this.#song !== song) return
     header.showMelodyToggle = Boolean(found)
@@ -446,7 +446,7 @@ export class LibraryView extends PageView {
     const song = this.#song as SongWithContent
     const metadata = this.#parsed?.metadata
     keySelector.showRangeOf(metadata, metadata?.key as string, async () =>
-      (await getCurrentDB()).getMelody(song.uuid)
+      (await getCurrentDB()).getScore(song.uuid)
     )
     // The key is saved with the song, which a user who can only read can't change
     keySelector.editMode = this.#editMode

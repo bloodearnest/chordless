@@ -29,15 +29,15 @@ export const waitFor = (check: () => unknown, timeout = 2000) =>
   waitUntil(check, 'Timed out waiting', { interval: 10, timeout })
 
 /** Run with saving a melody failing, as a full disk would make it */
-export async function whileMelodiesCannotBeSaved(run: () => Promise<unknown>): Promise<void> {
+export async function whileScoresCannotBeSaved(run: () => Promise<unknown>): Promise<void> {
   const db = ChordlessDB.prototype
-  const saveMelody = db.saveMelody
-  db.saveMelody = async () => {
+  const saveScore = db.saveScore
+  db.saveScore = async () => {
     throw new Error('disk full')
   }
   try {
     await run()
   } finally {
-    db.saveMelody = saveMelody
+    db.saveScore = saveScore
   }
 }

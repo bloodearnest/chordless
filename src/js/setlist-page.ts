@@ -1465,7 +1465,7 @@ export class SetlistPage {
   /** The song's melody and the key it is written in, or null when it has none (docs/MELODY.md) */
   async melodyOf(song: RuntimeSong): Promise<{ melody: Score; key: string } | null> {
     return scoreWithKey(
-      await this._database().getMelody(song._setlistEntry.songUuid),
+      await this._database().getScore(song._setlistEntry.songUuid),
       song.originalKey
     )
   }

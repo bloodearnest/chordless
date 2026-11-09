@@ -2,16 +2,16 @@
  * Making a song's melody record (docs/MELODY.md): the MusicXML score, the key it is in, and the
  * hash of the score, which is how the sync tells that it changed here.
  */
-import type { MelodyRecord } from './data-types.ts'
+import type { ScoreRecord } from './data-types.ts'
 import { hashText } from './utils/hash.ts'
 
 /** A record for the song `uuid` (a new one, or the one of `previous` changed): not yet in Drive until it is synced */
-export function melodyRecord(
+export function scoreRecord(
   uuid: string,
   xml: string,
   key: string | null,
-  previous?: MelodyRecord
-): MelodyRecord {
+  previous?: ScoreRecord
+): ScoreRecord {
   const now = new Date().toISOString()
   return {
     ...previous,

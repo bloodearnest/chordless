@@ -12,7 +12,7 @@ database named exactly after its `spaceId` containing these object stores:
 3. `setlists` – setlist documents
 4. `setlist_local` – local-only per-user state (not synced)
 5. `people` – who leads the setlists (`docs/IDENTITIES.md`; since database version 10)
-6. `melodies` – the notes of a song's lead sheet, one a song (`docs/MELODY.md`; since database version 13, holding the score since 14)
+6. `scores` – the MusicXML of a song's lead sheet, one a song (`docs/MELODY.md`; `melodies` from database version 13, holding the score since 14, renamed `scores` in 15)
 
 Drive sync stores JSON/ChordPro files inside the space’s Google Drive folder
 and tracks Drive metadata (`fileRef`, `fileModified`, `lastSyncedAt`, `_lastSyncHash`, etc.)
@@ -49,9 +49,9 @@ The `chordpro` object store mirrors chord text:
 - `contentHash`: hash used for deduping + sync comparisons
 - `lastModified`: timestamp of last edit (used when comparing with Drive)
 
-### Melodies Store
+### Scores Store
 
-The `melodies` object store (`MelodyRecord`) keeps the melody of a song, keyed by the song's `uuid` (a
+The `scores` object store (`ScoreRecord`) keeps the lead sheet of a song, keyed by the song's `uuid` (a
 variant has its own). Derived data: it can be read again from a lead sheet PDF or a MusicXML file.
 
 - `xml`: the MusicXML score, parsed when it is wanted (`readMusicXml`, a few milliseconds) into a `Score` (`src/js/score.ts`): measures, notes, lyrics, chord symbols, directions. Version 13 kept the parse; the upgrade to 14 clears those records
@@ -59,9 +59,12 @@ variant has its own). Derived data: it can be read again from a lead sheet PDF o
 - `contentHash`: hash of `xml`, so a change made here is found by comparing it with `syncedContentHash`
 - `createdDate`, `modifiedDate`
 - Sync metadata as the chart's: `fileRef`, `fileRev`, `fileModified`, `lastSyncedAt`, `syncedContentHash`
+- `legacyFile`: its Drive file still has the name and properties from before the rename (`.melody.mxl`, `type: 'melody'`); the next sync that can write rewrites it and clears this. The upgrade to version 15 sets it on every record that has a file
 
 In Drive it is an `.mxl` (zipped MusicXML) in the space's `songs` folder beside its chart, linked to it by `songUuid` in the
-file's properties (`type: 'melody'`). Deleting a song deletes its melody and puts the melody's file in the Drive trash.
+file's properties (`type: 'score'`; `'melody'` before the rename, still read). Deleting a song deletes its score and puts the score's file in the Drive trash.
+
+Version 15 renamed the `melodies` store to `scores` (the records are copied, and the old store dropped), and the `kind` of a pending deletion of such a file from `melody` to `score`.
 
 ### Song Versioning
 

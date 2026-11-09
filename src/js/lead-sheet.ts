@@ -5,10 +5,10 @@
 import { rangeOfChart, withRange } from './chart-range.ts'
 import type { ChordlessDB } from './db.ts'
 import { keyOfChart } from './library-repair.ts'
-import { melodyRecord } from './melody-record.ts'
 import { signatureMatchesKey } from './pitch.ts'
 import type { Score } from './score.ts'
 import { writeMusicXml } from './score-musicxml.ts'
+import { scoreRecord } from './score-record.ts'
 import { melodyRange, sungNotes } from './score-transpose.ts'
 import type { NoteRange } from './voice-range.ts'
 
@@ -134,8 +134,8 @@ export async function keepMelody(
   notes: KeptMelody
 ): Promise<boolean> {
   try {
-    const previous = await db.getMelody(songUuid)
-    await db.saveMelody(melodyRecord(songUuid, writeMusicXml(notes.melody), notes.key, previous))
+    const previous = await db.getScore(songUuid)
+    await db.saveScore(scoreRecord(songUuid, writeMusicXml(notes.melody), notes.key, previous))
     return true
   } catch (error) {
     console.warn('[Import] Could not keep the melody:', error)

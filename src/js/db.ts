@@ -1,9 +1,9 @@
 import { announceDataChange, type DataKind, type DataOrigin } from './data-changes.ts'
 import type {
   ChordProRecord,
-  MelodyRecord,
   PendingDeletion,
   Person,
+  ScoreRecord,
   Setlist,
   SetlistLocalState,
   SongInput,
@@ -24,7 +24,7 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 // NOTE: This now stores ALL space data in one database per space.
 // Space metadata is stored separately in the 'spaces' database.
 
-const DB_VERSION = 14
+const DB_VERSION = 15
 
 // Setlist types
 export const SETLIST_TYPES: Readonly<Record<string, string>> = {
@@ -154,7 +154,7 @@ export class ChordlessDB {
 
   /** Everything of each kind was written or cleared */
   #changedAll(): void {
-    for (const kind of ['setlist', 'song', 'chart', 'person', 'melody'] as const)
+    for (const kind of ['setlist', 'song', 'chart', 'person', 'score'] as const)
       this.#changed(kind, null)
   }
 
@@ -230,9 +230,10 @@ export class ChordlessDB {
           db.createObjectStore('pending_deletions', { keyPath: 'ref' })
         }
 
-        // The melodies of the songs, one for a song that has its lead sheet's notes (new in v13)
-        if (!db.objectStoreNames.contains('melodies')) {
-          db.createObjectStore('melodies', { keyPath: 'uuid' })
+        // The scores of the songs, one for a song that has its lead sheet's MusicXML (new in v13 as
+        // `melodies`, renamed in v15)
+        if (!db.objectStoreNames.contains('scores')) {
+          db.createObjectStore('scores', { keyPath: 'uuid' })
         }
 
         // The space's people, who lead setlists (new in v10)
@@ -696,11 +697,8 @@ export class ChordlessDB {
   // Clear setlists, songs and charts, keeping per-setlist device state
   // (setlist_local). Used to reset from Drive.
   async clearSyncedData(): Promise<void> {
-    const tx = this.#transaction(
-      ['setlists', 'songs', 'chordpro', 'people', 'melodies'],
-      'readwrite'
-    )
-    for (const name of ['setlists', 'songs', 'chordpro', 'people', 'melodies']) {
+    const tx = this.#transaction(['setlists', 'songs', 'chordpro', 'people', 'scores'], 'readwrite')
+    for (const name of ['setlists', 'songs', 'chordpro', 'people', 'scores']) {
       tx.objectStore(name).clear()
     }
     await transactionDone(tx)
@@ -713,7 +711,7 @@ export class ChordlessDB {
    * its file was in the folder that is let go. Used to start over in a new Drive folder.
    */
   async clearFileLinks(): Promise<void> {
-    const tx = this.#transaction(['setlists', 'songs', 'people', 'melodies'], 'readwrite')
+    const tx = this.#transaction(['setlists', 'songs', 'people', 'scores'], 'readwrite')
     const unlinked = {
       fileRef: null,
       fileModified: null,
@@ -742,10 +740,10 @@ export class ChordlessDB {
         people.put({ ...person, ...unlinked })
       }
     }
-    const melodies = tx.objectStore('melodies')
+    const melodies = tx.objectStore('scores')
     const melodiesRequest = melodies.getAll()
     melodiesRequest.onsuccess = () => {
-      for (const record of melodiesRequest.result as MelodyRecord[]) {
+      for (const record of melodiesRequest.result as ScoreRecord[]) {
         melodies.put({ ...record, ...unlinked })
       }
     }
@@ -753,7 +751,7 @@ export class ChordlessDB {
     this.#changed('setlist', null)
     this.#changed('song', null)
     this.#changed('person', null)
-    this.#changed('melody', null)
+    this.#changed('score', null)
   }
 
   /**
@@ -763,7 +761,7 @@ export class ChordlessDB {
    * @returns how many records were let go
    */
   async unlinkFiles(refs: Set<string>): Promise<number> {
-    const tx = this.#transaction(['setlists', 'songs', 'melodies'], 'readwrite')
+    const tx = this.#transaction(['setlists', 'songs', 'scores'], 'readwrite')
     const unlinked = {
       fileRef: null,
       fileModified: null,
@@ -776,7 +774,7 @@ export class ChordlessDB {
     const songs = tx.objectStore('songs')
     const setlistsRequest = setlists.getAll()
     const songsRequest = songs.getAll()
-    const melodies = tx.objectStore('melodies')
+    const melodies = tx.objectStore('scores')
     const melodiesRequest = melodies.getAll()
     setlistsRequest.onsuccess = () => {
       for (const setlist of setlistsRequest.result as Setlist[]) {
@@ -793,7 +791,7 @@ export class ChordlessDB {
       }
     }
     melodiesRequest.onsuccess = () => {
-      for (const record of melodiesRequest.result as MelodyRecord[]) {
+      for (const record of melodiesRequest.result as ScoreRecord[]) {
         if (!record.fileRef || !refs.has(record.fileRef)) continue
         melodies.put({ ...record, ...unlinked })
         count++
@@ -803,28 +801,28 @@ export class ChordlessDB {
     if (count > 0) {
       this.#changed('setlist', null)
       this.#changed('song', null)
-      this.#changed('melody', null)
+      this.#changed('score', null)
     }
     return count
   }
 
   // Melodies (docs/MELODY.md)
 
-  async getMelody(uuid: string): Promise<MelodyRecord | undefined> {
-    const tx = this.#transaction(['melodies'], 'readonly')
-    return requestResult(tx.objectStore('melodies').get(uuid))
+  async getScore(uuid: string): Promise<ScoreRecord | undefined> {
+    const tx = this.#transaction(['scores'], 'readonly')
+    return requestResult(tx.objectStore('scores').get(uuid))
   }
 
-  async getAllMelodies(): Promise<MelodyRecord[]> {
-    const tx = this.#transaction(['melodies'], 'readonly')
-    return requestResult(tx.objectStore('melodies').getAll())
+  async getAllScores(): Promise<ScoreRecord[]> {
+    const tx = this.#transaction(['scores'], 'readonly')
+    return requestResult(tx.objectStore('scores').getAll())
   }
 
-  async saveMelody(record: MelodyRecord): Promise<void> {
-    const tx = this.#transaction(['melodies'], 'readwrite')
-    tx.objectStore('melodies').put(record)
+  async saveScore(record: ScoreRecord): Promise<void> {
+    const tx = this.#transaction(['scores'], 'readwrite')
+    tx.objectStore('scores').put(record)
     await transactionDone(tx)
-    this.#changed('melody', [record.uuid])
+    this.#changed('score', [record.uuid])
   }
 
   /**
@@ -832,25 +830,28 @@ export class ChordlessDB {
    * it is stored now, not on the copy that was sent, so a change saved while it was being sent is
    * not undone (it is then a change the next sync sends). A melody deleted meanwhile is not put back.
    */
-  async saveMelodiesSent(sent: MelodyRecord[]): Promise<void> {
+  async saveScoresSent(sent: ScoreRecord[]): Promise<void> {
     if (sent.length === 0) return
-    const tx = this.#transaction(['melodies'], 'readwrite')
-    const store = tx.objectStore('melodies')
+    const tx = this.#transaction(['scores'], 'readwrite')
+    const store = tx.objectStore('scores')
     for (const record of sent) {
-      const current = (await requestResult(store.get(record.uuid))) as MelodyRecord | undefined
+      const current = (await requestResult(store.get(record.uuid))) as ScoreRecord | undefined
       if (!current) continue
-      store.put({
+      const updated: ScoreRecord = {
         ...current,
         fileRef: record.fileRef,
         fileRev: record.fileRev,
         fileModified: record.fileModified,
         lastSyncedAt: record.lastSyncedAt,
         syncedContentHash: record.syncedContentHash,
-      })
+      }
+      // (written with the file's new name and properties: not a legacy file now)
+      if (!record.legacyFile) delete updated.legacyFile
+      store.put(updated)
     }
     await transactionDone(tx)
     this.#changed(
-      'melody',
+      'score',
       sent.map(record => record.uuid)
     )
   }
@@ -860,24 +861,21 @@ export class ChordlessDB {
    * Drive trash, or the file would bring it back. A melody deleted because Drive no longer has
    * its file passes `remember: false`.
    */
-  async deleteMelody(
-    uuid: string,
-    { remember = true }: { remember?: boolean } = {}
-  ): Promise<void> {
-    const record = await this.getMelody(uuid)
+  async deleteScore(uuid: string, { remember = true }: { remember?: boolean } = {}): Promise<void> {
+    const record = await this.getScore(uuid)
     if (!record) return
-    const tx = this.#transaction(['melodies', 'pending_deletions'], 'readwrite')
-    tx.objectStore('melodies').delete(uuid)
+    const tx = this.#transaction(['scores', 'pending_deletions'], 'readwrite')
+    tx.objectStore('scores').delete(uuid)
     if (remember && record.fileRef) {
       const pending: PendingDeletion = {
         ref: record.fileRef,
-        kind: 'melody',
+        kind: 'score',
         deletedAt: new Date().toISOString(),
       }
       tx.objectStore('pending_deletions').put(pending)
     }
     await transactionDone(tx)
-    this.#changed('melody', [uuid])
+    this.#changed('score', [uuid])
   }
 
   /**
@@ -911,7 +909,7 @@ export class ChordlessDB {
     }
     // Its melody goes with it, and its file is put in the trash even when the song's was not (a song
     // deleted because Drive no longer has its chart left its melody's file there)
-    await this.deleteMelody(uuid)
+    await this.deleteScore(uuid)
     this.#changed('song', [uuid])
   }
 
@@ -931,7 +929,7 @@ export class ChordlessDB {
   // Clear all data (for re-import)
   async clearAll(): Promise<void> {
     const tx = this.#transaction(
-      ['setlists', 'songs', 'chordpro', 'setlist_local', 'pending_deletions', 'people', 'melodies'],
+      ['setlists', 'songs', 'chordpro', 'setlist_local', 'pending_deletions', 'people', 'scores'],
       'readwrite'
     )
 
@@ -946,7 +944,7 @@ export class ChordlessDB {
     await chordproStore.clear()
     await localStore.clear()
     await tx.objectStore('people').clear()
-    await tx.objectStore('melodies').clear()
+    await tx.objectStore('scores').clear()
 
     await transactionDone(tx)
     this.#changedAll()
@@ -1133,7 +1131,38 @@ function migrateRecords(transaction: IDBTransaction, oldVersion: number) {
   // Version 14: a melody is kept as its MusicXML, not parsed. The records of version 13 held the
   // parse, and are derived data (a synced melody is pulled again; one not yet synced is read from its
   // lead sheet again), so they are cleared rather than converted.
+  // (clears the store of the old name, which version 15 then moves)
   if (oldVersion === 13) transaction.objectStore('melodies').clear()
+  // Version 15: the `melodies` store is `scores`, and a pending deletion of a melody's file is of a score's.
+  // Their files in Drive keep the old name and properties until a device that can write rewrites them,
+  // which `legacyFile` says.
+  if (oldVersion >= 13 && oldVersion < 15) migrateMelodiesToScores(transaction)
+  if (oldVersion < 15) migratePendingDeletionKinds(transaction)
+}
+
+/** Version 15: the records of the `melodies` store are put in `scores`, and the old store goes */
+function migrateMelodiesToScores(transaction: IDBTransaction) {
+  const old = transaction.objectStore('melodies')
+  const read = old.getAll()
+  read.onsuccess = () => {
+    const scores = transaction.objectStore('scores')
+    for (const record of read.result as ScoreRecord[]) {
+      scores.put(record.fileRef ? { ...record, legacyFile: true } : record)
+    }
+    transaction.db.deleteObjectStore('melodies')
+  }
+}
+
+function migratePendingDeletionKinds(transaction: IDBTransaction) {
+  const pending = transaction.objectStore('pending_deletions')
+  const cursor = pending.openCursor()
+  cursor.onsuccess = () => {
+    const at = cursor.result
+    if (!at) return
+    const entry = at.value as { kind: string }
+    if (entry.kind === 'melody') at.update({ ...entry, kind: 'score' })
+    at.continue()
+  }
 }
 
 /**

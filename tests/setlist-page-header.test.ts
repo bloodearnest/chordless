@@ -693,7 +693,7 @@ describe('the setlist page: header, menu and keys', () => {
 
     it('gives the key picker the range of the song’s melody when the chart has none', async () => {
       await rig.open()
-      await rig.db.saveMelody(sampleRecord(rig.songs[0].uuid, 'G'))
+      await rig.db.saveScore(sampleRecord(rig.songs[0].uuid, 'G'))
       rig.page.showSong(0, true)
       await rig.page.header.show(rig.page.songs[0], true)
       const picker = must($('#key-selector')) as unknown as KeySelector
@@ -714,7 +714,7 @@ describe('the setlist page: header, menu and keys', () => {
       const pressed = () => toggle()?.getAttribute('aria-pressed')
 
       it('is there for a song with a melody and not for one without', async () => {
-        await rig.db.saveMelody(sampleRecord(rig.songs[0].uuid, 'G'))
+        await rig.db.saveScore(sampleRecord(rig.songs[0].uuid, 'G'))
         await rig.open()
         rig.page.showSong(0, true)
         await rig.page.header.show(rig.page.songs[0], true)
@@ -724,12 +724,12 @@ describe('the setlist page: header, menu and keys', () => {
         await rig.page.header.show(rig.page.songs[1], true)
         await until(() => !toggle())
         expect(toggle()).to.equal(null)
-        await rig.db.deleteMelody(rig.songs[0].uuid, { remember: false })
+        await rig.db.deleteScore(rig.songs[0].uuid, { remember: false })
       })
 
       it('shows the melody sheet in place of the lyrics, for this song alone, and follows the route', async () => {
-        await rig.db.saveMelody(sampleRecord(rig.songs[0].uuid, 'G'))
-        await rig.db.saveMelody(sampleRecord(rig.songs[1].uuid, 'G'))
+        await rig.db.saveScore(sampleRecord(rig.songs[0].uuid, 'G'))
+        await rig.db.saveScore(sampleRecord(rig.songs[1].uuid, 'G'))
         try {
           await rig.open()
           rig.page.showSong(0, true)
@@ -769,13 +769,13 @@ describe('the setlist page: header, menu and keys', () => {
           expect(lyricsOf(0)?.style.display).to.equal('')
           expect(rig.visited.at(-1)?.url).to.not.contain('melody')
         } finally {
-          await rig.db.deleteMelody(rig.songs[0].uuid, { remember: false })
-          await rig.db.deleteMelody(rig.songs[1].uuid, { remember: false })
+          await rig.db.deleteScore(rig.songs[0].uuid, { remember: false })
+          await rig.db.deleteScore(rig.songs[1].uuid, { remember: false })
         }
       })
 
       it('follows a route that asks for the melody, and for the lyrics again', async () => {
-        await rig.db.saveMelody(sampleRecord(rig.songs[0].uuid, 'G'))
+        await rig.db.saveScore(sampleRecord(rig.songs[0].uuid, 'G'))
         try {
           await rig.open()
           rig.page.showSong(0, true)
@@ -800,7 +800,7 @@ describe('the setlist page: header, menu and keys', () => {
           expect(sheetOf(2)).to.equal(null)
           expect(lyricsOf(2)?.style.display).to.equal('')
         } finally {
-          await rig.db.deleteMelody(rig.songs[0].uuid, { remember: false })
+          await rig.db.deleteScore(rig.songs[0].uuid, { remember: false })
         }
       })
     })
