@@ -54,7 +54,7 @@ describe('MusicXML of a hand-built melody', () => {
       xml,
       /<root-step>B<\/root-step><root-alter>-1<\/root-alter>.*<bass-step>D<\/bass-step>/
     )
-    assert.match(xml, /<rehearsal>VERSE 1<\/rehearsal>/)
+    assert.match(xml, /<rehearsal halign="left">VERSE 1<\/rehearsal>/)
     // a chord's text is in an attribute: a quote in it cannot end the attribute
     assert.ok(!xml.includes('<evil/>'))
     assert.match(xml, /text="X&quot;&gt;&lt;evil\/&gt;"/)

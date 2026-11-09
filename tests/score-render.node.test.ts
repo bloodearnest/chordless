@@ -44,6 +44,23 @@ describe('engraving a melody with Verovio', () => {
     assert.equal(withoutStyle('<svg><g/></svg>'), '<svg><g/></svg>')
   })
 
+  it('keeps a section that starts a line on the page, with no wide margin kept for it', async () => {
+    // (on a phone's narrow page the lines break every few bars, so sections start lines)
+    const measures = Array.from({ length: 12 }, (_, i) =>
+      measure(i + 1, ['G4:1:la', 'A4:1:la', 'B4:1:la', 'D5:1:la'], {
+        chords: [[0, 'G']],
+        ...(i % 3 === 0 ? { section: 'PRE-CHORUS' } : {}),
+      })
+    )
+    const out = await renderScoreHere(writeMusicXml({ ...melody, measures }), { pageWidth: 1200 })
+    assert.ok(out)
+    const svg = out.pages.join('')
+    const boxes = [...svg.matchAll(/class="reh"[^>]*>\s*<rect [^>]*\bx="(-?\d+)"/g)]
+    assert.equal(boxes.length, 4)
+    for (const [, x] of boxes)
+      assert.ok(Number(x) >= 0, `a section's box starts at ${x}, off the page`)
+  })
+
   it('says null for what is not MusicXML', async () => {
     assert.equal(await renderScoreHere('this is not music'), null)
   })

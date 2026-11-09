@@ -335,9 +335,11 @@ export function writeMusicXml(melody: Score): string {
     }
     const left = leftBarline(m)
     if (left) out.push(left)
+    // (a section's box starts at its barline, not centred on it: at the start of a line, centred, half
+    // of it would hang off the page, or need a wide margin kept for it on every line)
     if (m.section)
       out.push(
-        `<direction placement="above"><direction-type><rehearsal>${esc(m.section)}</rehearsal></direction-type></direction>`
+        `<direction placement="above"><direction-type><rehearsal halign="left">${esc(m.section)}</rehearsal></direction-type></direction>`
       )
     if (m.tempo)
       out.push(

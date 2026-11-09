@@ -82,9 +82,9 @@ export async function renderScoreHere(
     scale: options.scale ?? 40,
     // the page is as tall as the music, so a view scrolls it and no page ends mid-song
     adjustPageHeight: true,
-    // (a section box is centred on its barline, so the first one needs room to its left)
-    pageMarginLeft: 120,
-    // (the rest of the margin is not wanted: the page is fitted to the width of the screen)
+    // (no more margin than the measure numbers need: a section's box starts at its barline, so
+    // none hangs off the left, score-musicxml.ts, and the page is fitted to the width of the screen)
+    pageMarginLeft: 30,
     pageMarginRight: 20,
     pageMarginTop: 20,
     pageMarginBottom: 20,
