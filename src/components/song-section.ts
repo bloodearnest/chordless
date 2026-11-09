@@ -4,7 +4,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { listenForLongPress } from '../js/annotations/long-press.ts'
 import { nudgeLine } from '../js/annotations/nudge.ts'
 import type { ChartLine, ChartSegment, HideMode, ShownAnnotation } from '../js/data-types.ts'
-import { groupSegmentsIntoUnits } from '../js/utils/chart-line-units.ts'
+import { chordFitsOverWords, groupSegmentsIntoUnits } from '../js/utils/chart-line-units.ts'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
 import {
   formatHiddenLyricsText,
@@ -976,7 +976,10 @@ export class SongSection extends LitElement {
               this._renderSegment(
                 piece,
                 lineHasChords,
-                !!piece.chord && unit[at + 1] !== undefined && !unit[at + 1].chord
+                !!piece.chord &&
+                  unit[at + 1] !== undefined &&
+                  !unit[at + 1].chord &&
+                  chordFitsOverWords(unit, at)
               )
             )}</span>`
         )}

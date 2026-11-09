@@ -105,3 +105,18 @@ function giveChordsRoom(units: ChartSegment[][]): ChartSegment[][] {
   }
   return result
 }
+
+/**
+ * Whether the words after a chord in its unit (up to the next chord) are wide enough for it to hang
+ * over them without a width of its own. If they are not, the chord keeps its width, which pushes the
+ * next word along, rather than running into the chord that comes after (a long chord over a short
+ * "ho - " before another chord). A margin is kept, since these widths are guesses.
+ */
+export function chordFitsOverWords(unit: ChartSegment[], at: number): boolean {
+  let words = 0
+  for (let i = at; i < unit.length; i++) {
+    if (i > at && unit[i].chord) break
+    words += lyricsWidth(unit[i].lyrics)
+  }
+  return words >= chordWidth(unit[at].chord) * 1.15
+}

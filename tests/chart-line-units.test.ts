@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import type { ChartSegment } from '../src/js/data-types.ts'
-import { groupSegmentsIntoUnits } from '../src/js/utils/chart-line-units.ts'
+import { chordFitsOverWords, groupSegmentsIntoUnits } from '../src/js/utils/chart-line-units.ts'
 
 const { describe, it } = window
 
@@ -209,5 +209,23 @@ describe('groupSegmentsIntoUnits: room for the chords', () => {
     expect(shape(groupSegmentsIntoUnits([{ chord: 'Am7(4)', lyrics: 'I' }]))).to.deep.equal([
       [['Am7(4)', 'I']],
     ])
+  })
+})
+
+describe('chordFitsOverWords', () => {
+  it('is true for a chord over words as wide as it, and false for a long one over a short word before another chord', () => {
+    const unit = (chord: string, ...lyrics: string[]): ChartSegment[] =>
+      lyrics.map((l, i) => ({ chord: i === 0 ? chord : '', lyrics: l }))
+    expect(chordFitsOverWords(unit('G', 'sit ', 'down '), 0)).to.equal(true)
+    expect(chordFitsOverWords(unit('Db/Ab', 'Ado ', '- '), 0)).to.equal(false)
+    expect(chordFitsOverWords(unit('Dbsus', 'ho ', '- '), 0)).to.equal(false)
+  })
+
+  it('stops at the next chord in the unit', () => {
+    const unit: ChartSegment[] = [
+      { chord: 'Db/Ab', lyrics: 'a ' },
+      { chord: 'Ab', lyrics: 'very long word here' },
+    ]
+    expect(chordFitsOverWords(unit, 0)).to.equal(false)
   })
 })
