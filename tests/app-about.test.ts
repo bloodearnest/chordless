@@ -34,8 +34,8 @@ describe('app-about', () => {
 
   const show = async () => {
     const el = await fixture<AppAbout>(html`<app-about></app-about>`)
-    // (it loads as it is added: loading again waits for what that one reads to be read)
-    await el._load()
+    // (it loads as it is added, and what it reads last is the storage)
+    await waitUntil(() => el._storage !== null, 'the page to load')
     await el.updateComplete
     return el
   }
