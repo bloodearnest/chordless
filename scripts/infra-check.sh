@@ -10,6 +10,11 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
 tf() { mise exec -- terraform "$@"; }
+
+# Providers are downloaded once and shared by every stack and every run (and CI keeps the directory
+# between runs: docs/CI.md), so a blip of the registry's network does not fail a lint that has them
+export TF_PLUGIN_CACHE_DIR="${TF_PLUGIN_CACHE_DIR:-$HOME/.terraform.d/plugin-cache}"
+mkdir -p "$TF_PLUGIN_CACHE_DIR"
 failed=0
 
 case "${1:-}" in

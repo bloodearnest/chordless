@@ -33,6 +33,7 @@ runs:
         PLATFORM: ${{ runner.os }}-${{ runner.arch }}
         MISE_HASH: ${{ hashFiles('mise.toml') }}
         LOCK_HASH: ${{ hashFiles('package-lock.json') }}
+        TF_HASH: ${{ hashFiles('infra/**/.terraform.lock.hcl') }}
       run: |
         {
           echo "tools=mise-$PLATFORM-${TOOLS// /-}-$MISE_HASH"
@@ -42,6 +43,8 @@ runs:
           echo "npm=npm-$PLATFORM-$LOCK_HASH"
           echo "npm-prefix=npm-$PLATFORM-"
           echo "browser=browser-$PLATFORM-$BROWSER-$LOCK_HASH"
+          # the providers the stacks lock (scripts/infra-check.sh reads and fills this directory)
+          echo "terraform=terraform-providers-$PLATFORM-$TF_HASH"
         } >>"$GITHUB_OUTPUT"
 
     - name: Restore the tools
@@ -57,6 +60,14 @@ runs:
         TOOLS: ${{ inputs.tools }}
       # (word splitting on purpose: one argument per tool)
       run: scripts/ci/setup-tools.sh $TOOLS
+
+    - name: Restore Terraform's providers
+      id: terraform-cache
+      if: contains(inputs.tools, 'terraform')
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.terraform.d/plugin-cache
+        key: ${{ steps.keys.outputs.terraform }}
 
     - name: Restore node_modules
       id: modules-cache
@@ -101,10 +112,12 @@ runs:
       env:
         KEYS: ${{ toJSON(steps.keys.outputs) }}
         TOOLS_HIT: ${{ steps.tools-cache.outputs.cache-hit }}
+        TERRAFORM: ${{ contains(inputs.tools, 'terraform') && steps.terraform-cache.outputs.cache-hit != 'true' }}
         MODULES: ${{ inputs.npm == 'true' && steps.modules-cache.outputs.cache-hit != 'true' }}
         BROWSER: ${{ (inputs.browser == 'chromium' || inputs.browser == 'webkit') && steps.browser-cache.outputs.cache-hit != 'true' }}
       run: |
         echo "json=$(jq -c \
           --argjson tools "$([ "$TOOLS_HIT" = true ] && echo false || echo true)" \
           --argjson modules "$MODULES" --argjson browser "$BROWSER" \
-          '. + {save_tools: $tools, save_modules: $modules, save_browser: $browser}' <<<"$KEYS")" >>"$GITHUB_OUTPUT"
+          --argjson terraform "$TERRAFORM" \
+          '. + {save_tools: $tools, save_modules: $modules, save_browser: $browser, save_terraform: $terraform}' <<<"$KEYS")" >>"$GITHUB_OUTPUT"
