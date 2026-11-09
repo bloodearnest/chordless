@@ -21,6 +21,15 @@ updates:
     patterns: ["*"]
     cooldown:
       default-days: 7
+    # Held back on purpose, until they are dealt with by hand:
+    # - unpdf 2 bundles a pdf.js that needs Promise.try, Float16Array and Math.sumPrecise, which
+    #   Node 22 and our browser floor (Safari 17.4, Chrome 120) do not have.
+    # - verovio is pinned to the version SongSelect prints with (docs/MELODY.md); 6.4.0 changes the
+    #   PDF the melody is read back from ("tie joins no heads").
+    ignore:
+      - dependency-name: unpdf
+        update-types: ["version-update:semver-major"]
+      - dependency-name: verovio
     groups:
       security:
         applies-to: security-updates
