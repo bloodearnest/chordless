@@ -129,18 +129,6 @@ describe('the melodies store', () => {
     }
   }
 
-  it('clears the melodies of the version that kept them parsed, which are pulled or read again', async () => {
-    // a database as version 13 left it: a melody was the parsed object
-    const name = await oldDatabase(13, SCHEMA_V14, {
-      melodies: [{ uuid: 'song-1', melody, key: 'G', contentHash: 'h' }],
-    })
-    await upgraded(name, async db => {
-      expect(await db.getAllScores()).to.deep.equal([])
-      await db.saveScore(scoreRecord('song-1', xml, 'G'))
-      expect((await db.getScore('song-1'))?.xml).to.equal(xml)
-    })
-  })
-
   it('moves the melodies of version 14 to the scores store, and marks those with a file as having an old one', async () => {
     const synced = { ...scoreRecord('song-1', xml, 'G'), fileRef: 'file-1', syncedContentHash: 'h' }
     const local = scoreRecord('song-2', xml, null)

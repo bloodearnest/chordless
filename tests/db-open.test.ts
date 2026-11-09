@@ -7,10 +7,17 @@
 import { expect, waitUntil } from '@open-wc/testing'
 import { trace } from '@opentelemetry/api'
 import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace'
-import { ChordlessDB, DatabaseNewerError, DB_VERSION } from '../src/js/db.ts'
+import {
+  ChordlessDB,
+  DatabaseNewerError,
+  DatabaseTooOldError,
+  DB_VERSION,
+  OLDEST_UPGRADABLE,
+} from '../src/js/db.ts'
 import { setTelemetryPreference } from '../src/js/preferences.ts'
 import { baselineAttributes } from '../src/js/telemetry/baseline.ts'
 import { setAmbient } from '../src/js/telemetry/context.ts'
+import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { oldDatabase, SCHEMA_V14 } from './old-database.ts'
 import { clearToasts, deleteDatabase, shownToast } from './test-helpers.ts'
 
@@ -122,5 +129,113 @@ describe('ChordlessDB opening, as reported', () => {
     await db.init()
     await deleteDatabase(name)
     expect(shownToast()).to.equal(null)
+  })
+})
+
+describe('ChordlessDB opening a database older than it upgrades', () => {
+  let uninstall: () => void
+  let worker: ReturnType<typeof installFakeAuthWorker>['worker']
+
+  beforeEach(() => {
+    ;({ worker, uninstall } = installFakeAuthWorker())
+  })
+  afterEach(() => uninstall())
+
+  const signIn = (scope?: string) => {
+    worker.stored = {
+      blob: 'blob',
+      metadata: {
+        access_token: 'good',
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        ...(scope ? { scope } : {}),
+      },
+      updated_at: new Date().toISOString(),
+    }
+  }
+
+  const old = () => oldDatabase(OLDEST_UPGRADABLE - 1, SCHEMA_V14, { songs: [{ uuid: 'song-1' }] })
+
+  /** What an old database holds, read without upgrading it */
+  const songsIn = async (name: string) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(name)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const version = db.version
+    const songs = await new Promise<unknown[]>(resolve => {
+      const request = db.transaction('songs').objectStore('songs').getAll()
+      request.onsuccess = () => resolve(request.result)
+    })
+    db.close()
+    return { version, songs }
+  }
+
+  it('leaves it as it is, and says so, when there is no sign-in to bring it back from Drive', async () => {
+    const name = await old()
+    let error: unknown
+    try {
+      await new ChordlessDB(name).init()
+    } catch (caught) {
+      error = caught
+    }
+    expect(error).to.be.instanceOf(DatabaseTooOldError)
+    expect((error as DatabaseTooOldError).version).to.equal(OLDEST_UPGRADABLE - 1)
+    expect(await songsIn(name)).to.deep.equal({
+      version: OLDEST_UPGRADABLE - 1,
+      songs: [{ uuid: 'song-1' }],
+    })
+    await deleteDatabase(name)
+
+    expect(opens()[0].attributes).to.include({
+      'chordless.db.outcome': 'too_old',
+      'chordless.db.old_version': OLDEST_UPGRADABLE - 1,
+      'chordless.db.sign_in': 'signed-out',
+    })
+    await waitUntil(() => shownToast() !== null, 'the toast')
+    expect(shownToast()?.kind).to.equal('error')
+    expect(shownToast()?.details).to.contain('left as it is')
+  })
+
+  it('leaves it as it is when the sign-in has no Drive to bring it back from', async () => {
+    signIn('openid email profile')
+    const name = await old()
+    let error: unknown
+    try {
+      await new ChordlessDB(name).init()
+    } catch (caught) {
+      error = caught
+    }
+    expect(error).to.be.instanceOf(DatabaseTooOldError)
+    expect((await songsIn(name)).songs).to.have.length(1)
+    await deleteDatabase(name)
+    expect(opens()[0].attributes['chordless.db.sign_in']).to.equal('no-drive')
+  })
+
+  it('clears it and makes it again, to be brought back from Drive, when signed in with Drive', async () => {
+    signIn()
+    const name = await old()
+    const db = new ChordlessDB(name)
+    await db.init()
+    expect(db.db?.version).to.equal(DB_VERSION)
+    expect(await db.getAllSongs()).to.deep.equal([])
+    db.db?.close()
+    await deleteDatabase(name)
+
+    expect(opens().map(span => span.attributes['chordless.db.outcome'])).to.deep.equal(['cleared'])
+    expect(opens()[0].attributes['chordless.db.old_version']).to.equal(OLDEST_UPGRADABLE - 1)
+    await waitUntil(() => shownToast() !== null, 'the toast')
+    expect(shownToast()?.kind).to.equal('info')
+    expect(shownToast()?.message).to.contain('back from Drive')
+  })
+
+  it('upgrades the oldest version it upgrades, whoever is signed in', async () => {
+    const name = await oldDatabase(OLDEST_UPGRADABLE, SCHEMA_V14, { songs: [{ uuid: 'song-1' }] })
+    const db = new ChordlessDB(name)
+    await db.init()
+    expect(db.db?.version).to.equal(DB_VERSION)
+    db.db?.close()
+    await deleteDatabase(name)
+    expect(opens()[0].attributes['chordless.db.outcome']).to.equal('upgraded')
   })
 })
