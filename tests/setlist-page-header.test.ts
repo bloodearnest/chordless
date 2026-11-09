@@ -707,23 +707,23 @@ describe('the setlist page: header, menu and keys', () => {
         rig.root
           .querySelector<HTMLElement>('app-header')
           ?.shadowRoot?.querySelector<HTMLButtonElement>('.melody-toggle')
+      const enabled = () => (toggle()?.disabled === false ? toggle() : null)
       const sheetOf = (index: number) => rig.root.querySelector(`#song-${index} score-view`)
       const lyricsOf = (index: number) =>
         rig.root.querySelector<HTMLElement>(`#song-${index} song-display`)
       const until = (condition: () => unknown) => waitUntil(condition)
       const pressed = () => toggle()?.getAttribute('aria-pressed')
 
-      it('is there for a song with a melody and not for one without', async () => {
+      it('is there for a song with a melody and greyed out for one without', async () => {
         await rig.db.saveScore(sampleRecord(rig.songs[0].uuid, 'G'))
         await rig.open()
         rig.page.showSong(0, true)
         await rig.page.header.show(rig.page.songs[0], true)
-        await until(() => toggle())
-        expect(toggle()).to.not.equal(null)
+        await until(() => enabled())
         rig.page.showSong(1, true)
         await rig.page.header.show(rig.page.songs[1], true)
-        await until(() => !toggle())
-        expect(toggle()).to.equal(null)
+        await until(() => toggle()?.disabled)
+        expect(toggle()?.disabled).to.equal(true)
         await rig.db.deleteScore(rig.songs[0].uuid, { remember: false })
       })
 
@@ -735,7 +735,7 @@ describe('the setlist page: header, menu and keys', () => {
           rig.page.showSong(0, true)
           await rig.page.header.show(rig.page.songs[0], true)
           rig.page.currentSongIndex = 0
-          await until(() => toggle())
+          await until(() => enabled())
           toggle()?.click()
           await until(() => sheetOf(0) && pressed() === 'true')
           expect(sheetOf(0)?.hasAttribute('hidden')).to.equal(false)

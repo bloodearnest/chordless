@@ -1,5 +1,5 @@
 import type { PropertyValues } from 'lit'
-import { css, html, LitElement } from 'lit'
+import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { AppUpdateChangeEvent, appUpdate } from '../js/app-update.ts'
 import { sleep } from '../js/utils/sleep.ts'
@@ -49,6 +49,7 @@ export class HeaderInfoClickEvent extends Event {
  * @property {Boolean} showEditToggle - Whether to show the edit mode toggle button
  * @property {Boolean} showInfoButton - Whether to show the info button
  * @property {Boolean} showMelodyToggle - Whether to show the button that switches the song between its lyrics and its melody sheet
+ * @property {Boolean} melodyUnavailable - The song has no melody sheet: the button stays, greyed out, rather than disappearing
  * @property {Boolean} melodyMode - Whether the song is shown as its melody sheet (the button is pressed)
  * @property {Boolean} editMode - Current edit mode state (for styling the toggle button)
  * @property {String} phoneHeading - The title on a phone, if shorter than `heading` (the top row has little room)
@@ -81,6 +82,7 @@ export class AppHeader extends LitElement {
     showInfoButton: { type: Boolean, attribute: 'show-info-button' },
     showMelodyToggle: { type: Boolean, attribute: 'show-melody-toggle' },
     melodyMode: { type: Boolean, attribute: 'melody-mode' },
+    melodyUnavailable: { type: Boolean, attribute: 'melody-unavailable' },
     showLogo: { type: Boolean, attribute: 'show-logo' },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
     disableAnimation: { type: Boolean, attribute: 'disable-animation' },
@@ -97,6 +99,7 @@ export class AppHeader extends LitElement {
   declare showInfoButton: boolean
   declare showMelodyToggle: boolean
   declare melodyMode: boolean
+  declare melodyUnavailable: boolean
   declare showLogo: boolean
   declare editMode: boolean
   declare disableAnimation: boolean
@@ -429,6 +432,17 @@ export class AppHeader extends LitElement {
       box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
     }
 
+    /* A song with no lead sheet: the button stays, greyed out */
+    .icon-button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .icon-button:disabled:hover {
+      background-color: transparent;
+      transform: none;
+    }
+
     .edit-toggle.active:hover,
     .melody-toggle.active:hover {
       background-color: rgba(255, 255, 255, 0.9);
@@ -445,6 +459,7 @@ export class AppHeader extends LitElement {
     this.showInfoButton = false
     this.showMelodyToggle = false
     this.melodyMode = false
+    this.melodyUnavailable = false
     this.showLogo = false
     this.editMode = false
     this.disableAnimation = false
@@ -589,8 +604,16 @@ export class AppHeader extends LitElement {
                     class="icon-button melody-toggle ${this.melodyMode ? 'active' : ''}"
                     part="melody-toggle"
                     @click=${this._handleMelodyToggle}
-                    aria-label=${this.melodyMode ? 'Show the lyrics' : 'Show the lead sheet'}
+                    aria-label=${
+                      this.melodyUnavailable
+                        ? 'No lead sheet for this song'
+                        : this.melodyMode
+                          ? 'Show the lyrics'
+                          : 'Show the lead sheet'
+                    }
+                    title=${this.melodyUnavailable ? 'No lead sheet for this song' : nothing}
                     aria-pressed=${this.melodyMode ? 'true' : 'false'}
+                    ?disabled=${this.melodyUnavailable}
                   >
                     <app-icon name="music"></app-icon>
                   </button>

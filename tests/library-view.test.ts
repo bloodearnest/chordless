@@ -253,6 +253,7 @@ describe('the library view, with a song open', () => {
     describe('the melody sheet', () => {
       const header = () => control<AppHeader>('library-app-header')
       const toggle = () => header().shadowRoot?.querySelector<HTMLButtonElement>('.melody-toggle')
+      const enabled = () => (toggle()?.disabled === false ? toggle() : null)
       const sheet = () => view.querySelector<ScoreView>('score-view')
       const lyrics = () => view.querySelector<HTMLElement>('song-display')
       const visited: { url: string; replace?: boolean }[] = []
@@ -273,7 +274,7 @@ describe('the library view, with a song open', () => {
 
       it('has a button for a song with a melody, which shows the sheet in place of the lyrics and back', async () => {
         await open()
-        await until(() => toggle(), 'the melody button')
+        await until(() => enabled(), 'the melody button')
         expect(toggle()?.getAttribute('aria-pressed')).to.equal('false')
         expect(sheet()).to.equal(null)
 
@@ -292,7 +293,7 @@ describe('the library view, with a song open', () => {
 
       it('is shown in the key the song is in, and engraved again for a new one', async () => {
         await open()
-        await until(() => toggle(), 'the melody button')
+        await until(() => enabled(), 'the melody button')
         toggle()?.click()
         await until(() => sheet(), 'the melody sheet')
         expect(sheet()?.songKey).to.equal('G')
@@ -313,11 +314,12 @@ describe('the library view, with a song open', () => {
         await until(() => sheet() && !sheet()?.hidden, 'the sheet to come back')
       })
 
-      it('has no button for a song with no melody, and none once the song is closed', async () => {
+      it('has the button greyed out for a song with no melody, and none once the song is closed', async () => {
         await db.deleteScore(song.uuid, { remember: false })
         await open()
+        await until(() => toggle(), 'the melody button')
         await nothingFor()
-        expect(toggle() ?? null).to.equal(null)
+        expect(toggle()?.disabled).to.equal(true)
         await db.saveScore(sampleRecord(song.uuid, 'G'))
         view.route = { name: 'songs' }
         await nothingFor()

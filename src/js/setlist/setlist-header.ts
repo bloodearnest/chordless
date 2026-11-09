@@ -132,12 +132,16 @@ export class SetlistHeader {
     this.#melodyFor = song
     if (!song) {
       appHeader.showMelodyToggle = false
+      appHeader.melodyUnavailable = false
       appHeader.melodyMode = false
       return
     }
+    // (greyed out until the lookup says there is a sheet, so the button never appears and disappears)
+    appHeader.showMelodyToggle = true
+    appHeader.melodyUnavailable = true
     const found = await this.host.melodyOf(song)
     if (this.#melodyFor !== song) return
-    appHeader.showMelodyToggle = Boolean(found)
+    appHeader.melodyUnavailable = !found
     appHeader.melodyMode = Boolean(found) && this.host.isMelodyOn(song)
   }
 
