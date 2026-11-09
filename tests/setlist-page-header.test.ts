@@ -36,7 +36,7 @@ import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { sampleRecord } from './melody-sample.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
-import { nothingFor, shownToast, wait } from './test-helpers.ts'
+import { nextTimestamp, nothingFor, shownToast } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -348,7 +348,7 @@ describe('the setlist page: header, menu and keys', () => {
       )
       const before = must(await rig.db.getSetlist(setlist.id)).modifiedDate
       // (a clock tick, so a save now has a later time)
-      await wait(5)
+      await nextTimestamp()
       header().dispatchEvent(new EditModeToggleEvent())
       expect(document.body.classList.contains('edit-mode')).to.equal(false)
       await waitUntil(

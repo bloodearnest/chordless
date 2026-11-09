@@ -4,7 +4,7 @@ import type { SongWithContent } from '../src/js/data-types.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { AddSongModal } from '../src/js/setlist/add-song-modal.ts'
 import { createSong } from '../src/js/song-utils.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { settle, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -91,7 +91,7 @@ describe('AddSongModal', () => {
     await createSong(chart(`Closing ${stamp}`))
     await modal.open()
     modal.close()
-    await wait(0)
+    await settle()
     await modalElement().updateComplete
     expect(modalElement().hasAttribute('open')).to.equal(false)
 
@@ -106,7 +106,7 @@ describe('AddSongModal', () => {
     await modal.open()
     await type('again')
     modal.close()
-    await wait(0)
+    await settle()
     await modal.open()
     expect(root.querySelector('#add-song-search-input').value).to.equal('')
   })

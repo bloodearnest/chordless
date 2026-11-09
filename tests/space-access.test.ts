@@ -18,7 +18,7 @@ import {
 import { SpaceDB } from '../src/js/space-db.ts'
 import { SyncManager } from '../src/js/sync-manager.ts'
 import { installFakeDrive } from './fake-drive.ts'
-import { clearToasts, shownToast, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { clearToasts, settle, shownToast, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -154,7 +154,7 @@ describe('Knowing whether the user can write to the space folder', () => {
       })
       try {
         toast?.action?.run()
-        await wait(0)
+        await settle()
       } finally {
         setRouter(null)
       }

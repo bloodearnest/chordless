@@ -7,7 +7,7 @@ import { makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { MemoryStorage } from './memory-storage.ts'
 import { must } from './must.ts'
-import { deleteDatabase, TEST_SPACE, wait } from './test-helpers.ts'
+import { deleteDatabase, nextTimestamp, TEST_SPACE } from './test-helpers.ts'
 
 const { beforeEach, afterEach } = window
 
@@ -60,7 +60,7 @@ export async function addSong(
       chordproFileId,
     })
   )
-  await wait(5)
+  await nextTimestamp()
 }
 
 /** Edit a song's chart the way the app does: new content, and the song's modifiedDate moves */
@@ -74,7 +74,7 @@ export async function editSong(device: { db: ChordlessDB }, uuid: string, conten
   })
   song.modifiedDate = new Date().toISOString()
   await device.db.saveSong(song)
-  await wait(5)
+  await nextTimestamp()
 }
 
 /**
@@ -133,7 +133,7 @@ export function makeRig(storage: () => StorageBackend | undefined) {
   async function addSetlist(device, fields = {}) {
     const setlist = { ...createSetlist({ date: '2026-10-11' }), ...fields }
     await device.db.saveSetlist(setlist)
-    await wait(5)
+    await nextTimestamp()
     return setlist
   }
 
@@ -142,13 +142,13 @@ export function makeRig(storage: () => StorageBackend | undefined) {
     const setlist = await device.db.getSetlist(id)
     Object.assign(setlist, changes, { modifiedDate: new Date().toISOString() })
     await device.db.saveSetlist(setlist)
-    await wait(5)
+    await nextTimestamp()
   }
 
   /** Sync a device; what the sync reports */
   async function syncDevice(device) {
     const report = await device.sync.sync()
-    await wait(5)
+    await nextTimestamp()
     return report
   }
 

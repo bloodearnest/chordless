@@ -18,7 +18,7 @@ import '../src/js/views/setlist-view.ts'
 import '../src/js/views/account-view.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { settle, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, before, after, beforeEach, afterEach } = window
 
@@ -27,7 +27,7 @@ const frame = () => new Promise(resolve => requestAnimationFrame(resolve))
 /** Let what a view defers to the next frame run (page-view.ts), and anything that follows it */
 async function frames(n) {
   for (let i = 0; i < n; i++) await frame()
-  await wait(0)
+  await settle()
 }
 
 /** Wait until a view has loaded what it shows, and run the setup it defers a frame */

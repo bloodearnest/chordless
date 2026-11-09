@@ -39,6 +39,9 @@ export const wait = (ms: number) => new Promise<void>(resolve => setTimeout(reso
 
 export const settle = () => wait(0)
 
+/** Let the clock move on, so what is saved next has a later time than what was saved before */
+export const nextTimestamp = () => wait(5)
+
 /**
  * Time for what should not happen to have happened, if it were going to: a test that something
  * does not happen can only give it a while and look. Anything that should happen is waited for
