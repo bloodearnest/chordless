@@ -42,3 +42,18 @@ export async function showScore(content: HTMLElement, shown: ShownScore | null):
   if (!sheet) content.appendChild(made)
   if (display) display.style.display = 'none'
 }
+
+/**
+ * Put a song's lead sheet back into content that was made again (a new key draws the lyrics anew),
+ * with the lyrics hidden, so that they are not seen for the time it takes to engrave the new sheet: the
+ * sheet it had stays until the new one is ready (`<score-view>`).
+ */
+export function keepSheet(content: HTMLElement, display: HTMLElement, sheet: HTMLElement): void {
+  display.style.display = 'none'
+  content.appendChild(sheet)
+}
+
+/** The lead sheet that is shown in some content, to be kept through drawing the song again (null when the lyrics are) */
+export function shownSheet(content: ParentNode | null | undefined): HTMLElement | null {
+  return content?.querySelector<HTMLElement>('score-view:not([hidden])') ?? null
+}

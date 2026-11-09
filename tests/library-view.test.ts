@@ -306,6 +306,31 @@ describe('the library view, with a song open', () => {
         expect(lyrics()?.style.display).to.equal('none')
       })
 
+      it('keeps the sheet, and never shows the lyrics, while the song is drawn again for a new key', async () => {
+        await open()
+        await until(() => enabled(), 'the melody button')
+        toggle()?.click()
+        await until(() => sheet(), 'the melody sheet')
+        const before = sheet()
+        // (looked at every frame, from the key change until the new key is shown)
+        let lyricsSeen = false
+        let watching = true
+        const watch = () => {
+          if (lyrics() && lyrics()?.style.display !== 'none') lyricsSeen = true
+          if (watching) requestAnimationFrame(watch)
+        }
+        watch()
+        control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('A'))
+        await until(() => sheet()?.songKey === 'A', 'the sheet in A')
+        await new Promise(resolve => requestAnimationFrame(() => resolve(null)))
+        watching = false
+        expect(
+          sheet() === before,
+          'the same sheet, which shows the old key until the new is ready'
+        ).to.equal(true)
+        expect(lyricsSeen, 'the lyrics were shown').to.equal(false)
+      })
+
       it('follows the route: opened as the sheet, and moved to the lyrics and back by a link or Back', async () => {
         view = document.createElement('library-view')
         view.route = { name: 'songs', songUuid: song.uuid, melody: true }

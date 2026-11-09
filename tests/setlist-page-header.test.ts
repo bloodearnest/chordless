@@ -774,6 +774,32 @@ describe('the setlist page: header, menu and keys', () => {
         }
       })
 
+      it('keeps the sheet, and never shows the lyrics, while the song is drawn again for a new key', async () => {
+        await rig.db.saveScore(sampleRecord(rig.songs[0].uuid, 'G'))
+        try {
+          await rig.open()
+          rig.page.showSong(0, true)
+          rig.page.currentSongIndex = 0
+          rig.page.routeChanged({ songIndex: 0, melody: true })
+          await until(() => sheetOf(0) && lyricsOf(0)?.style.display === 'none')
+          const before = sheetOf(0)
+          let lyricsSeen = false
+          let watching = true
+          const watch = () => {
+            if (lyricsOf(0)?.style.display !== 'none') lyricsSeen = true
+            if (watching) requestAnimationFrame(watch)
+          }
+          watch()
+          await rig.page.reRenderSong(0)
+          await new Promise(resolve => requestAnimationFrame(() => resolve(null)))
+          watching = false
+          expect(sheetOf(0) === before, 'the same sheet').to.equal(true)
+          expect(lyricsSeen, 'the lyrics were shown').to.equal(false)
+        } finally {
+          await rig.db.deleteScore(rig.songs[0].uuid, { remember: false })
+        }
+      })
+
       it('follows a route that asks for the melody, and for the lyrics again', async () => {
         await rig.db.saveScore(sampleRecord(rig.songs[0].uuid, 'G'))
         try {

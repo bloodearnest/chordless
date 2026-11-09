@@ -44,7 +44,7 @@ import { getSpacePeople, identifyMe, settleLeader } from './people.ts'
 import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import type { Score } from './score.ts'
-import { scoreWithKey, showScore } from './score-shown.ts'
+import { keepSheet, scoreWithKey, shownSheet, showScore } from './score-shown.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
 import { AnnotationsController } from './setlist/annotations-controller.ts'
 import { enterEditMode, isEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
@@ -1420,6 +1420,9 @@ export class SetlistPage {
     if (songSection) {
       const songContent = songSection.querySelector<HTMLElement>('.song-content')
       if (songContent) {
+        // (a song shown as its lead sheet keeps it through being drawn again, in place of the lyrics:
+        // the sheet is made again for the new key when it is ready)
+        const sheet = this._melodyOn.has(songIndex) ? shownSheet(songContent) : null
         songContent.textContent = ''
         const songDisplay = document.createElement('song-display')
         songDisplay.parsed = song.parsed
@@ -1427,6 +1430,7 @@ export class SetlistPage {
         songDisplay.capo = this._capoEnabled ? song.currentCapo || 0 : 0
         songDisplay.annotations = this.annotations.chartAnnotations(songIndex)
         songContent.appendChild(songDisplay)
+        if (sheet) keepSheet(songContent, songDisplay, sheet)
 
         // Wait for Lit to render the shadow DOM contents
         await songDisplay.updateComplete
