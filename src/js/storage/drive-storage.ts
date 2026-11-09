@@ -45,6 +45,17 @@ async function inGroups<T, R>(items: T[], work: (item: T) => Promise<R>): Promis
   return results
 }
 
+/**
+ * Whether a file belongs to the songs collection: a chart (plain text) or a song's score, which is a
+ * MusicXML file and says what it is by its properties (`type: 'score'`, or `'melody'` before the
+ * rename: drive-metadata.ts). A listing that took only text would never show a score to a pull, and
+ * a device would never get back one that it lost.
+ */
+function isSongsFile(file: Pick<DriveFile, 'mimeType' | 'appProperties'>): boolean {
+  const type = file.appProperties?.type
+  return file.mimeType === 'text/plain' || type === 'score' || type === 'melody'
+}
+
 /** A Drive file as the storage API shows it */
 function toStored(file: DriveFile): StoredFile {
   return {
@@ -182,7 +193,7 @@ class DriveSpace implements SpaceStorage {
       for (const { fileId, file } of result.changes) {
         const parents = file?.parents ?? []
         if (!file || file.trashed) gone.push(fileId)
-        else if (inFolder(parents, songs) && file.mimeType === 'text/plain') {
+        else if (inFolder(parents, songs) && isSongsFile(file)) {
           changed.push({ collection: 'songs', file: toStored(file) })
         } else if (inFolder(parents, setlists) && file.name?.includes('.json')) {
           changed.push({ collection: 'setlists', file: toStored(file) })
@@ -214,7 +225,7 @@ class DriveSpace implements SpaceStorage {
                 .sort((a, b) => (b.modifiedTime ?? '').localeCompare(a.modifiedTime ?? ''))
             : collection === 'people'
               ? listed.filter(file => file.name?.includes('.json'))
-              : listed.filter(file => file.mimeType === 'text/plain')
+              : listed.filter(isSongsFile)
       return files.map(toStored)
     }
     const live = `'${folder}' in parents and trashed=false`
@@ -225,7 +236,8 @@ class DriveSpace implements SpaceStorage {
           ? await this.#api.listDriveFiles(`${live} and name contains '.json'`, 'modifiedTime desc')
           : collection === 'people'
             ? await this.#api.listDriveFiles(`${live} and name contains '.json'`)
-            : await this.#api.listDriveFiles(`${live} and mimeType='text/plain'`)
+            : // (the songs folder: its charts and its scores, told apart by what they are, not by one type)
+              (await this.#api.listDriveFiles(live)).filter(isSongsFile)
     return files.map(toStored)
   }
 

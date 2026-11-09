@@ -282,6 +282,57 @@ describe('Google Drive (on FakeDrive): the feed of changes', () => {
     return { fake, space, feed: must(space.changes) }
   }
 
+  describe('a song’s score, which is MusicXML and not plain text', () => {
+    const score = {
+      name: 'a.lead-sheet.mxl',
+      props: { type: 'score', songUuid: 's1' },
+      type: 'application/vnd.recordare.musicxml',
+    }
+    // (a score before the rename, and a file that is neither a chart nor a score)
+    const legacy = { ...score, name: 'b.melody.mxl', props: { type: 'melody', songUuid: 's2' } }
+    const other = { name: 'c.pdf', props: {}, type: 'application/pdf' }
+    const namesOf = (files: { name: string }[]) => files.map(file => file.name).sort()
+
+    async function withFiles() {
+      const { fake, space, feed } = await openSpace()
+      await space.create('songs', song, 'x')
+      await space.create('songs', score, 'x')
+      await space.create('songs', legacy, 'x')
+      await space.create('songs', other, 'x')
+      return { fake, space, feed }
+    }
+
+    it('is listed with the charts, as Drive lists them, so a pull can bring it back', async () => {
+      const { space } = await withFiles()
+      expect(namesOf(await space.list('songs'))).to.deep.equal([
+        'a.lead-sheet.mxl',
+        'a.txt',
+        'b.melody.mxl',
+      ])
+    })
+
+    it('is listed from the inventory too', async () => {
+      const { space } = await withFiles()
+      await space.inventory()
+      expect(namesOf(await space.list('songs'))).to.deep.equal([
+        'a.lead-sheet.mxl',
+        'a.txt',
+        'b.melody.mxl',
+      ])
+    })
+
+    it('is in the feed of changes, in the songs', async () => {
+      const { space, feed } = await withFiles()
+      const first = await feed.start()
+      await space.create('songs', { ...score, name: 'd.lead-sheet.mxl' }, 'x')
+      await space.create('songs', { ...other, name: 'e.pdf' }, 'x')
+      const { changed } = await feed.since(first)
+      expect(changed.map(c => [c.collection, c.file.name])).to.deep.equal([
+        ['songs', 'd.lead-sheet.mxl'],
+      ])
+    })
+  })
+
   it('shows nothing until something changes, then the files that did, by collection', async () => {
     const { space, feed } = await openSpace()
     const start = await feed.start()
