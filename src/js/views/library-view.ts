@@ -178,7 +178,8 @@ export class LibraryView extends PageView {
     const found = scoreWithKey(await (await getCurrentDB()).getScore(song.uuid), song.originalKey)
     // (the song may have changed while this was read)
     if (this.#song !== song) return
-    header.showMelodyToggle = Boolean(found)
+    header.showMelodyToggle = true
+    header.melodyUnavailable = !found
     if (!found) this.#melodyOn = false
     header.melodyMode = this.#melodyOn
     if (!content) return
@@ -347,6 +348,7 @@ export class LibraryView extends PageView {
     const header = this.querySelector<AppHeader>('#library-app-header')
     if (header) {
       header.showMelodyToggle = false
+      header.melodyUnavailable = false
       header.melodyMode = false
     }
     this._source = ''

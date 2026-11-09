@@ -150,6 +150,19 @@ describe('app-header', () => {
       expect(toggle.classList.contains('active')).to.equal(true)
     })
 
+    it('keeps a greyed-out melody button for a song with no lead sheet, which does nothing when pressed', async () => {
+      const header = await fixture<AppHeader>(
+        html`<app-header heading="Page" show-melody-toggle melody-unavailable></app-header>`
+      )
+      const toggle = must(button(header, '.melody-toggle')) as HTMLButtonElement
+      expect(toggle.disabled).to.equal(true)
+      expect(toggle.getAttribute('aria-label')).to.equal('No lead sheet for this song')
+      let pressed = 0
+      header.addEventListener(MelodyToggleEvent.type, () => pressed++)
+      toggle.click()
+      expect(pressed).to.equal(0)
+    })
+
     it('marks the edit button while in edit mode', async () => {
       const header = await fixture<AppHeader>(
         html`<app-header heading="Page" show-edit-toggle edit-mode></app-header>`
