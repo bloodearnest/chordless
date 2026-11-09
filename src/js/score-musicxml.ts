@@ -122,7 +122,8 @@ function noteXml(
   n: ScoreNote,
   voice: number,
   prev: ScoreNote | undefined,
-  accidental = ''
+  accidental = '',
+  beams = ''
 ): string {
   const { type, dots } = typeOf(n.duration / n.tupletRatio)
   const lyrics = n.syllables
@@ -140,7 +141,7 @@ function noteXml(
     `<pitch><step>${n.step}</step>${n.alter ? `<alter>${n.alter}</alter>` : ''}<octave>${n.octave}</octave></pitch>` +
     `<duration>${Math.round(n.duration * DIVISIONS)}</duration>` +
     `${n.tieStop ? '<tie type="stop"/>' : ''}${n.tieStart ? '<tie type="start"/>' : ''}` +
-    `<voice>${voice}</voice><type>${type}</type>${'<dot/>'.repeat(dots)}${accidental}${timeModification(n.tupletRatio)}` +
+    `<voice>${voice}</voice><type>${type}</type>${'<dot/>'.repeat(dots)}${accidental}${timeModification(n.tupletRatio)}${beams}` +
     notations(
       `${n.tieStop ? '<tied type="stop"/>' : ''}${n.tieStart ? '<tied type="start"/>' : ''}`,
       n
@@ -206,6 +207,73 @@ function rightBarline(m: ScoreMeasure): string {
   const repeat = m.barline === 'repeat-end' ? '<repeat direction="backward"/>' : ''
   if (!style && !ending && !repeat) return ''
   return `<barline location="right">${style ? `<bar-style>${style}</bar-style>` : ''}${ending}${repeat}</barline>`
+}
+
+/** How many beams a note's length has: an eighth one, a sixteenth two, and so on; none for a quarter or longer */
+function beamLevels(e: ScoreEvent): number {
+  const q = e.duration / e.tupletRatio
+  return q >= 1 - 1e-6 ? 0 : Math.min(4, Math.max(1, Math.round(-Math.log2(q))))
+}
+
+/**
+ * The `<beam>` elements of each note in a line, by the usual rule that notes shorter than a quarter are
+ * joined within a beat (a dotted quarter's worth in 6/8, 9/8 and 12/8) and a rest or a note of another
+ * size (cue or not) breaks the group. The score does not keep how the sheet beamed its notes, so this
+ * is worked out again; without it every note is drawn alone with its own flag. A note sounding with the
+ * one before it (a chord) is beamed with it.
+ */
+function beamsOf(line: ScoreEvent[], beat: number): Map<ScoreEvent, string> {
+  const out = new Map<ScoreEvent, string>()
+  const groups: ScoreNote[][] = []
+  let group: ScoreNote[] = []
+  let at = -1
+  let cue = false
+  const close = () => {
+    if (group.length > 1) groups.push(group)
+    group = []
+  }
+  for (const e of line) {
+    if (e.kind === 'note' && e.withPrevious) continue
+    if (e.kind !== 'note' || beamLevels(e) === 0) {
+      close()
+      continue
+    }
+    const slot = Math.floor(e.start / beat + 1e-6)
+    if (group.length && (slot !== at || e.cue !== cue)) close()
+    at = slot
+    cue = e.cue
+    group.push(e)
+  }
+  close()
+  for (const notes of groups) {
+    const levels = notes.map(beamLevels)
+    notes.forEach((n, i) => {
+      let xml = ''
+      for (let level = 1; level <= (levels[i] as number); level++) {
+        const hasPrev = i > 0 && (levels[i - 1] as number) >= level
+        const hasNext = i < notes.length - 1 && (levels[i + 1] as number) >= level
+        const kind =
+          hasPrev && hasNext
+            ? 'continue'
+            : hasPrev
+              ? 'end'
+              : hasNext
+                ? 'begin'
+                : i === 0
+                  ? 'forward hook'
+                  : 'backward hook'
+        xml += `<beam number="${level}">${kind}</beam>`
+      }
+      out.set(n, xml)
+    })
+  }
+  // (a note in a chord takes the beams of the one it sounds with)
+  let last = ''
+  for (const e of line) {
+    if (e.kind === 'note' && e.withPrevious) out.set(e, last)
+    else last = out.get(e) ?? ''
+  }
+  return out
 }
 
 /**
@@ -284,7 +352,9 @@ export function writeMusicXml(melody: Score): string {
     let cursor = 0
     const accidentals = new Accidentals(m.fifths, carried)
     const tiedOn = new Map<string, number>()
+    const beat = m.beatType === 8 && m.beats % 3 === 0 ? 1.5 : 1
     m.voices.flatMap(lanesOf).forEach((v, vi) => {
+      const beams = beamsOf(v, beat)
       if (vi > 0) {
         out.push(`<backup><duration>${cursor}</duration></backup>`)
         cursor = 0
@@ -320,7 +390,7 @@ export function writeMusicXml(melody: Score): string {
           out.push(restXml(e, vi + 1))
           prev = undefined
         } else {
-          out.push(noteXml(e, vi + 1, prev, accidentals.of(e)))
+          out.push(noteXml(e, vi + 1, prev, accidentals.of(e), beams.get(e)))
           accidentals.carryOn(e, tiedOn)
           prev = e
         }

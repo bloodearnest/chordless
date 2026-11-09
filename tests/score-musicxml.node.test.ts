@@ -179,3 +179,57 @@ describe('directions, repeats and endings', () => {
     assert.match(xml, /<bar-style>light-light<\/bar-style>/)
   })
 })
+
+describe('MusicXML beams', () => {
+  const beamsIn = (xml: string) =>
+    [...xml.matchAll(/<beam number="(\d)">([^<]*)<\/beam>/g)].map(m => `${m[1]}${m[2]}`)
+  const eighths = (...starts: number[]) =>
+    starts.map(start => note('E', 4, { start, duration: 0.5 }))
+
+  it('beams the eighths of a beat together and leaves the quarters alone', () => {
+    const xml = writeMusicXml(
+      melodyOf(null, [bar([...eighths(0, 0.5), note('G', 4, { start: 1 }), ...eighths(2, 2.5)])])
+    )
+    assert.deepEqual(beamsIn(xml), ['1begin', '1end', '1begin', '1end'])
+  })
+
+  it('does not beam across a beat, or over a rest', () => {
+    const xml = writeMusicXml(
+      melodyOf(null, [
+        bar([...eighths(0.5, 1), rest({ start: 1.5, duration: 0.5 }), ...eighths(2, 2.5)]),
+      ])
+    )
+    // (0.5 and 1 are in different beats; the rest breaks what is left)
+    assert.deepEqual(beamsIn(xml), ['1begin', '1end'])
+  })
+
+  it('gives sixteenths a second beam, with a hook for one that has no neighbour at that level', () => {
+    const xml = writeMusicXml(
+      melodyOf(null, [
+        bar([
+          note('E', 4, { start: 0, duration: 0.75 }),
+          note('F', 4, { start: 0.75, duration: 0.25 }),
+          note('G', 4, { start: 1, duration: 1 }),
+        ]),
+      ])
+    )
+    assert.deepEqual(beamsIn(xml), ['1begin', '1end', '2backward hook'])
+  })
+
+  it('joins the three eighths of a beat in 6/8 and keeps a cue line apart', () => {
+    const six = bar([...eighths(0, 0.5, 1), ...eighths(1.5, 2, 2.5)], { beats: 6, beatType: 8 })
+    assert.deepEqual(beamsIn(writeMusicXml(melodyOf(null, [six]))), [
+      '1begin',
+      '1continue',
+      '1end',
+      '1begin',
+      '1continue',
+      '1end',
+    ])
+    const cue = bar([
+      note('E', 4, { duration: 0.5, cue: true }),
+      note('E', 4, { start: 0.5, duration: 0.5 }),
+    ])
+    assert.deepEqual(beamsIn(writeMusicXml(melodyOf(null, [cue]))), [])
+  })
+})
