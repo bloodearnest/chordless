@@ -7,7 +7,7 @@ import {
   MelodyToggleEvent,
 } from '../src/components/app-header.ts'
 import { AppUpdateChangeEvent } from '../src/js/app-update.ts'
-import { wait } from './test-helpers.ts'
+import { nothingFor, wait } from './test-helpers.ts'
 import '../src/components/app-header.ts'
 
 import { must } from './must.ts'
@@ -71,7 +71,7 @@ describe('app-header', () => {
     }
     header.setTitleInstant('Second')
     await header.updateComplete
-    await wait(50)
+    await nothingFor(50)
     expect(shownTitle(header)).to.equal('Second')
     expect(updates).to.equal(1)
     // The next change fades as usual

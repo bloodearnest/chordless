@@ -11,7 +11,6 @@ import {
   type ClickOscillator,
   MetronomeController,
 } from '../src/js/metronome-controller.ts'
-import { wait } from './test-helpers.ts'
 
 class MockAudioContext implements ClickAudioContext {
   state: string
@@ -246,11 +245,11 @@ describe('MetronomeController, the details of timing and stopping', () => {
     const controller = make(ctx)
     controller.start(600, '4/4', '1/4')
     expect(ctx.oscillators).to.have.length(1)
-    await wait(260)
+    await waitUntil(() => ctx.oscillators.length >= 3, 'three clicks')
     controller.stop()
     const clicks = ctx.oscillators.length
     expect(clicks).to.be.at.least(3)
-    await wait(200)
+    await nothingFor(200)
     expect(ctx.oscillators.length, 'no more once stopped').to.equal(clicks)
   })
 

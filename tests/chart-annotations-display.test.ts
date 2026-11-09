@@ -8,8 +8,9 @@ import { noSources, putAnnotation } from '../src/js/annotations/store.ts'
 import type { ChartAnnotation } from '../src/js/data-types.ts'
 import { ChordProParser } from '../src/js/parser.ts'
 import { makeAnnotation } from './builders.ts'
+import { installFakeTimers } from './test-helpers.ts'
 
-const { describe, it } = window
+const { describe, it, afterEach } = window
 
 const parsed = new ChordProParser().parse(
   '{title: A}\n{key: G}\n\n{comment: Verse}\n[G]Amazing [C]grace how sweet\n\n{comment: Chorus}\n[D]Oh how free'
@@ -350,7 +351,17 @@ describe('annotations on a chart', () => {
     const labelled = new ChordProParser().parse(
       '{title: A}\n{key: G}\n\n{comment: Verse}\n[G]Amazing [C]grace how sweet'
     )
-    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+    /** A hold is timed: the clock is the test's (from once the section is drawn), so it is never too slow */
+    let clock: ReturnType<typeof installFakeTimers> | undefined
+    afterEach(() => {
+      clock?.uninstall()
+      clock = undefined
+    })
+    const hold = async (target: Element) => {
+      clock ??= installFakeTimers({ date: true })
+      press(target)
+      await clock.tick(650)
+    }
 
     async function editing(withAnnotations = noSources()) {
       const display = await fixture<SongDisplay>(html`<song-display></song-display>`)
@@ -381,10 +392,8 @@ describe('annotations on a chart', () => {
 
     it('asks for the annotation editor when a word or the title is held', async () => {
       const { root, requests } = await editing()
-      press(root.querySelectorAll('.chord-segment')[1] as Element)
-      await wait(650)
-      press(root.querySelector('.section-title') as Element)
-      await wait(650)
+      await hold(root.querySelectorAll('.chord-segment')[1] as Element)
+      await hold(root.querySelector('.section-title') as Element)
       expect(
         requests.map(each => [
           each.songIndex,
@@ -464,8 +473,7 @@ describe('annotations on a chart', () => {
       const { section, root, requests } = await editing(sources)
       section.editMode = false
       await section.updateComplete
-      press(root.querySelectorAll('.chord-segment')[1] as Element)
-      await wait(650)
+      await hold(root.querySelectorAll('.chord-segment')[1] as Element)
       ;(root.querySelector('.segment-annotations .annotation') as HTMLElement).click()
       expect(requests).to.deep.equal([])
       expect(root.querySelector('.chord-segment')?.hasAttribute('tabindex')).to.equal(false)
