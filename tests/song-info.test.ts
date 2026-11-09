@@ -3,7 +3,7 @@ import { type SongInfo, SongRangeChangeEvent } from '../src/components/song-info
 import '../src/components/song-info.ts'
 
 import { songMelody } from '../src/js/melody-analysis.ts'
-import { sampleRecord } from './melody-sample.ts'
+import { sampleRecord } from './score-sample.ts'
 import { A11Y } from './test-helpers.ts'
 
 const { describe, it } = window

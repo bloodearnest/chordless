@@ -7,9 +7,9 @@
  */
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Melody, MelodyEvent, MelodyNote } from '../src/js/melody.ts'
-import { writeMusicXml } from '../src/js/melody-musicxml.ts'
-import { readMusicXml } from '../src/js/melody-musicxml-read.ts'
+import type { Score, ScoreEvent, ScoreNote } from '../src/js/score.ts'
+import { writeMusicXml } from '../src/js/score-musicxml.ts'
+import { readMusicXml } from '../src/js/score-musicxml-read.ts'
 import { readPdf } from './melody-pdf-spike.ts'
 
 const dir = process.argv[2] as string
@@ -22,14 +22,14 @@ const r = (n: number) => Math.round(n * 10000) / 10000
  * barline that is "none" (a plain one), and the words of a segno or coda sign.
  */
 /** The lyrics a note keeps: none on a cue note, no verse number, and no empty verse at the end */
-function syllablesOf(e: MelodyNote): string[] {
+function syllablesOf(e: ScoreNote): string[] {
   const kept = e.cue ? [] : e.syllables.map(s => (/^\d+\.$/.test(s) ? '' : s))
   while (kept.length && !kept[kept.length - 1]) kept.pop()
   return kept
 }
 
-function normal(m: Melody) {
-  const event = (e: MelodyEvent) =>
+function normal(m: Score) {
+  const event = (e: ScoreEvent) =>
     e.kind === 'note'
       ? [
           'n',

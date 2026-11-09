@@ -1,7 +1,7 @@
-/** The signs of a lead sheet's page read from its drawing (src/js/melody-pdf.ts) */
+/** The signs of a lead sheet's page read from its drawing (src/js/score-pdf.ts) */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { type Glyph, type Line, type Staff, signsOf } from '../src/js/melody-pdf.ts'
+import { type Glyph, type Line, type Staff, signsOf } from '../src/js/score-pdf.ts'
 
 describe('repeat signs and endings on a page', () => {
   const staff = (x0: number, x1: number, top: number, sys = 0): Staff & { sys: number } => ({

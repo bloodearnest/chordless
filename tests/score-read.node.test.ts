@@ -1,7 +1,7 @@
-/** Reading the tree of a lead sheet as Verovio engraves it (src/js/melody-read.ts), from an SVG drawn the same way */
+/** Reading the tree of a lead sheet as Verovio engraves it (src/js/score-read.ts), from an SVG drawn the same way */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { readMelodySvg } from '../scripts/melody-xml.ts'
+import { readScoreSvg } from '../scripts/melody-xml.ts'
 
 /** One measure of 4/4 in the shape Verovio writes, drawn with the glyphs named, as a lead sheet's SVG is */
 function sheet(notes: string, key = ''): string {
@@ -23,8 +23,8 @@ const quarter = (id: string, step: number, extra = '') =>
 
 describe('reading a lead sheet SVG', () => {
   it('reads pitch from the staff and length from the glyphs, and checks the measure adds up', () => {
-    const stats = { warnings: [] as string[] } as Parameters<typeof readMelodySvg>[1]
-    const melody = readMelodySvg(
+    const stats = { warnings: [] as string[] } as Parameters<typeof readScoreSvg>[1]
+    const melody = readScoreSvg(
       [sheet(`${quarter('a', 0)}${quarter('b', 1)}${quarter('c', 2)}${quarter('d', 3)}`)],
       stats
     )
@@ -42,7 +42,7 @@ describe('reading a lead sheet SVG', () => {
   })
 
   it('flags a measure that does not add up', () => {
-    const melody = readMelodySvg([sheet(`${quarter('a', 0)}${quarter('b', 1)}${quarter('c', 2)}`)])
+    const melody = readScoreSvg([sheet(`${quarter('a', 0)}${quarter('b', 1)}${quarter('c', 2)}`)])
     assert.equal(melody.measures[0]?.full, false)
     assert.equal(melody.measures[0]?.length, 3)
   })
@@ -50,7 +50,7 @@ describe('reading a lead sheet SVG', () => {
   it('applies the key signature, so a flat on the B line makes a B flat', () => {
     const key =
       '<g class="keySig"><g class="keyAccid"><use xlink:href="#E260-x" transform="translate(735, 3597) scale(0.72, 0.72)" /></g></g>'
-    const melody = readMelodySvg([
+    const melody = readScoreSvg([
       sheet(`${quarter('a', 4)}${quarter('b', 0)}${quarter('c', 0)}${quarter('d', 0)}`, key),
     ])
     const first = melody.measures[0]?.voices[0]?.[0]
@@ -71,11 +71,11 @@ describe('lining up a cue line with the sung one', () => {
       '<g class="layer"></g>',
       `<g class="layer">${sung.join('')}</g><g class="layer">${cue.join('')}</g>`
     )
-    const melody = readMelodySvg([svg])
+    const melody = readScoreSvg([svg])
     assert.equal(melody.measures[0]?.length, 4)
     assert.equal(melody.measures[0]?.full, true)
     // a cue head a bar further along is not beside anything: it stays a place of its own
     const far = svg.replace(/data-x="1830"/, 'data-x="2400"')
-    assert.notEqual(readMelodySvg([far]).measures[0]?.length, 4)
+    assert.notEqual(readScoreSvg([far]).measures[0]?.length, 4)
   })
 })

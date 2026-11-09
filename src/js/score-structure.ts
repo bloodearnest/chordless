@@ -9,7 +9,7 @@
  * ("Play 3 times", "(4x)"), the repeats are not taken again after a D.S. or D.C., and "to Coda" is
  * taken on the way through after a jump.
  */
-import type { Melody, MelodyMeasure } from './melody.ts'
+import type { Score, ScoreMeasure } from './score.ts'
 import { lyricWords } from './utils/lyric-words.ts'
 
 export interface SheetSection {
@@ -20,7 +20,7 @@ export interface SheetSection {
 }
 
 /** The sections a sheet is boxed into, in order; measures before the first box are a section of no name */
-export function sheetSections(melody: Melody): SheetSection[] {
+export function sheetSections(melody: Score): SheetSection[] {
   const out: SheetSection[] = []
   melody.measures.forEach((m, i) => {
     if (m.section || i === 0) {
@@ -38,7 +38,7 @@ function endingHas(label: string, pass: number): boolean {
 }
 
 /** How many times the repeat that ends at `end` and starts at `start` is played, from a "Play 3 times" or "(4x)" in it */
-function timesOf(measures: MelodyMeasure[], start: number, end: number): number {
+function timesOf(measures: ScoreMeasure[], start: number, end: number): number {
   for (let i = start; i <= end; i++)
     for (const d of measures[i]?.directions ?? []) {
       const m = d.kind === 'text' ? /(\d+)\s*(?:x\b|times)/i.exec(d.text) : null
@@ -54,10 +54,10 @@ export interface Played {
 }
 
 /** The measures in the order they are played, following the repeats, endings and jumps */
-export function playOrder(melody: Melody): Played[] {
+export function playOrder(melody: Score): Played[] {
   const ms = melody.measures
   const out: Played[] = []
-  const has = (m: MelodyMeasure | undefined, kind: string) =>
+  const has = (m: ScoreMeasure | undefined, kind: string) =>
     !!m?.directions.some(d => d.kind === kind)
   const segnoAt = ms.findIndex(m => has(m, 'segno'))
   let codaAt = -1
@@ -69,7 +69,7 @@ export function playOrder(melody: Melody): Played[] {
   let start = 0
   let jumped: 'coda' | 'fine' | 'plain' | null = null
   for (let steps = 0; i < ms.length && steps < 5000; steps++) {
-    const m = ms[i] as MelodyMeasure
+    const m = ms[i] as ScoreMeasure
     if (m.repeatStart && !jumped) {
       start = i
     }
@@ -136,7 +136,7 @@ export interface PlayStep {
   pass: number
 }
 
-export function playSteps(melody: Melody, order = playOrder(melody)): PlayStep[] {
+export function playSteps(melody: Score, order = playOrder(melody)): PlayStep[] {
   const sections = sheetSections(melody)
   const sectionOf = (measure: number) =>
     sections.findIndex(s => measure >= s.from && measure < s.to)
@@ -162,7 +162,7 @@ export function playSteps(melody: Melody, order = playOrder(melody)): PlayStep[]
  * The lyric words of a run of measures, for a verse (0 is the first). A verse the run has no words
  * for (the chorus a second time, written once) is read from the first.
  */
-export function stepWords(melody: Melody, step: PlayStep, verse = step.pass - 1): string[] {
+export function stepWords(melody: Score, step: PlayStep, verse = step.pass - 1): string[] {
   const read = (v: number) => {
     let text = ''
     for (const [from, to] of step.spans)
@@ -202,7 +202,7 @@ export function lyricSimilarity(a: string[], b: string[]): number {
 }
 
 /** How many verses of lyrics are written under a run of measures (strophic songs print all of them under one section) */
-export function verseRows(melody: Melody, step: PlayStep): number {
+export function verseRows(melody: Score, step: PlayStep): number {
   let rows = 0
   for (const [from, to] of step.spans)
     for (const m of melody.measures.slice(from, to))
@@ -216,7 +216,7 @@ export function verseRows(melody: Melody, step: PlayStep): number {
 }
 
 /** The chart sections the lyrics of every verse of a step say, best match first for each verse; null where none is near */
-export function matchVerses(melody: Melody, step: PlayStep, chart: ChartText[]): (string | null)[] {
+export function matchVerses(melody: Score, step: PlayStep, chart: ChartText[]): (string | null)[] {
   const chartWords = chart.map(c => lyricWords(c.text))
   return Array.from({ length: Math.max(1, verseRows(melody, step)) }, (_, v) => {
     const mine = stepWords(melody, step, v)
@@ -238,7 +238,7 @@ export interface Matched {
  * each chart section's. Identical sections (Chorus 1, Chorus 2) go to the first one not used yet.
  * A step with no words (an instrumental) goes by the name of its sheet section.
  */
-export function matchChart(melody: Melody, steps: PlayStep[], chart: ChartText[]): Matched[] {
+export function matchChart(melody: Score, steps: PlayStep[], chart: ChartText[]): Matched[] {
   const sections = sheetSections(melody)
   const chartWords = chart.map(c => lyricWords(c.text))
   const used = new Set<number>()

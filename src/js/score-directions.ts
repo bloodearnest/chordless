@@ -3,13 +3,13 @@
  * "2nd time to Coda", "Fine", the segno and coda signs, and plain instructions ("Play 3 times").
  * The signs are characters of the music font in the text (U+E047 segno, U+E048 coda).
  */
-import type { MelodyDirection } from './melody.ts'
+import type { ScoreDirection } from './score.ts'
 
 const SEGNO = ''
 const CODA = ''
 
 /** What one line of direction text, with its signs, says; null for nothing that is a direction */
-export function parseDirection(raw: string): MelodyDirection | null {
+export function parseDirection(raw: string): ScoreDirection | null {
   const text = raw.replace(/[-]/g, '').replace(/\s+/g, ' ').trim()
   const hasCoda = raw.includes(CODA)
   const hasSegno = raw.includes(SEGNO)
@@ -19,7 +19,7 @@ export function parseDirection(raw: string): MelodyDirection | null {
   // ("Repeat 3x Last time to Coda": the last time is the third)
   const lastTime = /\blast\s+time\b/i.test(text) ? /\brepeat\s+(\d+)\s*x/i.exec(text) : null
   const time = timeMatch ? Number(timeMatch[1]) : lastTime ? Number(lastTime[1]) : null
-  const make = (kind: MelodyDirection['kind']): MelodyDirection => ({
+  const make = (kind: ScoreDirection['kind']): ScoreDirection => ({
     kind,
     al: kind === 'da-segno' || kind === 'da-capo' ? al : null,
     time,

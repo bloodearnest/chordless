@@ -9,8 +9,8 @@
 import type { MelodyRecord, Person, Setlist, SongInput, SongRecord } from '../data-types.ts'
 import { withNumericTempos } from '../db.ts'
 import { adoptLegacyLeader, type Leaders } from '../leaders.ts'
-import { readMusicXml } from '../melody-musicxml-read.ts'
-import { readMelodyFile } from '../mxl.ts'
+import { readScoreFile } from '../mxl.ts'
+import { readMusicXml } from '../score-musicxml-read.ts'
 import { songSource } from '../song-source.ts'
 import { chartFields, chartIdentity } from '../song-utils.ts'
 import type { StoredFile } from '../storage/types.ts'
@@ -671,7 +671,7 @@ async function downloadMelody(
   bytes: Uint8Array
 ): Promise<void> {
   // (an .mxl, or the plain MusicXML the first version wrote, and a text-only space keeps)
-  const xml = await readMelodyFile(bytes)
+  const xml = await readScoreFile(bytes)
   if (xml === null) {
     console.warn(`[DriveSync] ${file.name} is not MusicXML Chordless can read: left as it is`)
     return

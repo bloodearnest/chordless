@@ -1,5 +1,5 @@
 /**
- * Reads MusicXML into a `Melody`: the other half of `melody-musicxml.ts`, which writes it. This is how
+ * Reads MusicXML into a `Score`: the other half of `score-musicxml.ts`, which writes it. This is how
  * a melody is kept (a MusicXML file beside the chart, docs/MELODY.md) and how one from another
  * program comes in. It reads partwise scores, the first part, and what a lead sheet has: pitches and
  * lengths, voices (with `<backup>` and `<forward>`), chords, ties, tuplets, lyrics, chord symbols,
@@ -9,17 +9,17 @@
  * anything that makes the music other than notes and rests. A file with no part is null.
  */
 
-import type {
-  Melody,
-  MelodyChord,
-  MelodyDirection,
-  MelodyEnding,
-  MelodyEvent,
-  MelodyMeasure,
-  MelodyNote,
-} from './melody.ts'
-import { parseDirection } from './melody-directions.ts'
 import { midiOf } from './pitch.ts'
+import type {
+  Score,
+  ScoreChord,
+  ScoreDirection,
+  ScoreEnding,
+  ScoreEvent,
+  ScoreMeasure,
+  ScoreNote,
+} from './score.ts'
+import { parseDirection } from './score-directions.ts'
 import { type El, parseXml } from './xml.ts'
 
 const child = (e: El, name: string) => e.children.find(c => c.name === name)
@@ -87,7 +87,7 @@ function readBarline(b: El, edges: Edges) {
   }
 }
 
-function barlineOf(edges: Edges): MelodyMeasure['barline'] {
+function barlineOf(edges: Edges): ScoreMeasure['barline'] {
   if (edges.repeatEnd) return 'repeat-end'
   if (edges.style === 'light-light') return 'double'
   if (edges.style === 'light-heavy') return 'final'
@@ -117,26 +117,26 @@ function titleOf(root: El): string | null {
 }
 
 /** The melody of a MusicXML document, or null if it is not a partwise score with a part */
-export function readMusicXml(xml: string): Melody | null {
+export function readMusicXml(xml: string): Score | null {
   const root = parseXml(xml)
   const part = root?.name === 'score-partwise' ? child(root, 'part') : undefined
   if (!root || !part) return null
   const title = titleOf(root)
   const notice = kids(child(root, 'identification') ?? root, 'rights').map(r => r.text.trim())
 
-  const measures: MelodyMeasure[] = []
+  const measures: ScoreMeasure[] = []
   let divisions = 1
   let fifths = 0
   let beats = 4
   let beatType = 4
-  let open: { label: string; of: MelodyMeasure[] } | null = null
+  let open: { label: string; of: ScoreMeasure[] } | null = null
 
   part.children
     .filter(m => m.name === 'measure')
     .forEach((m, index) => {
-      const voices = new Map<number, MelodyEvent[]>()
-      const chords: MelodyChord[] = []
-      const directions: MelodyDirection[] = []
+      const voices = new Map<number, ScoreEvent[]>()
+      const chords: ScoreChord[] = []
+      const directions: ScoreDirection[] = []
       const edges: Edges = {
         repeatStart: false,
         repeatEnd: false,
@@ -202,9 +202,9 @@ export function readMusicXml(xml: string): Melody | null {
             ...(tuplet ? { tuplet } : {}),
           }
           const pitch = child(e, 'pitch')
-          let event: MelodyEvent
+          let event: ScoreEvent
           if (pitch) {
-            const step = textOf(child(pitch, 'step')) as MelodyNote['step']
+            const step = textOf(child(pitch, 'step')) as ScoreNote['step']
             const alter = Math.round(numberOf(child(pitch, 'alter'), 0))
             const octave = numberOf(child(pitch, 'octave'), 4)
             const syllables: string[] = []
@@ -244,7 +244,7 @@ export function readMusicXml(xml: string): Melody | null {
       }
 
       const lists = [...voices.values()]
-      const end = (v: MelodyEvent[]) => v.reduce((x, e) => Math.max(x, e.start + e.duration), 0)
+      const end = (v: ScoreEvent[]) => v.reduce((x, e) => Math.max(x, e.start + e.duration), 0)
       const lengths = lists.map(end)
       const length = Math.max(0, ...lengths)
       const measureLength = (beats * 4) / beatType
@@ -255,7 +255,7 @@ export function readMusicXml(xml: string): Melody | null {
         Math.abs(main - measureLength) < 1e-6 &&
         lengths.every(l => l <= measureLength + 1e-6)
 
-      const measure: MelodyMeasure = {
+      const measure: ScoreMeasure = {
         number: numberOf(
           { text: m.attrs.number ?? '', name: '', attrs: {}, children: [] },
           index + 1
@@ -277,7 +277,7 @@ export function readMusicXml(xml: string): Melody | null {
       // An ending is a bracket over the measures from its start to its stop (the barlines only name those two)
       if (edges.endingStart !== null) open = { label: edges.endingStart, of: [] }
       if (open) {
-        const ending: MelodyEnding = {
+        const ending: ScoreEnding = {
           label: open.label,
           start: edges.endingStart !== null,
           stop: edges.endingStop !== null,
@@ -286,7 +286,7 @@ export function readMusicXml(xml: string): Melody | null {
         measure.ending = ending
         open.of.push(measure)
         if (edges.endingStop) {
-          for (const x of open.of) (x.ending as MelodyEnding).closed = edges.endingStop === 'stop'
+          for (const x of open.of) (x.ending as ScoreEnding).closed = edges.endingStop === 'stop'
           open = null
         }
       }

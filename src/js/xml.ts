@@ -1,5 +1,5 @@
 /**
- * A small XML reader, for the tree `melody-read.ts` walks: elements, their attributes and their text.
+ * A small XML reader, for the tree `score-read.ts` walks: elements, their attributes and their text.
  * It is for what Verovio and MusicXML files write, so it has what they have (a declaration, a
  * DOCTYPE, comments, CDATA, processing instructions, the five named entities and numeric ones) and
  * nothing else: no namespaces, and no DTD is ever read or fetched, so a file cannot name an entity

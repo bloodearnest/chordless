@@ -1,7 +1,7 @@
 /** `.mxl` (src/js/mxl.ts): the zip a notation program writes, and the one Chordless writes */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { isZip, readMelodyFile, readMxl, writeMxl } from '../src/js/mxl.ts'
+import { isZip, readMxl, readScoreFile, writeMxl } from '../src/js/mxl.ts'
 
 /** Zips made by Python's zipfile, with the score at a path container.xml names (and another XML file that is not it) */
 const DEFLATED =
@@ -49,9 +49,9 @@ describe('.mxl', () => {
   })
 
   it('reads a melody file in either form, and drops a byte order mark', async () => {
-    assert.equal(await readMelodyFile(await writeMxl(SCORE)), SCORE)
-    assert.equal(await readMelodyFile(new TextEncoder().encode(SCORE)), SCORE)
-    assert.equal(await readMelodyFile(new TextEncoder().encode(`\uFEFF${SCORE}`)), SCORE)
+    assert.equal(await readScoreFile(await writeMxl(SCORE)), SCORE)
+    assert.equal(await readScoreFile(new TextEncoder().encode(SCORE)), SCORE)
+    assert.equal(await readScoreFile(new TextEncoder().encode(`\uFEFF${SCORE}`)), SCORE)
   })
 
   /** A zip of these files, written the plain way: each entry stored (method 0) unless it says another */

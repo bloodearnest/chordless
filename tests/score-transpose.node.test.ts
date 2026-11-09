@@ -1,20 +1,20 @@
-/** A melody's range, its extremes, and moving it to another key (src/js/melody-transpose.ts) */
+/** A melody's range, its extremes, and moving it to another key (src/js/score-transpose.ts) */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import type { Melody, MelodyNote } from '../src/js/melody.ts'
-import { melodyExtremes, melodyRange, transposeMelody } from '../src/js/melody-transpose.ts'
 import { fifthsOfKey, type Step } from '../src/js/pitch.ts'
-import { bar, melodyOf, note, rest } from './melody-build.ts'
+import type { Score, ScoreNote } from '../src/js/score.ts'
+import { melodyExtremes, melodyRange, transposeScore } from '../src/js/score-transpose.ts'
+import { bar, melodyOf, note, rest } from './score-build.ts'
 
 describe('transposing a melody', () => {
   const cue = (step: Step, octave: number) => note(step, octave, { cue: true })
-  const tune = (notes: MelodyNote[], chord = 'G'): Melody =>
+  const tune = (notes: ScoreNote[], chord = 'G'): Score =>
     melodyOf(null, [bar(notes, { fifths: 1, chords: [{ start: 0, text: chord }] })])
 
   it('moves the notes, respells them, and gives the key signature and chords of the new key', () => {
     // G major, D4 to B4, up a fourth to C: G4 to E5, already in the green
-    const out = transposeMelody(tune([note('D', 4), note('B', 4)]), 'G', 'C')
-    const events = out.measures[0].voices[0] as MelodyNote[]
+    const out = transposeScore(tune([note('D', 4), note('B', 4)]), 'G', 'C')
+    const events = out.measures[0].voices[0] as ScoreNote[]
     assert.deepEqual(
       events.map(n => [n.step, n.alter, n.octave]),
       [
@@ -27,18 +27,18 @@ describe('transposing a melody', () => {
   })
 
   it('spells for the key: flats in a flat key, sharps in a sharp one', () => {
-    const flat = transposeMelody(tune([note('G', 4), note('A', 4)]), 'G', 'Bb')
+    const flat = transposeScore(tune([note('G', 4), note('A', 4)]), 'G', 'Bb')
     assert.deepEqual(
-      (flat.measures[0].voices[0] as MelodyNote[]).map(n => [n.step, n.alter]),
+      (flat.measures[0].voices[0] as ScoreNote[]).map(n => [n.step, n.alter]),
       [
         ['B', -1],
         ['C', 0],
       ]
     )
     assert.equal(flat.measures[0].fifths, -2)
-    const sharp = transposeMelody(tune([note('G', 4), note('A', 4)]), 'G', 'E')
+    const sharp = transposeScore(tune([note('G', 4), note('A', 4)]), 'G', 'E')
     assert.deepEqual(
-      (sharp.measures[0].voices[0] as MelodyNote[]).map(n => [n.step, n.alter]),
+      (sharp.measures[0].voices[0] as ScoreNote[]).map(n => [n.step, n.alter]),
       [
         ['E', 0],
         ['F', 1],
@@ -49,15 +49,15 @@ describe('transposing a melody', () => {
 
   it('takes the octave nearest the green range, not the nearest interval', () => {
     // C3 to G3 in C, to D: the nearest way is up two (D3 to A3, red); up fourteen is D4 to A4
-    const low = transposeMelody(tune([note('C', 3), note('G', 3)], 'C'), 'C', 'D')
+    const low = transposeScore(tune([note('C', 3), note('G', 3)], 'C'), 'C', 'D')
     assert.deepEqual(
-      (low.measures[0].voices[0] as MelodyNote[]).map(n => n.midi),
+      (low.measures[0].voices[0] as ScoreNote[]).map(n => n.midi),
       [62, 69]
     )
     // and a high tune comes down: C6 to G6 in C, to D, is down twenty-two, not up two
-    const high = transposeMelody(tune([note('C', 6), note('G', 6)], 'C'), 'C', 'D')
+    const high = transposeScore(tune([note('C', 6), note('G', 6)], 'C'), 'C', 'D')
     assert.deepEqual(
-      (high.measures[0].voices[0] as MelodyNote[]).map(n => n.midi),
+      (high.measures[0].voices[0] as ScoreNote[]).map(n => n.midi),
       [62, 69]
     )
   })
@@ -65,7 +65,7 @@ describe('transposing a melody', () => {
   it('leaves cue notes out of the range, and the melody alone for a key it cannot read', () => {
     const t = tune([note('C', 4), cue('C', 2)])
     assert.deepEqual(melodyRange(t), { low: 60, high: 60 })
-    assert.equal(transposeMelody(t, 'C', 'H'), t)
+    assert.equal(transposeScore(t, 'C', 'H'), t)
     assert.equal(fifthsOfKey('Em'), 1)
     assert.equal(fifthsOfKey('F#'), 6)
     assert.equal(fifthsOfKey('F♯'), 6)
@@ -89,7 +89,7 @@ describe('transposing a melody', () => {
   })
 
   it('leaves out a full-size note in a bar with no lyric, unless it is tied over or the sheet has no lyrics', () => {
-    const sung = (n: MelodyNote, syllable: string): MelodyNote => ({ ...n, syllables: [syllable] })
+    const sung = (n: ScoreNote, syllable: string): ScoreNote => ({ ...n, syllables: [syllable] })
     const t = tune([sung(note('E', 4), 'Lord'), sung(note('G', 4), 'of')])
     // an instrumental bar printed full size, lower and higher, and a sung G tied into it
     t.measures.push({
@@ -109,12 +109,12 @@ describe('transposing a melody', () => {
     const silence = rest({ start: 1 })
     const t = tune([note('E', 4)], 'Em')
     t.measures[0].voices[0].push(silence)
-    const out = transposeMelody(t, 'Em', 'Am')
+    const out = transposeScore(t, 'Em', 'Am')
     assert.equal(out.measures[0].voices[0][1], silence)
     assert.equal(out.measures[0].fifths, 0)
     assert.equal(out.measures[0].chords[0].text, 'Am')
     const cueOnly = tune([cue('E', 2)], 'Em')
     assert.equal(melodyRange(cueOnly), null)
-    assert.equal(transposeMelody(cueOnly, 'Em', 'Gm').measures[0].fifths, -2)
+    assert.equal(transposeScore(cueOnly, 'Em', 'Gm').measures[0].fifths, -2)
   })
 })

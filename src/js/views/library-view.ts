@@ -39,7 +39,6 @@ import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../da
 import { watchData } from '../data-watcher.ts'
 import { getCurrentDB } from '../db.ts'
 import { filterByPlace, loadLeftOut, placesOf, saveLeftOut } from '../library-spaces.ts'
-import { melodyWithKey, showMelody } from '../melody-shown.ts'
 import { goTo } from '../navigation.ts'
 import {
   addToLibrary,
@@ -49,6 +48,7 @@ import {
   withSpaceName,
 } from '../other-songs.ts'
 import { buildUrl, type Route } from '../router.ts'
+import { scoreWithKey, showScore } from '../score-shown.ts'
 import { isEditMode, setBodyEditMode } from '../setlist/edit-mode-ui.ts'
 import { createLibrarySongModel } from '../song-model-factory.ts'
 import { setSongUserPref } from '../song-user-prefs.ts'
@@ -175,14 +175,14 @@ export class LibraryView extends PageView {
     const header = this.querySelector<AppHeader>('#library-app-header')
     const content = this.#content.value?.querySelector<HTMLElement>('.song-content')
     if (!song || !header) return
-    const found = melodyWithKey(await (await getCurrentDB()).getMelody(song.uuid), song.originalKey)
+    const found = scoreWithKey(await (await getCurrentDB()).getMelody(song.uuid), song.originalKey)
     // (the song may have changed while this was read)
     if (this.#song !== song) return
     header.showMelodyToggle = Boolean(found)
     if (!found) this.#melodyOn = false
     header.melodyMode = this.#melodyOn
     if (!content) return
-    await showMelody(
+    await showScore(
       content,
       this.#melodyOn && found ? { ...found, songKey: this.#key || found.key } : null
     )

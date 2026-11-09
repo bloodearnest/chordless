@@ -1,6 +1,6 @@
 /**
  * Reads the melody out of the tree of a SongSelect lead sheet as Verovio engraves it (`docs/MELODY.md`). The
- * tree comes from the PDF (`melody-pdf.ts` rebuilds it from the drawing) and, in development, from the SVG of
+ * tree comes from the PDF (`score-pdf.ts` rebuilds it from the drawing) and, in development, from the SVG of
  * `GetSongLeadPreview` (`scripts/melody-xml.ts`), which is the oracle the PDF's reading is checked against.
  *
  * Verovio draws every symbol as a reference to a named music font glyph (SMuFL code points) and
@@ -10,15 +10,16 @@
  * signature, and the sheet's accidentals. Every measure is then added up against the time signature,
  * which is how a wrong reading shows.
  */
-import type {
-  Melody,
-  MelodyChord,
-  MelodyDirection,
-  MelodyEvent,
-  MelodyMeasure,
-  MelodyNote,
-} from './melody.ts'
+
 import { keyAlters as alterationsOf, midiOf, STEPS, type Step } from './pitch.ts'
+import type {
+  Score,
+  ScoreChord,
+  ScoreDirection,
+  ScoreEvent,
+  ScoreMeasure,
+  ScoreNote,
+} from './score.ts'
 import type { El } from './xml.ts'
 
 const classes = (e: El) => (e.attrs.class ?? '').split(/\s+/)
@@ -139,7 +140,7 @@ export interface ReadStats {
   /** Measures whose voices all add up to the time signature */
   full: number
   /** Measures that do not (the pickup and the last may be short legitimately) */
-  short: MelodyMeasure[]
+  short: ScoreMeasure[]
   notes: number
   rests: number
   warnings: string[]
@@ -156,10 +157,10 @@ function lengthOf(beats: number, beatType: number): number {
 }
 
 /**
- * Read pages already parsed. The PDF reader (`melody-pdf.ts`) builds the same tree from the page's
+ * Read pages already parsed. The PDF reader (`score-pdf.ts`) builds the same tree from the page's
  * drawing, so everything from here on is shared.
  */
-export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
+export function readScoreTrees(roots: El[], stats?: ReadStats): Score {
   const warnings: string[] = stats?.warnings ?? []
   const raws: Raw[] = []
   const notice: string[] = []
@@ -182,7 +183,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
     }
   }
 
-  const measures: MelodyMeasure[] = []
+  const measures: ScoreMeasure[] = []
   let fifths = 0
   let beats = 4
   let beatType = 4
@@ -264,12 +265,12 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
 
     // Notes and rests, voice by voice, in the order they are drawn
     const measureAlters = new Map<number, number>()
-    const voices: MelodyEvent[][] = []
+    const voices: ScoreEvent[][] = []
     /** Where an event is on the page, when the source says (the PDF's drawing does): lines of different voices are lined up by it */
-    const xOf = new Map<MelodyEvent, number>()
-    const headXs: { x: number; ev: MelodyEvent }[] = []
+    const xOf = new Map<ScoreEvent, number>()
+    const headXs: { x: number; ev: ScoreEvent }[] = []
     for (const layer of byClass(staff, 'layer')) {
-      const events: MelodyEvent[] = []
+      const events: ScoreEvent[] = []
       let t = 0
       voices.push(events)
       const walk = (parent: El, tupletRatio: number, beams: El | null) => {
@@ -311,8 +312,8 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
               cue: g.scale < 0.65,
             })
             if (c.attrs['data-x'])
-              xOf.set(events[events.length - 1] as MelodyEvent, Number(c.attrs['data-x']))
-            headXs.push({ x: g.x, ev: events[events.length - 1] as MelodyEvent })
+              xOf.set(events[events.length - 1] as ScoreEvent, Number(c.attrs['data-x']))
+            headXs.push({ x: g.x, ev: events[events.length - 1] as ScoreEvent })
             t += dur
           } else if (is(c, 'chord') || is(c, 'note')) {
             const notes = is(c, 'chord') ? byClass(c, 'note') : [c]
@@ -377,13 +378,13 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
                 withPrevious: !first,
               })
               if (owner.attrs['data-x'])
-                xOf.set(events[events.length - 1] as MelodyEvent, Number(owner.attrs['data-x']))
-              headXs.push({ x: hg.x, ev: events[events.length - 1] as MelodyEvent })
+                xOf.set(events[events.length - 1] as ScoreEvent, Number(owner.attrs['data-x']))
+              headXs.push({ x: hg.x, ev: events[events.length - 1] as ScoreEvent })
               heads.push({
                 sys: systemIndex,
                 x: hg.x + (HEAD_WIDTH * hg.scale) / 2,
                 y: hg.y,
-                note: events[events.length - 1] as MelodyNote,
+                note: events[events.length - 1] as ScoreNote,
               })
               first = false
             }
@@ -410,12 +411,12 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
       voiceLengths.every(l => l <= measureLen + 1e-6)
 
     // Chord symbols sit above the beat they belong to: the nearest head along the staff
-    const chords: MelodyChord[] = byClass(m, 'harm').flatMap(h => {
+    const chords: ScoreChord[] = byClass(m, 'harm').flatMap(h => {
       const text = chordText(textOf(h))
       const tx = firstByClass(h, 'text')
       const x = Number(h.children[0]?.attrs.x ?? tx?.attrs.x ?? 0)
       if (!text) return []
-      const near = headXs.reduce<{ x: number; ev: MelodyEvent } | null>(
+      const near = headXs.reduce<{ x: number; ev: ScoreEvent } | null>(
         (b, c) => (!b || Math.abs(c.x - x) < Math.abs(b.x - x) ? c : b),
         null
       )
@@ -457,7 +458,7 @@ export function readMelodyTrees(roots: El[], stats?: ReadStats): Melody {
   return { title, measures, notice: [...new Set(notice)] }
 }
 
-function end(events: MelodyEvent[]): number {
+function end(events: ScoreEvent[]): number {
   return events.reduce((m, e) => Math.max(m, e.start + e.duration), 0)
 }
 
@@ -532,17 +533,17 @@ function beamLevels(beam: El, x: number): number {
 }
 
 /** A direction the page reader found over this measure, as it said what it is */
-function directionOf(e: El): MelodyDirection {
+function directionOf(e: El): ScoreDirection {
   return {
-    kind: e.attrs['data-kind'] as MelodyDirection['kind'],
-    al: (e.attrs['data-al'] || null) as MelodyDirection['al'],
+    kind: e.attrs['data-kind'] as ScoreDirection['kind'],
+    al: (e.attrs['data-al'] || null) as ScoreDirection['al'],
     time: e.attrs['data-time'] ? Number(e.attrs['data-time']) : null,
     text: e.attrs['data-text'] ?? '',
   }
 }
 
 /** A numbered ending the page reader found over this measure (the preview's SVG has no such element) */
-function endingOf(e: El | undefined): MelodyMeasure['ending'] {
+function endingOf(e: El | undefined): ScoreMeasure['ending'] {
   if (!e) return null
   return {
     label: e.attrs['data-label'] ?? '',
@@ -552,11 +553,11 @@ function endingOf(e: El | undefined): MelodyMeasure['ending'] {
   }
 }
 
-function barlineOf(b: El | undefined): MelodyMeasure['barline'] {
+function barlineOf(b: El | undefined): ScoreMeasure['barline'] {
   if (!b) return 'none'
   // (the page reader says what it saw: lines and dots by their places, not by their kind)
   const said = b.attrs['data-bar']
-  if (said) return said as MelodyMeasure['barline']
+  if (said) return said as ScoreMeasure['barline']
   const lines = all(b, c => c.name === 'path').length
   const dots = all(b, c => c.name === 'ellipse' || c.name === 'circle').length
   if (dots) return 'repeat-end'
@@ -571,7 +572,7 @@ interface Head {
   sys: number
   x: number
   y: number
-  note: MelodyNote
+  note: ScoreNote
 }
 
 /** A head drawn beside a neighbour a second away is moved sideways by this much at most */
@@ -621,25 +622,25 @@ function tieNotes(raws: Raw[], heads: Head[], warnings: string[]) {
  * is when the first of the events still sounding ends. The line that is sung and one in cue size
  * that runs with it, or takes over from its rests, come out as one timeline. Returns when it ends.
  */
-function alignVoices(voices: MelodyEvent[][], xOf: Map<MelodyEvent, number>): number {
-  const voiceOf = new Map<MelodyEvent, number>()
+function alignVoices(voices: ScoreEvent[][], xOf: Map<ScoreEvent, number>): number {
+  const voiceOf = new Map<ScoreEvent, number>()
   voices.forEach((v, i) => {
     for (const e of v) voiceOf.set(e, i)
   })
-  const x = (e: MelodyEvent) => xOf.get(e) as number
+  const x = (e: ScoreEvent) => xOf.get(e) as number
   const all = voices.flat().sort((a, b) => x(a) - x(b))
   // Events at one place; a head drawn beside a neighbour a second away is shifted by a head's
   // width, so the cue line and the sung line that meet there are one place too
-  const places: MelodyEvent[][] = []
+  const places: ScoreEvent[][] = []
   for (const e of all) {
     const last = places[places.length - 1]
     const first = last?.[0]
     if (last && first && x(e) - x(first) < 40) last.push(e)
     else places.push([e])
   }
-  const midiOf = (e: MelodyEvent) => (e.kind === 'note' ? e.midi : null)
-  const beside = (a: MelodyEvent[], b: MelodyEvent[]) => {
-    const gap = x(b[0] as MelodyEvent) - x(a[0] as MelodyEvent)
+  const midiOf = (e: ScoreEvent) => (e.kind === 'note' ? e.midi : null)
+  const beside = (a: ScoreEvent[], b: ScoreEvent[]) => {
+    const gap = x(b[0] as ScoreEvent) - x(a[0] as ScoreEvent)
     if (gap > WIDE_DISPLACED) return false
     // from different voices only, and one of them cue size, and a second or a unison apart
     if (a.some(e => b.some(o => voiceOf.get(e) === voiceOf.get(o)))) return false
@@ -654,12 +655,12 @@ function alignVoices(voices: MelodyEvent[][], xOf: Map<MelodyEvent, number>): nu
     )
   }
   for (let i = 0; i + 1 < places.length; ) {
-    if (beside(places[i] as MelodyEvent[], places[i + 1] as MelodyEvent[])) {
-      ;(places[i] as MelodyEvent[]).push(...(places[i + 1] as MelodyEvent[]))
+    if (beside(places[i] as ScoreEvent[], places[i + 1] as ScoreEvent[])) {
+      ;(places[i] as ScoreEvent[]).push(...(places[i + 1] as ScoreEvent[]))
       places.splice(i + 1, 1)
     } else i++
   }
-  const sounding: MelodyEvent[] = []
+  const sounding: ScoreEvent[] = []
   let time = 0
   let latest = 0
   for (const place of places) {

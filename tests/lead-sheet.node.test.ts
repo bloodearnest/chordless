@@ -2,15 +2,15 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readOfMelody } from '../src/js/lead-sheet.ts'
-import type { MelodyEvent } from '../src/js/melody.ts'
 import type { Step } from '../src/js/pitch.ts'
-import { bar, melodyOf, note, rest } from './melody-build.ts'
+import type { ScoreEvent } from '../src/js/score.ts'
+import { bar, melodyOf, note, rest } from './score-build.ts'
 
 /** A note sung to `syllable`, or none; `cue` for a small one */
 const sung = (step: Step, octave: number, syllable = '', cue = false) =>
   note(step, octave, { syllables: [syllable], cue })
 /** A measure of a sheet in F (one flat), by the number the sheet prints */
-const at = (number: number, events: MelodyEvent[]) => bar(events, { number, fifths: -1 })
+const at = (number: number, events: ScoreEvent[]) => bar(events, { number, fifths: -1 })
 
 test('the range of the sung notes, what was left out, and the bars of the two ends', () => {
   const read = readOfMelody(

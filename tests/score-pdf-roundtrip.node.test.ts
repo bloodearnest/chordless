@@ -1,18 +1,18 @@
 /**
  * The PDF reader on lead sheets made from melodies written for the test (public-domain, or just
  * scales): Verovio engraves the melody, `svgToPdf` prints it the way SongSelect's PDFs are made
- * (tests/melody-svg-pdf.ts), and `readMelodyPdf` has to read the melody that went in. The real
+ * (tests/score-svg-pdf.ts), and `readScorePdf` has to read the melody that went in. The real
  * sheets are CCLI's and cannot be kept, so this is what stands in for them.
  */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import type { Melody } from '../src/js/melody.ts'
-import { writeMusicXml } from '../src/js/melody-musicxml.ts'
-import { readMelodyPdf } from '../src/js/melody-pdfjs.ts'
-import type { ReadStats } from '../src/js/melody-read.ts'
-import { renderMelodyHere } from '../src/js/melody-render-engine.ts'
-import { measure as m, melodyOf } from './melody-build.ts'
-import { svgToPdf } from './melody-svg-pdf.ts'
+import type { Score } from '../src/js/score.ts'
+import { writeMusicXml } from '../src/js/score-musicxml.ts'
+import { readScorePdf } from '../src/js/score-pdfjs.ts'
+import type { ReadStats } from '../src/js/score-read.ts'
+import { renderScoreHere } from '../src/js/score-render-engine.ts'
+import { measure as m, melodyOf } from './score-build.ts'
+import { svgToPdf } from './score-svg-pdf.ts'
 
 /** The tallies the reader fills in, of which the test reads the warnings */
 const stats = (): ReadStats => ({
@@ -27,7 +27,7 @@ const stats = (): ReadStats => ({
 const round = (n: number) => Math.round(n * 1000) / 1000
 
 /** What the sheet shows of a melody, measure by measure, as plain text to compare */
-function shown(melody: Melody) {
+function shown(melody: Score) {
   return melody.measures.map(x => ({
     events: x.voices
       .flat()
@@ -48,17 +48,17 @@ function shown(melody: Melody) {
 }
 
 /** The pages of the PDF made from a melody, and the melody read back from them */
-async function throughPdf(melody: Melody) {
-  const out = await renderMelodyHere(writeMusicXml(melody))
+async function throughPdf(melody: Score) {
+  const out = await renderScoreHere(writeMusicXml(melody))
   assert.ok(out, 'Verovio engraved it')
   const tally = stats()
-  const read = await readMelodyPdf(svgToPdf(out.pages as string[]), tally)
+  const read = await readScorePdf(svgToPdf(out.pages as string[]), tally)
   assert.deepEqual(tally.warnings, [])
   assert.ok(read, 'the PDF was read')
   return { read, pages: out.pages.length }
 }
 
-async function sameAfterPdf(melody: Melody) {
+async function sameAfterPdf(melody: Score) {
   const { read } = await throughPdf(melody)
   assert.deepEqual(shown(read), shown(melody))
 }
@@ -187,12 +187,12 @@ describe('a melody printed as SongSelect prints it and read back', () => {
     const pages = [measures, rest].flatMap(part => part)
     assert.equal(pages.length, 48)
     const engrave = async (part: typeof measures) => {
-      const out = await renderMelodyHere(writeMusicXml(melodyOf('Long', part)))
+      const out = await renderScoreHere(writeMusicXml(melodyOf('Long', part)))
       assert.ok(out)
       return out.pages
     }
     const tally = stats()
-    const read = await readMelodyPdf(
+    const read = await readScorePdf(
       svgToPdf([...(await engrave(measures)), ...(await engrave(rest))]),
       tally
     )
@@ -203,11 +203,11 @@ describe('a melody printed as SongSelect prints it and read back', () => {
 
   it('has no melody in a file that is no PDF, and none in a PDF with no music', async () => {
     assert.equal(
-      await readMelodyPdf(new TextEncoder().encode('not a pdf').buffer as ArrayBuffer),
+      await readScorePdf(new TextEncoder().encode('not a pdf').buffer as ArrayBuffer),
       null
     )
     assert.equal(
-      await readMelodyPdf(
+      await readScorePdf(
         svgToPdf([
           '<svg viewBox="0 0 100 100"><text x="10" y="50" font-size="10px">hello</text></svg>',
         ])

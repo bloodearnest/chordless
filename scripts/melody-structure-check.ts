@@ -7,6 +7,7 @@
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { ChordProParser } from '../src/js/parser.ts'
 import {
   matchChart,
   matchVerses,
@@ -14,8 +15,7 @@ import {
   playSteps,
   sheetSections,
   stepWords,
-} from '../src/js/melody-structure.ts'
-import { ChordProParser } from '../src/js/parser.ts'
+} from '../src/js/score-structure.ts'
 import { readPdf } from './melody-pdf-spike.ts'
 
 const dir = process.argv[2] as string

@@ -5,13 +5,13 @@
  * compiles the WebAssembly (and its Content-Security-Policy need not allow that) and the 7 MB module is
  * not parsed on the thread the lyrics scroll on.
  */
-import type { RenderedMelody, RenderOptions } from './melody-render-engine.ts'
+import type { RenderedScore, RenderOptions } from './score-render-engine.ts'
 import type { RenderReply, RenderRequest } from './verovio-worker.ts'
 
-export type { RenderedMelody, RenderOptions }
+export type { RenderedScore, RenderOptions }
 
 interface Pending {
-  resolve(result: RenderedMelody | null): void
+  resolve(result: RenderedScore | null): void
   reject(error: Error): void
 }
 
@@ -43,10 +43,10 @@ function start(): Worker {
 }
 
 /** The MusicXML as SVG pages, or null if Verovio could not read it. Rejects if the worker fails */
-export function renderMelody(
+export function renderScore(
   musicXml: string,
   options: RenderOptions = {}
-): Promise<RenderedMelody | null> {
+): Promise<RenderedScore | null> {
   return new Promise((resolve, reject) => {
     const id = nextId++
     pending.set(id, { resolve, reject })

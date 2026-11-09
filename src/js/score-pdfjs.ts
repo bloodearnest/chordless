@@ -1,11 +1,11 @@
 /**
  * Reads the melody out of a SongSelect lead sheet PDF, with pdf.js (through unpdf): the page's paths and matrices from its operator list, its words from the text content, and
- * from them `melody-pdf.ts` builds the notes. Needs nothing but the PDF.
+ * from them `score-pdf.ts` builds the notes. Needs nothing but the PDF.
  */
 import { getDocumentProxy, getResolvedPDFJS } from 'unpdf'
-import type { Melody } from './melody.ts'
-import { type DrawItem, pdfPageToTree, type TextRun } from './melody-pdf.ts'
-import { type ReadStats, readMelodyTrees } from './melody-read.ts'
+import type { Score } from './score.ts'
+import { type DrawItem, pdfPageToTree, type TextRun } from './score-pdf.ts'
+import { type ReadStats, readScoreTrees } from './score-read.ts'
 import type { El } from './xml.ts'
 
 type Matrix = [number, number, number, number, number, number]
@@ -210,7 +210,7 @@ function wordsOf(chars: Char[]): TextRun[] {
 }
 
 /** The melody of a lead sheet PDF, or null if it has none to read (not a lead sheet, or not one of SongSelect's) */
-export async function readMelodyPdf(pdf: ArrayBuffer, stats?: ReadStats): Promise<Melody | null> {
+export async function readScorePdf(pdf: ArrayBuffer, stats?: ReadStats): Promise<Score | null> {
   try {
     const pdfjs = await getResolvedPDFJS()
     // (with the extra font properties the fonts keep their names, which say which words are bold)
@@ -240,7 +240,7 @@ export async function readMelodyPdf(pdf: ArrayBuffer, stats?: ReadStats): Promis
       if (tree) trees.push(tree)
     }
     if (!trees.length) return null
-    return readMelodyTrees(trees, stats)
+    return readScoreTrees(trees, stats)
   } catch (error) {
     console.warn('Could not read the melody of a PDF:', error)
     return null

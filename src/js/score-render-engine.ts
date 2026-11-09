@@ -6,7 +6,7 @@
  * This is the engine, which runs wherever it is called. The app does not call it on the page: the
  * page's Content-Security-Policy has no `'wasm-unsafe-eval'`, which Verovio's WebAssembly needs. It
  * runs in a worker (`verovio-worker.ts`) whose own policy allows that and nothing else, and the page
- * asks it through `renderMelody` (`melody-render.ts`). Node, for the tests and the scripts, calls
+ * asks it through `renderScore` (`score-render.ts`). Node, for the tests and the scripts, calls
  * this directly.
  *
  * Verovio is a 7 MB module, so it is only imported when a sheet is first rendered, and its toolkit is
@@ -64,7 +64,7 @@ export interface RenderOptions {
   scale?: number
 }
 
-export interface RenderedMelody {
+export interface RenderedScore {
   /** One SVG document a page */
   pages: string[]
   /** What the toolkit said about the file: warnings of anything it could not read */
@@ -72,10 +72,10 @@ export interface RenderedMelody {
 }
 
 /** The MusicXML as SVG pages, or null if Verovio could not read it */
-export async function renderMelodyHere(
+export async function renderScoreHere(
   musicXml: string,
   options: RenderOptions = {}
-): Promise<RenderedMelody | null> {
+): Promise<RenderedScore | null> {
   const tk = await load()
   tk.setOptions({
     pageWidth: options.pageWidth ?? 2100,
@@ -96,7 +96,7 @@ export async function renderMelodyHere(
   if (!tk.loadData(musicXml)) return null
   const pages: string[] = []
   // (the page's policy allows no <style> element, so the few rules Verovio puts in each page are the
-  // view's own: `melody-sheet.ts`)
+  // view's own: `score-view.ts`)
   for (let page = 1; page <= tk.getPageCount(); page++) {
     pages.push(withoutStyle(tk.renderToSVG(page)))
   }

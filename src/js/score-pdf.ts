@@ -1,23 +1,23 @@
 /**
  * Reads a SongSelect lead sheet PDF's drawing into the tree the preview's SVG gives
- * (`melody-read.ts` reads that), so the lengths, pitches and measure sums are worked out in one place.
+ * (`score-read.ts` reads that), so the lengths, pitches and measure sums are worked out in one place.
  *
  * The PDF is IronPdf printing the same Verovio SVG, so its drawing keeps the SVG's own units and
  * path data. What it loses is the grouping and the names: a notehead is a filled shape, not a
  * `<g class="note">` holding a glyph reference. This puts both back:
  *
  * - **names**: each filled shape drawn flipped (a glyph is drawn upside down in a PDF's y-up space
- *   so it is the shape of a font glyph) is looked up by its hash in `melody-glyphs.ts`;
+ *   so it is the shape of a font glyph) is looked up by its hash in `score-glyphs.ts`;
  * - **grouping**: staves are the sets of five lines, a measure is one such set (Verovio draws a
  *   staff line per measure); a head, its stem, flag, dots and accidental are found by where they sit.
  *
  * Input is the page as SVG text (what `mutool draw -F svg` writes: for the spike; in the app the same
- * shapes come from pdf.js's drawing operations: `melody-pdfjs.ts`).
+ * shapes come from pdf.js's drawing operations: `score-pdfjs.ts`).
  */
 
-import { parseDirection } from './melody-directions.ts'
-import { GLYPHS } from './melody-glyphs.ts'
-import { absolutePath, shapeHash } from './melody-path.ts'
+import { parseDirection } from './score-directions.ts'
+import { GLYPHS } from './score-glyphs.ts'
+import { absolutePath, shapeHash } from './score-path.ts'
 import type { El } from './xml.ts'
 
 export interface Line {
@@ -79,7 +79,7 @@ const isDigit = (c: string) => /^E08[0-9AB]$/.test(c)
 /** Glyphs the sheet draws that do not change what the notes are */
 const IGNORED = new Set(['E4C0', 'E4C1', 'E07A', 'E1E7', 'E887'])
 
-/** One page of the PDF's drawing as the tree `readMelodyTrees` reads, or null if no staff is found */
+/** One page of the PDF's drawing as the tree `readScoreTrees` reads, or null if no staff is found */
 /** A shape the page paints: its path data (the font's units for a glyph), the matrix in force, and whether it is stroked (a line) or filled */
 export interface DrawItem {
   d: string
@@ -91,8 +91,8 @@ export interface DrawItem {
 }
 
 /**
- * One page of the PDF's drawing as the tree `readMelodyTrees` reads, or null if no staff is found.
- * `items` and `runs` come from `melody-pdfjs.ts` in the app (and from `mutool` in the spike's scripts).
+ * One page of the PDF's drawing as the tree `readScoreTrees` reads, or null if no staff is found.
+ * `items` and `runs` come from `score-pdfjs.ts` in the app (and from `mutool` in the spike's scripts).
  */
 export function pdfPageToTree(
   items: DrawItem[],

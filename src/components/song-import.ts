@@ -56,9 +56,9 @@ import {
   type LeadSheetRead,
   type MelodyRead,
 } from '../js/lead-sheet.ts'
-import type { Melody } from '../js/melody.ts'
 import { goTo, loadPage } from '../js/navigation.ts'
 import { describeSignature, noteName } from '../js/pitch.ts'
+import type { Score } from '../js/score.ts'
 import { SONGSELECT } from '../js/song-source.ts'
 import { ensureCurrentSpace, setCurrentSpace } from '../js/space.ts'
 import { visibleSpaces } from '../js/space-tabs.ts'
@@ -195,8 +195,8 @@ export class SongImport extends LitElement {
 
   /** Loads the reader of a lead sheet's whole melody: notes, words, chords and structure (a test gives its own) */
   loadMelodyPdfReader: () => Promise<{
-    readMelodyPdf(pdf: ArrayBuffer): Promise<Melody | null>
-  }> = () => import('../js/melody-pdfjs.ts')
+    readScorePdf(pdf: ArrayBuffer): Promise<Score | null>
+  }> = () => import('../js/score-pdfjs.ts')
 
   constructor() {
     super()
@@ -616,7 +616,7 @@ export class SongImport extends LitElement {
   _chartWithRange(chordproText: string, leadSheet: unknown): Promise<LeadSheetRead> {
     return chartWithLeadSheet(chordproText, leadSheet, async pdf => {
       this._progress = 'Reading the lead sheet…'
-      return (await this.loadMelodyPdfReader()).readMelodyPdf(pdf)
+      return (await this.loadMelodyPdfReader()).readScorePdf(pdf)
     })
   }
 

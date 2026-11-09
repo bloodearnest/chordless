@@ -8,7 +8,7 @@ import { expect, waitUntil } from '@open-wc/testing'
 import type { AppHeader } from '../src/components/app-header.ts'
 import type { AppModal } from '../src/components/app-modal.ts'
 import { KeyChangeEvent, type KeySelector } from '../src/components/key-selector.ts'
-import type { MelodySheet } from '../src/components/melody-sheet.ts'
+import type { ScoreView } from '../src/components/score-view.ts'
 import { SongRangeChangedEvent } from '../src/components/song-info-dialog.ts'
 import {
   SectionActionEvent,
@@ -18,7 +18,7 @@ import {
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import { getSongUserPrefs } from '../src/js/song-user-prefs.ts'
-import { sampleRecord } from './melody-sample.ts'
+import { sampleRecord } from './score-sample.ts'
 import '../src/js/views/library-view.ts'
 import type { LibraryView } from '../src/js/views/library-view.ts'
 import { makeSong } from './builders.ts'
@@ -253,7 +253,7 @@ describe('the library view, with a song open', () => {
     describe('the melody sheet', () => {
       const header = () => control<AppHeader>('library-app-header')
       const toggle = () => header().shadowRoot?.querySelector<HTMLButtonElement>('.melody-toggle')
-      const sheet = () => view.querySelector<MelodySheet>('melody-sheet')
+      const sheet = () => view.querySelector<ScoreView>('score-view')
       const lyrics = () => view.querySelector<HTMLElement>('song-display')
       const visited: { url: string; replace?: boolean }[] = []
 

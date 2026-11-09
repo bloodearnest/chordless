@@ -5,13 +5,9 @@
  * policy of its own response, not of the page that made it.
  *
  * It answers one kind of message, `{ id, musicXml, options }`, with `{ id, result }`, or
- * `{ id, error }` if rendering threw. `melody-render.ts` is the page's end of it.
+ * `{ id, error }` if rendering threw. `score-render.ts` is the page's end of it.
  */
-import {
-  type RenderedMelody,
-  type RenderOptions,
-  renderMelodyHere,
-} from './melody-render-engine.ts'
+import { type RenderedScore, type RenderOptions, renderScoreHere } from './score-render-engine.ts'
 
 export interface RenderRequest {
   id: number
@@ -19,7 +15,7 @@ export interface RenderRequest {
   options: RenderOptions
 }
 export type RenderReply =
-  | { id: number; result: RenderedMelody | null }
+  | { id: number; result: RenderedScore | null }
   | { id: number; error: string }
 
 // (the worker's global, typed as far as it is used: this project's tsconfig has no worker library)
@@ -30,7 +26,7 @@ const scope = self as unknown as {
 
 scope.onmessage = async ({ data }) => {
   try {
-    scope.postMessage({ id: data.id, result: await renderMelodyHere(data.musicXml, data.options) })
+    scope.postMessage({ id: data.id, result: await renderScoreHere(data.musicXml, data.options) })
   } catch (error) {
     scope.postMessage({ id: data.id, error: String(error) })
   }

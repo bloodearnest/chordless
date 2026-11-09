@@ -1,14 +1,14 @@
 /**
- * The melody of a lead sheet as music: what `docs/MELODY.md` calls the `Melody`. Plain data, small
+ * The melody of a lead sheet as music: what `docs/MELODY.md` calls the `Score`. Plain data, small
  * as JSON, and no XML: MusicXML is written from it and read into it at the edges
- * (`melody-musicxml.ts`).
+ * (`score-musicxml.ts`).
  *
  * Times are in quarter notes from the start of the measure. Pitch is spelled (step, alter, octave)
  * as the sheet spells it; `midi` is derived and kept because analysis and checks want the number.
  */
 import type { Step } from './pitch.ts'
 
-export interface MelodyNote {
+export interface ScoreNote {
   kind: 'note'
   /** The id of the note's element in the sheet's SVG (the preview's time map names the same ids) */
   id: string
@@ -35,7 +35,7 @@ export interface MelodyNote {
   withPrevious: boolean
 }
 
-export interface MelodyRest {
+export interface ScoreRest {
   kind: 'rest'
   id: string
   start: number
@@ -48,16 +48,16 @@ export interface MelodyRest {
   cue: boolean
 }
 
-export type MelodyEvent = MelodyNote | MelodyRest
+export type ScoreEvent = ScoreNote | ScoreRest
 
-export interface MelodyChord {
+export interface ScoreChord {
   /** Quarter notes from the start of the measure */
   start: number
   text: string
 }
 
 /** A numbered ending's bracket, as it covers one measure of it */
-export interface MelodyEnding {
+export interface ScoreEnding {
   /** What the bracket says: "1", "2" or "2,3" */
   label: string
   /** This is the measure the bracket starts over / ends over */
@@ -68,7 +68,7 @@ export interface MelodyEnding {
 }
 
 /** A sign or an instruction over a measure that changes where the player goes next, or how many times */
-export interface MelodyDirection {
+export interface ScoreDirection {
   /** `da-segno` is "D.S." and `da-capo` "D.C."; `to-coda` is where to jump to the coda sign; `text` is any other instruction */
   kind: 'segno' | 'coda' | 'to-coda' | 'fine' | 'da-segno' | 'da-capo' | 'text'
   /** "al Coda" / "al Fine" after a D.S. or D.C. */
@@ -79,12 +79,12 @@ export interface MelodyDirection {
   text: string
 }
 
-export interface MelodyMeasure {
+export interface ScoreMeasure {
   /** The number the sheet prints, counted from 1 (a pickup is 0 when the sheet says so) */
   number: number
   /** One list per voice; nearly always one */
-  voices: MelodyEvent[][]
-  chords: MelodyChord[]
+  voices: ScoreEvent[][]
+  chords: ScoreChord[]
   /** A boxed section name that starts here ("INTRO", "VERSE 1") */
   section: string | null
   /** The barline that closes the measure */
@@ -92,9 +92,9 @@ export interface MelodyMeasure {
   /** The measure opens with a repeat sign (a thick line and dots on its left edge): play from here again */
   repeatStart: boolean
   /** Signs and instructions over the measure: segno, coda, D.S., D.C., Fine, "Play 3 times" */
-  directions: MelodyDirection[]
+  directions: ScoreDirection[]
   /** The numbered ending ("1", "2", "2,3") whose bracket this measure is under, if any */
-  ending: MelodyEnding | null
+  ending: ScoreEnding | null
   /** Sum of the voices' lengths, checked against the time signature */
   length: number
   /** The measure holds as much as the time signature says (a pickup or last measure may not) */
@@ -107,9 +107,9 @@ export interface MelodyMeasure {
   tempo: number | null
 }
 
-export interface Melody {
+export interface Score {
   title: string | null
-  measures: MelodyMeasure[]
+  measures: ScoreMeasure[]
   /** The text under the music that has to travel with it: copyright, CCLI numbers (docs/MELODY.md, "The terms") */
   notice: string[]
 }

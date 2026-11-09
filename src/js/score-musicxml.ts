@@ -3,15 +3,16 @@
  * web renderer reads (`docs/MELODY.md`, "The format"). Chord symbols are `<harmony>`, written from
  * our own text so the app's spelling stays the app's; sections are rehearsal marks.
  */
-import type {
-  Melody,
-  MelodyChord,
-  MelodyDirection,
-  MelodyEvent,
-  MelodyMeasure,
-  MelodyNote,
-} from './melody.ts'
+
 import { keyAlters } from './pitch.ts'
+import type {
+  Score,
+  ScoreChord,
+  ScoreDirection,
+  ScoreEvent,
+  ScoreMeasure,
+  ScoreNote,
+} from './score.ts'
 
 const DIVISIONS = 24 // per quarter: whole divisions for 16ths, 32nds, and triplets of them
 
@@ -96,7 +97,7 @@ class Accidentals {
   }
 
   /** The `<accidental>` element for a note, or '' where none is printed */
-  of(n: MelodyNote): string {
+  of(n: ScoreNote): string {
     const at = `${n.step}${n.octave}`
     const carried = n.tieStop ? this.carried.get(at) : undefined
     const current = this.inForce.get(at) ?? carried ?? this.key[n.step] ?? 0
@@ -106,7 +107,7 @@ class Accidentals {
   }
 
   /** The alterations of the notes tied on out of this measure, for the next to carry */
-  carryOn(n: MelodyNote, into: Map<string, number>): void {
+  carryOn(n: ScoreNote, into: Map<string, number>): void {
     if (n.tieStart) into.set(`${n.step}${n.octave}`, n.alter)
   }
 }
@@ -118,9 +119,9 @@ function notations(ties: string, e: { tuplet?: 'start' | 'stop' }): string {
 }
 
 function noteXml(
-  n: MelodyNote,
+  n: ScoreNote,
   voice: number,
-  prev: MelodyNote | undefined,
+  prev: ScoreNote | undefined,
   accidental = ''
 ): string {
   const { type, dots } = typeOf(n.duration / n.tupletRatio)
@@ -148,7 +149,7 @@ function noteXml(
   )
 }
 
-function restXml(e: Extract<MelodyEvent, { kind: 'rest' }>, voice: number): string {
+function restXml(e: Extract<ScoreEvent, { kind: 'rest' }>, voice: number): string {
   const { type, dots } = typeOf(e.duration / e.tupletRatio)
   return (
     `<note>${e.cue ? '<cue/>' : ''}<rest${e.wholeMeasure ? ' measure="yes"' : ''}/>` +
@@ -159,7 +160,7 @@ function restXml(e: Extract<MelodyEvent, { kind: 'rest' }>, voice: number): stri
 }
 
 /** A sign or instruction over a measure: the sign or the words, and what the player does about it as `<sound>` */
-function directionXml(d: MelodyDirection): string {
+function directionXml(d: ScoreDirection): string {
   const words = `<words>${esc(d.text)}</words>`
   const sound =
     d.kind === 'segno'
@@ -180,7 +181,7 @@ function directionXml(d: MelodyDirection): string {
 }
 
 /** The barline at the start of a measure: a repeat sign and the start of a numbered ending, when there are any */
-function leftBarline(m: MelodyMeasure): string {
+function leftBarline(m: ScoreMeasure): string {
   const ending = m.ending?.start
     ? `<ending number="${esc(m.ending.label.replace(/,/g, ', '))}" type="start">${esc(m.ending.label)}.</ending>`
     : ''
@@ -189,7 +190,7 @@ function leftBarline(m: MelodyMeasure): string {
 }
 
 /** The barline at the end of a measure; a plain one is the default and is not written */
-function rightBarline(m: MelodyMeasure): string {
+function rightBarline(m: ScoreMeasure): string {
   const style =
     m.barline === 'double'
       ? 'light-light'
@@ -212,9 +213,9 @@ function rightBarline(m: MelodyMeasure): string {
  * can hold two that run together (a cue line over another), which are written as voices of their own. A
  * note that sounds with the one before it (a chord) stays with it.
  */
-function lanesOf(voice: MelodyEvent[]): MelodyEvent[][] {
-  const lanes: { events: MelodyEvent[]; end: number }[] = []
-  let current: { events: MelodyEvent[]; end: number } | undefined
+function lanesOf(voice: ScoreEvent[]): ScoreEvent[][] {
+  const lanes: { events: ScoreEvent[]; end: number }[] = []
+  let current: { events: ScoreEvent[]; end: number } | undefined
   for (const e of voice) {
     const at = Math.round(e.start * DIVISIONS)
     const chord = e.kind === 'note' && e.withPrevious
@@ -231,7 +232,7 @@ function lanesOf(voice: MelodyEvent[]): MelodyEvent[][] {
   return lanes.map(l => l.events)
 }
 
-export function writeMusicXml(melody: Melody): string {
+export function writeMusicXml(melody: Score): string {
   const out: string[] = []
   out.push('<?xml version="1.0" encoding="UTF-8"?>')
   out.push(
@@ -288,14 +289,14 @@ export function writeMusicXml(melody: Melody): string {
         out.push(`<backup><duration>${cursor}</duration></backup>`)
         cursor = 0
       }
-      let prev: MelodyNote | undefined
+      let prev: ScoreNote | undefined
       for (const e of v) {
         const at = Math.round(e.start * DIVISIONS)
         const sounds = e.kind === 'rest' || !e.withPrevious
         // A chord symbol goes at its own place: a late voice has a gap before it, and a chord that falls in
         // the gap is written there (a <forward> to it, then the symbol), not after the gap
         while (vi === 0 && chords[0] && chords[0].start <= e.start + 1e-6) {
-          const symbol = chords.shift() as MelodyChord
+          const symbol = chords.shift() as ScoreChord
           const place = Math.round(symbol.start * DIVISIONS)
           if (sounds && place > cursor && place <= at) {
             out.push(`<forward><duration>${place - cursor}</duration></forward>`)

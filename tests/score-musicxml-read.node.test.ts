@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import type { Melody, MelodyEvent, MelodyMeasure, MelodyNote } from '../src/js/melody.ts'
-import { writeMusicXml } from '../src/js/melody-musicxml.ts'
-import { readMusicXml } from '../src/js/melody-musicxml-read.ts'
 import type { Step } from '../src/js/pitch.ts'
+import type { Score, ScoreEvent, ScoreMeasure, ScoreNote } from '../src/js/score.ts'
+import { writeMusicXml } from '../src/js/score-musicxml.ts'
+import { readMusicXml } from '../src/js/score-musicxml-read.ts'
 import { parseXml } from '../src/js/xml.ts'
-import { bar, note } from './melody-build.ts'
+import { bar, note } from './score-build.ts'
 
 describe('the XML reader', () => {
   it('reads elements, attributes, text and entities, and skips what is not content', () => {
@@ -100,9 +100,9 @@ describe('reading MusicXML written by another program', () => {
     assert.ok(melody)
     assert.equal(melody.title, 'Hymn')
     assert.deepEqual(melody.notice, ['(c) Somebody'])
-    const m = melody.measures[0] as MelodyMeasure
+    const m = melody.measures[0] as ScoreMeasure
     assert.deepEqual([m.fifths, m.beats, m.beatType], [-1, 3, 4])
-    const notes = m.voices[0] as MelodyNote[]
+    const notes = m.voices[0] as ScoreNote[]
     // (the grace note has no length and is left out)
     assert.deepEqual(
       notes.map(n => [n.step, n.alter, n.octave, n.start, n.duration, n.tieStart, n.tieStop]),
@@ -134,9 +134,9 @@ describe('reading MusicXML written by another program', () => {
   <note><pitch><step>A</step><octave>3</octave></pitch><duration>3</duration><voice>2</voice></note>
 </measure>`)
     )
-    const [one, two] = ((melody as Melody).measures[0] as MelodyMeasure).voices as [
-      MelodyEvent[],
-      MelodyEvent[],
+    const [one, two] = ((melody as Score).measures[0] as ScoreMeasure).voices as [
+      ScoreEvent[],
+      ScoreEvent[],
     ]
     assert.deepEqual(
       one.map(e => [e.start, e.kind === 'note' && e.withPrevious]),
@@ -178,11 +178,11 @@ describe('reading MusicXML written by another program', () => {
   <note><rest measure="yes"/><duration>4</duration></note>
 </measure>`)
     )
-    const [a, b, c, d] = (melody as Melody).measures as [
-      MelodyMeasure,
-      MelodyMeasure,
-      MelodyMeasure,
-      MelodyMeasure,
+    const [a, b, c, d] = (melody as Score).measures as [
+      ScoreMeasure,
+      ScoreMeasure,
+      ScoreMeasure,
+      ScoreMeasure,
     ]
     assert.deepEqual([a.section, a.tempo, a.repeatStart], ['VERSE', 96, true])
     assert.deepEqual(a.chords, [{ start: 0, text: 'Bbm7/D' }])
@@ -203,10 +203,10 @@ describe('reading MusicXML written by another program', () => {
 
 describe('MusicXML as what is kept: written and read back', () => {
   /** A note in octave 4, at a start in the measure */
-  const at = (step: Step, start: number, over: Partial<MelodyNote> = {}) =>
+  const at = (step: Step, start: number, over: Partial<ScoreNote> = {}) =>
     note(step, 4, { start, ...over })
-  const measure = (over: Partial<MelodyMeasure>) => bar([], over)
-  const back = (m: Melody) => readMusicXml(writeMusicXml(m)) as Melody
+  const measure = (over: Partial<ScoreMeasure>) => bar([], over)
+  const back = (m: Score) => readMusicXml(writeMusicXml(m)) as Score
 
   it('keeps a chord inside a held note, a chord after the last note, and two lines in one voice', () => {
     const whole = at('D', 0, { duration: 4 })
@@ -226,9 +226,9 @@ describe('MusicXML as what is kept: written and read back', () => {
       ],
     })
     const out = back({ title: 'T', notice: ['n'], measures: [m] })
-    const read = out.measures[0] as MelodyMeasure
+    const read = out.measures[0] as ScoreMeasure
     assert.deepEqual(read.chords, m.chords)
-    const key = (e: MelodyEvent) => (e.kind === 'note' ? `${e.step}${e.start}` : 'r')
+    const key = (e: ScoreEvent) => (e.kind === 'note' ? `${e.step}${e.start}` : 'r')
     assert.deepEqual(read.voices.flat().map(key).sort(), ['A0', 'B3', 'C0', 'D0'])
     assert.equal(out.title, 'T')
     assert.deepEqual(out.notice, ['n'])
@@ -260,7 +260,7 @@ describe('MusicXML as what is kept: written and read back', () => {
       voices: [[at('A', 0, { duration: 4, syllables: ['Lord-', 'x'] })]],
     })
     const read = back({ title: null, notice: [], measures: [first, second] }).measures
-    const [a, b] = read as [MelodyMeasure, MelodyMeasure]
+    const [a, b] = read as [ScoreMeasure, ScoreMeasure]
     assert.deepEqual(
       a.voices
         .flat()
@@ -288,6 +288,6 @@ describe('MusicXML as what is kept: written and read back', () => {
       [b.barline, b.ending],
       ['repeat-end', { label: '1', start: true, stop: true, closed: true }]
     )
-    assert.deepEqual(((b.voices[0] as MelodyEvent[])[0] as MelodyNote).syllables, ['Lord-', 'x'])
+    assert.deepEqual(((b.voices[0] as ScoreEvent[])[0] as ScoreNote).syllables, ['Lord-', 'x'])
   })
 })

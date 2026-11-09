@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { renderMelody } from '../src/js/melody-render.ts'
+import { renderScore } from '../src/js/score-render.ts'
 
 const { describe, it } = window
 
@@ -19,7 +19,7 @@ ${['C', 'D', 'E', 'F']
 
 describe('engraving a melody in a worker', () => {
   it('gives the SVG of the page, made by Verovio in a worker rather than on the page', async () => {
-    const out = await renderMelody(MUSIC_XML)
+    const out = await renderScore(MUSIC_XML)
     expect(out).to.not.equal(null)
     expect(out?.pages).to.have.length(1)
     const svg = out?.pages[0] as string
@@ -29,7 +29,7 @@ describe('engraving a melody in a worker', () => {
   })
 
   it('answers the next sheet from the same worker, and null for what is not music', async () => {
-    const [again, nothing] = await Promise.all([renderMelody(MUSIC_XML), renderMelody('not music')])
+    const [again, nothing] = await Promise.all([renderScore(MUSIC_XML), renderScore('not music')])
     expect(again?.pages).to.have.length(1)
     expect(nothing).to.equal(null)
   })

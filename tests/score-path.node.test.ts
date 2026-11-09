@@ -1,7 +1,7 @@
-/** Path shapes normalised and named (src/js/melody-path.ts) */
+/** Path shapes normalised and named (src/js/score-path.ts) */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { absolutePath, shapeHash } from '../src/js/melody-path.ts'
+import { absolutePath, shapeHash } from '../src/js/score-path.ts'
 
 describe('shape names', () => {
   it('finds the same shape written with relative or absolute commands, with or without the closing line', () => {

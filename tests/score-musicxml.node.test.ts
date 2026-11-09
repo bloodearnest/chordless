@@ -1,10 +1,10 @@
-/** Writing a melody as MusicXML (src/js/melody-musicxml.ts) */
+/** Writing a melody as MusicXML (src/js/score-musicxml.ts) */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import type { MelodyEvent, MelodyMeasure, MelodyNote } from '../src/js/melody.ts'
-import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import type { Step } from '../src/js/pitch.ts'
-import { bar, measure, melodyOf, note, rest } from './melody-build.ts'
+import type { ScoreEvent, ScoreMeasure, ScoreNote } from '../src/js/score.ts'
+import { writeMusicXml } from '../src/js/score-musicxml.ts'
+import { bar, measure, melodyOf, note, rest } from './score-build.ts'
 
 describe('MusicXML', () => {
   it('writes the notes, their pitch spelling and a key', () => {
@@ -17,7 +17,7 @@ describe('MusicXML', () => {
 })
 
 describe('MusicXML of a hand-built melody', () => {
-  const bFlat = (over: Partial<MelodyNote>) => note('B', 4, { alter: -1, ...over })
+  const bFlat = (over: Partial<ScoreNote>) => note('B', 4, { alter: -1, ...over })
   const melody = {
     title: 'A & B',
     notice: ['CCLI Song # 1'],
@@ -65,10 +65,10 @@ describe('MusicXML of a hand-built melody', () => {
 
 describe('MusicXML for an engraver', () => {
   /** A note in octave 4, sharp (1), natural (0) or flat (-1) */
-  const at = (step: Step, alter: number, over: Partial<MelodyNote> = {}) =>
+  const at = (step: Step, alter: number, over: Partial<ScoreNote> = {}) =>
     note(step, 4, { alter, ...over })
-  const measure = (fifths: number, events: MelodyEvent[]) => bar(events, { fifths })
-  const write = (...measures: MelodyMeasure[]) => writeMusicXml(melodyOf(null, measures))
+  const measure = (fifths: number, events: ScoreEvent[]) => bar(events, { fifths })
+  const write = (...measures: ScoreMeasure[]) => writeMusicXml(melodyOf(null, measures))
 
   it('prints an accidental only where the alteration is not the one in force', () => {
     // G major: F is sharp already. F#, then F natural (marked), then F natural again (not), then Bb (marked)
@@ -154,7 +154,7 @@ describe('directions, repeats and endings', () => {
   })
 
   it('writes repeats and endings as MusicXML barlines', () => {
-    const barOf = (over: Partial<MelodyMeasure>) => bar([], over)
+    const barOf = (over: Partial<ScoreMeasure>) => bar([], over)
     const xml = writeMusicXml(
       melodyOf(null, [
         barOf({ repeatStart: true }),

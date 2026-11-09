@@ -1,26 +1,26 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Melody, MelodyNote } from '../src/js/melody.ts'
-import { pdfPageToTree } from '../src/js/melody-pdf.ts'
-import { type ReadStats, readMelodyTrees } from '../src/js/melody-read.ts'
+import type { Score, ScoreNote } from '../src/js/score.ts'
+import { pdfPageToTree } from '../src/js/score-pdf.ts'
+import { type ReadStats, readScoreTrees } from '../src/js/score-read.ts'
 import { mutoolPages } from './melody-mutool.ts'
-import { readMelodySvg } from './melody-xml.ts'
+import { readScoreSvg } from './melody-xml.ts'
 
-export function readPdf(file: string): { melody: Melody; stats: ReadStats } {
+export function readPdf(file: string): { melody: Score; stats: ReadStats } {
   const stats = { warnings: [] as string[] } as ReadStats
   const trees = mutoolPages(file).flatMap(p => pdfPageToTree(p.items, stats.warnings, p.runs) ?? [])
-  return { melody: readMelodyTrees(trees, stats), stats }
+  return { melody: readScoreTrees(trees, stats), stats }
 }
 
 /** The notes in the order they sound (voices are only a reading detail), the lower of a chord first */
-const notesOf = (m: Melody) =>
+const notesOf = (m: Score) =>
   m.measures.flatMap(x =>
     x.voices
       .flat()
-      .filter((e): e is MelodyNote => e.kind === 'note')
+      .filter((e): e is ScoreNote => e.kind === 'note')
       .sort((p, q) => p.start - q.start || p.midi - q.midi)
   )
-const spell = (n: MelodyNote) =>
+const spell = (n: ScoreNote) =>
   `${n.step}${n.alter > 0 ? '#' : n.alter < 0 ? 'b' : ''}${n.octave}:${n.duration}${n.cue ? 'c' : ''}`
 
 const args = process.argv.slice(2)
@@ -63,20 +63,20 @@ if (!import.meta.main) {
     const svgs = (res.payload.svgs as string[]).map(s =>
       Buffer.from(s.replace(/^data:[^,]*,\s*/, ''), 'base64').toString('utf8')
     )
-    const ref = readMelodySvg(svgs)
+    const ref = readScoreSvg(svgs)
     const a = notesOf(melody)
     const b = notesOf(ref)
     let same = 0
     const bad: string[] = []
     for (let i = 0; i < Math.min(a.length, b.length); i++) {
       if (
-        spell(a[i] as MelodyNote) === spell(b[i] as MelodyNote) &&
-        (a[i] as MelodyNote).tieStart === (b[i] as MelodyNote).tieStart
+        spell(a[i] as ScoreNote) === spell(b[i] as ScoreNote) &&
+        (a[i] as ScoreNote).tieStart === (b[i] as ScoreNote).tieStart
       )
         same++
       else if (bad.length < 10)
         bad.push(
-          `#${i}: pdf ${spell(a[i] as MelodyNote)}${(a[i] as MelodyNote).tieStart ? '~' : ''} svg ${spell(b[i] as MelodyNote)}${(b[i] as MelodyNote).tieStart ? '~' : ''}`
+          `#${i}: pdf ${spell(a[i] as ScoreNote)}${(a[i] as ScoreNote).tieStart ? '~' : ''} svg ${spell(b[i] as ScoreNote)}${(b[i] as ScoreNote).tieStart ? '~' : ''}`
         )
     }
     // The words: syllables on the notes (the first two verses), chords and sections by measure
@@ -85,8 +85,8 @@ if (!import.meta.main) {
     const sylBad: string[] = []
     for (let i = 0; i < Math.min(a.length, b.length); i++)
       for (let v = 0; v < 2; v++) {
-        const x = (a[i] as MelodyNote).syllables[v] ?? ''
-        const y = (b[i] as MelodyNote).syllables[v] ?? ''
+        const x = (a[i] as ScoreNote).syllables[v] ?? ''
+        const y = (b[i] as ScoreNote).syllables[v] ?? ''
         if (!x && !y) continue
         syl++
         if (x === y) sylSame++
@@ -94,7 +94,7 @@ if (!import.meta.main) {
       }
     console.log(`syllables (verses 1 and 2): ${sylSame}/${syl} the same, with their hyphens`)
     for (const x of sylBad) console.log(`  ${x}`)
-    const chords = (m: Melody) =>
+    const chords = (m: Score) =>
       m.measures.map(x => x.chords.map(c => `${c.text}@${c.start}`).join(' '))
     const ca = chords(melody)
     const cb = chords(ref)
@@ -105,7 +105,7 @@ if (!import.meta.main) {
       `chords: ${ca.length - cBad.length}/${ca.length} measures the same, symbol and beat`
     )
     for (const x of cBad.slice(0, 6)) console.log(`  ${x}`)
-    const sec = (m: Melody) => m.measures.map(x => `${x.section ?? ''}|${x.tempo ?? ''}`)
+    const sec = (m: Score) => m.measures.map(x => `${x.section ?? ''}|${x.tempo ?? ''}`)
     const sa = sec(melody)
     const sb = sec(ref)
     const sBad = sa.flatMap((x, i) =>

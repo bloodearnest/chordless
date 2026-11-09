@@ -7,9 +7,10 @@
  * sung melody lands nearest the green range (`octaveNearGreen`, as the key picker shows), and the
  * chords take the plain nearest interval, since they have no octave.
  */
-import type { Melody, MelodyEvent, MelodyNote } from './melody.ts'
-import { playOrder } from './melody-structure.ts'
+
 import { fifthsOfKey, midiOf, noteName, semitonesBetween } from './pitch.ts'
+import type { Score, ScoreEvent, ScoreNote } from './score.ts'
+import { playOrder } from './score-structure.ts'
 import { transposeChord } from './transpose.ts'
 import { type NoteRange, octaveNearGreen } from './voice-range.ts'
 
@@ -19,7 +20,7 @@ import { type NoteRange, octaveNearGreen } from './voice-range.ts'
  * over from the measure before. A sheet with no lyrics at all has none to go by, so its full-size
  * notes all count.
  */
-export function sungNotes(melody: Melody): (measure: number, note: MelodyNote) => boolean {
+export function sungNotes(melody: Score): (measure: number, note: ScoreNote) => boolean {
   const lyric = melody.measures.map(m =>
     m.voices.some(voice => voice.some(e => e.kind === 'note' && e.syllables.some(Boolean)))
   )
@@ -28,7 +29,7 @@ export function sungNotes(melody: Melody): (measure: number, note: MelodyNote) =
 }
 
 /** The lowest and highest sung note (`sungNotes`), or null if none is sung */
-export function melodyRange(melody: Melody): NoteRange | null {
+export function melodyRange(melody: Score): NoteRange | null {
   const sung = sungNotes(melody)
   let low = Number.POSITIVE_INFINITY
   let high = Number.NEGATIVE_INFINITY
@@ -55,7 +56,7 @@ export interface MelodyExtremes extends NoteRange {
  * not sung (`sungNotes`) left out. A high note held a long time tires a singer more than one touched once. Null if no
  * note is sung.
  */
-export function melodyExtremes(melody: Melody): MelodyExtremes | null {
+export function melodyExtremes(melody: Score): MelodyExtremes | null {
   const range = melodyRange(melody)
   if (!range) return null
   const sung = sungNotes(melody)
@@ -72,12 +73,12 @@ export function melodyExtremes(melody: Melody): MelodyExtremes | null {
 }
 
 /** The note at a new pitch, spelled in a key */
-function respell(note: MelodyNote, midi: number, key: string): MelodyNote {
+function respell(note: ScoreNote, midi: number, key: string): ScoreNote {
   const [, step, accidental, octave] = /^([A-G])([#b]?)(-?\d+)$/.exec(
     noteName(midi, key)
   ) as RegExpExecArray
   const alter = accidental === '#' ? 1 : accidental === 'b' ? -1 : 0
-  const spelled = { step: step as MelodyNote['step'], alter, octave: Number(octave) }
+  const spelled = { step: step as ScoreNote['step'], alter, octave: Number(octave) }
   return { ...note, ...spelled, midi: midiOf(spelled.step, alter, spelled.octave) }
 }
 
@@ -85,7 +86,7 @@ function respell(note: MelodyNote, midi: number, key: string): MelodyNote {
  * The melody in `to`, written in `from`. The result is the sheet in the new key, with a new key
  * signature; a key either name does not parse leaves the melody as it was.
  */
-export function transposeMelody(melody: Melody, from: string, to: string): Melody {
+export function transposeScore(melody: Score, from: string, to: string): Score {
   const fifths = fifthsOfKey(to)
   if (fifths === null || fifthsOfKey(from) === null) return melody
   const nearest = semitonesBetween(from, to)
@@ -94,7 +95,7 @@ export function transposeMelody(melody: Melody, from: string, to: string): Melod
   const shift = range
     ? octaveNearGreen({ low: range.low + nearest, high: range.high + nearest }).low - range.low
     : nearest
-  const move = (e: MelodyEvent): MelodyEvent =>
+  const move = (e: ScoreEvent): ScoreEvent =>
     e.kind === 'note' ? respell(e, e.midi + shift, to) : e
   return {
     ...melody,

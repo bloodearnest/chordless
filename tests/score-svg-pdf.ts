@@ -1,6 +1,6 @@
 /**
  * A lead sheet as a PDF, made from Verovio's SVG of a melody: for the tests of the PDF reader
- * (`melody-pdfjs.ts`) without a CCLI sheet. SongSelect's PDFs are IronPdf printing the same Verovio
+ * (`score-pdfjs.ts`) without a CCLI sheet. SongSelect's PDFs are IronPdf printing the same Verovio
  * SVG, so what matters is that nothing is changed on the way: every glyph keeps its own path (the
  * reader tells a notehead from a clef by the shape of its outline, and a general converter bakes
  * the placing into the coordinates, which changes it), and is put on the page by a matrix, as the

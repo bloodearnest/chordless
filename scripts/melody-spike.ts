@@ -6,9 +6,9 @@
  *   node scripts/melody-spike.ts preview.json [--musicxml out.musicxml] [--dump]
  */
 import { readFileSync, writeFileSync } from 'node:fs'
-import type { MelodyNote } from '../src/js/melody.ts'
-import type { ReadStats } from '../src/js/melody-read.ts'
-import { readMelodySvg } from './melody-xml.ts'
+import type { ScoreNote } from '../src/js/score.ts'
+import type { ReadStats } from '../src/js/score-read.ts'
+import { readScoreSvg } from './melody-xml.ts'
 
 interface TimeEvent {
   on: string[] | null
@@ -100,7 +100,7 @@ const res = JSON.parse(readFileSync(file, 'utf8'))
 const payload = res.payload ?? res
 const svgs: string[] = (payload.svgs as string[]).map(s => b64(s).toString('utf8'))
 const stats = { warnings: [] as string[] } as ReadStats
-const melody = readMelodySvg(svgs, stats)
+const melody = readScoreSvg(svgs, stats)
 
 console.log(
   `${melody.title}: ${stats.measures} measures, ${stats.full} add up to the time signature`
@@ -119,8 +119,8 @@ for (const e of timemap) {
   for (const id of e.on ?? []) onAt.set(id, e.qstamp)
   for (const id of e.off ?? []) offAt.set(id, e.qstamp)
 }
-const notes: MelodyNote[] = melody.measures.flatMap(m =>
-  m.voices.flat().filter((e): e is MelodyNote => e.kind === 'note')
+const notes: ScoreNote[] = melody.measures.flatMap(m =>
+  m.voices.flat().filter((e): e is ScoreNote => e.kind === 'note')
 )
 let known = 0
 let durOk = 0
@@ -205,6 +205,6 @@ if (args.includes('--dump')) {
 }
 const xo = args.indexOf('--musicxml')
 if (xo >= 0 && args[xo + 1]) {
-  const { writeMusicXml } = await import('../src/js/melody-musicxml.ts')
+  const { writeMusicXml } = await import('../src/js/score-musicxml.ts')
   writeFileSync(args[xo + 1] as string, writeMusicXml(melody))
 }

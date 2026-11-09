@@ -54,7 +54,7 @@ The `chordpro` object store mirrors chord text:
 The `melodies` object store (`MelodyRecord`) keeps the melody of a song, keyed by the song's `uuid` (a
 variant has its own). Derived data: it can be read again from a lead sheet PDF or a MusicXML file.
 
-- `xml`: the MusicXML score, parsed when it is wanted (`readMusicXml`, a few milliseconds) into a `Melody` (`src/js/melody.ts`): measures, notes, lyrics, chord symbols, directions. Version 13 kept the parse; the upgrade to 14 clears those records
+- `xml`: the MusicXML score, parsed when it is wanted (`readMusicXml`, a few milliseconds) into a `Score` (`src/js/score.ts`): measures, notes, lyrics, chord symbols, directions. Version 13 kept the parse; the upgrade to 14 clears those records
 - `key`: the key the melody is written in, as the chart names it (the MusicXML has a key signature, not a name)
 - `contentHash`: hash of `xml`, so a change made here is found by comparing it with `syncedContentHash`
 - `createdDate`, `modifiedDate`
