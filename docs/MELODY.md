@@ -288,7 +288,11 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
   and up and down scroll the sheet. The mode is in the URL as `?melody` (`docs/ROUTING.md`), a replace and not a new history
   entry, so a reload or a link keeps it; the sheet is `<score-view>` (`src/components/score-view.ts`), engraved in the key
   the song is shown in (a key change engraves it again, keeping the old sheet on show until the new one is ready), fitted to
-  the width of the screen with almost no margin, and with a narrower page on a phone so the music is drawn larger. Verovio's
+  the width of the screen with almost no margin, and with a narrower page on a phone so the music is drawn larger. Each
+  section starts a line, as on SongSelect's sheets: Verovio's own mode for keeping a line break written in the file ('smart')
+  did not keep them, so the engine lays out each section alone to find its lines, shares its measures out over them (no
+  last line of one measure stretched across the page), and lays out the whole with exactly those breaks
+  (`score-render-engine.ts`); a pickup before the first section goes on its first line. Verovio's
   own `<style>` element is taken out of each page (the page's policy allows none) and its few rules are the component's. The library's song page has the same button and `?melody` (`/songs/<uuid>?melody`); there it is the one song open. A `built` test (`tests/built.playwright.ts`) engraves a sheet on the production build under the real policy, checks the worker file's own policy, and fails without the `_headers` rule. Not
   yet: the beats of the high notes shown
   on it.

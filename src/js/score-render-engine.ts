@@ -62,6 +62,11 @@ export interface RenderOptions {
   pageWidth?: number
   /** Percent: 100 is the size SongSelect prints at the width above */
   scale?: number
+  /**
+   * The MusicXML of each section on its own (`writeSectionsMusicXml`): given, every section starts a
+   * line, as on SongSelect's sheets, and its measures are shared out over its lines (`balanceLines`)
+   */
+  sections?: string[]
 }
 
 export interface RenderedScore {
@@ -71,6 +76,59 @@ export interface RenderedScore {
   log: string
 }
 
+/**
+ * The measures on each line, shared out more evenly: a section's last line is not left with one or
+ * two measures stretched across the page while the line before it is full. A measure moves down
+ * from the line before, which had room for it, until the two differ by one at most.
+ */
+export function balanceLines(counts: number[]): number[] {
+  const out = [...counts]
+  for (let i = out.length - 1; i > 0; i--) {
+    while ((out[i - 1] as number) - (out[i] as number) > 1) {
+      out[i - 1] = (out[i - 1] as number) - 1
+      out[i] = (out[i] as number) + 1
+    }
+  }
+  return out
+}
+
+/** How many measures are on each line of the pages Verovio laid out */
+function measuresPerLine(tk: Toolkit): number[] {
+  const out: number[] = []
+  for (let page = 1; page <= tk.getPageCount(); page++) {
+    for (const line of tk.renderToSVG(page).split('class="system"').slice(1)) {
+      out.push(line.split('class="measure"').length - 1)
+    }
+  }
+  return out
+}
+
+/**
+ * The index of each measure that starts a line, when every section starts one: each section laid
+ * out on its own, with the lines Verovio breaks it into, balanced. Null if a section could not be read.
+ */
+function lineStarts(tk: Toolkit, sections: string[]): Set<number> | null {
+  const starts = new Set<number>()
+  let at = 0
+  for (const section of sections) {
+    if (!tk.loadData(section)) return null
+    for (const count of balanceLines(measuresPerLine(tk))) {
+      starts.add(at)
+      at += count
+    }
+  }
+  return starts
+}
+
+/** The MusicXML with a new line at each of these measures (by index) */
+function withLineBreaks(musicXml: string, starts: Set<number>): string {
+  let index = -1
+  return musicXml.replace(/<measure\b[^>]*>/g, open => {
+    index++
+    return index > 0 && starts.has(index) ? `${open}<print new-system="yes"/>` : open
+  })
+}
+
 /** The MusicXML as SVG pages, or null if Verovio could not read it */
 export async function renderScoreHere(
   musicXml: string,
@@ -78,6 +136,8 @@ export async function renderScoreHere(
 ): Promise<RenderedScore | null> {
   const tk = await load()
   tk.setOptions({
+    // (where the lines break: Verovio's choice, unless the sections are given; see below)
+    breaks: 'auto',
     pageWidth: options.pageWidth ?? 2100,
     scale: options.scale ?? 40,
     // the page is as tall as the music, so a view scrolls it and no page ends mid-song
@@ -96,7 +156,13 @@ export async function renderScoreHere(
     svgViewBox: true,
     svgRemoveXlink: true,
   })
-  if (!tk.loadData(musicXml)) return null
+  // Every section starts a line. Verovio's own way to keep a line break that is written in the file
+  // while it breaks the rest ('smart') did not keep them, so each section is laid out alone to find its
+  // lines, and the whole is laid out with exactly those breaks ('line')
+  const sections = options.sections ?? []
+  const starts = sections.length > 1 ? lineStarts(tk, sections) : null
+  if (starts) tk.setOptions({ breaks: 'line' })
+  if (!tk.loadData(starts ? withLineBreaks(musicXml, starts) : musicXml)) return null
   const pages: string[] = []
   // (the page's policy allows no <style> element, so the few rules Verovio puts in each page are the
   // view's own: `score-view.ts`)

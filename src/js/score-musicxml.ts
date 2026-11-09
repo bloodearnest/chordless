@@ -421,3 +421,22 @@ export function writeMusicXml(melody: Score): string {
   out.push('</score-partwise>')
   return out.join('\n')
 }
+
+/**
+ * Each section of the melody as MusicXML of its own (the measures from one boxed section name to
+ * the next, and those before the first), for the engraver to find where each one's lines break, so
+ * that every section starts a line, as SongSelect's sheets have them (`score-render-engine.ts`)
+ */
+export function writeSectionsMusicXml(melody: Score): string[] {
+  const starts = melody.measures.flatMap((m, i) => (i === 0 || m.section ? [i] : []))
+  // (a pickup before the first section is on its first line, as on the sheet, not on a line alone)
+  if (starts[1] === 1 && melody.measures[0]?.full === false) starts.splice(1, 1)
+  return starts.map((from, k) =>
+    writeMusicXml({
+      ...melody,
+      title: null,
+      notice: [],
+      measures: melody.measures.slice(from, starts[k + 1] ?? melody.measures.length),
+    })
+  )
+}
