@@ -786,6 +786,9 @@ function node2(name: string, attrs: Record<string, string>, children: El[], text
 const textEl = (text: string, x: number, y: number) =>
   node2('text', { class: 'text', x: num(x), y: num(y) }, [], text)
 
+/** How far above its staff a section's name can be, in the page's units (a staff space is 250) */
+const SECTION_REACH = 2600
+
 /**
  * Puts the page's words where Verovio had them: above a staff the regular 405-unit words are chord
  * symbols, bold ones a section name (in its box) or the tempo, and below it they are lyrics, a row for each
@@ -822,8 +825,11 @@ function placeText(
     above: Staff & { sys: number }
     below: Staff | undefined
   }[] = []
+  // (a section's name, bold, can sit higher over its staff than the chords do: over a first staff that
+  // has the tempo under it too, INTRO is 1,900 units up)
+  const reach = (r: { bold: boolean }) => (r.bold ? SECTION_REACH : 1500)
   for (const r of units) {
-    if (!r.text || r.size < 370 || r.size > 440 || r.y < top - 1500) {
+    if (!r.text || r.size < 370 || r.size > 440 || r.y < top - reach(r)) {
       left.push(r)
       continue
     }
@@ -832,7 +838,7 @@ function placeText(
         s =>
           inX(s, r.x0 + (r.bold ? 100 : 0)) &&
           r.y < (s.ys[0] as number) + 60 &&
-          (s.ys[0] as number) - r.y < 1900
+          (s.ys[0] as number) - r.y < Math.max(1900, reach(r))
       )
       .sort((p, q) => (p.ys[0] as number) - (q.ys[0] as number))[0]
     const above = staves
