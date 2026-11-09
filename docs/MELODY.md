@@ -1,9 +1,16 @@
-# The melody as music: lead sheet to MusicXML
+# The lead sheet as music: lead sheet to MusicXML
 
 **A plan, with a spike built** (see "Spike results"). A lead sheet used to be read for one thing, the lowest and highest sung note
-(`docs/RANGE.md`), and the PDF then thrown away; the range now comes from the melody read here. This asked whether to
-read the whole melody (pitches, lengths, rests, lyrics, chords, sections) into a music format, keep
-that, and do more with it: transpose the notes, analyse them, show them, play them.
+(`docs/RANGE.md`), and the PDF then thrown away. What is kept now is the lead sheet as MusicXML: the melody, and the
+words, chords, sections, repeats and directions that go with it, so that Chordless can transpose it, analyse it,
+show it and (later) play it. The range comes from the melody read there.
+
+**The words.** The thing is the **lead sheet** (to people: "Show the lead sheet", "the lead sheet could not be read"; not "sheet
+music", which is any notation, and not "the melody", which is one part of it). Its MusicXML is the **score** in the
+code's own words. The **melody** is the sung line within it, so "Melody range" is right where it means that line.
+The code still calls the whole thing `Melody` (`melody-*.ts`, the `melodies` store, the `melody` file type in Drive and
+the `.melody.mxl` suffix, which are on devices and in Drive and are not worth a migration); a later change renames the
+types and modules to `Score` and `score-*.ts`.
 
 ## Why
 

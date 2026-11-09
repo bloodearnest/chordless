@@ -589,7 +589,7 @@ export class AppHeader extends LitElement {
                     class="icon-button melody-toggle ${this.melodyMode ? 'active' : ''}"
                     part="melody-toggle"
                     @click=${this._handleMelodyToggle}
-                    aria-label=${this.melodyMode ? 'Show the lyrics' : 'Show the melody'}
+                    aria-label=${this.melodyMode ? 'Show the lyrics' : 'Show the lead sheet'}
                     aria-pressed=${this.melodyMode ? 'true' : 'false'}
                   >
                     <app-icon name="music"></app-icon>

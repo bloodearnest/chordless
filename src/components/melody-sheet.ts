@@ -135,7 +135,7 @@ export class MelodySheet extends LitElement {
       })
       if (asked !== this._asked) return
       /* v8 ignore next -- Verovio only gives null for MusicXML it cannot read, which writeMusicXml does not write */
-      if (!result) throw new Error('The sheet music could not be read')
+      if (!result) throw new Error('The lead sheet could not be read')
       this._pages = result.pages
       this._failed = false
     } catch (error) {
@@ -149,7 +149,7 @@ export class MelodySheet extends LitElement {
 
   override render() {
     if (this._failed && !this._pages.length) {
-      return html`<p class="failed" role="alert">The sheet music could not be shown for this song.</p>`
+      return html`<p class="failed" role="alert">The lead sheet could not be shown for this song.</p>`
     }
     const notice = this.melody?.notice ?? []
     return html`
