@@ -208,8 +208,9 @@ export class ScoreView extends LitElement {
     if (measured === this._measured) return
     this._measured = measured
     let notes = 0
-    for (const svg of this.shadowRoot?.querySelectorAll('.page > svg') ?? []) {
-      const [, , w, h] = (svg.getAttribute('viewBox') ?? '').split(' ').map(Number)
+    const pages = (this.shadowRoot as ShadowRoot).querySelectorAll('.page > svg')
+    for (const svg of pages) {
+      const [, , w, h] = (svg.getAttribute('viewBox') as string).split(' ').map(Number)
       if (w && h) notes += (h / w) * width
     }
     const around = ['.credits', '.notice'].reduce(
@@ -227,7 +228,7 @@ export class ScoreView extends LitElement {
 
   /** The room the player's controls take at the foot of the sheet (the padding-bottom of the host) */
   _bottomPadding(): number {
-    return Number.parseFloat(getComputedStyle(this).paddingBottom) || 0
+    return Number.parseFloat(getComputedStyle(this).paddingBottom)
   }
 
   override willUpdate(changed: PropertyValues): void {
