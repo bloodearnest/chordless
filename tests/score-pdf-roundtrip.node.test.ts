@@ -94,6 +94,15 @@ describe('a melody printed as SongSelect prints it and read back', () => {
     )
   })
 
+  it('keeps lone short notes, which have a flag and no beam (a rest or a long note either side)', async () => {
+    await sameAfterPdf(
+      melodyOf('Flags', [
+        m(1, ['C4:0.5:a', 'r:0.5', 'D4:1:b', 'E4:0.25:c', 'r:0.75', 'F4:1:d']),
+        m(2, ['G4:0.5:e', 'r:0.5', 'A4:0.25:f', 'r:0.25', 'B4:2:g'], { barline: 'final' }),
+      ])
+    )
+  })
+
   it('keeps the key signature and the accidentals it makes', async () => {
     await sameAfterPdf(
       melodyOf('Sharps', [
