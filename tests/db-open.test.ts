@@ -96,6 +96,8 @@ describe('ChordlessDB opening, as reported', () => {
     expect(shownToast()).to.include({ kind: 'error' })
     expect(shownToast()?.message).to.contain('newer Chordless data')
     expect(shownToast()?.action?.label).to.equal('Check for updates')
+    // (pressed: there is no service worker here to ask, so nothing comes of it)
+    shownToast()?.action?.run()
   })
 
   it('says so when another window upgrades the database, and has let go of it', async () => {

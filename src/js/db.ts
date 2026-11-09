@@ -162,6 +162,7 @@ async function tellDatabaseWasUpgraded(): Promise<void> {
   ])
   toast('Chordless was updated in another window. Reload this one to carry on.', {
     kind: 'error',
+    /* v8 ignore next -- reloading the page would end the test run */
     action: { label: 'Reload', run: () => appUpdate.apply() },
   })
 }
