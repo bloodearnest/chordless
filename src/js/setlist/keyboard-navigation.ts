@@ -13,18 +13,29 @@ export interface NavigationKeys {
   currentIndex: () => number
   songCount: () => number
   goTo: (index: number) => void
-  /** How far an arrow key scrolls, in px */
+  /** How far an arrow key scrolls the lyrics, in px (a lead sheet scrolls by most of a screen) */
   scrollAmount: number
   /** Escape was pressed: leaves edit mode, if that is where it is. True if it did something */
   onEscape: () => boolean
 }
 
+/**
+ * How much of its height a song shown as a lead sheet scrolls by: not all of it, so that the last line
+ * of the screen is the first of the next, and a player never has to look for where the music went
+ * (what a page turn is on paper, but with the line to read ahead kept in view)
+ */
+const SHEET_SCROLL_FRACTION = 0.8
+
 export function listenForNavigationKeys(keys: NavigationKeys) {
-  const scrollBy = (top: number) => {
+  const scrollBy = (direction: 1 | -1) => {
     const index = keys.currentIndex()
-    keys.root
-      .querySelector<HTMLElement>(index >= 0 ? `#song-${index}` : '#overview')
-      ?.scrollBy({ top, behavior: 'smooth' })
+    const element = keys.root.querySelector<HTMLElement>(
+      index >= 0 ? `#song-${index}` : '#overview'
+    )
+    if (!element) return
+    const sheet = element.querySelector('score-view:not([hidden])')
+    const step = sheet ? element.clientHeight * SHEET_SCROLL_FRACTION : keys.scrollAmount
+    element.scrollBy({ top: direction * step, behavior: 'smooth' })
   }
 
   document.addEventListener(
@@ -56,11 +67,11 @@ export function listenForNavigationKeys(keys: NavigationKeys) {
           break
         case 'ArrowUp':
           event.preventDefault()
-          scrollBy(-keys.scrollAmount)
+          scrollBy(-1)
           break
         case 'ArrowDown':
           event.preventDefault()
-          scrollBy(keys.scrollAmount)
+          scrollBy(1)
           break
       }
     },
