@@ -57,6 +57,36 @@ test('a song with a melody can be shown as its sheet, and back to its lyrics', a
   expect(consoleErrors.filter(text => /Content Security Policy|wasm/i.test(text))).toEqual([])
 })
 
+test('in a dark theme the sheet has the whole page below the header, in its dimmed light colours', async ({
+  page,
+}) => {
+  await seedSong(page, { setlistId: 'melody-setlist' })
+  await page.evaluate(async xml => {
+    localStorage.setItem('theme', 'dark')
+    const { getCurrentDB } = await import('/js/db.ts')
+    const { scoreRecord } = await import('/js/score-record.ts')
+    await (await getCurrentDB()).saveScore(scoreRecord('info-test-song', xml, 'G'))
+  }, MUSIC_XML)
+  await page.goto('/setlist/melody-setlist/song/0?melody')
+  await page.reload()
+  await expect(page.locator('score-view .notehead')).toHaveCount(4)
+
+  const background = (selector: string) =>
+    page.locator(selector).evaluate(e => getComputedStyle(e).backgroundColor)
+  const sheet = await background('score-view')
+  const lyrics = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+  expect(sheet).not.toEqual(lyrics)
+  // (the song's whole slide, its margins too, not a box on the dark page)
+  expect(await background('#song-0')).toEqual(sheet)
+  // (and the page's margins above and below it, on a tablet or a desktop)
+  await expect.poll(() => background('#main-content')).toEqual(sheet)
+
+  await page.getByRole('button', { name: 'Show the lyrics' }).click()
+  await expect(page.locator('score-view')).toBeHidden()
+  expect(await background('#song-0')).not.toEqual(sheet)
+  await expect.poll(() => background('#main-content')).not.toEqual(sheet)
+})
+
 test('the library shows a song as its sheet too, in its own key', async ({ page }) => {
   await seedSong(page)
   await page.evaluate(async xml => {

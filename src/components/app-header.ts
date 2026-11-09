@@ -81,7 +81,8 @@ export class AppHeader extends LitElement {
     showEditToggle: { type: Boolean, attribute: 'show-edit-toggle' },
     showInfoButton: { type: Boolean, attribute: 'show-info-button' },
     showMelodyToggle: { type: Boolean, attribute: 'show-melody-toggle' },
-    melodyMode: { type: Boolean, attribute: 'melody-mode' },
+    // (reflected: the page below the header takes the sheet's colours while one is shown, style.css)
+    melodyMode: { type: Boolean, reflect: true, attribute: 'melody-mode' },
     melodyUnavailable: { type: Boolean, attribute: 'melody-unavailable' },
     showLogo: { type: Boolean, attribute: 'show-logo' },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },

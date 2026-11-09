@@ -73,8 +73,9 @@ export class ScoreView extends LitElement {
       display: block;
       /* (the player's controls float over the bottom of the page: the last line can be scrolled clear of them) */
       padding-bottom: 6rem;
-      background: var(--sheet-background, var(--bg-color, white));
-      color: var(--sheet-text, var(--text-color, black));
+      /* (ink on paper in either theme: the theme sets the paper, dimmed in the dark one) */
+      background: var(--sheet-background, white);
+      color: var(--sheet-text, black);
     }
     :host([hidden]) {
       display: none;
@@ -101,8 +102,8 @@ export class ScoreView extends LitElement {
     .page rect {
       stroke: currentColor;
     }
-    /* (the music is drawn in the page's text colour, so a dark theme gets light notes on a dark page:
-       Verovio's own color="black" on the <svg> is a presentation attribute, which a rule overrides) */
+    /* (the music is drawn in the sheet's ink colour: Verovio's own color="black" on the <svg> is a
+       presentation attribute, which a rule overrides) */
     .page svg {
       color: inherit;
       fill: currentColor;
@@ -126,7 +127,7 @@ export class ScoreView extends LitElement {
     .credits {
       padding: 0.5rem 0.75rem 0;
       font-family: Times, 'Times New Roman', serif;
-      color: var(--sheet-notice, var(--text-secondary, #444));
+      color: var(--sheet-notice, #444);
     }
     .subtitle {
       text-align: center;
@@ -146,7 +147,7 @@ export class ScoreView extends LitElement {
       display: block;
       font-size: 0.9rem;
       font-weight: bold;
-      color: var(--sheet-text, var(--text-color, inherit));
+      color: var(--sheet-text, inherit);
     }
     .notice {
       padding: 0.5rem 0.75rem 1rem;
@@ -154,7 +155,7 @@ export class ScoreView extends LitElement {
       font-size: 0.7rem;
       line-height: 1.25;
       text-align: center;
-      color: var(--sheet-notice, var(--text-secondary, #444));
+      color: var(--sheet-notice, #444);
     }
     .notice p {
       margin: 0;
