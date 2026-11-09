@@ -396,7 +396,7 @@ from each PDF, engrave it, read Verovio's SVG back with the SVG reader, and comp
   measure and octave, with a tied note's carried over the barline); a tuplet needs `<tuplet type="start|stop">`
   as well as `time-modification` (the reader now keeps where a bracket starts and stops: `tuplet` on the first
   and last event); and a line that comes in late (a cue line over a rest, drawn by SongSelect with no spacer) needs
-  `<forward>` to start where it does. The part name is hidden and the page has room on the left for a boxed section name.
+  `<forward>` to start where it does. The part name is hidden, and a boxed section name starts at its barline (`halign="left"`, as SongSelect's do) rather than centred on it, so the page needs no room on the left for one.
 - The page looks like a lead sheet: chord symbols (with our text, "Eb2"), boxed sections, the hyphens and
   underscores of the lyrics, ties, cue notes small, repeat and ending signs. It is not SongSelect's layout to
   the pixel (their page and spacing options are not known), and this shows no title or notice yet.
