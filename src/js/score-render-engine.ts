@@ -88,6 +88,9 @@ export async function renderScoreHere(
     pageMarginRight: 20,
     pageMarginTop: 20,
     pageMarginBottom: 20,
+    // (a word's width of space between words, not Verovio's 1.2: with that, a line of short words on
+    // quick notes ran them together, "richin love", once the narrow margin let another bar onto it)
+    lyricWordSpace: 3,
     footer: 'none',
     header: 'none',
     svgViewBox: true,
