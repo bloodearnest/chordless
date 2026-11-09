@@ -10,10 +10,8 @@ import type {
   SongRecord,
   TempoInput,
 } from './data-types.ts'
-import { leaderName, planPeople } from './leaders.ts'
-import { songSource } from './song-source.ts'
+import { leaderName } from './leaders.ts'
 import { PERSON_SYNC_FIELDS } from './sync/person-hash.ts'
-import { setlistContentHash } from './sync/setlist-hash.ts'
 import { setAmbient } from './telemetry/context.ts'
 import { recordSpan } from './telemetry/telemetry.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
@@ -27,6 +25,11 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 // Space metadata is stored separately in the 'spaces' database.
 
 export const DB_VERSION = 15
+/**
+ * The oldest version a database is upgraded from (docs/MIGRATIONS.md, "The floor"). Raised when the steps
+ * for versions below it are dropped, which is when nobody has a device that old.
+ */
+export const OLDEST_UPGRADABLE = 14
 
 // Setlist types
 export const SETLIST_TYPES: Readonly<Record<string, string>> = {
@@ -137,7 +140,45 @@ export class DatabaseNewerError extends Error {
   }
 }
 
+/** The database on this device is older than this code upgrades, and there is no sign-in to make it again from Drive */
+export class DatabaseTooOldError extends Error {
+  readonly version: number
+  constructor(version: number) {
+    super('The data on this device is from a version of Chordless that is too old to be upgraded.')
+    this.name = 'DatabaseTooOldError'
+    this.version = version
+  }
+}
+
+/** Delete a database (a window that holds it open lets go of it: `onversionchange`) */
+function deleteDatabase(name: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(name)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+  })
+}
+
 let toldDatabaseIsNewer = false
+let toldDatabaseIsTooOld = false
+
+/** Say, once, that the data is too old to upgrade, that it is untouched, and what makes it again */
+async function tellDatabaseIsTooOld(): Promise<void> {
+  if (toldDatabaseIsTooOld) return
+  toldDatabaseIsTooOld = true
+  const { toast } = await import('./toast.ts')
+  toast('The data on this device is from an old version of Chordless.', {
+    kind: 'error',
+    details:
+      'It is too old to be upgraded here, and has been left as it is. Sign in with Google to bring your songs and setlists back from Drive.',
+  })
+}
+
+/** Say that old data was cleared, and that it is being brought back from Drive */
+async function tellDatabaseWasCleared(): Promise<void> {
+  const { toast } = await import('./toast.ts')
+  toast('Chordless is bringing your songs and setlists back from Drive.')
+}
 
 /** Say, once, that the data is newer than the app, and offer to look for a newer app (docs/MIGRATIONS.md) */
 async function tellDatabaseIsNewer(): Promise<void> {
@@ -204,11 +245,46 @@ export class ChordlessDB {
     return this.db.transaction(stores, mode)
   }
 
+  /**
+   * Open the database, upgrading it. One that is older than `OLDEST_UPGRADABLE` is not upgraded: if
+   * there is a sign-in that works with Drive, which has the songs and setlists, it is cleared and
+   * made again from there; otherwise it is left as it is, untouched, and `DatabaseTooOldError` says so.
+   */
   async init(): Promise<void> {
+    try {
+      await this.#open()
+    } catch (error) {
+      if (!(error instanceof DatabaseTooOldError)) throw error
+      const { getSignInState } = await import('./google-auth.ts')
+      const signIn = await getSignInState()
+      if (signIn !== 'signed-in') {
+        recordSpan('chordless.db.open', {
+          'chordless.db.outcome': 'too_old',
+          'chordless.db.old_version': error.version,
+          'chordless.db.new_version': DB_VERSION,
+          'chordless.db.sign_in': signIn,
+        })
+        void tellDatabaseIsTooOld()
+        throw error
+      }
+      await deleteDatabase(this.dbName)
+      recordSpan('chordless.db.open', {
+        'chordless.db.outcome': 'cleared',
+        'chordless.db.old_version': error.version,
+        'chordless.db.new_version': DB_VERSION,
+      })
+      void tellDatabaseWasCleared()
+      await this.#open()
+    }
+  }
+
+  #open(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const started = performance.now()
       /** The version it was upgraded from, if this open upgraded it (not one made new) */
       let upgradedFrom: number | null = null
+      /** The version it is at, if it is older than can be upgraded */
+      let tooOld: number | null = null
       const report = (outcome: string, extra: Record<string, string | number | boolean> = {}) =>
         recordSpan('chordless.db.open', {
           'chordless.db.outcome': outcome,
@@ -220,6 +296,10 @@ export class ChordlessDB {
       const request = indexedDB.open(this.dbName, DB_VERSION)
 
       request.onerror = () => {
+        if (tooOld !== null) {
+          reject(new DatabaseTooOldError(tooOld))
+          return
+        }
         const error = request.error
         const name = error?.name ?? 'unknown'
         report('failed', {
@@ -262,6 +342,13 @@ export class ChordlessDB {
       request.onupgradeneeded = event => {
         const db = request.result
         const oldVersion = event.oldVersion
+        // Older than this build upgrades: leave it as it is (aborting the upgrade changes nothing),
+        // and let `init()` decide what is to be done (docs/MIGRATIONS.md, "The floor")
+        if (oldVersion > 0 && oldVersion < OLDEST_UPGRADABLE) {
+          tooOld = oldVersion
+          request.transaction?.abort()
+          return
+        }
         if (oldVersion > 0) upgradedFrom = oldVersion
 
         // Create Songs store (moved from global SongsDB)
@@ -286,10 +373,6 @@ export class ChordlessDB {
           const setlistStore = db.createObjectStore('setlists', { keyPath: 'id' })
           setlistStore.createIndex('date', 'date', { unique: false })
           setlistStore.createIndex('type', 'type', { unique: false })
-        } else {
-          // The owner index went with the owner field (v10)
-          const setlistStore = (request.transaction as IDBTransaction).objectStore('setlists')
-          if (setlistStore.indexNames.contains('owner')) setlistStore.deleteIndex('owner')
         }
 
         // Create setlist_local store (new in v5)
@@ -314,17 +397,7 @@ export class ChordlessDB {
         }
 
         if (oldVersion > 0 && oldVersion < DB_VERSION) {
-          migrateRecords(request.transaction as IDBTransaction, oldVersion)
-        }
-
-        // Clean up old stores
-        if (db.objectStoreNames.contains('song_usage')) {
-          db.deleteObjectStore('song_usage')
-        }
-        // The private annotations kept for a song in every setlist (v11), which were not kept: an
-        // annotation belongs to one song in one setlist (docs/ANNOTATIONS.md)
-        if (db.objectStoreNames.contains('song_notes')) {
-          db.deleteObjectStore('song_notes')
+          upgradeRecords(request.transaction as IDBTransaction, oldVersion)
         }
       }
     })
@@ -1118,98 +1191,19 @@ export function withNumericTempos<T extends { songs?: { tempo?: TempoInput }[] }
 }
 
 /**
- * Version 6: songs' and setlist entries' tempos become numbers (they were a
- * chart's text). A setlist that was in sync stays in sync: its synced hash is
- * refreshed for the converted content.
+ * Bring a database of at least `OLDEST_UPGRADABLE` up to date (what is older is not upgraded: see
+ * docs/MIGRATIONS.md, "The floor"). The steps of versions before 14 were dropped when that floor was set;
+ * `git log -S` finds them.
+ *
+ * Version 15: the `melodies` store is `scores`, and a pending deletion of a melody's file is of a score's.
+ * Their files in Drive keep the old name and properties until a device that can write rewrites them,
+ * which `legacyFile` says.
  */
-/**
- * What a record kept of its file in the storage was called before 2026-10-20 (when sync stopped
- * being about Google Drive alone): the file's ref, its rev, when it changed, and the properties
- * the song's file had when it was last synced.
- */
-const FILE_FIELDS_BEFORE_V7: Record<string, string> = {
-  driveFileId: 'fileRef',
-  driveChecksum: 'fileRev',
-  driveModifiedTime: 'fileModified',
-  driveProperties: 'fileProps',
-}
-
-/** The record with those fields under their new names (the new name wins if both are there) */
-export function withFileFieldsRenamed<T extends object>(record: T): T {
-  const renamed = { ...record } as Record<string, unknown>
-  let changed = false
-  for (const [before, now] of Object.entries(FILE_FIELDS_BEFORE_V7)) {
-    if (!(before in renamed)) continue
-    if (!(now in renamed)) renamed[now] = renamed[before]
-    delete renamed[before]
-    changed = true
+function upgradeRecords(transaction: IDBTransaction, oldVersion: number) {
+  if (oldVersion < 15) {
+    migrateMelodiesToScores(transaction)
+    migratePendingDeletionKinds(transaction)
   }
-  return changed ? (renamed as T) : record
-}
-
-/**
- * The song with an empty source where it was recorded as how it arrived (Google Drive, a copy,
- * an import) and not where it came from (docs/SPACES.md; `song-source.ts`). The true origin of
- * such a song is not known, so it is not guessed.
- */
-export function withOriginKept<T extends { importSource?: string }>(song: T): T {
-  if (song.importSource === undefined) return song
-  const source = songSource(song.importSource)
-  return source === song.importSource ? song : { ...song, importSource: source }
-}
-
-/**
- * Bring the songs and setlists of a database from `oldVersion` up to date: tempos as numbers
- * (version 6), the file fields under their new names (7), and the source of a song kept as where it
- * came from, not how it arrived (8). One pass over each store applies every
- * step to a record in turn: a cursor for each step would each read the record as it was, and the
- * last to write would undo the others.
- */
-function migrateRecords(transaction: IDBTransaction, oldVersion: number) {
-  const songs = transaction.objectStore('songs').openCursor()
-  songs.onsuccess = () => {
-    const cursor = songs.result
-    if (!cursor) return
-    let song = cursor.value
-    if (oldVersion < 6) song = withNumericSongTempos(song)
-    if (oldVersion < 7) song = withFileFieldsRenamed(song)
-    if (oldVersion < 8) song = withOriginKept(song)
-    if (song !== cursor.value) cursor.update(song)
-    cursor.continue()
-  }
-  const setlists = transaction.objectStore('setlists').openCursor()
-  setlists.onsuccess = () => {
-    const cursor = setlists.result
-    if (!cursor) return
-    const before: Setlist = cursor.value
-    let setlist = before
-    if (oldVersion < 6) {
-      const converted = withNumericTempos(setlist)
-      if (JSON.stringify(converted) !== JSON.stringify(setlist)) {
-        if (
-          setlist.syncedContentHash &&
-          setlist.syncedContentHash === setlistContentHash(setlist)
-        ) {
-          converted.syncedContentHash = setlistContentHash(converted)
-        }
-        setlist = converted
-      }
-    }
-    if (oldVersion < 7) setlist = withFileFieldsRenamed(setlist)
-    if (setlist !== before) cursor.update(setlist)
-    cursor.continue()
-  }
-  if (oldVersion < 10) migrateLeaders(transaction)
-  // Version 14: a melody is kept as its MusicXML, not parsed. The records of version 13 held the
-  // parse, and are derived data (a synced melody is pulled again; one not yet synced is read from its
-  // lead sheet again), so they are cleared rather than converted.
-  // (clears the store of the old name, which version 15 then moves)
-  if (oldVersion === 13) transaction.objectStore('melodies').clear()
-  // Version 15: the `melodies` store is `scores`, and a pending deletion of a melody's file is of a score's.
-  // Their files in Drive keep the old name and properties until a device that can write rewrites them,
-  // which `legacyFile` says.
-  if (oldVersion >= 13 && oldVersion < 15) migrateMelodiesToScores(transaction)
-  if (oldVersion < 15) migratePendingDeletionKinds(transaction)
 }
 
 /** Version 15: the records of the `melodies` store are put in `scores`, and the old store goes */
@@ -1234,31 +1228,6 @@ function migratePendingDeletionKinds(transaction: IDBTransaction) {
     const entry = at.value as { kind: string }
     if (entry.kind === 'melody') at.update({ ...entry, kind: 'score' })
     at.continue()
-  }
-}
-
-/**
- * Version 10: a setlist's `owner` and `ownerId` become a person of the space, and `leaderId`.
- * Read in its own pass, after the others have written, so it sees the records as they are now.
- */
-function migrateLeaders(transaction: IDBTransaction) {
-  const setlists = transaction.objectStore('setlists')
-  const read = setlists.getAll()
-  read.onsuccess = () => {
-    const all: Setlist[] = read.result
-    const now = new Date().toISOString()
-    const { people, leaderIds } = planPeople(all, now)
-    const store = transaction.objectStore('people')
-    for (const person of people) store.put(person)
-    all.forEach((setlist, i) => {
-      const { owner, ownerId, ...rest } = setlist
-      if (owner === undefined && ownerId === undefined) return
-      const leaderId = leaderIds[i]
-      const migrated: Setlist = { ...rest, ...(leaderId ? { leaderId } : {}) }
-      // The leader is content: a setlist the upgrade changed is one to send
-      migrated.modifiedDate = now
-      setlists.put(migrated)
-    })
   }
 }
 

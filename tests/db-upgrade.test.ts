@@ -4,14 +4,13 @@
  * old-database.ts, so a change to the stores that skips it, or a version without a snapshot, fails here.
  */
 import { expect } from '@open-wc/testing'
-import { ChordlessDB, DB_VERSION } from '../src/js/db.ts'
+import { ChordlessDB, DB_VERSION, OLDEST_UPGRADABLE } from '../src/js/db.ts'
 import { oldDatabase, SCHEMA_V14, type StoreShape, schemaOf } from './old-database.ts'
 import { deleteDatabase } from './test-helpers.ts'
 
 const { describe, it } = window
 
-/** The oldest version a database is upgraded from */
-const OLDEST = 14
+const OLDEST = OLDEST_UPGRADABLE
 
 /** What each version below the current one had: add one when DB_VERSION goes up */
 const SCHEMAS: Record<number, StoreShape[]> = { 14: SCHEMA_V14 }

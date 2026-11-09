@@ -10,7 +10,6 @@ import {
   leaderName,
   mergePlan,
   normalizeName,
-  planPeople,
   renamed,
   resolveLeader,
   resolvePerson,
@@ -94,90 +93,8 @@ describe('resolvePerson and leaderName', () => {
   })
 })
 
-describe('planPeople', () => {
-  it('makes one person for each email, named by the spelling used most', () => {
-    const { people, leaderIds } = planPeople(
-      [
-        { owner: 'Tom', ownerId: 'Tom@Example.com' },
-        { owner: 'Tom Smith', ownerId: 'tom@example.com' },
-        { owner: 'Tom Smith', ownerId: 'tom@example.com' },
-        { owner: 'Ann', ownerId: 'ann@example.com' },
-      ],
-      NOW
-    )
-    assert.deepEqual(people.map(p => [p.name, p.emails]).sort(), [
-      ['Ann', ['ann@example.com']],
-      ['Tom Smith', ['tom@example.com']],
-    ])
-    assert.equal(leaderIds[0], leaderIds[1])
-    assert.equal(leaderIds[1], leaderIds[2])
-    assert.notEqual(leaderIds[2], leaderIds[3])
-  })
-
-  it('gives a name with no email to the one person with an email who is called that', () => {
-    const { people, leaderIds } = planPeople(
-      [{ owner: 'Ann Smith', ownerId: 'ann@example.com' }, { owner: 'ann  smith.' }],
-      NOW
-    )
-    assert.equal(people.length, 1)
-    assert.equal(leaderIds[0], leaderIds[1])
-  })
-
-  it('makes a person of their own for a name nobody with an email is called', () => {
-    const { people, leaderIds } = planPeople(
-      [
-        { owner: 'Visiting Vic' },
-        { owner: 'visiting vic' },
-        { owner: 'Ann', ownerId: 'a@example.com' },
-      ],
-      NOW
-    )
-    assert.equal(people.length, 2)
-    assert.equal(leaderIds[0], leaderIds[1])
-    assert.equal(people.find(p => p.id === leaderIds[0])?.emails.length, 0)
-  })
-
-  it('does not join a name to two people with that name: they stay apart', () => {
-    const { people, leaderIds } = planPeople(
-      [
-        { owner: 'Sam', ownerId: 'sam1@example.com' },
-        { owner: 'Sam', ownerId: 'sam2@example.com' },
-        { owner: 'Sam' },
-      ],
-      NOW
-    )
-    assert.equal(people.length, 3)
-    assert.notEqual(leaderIds[2], leaderIds[0])
-    assert.notEqual(leaderIds[2], leaderIds[1])
-  })
-
-  it('has no leader for no name and no email', () => {
-    const { people, leaderIds } = planPeople([{ owner: '' }, {}, { owner: '  ' }], NOW)
-    assert.deepEqual(people, [])
-    assert.deepEqual(leaderIds, [null, null, null])
-  })
-
-  it('makes the same people, with the same ids, whatever order the setlists come in', () => {
-    const leaders = [
-      { owner: 'Ann', ownerId: 'a@example.com' },
-      { owner: 'Vic' },
-      { owner: 'Ben', ownerId: 'b@example.com' },
-    ]
-    const forward = planPeople(leaders, NOW)
-    const backward = planPeople([...leaders].reverse(), NOW)
-    assert.deepEqual(forward.people.map(p => p.id).sort(), backward.people.map(p => p.id).sort())
-  })
-})
-
 describe('a leader known only by email', () => {
-  it('is named by the email, in the plan and for a setlist from before people', () => {
-    const { people, leaderIds } = planPeople(
-      [{ ownerId: 'Cat@Example.com' }, { owner: ' ', ownerId: 'cat@example.com' }],
-      NOW
-    )
-    assert.equal(people.length, 1)
-    assert.equal(people[0].name, 'cat@example.com')
-    assert.equal(leaderIds[0], leaderIds[1])
+  it('is named by the email, for a setlist from before people', () => {
     const leaders = { known: [] as Person[], added: [] as Person[] }
     adoptLegacyLeader(
       { id: 's', ownerId: 'dan@example.com', songs: [] } as unknown as Setlist,

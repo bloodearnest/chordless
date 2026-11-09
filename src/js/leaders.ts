@@ -87,21 +87,6 @@ export function findPerson(
   return live.find(person => normalizeName(person.name) === name)
 }
 
-/** The most common of some spellings, the first of any tie */
-function commonest(names: string[]): string {
-  const counts = new Map<string, number>()
-  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1)
-  let best = ''
-  let bestCount = 0
-  for (const [name, count] of counts) {
-    if (count > bestCount || (count === bestCount && name.localeCompare(best) < 0)) {
-      best = name
-      bestCount = count
-    }
-  }
-  return best
-}
-
 /** A person made from what a setlist said of its leader: with the id the same leader always gets */
 export function personFromLegacy(legacy: LegacyLeader, now: string): Person | null {
   const email = normalizeEmail(legacy.ownerId)
@@ -117,70 +102,6 @@ export function personFromLegacy(legacy: LegacyLeader, now: string): Person | nu
   const norm = normalizeName(name)
   if (!norm) return null
   return { id: idFromKey(`name:${norm}`), name, emails: [], modifiedDate: now }
-}
-
-/**
- * The people for a list of setlists' leaders, and the id of each one's person (null for no leader),
- * in the order given. One person for each email; one for each name that has no email, unless it is
- * the name of one person with an email (then it is theirs). A person is named by the spelling used
- * most often.
- */
-export function planPeople(
-  leaders: LegacyLeader[],
-  now: string
-): { people: Person[]; leaderIds: (string | null)[] } {
-  const byEmail = new Map<string, string[]>()
-  for (const leader of leaders) {
-    const email = normalizeEmail(leader.ownerId)
-    if (!email) continue
-    const names = byEmail.get(email) ?? []
-    const name = (leader.owner ?? '').trim()
-    if (name) names.push(name)
-    byEmail.set(email, names)
-  }
-
-  const people = new Map<string, Person>()
-  const emailPerson = new Map<string, Person>()
-  for (const [email, names] of byEmail) {
-    const person = personFromLegacy({ owner: commonest(names), ownerId: email }, now) as Person
-    people.set(person.id, person)
-    emailPerson.set(email, person)
-  }
-
-  // A name with no email belongs to the one person with an email that is called that
-  const emailNames = new Map<string, Person[]>()
-  for (const [email, names] of byEmail) {
-    for (const name of new Set(names)) {
-      const norm = normalizeName(name)
-      emailNames.set(norm, [...(emailNames.get(norm) ?? []), emailPerson.get(email) as Person])
-    }
-  }
-
-  const nameSpellings = new Map<string, string[]>()
-  for (const leader of leaders) {
-    if (normalizeEmail(leader.ownerId)) continue
-    const name = (leader.owner ?? '').trim()
-    const norm = normalizeName(name)
-    if (norm) nameSpellings.set(norm, [...(nameSpellings.get(norm) ?? []), name])
-  }
-  const namePerson = new Map<string, Person>()
-  for (const [norm, spellings] of nameSpellings) {
-    const owners = new Set(emailNames.get(norm)?.map(person => person.id))
-    if (owners.size === 1) {
-      namePerson.set(norm, emailNames.get(norm)?.[0] as Person)
-      continue
-    }
-    const person = personFromLegacy({ owner: commonest(spellings) }, now) as Person
-    people.set(person.id, person)
-    namePerson.set(norm, person)
-  }
-
-  const leaderIds = leaders.map(leader => {
-    const email = normalizeEmail(leader.ownerId)
-    if (email) return (emailPerson.get(email) as Person).id
-    return namePerson.get(normalizeName(leader.owner ?? ''))?.id ?? null
-  })
-  return { people: [...people.values()], leaderIds }
 }
 
 /** The people a pull knows, and those it has made for setlists from before people */
