@@ -504,9 +504,11 @@ function beamLevels(beam: El, x: number): number {
   const polys: P[] = beam.children
     .filter(c => c.name === 'polygon')
     .flatMap(p => {
+      /* v8 ignore next -- Verovio's beams are polygons with points */
       const pts = (p.attrs.points ?? '')
         .split(/\s+/)
         .map(pt => pt.split(',').map(Number) as [number, number])
+      /* v8 ignore next -- a beam polygon has four points */
       if (pts.length < 4) return []
       const [tl, tr] = pts as [[number, number], [number, number]]
       return [
@@ -523,10 +525,13 @@ function beamLevels(beam: El, x: number): number {
   polys.forEach((p, i) => {
     p.chain = i
   })
+  /* v8 ignore start -- a secondary beam drawn in pieces is how SongSelect's own sheets are made; the
+     sheets made for the tests (Verovio's own) draw each beam as one polygon */
   for (const a of polys)
     for (const b of polys)
       if (a !== b && Math.abs(a.x1 - b.x0) < 8 && Math.abs(a.yRight - b.yLeft) < 12)
         b.chain = a.chain
+  /* v8 ignore stop */
   const chains = new Set<number>()
   for (const p of polys) if (p.x0 - 25 <= x && x <= p.x1 + 25) chains.add(p.chain)
   return chains.size

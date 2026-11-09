@@ -103,6 +103,15 @@ describe('a melody printed as SongSelect prints it and read back', () => {
     )
   })
 
+  it('keeps beamed notes of mixed lengths: broken second beams, hooks and a dotted note', async () => {
+    await sameAfterPdf(
+      melodyOf('Beams', [
+        m(1, ['C4:0.25:a', 'D4:0.25:b', 'E4:0.5:c', 'F4:0.5:d', 'G4:0.25:e', 'A4:0.25:f']),
+        m(2, ['C4:0.75:g', 'D4:0.25:h', 'E4:0.25:i', 'F4:0.75:j', 'G4:2:k'], { barline: 'final' }),
+      ])
+    )
+  })
+
   it('keeps the key signature and the accidentals it makes', async () => {
     await sameAfterPdf(
       melodyOf('Sharps', [
