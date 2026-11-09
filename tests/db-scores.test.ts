@@ -5,6 +5,7 @@ import type { Score } from '../src/js/score.ts'
 import { writeMusicXml } from '../src/js/score-musicxml.ts'
 import { scoreRecord } from '../src/js/score-record.ts'
 import { addSong } from './drive-harness.ts'
+import { oldDatabase, SCHEMA_V14 } from './old-database.ts'
 import { deleteDatabase } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -117,39 +118,6 @@ describe('the melodies store', () => {
     expect(await db.getScore('song-1')).to.equal(undefined)
   })
 
-  /** A database as an older version left it, with `melodies` (the old name of `scores`) holding `records` */
-  async function oldDatabase(
-    version: number,
-    records: object[],
-    pending: object[] = []
-  ): Promise<string> {
-    const name = `test-melodies-v${version}-${crypto.randomUUID()}`
-    const old = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(name, version)
-      request.onupgradeneeded = () => {
-        for (const [store, keyPath] of [
-          ['songs', 'id'],
-          ['setlists', 'id'],
-          ['melodies', 'uuid'],
-          ['pending_deletions', 'ref'],
-        ] as const) {
-          request.result.createObjectStore(store, { keyPath })
-        }
-      }
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
-    await new Promise<void>((resolve, reject) => {
-      const tx = old.transaction(['melodies', 'pending_deletions'], 'readwrite')
-      for (const record of records) tx.objectStore('melodies').put(record)
-      for (const entry of pending) tx.objectStore('pending_deletions').put(entry)
-      tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
-    })
-    old.close()
-    return name
-  }
-
   async function upgraded<T>(name: string, then: (db: ChordlessDB) => Promise<T>): Promise<T> {
     const db = new ChordlessDB(name)
     await db.init()
@@ -163,7 +131,9 @@ describe('the melodies store', () => {
 
   it('clears the melodies of the version that kept them parsed, which are pulled or read again', async () => {
     // a database as version 13 left it: a melody was the parsed object
-    const name = await oldDatabase(13, [{ uuid: 'song-1', melody, key: 'G', contentHash: 'h' }])
+    const name = await oldDatabase(13, SCHEMA_V14, {
+      melodies: [{ uuid: 'song-1', melody, key: 'G', contentHash: 'h' }],
+    })
     await upgraded(name, async db => {
       expect(await db.getAllScores()).to.deep.equal([])
       await db.saveScore(scoreRecord('song-1', xml, 'G'))
@@ -174,7 +144,7 @@ describe('the melodies store', () => {
   it('moves the melodies of version 14 to the scores store, and marks those with a file as having an old one', async () => {
     const synced = { ...scoreRecord('song-1', xml, 'G'), fileRef: 'file-1', syncedContentHash: 'h' }
     const local = scoreRecord('song-2', xml, null)
-    const name = await oldDatabase(14, [synced, local])
+    const name = await oldDatabase(14, SCHEMA_V14, { melodies: [synced, local] })
     await upgraded(name, async db => {
       const all = await db.getAllScores()
       expect(all.map(record => record.uuid).sort()).to.deep.equal(['song-1', 'song-2'])
@@ -187,14 +157,12 @@ describe('the melodies store', () => {
 
   it('keeps the kind of a file waiting for the trash as a score', async () => {
     const at = new Date().toISOString()
-    const name = await oldDatabase(
-      14,
-      [],
-      [
+    const name = await oldDatabase(14, SCHEMA_V14, {
+      pending_deletions: [
         { ref: 'a', kind: 'melody', deletedAt: at },
         { ref: 'b', kind: 'song', deletedAt: at },
-      ]
-    )
+      ],
+    })
     await upgraded(name, async db => {
       const pending = (await db.getPendingDeletions()).sort((a, b) => a.ref.localeCompare(b.ref))
       expect(pending.map(entry => [entry.ref, entry.kind])).to.deep.equal([

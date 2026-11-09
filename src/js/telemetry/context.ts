@@ -15,6 +15,8 @@ export interface Ambient {
   /** Random ids kept in the person's own synced data, never derived from who they are */
   accountId?: string
   teamPseudoId?: string
+  /** The version of the local database last opened (db.ts): how far a device has been upgraded */
+  dbVersion?: number
 }
 
 let ambient: Ambient = {}

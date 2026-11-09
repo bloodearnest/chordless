@@ -26,6 +26,7 @@ export function baselineAttributes(): Attributes {
   set('chordless.team.pseudo_id', ambient.teamPseudoId)
   set('chordless.space_kind', ambient.spaceKind)
   set(ATTR_SESSION_ID, ambient.sessionId)
+  set('chordless.db.version', ambient.dbVersion)
   // (the name of the page, not its address: the route's own words, like "setlist")
   set('chordless.route', document.body.dataset.view)
   set('chordless.live', getLive() !== null)
