@@ -59,7 +59,7 @@ describe('score-view', () => {
     const bare = { ...sampleScore, notice: ['CCLI Song # 1'] }
     const plain = await shown({ melody: bare, melodyKey: 'C', songKey: 'C' })
     expect(plain.shadowRoot?.querySelector('.credits')).to.equal(null)
-    const noSubtitle = { ...sampleScore, notice: ['Words by', 'Some Writer'] }
+    const noSubtitle = { ...sampleScore, notice: ['Words by', 'Some Writer', 'CCLI Song # 1'] }
     const credited = await shown({ melody: noSubtitle, melodyKey: 'C', songKey: 'C' })
     expect(credited.shadowRoot?.querySelector('.subtitle')).to.equal(null)
     expect(credited.shadowRoot?.querySelector('.credit .names')?.textContent).to.equal(
