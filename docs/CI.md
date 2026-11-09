@@ -213,6 +213,8 @@ One run, in order, so a deploy never runs before what it depends on:
    (`check-prod-secrets.ts`), `wrangler deploy` runs from the built artifact, `scripts/ci/smoke.sh` waits
    for the site to run that hash and answer, and on failure `wrangler rollback` puts the previous version
    back (Durable Object migrations only add, so they stay).
+   (That is for a build that fails its smoke test, which no device has updated to. Once devices have, a rollback would
+   leave them unable to open a database a newer build upgraded: a bad release is fixed by a new one, `docs/MIGRATIONS.md`.)
 
 The jobs are repeated, not called: a called workflow did not get the secrets of an
 environment its caller's job would need (the first run showed `GH_TERRAFORM_TOKEN` empty in a called
