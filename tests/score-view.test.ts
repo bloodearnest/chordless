@@ -24,6 +24,11 @@ describe('score-view', () => {
     expect(sheet.shadowRoot?.querySelectorAll('.notice p')).to.have.length(2)
   })
 
+  it('shows the title, as the sheet had it', async () => {
+    const sheet = await shown({ melody: sampleScore, melodyKey: 'C', songKey: 'C' })
+    expect(sheet.shadowRoot?.querySelector('.title')?.textContent).to.equal('Test')
+  })
+
   it('lays the notice out as CCLI does: credits above the music, the terms centred under it', async () => {
     const melody = {
       ...sampleScore,
@@ -54,14 +59,16 @@ describe('score-view', () => {
     const sheet = await shown({ melody, melodyKey: 'C', songKey: 'C' })
     const root = sheet.shadowRoot as ShadowRoot
     expect(root.querySelector('.subtitle')?.textContent).to.equal('(a subtitle)')
-    expect(root.querySelector('.credit .label')).to.equal(null)
+    expect(root.querySelector('.credit .label') === null).to.equal(true)
     expect(root.querySelector('.credit .names')?.textContent).to.equal('Some Writer')
     const bare = { ...sampleScore, notice: ['CCLI Song # 1'] }
     const plain = await shown({ melody: bare, melodyKey: 'C', songKey: 'C' })
-    expect(plain.shadowRoot?.querySelector('.credits')).to.equal(null)
+    // (the title is still there: it is the only thing in the credits)
+    expect(plain.shadowRoot?.querySelector('.credit') === null).to.equal(true)
+    expect(plain.shadowRoot?.querySelector('.subtitle') === null).to.equal(true)
     const noSubtitle = { ...sampleScore, notice: ['Words by', 'Some Writer', 'CCLI Song # 1'] }
     const credited = await shown({ melody: noSubtitle, melodyKey: 'C', songKey: 'C' })
-    expect(credited.shadowRoot?.querySelector('.subtitle')).to.equal(null)
+    expect(credited.shadowRoot?.querySelector('.subtitle') === null).to.equal(true)
     expect(credited.shadowRoot?.querySelector('.credit .names')?.textContent).to.equal(
       'Some Writer'
     )
@@ -71,6 +78,56 @@ describe('score-view', () => {
     const sheet = await shown({ melody: sampleScore, melodyKey: 'C', songKey: 'C' })
     const svg = sheet.shadowRoot?.querySelector('.page svg') as SVGElement
     expect(getComputedStyle(svg).fill).to.equal(getComputedStyle(svg).color)
+  })
+
+  describe('fitting the screen', () => {
+    /** The sheet in a box that scrolls, `height` px tall */
+    async function inBox(height: number) {
+      const box = await fixture<HTMLElement>(
+        html`<div style="height: ${height}px; overflow-y: auto; width: 600px"><score-view></score-view></div>`
+      )
+      const sheet = box.querySelector('score-view') as ScoreView
+      Object.assign(sheet, { melody: sampleScore, melodyKey: 'C', songKey: 'C' })
+      await sheet.updateComplete
+      await waitUntil(() => sheet._pages.length, undefined, { timeout: 5000 })
+      await sheet.updateComplete
+      return { box, sheet }
+    }
+    const svgOf = (sheet: ScoreView) => sheet.shadowRoot?.querySelector('.page svg') as SVGElement
+    /** Page height of the sheet at the full width, and what the foot of the sheet keeps clear */
+    const natural = async () => {
+      const { sheet } = await inBox(2000)
+      const around = (selector: string) =>
+        sheet.shadowRoot?.querySelector<HTMLElement>(selector)?.offsetHeight ?? 0
+      // (the height of the page at this width, from its proportions)
+      const [, , vw, vh] = (svgOf(sheet).getAttribute('viewBox') ?? '').split(' ').map(Number)
+      return {
+        height: (600 * (vh as number)) / (vw as number),
+        // (what is not music: the title above it, and the foot of the sheet kept clear of the player)
+        padding:
+          Number.parseFloat(getComputedStyle(sheet).paddingBottom) +
+          around('.credits') +
+          around('.notice'),
+      }
+    }
+
+    it('is drawn at the full width when it fits, or would have to shrink a lot to', async () => {
+      const { height, padding } = await natural()
+      const roomy = await inBox(Math.ceil(height + padding) + 50)
+      expect(svgOf(roomy.sheet).getBoundingClientRect().width).to.be.closeTo(600, 1)
+      const cramped = await inBox(Math.ceil(height * 0.5 + padding))
+      expect(svgOf(cramped.sheet).getBoundingClientRect().width).to.be.closeTo(600, 1)
+    })
+
+    it('is drawn smaller, to fit with no scrolling, when that takes off a little', async () => {
+      const { height, padding } = await natural()
+      const { sheet } = await inBox(Math.ceil(height * 0.85 + padding))
+      await waitUntil(() => sheet._fit < 1, 'the sheet to be fitted')
+      await sheet.updateComplete
+      const drawn = svgOf(sheet).getBoundingClientRect()
+      expect(drawn.width).to.be.closeTo(600 * 0.85, 15)
+      expect(drawn.height).to.be.at.most(height * 0.85 + 3)
+    })
   })
 
   it('shows it in the key the song is shown in', async () => {

@@ -32,6 +32,22 @@ export class ScoreViewErrorEvent extends Event {
 const WIDE_PAGE = 2100
 const NARROW_PAGE = 1200
 const NARROW_BELOW = 600
+/** The smallest a sheet is drawn to fit the screen: below this it is scrolled instead */
+const MIN_FIT = 0.7
+
+/** The element that scrolls the sheet: the nearest ancestor (across shadow roots) that scrolls vertically */
+function scrollerOf(element: HTMLElement): HTMLElement | null {
+  for (
+    let at: Node | null = element.parentNode;
+    at;
+    at = (at as Element).parentElement ?? (at as ShadowRoot).host ?? null
+  ) {
+    if (!(at instanceof HTMLElement)) continue
+    const { overflowY } = getComputedStyle(at)
+    if (overflowY === 'auto' || overflowY === 'scroll') return at
+  }
+  return null
+}
 
 export class ScoreView extends LitElement {
   static override properties = {
@@ -47,6 +63,8 @@ export class ScoreView extends LitElement {
   declare songKey: string
   declare _pages: string[]
   declare _failed: boolean
+  /** How much of the width the music is drawn at, so that a sheet that all but fits the screen does: 1 when it does not need to */
+  _fit = 1
   /** The newest engraving asked for: an older one that finishes later is dropped */
   _asked = 0
 
@@ -91,6 +109,17 @@ export class ScoreView extends LitElement {
       display: block;
       width: 100%;
       height: auto;
+    }
+    /* (a sheet that is fitted to the screen is a little narrower, and in the middle) */
+    .page {
+      width: calc(100% * var(--fit, 1));
+      margin-inline: auto;
+    }
+    .title {
+      text-align: center;
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: var(--sheet-text, var(--text-color, inherit));
     }
     /* The words around the music, laid out as CCLI's sheet has them: credits at the top right, the
        terms centred and small at the foot */
@@ -144,6 +173,63 @@ export class ScoreView extends LitElement {
     this._failed = false
   }
 
+  _resizes: ResizeObserver | null = null
+  /** The width, the height of what scrolls it and the pages that the fit was last worked out from */
+  _measured = ''
+
+  override connectedCallback(): void {
+    super.connectedCallback()
+    this._resizes = new ResizeObserver(() => this._fitToScreen())
+    this._resizes.observe(this)
+  }
+
+  override disconnectedCallback(): void {
+    this._resizes?.disconnect()
+    this._resizes = null
+    super.disconnectedCallback()
+  }
+
+  override updated(changed: PropertyValues): void {
+    if (changed.has('_pages')) this._fitToScreen()
+  }
+
+  /**
+   * A sheet that does not quite fit the screen is drawn a little smaller, so that all of it can be
+   * seen with no scrolling; one that would have to shrink a lot to is left at the width of the screen
+   * and scrolled (a phone's width gives notes you can read, and this is not to make them small).
+   */
+  _fitToScreen(): void {
+    const scroller = scrollerOf(this)
+    const width = this.clientWidth
+    if (!scroller || !width || !this._pages.length) return
+    // (what it was last worked out from: the same again changes nothing, and a change of the size
+    // that this makes is not answered with another, round and round)
+    const measured = `${width}x${scroller.clientHeight}x${this._pages.length}`
+    if (measured === this._measured) return
+    this._measured = measured
+    let notes = 0
+    for (const svg of this.shadowRoot?.querySelectorAll('.page > svg') ?? []) {
+      const [, , w, h] = (svg.getAttribute('viewBox') ?? '').split(' ').map(Number)
+      if (w && h) notes += (h / w) * width
+    }
+    const around = ['.credits', '.notice'].reduce(
+      (sum, selector) =>
+        sum + (this.shadowRoot?.querySelector<HTMLElement>(selector)?.offsetHeight ?? 0),
+      0
+    )
+    const room = scroller.clientHeight - around - this._bottomPadding()
+    const fit = notes > room && room / notes >= MIN_FIT ? room / notes : 1
+    if (Math.abs(fit - this._fit) < 0.005) return
+    this._fit = fit
+    // (set through the style object, which the page's policy allows, not as a style attribute)
+    this.style.setProperty('--fit', String(fit))
+  }
+
+  /** The room the player's controls take at the foot of the sheet (the padding-bottom of the host) */
+  _bottomPadding(): number {
+    return Number.parseFloat(getComputedStyle(this).paddingBottom) || 0
+  }
+
   override willUpdate(changed: PropertyValues): void {
     if (changed.has('melody') || changed.has('melodyKey') || changed.has('songKey')) {
       void this._engrave()
@@ -186,6 +272,7 @@ export class ScoreView extends LitElement {
       return html`<p class="failed" role="alert">The lead sheet could not be shown for this song.</p>`
     }
     const sections = (this.melody?.measures ?? []).flatMap(m => (m.section ? [m.section] : []))
+    const title = this.melody?.title ?? ''
     const { subtitle, credits, footer } = layoutNotice(
       this.melody?.notice ?? [],
       this.melody?.title ?? null,
@@ -194,8 +281,9 @@ export class ScoreView extends LitElement {
     const shown = this._pages.length > 0
     return html`
       ${
-        shown && (subtitle || credits.length)
+        shown && (title || subtitle || credits.length)
           ? html`<div class="credits">
+            ${title ? html`<div class="title">${title}</div>` : nothing}
             ${subtitle ? html`<div class="subtitle">${subtitle}</div>` : nothing}
             ${credits.map(
               c => html`<div class="credit">
