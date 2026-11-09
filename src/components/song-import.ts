@@ -570,6 +570,9 @@ export class SongImport extends LitElement {
           item.existingText = existingText
           item.comparison = compareCharts(existingText, chordproText)
           if (item.comparison.verdict === 'identical') {
+            // (the lead sheet may have changed, though the chart has not: the melody is not the
+            // chart, and is kept with the library's song)
+            item.melodySaved = notes ? await this._keepMelody(existing, notes) : undefined
             // (the same chart again: nothing to ask)
             item.choice = 'use-existing'
             // and if it is now known to be SongSelect's, the library's record of where it is from
@@ -663,12 +666,10 @@ export class SongImport extends LitElement {
   /** What the page says of the lead sheet's whole melody: kept with the song, or why it is not (docs/MELODY.md) */
   _melodyKept(item: ImportItem): string {
     if (item.melodySaved === false) {
-      return "The lead sheet's melody could not be saved, so the song has only its range."
+      return 'The lead sheet could not be saved, so the song has only its range.'
     }
     if (item.notes) {
-      return item.isDuplicate && (item.choice ?? item.pick) === 'use-existing'
-        ? "The library's chart stays, so the lead sheet's melody is not kept."
-        : "The lead sheet's melody is kept with the song."
+      return 'The lead sheet is kept with the song.'
     }
     // (a range read from the lead sheet always comes with its notes)
     return ''
@@ -1076,8 +1077,8 @@ export class SongImport extends LitElement {
           // (the library's chart stays the song the setlists see; the new variant is its own)
           song = await importAsVariant(item.song.uuid, item.chordproText, incoming, label, db)
         }
-        // (the melody goes with the chart that was taken: not when the library's own stays)
-        if (item.pick !== 'use-existing') await this._keepMelody(song, item.notes)
+        // (the melody is kept with the song whichever chart is taken: a lead sheet may have changed)
+        await this._keepMelody(song, item.notes)
         this._applied = true
         this._setChoice(item, item.pick, song)
       } catch (error) {

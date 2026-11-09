@@ -151,7 +151,7 @@ describe('song-import: corners', () => {
         source: 'songselect',
         leadSheet: leadSheet(),
       })
-      expect(await said(element)).to.contain("The lead sheet's melody is kept with the song.")
+      expect(await said(element)).to.contain('The lead sheet is kept with the song.')
 
       // a sheet whose notes are in another key is not kept, and the page says why
       const other = await importerKeeping(async () => read({ fifths: 1 }))
@@ -173,17 +173,17 @@ describe('song-import: corners', () => {
           leadSheet: leadSheet(),
         })
       )
-      expect(await said(failing)).to.contain('melody could not be saved')
+      expect(await said(failing)).to.contain('lead sheet could not be saved')
     })
 
-    it("says the library's chart stays, and its lead sheet melody is not kept, when that is the choice", async () => {
+    it("says the lead sheet is kept even when the library's chart stays", async () => {
       const element = await importerKeeping(async () => read())
       const item = {
         isDuplicate: true,
         choice: 'use-existing',
         notes: { melody: read(), key: 'C' },
       }
-      expect(element._melodyKept(item)).to.contain('is not kept')
+      expect(element._melodyKept(item)).to.contain('is kept')
       expect(element._melodyKept({ ...item, choice: null, pick: 'update' })).to.contain('is kept')
       expect(element._melodyKept({ ...item, notes: undefined, leadSheet: 'no-melody' })).to.equal(
         ''
@@ -318,6 +318,18 @@ describe('song-import: corners', () => {
       expect(text).to.contain('1 bar: 1 sung note read.')
       expect(text).to.not.contain('left out')
       expect(text).to.contain('Key signature: 2 flats (Bb major or G minor).')
+    })
+
+    it("keeps a lead sheet's melody with a song already in the library with the same chart", async () => {
+      const { element } = await importerReading(async () => read())
+      const text = chart(unique('Same chart, new sheet'))
+      await createSong(text.replace('{key: C}', '{key: C}\n{x_chordless_range: D4-E5}'))
+      await element.receive({ chordproText: text, source: 'songselect', leadSheet: leadSheet() })
+      expect(element._imports[0].comparison.verdict).to.equal('identical')
+      expect(await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)).to.not.equal(
+        undefined
+      )
+      expect(await said(element)).to.contain('The lead sheet is kept with the song.')
     })
 
     it('says when the song is already in the library and the chart is the same', async () => {

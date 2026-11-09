@@ -556,11 +556,12 @@ puts it there), and "Repeat 3x Last time to Coda" as the third pass.
 **Import keeps the melody (built).** `song-import` reads a lead sheet once, with `readMelodyPdf`, for the whole `Melody`,
 and the range is that melody's sung notes (`readOfMelody`, `src/js/lead-sheet.ts`). The melody is saved (`melodyRecord`, in the
 `melodies` store, synced as in "Syncing") for the song the chart goes to: a new song, the library's song when the chart
-updates it, the new song of an import as original or as variant, and not when the library's own chart stays
-(`use-existing`). It is kept only when the sheet is in the chart's key (its first measure's key signature against the
+updates it, the new song of an import as original or as variant, and the library's song when its own chart stays
+(`use-existing`, or the same chart again): the lead sheet may have changed where the chart has not, so a re-import
+replaces the melody. It is kept only when the sheet is in the chart's key (its first measure's key signature against the
 chart's `{key}`), as the range is; a sheet in another key, or one `readMelodyPdf` cannot read, leaves the song with its
 chart and no melody. A chart that has a range already keeps it, but the melody is
-still kept. The import page says it under the range: "The lead sheet's melody is kept with the song."; "The library's chart stays, so the lead sheet's melody is not kept." (a duplicate that is not updated); "…could not be saved". A sheet in another key gives neither, and the page says why.
+still kept. The import page says it under the range: "The lead sheet is kept with the song."; "The lead sheet could not be saved…". It says the same whichever chart is taken. A sheet in another key gives neither, and the page says why.
 
 Each step is a pull request that leaves the app working; the first two change nothing a person
 sees except a better range and a "how it was read" that can show the whole line.
