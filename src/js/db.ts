@@ -155,6 +155,7 @@ function deleteDatabase(name: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.deleteDatabase(name)
     request.onsuccess = () => resolve()
+    /* v8 ignore next -- a browser does not fail to delete a database, short of its storage being gone */
     request.onerror = () => reject(request.error)
   })
 }
