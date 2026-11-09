@@ -48,7 +48,7 @@ import {
   withSpaceName,
 } from '../other-songs.ts'
 import { buildUrl, type Route } from '../router.ts'
-import { scoreWithKey, showScore } from '../score-shown.ts'
+import { scoreWithKey, shownSheet, showScore } from '../score-shown.ts'
 import { isEditMode, setBodyEditMode } from '../setlist/edit-mode-ui.ts'
 import { createLibrarySongModel } from '../song-model-factory.ts'
 import { setSongUserPref } from '../song-user-prefs.ts'
@@ -357,7 +357,9 @@ export class LibraryView extends PageView {
   /** Render a (possibly transposed) chart into the song view, and set its sections up */
   async #renderSong(parsed: ParsedChart, song: SongWithContent): Promise<void> {
     const content = this.#content.value as HTMLElement
-    await SongViewManager.renderSongView(parsed, content, { songIndex: 0 })
+    // (a song shown as its lead sheet keeps it through being drawn again: its lyrics are not seen meanwhile)
+    const sheet = this.#melodyOn ? shownSheet(content) : null
+    await SongViewManager.renderSongView(parsed, content, { songIndex: 0, sheet })
     const db = await getCurrentDB()
     const model = createLibrarySongModel(song, db, db.spaceId)
     SongViewManager.initializeSongSections(content, model, { editMode: this.#editMode })

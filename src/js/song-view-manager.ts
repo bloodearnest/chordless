@@ -2,6 +2,7 @@ import type { SongDisplay } from '../components/song-display.ts'
 import type { SongSection } from '../components/song-section.ts'
 import type { ParsedChart } from './data-types.ts'
 import type { LibrarySong } from './models/library-song.ts'
+import { keepSheet } from './score-shown.ts'
 
 /**
  * Song View Manager
@@ -22,15 +23,17 @@ import type { LibrarySong } from './models/library-song.ts'
  *
  * @param parsedSong - Parsed ChordPro song data
  * @param container - Container to render into
- * @param options - { songIndex, capo }
+ * @param options - { songIndex, capo, sheet }: `sheet` is the song's lead sheet when it is shown as one, which
+ *   is put back in place of the lyrics at once (and made again for the new key by its own element), so that
+ *   drawing the song again does not show its lyrics for a moment
  * @returns The song-display element
  */
 export async function renderSongView(
   parsedSong: ParsedChart,
   container: HTMLElement,
-  options: { songIndex?: number; capo?: number } = {}
+  options: { songIndex?: number; capo?: number; sheet?: HTMLElement | null } = {}
 ): Promise<SongDisplay> {
-  const { songIndex = 0, capo = 0 } = options
+  const { songIndex = 0, capo = 0, sheet = null } = options
 
   container.innerHTML = ''
 
@@ -44,6 +47,7 @@ export async function renderSongView(
   songDisplay.capo = capo
 
   songContent.appendChild(songDisplay)
+  if (sheet) keepSheet(songContent, songDisplay, sheet)
   container.appendChild(songContent)
 
   // Wait for song-display to render
