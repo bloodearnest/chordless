@@ -137,7 +137,7 @@ describe('app-header', () => {
         html`<app-header heading="Page" show-melody-toggle></app-header>`
       )
       const toggle = must(button(header, '.melody-toggle'))
-      expect(toggle.getAttribute('aria-label')).to.equal('Show the melody')
+      expect(toggle.getAttribute('aria-label')).to.equal('Show the lead sheet')
       expect(toggle.getAttribute('aria-pressed')).to.equal('false')
       let pressed = 0
       header.addEventListener(MelodyToggleEvent.type, () => pressed++)

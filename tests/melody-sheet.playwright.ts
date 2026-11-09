@@ -31,7 +31,7 @@ test('a song with a melody can be shown as its sheet, and back to its lyrics', a
   await page.goto('/setlist/melody-setlist/song/0')
   await page.reload()
 
-  const toggle = page.getByRole('button', { name: 'Show the melody' })
+  const toggle = page.getByRole('button', { name: 'Show the lead sheet' })
   await expect(toggle).toBeVisible()
   await toggle.click()
 
@@ -66,7 +66,7 @@ test('the library shows a song as its sheet too, in its own key', async ({ page 
   }, MUSIC_XML)
   await page.goto('/songs/info-test-song')
   await page.reload()
-  await page.getByRole('button', { name: 'Show the melody' }).click()
+  await page.getByRole('button', { name: 'Show the lead sheet' }).click()
   await expect(page.locator('melody-sheet .notehead')).toHaveCount(4)
   await expect(page).toHaveURL(/\/songs\/info-test-song\?melody$/)
   await page.reload()
