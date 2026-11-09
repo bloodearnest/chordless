@@ -619,7 +619,7 @@ describe('transactionDone', () => {
 })
 
 describe('ChordlessDB opening', () => {
-  it('fails when the database cannot be opened', async () => {
+  it('fails when the database is newer than the code, which cannot downgrade it', async () => {
     const name = `TEST-${uniqueName()}`
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.open(name, 99)
@@ -629,14 +629,14 @@ describe('ChordlessDB opening', () => {
       }
       request.onerror = () => reject(request.error)
     })
-    let message = ''
+    let name_ = ''
     try {
       await new ChordlessDB(name).init()
     } catch (error) {
-      message = (error as Error).message
+      name_ = (error as Error).name
     }
     await deleteDatabase(name)
-    expect(message).to.equal('Failed to open IndexedDB')
+    expect(name_).to.equal('DatabaseNewerError')
   })
 
   it('needs a space, and to be opened before it is used', async () => {

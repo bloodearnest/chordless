@@ -14,6 +14,8 @@ import { leaderName, planPeople } from './leaders.ts'
 import { songSource } from './song-source.ts'
 import { PERSON_SYNC_FIELDS } from './sync/person-hash.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
+import { setAmbient } from './telemetry/context.ts'
+import { recordSpan } from './telemetry/telemetry.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
 import { requestResult, transactionDone } from './utils/idb.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
@@ -24,7 +26,7 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 // NOTE: This now stores ALL space data in one database per space.
 // Space metadata is stored separately in the 'spaces' database.
 
-const DB_VERSION = 15
+export const DB_VERSION = 15
 
 // Setlist types
 export const SETLIST_TYPES: Readonly<Record<string, string>> = {
@@ -127,6 +129,43 @@ const SONG_LINK_FIELDS = [
   'syncedContentHash',
 ] as const
 
+/** The database on this device is of a newer version than this code can read (it cannot be downgraded) */
+export class DatabaseNewerError extends Error {
+  constructor() {
+    super('The data on this device is from a newer version of Chordless than this one can read.')
+    this.name = 'DatabaseNewerError'
+  }
+}
+
+let toldDatabaseIsNewer = false
+
+/** Say, once, that the data is newer than the app, and offer to look for a newer app (docs/MIGRATIONS.md) */
+async function tellDatabaseIsNewer(): Promise<void> {
+  if (toldDatabaseIsNewer) return
+  toldDatabaseIsNewer = true
+  const [{ toast }, { appUpdate }] = await Promise.all([
+    import('./toast.ts'),
+    import('./app-update.ts'),
+  ])
+  toast('This device has newer Chordless data than this version can read.', {
+    kind: 'error',
+    details: `The data is newer than version ${DB_VERSION} of its format. Check for a newer version of the app.`,
+    action: { label: 'Check for updates', run: () => void appUpdate.check({ force: true }) },
+  })
+}
+
+/** Say that another window upgraded the data, so that this one, which let go of it, has to be reloaded */
+async function tellDatabaseWasUpgraded(): Promise<void> {
+  const [{ toast }, { appUpdate }] = await Promise.all([
+    import('./toast.ts'),
+    import('./app-update.ts'),
+  ])
+  toast('Chordless was updated in another window. Reload this one to carry on.', {
+    kind: 'error',
+    action: { label: 'Reload', run: () => appUpdate.apply() },
+  })
+}
+
 export class ChordlessDB {
   dbName: string
   spaceId: string
@@ -166,15 +205,39 @@ export class ChordlessDB {
 
   async init(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
+      const started = performance.now()
+      /** The version it was upgraded from, if this open upgraded it (not one made new) */
+      let upgradedFrom: number | null = null
+      const report = (outcome: string, extra: Record<string, string | number | boolean> = {}) =>
+        recordSpan('chordless.db.open', {
+          'chordless.db.outcome': outcome,
+          'chordless.db.new_version': DB_VERSION,
+          'chordless.db.open_ms': Math.round(performance.now() - started),
+          ...(upgradedFrom === null ? {} : { 'chordless.db.old_version': upgradedFrom }),
+          ...extra,
+        })
       const request = indexedDB.open(this.dbName, DB_VERSION)
 
       request.onerror = () => {
-        reject(new Error('Failed to open IndexedDB'))
+        const error = request.error
+        const name = error?.name ?? 'unknown'
+        report('failed', {
+          'chordless.error': true,
+          'chordless.db.error': name,
+          'chordless.db.error_message': error?.message ?? '',
+        })
+        // The database is of a newer version than this code (a build was rolled back, or an older
+        // one is being run): it cannot be read, nor downgraded. Say so, and look for a newer build.
+        if (name === 'VersionError') {
+          void tellDatabaseIsNewer()
+          reject(new DatabaseNewerError())
+        } else reject(new Error('Failed to open IndexedDB', { cause: error }))
       }
 
       // Another window on a newer build wants to upgrade: let go, or its open waits for ever
       /* v8 ignore start -- needs a second window on an older build holding the database open */
       request.onblocked = () => {
+        report('blocked')
         void import('./toast.ts').then(({ toast }) =>
           toast('Close the other Chordless windows to finish updating.', { kind: 'error' })
         )
@@ -183,7 +246,14 @@ export class ChordlessDB {
 
       request.onsuccess = () => {
         this.db = request.result
-        this.db.onversionchange = () => this.db?.close()
+        // Another window upgrades it (a newer build): this one lets go, so that its open is not left
+        // waiting, and can no longer use the database, which it says (not when it is being deleted)
+        this.db.onversionchange = event => {
+          this.db?.close()
+          if (event.newVersion !== null) void tellDatabaseWasUpgraded()
+        }
+        setAmbient({ dbVersion: this.db.version })
+        if (upgradedFrom !== null) report('upgraded')
         resolve()
         ensurePersistentStorage(this.spaceId)
       }
@@ -191,6 +261,7 @@ export class ChordlessDB {
       request.onupgradeneeded = event => {
         const db = request.result
         const oldVersion = event.oldVersion
+        if (oldVersion > 0) upgradedFrom = oldVersion
 
         // Create Songs store (moved from global SongsDB)
         // Now uses uuid as keyPath instead of id
