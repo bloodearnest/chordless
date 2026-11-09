@@ -27,7 +27,7 @@ import {
 } from '../src/js/space.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nextTimestamp, nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -82,7 +82,7 @@ describe('account-page', () => {
 
   it('keeps the spaces in the order they were added, whichever is in use, and marks only that one', async () => {
     const first = await space('First')
-    await wait(5)
+    await nextTimestamp()
     const second = await space('Second')
     const order = () => cards(el).map(card => card.space.id)
     await setCurrentSpace(first.id, first.name)

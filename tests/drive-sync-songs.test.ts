@@ -3,7 +3,7 @@ import { songFileMetadata } from '../src/js/drive-metadata.ts'
 import type { SyncManager } from '../src/js/sync-manager.ts'
 import { addSong, editSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, TEST_SPACE, wait } from './test-helpers.ts'
+import { nextTimestamp, suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -332,7 +332,7 @@ describe('Drive sync: songs', () => {
         importSource: 'songselect',
         metadataChangedAt: new Date().toISOString(),
       })
-      await wait(5)
+      await nextTimestamp()
       await syncDevice(phone)
       expect(file().props.importSource).to.equal('songselect')
 

@@ -1,4 +1,4 @@
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { WelcomeCard } from '../src/components/welcome-card.ts'
 import { INSTALL_CHANGE_EVENT } from '../src/js/install.ts'
 import { setRouter } from '../src/js/navigation.ts'
@@ -47,10 +47,7 @@ describe('welcome-card', () => {
         : new Response('{title: Welcome Sample}\n[C]La')) as typeof fetch
     const card = await make()
     ;(root(card).querySelector('#welcome-samples button') as HTMLButtonElement).click()
-    await new Promise<void>(resolve => {
-      const wait = () => (visited.length ? resolve() : setTimeout(wait, 10))
-      wait()
-    })
+    await waitUntil(() => visited.length, 'the sample setlist to be opened')
     expect(visited[0]).to.match(/^\/setlist\//)
     await card.updateComplete
     expect(card._busy).to.equal(false)
@@ -60,10 +57,7 @@ describe('welcome-card', () => {
     window.fetch = (async () => new Response('', { status: 500 })) as typeof fetch
     const card = await make()
     ;(root(card).querySelector('#welcome-samples button') as HTMLButtonElement).click()
-    await new Promise<void>(resolve => {
-      const wait = () => (card._error ? resolve() : setTimeout(wait, 10))
-      wait()
-    })
+    await waitUntil(() => card._error, 'the failure to be told')
     await card.updateComplete
     expect(root(card).querySelector('.error')?.textContent).to.contain(
       'Could not add the sample setlist'

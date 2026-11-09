@@ -143,11 +143,20 @@ app's own modules, imported directly: there's no build step to test around.
 - **Live mode**: the state (`live.test.ts`: the record in localStorage, its events, another window's changes), and the header's button with what the setlist page does with it (`setlist-page-edges.test.ts`).
 - **Transposition** (`transpose.test.ts`) generates one test per case from a table, so a
   failure names the chord and key.
-- Shared setup is in `test-helpers.ts`: `deleteDatabase`, `uniqueName`, `wait`/`settle`,
-  `TEST_SPACE`, `suppressConsoleLogs`, and `installFakeTimers()` (a clock that moves only on
-  `await clock.tick(ms)`, for code that fades or waits: see `pad-audio-controller.test.ts`).
-  Wait for what the test is about (`waitUntil` from
-  `@open-wc/testing`) rather than a fixed time where you can.
+- Shared setup is in `test-helpers.ts`: `deleteDatabase`, `uniqueName`, `TEST_SPACE`,
+  `suppressConsoleLogs`, the waits below, and `installFakeTimers()` (a clock that moves only on
+  `await clock.tick(ms)`, for code that fades or waits: see `pad-audio-controller.test.ts`;
+  `{ date: true }` moves `Date.now()` with it, for code that measures how long passed, as a long
+  press and the wake lock's idle limit do).
+- **Waiting.** Wait for what the test is about: `waitUntil` from `@open-wc/testing` (it takes an
+  async predicate too, for a database read), or a promise the code gives (a Lit `Task`'s
+  `taskComplete`, a load that can be run again and awaited). A fixed time is only for what it
+  names: `nothingFor(ms)`, time for what must not happen to have happened if it were going to
+  (and only that: a wait before something that must happen is a `waitUntil`); `nextTimestamp()`,
+  so what is saved next has a later time; `settle()`, to let what is queued run; and `wait(ms)` for
+  a fake's own delay. When the point is that something happens once, wait for it, then give a
+  second one `nothingFor` to come. Don't poll with a function that uses up what it reads (a link
+  taken with `takeLink`), and don't let a loop run out quietly: `waitUntil` fails at its timeout.
 - `suppressConsoleLogs()` (`test-helpers.js`) hides the app's logging, printing it
   only for tests that fail.
 

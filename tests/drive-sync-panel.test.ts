@@ -16,7 +16,7 @@ import { createSyncOrchestrator } from '../src/js/sync-orchestrator.ts'
 import { makeSetlist } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { nothingFor, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -199,7 +199,7 @@ describe('drive-sync-panel', () => {
         timeout: 4000,
       })
       await waitUntil(() => !el.syncing, 'it is done', { timeout: 4000 })
-      await wait(DriveSyncPanel.reloadMs * 2)
+      await nothingFor(DriveSyncPanel.reloadMs * 2)
       expect(reloads).to.equal(0)
     })
   })

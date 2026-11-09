@@ -9,7 +9,7 @@ import { addSong, useSyncRig } from './drive-harness.ts'
 import { measure } from './melody-build.ts'
 import type { MemoryFile } from './memory-storage.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nextTimestamp, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -380,7 +380,7 @@ describe('Drive sync: melodies', () => {
     await syncDevice(phone)
     const original = melodyFiles()[0]
     rig.storage.copyFile(original.ref, { ref: 'copy-1', props: { ...original.props } })
-    await wait(5)
+    await nextTimestamp()
     rig.storage.edit('copy-1', writeMusicXml(melodyOf('newer')))
     rig.storage.copyFile(original.ref, { ref: 'loose-1', props: { type: 'melody' } })
 
@@ -563,7 +563,7 @@ describe('Drive sync: melodies', () => {
     await syncDevice(phone)
     const original = melodyFiles()[0]
     rig.storage.copyFile(original.ref, { ref: 'copy-2', props: { ...original.props } })
-    await wait(5)
+    await nextTimestamp()
     // (the original is edited last, so the copy listed after it is the older)
     rig.storage.edit(original.ref, writeMusicXml(melodyOf('latest')))
 
@@ -579,7 +579,7 @@ describe('Drive sync: melodies', () => {
     await syncDevice(tablet)
     const original = melodyFiles()[0]
     rig.storage.copyFile(original.ref, { ref: 'copy-3', props: { ...original.props, key: '' } })
-    await wait(5)
+    await nextTimestamp()
     rig.storage.edit('copy-3', writeMusicXml(melodyOf('keyless')))
     await syncDevice(tablet)
     expect(wordOf(await tablet.db.getMelody('song-1'))).to.equal('keyless')

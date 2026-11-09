@@ -4,7 +4,7 @@ import { hashText } from '../src/js/song-utils.ts'
 import { makeLocalState, makeSong } from './builders.ts'
 import { useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nextTimestamp, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -89,7 +89,7 @@ describe('Drive sync: reset from Drive', () => {
       await phone.db.saveSong(
         makeSong({ uuid: 'song-1', id: 'title-a', title: 'A', chordproFileId })
       )
-      await wait(5)
+      await nextTimestamp()
       await syncDevice(phone)
       await phone.db.saveChordPro({
         id: chordproFileId,

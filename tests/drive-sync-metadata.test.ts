@@ -13,7 +13,7 @@ import {
 import { makeSong } from './builders.ts'
 import { addSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { nextTimestamp, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -30,7 +30,7 @@ describe('Drive sync: a song’s metadata', () => {
       ...fields,
       metadataChangedAt: new Date().toISOString(),
     })
-    await wait(5)
+    await nextTimestamp()
   }
   const file = (uuid: string) =>
     rig.storage.list(f => f.props.type === 'chordpro' && f.props.songUuid === uuid)[0]
