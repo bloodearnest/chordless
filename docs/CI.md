@@ -128,11 +128,17 @@ uses. The end-to-end jobs write a `.dev.vars` of made-up values (`scripts/ci/fak
 |---|---|
 | mise's tools | the OS, the tools, `mise.toml` |
 | `node_modules` | the OS, `mise.toml` (Node's version), `package-lock.json` |
+| Terraform's providers | the OS, the stacks' `.terraform.lock.hcl` files (jobs that install `terraform`) |
 | npm's downloads | the OS, `package-lock.json` (or the newest older one) |
 | Playwright's browser | the OS, the browser, `package-lock.json` |
 
 `node_modules` can be cached whole because no install script runs (`.npmrc`): it depends on nothing
 but the key. On a hit, `npm ci` is skipped.
+
+The providers are a plugin cache directory (`TF_PLUGIN_CACHE_DIR`, `~/.terraform.d/plugin-cache`, set
+by `scripts/infra-check.sh`, which also keeps one on a developer's machine): `terraform init` takes a
+locked provider from it and goes to the registry only for one it lacks, so a blip of the registry's
+network cannot fail the lint of a run that has them. The lockfile's hashes still check what is used.
 
 A pull request can read `main`'s caches but not save any, and `main` never reads a pull request's, so
 nothing a pull request does can end up in what `main` builds. Caches are saved on `main` only, by one

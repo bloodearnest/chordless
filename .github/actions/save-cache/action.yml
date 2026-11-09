@@ -2,7 +2,7 @@
 # saves each cache, and only on main, so pull requests read main's caches and never write any
 # (docs/CI.md). Takes the setup step's outputs.
 name: Save cache
-description: Save the tools, npm packages and browser that the setup step had to fetch
+description: Save the tools, Terraform providers, npm packages and browser that the setup step had to fetch
 
 inputs:
   setup:
@@ -18,6 +18,13 @@ runs:
       with:
         path: ${{ runner.os == 'Windows' && '~\AppData\Local\mise' || '~/.local/share/mise' }}
         key: ${{ fromJSON(inputs.setup).tools }}
+
+    - name: Save Terraform's providers
+      if: fromJSON(inputs.setup).save_terraform
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.terraform.d/plugin-cache
+        key: ${{ fromJSON(inputs.setup).terraform }}
 
     - name: Save node_modules
       if: fromJSON(inputs.setup).save_modules
