@@ -49,6 +49,18 @@ describe('score-view', () => {
     expect(order).to.deep.equal(['credits', 'page', 'notice'])
   })
 
+  it('shows credits with no label, and a subtitle alone', async () => {
+    const melody = { ...sampleScore, notice: ['(a subtitle)', 'Some Writer', 'CCLI Song # 1'] }
+    const sheet = await shown({ melody, melodyKey: 'C', songKey: 'C' })
+    const root = sheet.shadowRoot as ShadowRoot
+    expect(root.querySelector('.subtitle')?.textContent).to.equal('(a subtitle)')
+    expect(root.querySelector('.credit .label')).to.equal(null)
+    expect(root.querySelector('.credit .names')?.textContent).to.equal('Some Writer')
+    const bare = { ...sampleScore, notice: ['CCLI Song # 1'] }
+    const plain = await shown({ melody: bare, melodyKey: 'C', songKey: 'C' })
+    expect(plain.shadowRoot?.querySelector('.credits')).to.equal(null)
+  })
+
   it('draws the music in the text colour, so a dark theme is not black on black', async () => {
     const sheet = await shown({ melody: sampleScore, melodyKey: 'C', songKey: 'C' })
     const svg = sheet.shadowRoot?.querySelector('.page svg') as SVGElement
