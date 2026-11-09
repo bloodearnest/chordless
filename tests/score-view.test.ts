@@ -24,6 +24,37 @@ describe('score-view', () => {
     expect(sheet.shadowRoot?.querySelectorAll('.notice p')).to.have.length(2)
   })
 
+  it('lays the notice out as CCLI does: credits above the music, the terms centred under it', async () => {
+    const melody = {
+      ...sampleScore,
+      notice: [
+        '(based on a recording)',
+        'Words and Music by',
+        'A Writer and Another',
+        'CCLI Song # 1',
+        '© Somebody',
+      ],
+    }
+    const sheet = await shown({ melody, melodyKey: 'C', songKey: 'C' })
+    const root = sheet.shadowRoot as ShadowRoot
+    expect(root.querySelector('.subtitle')?.textContent).to.equal('(based on a recording)')
+    expect(root.querySelector('.credit .label')?.textContent).to.equal('Words and Music by')
+    expect(root.querySelector('.credit .names')?.textContent).to.equal('A Writer and Another')
+    expect([...root.querySelectorAll('.notice p')].map(p => p.textContent)).to.deep.equal([
+      'CCLI Song # 1',
+      '© Somebody',
+    ])
+    // (the credits come before the music, and the terms after it)
+    const order = [...root.querySelectorAll('.credits, .page, .notice')].map(e => e.className)
+    expect(order).to.deep.equal(['credits', 'page', 'notice'])
+  })
+
+  it('draws the music in the text colour, so a dark theme is not black on black', async () => {
+    const sheet = await shown({ melody: sampleScore, melodyKey: 'C', songKey: 'C' })
+    const svg = sheet.shadowRoot?.querySelector('.page svg') as SVGElement
+    expect(getComputedStyle(svg).fill).to.equal(getComputedStyle(svg).color)
+  })
+
   it('shows it in the key the song is shown in', async () => {
     const sheet = await shown({ melody: sampleScore, melodyKey: 'C', songKey: 'C' })
     const before = sheet._pages[0]

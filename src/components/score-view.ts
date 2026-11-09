@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing, type PropertyValues } from 'lit'
 import { unsafeSVG } from 'lit/directives/unsafe-svg.js'
 import type { Score } from '../js/score.ts'
 import { writeMusicXml } from '../js/score-musicxml.ts'
+import { layoutNotice } from '../js/score-notice.ts'
 import { renderScore } from '../js/score-render.ts'
 import { transposeScore } from '../js/score-transpose.ts'
 
@@ -54,8 +55,8 @@ export class ScoreView extends LitElement {
       display: block;
       /* (the player's controls float over the bottom of the page: the last line can be scrolled clear of them) */
       padding-bottom: 6rem;
-      background: var(--sheet-background, white);
-      color: var(--sheet-text, black);
+      background: var(--sheet-background, var(--bg-color, white));
+      color: var(--sheet-text, var(--text-color, black));
     }
     :host([hidden]) {
       display: none;
@@ -82,16 +83,49 @@ export class ScoreView extends LitElement {
     .page rect {
       stroke: currentColor;
     }
+    /* (the music is drawn in the page's text colour, so a dark theme gets light notes on a dark page:
+       Verovio's own color="black" on the <svg> is a presentation attribute, which a rule overrides) */
     .page svg {
+      color: inherit;
+      fill: currentColor;
       display: block;
       width: 100%;
       height: auto;
     }
+    /* The words around the music, laid out as CCLI's sheet has them: credits at the top right, the
+       terms centred and small at the foot */
+    .credits {
+      padding: 0.5rem 0.75rem 0;
+      font-family: Times, 'Times New Roman', serif;
+      color: var(--sheet-notice, var(--text-secondary, #444));
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 0.8rem;
+      font-style: italic;
+    }
+    .credit {
+      text-align: right;
+      margin-top: 0.15rem;
+    }
+    .credit .label {
+      display: block;
+      font-size: 0.7rem;
+      font-style: italic;
+    }
+    .credit .names {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: var(--sheet-text, var(--text-color, inherit));
+    }
     .notice {
       padding: 0.5rem 0.75rem 1rem;
-      font-size: 0.75rem;
-      line-height: 1.4;
-      color: var(--sheet-notice, #444);
+      font-family: Times, 'Times New Roman', serif;
+      font-size: 0.7rem;
+      line-height: 1.25;
+      text-align: center;
+      color: var(--sheet-notice, var(--text-secondary, #444));
     }
     .notice p {
       margin: 0;
@@ -151,12 +185,31 @@ export class ScoreView extends LitElement {
     if (this._failed && !this._pages.length) {
       return html`<p class="failed" role="alert">The lead sheet could not be shown for this song.</p>`
     }
-    const notice = this.melody?.notice ?? []
+    const sections = (this.melody?.measures ?? []).flatMap(m => (m.section ? [m.section] : []))
+    const { subtitle, credits, footer } = layoutNotice(
+      this.melody?.notice ?? [],
+      this.melody?.title ?? null,
+      sections
+    )
+    const shown = this._pages.length > 0
     return html`
+      ${
+        shown && (subtitle || credits.length)
+          ? html`<div class="credits">
+            ${subtitle ? html`<div class="subtitle">${subtitle}</div>` : nothing}
+            ${credits.map(
+              c => html`<div class="credit">
+                ${c.label ? html`<span class="label">${c.label}</span>` : nothing}
+                <span class="names">${c.names.join(', ')}</span>
+              </div>`
+            )}
+          </div>`
+          : nothing
+      }
       ${this._pages.map(page => html`<div class="page">${unsafeSVG(page)}</div>`)}
       ${
-        this._pages.length && notice.length
-          ? html`<div class="notice">${notice.map(line => html`<p>${line}</p>`)}</div>`
+        shown && footer.length
+          ? html`<div class="notice">${footer.map(line => html`<p>${line}</p>`)}</div>`
           : nothing
       }
     `
