@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import type { Score } from '../src/js/score.ts'
 import { writeMusicXml } from '../src/js/score-musicxml.ts'
 import { renderScoreHere, withoutStyle } from '../src/js/score-render-engine.ts'
+import { withTextAccidentals } from '../src/js/score-svg-text.ts'
 import { measure } from './score-build.ts'
 
 const melody: Score = {
@@ -45,5 +46,27 @@ describe('engraving a melody with Verovio', () => {
 
   it('says null for what is not MusicXML', async () => {
     assert.equal(await renderScoreHere('this is not music'), null)
+  })
+
+  it('writes the flats and sharps of chord symbols as text, in the size of the chord, not as a glyph of a font the page lacks', () => {
+    const text =
+      '<tspan font-size="405px" x="1" y="2">B</tspan>\n<tspan font-family="Leipzig" font-size="720px">\uEA64</tspan>\n<tspan font-size="405px">m7</tspan>'
+    assert.equal(
+      withTextAccidentals(text),
+      '<tspan font-size="405px" x="1" y="2">B</tspan>\n<tspan font-size="405px">♭</tspan>\n<tspan font-size="405px">m7</tspan>'
+    )
+    assert.match(withTextAccidentals('<tspan font-family="Leipzig">\uEA63</tspan>'), /♯<\/tspan>/)
+  })
+
+  it('has no Leipzig character left in a chord symbol of a melody with flat chords', async () => {
+    const flat = {
+      ...melody,
+      measures: melody.measures.map(m => ({ ...m, chords: [{ start: 0, text: 'Bbm7/Db' }] })),
+    }
+    const out = await renderScoreHere(writeMusicXml(flat))
+    assert.ok(out)
+    const shown = out.pages.map(withTextAccidentals).join('')
+    assert.doesNotMatch(shown, /font-family="Leipzig"[^>]*>[\uEA63-\uEA65]/)
+    assert.match(shown, /♭/)
   })
 })

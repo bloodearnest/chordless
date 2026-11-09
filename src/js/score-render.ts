@@ -6,6 +6,7 @@
  * not parsed on the thread the lyrics scroll on.
  */
 import type { RenderedScore, RenderOptions } from './score-render-engine.ts'
+import { withTextAccidentals } from './score-svg-text.ts'
 import type { RenderReply, RenderRequest } from './verovio-worker.ts'
 
 export type { RenderedScore, RenderOptions }
@@ -27,7 +28,10 @@ function start(): Worker {
     if (!waiting) return
     pending.delete(data.id)
     if ('error' in data) waiting.reject(new Error(data.error))
-    else waiting.resolve(data.result)
+    else
+      waiting.resolve(
+        data.result && { ...data.result, pages: data.result.pages.map(withTextAccidentals) }
+      )
   }
   // A worker that fails (the file did not load, or the policy refused it) fails what waits on it, and
   // the next call makes a new one
