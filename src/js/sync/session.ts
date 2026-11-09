@@ -138,7 +138,7 @@ export class SyncRun {
   /** The ids of the songs that have a live file in Drive, as listed by the pull (null: not listed) */
   liveSongUuids: Set<string> | null = null
   /** The uuids of the songs whose melody has a live file in Drive, as listed by the pull (null: not listed) */
-  liveMelodyUuids: Set<string> | null = null
+  liveScoreUuids: Set<string> | null = null
 
   constructor(options: {
     db: ChordlessDB

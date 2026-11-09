@@ -25,8 +25,8 @@ test('a song with a melody can be shown as its sheet, and back to its lyrics', a
   await seedSong(page, { setlistId: 'melody-setlist' })
   await page.evaluate(async xml => {
     const { getCurrentDB } = await import('/js/db.ts')
-    const { melodyRecord } = await import('/js/melody-record.ts')
-    await (await getCurrentDB()).saveMelody(melodyRecord('info-test-song', xml, 'G'))
+    const { scoreRecord } = await import('/js/score-record.ts')
+    await (await getCurrentDB()).saveScore(scoreRecord('info-test-song', xml, 'G'))
   }, MUSIC_XML)
   await page.goto('/setlist/melody-setlist/song/0')
   await page.reload()
@@ -61,8 +61,8 @@ test('the library shows a song as its sheet too, in its own key', async ({ page 
   await seedSong(page)
   await page.evaluate(async xml => {
     const { getCurrentDB } = await import('/js/db.ts')
-    const { melodyRecord } = await import('/js/melody-record.ts')
-    await (await getCurrentDB()).saveMelody(melodyRecord('info-test-song', xml, 'G'))
+    const { scoreRecord } = await import('/js/score-record.ts')
+    await (await getCurrentDB()).saveScore(scoreRecord('info-test-song', xml, 'G'))
   }, MUSIC_XML)
   await page.goto('/songs/info-test-song')
   await page.reload()

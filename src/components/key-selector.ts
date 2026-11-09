@@ -1,5 +1,5 @@
 import { rangeOfMetadata } from '../js/chart-range.ts'
-import type { ChartMetadata, MelodyRecord } from '../js/data-types.ts'
+import type { ChartMetadata, ScoreRecord } from '../js/data-types.ts'
 import { songMelody } from '../js/melody-analysis.ts'
 import { noteName, semitonesBetween } from '../js/pitch.ts'
 import { describeRange, type NoteRange, octaveNearGreen, rangeStatus } from '../js/voice-range.ts'
@@ -70,7 +70,7 @@ export class KeySelector extends OptionPicker<string> {
   showRangeOf(
     metadata: ChartMetadata | undefined,
     chartKey: string,
-    melody: () => Promise<MelodyRecord | undefined>
+    melody: () => Promise<ScoreRecord | undefined>
   ): void {
     const asked = ++this.#asked
     this.range = rangeOfMetadata(metadata)

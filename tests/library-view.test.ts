@@ -265,10 +265,10 @@ describe('the library view, with a song open', () => {
             return true
           },
         })
-        await db.saveMelody(sampleRecord(song.uuid, 'G'))
+        await db.saveScore(sampleRecord(song.uuid, 'G'))
       })
       afterEach(async () => {
-        await db.deleteMelody(song.uuid, { remember: false })
+        await db.deleteScore(song.uuid, { remember: false })
       })
 
       it('has a button for a song with a melody, which shows the sheet in place of the lyrics and back', async () => {
@@ -314,11 +314,11 @@ describe('the library view, with a song open', () => {
       })
 
       it('has no button for a song with no melody, and none once the song is closed', async () => {
-        await db.deleteMelody(song.uuid, { remember: false })
+        await db.deleteScore(song.uuid, { remember: false })
         await open()
         await nothingFor()
         expect(toggle() ?? null).to.equal(null)
-        await db.saveMelody(sampleRecord(song.uuid, 'G'))
+        await db.saveScore(sampleRecord(song.uuid, 'G'))
         view.route = { name: 'songs' }
         await nothingFor()
         expect(toggle() ?? null).to.equal(null)
@@ -341,14 +341,14 @@ describe('the library view, with a song open', () => {
       })
 
       it('comes from the song’s melody when the chart has no range of its own', async () => {
-        await db.saveMelody(sampleRecord(song.uuid, 'G'))
+        await db.saveScore(sampleRecord(song.uuid, 'G'))
         try {
           await open()
           await until(() => selector().range, 'the melody’s range')
           expect(selector().range).to.deep.equal({ low: 60, high: 67 })
           expect(selector().rangeKey).to.equal('G')
         } finally {
-          await db.deleteMelody(song.uuid, { remember: false })
+          await db.deleteScore(song.uuid, { remember: false })
         }
       })
 

@@ -6,7 +6,7 @@
  */
 
 import { rangeOfMetadata } from './chart-range.ts'
-import type { ChartMetadata, MelodyRecord } from './data-types.ts'
+import type { ChartMetadata, ScoreRecord } from './data-types.ts'
 import type { Score } from './score.ts'
 import { readMusicXml } from './score-musicxml-read.ts'
 import { type MelodyExtremes, melodyExtremes } from './score-transpose.ts'
@@ -26,7 +26,7 @@ const parsed = new Map<string, Score | null>()
 const extremes = new Map<string, MelodyExtremes | null>()
 
 /** The melody a record's score gives (null if it will not read), parsed once for a score */
-export function melodyOfRecord(record: MelodyRecord): Score | null {
+export function melodyOfRecord(record: ScoreRecord): Score | null {
   const hit = parsed.get(record.contentHash)
   if (hit !== undefined) return hit
   const melody = readMusicXml(record.xml)
@@ -35,7 +35,7 @@ export function melodyOfRecord(record: MelodyRecord): Score | null {
 }
 
 /** The lowest and highest note of a melody record, and the beats on each (null if it will not read or has no sung note) */
-export function extremesOf(record: MelodyRecord): MelodyExtremes | null {
+export function extremesOf(record: ScoreRecord): MelodyExtremes | null {
   const hit = extremes.get(record.contentHash)
   if (hit !== undefined) return hit
   const melody = melodyOfRecord(record)
@@ -50,7 +50,7 @@ export function extremesOf(record: MelodyRecord): MelodyExtremes | null {
  */
 export function songMelody(
   metadata: ChartMetadata | undefined,
-  record: MelodyRecord | undefined
+  record: ScoreRecord | undefined
 ): SongMelody | null {
   const chartKey = metadata?.key ?? ''
   const found = record ? extremesOf(record) : null

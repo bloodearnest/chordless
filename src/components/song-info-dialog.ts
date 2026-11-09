@@ -89,7 +89,7 @@ export class SongInfoDialog extends LitElement {
           db.getSongUsageFromSetlists(songId),
         ])
         const { songMelody } = await import('../js/melody-analysis.ts')
-        const record = await db.getMelody(song.uuid)
+        const record = await db.getScore(song.uuid)
         signal.throwIfAborted()
         return {
           melody: songMelody(song.parsed?.metadata, record),

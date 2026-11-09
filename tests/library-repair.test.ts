@@ -610,7 +610,7 @@ describe('repairing a library', () => {
   it('moves the melody of a copy that goes to the song kept, as a new file to upload', async () => {
     await duplicated()
     const at = '2026-10-11T10:00:00.000Z'
-    await db.saveMelody({
+    await db.saveScore({
       uuid: 'may',
       xml: '<score-partwise/>',
       key: 'G',
@@ -624,8 +624,8 @@ describe('repairing a library', () => {
       syncedContentHash: 'h1',
     })
     await applyRepair(db, await planRepair(db, 'Simon Davy'))
-    expect(await db.getMelody('may')).to.equal(undefined)
-    const moved = must(await db.getMelody('june'))
+    expect(await db.getScore('may')).to.equal(undefined)
+    const moved = must(await db.getScore('june'))
     expect(moved.xml).to.equal('<score-partwise/>')
     expect(moved.contentHash).to.equal('h1')
     // (still written in the key of the copy it came from, which is not the key of the song kept)
@@ -648,11 +648,11 @@ describe('repairing a library', () => {
       modifiedDate: at,
       contentHash: xml,
     })
-    await db.saveMelody(melody('may', '<may/>'))
-    await db.saveMelody(melody('june', '<june/>'))
+    await db.saveScore(melody('may', '<may/>'))
+    await db.saveScore(melody('june', '<june/>'))
     await applyRepair(db, await planRepair(db, 'Simon Davy'))
-    expect(must(await db.getMelody('june')).xml).to.equal('<june/>')
-    expect(await db.getMelody('may')).to.equal(undefined)
+    expect(must(await db.getScore('june')).xml).to.equal('<june/>')
+    expect(await db.getScore('may')).to.equal(undefined)
   })
 
   it('keeps showing the tempo an entry showed', async () => {

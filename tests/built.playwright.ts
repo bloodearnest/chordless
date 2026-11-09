@@ -191,14 +191,14 @@ test('the melody sheet is engraved under the page policy, by a worker with a pol
     async ({ chordpro, song, melody }) => {
       const space = localStorage.getItem('current-space-id') as string
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(space, 14)
+        const request = indexedDB.open(space)
         request.onsuccess = () => resolve(request.result)
         request.onerror = () => reject(request.error)
       })
-      const tx = db.transaction(['chordpro', 'songs', 'melodies'], 'readwrite')
+      const tx = db.transaction(['chordpro', 'songs', 'scores'], 'readwrite')
       tx.objectStore('chordpro').put(chordpro)
       tx.objectStore('songs').put(song)
-      tx.objectStore('melodies').put(melody)
+      tx.objectStore('scores').put(melody)
       await new Promise((resolve, reject) => {
         tx.oncomplete = resolve
         tx.onerror = () => reject(tx.error)

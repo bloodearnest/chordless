@@ -9,9 +9,10 @@ show it and (later) play it. The range comes from the melody read there.
 music", which is any notation, and not "the melody", which is one part of it). Its MusicXML is the **score** in the
 code's own words. The **melody** is the sung line within it, so "Melody range" is right where it means that line.
 The code says the same: `Score` and the `Score*` types (`src/js/score.ts`), the `score-*.ts` modules that read, write,
-transpose and render it, and `ScoreView` for the lead sheet's view. `melody-analysis.ts` (range, tessitura) and `melody-record.ts`
-keep the word, as does what is stored: the `melodies` store, `getMelody`/`saveMelody`, the `melody` file type in Drive and
-the `.melody.mxl` suffix are on devices and in Drive, and are not worth a migration.
+transpose and render it, and `ScoreView` for the lead sheet's view. `melody-analysis.ts` (range, tessitura) keeps the word.
+What is stored has the new name: the `scores` store (`getScore`/`saveScore`, `ScoreRecord`), the `score` file type in Drive
+and, as people see it in Drive, `.lead-sheet.mxl`. Both were once `melody`; the database upgrade and the sync move them
+(docs/SYNC_ARCHITECTURE.md, "Scores").
 
 ## Why
 
@@ -173,15 +174,15 @@ as the chord transposer spells them. The range is of the sung notes: cue notes a
 - **Not in the chart.** A directive could hold the range (it does); the melody is kilobytes and
   would make the chart unreadable in the editor.
 - **A MusicXML file beside the chart in Drive** (built: PR "sync a song's melody"), per chart (a variant has its own),
-  in the key the chart is in, linked to its chart by `appProperties` (`type: 'melody'`, `songUuid` and `songId`, `key`,
-  `melodyFormat`, `spaceId`, `appVersion`) like the chart's own, named `<title>[-<ccli>].melody.mxl`: an `.mxl`
-  (`src/js/mxl.ts`), the zipped MusicXML that MuseScore, Sibelius and Dorico write and open, `melodyFormat: '2'`. It goes
+  in the key the chart is in, linked to its chart by `appProperties` (`type: 'score'`, `songUuid` and `songId`, `key`,
+  `scoreFormat`, `spaceId`, `appVersion`; `melody` and `melodyFormat` before the rename) like the chart's own, named `<title>[-<ccli>].lead-sheet.mxl`: an `.mxl`
+  (`src/js/mxl.ts`), the zipped MusicXML that MuseScore, Sibelius and Dorico write and open, `scoreFormat: '2'`. It goes
   through the same storage and sync as the chart (`docs/STORAGE_API.md`, `docs/SYNC_ARCHITECTURE.md`, "Melodies"): the
   user's browser and the user's, or their team space owner's, Drive. Older clients ignore it: the pull skips a file in
   `songs` whose `type` is not `chordpro`. Deleting a song deletes its melody and puts its file in the trash (a melody
   whose chart was deleted in Drive is cleaned up by the next full sync). **Merging copies** (`applyRepair`: the same chart imported twice) moves the melody of a copy that goes to the song kept, if that has none, as a new file to upload (the copy's file goes in the trash); the kept song's own melody is never replaced. It keeps its `key`, which may differ from the kept chart's. Linking a song as a variant of another (`linkSong`) deletes nothing, so each keeps its melody.
 - **On the device, the MusicXML text**, in an IndexedDB store of its own (`melodies`, since database version 13, keyed
-  by the song's uuid, with the file's `fileRef`, `fileRev` and `fileModified` as the chart's records have; `MelodyRecord`
+  by the song's uuid, with the file's `fileRef`, `fileRev` and `fileModified` as the chart's records have; `ScoreRecord`
   in `data-types.ts`), not in `songs` or `chordpro`: it is 30 to 70 KB a song and only the Melody view wants it. It is
   read again from the file when the file's `rev` changes, and only the original key is kept: other keys are
   `transposeScore`. **The score is kept, not its parse** (version 14; version 13 kept the parsed `Score`, and its records are
@@ -189,7 +190,7 @@ as the chord transposer spells them. The range is of the sung notes: cue notes a
   melody is wanted (the view, the key picker's analysis of the song in front of you), not for every song; a stored parse
   would have to be migrated whenever the `Score` type changes, and would keep what an older reader made of the score
   after the reader improved. The score also goes straight to Verovio for the original key. `contentHash` (of the score) is
-  how a change made here is found; `melodyRecord(uuid, xml, key)` makes a record with it. The import step writes the
+  how a change made here is found; `scoreRecord(uuid, xml, key)` makes a record with it. The import step writes the
   score once (`writeMusicXml`) and a pull stores what Drive had, once it is known to parse.
 - **Compression:** the file in Drive is an `.mxl`: 62 KB of MusicXML is 3 KB, so about 150 songs are 0.5 MB rather than 9 MB
   to download on a new device or a first sync. Drive stores the bytes as sent and counts them, and the browser's
@@ -198,9 +199,9 @@ as the chord transposer spells them. The range is of the sung notes: cue notes a
   around it is written by hand with a fixed timestamp. **No churn:** change detection is the hash of the *score*, not of
   the file, so a different deflate in another browser makes a different file (and a different `rev`) but never an upload:
   the pull downloads it once, sees the same hash, and only records the file's markers. A melody is uploaded only when its
-  score changed. Reading takes either form: `.mxl`, or the plain `.melody.musicxml` the first version wrote (`melodyFormat:
+  score changed. Reading takes either form: `.mxl`, or the plain `.lead-sheet.musicxml` (`.melody.musicxml` before the rename; `scoreFormat:
   '1'`), which is rewritten as an `.mxl` the next time the melody changes here. **A space that holds text only** (a team
-  space, until the Worker's routes take bytes: `SpaceStorage.bytes`) keeps the plain `.melody.musicxml` as before.
+  space, until the Worker's routes take bytes: `SpaceStorage.bytes`) keeps the plain `.lead-sheet.musicxml`.
 - **The copyright rule holds** (`CLAUDE.md`): the notes and lyrics are the song's, so they live
   only in the user's browser and Drive, never on the Worker, never in a share link, never in
   telemetry. A share carries the setlist; the receiver imports their own.
@@ -562,7 +563,7 @@ is sometimes read as a hyphen or missed. `readMusicXml` reads the title from a `
 puts it there), and "Repeat 3x Last time to Coda" as the third pass.
 
 **Import keeps the melody (built).** `song-import` reads a lead sheet once, with `readScorePdf`, for the whole `Score`,
-and the range is that melody's sung notes (`readOfMelody`, `src/js/lead-sheet.ts`). The melody is saved (`melodyRecord`, in the
+and the range is that melody's sung notes (`readOfMelody`, `src/js/lead-sheet.ts`). The melody is saved (`scoreRecord`, in the
 `melodies` store, synced as in "Syncing") for the song the chart goes to: a new song, the library's song when the chart
 updates it, the new song of an import as original or as variant, and the library's song when its own chart stays
 (`use-existing`, or the same chart again): the lead sheet may have changed where the chart has not, so a re-import

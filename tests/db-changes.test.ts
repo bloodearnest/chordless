@@ -86,13 +86,13 @@ describe('Telling of what is written (the change bus)', () => {
       'song:all:local',
       'chart:all:local',
       'person:all:local',
-      'melody:all:local',
+      'score:all:local',
     ])
     expect(await announced(d => d.clearFileLinks())).to.deep.equal([
       'setlist:all:local',
       'song:all:local',
       'person:all:local',
-      'melody:all:local',
+      'score:all:local',
     ])
     expect(await announced(d => d.clearAll())).to.have.length(5)
   })
@@ -103,7 +103,7 @@ describe('Telling of what is written (the change bus)', () => {
       await d.saveSetlist(makeSetlist({ id: 'linked', fileRef: 'file-1' }))
       await d.unlinkFiles(new Set(['file-1']))
     })
-    expect(seen.slice(1)).to.deep.equal(['setlist:all:local', 'song:all:local', 'melody:all:local'])
+    expect(seen.slice(1)).to.deep.equal(['setlist:all:local', 'song:all:local', 'score:all:local'])
   })
 
   it('says nothing of a delete of nothing', async () => {

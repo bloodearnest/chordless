@@ -11,9 +11,9 @@
 
 import type {
   ChordProRecord,
-  MelodyRecord,
   ParsedChart,
   Person,
+  ScoreRecord,
   Setlist,
   SongRecord,
 } from './data-types.ts'
@@ -211,15 +211,35 @@ export function songFileMetadata(
  * The version of the melody file's shape, in its properties: what a reader checks before it reads.
  * 1 is plain MusicXML (the first version, and what a text-only space keeps), 2 is an `.mxl`.
  */
-export const MELODY_FORMAT = '2'
-export const MELODY_FORMAT_TEXT = '1'
+export const SCORE_FORMAT = '2'
+export const SCORE_FORMAT_TEXT = '1'
 
 /**
- * The file name of a song's melody: its chart's name without the extension, then `.melody.mxl`
- * (or `.melody.musicxml` where the space holds text only)
+ * What the files were called before the rename: `type: 'melody'`, and `melodyFormat`. They are still
+ * read (a reader of a Drive folder cannot rewrite them), and a device that can write gives each file
+ * its new name and properties the next time it syncs (`ScoreRecord.legacyFile`).
  */
-export function melodyFilename(title: string, ccliNumber?: string | null, bytes = true): string {
-  return `${chordproFilename(title, ccliNumber).replace(/\.txt$/, '')}.melody.${bytes ? 'mxl' : 'musicxml'}`
+const LEGACY_SCORE_TYPE = 'melody'
+
+/** Whether a file's properties say it is a song's score (by either name) */
+export function isScoreFile(props: Record<string, string | undefined>): boolean {
+  return props.type === 'score' || props.type === LEGACY_SCORE_TYPE
+}
+
+/** Whether a score file still has its old properties */
+export function isLegacyScoreFile(props: Record<string, string | undefined>): boolean {
+  return props.type === LEGACY_SCORE_TYPE
+}
+
+const RETIRED_SCORE_PROPERTIES = ['melodyFormat']
+
+/**
+ * The file name of a song's score, which people see in Drive as its lead sheet: its chart's name
+ * without the extension, then `.lead-sheet.mxl` (or `.lead-sheet.musicxml` where the space holds text
+ * only). Before the rename (docs/MELODY.md, "What is stored") it was `.melody.mxl`.
+ */
+export function scoreFilename(title: string, ccliNumber?: string | null, bytes = true): string {
+  return `${chordproFilename(title, ccliNumber).replace(/\.txt$/, '')}.lead-sheet.${bytes ? 'mxl' : 'musicxml'}`
 }
 
 /**
@@ -227,24 +247,24 @@ export function melodyFilename(title: string, ccliNumber?: string | null, bytes 
  * by `songUuid` (and `songId`) like the chart's own properties. The key it is written in is here,
  * as the MusicXML has a key signature and not the key's name.
  */
-export function melodyFileMetadata(
-  record: Pick<MelodyRecord, 'uuid' | 'key'>,
+export function scoreFileMetadata(
+  record: Pick<ScoreRecord, 'uuid' | 'key'>,
   song: Pick<SongRecord, 'id' | 'title' | 'ccliNumber'>,
   { spaceId, bytes = true }: FileMetadataOptions & { bytes?: boolean }
 ): DriveFileMetadata {
   return {
-    name: melodyFilename(song.title || 'Untitled', song.ccliNumber, bytes),
+    name: scoreFilename(song.title || 'Untitled', song.ccliNumber, bytes),
     // (the types MusicXML files are given: Drive shows them as files other programs open)
     mimeType: bytes
       ? 'application/vnd.recordare.musicxml'
       : 'application/vnd.recordare.musicxml+xml',
     appProperties: {
-      type: 'melody',
+      type: 'score',
       spaceId: spaceId || '',
       songUuid: record.uuid,
       songId: song.id,
       key: record.key ?? '',
-      melodyFormat: bytes ? MELODY_FORMAT : MELODY_FORMAT_TEXT,
+      scoreFormat: bytes ? SCORE_FORMAT : SCORE_FORMAT_TEXT,
       appVersion: APP_VERSION,
     },
   }
@@ -262,7 +282,7 @@ export function fileInput({ name, mimeType, appProperties }: DriveFileMetadata):
 /** What the storage API updates a file with: see forUpdate */
 export function updateInput(
   metadata: DriveFileMetadata,
-  kind: 'setlist' | 'song' | 'share' | 'melody'
+  kind: 'setlist' | 'song' | 'share' | 'score'
 ): FileInput {
   return {
     type: metadata.mimeType,
@@ -273,10 +293,16 @@ export function updateInput(
 
 export function forUpdate(
   { name, appProperties }: Pick<DriveFileMetadata, 'name' | 'appProperties'>,
-  kind: 'setlist' | 'song' | 'share' | 'melody'
+  kind: 'setlist' | 'song' | 'share' | 'score'
 ): { name: string; appProperties: Record<string, string | null> } {
   const retired =
-    kind === 'setlist' ? RETIRED_SETLIST_PROPERTIES : kind === 'song' ? RETIRED_SONG_PROPERTIES : []
+    kind === 'setlist'
+      ? RETIRED_SETLIST_PROPERTIES
+      : kind === 'song'
+        ? RETIRED_SONG_PROPERTIES
+        : kind === 'score'
+          ? RETIRED_SCORE_PROPERTIES
+          : []
   return {
     name,
     appProperties: {

@@ -429,7 +429,7 @@ export class SongCard extends LitElement {
       return
     }
     const { getCurrentDB } = await import('../js/db.ts')
-    const record = await (await getCurrentDB()).getMelody(uuid)
+    const record = await (await getCurrentDB()).getScore(uuid)
     // (the card may have been given another song while this was read)
     if (this.song === song) this._melody = songMelody(song?.parsed?.metadata, record)
   }

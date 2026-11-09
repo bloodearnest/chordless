@@ -4,7 +4,7 @@
  * `.song-content`, one of them hidden. The sheet's component is loaded the first time one is shown.
  */
 import type { ScoreView } from '../components/score-view.ts'
-import type { MelodyRecord } from './data-types.ts'
+import type { ScoreRecord } from './data-types.ts'
 import { melodyOfRecord } from './melody-analysis.ts'
 import type { Score } from './score.ts'
 
@@ -17,7 +17,7 @@ export interface ShownScore {
 
 /** The melody a record gives, and its key (the song's own when the record names none); null if there is none */
 export function scoreWithKey(
-  record: MelodyRecord | undefined,
+  record: ScoreRecord | undefined,
   songKey: string | null | undefined
 ): { melody: Score; key: string } | null {
   const melody = record && melodyOfRecord(record)

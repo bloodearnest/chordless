@@ -18,7 +18,7 @@
  * database, so they can be checked on an export). Applying does.
  */
 
-import type { MelodyRecord, Setlist, SongRecord } from './data-types.ts'
+import type { ScoreRecord, Setlist, SongRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { lyricsOf } from './import-plan.ts'
 import { SONGSELECT, songSource } from './song-source.ts'
@@ -584,14 +584,14 @@ export interface RepairReport {
  * goes in the trash with the song that is deleted.
  */
 async function keepMelody(db: ChordlessDB, group: MergeGroup): Promise<void> {
-  if (await db.getMelody(group.keep.uuid)) return
-  const found = (await Promise.all(group.remove.map(record => db.getMelody(record.uuid)))).filter(
-    (melody): melody is MelodyRecord => !!melody
+  if (await db.getScore(group.keep.uuid)) return
+  const found = (await Promise.all(group.remove.map(record => db.getScore(record.uuid)))).filter(
+    (melody): melody is ScoreRecord => !!melody
   )
   found.sort((a, b) => b.modifiedDate.localeCompare(a.modifiedDate))
   const [melody] = found
   if (!melody) return
-  await db.saveMelody({
+  await db.saveScore({
     ...melody,
     uuid: group.keep.uuid,
     fileRef: null,

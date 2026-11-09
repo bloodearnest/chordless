@@ -16,7 +16,7 @@ import {
   said,
   unique,
   waitFor,
-  whileMelodiesCannotBeSaved,
+  whileScoresCannotBeSaved,
 } from './song-import-helpers.ts'
 import { clearToasts, shownToast, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -139,7 +139,7 @@ describe('song-import: corners', () => {
         source: 'songselect',
         leadSheet: leadSheet(),
       })
-      const record = await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)
+      const record = await (await getCurrentDB()).getScore(element._imports[0].song.uuid)
       expect(record?.key).to.equal('C')
       expect(readMusicXml(record?.xml ?? '')?.measures).to.have.length(3)
     })
@@ -166,7 +166,7 @@ describe('song-import: corners', () => {
 
       // and when saving it fails, the page does not say it is kept
       const failing = await importerKeeping(async () => read())
-      await whileMelodiesCannotBeSaved(() =>
+      await whileScoresCannotBeSaved(() =>
         failing.receive({
           chordproText: chart(unique('Said unsaved')),
           source: 'songselect',
@@ -196,14 +196,14 @@ describe('song-import: corners', () => {
       await element.receive({ chordproText: text, source: 'songselect', leadSheet: leadSheet() })
       expect(reads).to.have.length(1)
       expect(element._imports[0].chordproText).to.equal(text)
-      expect(await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)).to.not.equal(
+      expect(await (await getCurrentDB()).getScore(element._imports[0].song.uuid)).to.not.equal(
         undefined
       )
     })
 
     it('still imports the chart when the melody cannot be saved', async () => {
       const element = await importerKeeping(async () => read())
-      await whileMelodiesCannotBeSaved(() =>
+      await whileScoresCannotBeSaved(() =>
         element.receive({
           chordproText: chart(unique('Not saved')),
           source: 'songselect',
@@ -211,7 +211,7 @@ describe('song-import: corners', () => {
         })
       )
       expect(element._imports).to.have.length(1)
-      expect(await element._db.getMelody(element._imports[0].song.uuid)).to.equal(undefined)
+      expect(await element._db.getScore(element._imports[0].song.uuid)).to.equal(undefined)
     })
 
     it('keeps no melody from a sheet in another key, or one that cannot be read, and still imports the chart', async () => {
@@ -226,7 +226,7 @@ describe('song-import: corners', () => {
           leadSheet: leadSheet(),
         })
         expect(element._imports).to.have.length(1)
-        expect(await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)).to.equal(
+        expect(await (await getCurrentDB()).getScore(element._imports[0].song.uuid)).to.equal(
           undefined
         )
       }
@@ -326,7 +326,7 @@ describe('song-import: corners', () => {
       await createSong(text.replace('{key: C}', '{key: C}\n{x_chordless_range: D4-E5}'))
       await element.receive({ chordproText: text, source: 'songselect', leadSheet: leadSheet() })
       expect(element._imports[0].comparison.verdict).to.equal('identical')
-      expect(await (await getCurrentDB()).getMelody(element._imports[0].song.uuid)).to.not.equal(
+      expect(await (await getCurrentDB()).getScore(element._imports[0].song.uuid)).to.not.equal(
         undefined
       )
       expect(await said(element)).to.contain('The lead sheet is kept with the song.')

@@ -144,7 +144,7 @@ describe('song-card', () => {
     it('gives the key picker the range of the song’s melody when the chart says none', async () => {
       const db = await getCurrentDB()
       const uuid = `melody-${crypto.randomUUID()}`
-      await db.saveMelody(sampleRecord(uuid, 'G'))
+      await db.saveScore(sampleRecord(uuid, 'G'))
       try {
         const parsed = new ChordProParser().parse('{title: Washed}\n{key: G}\n[G]Washed')
         const inList = song({
@@ -171,7 +171,7 @@ describe('song-card', () => {
         await nothingFor()
         expect((await picker(moved)).range).to.equal(null)
       } finally {
-        await db.deleteMelody(uuid, { remember: false })
+        await db.deleteScore(uuid, { remember: false })
       }
     })
 
