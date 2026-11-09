@@ -24,6 +24,13 @@ describe('score-view', () => {
     expect(sheet.shadowRoot?.querySelectorAll('.notice p')).to.have.length(2)
   })
 
+  it('has no title line for a sheet that has none', async () => {
+    const melody = { ...sampleScore, title: null, notice: ['(a subtitle)', 'CCLI Song # 1'] }
+    const sheet = await shown({ melody, melodyKey: 'C', songKey: 'C' })
+    expect(sheet.shadowRoot?.querySelector('.title') === null).to.equal(true)
+    expect(sheet.shadowRoot?.querySelector('.subtitle')?.textContent).to.equal('(a subtitle)')
+  })
+
   it('shows the title, as the sheet had it', async () => {
     const sheet = await shown({ melody: sampleScore, melodyKey: 'C', songKey: 'C' })
     expect(sheet.shadowRoot?.querySelector('.title')?.textContent).to.equal('Test')
@@ -117,6 +124,20 @@ describe('score-view', () => {
       expect(svgOf(roomy.sheet).getBoundingClientRect().width).to.be.closeTo(600, 1)
       const cramped = await inBox(Math.ceil(height * 0.5 + padding))
       expect(svgOf(cramped.sheet).getBoundingClientRect().width).to.be.closeTo(600, 1)
+    })
+
+    it('finds what scrolls it through the shadow root it is in', async () => {
+      const box = await fixture<HTMLElement>(
+        html`<div style="height: 300px; overflow-y: auto"><div id="host"></div></div>`
+      )
+      const root = (box.querySelector('#host') as HTMLElement).attachShadow({ mode: 'open' })
+      const sheet = document.createElement('score-view') as ScoreView
+      root.append(sheet)
+      Object.assign(sheet, { melody: sampleScore, melodyKey: 'C', songKey: 'C' })
+      await waitUntil(() => sheet._pages.length, undefined, { timeout: 5000 })
+      await sheet.updateComplete
+      // (it was measured against the box: a sheet this small fits, and is left at full width)
+      expect(sheet._measured.startsWith(`${sheet.clientWidth}x300x`)).to.equal(true)
     })
 
     it('is drawn smaller, to fit with no scrolling, when that takes off a little', async () => {
