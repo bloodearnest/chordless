@@ -69,6 +69,10 @@ export class ThemeManager {
       // Annotations on a chart: private in pencil, shared in ink (docs/ANNOTATIONS.md)
       'annotation-private-color': '#4f5b66',
       'annotation-shared-color': '#b8431f',
+      // A lead sheet is dark ink on a light page, as musicians read one, in either theme
+      'sheet-background': '#ffffff',
+      'sheet-text': '#1a1a1a',
+      'sheet-notice': '#444444',
 
       // Border colors
       'border-color': '#d5dbdb',
@@ -124,6 +128,13 @@ export class ThemeManager {
       'chord-color': '#22d3ee',
       'annotation-private-color': '#aab4c0',
       'annotation-shared-color': '#ff9f7a',
+      // Still dark ink on a light page (light notes on a dark one read as a negative), but the page
+      // dimmed: the header's blue (hue 249) as the faintest tint, at 75% lightness, which is about
+      // 40% of white's light; black ink keeps the contrast at 9.5:1. (One lightness: a preference
+      // could set it.) While a sheet is shown it has the whole page below the header (style.css)
+      'sheet-background': 'oklch(75% 0.01 249)',
+      'sheet-text': '#000000',
+      'sheet-notice': '#2a2e33',
 
       // Border colors
       'border-color': '#404040',

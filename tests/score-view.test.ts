@@ -81,10 +81,21 @@ describe('score-view', () => {
     )
   })
 
-  it('draws the music in the text colour, so a dark theme is not black on black', async () => {
-    const sheet = await shown({ melody: sampleScore, melodyKey: 'C', songKey: 'C' })
-    const svg = sheet.shadowRoot?.querySelector('.page svg') as SVGElement
-    expect(getComputedStyle(svg).fill).to.equal(getComputedStyle(svg).color)
+  it("draws the music in the sheet's ink, on its paper, whatever the page's text colour", async () => {
+    document.documentElement.style.setProperty('--text-color', 'rgb(236, 240, 241)')
+    document.documentElement.style.setProperty('--sheet-background', 'rgb(169, 165, 155)')
+    document.documentElement.style.setProperty('--sheet-text', 'rgb(0, 0, 0)')
+    try {
+      const sheet = await shown({ melody: sampleScore, melodyKey: 'C', songKey: 'C' })
+      const svg = sheet.shadowRoot?.querySelector('.page svg') as SVGElement
+      expect(getComputedStyle(svg).fill).to.equal('rgb(0, 0, 0)')
+      expect(getComputedStyle(svg).color).to.equal('rgb(0, 0, 0)')
+      expect(getComputedStyle(sheet).backgroundColor).to.equal('rgb(169, 165, 155)')
+    } finally {
+      for (const name of ['--text-color', '--sheet-background', '--sheet-text']) {
+        document.documentElement.style.removeProperty(name)
+      }
+    }
   })
 
   describe('fitting the screen', () => {

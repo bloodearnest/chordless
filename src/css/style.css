@@ -67,6 +67,9 @@ app-modal:not(:defined) {
   --chord-color: #2980b9;
   --annotation-private-color: #4f5b66;
   --annotation-shared-color: #b8431f;
+  --sheet-background: #ffffff;
+  --sheet-text: #1a1a1a;
+  --sheet-notice: #444444;
   --border-color: #d5dbdb;
   --border-light: #ecf0f1;
   --overlay-bg: rgba(0, 0, 0, 0.7);
@@ -359,6 +362,14 @@ body:not([data-view='setlist']) media-player:not([active]) {
   flex: 1;
   overflow-y: auto;
   padding: 0;
+}
+
+/* A song shown as its lead sheet gives the whole page below the header to the sheet's colours, edge
+   to edge (in a dark theme, a dimmed light page: theme-manager.ts). Each song is its own slide, so
+   the colour moves in and out with the song as it is swiped, with no flash */
+.section:has(score-view:not([hidden])),
+.library-song-content:has(score-view:not([hidden])) {
+  background-color: var(--sheet-background);
 }
 
 .setlist-list {
@@ -1131,6 +1142,13 @@ body.edit-mode .key-selector:focus {
 @media (min-width: 48rem) {
   #main-content {
     padding-block: var(--song-margin);
+    transition: background-color 0.3s;
+  }
+
+  /* (those margins are the page's, not the song's: while the song is shown as its lead sheet,
+     they take its colour too, fading as a swipe goes between a sheet and lyrics) */
+  app-header[melody-mode] ~ #main-content {
+    background-color: var(--sheet-background);
   }
 
   .section > * {
