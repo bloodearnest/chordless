@@ -180,6 +180,26 @@ describe('a melody printed as SongSelect prints it and read back', () => {
     )
   })
 
+  it('keeps a section whose name sits high over its first staff, over an ending, a sign and a chord', async () => {
+    // (on SongSelect's sheets an INTRO over the tempo, or a section over an ending's bracket, was read
+    // as a credit, or lost)
+    await sameAfterPdf(
+      melodyOf('High', [
+        m(1, ['C4:4:one'], {
+          section: 'INTRO',
+          chords: [[0, 'G']],
+          directions: [{ kind: 'segno' }],
+          barline: 'repeat-end',
+          ending: { label: '1', start: true, stop: true, closed: true },
+        }),
+        m(2, ['D4:4:two'], {
+          barline: 'final',
+          ending: { label: '2', start: true, stop: true, closed: false },
+        }),
+      ])
+    )
+  })
+
   it('keeps the segno, coda, To Coda and D.S. al Coda', async () => {
     await sameAfterPdf(
       melodyOf('Signs', [
