@@ -61,9 +61,13 @@ describe('the library view, with a song open', () => {
   const control = <T extends HTMLElement>(id: string) => must(view.querySelector<T>(`#${id}`))
   const prefs = () => getSongUserPrefs(song.id, db.spaceId)
 
-  /** Wait for something the view does a step after the last thing awaited */
+  /**
+   * Wait for something the view does a step after the last thing awaited. The timeout is only how long
+   * to wait for a step that does not come: it costs nothing when it does, and 1.5 s was too short for
+   * a busy CI runner (the save after leaving edit mode timed out on #144's run and on main's)
+   */
   const until = (condition: () => unknown, what: string) =>
-    waitUntil(condition, what, { interval: 20, timeout: 1500 })
+    waitUntil(condition, what, { interval: 20, timeout: 5000 })
 
   async function open(uuid = song.uuid) {
     view = document.createElement('library-view')
