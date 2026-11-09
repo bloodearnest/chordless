@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { Score } from '../src/js/score.ts'
-import { writeMusicXml } from '../src/js/score-musicxml.ts'
-import { renderScoreHere, withoutStyle } from '../src/js/score-render-engine.ts'
+import { writeMusicXml, writeSectionsMusicXml } from '../src/js/score-musicxml.ts'
+import { balanceLines, renderScoreHere, withoutStyle } from '../src/js/score-render-engine.ts'
 import { withTextAccidentals } from '../src/js/score-svg-text.ts'
 import { measure } from './score-build.ts'
 
@@ -59,6 +59,53 @@ describe('engraving a melody with Verovio', () => {
     assert.equal(boxes.length, 4)
     for (const [, x] of boxes)
       assert.ok(Number(x) >= 0, `a section's box starts at ${x}, off the page`)
+  })
+
+  it('starts every section on a line of its own when given the sections, sharing out their measures', async () => {
+    // (seven measures a section: on a phone's page Verovio would run each into the next, mid-line)
+    const measures = Array.from({ length: 21 }, (_, i) =>
+      measure(i + 1, ['G4:1:la', 'A4:1:la', 'B4:1:la', 'D5:1:la'], {
+        chords: [[0, 'G']],
+        ...(i % 7 === 0 ? { section: `PART ${i / 7 + 1}` } : {}),
+      })
+    )
+    const score = { ...melody, measures }
+    const lines = async (sections?: string[]) => {
+      const out = await renderScoreHere(writeMusicXml(score), { pageWidth: 1200, sections })
+      assert.ok(out)
+      return out.pages
+        .join('')
+        .split('class="system"')
+        .slice(1)
+        .map(line => line.split('class="measure"').slice(1))
+    }
+    const startsALine = (all: string[][]) =>
+      all.flatMap(line => line.filter(m => m.includes('class="reh"')).map(m => line[0] === m))
+    assert.ok(startsALine(await lines()).includes(false), 'without them, a section starts mid-line')
+    const laidOut = await lines(writeSectionsMusicXml(score))
+    assert.deepEqual(startsALine(laidOut), [true, true, true])
+    // (seven measures over three lines, three, two and two: not three, three and one)
+    assert.deepEqual(
+      laidOut.map(line => line.length),
+      [3, 2, 2, 3, 2, 2, 3, 2, 2]
+    )
+  })
+
+  it('shares measures out over the lines, so a last line is not left with one', () => {
+    assert.deepEqual(balanceLines([3, 1]), [2, 2])
+    assert.deepEqual(balanceLines([4, 4, 1]), [4, 3, 2])
+    assert.deepEqual(balanceLines([4, 3]), [4, 3])
+    assert.deepEqual(balanceLines([1, 3]), [1, 3])
+    assert.deepEqual(balanceLines([5]), [5])
+    assert.deepEqual(balanceLines([]), [])
+  })
+
+  it('lays the sheet out as Verovio would when a section cannot be read', async () => {
+    const out = await renderScoreHere(writeMusicXml(melody), {
+      sections: ['not music', 'nor this'],
+    })
+    assert.ok(out)
+    assert.equal((out.pages[0]?.match(/class="notehead"/g) ?? []).length, 4)
   })
 
   it('says null for what is not MusicXML', async () => {

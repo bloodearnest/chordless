@@ -1,7 +1,7 @@
 import { css, html, LitElement, nothing, type PropertyValues } from 'lit'
 import { unsafeSVG } from 'lit/directives/unsafe-svg.js'
 import type { Score } from '../js/score.ts'
-import { writeMusicXml } from '../js/score-musicxml.ts'
+import { writeMusicXml, writeSectionsMusicXml } from '../js/score-musicxml.ts'
 import { layoutNotice } from '../js/score-notice.ts'
 import { renderScore } from '../js/score-render.ts'
 import { transposeScore } from '../js/score-transpose.ts'
@@ -254,6 +254,8 @@ export class ScoreView extends LitElement {
       const narrow = this.clientWidth > 0 && this.clientWidth < NARROW_BELOW
       const result = await renderScore(writeMusicXml(moved), {
         pageWidth: narrow ? NARROW_PAGE : WIDE_PAGE,
+        // (each section starts a line, as on SongSelect's sheet)
+        sections: writeSectionsMusicXml(moved),
       })
       if (asked !== this._asked) return
       /* v8 ignore next -- Verovio only gives null for MusicXML it cannot read, which writeMusicXml does not write */

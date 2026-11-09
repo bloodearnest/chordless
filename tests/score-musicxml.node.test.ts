@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { Step } from '../src/js/pitch.ts'
 import type { ScoreEvent, ScoreMeasure, ScoreNote } from '../src/js/score.ts'
-import { writeMusicXml } from '../src/js/score-musicxml.ts'
+import { writeMusicXml, writeSectionsMusicXml } from '../src/js/score-musicxml.ts'
 import { bar, measure, melodyOf, note, rest } from './score-build.ts'
 
 describe('MusicXML', () => {
@@ -256,5 +256,38 @@ describe('MusicXML beams', () => {
       '1end',
       '1end',
     ])
+  })
+})
+
+describe('writeSectionsMusicXml', () => {
+  it('writes each section on its own, from its boxed name to the next, each with its key and time', () => {
+    const melody = melodyOf(null, [
+      measure(1, ['C4:4:']),
+      measure(2, ['D4:4:'], { section: 'VERSE' }),
+      measure(3, ['E4:4:']),
+      measure(4, ['F4:4:'], { section: 'CHORUS' }),
+    ])
+    const sections = writeSectionsMusicXml(melody)
+    assert.deepEqual(
+      sections.map(xml => [...xml.matchAll(/<measure number="(\d+)"/g)].map(m => m[1])),
+      [['1'], ['2', '3'], ['4']]
+    )
+    for (const xml of sections)
+      assert.match(xml, /<divisions>.*<key><fifths>0<\/fifths><\/key><time>/)
+  })
+
+  it("puts a pickup before the first section on the first section's first line", () => {
+    const melody = melodyOf(null, [
+      // (one beat of four: a pickup)
+      measure(0, ['C4:1:']),
+      measure(1, ['D4:4:'], { section: 'VERSE' }),
+      measure(2, ['E4:4:'], { section: 'CHORUS' }),
+    ])
+    assert.deepEqual(
+      writeSectionsMusicXml(melody).map(xml =>
+        [...xml.matchAll(/<measure number="(\d+)"/g)].map(m => m[1])
+      ),
+      [['0', '1'], ['2']]
+    )
   })
 })
