@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import type { Melody } from '../src/js/melody.ts'
-import { writeMusicXml } from '../src/js/melody-musicxml.ts'
-import { renderMelodyHere, withoutStyle } from '../src/js/melody-render-engine.ts'
-import { measure } from './melody-build.ts'
+import type { Score } from '../src/js/score.ts'
+import { writeMusicXml } from '../src/js/score-musicxml.ts'
+import { renderScoreHere, withoutStyle } from '../src/js/score-render-engine.ts'
+import { measure } from './score-build.ts'
 
-const melody: Melody = {
+const melody: Score = {
   title: 'A Song',
   notice: [],
   measures: [
@@ -19,7 +19,7 @@ const melody: Melody = {
 
 describe('engraving a melody with Verovio', () => {
   it('turns our MusicXML into SVG with the staff, the notes and the words', async () => {
-    const out = await renderMelodyHere(writeMusicXml(melody))
+    const out = await renderScoreHere(writeMusicXml(melody))
     assert.ok(out)
     assert.equal(out.pages.length, 1)
     const svg = out.pages[0] as string
@@ -29,7 +29,7 @@ describe('engraving a melody with Verovio', () => {
   })
 
   it('leaves no <style> element in the pages, which the page’s policy would not allow', async () => {
-    const out = await renderMelodyHere(writeMusicXml(melody))
+    const out = await renderScoreHere(writeMusicXml(melody))
     assert.ok(out)
     for (const page of out.pages) assert.doesNotMatch(page, /<style/i)
   })
@@ -44,6 +44,6 @@ describe('engraving a melody with Verovio', () => {
   })
 
   it('says null for what is not MusicXML', async () => {
-    assert.equal(await renderMelodyHere('this is not music'), null)
+    assert.equal(await renderScoreHere('this is not music'), null)
   })
 })

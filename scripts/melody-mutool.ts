@@ -1,13 +1,13 @@
 /**
- * The pages of a PDF as `melody-pdf.ts` takes them, by `mutool` (a command line tool): its SVG output
+ * The pages of a PDF as `score-pdf.ts` takes them, by `mutool` (a command line tool): its SVG output
  * keeps every path and the matrix it was drawn with, and its stext output has the words. The app gets
- * the same from pdf.js (`src/js/melody-pdfjs.ts`); this is for developing against, and for comparing.
+ * the same from pdf.js (`src/js/score-pdfjs.ts`); this is for developing against, and for comparing.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { DrawItem, TextRun } from '../src/js/melody-pdf.ts'
+import type { DrawItem, TextRun } from '../src/js/score-pdf.ts'
 import type { El } from '../src/js/xml.ts'
 import { parseXml } from '../src/js/xml.ts'
 

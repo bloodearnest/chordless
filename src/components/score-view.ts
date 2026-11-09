@@ -1,29 +1,29 @@
 import { css, html, LitElement, nothing, type PropertyValues } from 'lit'
 import { unsafeSVG } from 'lit/directives/unsafe-svg.js'
-import type { Melody } from '../js/melody.ts'
-import { writeMusicXml } from '../js/melody-musicxml.ts'
-import { renderMelody } from '../js/melody-render.ts'
-import { transposeMelody } from '../js/melody-transpose.ts'
+import type { Score } from '../js/score.ts'
+import { writeMusicXml } from '../js/score-musicxml.ts'
+import { renderScore } from '../js/score-render.ts'
+import { transposeScore } from '../js/score-transpose.ts'
 
 /**
  * A song's melody engraved as sheet music (docs/MELODY.md, "Uses"): the lead sheet in the key the
  * song is shown in, as wide as its space with no margin to speak of, and the notice under it.
  *
  * The notes are moved to `songKey` (from `melodyKey`, the key they are written in) by
- * `transposeMelody`, whose chord symbols are the app's own, then written as MusicXML and engraved
- * by Verovio in a worker (`melody-render.ts`). A new key shows the sheet it had until the new one
+ * `transposeScore`, whose chord symbols are the app's own, then written as MusicXML and engraved
+ * by Verovio in a worker (`score-render.ts`). A new key shows the sheet it had until the new one
  * is ready, so changing key never blanks the page.
  *
- * @property {Melody|null} melody - The melody, in `melodyKey`
+ * @property {Score|null} melody - The melody, in `melodyKey`
  * @property {string} melodyKey - The key the melody is written in
  * @property {string} songKey - The key to show it in
  *
- * Events: `melody-sheet:error` when the sheet could not be engraved
+ * Events: `score-view:error` when the sheet could not be engraved
  */
-export class MelodySheetErrorEvent extends Event {
-  static readonly type = 'melody-sheet:error'
+export class ScoreViewErrorEvent extends Event {
+  static readonly type = 'score-view:error'
   constructor() {
-    super(MelodySheetErrorEvent.type, { bubbles: true, composed: true })
+    super(ScoreViewErrorEvent.type, { bubbles: true, composed: true })
   }
 }
 
@@ -32,7 +32,7 @@ const WIDE_PAGE = 2100
 const NARROW_PAGE = 1200
 const NARROW_BELOW = 600
 
-export class MelodySheet extends LitElement {
+export class ScoreView extends LitElement {
   static override properties = {
     melody: { attribute: false },
     melodyKey: { type: String, attribute: 'melody-key' },
@@ -41,7 +41,7 @@ export class MelodySheet extends LitElement {
     _failed: { state: true },
   }
 
-  declare melody: Melody | null
+  declare melody: Score | null
   declare melodyKey: string
   declare songKey: string
   declare _pages: string[]
@@ -127,10 +127,10 @@ export class MelodySheet extends LitElement {
       // (a key that is not known leaves the notes as they were written)
       const moved =
         this.melodyKey && this.songKey
-          ? transposeMelody(melody, this.melodyKey, this.songKey)
+          ? transposeScore(melody, this.melodyKey, this.songKey)
           : melody
       const narrow = this.clientWidth > 0 && this.clientWidth < NARROW_BELOW
-      const result = await renderMelody(writeMusicXml(moved), {
+      const result = await renderScore(writeMusicXml(moved), {
         pageWidth: narrow ? NARROW_PAGE : WIDE_PAGE,
       })
       if (asked !== this._asked) return
@@ -141,9 +141,9 @@ export class MelodySheet extends LitElement {
     } catch (error) {
       /* v8 ignore next -- an older engraving that fails after a newer one was asked for */
       if (asked !== this._asked) return
-      console.error('[MelodySheet] Could not engrave the melody:', error)
+      console.error('[ScoreView] Could not engrave the melody:', error)
       this._failed = true
-      this.dispatchEvent(new MelodySheetErrorEvent())
+      this.dispatchEvent(new ScoreViewErrorEvent())
     }
   }
 
@@ -162,10 +162,10 @@ export class MelodySheet extends LitElement {
     `
   }
 }
-customElements.define('melody-sheet', MelodySheet)
+customElements.define('score-view', ScoreView)
 
 declare global {
   interface HTMLElementTagNameMap {
-    'melody-sheet': MelodySheet
+    'score-view': ScoreView
   }
 }

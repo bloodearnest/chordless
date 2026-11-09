@@ -36,7 +36,7 @@ test('a song with a melody can be shown as its sheet, and back to its lyrics', a
   await toggle.click()
 
   // the sheet is engraved by Verovio in its worker, in the key the song is in in this setlist (A)
-  const sheet = page.locator('melody-sheet')
+  const sheet = page.locator('score-view')
   await expect(sheet.locator('.notehead')).toHaveCount(4)
   await expect(sheet).toContainText('© Public domain')
   await expect(page).toHaveURL(/\/setlist\/melody-setlist\/song\/0\?melody$/)
@@ -47,11 +47,11 @@ test('a song with a melody can be shown as its sheet, and back to its lyrics', a
 
   // a reload stays on the sheet
   await page.reload()
-  await expect(page.locator('melody-sheet .notehead')).toHaveCount(4)
+  await expect(page.locator('score-view .notehead')).toHaveCount(4)
 
   await page.getByRole('button', { name: 'Show the lyrics' }).click()
   await expect(page.locator('song-display')).toBeVisible()
-  await expect(page.locator('melody-sheet')).toBeHidden()
+  await expect(page.locator('score-view')).toBeHidden()
   await expect(page).toHaveURL(/\/song\/0$/)
 
   expect(consoleErrors.filter(text => /Content Security Policy|wasm/i.test(text))).toEqual([])
@@ -67,11 +67,11 @@ test('the library shows a song as its sheet too, in its own key', async ({ page 
   await page.goto('/songs/info-test-song')
   await page.reload()
   await page.getByRole('button', { name: 'Show the lead sheet' }).click()
-  await expect(page.locator('melody-sheet .notehead')).toHaveCount(4)
+  await expect(page.locator('score-view .notehead')).toHaveCount(4)
   await expect(page).toHaveURL(/\/songs\/info-test-song\?melody$/)
   await page.reload()
-  await expect(page.locator('melody-sheet .notehead')).toHaveCount(4)
+  await expect(page.locator('score-view .notehead')).toHaveCount(4)
   await page.getByRole('button', { name: 'Show the lyrics' }).click()
-  await expect(page.locator('melody-sheet')).toBeHidden()
+  await expect(page.locator('score-view')).toBeHidden()
   await expect(page.locator('#library-song-content song-display')).toBeVisible()
 })

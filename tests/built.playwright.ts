@@ -5,8 +5,8 @@ import { makeSong } from './builders.ts'
 import { linkFor } from './email-link-for.ts'
 import { expect, test, waitForServiceWorker } from './fixtures.ts'
 import { email } from './make-email.ts'
-import { sampleRecord } from './melody-sample.ts'
 import { must } from './must.ts'
+import { sampleRecord } from './score-sample.ts'
 
 // Every view the router has, by the URL that shows it
 const VIEWS = [
@@ -210,7 +210,7 @@ test('the melody sheet is engraved under the page policy, by a worker with a pol
 
   await page.goto(`/songs/${song.uuid}?melody`)
   // (Verovio is WebAssembly, which the page's own policy does not allow: the worker has its own)
-  await expect(page.locator('melody-sheet .notehead')).toHaveCount(3)
+  await expect(page.locator('score-view .notehead')).toHaveCount(3)
   expect(violations).toEqual([])
 
   // The page's policy has no wasm-unsafe-eval; the worker's files have only the tight one

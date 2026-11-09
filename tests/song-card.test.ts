@@ -11,8 +11,8 @@ import {
 } from '../src/components/song-card.ts'
 import { getCurrentDB } from '../src/js/db.ts'
 import { ChordProParser } from '../src/js/parser.ts'
-import { sampleRecord } from './melody-sample.ts'
 import { must } from './must.ts'
+import { sampleRecord } from './score-sample.ts'
 import { nothingFor } from './test-helpers.ts'
 
 const { describe, it } = window

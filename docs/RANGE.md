@@ -109,9 +109,9 @@ opening each song: docs/REIMPORT.md.
 
 ## Getting a range from a lead sheet
 
-The lead sheet's whole melody is read once (`src/js/melody-pdfjs.ts`, docs/MELODY.md), and the range
+The lead sheet's whole melody is read once (`src/js/score-pdfjs.ts`, docs/MELODY.md), and the range
 is its lowest and highest sung note (`readOfMelody` in `src/js/lead-sheet.ts`). Two signs say a note
-is not sung, and either leaves it out (`sungNotes` in `src/js/melody-transpose.ts`): it is drawn
+is not sung, and either leaves it out (`sungNotes` in `src/js/score-transpose.ts`): it is drawn
 small (an instrumental line: an intro, a turnaround), or its measure has no lyric under it (a
 full-size instrumental line has none). It is the measure, not each note, that needs a lyric, as a
 run of notes on one syllable has the one (and a note tied over from a sung one is sung). A sheet

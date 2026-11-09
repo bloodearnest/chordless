@@ -247,7 +247,7 @@ export function isZip(bytes: Uint8Array): boolean {
  * The MusicXML text of a melody file, whichever form it is in: `.mxl` (what is written now) or
  * plain MusicXML (what the first version wrote, and what a text-only space keeps)
  */
-export async function readMelodyFile(bytes: Uint8Array): Promise<string | null> {
+export async function readScoreFile(bytes: Uint8Array): Promise<string | null> {
   if (isZip(bytes)) return readMxl(bytes)
   return new TextDecoder().decode(bytes).replace(/^﻿/, '')
 }

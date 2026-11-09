@@ -7,9 +7,9 @@
 
 import { rangeOfMetadata } from './chart-range.ts'
 import type { ChartMetadata, MelodyRecord } from './data-types.ts'
-import type { Melody } from './melody.ts'
-import { readMusicXml } from './melody-musicxml-read.ts'
-import { type MelodyExtremes, melodyExtremes } from './melody-transpose.ts'
+import type { Score } from './score.ts'
+import { readMusicXml } from './score-musicxml-read.ts'
+import { type MelodyExtremes, melodyExtremes } from './score-transpose.ts'
 import type { NoteRange } from './voice-range.ts'
 
 export interface SongMelody {
@@ -22,11 +22,11 @@ export interface SongMelody {
 }
 
 /** By the score's hash: the parse is 2 to 4 ms, and a list of songs asks for many */
-const parsed = new Map<string, Melody | null>()
+const parsed = new Map<string, Score | null>()
 const extremes = new Map<string, MelodyExtremes | null>()
 
 /** The melody a record's score gives (null if it will not read), parsed once for a score */
-export function melodyOfRecord(record: MelodyRecord): Melody | null {
+export function melodyOfRecord(record: MelodyRecord): Score | null {
   const hit = parsed.get(record.contentHash)
   if (hit !== undefined) return hit
   const melody = readMusicXml(record.xml)

@@ -1,15 +1,15 @@
 import { expect } from '@open-wc/testing'
 import { DataChangeEvent } from '../src/js/data-changes.ts'
 import { ChordlessDB } from '../src/js/db.ts'
-import type { Melody } from '../src/js/melody.ts'
-import { writeMusicXml } from '../src/js/melody-musicxml.ts'
 import { melodyRecord } from '../src/js/melody-record.ts'
+import type { Score } from '../src/js/score.ts'
+import { writeMusicXml } from '../src/js/score-musicxml.ts'
 import { addSong } from './drive-harness.ts'
 import { deleteDatabase } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
-const melody: Melody = {
+const melody: Score = {
   title: 'T',
   notice: [],
   measures: [

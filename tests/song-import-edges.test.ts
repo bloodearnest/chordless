@@ -2,13 +2,13 @@ import { expect } from '@open-wc/testing'
 import { SongImportedEvent } from '../src/components/song-import.ts'
 import { createSetlist, getCurrentDB, normalizeTitle } from '../src/js/db.ts'
 import { offerIncoming } from '../src/js/incoming-songs.ts'
-import type { MelodyEvent } from '../src/js/melody.ts'
-import { readMusicXml } from '../src/js/melody-musicxml-read.ts'
+import type { ScoreEvent } from '../src/js/score.ts'
+import { readMusicXml } from '../src/js/score-musicxml-read.ts'
 import { createSong } from '../src/js/song-utils.ts'
 import { makeSong } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
-import { bar, note } from './melody-build.ts'
 import { must } from './must.ts'
+import { bar, note } from './score-build.ts'
 import {
   $,
   chart,
@@ -76,7 +76,7 @@ describe('song-import: corners', () => {
     /** A note by its MIDI number (the reader goes by it), sung to `syllable` or none, small if `cue` */
     const pitch = (midi: number, syllable = '', cue = false) =>
       note('C', 4, { midi, syllables: [syllable], cue })
-    const at = (number: number, events: MelodyEvent[], fifths: number) =>
+    const at = (number: number, events: ScoreEvent[], fifths: number) =>
       bar(events, { number, fifths })
     /**
      * The melody the reader gives for the sheet of a song in C, D4 to E5: the highest note and one
@@ -105,7 +105,7 @@ describe('song-import: corners', () => {
       const element = await importer()
       const reads: ArrayBuffer[] = []
       element.loadMelodyPdfReader = async () => ({
-        readMelodyPdf: async (pdf: ArrayBuffer) => {
+        readScorePdf: async (pdf: ArrayBuffer) => {
           reads.push(pdf)
           return read(pdf)
         },
@@ -590,7 +590,7 @@ describe('song-import: corners', () => {
           readPdfText: async (bytes: ArrayBuffer) => texts[markerOf(bytes)] ?? '',
         })
         element.loadMelodyPdfReader = async () => ({
-          readMelodyPdf: async (bytes: ArrayBuffer) => {
+          readScorePdf: async (bytes: ArrayBuffer) => {
             const range = ranges[markerOf(bytes)]
             return range ? read(range) : null
           },
@@ -714,7 +714,7 @@ describe('song-import: corners', () => {
 
     it('is read by the real reader, which loads in the browser', async () => {
       const element = await importer()
-      expect((await element.loadMelodyPdfReader()).readMelodyPdf).to.be.a('function')
+      expect((await element.loadMelodyPdfReader()).readScorePdf).to.be.a('function')
     })
 
     it('comes from the bookmarklet in its message', async () => {
@@ -767,7 +767,7 @@ describe('song-import: corners', () => {
         let finish: (value: unknown) => void = () => {}
         element.loadMelodyPdfReader = () =>
           new Promise(resolve => {
-            finish = () => resolve({ readMelodyPdf: async () => null })
+            finish = () => resolve({ readScorePdf: async () => null })
           })
         message({
           type: 'CHORDLESS_IMPORT',

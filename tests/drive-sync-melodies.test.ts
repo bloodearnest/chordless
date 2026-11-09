@@ -1,14 +1,14 @@
 import { expect } from '@open-wc/testing'
 import type { MelodyRecord } from '../src/js/data-types.ts'
-import type { Melody } from '../src/js/melody.ts'
-import { writeMusicXml } from '../src/js/melody-musicxml.ts'
-import { readMusicXml } from '../src/js/melody-musicxml-read.ts'
 import { melodyRecord } from '../src/js/melody-record.ts'
-import { readMelodyFile, readMxl } from '../src/js/mxl.ts'
+import { readMxl, readScoreFile } from '../src/js/mxl.ts'
+import type { Score } from '../src/js/score.ts'
+import { writeMusicXml } from '../src/js/score-musicxml.ts'
+import { readMusicXml } from '../src/js/score-musicxml-read.ts'
 import { addSong, useSyncRig } from './drive-harness.ts'
-import { measure } from './melody-build.ts'
 import type { MemoryFile } from './memory-storage.ts'
 import { must } from './must.ts'
+import { measure } from './score-build.ts'
 import { nextTimestamp, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -16,7 +16,7 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 /** A melody of one bar of four notes, whose first lyric says which one it is */
-function melodyOf(word: string): Melody {
+function melodyOf(word: string): Score {
   return {
     title: null,
     notice: ['CCLI Song # 1'],
@@ -43,7 +43,7 @@ const bytesOf = (file: MemoryFile): Uint8Array =>
     : new TextEncoder().encode(file.content)
 
 /** The MusicXML a melody file holds, whichever form it is in */
-const scoreOf = (file: MemoryFile) => readMelodyFile(bytesOf(file))
+const scoreOf = (file: MemoryFile) => readScoreFile(bytesOf(file))
 
 describe('Drive sync: melodies', () => {
   const rig = useSyncRig()

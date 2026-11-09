@@ -1,15 +1,15 @@
 /**
  * A SongSelect lead sheet, as an import reads it (docs/RANGE.md, docs/MELODY.md): the melody is
- * read from the PDF once (`melody-pdfjs.ts`), and its range, and how it was found, come from that.
+ * read from the PDF once (`score-pdfjs.ts`), and its range, and how it was found, come from that.
  */
 import { rangeOfChart, withRange } from './chart-range.ts'
 import type { ChordlessDB } from './db.ts'
 import { keyOfChart } from './library-repair.ts'
-import type { Melody } from './melody.ts'
-import { writeMusicXml } from './melody-musicxml.ts'
 import { melodyRecord } from './melody-record.ts'
-import { melodyRange, sungNotes } from './melody-transpose.ts'
 import { signatureMatchesKey } from './pitch.ts'
+import type { Score } from './score.ts'
+import { writeMusicXml } from './score-musicxml.ts'
+import { melodyRange, sungNotes } from './score-transpose.ts'
 import type { NoteRange } from './voice-range.ts'
 
 /** A lead sheet is about 130 KB: anything much bigger is not one */
@@ -23,7 +23,7 @@ export type LeadSheetOutcome = 'read' | 'no-melody' | 'unreadable' | 'other-key'
 
 /** A melody to keep with a song, and the key it is written in (the chart's) */
 export interface KeptMelody {
-  melody: Melody
+  melody: Score
   key: string
 }
 
@@ -51,7 +51,7 @@ export interface MelodyRead extends NoteRange {
 }
 
 /** The range of a melody's sung notes, and how it was read; null if no note is sung */
-export function readOfMelody(melody: Melody): MelodyRead | null {
+export function readOfMelody(melody: Score): MelodyRead | null {
   const range = melodyRange(melody)
   if (!range) return null
   const sung = sungNotes(melody)
@@ -75,7 +75,7 @@ export function readOfMelody(melody: Melody): MelodyRead | null {
   return {
     ...range,
     // (a note was sung, so there is a first measure)
-    keySignature: (melody.measures[0] as Melody['measures'][number]).fifths,
+    keySignature: (melody.measures[0] as Score['measures'][number]).fifths,
     notes,
     instrumental,
     unsung,
@@ -96,7 +96,7 @@ export function readOfMelody(melody: Melody): MelodyRead | null {
 export async function chartWithLeadSheet(
   chordproText: string,
   leadSheet: unknown,
-  read: (pdf: ArrayBuffer) => Promise<Melody | null>
+  read: (pdf: ArrayBuffer) => Promise<Score | null>
 ): Promise<LeadSheetRead> {
   const key = keyOfChart(chordproText)
   if (!(leadSheet instanceof ArrayBuffer) || leadSheet.byteLength > MAX_LEAD_SHEET) {
@@ -105,7 +105,7 @@ export async function chartWithLeadSheet(
   // (one with no key has nothing to put the notes in)
   if (!key) return { chordproText }
   const ranged = Boolean(rangeOfChart(chordproText))
-  let melody: Melody | null
+  let melody: Score | null
   try {
     melody = await read(leadSheet.slice(0))
   } catch (error) {

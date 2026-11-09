@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import type { Melody, MelodyDirection } from '../src/js/melody.ts'
+import type { Score, ScoreDirection } from '../src/js/score.ts'
 import {
   lyricSimilarity,
   matchChart,
@@ -10,8 +10,8 @@ import {
   playSteps,
   sheetSections,
   stepWords,
-} from '../src/js/melody-structure.ts'
-import { bar, melodyOf, note } from './melody-build.ts'
+} from '../src/js/score-structure.ts'
+import { bar, melodyOf, note } from './score-build.ts'
 
 interface Spec {
   section?: string
@@ -19,7 +19,7 @@ interface Spec {
   end?: boolean
   ending?: string
   endingStart?: boolean
-  dirs?: Partial<MelodyDirection>[]
+  dirs?: Partial<ScoreDirection>[]
   /** One word per note: the first verse */
   words?: string[]
   /** The syllables of each note, a list per verse */
@@ -27,7 +27,7 @@ interface Spec {
 }
 
 /** A melody of measures that are each a few notes; `words` and `notes` give their syllables */
-function melody(specs: Spec[]): Melody {
+function melody(specs: Spec[]): Score {
   return melodyOf(
     null,
     specs.map((s, i) =>
@@ -56,7 +56,7 @@ function melody(specs: Spec[]): Melody {
   )
 }
 
-const played = (m: Melody) => playOrder(m).map(p => p.measure)
+const played = (m: Score) => playOrder(m).map(p => p.measure)
 
 describe('the play order of a lead sheet', () => {
   it('plays a repeat twice, and three times where it says so', () => {

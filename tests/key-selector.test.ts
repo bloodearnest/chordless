@@ -1,7 +1,7 @@
 import { expect } from '@open-wc/testing'
 import '../src/components/key-selector.ts'
-import { sampleRecord } from './melody-sample.ts'
 import { must } from './must.ts'
+import { sampleRecord } from './score-sample.ts'
 import { A11Y, settle } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window

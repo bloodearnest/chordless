@@ -1,7 +1,7 @@
-/** Reading a direction's text (src/js/melody-directions.ts) */
+/** Reading a direction's text (src/js/score-directions.ts) */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { parseDirection } from '../src/js/melody-directions.ts'
+import { parseDirection } from '../src/js/score-directions.ts'
 
 describe('jump directions', () => {
   it('reads D.S. and D.C. with the place they go to, a segno and a coda from their signs', () => {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { extremesOf, formatBeats, songMelody } from '../src/js/melody-analysis.ts'
-import { sampleRecord } from './melody-sample.ts'
+import { sampleRecord } from './score-sample.ts'
 
 const record = sampleRecord('u1')
 

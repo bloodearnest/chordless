@@ -37,14 +37,14 @@ import { type ChordlessDB, getCurrentDB, NO_CHANGE } from './db.ts'
 import { leaderName } from './leaders.ts'
 import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
 import { LiveSyncStatusEvent } from './live-sync-status.ts'
-import type { Melody } from './melody.ts'
-import { melodyWithKey, showMelody } from './melody-shown.ts'
 import { goTo, setPageTitle } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getSpacePeople, identifyMe, settleLeader } from './people.ts'
 import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
+import type { Score } from './score.ts'
+import { scoreWithKey, showScore } from './score-shown.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
 import { AnnotationsController } from './setlist/annotations-controller.ts'
 import { enterEditMode, isEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
@@ -1463,8 +1463,8 @@ export class SetlistPage {
   }
 
   /** The song's melody and the key it is written in, or null when it has none (docs/MELODY.md) */
-  async melodyOf(song: RuntimeSong): Promise<{ melody: Melody; key: string } | null> {
-    return melodyWithKey(
+  async melodyOf(song: RuntimeSong): Promise<{ melody: Score; key: string } | null> {
+    return scoreWithKey(
       await this._database().getMelody(song._setlistEntry.songUuid),
       song.originalKey
     )
@@ -1486,7 +1486,7 @@ export class SetlistPage {
     const song = this.songs[index]
     // (a song with no melody stays in its lyrics, whatever asked)
     const shown = this._melodyOn.has(index)
-    if (song) await this.header.showMelody(song)
+    if (song) await this.header.showScore(song)
     if (!fromRoute || shown !== on) this.navigateTo(index, { replace: true })
   }
 
@@ -1498,7 +1498,7 @@ export class SetlistPage {
     const found = this._melodyOn.has(index) ? await this.melodyOf(song) : null
     // (a song with no melody stays in its lyrics)
     if (!found) this._melodyOn.delete(index)
-    await showMelody(content, found && { ...found, songKey: song.currentKey ?? found.key })
+    await showScore(content, found && { ...found, songKey: song.currentKey ?? found.key })
   }
 
   _updateSongDisplayCapo(songIndex: number, capoValue: unknown) {

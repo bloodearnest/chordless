@@ -4,20 +4,21 @@
  * `#` or `b`, and an octave. Or one event or measure at a time with every field (`note`, `rest`,
  * `bar`), for what the short form cannot say: give only what the test is about.
  */
-import type {
-  Melody,
-  MelodyDirection,
-  MelodyEvent,
-  MelodyMeasure,
-  MelodyNote,
-  MelodyRest,
-} from '../src/js/melody.ts'
+
 import { midiOf, type Step } from '../src/js/pitch.ts'
+import type {
+  Score,
+  ScoreDirection,
+  ScoreEvent,
+  ScoreMeasure,
+  ScoreNote,
+  ScoreRest,
+} from '../src/js/score.ts'
 
 let ids = 0
 
 /** A quarter note at the start of the measure, sung to nothing, unless `over` says otherwise (its MIDI number follows `alter`) */
-export function note(step: Step, octave = 4, over: Partial<MelodyNote> = {}): MelodyNote {
+export function note(step: Step, octave = 4, over: Partial<ScoreNote> = {}): ScoreNote {
   const alter = over.alter ?? 0
   return {
     kind: 'note',
@@ -39,7 +40,7 @@ export function note(step: Step, octave = 4, over: Partial<MelodyNote> = {}): Me
 }
 
 /** A quarter rest at the start of the measure, unless `over` says otherwise */
-export function rest(over: Partial<MelodyRest> = {}): MelodyRest {
+export function rest(over: Partial<ScoreRest> = {}): ScoreRest {
   return {
     kind: 'rest',
     id: `r${ids++}`,
@@ -53,7 +54,7 @@ export function rest(over: Partial<MelodyRest> = {}): MelodyRest {
 }
 
 /** Measure 1 of 4/4 in C with these events in one voice, full, unless `over` says otherwise */
-export function bar(events: MelodyEvent[], over: Partial<MelodyMeasure> = {}): MelodyMeasure {
+export function bar(events: ScoreEvent[], over: Partial<ScoreMeasure> = {}): ScoreMeasure {
   return {
     number: 1,
     voices: [events],
@@ -76,10 +77,10 @@ export function bar(events: MelodyEvent[], over: Partial<MelodyMeasure> = {}): M
 export interface MeasureOptions {
   chords?: [start: number, text: string][]
   section?: string
-  barline?: MelodyMeasure['barline']
+  barline?: ScoreMeasure['barline']
   repeatStart?: boolean
   ending?: { label: string; start: boolean; stop: boolean; closed: boolean }
-  directions?: Partial<MelodyDirection>[]
+  directions?: Partial<ScoreDirection>[]
   fifths?: number
   beats?: number
   beatType?: number
@@ -92,10 +93,10 @@ export function measure(
   number: number,
   events: string[],
   options: MeasureOptions = {}
-): MelodyMeasure {
+): ScoreMeasure {
   let start = 0
   const triplet = options.triplet
-  const list: MelodyEvent[] = events.map((text, index) => {
+  const list: ScoreEvent[] = events.map((text, index) => {
     const [what = '', beats = '1', ...words] = text.split(':')
     const inTriplet = triplet && index >= triplet[0] && index <= triplet[1]
     const length = Number(beats) * (inTriplet ? 2 / 3 : 1)
@@ -153,6 +154,6 @@ export function measure(
 }
 
 /** A melody of these measures, with no notice */
-export function melodyOf(title: string | null, measures: MelodyMeasure[]): Melody {
+export function melodyOf(title: string | null, measures: ScoreMeasure[]): Score {
   return { title, notice: [], measures }
 }

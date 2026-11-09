@@ -8,9 +8,10 @@ show it and (later) play it. The range comes from the melody read there.
 **The words.** The thing is the **lead sheet** (to people: "Show the lead sheet", "the lead sheet could not be read"; not "sheet
 music", which is any notation, and not "the melody", which is one part of it). Its MusicXML is the **score** in the
 code's own words. The **melody** is the sung line within it, so "Melody range" is right where it means that line.
-The code still calls the whole thing `Melody` (`melody-*.ts`, the `melodies` store, the `melody` file type in Drive and
-the `.melody.mxl` suffix, which are on devices and in Drive and are not worth a migration); a later change renames the
-types and modules to `Score` and `score-*.ts`.
+The code says the same: `Score` and the `Score*` types (`src/js/score.ts`), the `score-*.ts` modules that read, write,
+transpose and render it, and `ScoreView` for the lead sheet's view. `melody-analysis.ts` (range, tessitura) and `melody-record.ts`
+keep the word, as does what is stored: the `melodies` store, `getMelody`/`saveMelody`, the `melody` file type in Drive and
+the `.melody.mxl` suffix are on devices and in Drive, and are not worth a migration.
 
 ## Why
 
@@ -144,13 +145,13 @@ is the main reason the work is feasible: the format of the answer is its own tes
 
 Two layers, and not one.
 
-1. **Inside the app: a small typed `Melody`**, not XML: measures, each with notes `{ midi, step,
+1. **Inside the app: a small typed `Score`**, not XML: measures, each with notes `{ midi, step,
    alter, octave, start, duration, tied, syllable, cue }`, plus key, time signature, tempo,
    sections, chord symbols. Analysis, transposing, the range and the play order derive from it. It is
    what the PDF reader builds and what the score is parsed into when it is wanted, not what is stored (below).
    As JSON it is not small: 68 KB at the median and 164 KB at most over the 137 sheets (the PDF is 125 KB).
-2. **MusicXML 4.0 (partwise) is the file that is kept, and the edge**: written from the `Melody`
-   (`melody-musicxml.ts`) and read into it (`melody-musicxml-read.ts`), for the renderer, for export and
+2. **MusicXML 4.0 (partwise) is the file that is kept, and the edge**: written from the `Score`
+   (`score-musicxml.ts`) and read into it (`score-musicxml-read.ts`), for the renderer, for export and
    import, and as the file in Drive. It is the interchange format every notation program speaks, so
    the user's file stays one they can open without us, and there is one format at the edge, not two. It is
    62 KB at the median (151 KB at most) and 3 KB gzipped. MEI is the other candidate (it is what Verovio
@@ -160,7 +161,7 @@ Two layers, and not one.
 Transposing is the notes moved by the interval and respelled for the new key, which
 `transposeNote`/`noteName` already do for chords. Nothing else about the song changes.
 
-`transposeMelody` (`src/js/melody-transpose.ts`) does it. The notes go through `octaveNearGreen`, the same
+`transposeScore` (`src/js/score-transpose.ts`) does it. The notes go through `octaveNearGreen`, the same
 rule as the key picker: a key is a pitch class, so of the shift and the octave either side of it the one
 that sits least outside the green range wins, and a sheet and the picker never show different octaves. The
 chords take the plain nearest interval (they have no octave) through `transposeChord`. Notes are spelled
@@ -183,10 +184,10 @@ as the chord transposer spells them. The range is of the sung notes: cue notes a
   by the song's uuid, with the file's `fileRef`, `fileRev` and `fileModified` as the chart's records have; `MelodyRecord`
   in `data-types.ts`), not in `songs` or `chordpro`: it is 30 to 70 KB a song and only the Melody view wants it. It is
   read again from the file when the file's `rev` changes, and only the original key is kept: other keys are
-  `transposeMelody`. **The score is kept, not its parse** (version 14; version 13 kept the parsed `Melody`, and its records are
+  `transposeScore`. **The score is kept, not its parse** (version 14; version 13 kept the parsed `Score`, and its records are
   cleared by the upgrade, being derived data). Parsing a score takes 2 to 4 ms on a desktop, so it is done when a song's
   melody is wanted (the view, the key picker's analysis of the song in front of you), not for every song; a stored parse
-  would have to be migrated whenever the `Melody` type changes, and would keep what an older reader made of the score
+  would have to be migrated whenever the `Score` type changes, and would keep what an older reader made of the score
   after the reader improved. The score also goes straight to Verovio for the original key. `contentHash` (of the score) is
   how a change made here is found; `melodyRecord(uuid, xml, key)` makes a record with it. The import step writes the
   score once (`writeMusicXml`) and a pull stores what Drive had, once it is known to parse.
@@ -248,7 +249,7 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
   computerized storage is a Copy (§2.8). The lead sheet's own page header and footer carry all of it
   (title, writers, `CCLI Song #`, the copyright, "For use solely with the SongSelect® Terms of Use",
   and the church's `CCLI License #`), and the chart keeps the same as `{ccli}`, `{ccli_license}`,
-  `{copyright}` and `{footer}`. A `Melody` view or export must show the notice from those, in every
+  `{copyright}` and `{footer}`. A `Score` view or export must show the notice from those, in every
   key. The song info already shows them; they should be at the foot of the melody too.
 - **Only the licensed church.** §3.1.7 allows copies for people in the congregation, §3.2.2 no
   distribution outside services and activities, §12 no sublicensing, and the TOU (§6.3, §6.6, §6.7)
@@ -284,7 +285,7 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
   song that has a melody) switches *that song* between its lyrics and its sheet, in the section the song already has, so
   swiping or the arrow keys still move to the next song (which is in its own mode: the choice is per song, not carried over),
   and up and down scroll the sheet. The mode is in the URL as `?melody` (`docs/ROUTING.md`), a replace and not a new history
-  entry, so a reload or a link keeps it; the sheet is `<melody-sheet>` (`src/components/melody-sheet.ts`), engraved in the key
+  entry, so a reload or a link keeps it; the sheet is `<score-view>` (`src/components/score-view.ts`), engraved in the key
   the song is shown in (a key change engraves it again, keeping the old sheet on show until the new one is ready), fitted to
   the width of the screen with almost no margin, and with a narrower page on a phone so the music is drawn larger. Verovio's
   own `<style>` element is taken out of each page (the page's policy allows none) and its few rules are the component's. The library's song page has the same button and `?melody` (`/songs/<uuid>?melody`); there it is the one song open. A `built` test (`tests/built.playwright.ts`) engraves a sheet on the production build under the real policy, checks the worker file's own policy, and fails without the `_headers` rule. Not
@@ -304,13 +305,13 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
 - **SongSelect changes its renderer.** The shapes are the renderer's. Tests keep the failures
   visible (below), and the self-check turns a change into "could not read", not a wrong melody.
 - **Test data.** The real sheets are copyrighted and cannot be committed; the tests engrave
-  melodies of their own with Verovio and print them as PDFs (`tests/melody-svg-pdf.ts`,
+  melodies of their own with Verovio and print them as PDFs (`tests/score-svg-pdf.ts`,
   `tests/melody-pdf-roundtrip.node.test.ts`), so the fixtures are made the way the real ones are,
   without being anyone's song.
   The real ones, a local export of PDFs and charts, are a corpus for the spike and for scoring the
   reader, kept out of git (they carry the church's licence number as well as the songs).
 - **A copy without its notice.** A reader or view that keeps the notes and drops the header and
-  footer would break §10.5 (see "The terms"). The `Melody` keeps the notice text, and a test fails
+  footer would break §10.5 (see "The terms"). The `Score` keeps the notice text, and a test fails
   if a rendered sheet lacks it.
 - **A wrong tune that looks right.** The measure sum is the guard; a note one step off in pitch
   passes it, so pitch has the existing checks (the key signature against the chart's key, the lyric
@@ -320,10 +321,10 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
 
 ## Spike results
 
-Step 0 was done on 2026-11-06 (branch `claude/melody-spike`): `src/js/melody-read.ts` (the shared reader of Verovio's tree),
-`melody-pdf.ts` and `melody-pdfjs.ts` (the PDF reader), `melody-musicxml.ts` (the writer), `melody.ts` (the `Melody` type),
+Step 0 was done on 2026-11-06 (branch `claude/melody-spike`): `src/js/score-read.ts` (the shared reader of Verovio's tree),
+`score-pdf.ts` and `score-pdfjs.ts` (the PDF reader), `score-musicxml.ts` (the writer), `melody.ts` (the `Score` type),
 `scripts/melody-xml.ts` (the preview SVG, the oracle: nothing in `src/` uses it), `scripts/melody-spike.ts`,
-`scripts/melody-pdf-spike.ts` and `scripts/melody-mutool.ts` (the scoring), and the tests named for each module (`tests/melody-read.node.test.ts`, `tests/melody-musicxml.node.test.ts`, ...).
+`scripts/melody-pdf-spike.ts` and `scripts/melody-mutool.ts` (the scoring), and the tests named for each module (`tests/score-read.node.test.ts`, `tests/score-musicxml.node.test.ts`, ...).
 Tested on the Holy Forever preview (`preview.json`) and on all 137 PDFs of the local corpus, none of which is in git.
 **The answer to "stop here if it does not reach nearly every measure of nearly every song" is that it does.**
 
@@ -349,14 +350,14 @@ data, only the grouping and the glyph names are lost (check: `mutool draw -F svg
 "M0 3237H4939" for a staff line, the same numbers as the SVG).
 
 - **All the music in the 137 PDFs is 31 distinct glyph shapes** (plus lines and circles). Each glyph is a flipped
-  filled path whose data is the font's outline, so a hash of the path (`melody-path.ts`, `shapeHash`) names it.
-  The table (`melody-glyphs.ts`) came from the glyph definitions in the preview SVG (9 shapes, named) and, for the
+  filled path whose data is the font's outline, so a hash of the path (`score-path.ts`, `shapeHash`) names it.
+  The table (`score-glyphs.ts`) came from the glyph definitions in the preview SVG (9 shapes, named) and, for the
   other 22, from looking at a sheet of the shapes: both heads, whole/half/16th rests and flags, the sharp and the
   natural, the digits 2 3 5 6 8, cut time, F clef, fermatas, the repeat dots, an x head. There is no
   shape recognition and no tolerance to tune. A new shape is a "glyph not read" warning and a measure that does
   not pass, not a wrong tune.
 - **The hard part is the grouping** (which stem, flag, dot and accidental goes with which head): geometry in
-  staff-line units. `melody-pdf.ts` rebuilds Verovio's own tree from the page (measure, staff, layer, note, beam,
+  staff-line units. `score-pdf.ts` rebuilds Verovio's own tree from the page (measure, staff, layer, note, beam,
   tuplet) and hands it to the same reader as the SVG, so the two readers cannot disagree about meaning.
   The PDF reading of Holy Forever is the SVG reading: 362 of 362 notes the same in pitch, length and tie.
 - **Corpus: 137 PDFs, 8,410 measures, 8,264 (98.3%) add up.** Of the 146 that do not: 55 are a first or last measure
@@ -368,7 +369,7 @@ data, only the grouping and the glyph names are lost (check: `mutool draw -F svg
   137 of 137 sheets (the relative minor counted), and the time signature in all 133 whose chart has a `{time}`.
 - **The 3 PDFs that do not embed the music font** (`185883`, `2098033`, `3359080`) read as well as any, since the notes
   never needed the font: all their measures add up.
-- **Against the range reader there was then** (`melody-range.ts`, since removed: the range is now the melody's, `sungNotes` in `melody-transpose.ts` leaving out a bar with no lyric as it did; a different way: ellipses in the page by size and
+- **Against the range reader there was then** (`melody-range.ts`, since removed: the range is now the melody's, `sungNotes` in `score-transpose.ts` leaving out a bar with no lyric as it did; a different way: ellipses in the page by size and
   lyrics): the lowest and highest sung note agree for 125 of 137 sheets. The 12 differences are where this reader
   counts a full-size note the old one drops for having no lyric under its measure (a bass line, an instrumental
   bar: 7123436 has a 49 against 64) and accidentals the old one does not read (a flat or sharp apex: one semitone).
@@ -380,15 +381,15 @@ tuplets (`time-modification`), lyrics with syllabic and extend, `<harmony>` (roo
 `text`, bass), rehearsal marks for sections, tempo, key, time, the notice as `<rights>`. Well formed
 (`xmllint`) and ordered by the schema, and **opened in Verovio** (next).
 
-**Rendering with Verovio (the engraver SongSelect uses; `src/js/melody-render.ts`).** The sheet's SVG was written
-by Verovio 6.0.1, so that exact version is the dependency (`verovio@6.0.1`, pinned; `renderMelody(musicXml)`
+**Rendering with Verovio (the engraver SongSelect uses; `src/js/score-render.ts`).** The sheet's SVG was written
+by Verovio 6.0.1, so that exact version is the dependency (`verovio@6.0.1`, pinned; `renderScore(musicXml)`
 gives one SVG a page). It is WebAssembly embedded in a 6.4 MB JavaScript module (`verovio/wasm`) with a 14 KB wrapper
 (`verovio/esm`), imported only on first use, in a worker (below). `scripts/melody-render-check.ts` is the test of the MusicXML: write it
 from each PDF, engrave it, read Verovio's SVG back with the SVG reader, and compare with what went in.
 
 - **All 137 sheets render, with no messages from Verovio. 8,410 of 8,410 measures, 35,396 of 35,396 notes
   (measure, pitch, length), and the syllables of every song come back the same.** The same again for each
-  song moved three semitones up with `transposeMelody` (new key signature and spelling): 35,396 of 35,396.
+  song moved three semitones up with `transposeScore` (new key signature and spelling): 35,396 of 35,396.
 - It found three things the MusicXML lacked, all of them invisible in the sound and plain on the page: Verovio prints an
   accidental only when told (`<accidental>`: now written by the usual rule, from the key signature, the
   measure and octave, with a tied note's carried over the barline); a tuplet needs `<tuplet type="start|stop">`
@@ -399,21 +400,21 @@ from each PDF, engrave it, read Verovio's SVG back with the SVG reader, and comp
   underscores of the lyrics, ties, cue notes small, repeat and ending signs. It is not SongSelect's layout to
   the pixel (their page and spacing options are not known), and this shows no title or notice yet.
 - **Wired for the app (the owner agreed to the licence and the policy), though no view imports it yet.** Verovio runs in a
-  **worker** (`verovio-worker.ts`; the page asks it through `renderMelody` in `melody-render.ts`, and Node calls the
-  engine, `melody-render-engine.ts`, directly). WebAssembly needs `'wasm-unsafe-eval'`, and the page's policy does not
+  **worker** (`verovio-worker.ts`; the page asks it through `renderScore` in `score-render.ts`, and Node calls the
+  engine, `score-render-engine.ts`, directly). WebAssembly needs `'wasm-unsafe-eval'`, and the page's policy does not
   have it: a worker has the policy of its own response, so `public/_headers` gives the files named `verovio-*` (the worker
   and its modules) a policy of their own, `default-src 'none'; script-src 'self' 'wasm-unsafe-eval'` (with a `!` line to take
   off the page's policy first, as two policies on one file are both enforced). The 7 MB module is also compiled off the
   thread the lyrics scroll on. The files are not precached (`NOT_PRECACHED`, like the PDF reader).
   Checked on a real build with a temporary import: the page's policy has no `wasm-unsafe-eval`, the three `verovio-*`
   files have only the tight one, a sheet is engraved with no violations, and without the `_headers` rule the worker fails
-  with the policy's CompileError. A browser unit test runs `renderMelody` through a real worker. When the view lands, add the
+  with the policy's CompileError. A browser unit test runs `renderScore` through a real worker. When the view lands, add the
   `built` test that does the same on the build (done: it seeds the build's database directly, as it has no module paths to import).
   Verovio is **LGPL-3.0-or-later**: it stays an unmodified chunk of its own, and `/licences.html` (linked from the terms
   and privacy pages) has the notice, the source and the full LGPL and GPL texts (`public/licences/`).
 - "Does OpenSheetMusicDisplay transpose `<harmony>` correctly" no longer matters: it is not used.
 
-**Reading MusicXML back (`src/js/melody-musicxml-read.ts`, with `src/js/xml.ts`).** The file that is kept has
+**Reading MusicXML back (`src/js/score-musicxml-read.ts`, with `src/js/xml.ts`).** The file that is kept has
 to give the melody again, so `readMusicXml(writeMusicXml(melody))` is checked field by field over the corpus
 (`scripts/melody-xml-roundtrip.ts`: every note's pitch, start, length, tuplet bracket, ties, cue flag and
 lyrics; chords with their beat; section, tempo, key and time; barline, repeat, ending and directions; each measure's length
@@ -429,7 +430,7 @@ voices by `<backup>`), but only from our own files has it been checked exactly; 
 Dorico are the next test. `xml.ts` reads no DTD and expands no entity of its own, so a file cannot reach outside
 itself. The Verovio check (above) still gives 35,396 of 35,396 notes after these changes.
 
-**Text and pdf.js (second round, from the PDF alone).** `src/js/melody-pdfjs.ts` reads a lead sheet PDF with
+**Text and pdf.js (second round, from the PDF alone).** `src/js/score-pdfjs.ts` reads a lead sheet PDF with
 pdf.js and needs nothing else: the preview is only the oracle it was developed against.
 
 - **Words are read from the PDF.** Each character is its own text operation, so the words are rebuilt from the
@@ -469,7 +470,7 @@ words, and `<sound segno/coda/tocoda/dalsegno/dacapo/fine>`. Over the corpus: 93
 segno, every "al Coda" has a "to Coda" and a coda, and every "al Fine" a Fine. The jumps are not followed
 yet: expanding the sheet into the order it is played is the structure work (`structureOf`).
 
-**Structure: the order a sheet is played in, matched to the chart (`melody-structure.ts`).** `playOrder` follows
+**Structure: the order a sheet is played in, matched to the chart (`score-structure.ts`).** `playOrder` follows
 repeats (twice, or "Play 3 times" / "(4x)"), numbered endings (by pass), and D.S./D.C. al Coda/Fine with the
 usual conventions (repeats not taken again after a jump; only the last ending after one; "to Coda" taken on the
 way through after a jump). `playSteps` groups that into goes at each boxed section. `matchChart` finds the
@@ -529,10 +530,10 @@ setlist's structure feature would show first, with the chart's order as the fall
    time signature; say how many measures pass. Stop here if it does not reach nearly every measure
    of nearly every song. Run it over the local corpus of 137 PDFs and score pitch and start time
    against each one's MIDI where a preview is to hand, and open the 3 PDFs with no music font first.
-1. **The reader and the `Melody`**, in `readMelodyRange`'s place (done: it is gone): the range comes from it, the
+1. **The reader and the `Score`**, in `readMelodyRange`'s place (done: it is gone): the range comes from it, the
    import page says what was read, and a song it cannot read keeps today's result. Tests from
    fixtures that are not copyrighted. The notice text is kept with the notes from the start.
-2. **MusicXML out and in**, and the storage and sync of the `Melody` beside the chart.
+2. **MusicXML out and in**, and the storage and sync of the `Score` beside the chart.
 3. **Analysis in the key picker**, and the voice preference.
 4. **The view** (and playing it), if the band wants it.
 
@@ -542,11 +543,11 @@ the notes would come only from a lead sheet the person downloaded or imported th
 page and the help text change in the step that ships it.
 
 **Synthetic lead sheets (built).** The real sheets are CCLI's and stay out of the repository, so the PDF reader is tested on
-sheets made from melodies written for the test: `tests/melody-build.ts` writes a `Melody` short (`C4:1:Ho-`),
-Verovio engraves it, `tests/melody-svg-pdf.ts` prints the SVG as a PDF, and `readMelodyPdf` has to read the melody that
+sheets made from melodies written for the test: `tests/score-build.ts` writes a `Score` short (`C4:1:Ho-`),
+Verovio engraves it, `tests/score-svg-pdf.ts` prints the SVG as a PDF, and `readScorePdf` has to read the melody that
 went in (`tests/melody-pdf-roundtrip.node.test.ts`; notes, lengths, rests, words, chords, sections, key signatures and
 accidentals, triplets, pickups, repeats, endings, segno/coda/D.S., several pages). The converter exists because a general
-SVG-to-PDF tool (`rsvg-convert`) bakes the placing into each glyph's coordinates, so the glyph hashes in `melody-glyphs.ts`
+SVG-to-PDF tool (`rsvg-convert`) bakes the placing into each glyph's coordinates, so the glyph hashes in `score-glyphs.ts`
 no longer match. SongSelect's PDFs are IronPdf printing the same Verovio SVG, and the glyph outlines in them are Verovio's
 own (the three checked, clef, time signature and notehead, hash to the table's entries), so the converter keeps each glyph's
 path as Verovio draws it and puts it on the page with a matrix. Lines are stroked, noteheads and stems filled, words are
@@ -560,13 +561,13 @@ accidental of a tied note is not drawn on the second note, so a tie over a barli
 is sometimes read as a hyphen or missed. `readMusicXml` reads the title from a `credit` where there is no work title (MuseScore
 puts it there), and "Repeat 3x Last time to Coda" as the third pass.
 
-**Import keeps the melody (built).** `song-import` reads a lead sheet once, with `readMelodyPdf`, for the whole `Melody`,
+**Import keeps the melody (built).** `song-import` reads a lead sheet once, with `readScorePdf`, for the whole `Score`,
 and the range is that melody's sung notes (`readOfMelody`, `src/js/lead-sheet.ts`). The melody is saved (`melodyRecord`, in the
 `melodies` store, synced as in "Syncing") for the song the chart goes to: a new song, the library's song when the chart
 updates it, the new song of an import as original or as variant, and the library's song when its own chart stays
 (`use-existing`, or the same chart again): the lead sheet may have changed where the chart has not, so a re-import
 replaces the melody. It is kept only when the sheet is in the chart's key (its first measure's key signature against the
-chart's `{key}`), as the range is; a sheet in another key, or one `readMelodyPdf` cannot read, leaves the song with its
+chart's `{key}`), as the range is; a sheet in another key, or one `readScorePdf` cannot read, leaves the song with its
 chart and no melody. A chart that has a range already keeps it, but the melody is
 still kept. The import page says it under the range: "The lead sheet is kept with the song."; "The lead sheet could not be saved…". It says the same whichever chart is taken. A sheet in another key gives neither, and the page says why.
 

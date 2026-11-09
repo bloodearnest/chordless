@@ -34,7 +34,7 @@ import type { Person, Setlist } from '../src/js/data-types.ts'
 import { setCapoPreference } from '../src/js/preferences.ts'
 import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
-import { sampleRecord } from './melody-sample.ts'
+import { sampleRecord } from './score-sample.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
 import { nextTimestamp, nothingFor, shownToast } from './test-helpers.ts'
 
@@ -707,7 +707,7 @@ describe('the setlist page: header, menu and keys', () => {
         rig.root
           .querySelector<HTMLElement>('app-header')
           ?.shadowRoot?.querySelector<HTMLButtonElement>('.melody-toggle')
-      const sheetOf = (index: number) => rig.root.querySelector(`#song-${index} melody-sheet`)
+      const sheetOf = (index: number) => rig.root.querySelector(`#song-${index} score-view`)
       const lyricsOf = (index: number) =>
         rig.root.querySelector<HTMLElement>(`#song-${index} song-display`)
       const until = (condition: () => unknown) => waitUntil(condition)

@@ -96,7 +96,7 @@ export class SetlistHeader {
     const subheading = onOverview ? currentSetlist.name || currentSetlist.type || '' : ''
 
     appHeader.showEditToggle = true
-    void this.showMelody(song)
+    void this.showScore(song)
     void this.#showSubheader(appHeader, onOverview ? currentSetlist : null)
     // (nothing to change)
     if (
@@ -125,7 +125,7 @@ export class SetlistHeader {
   #melodyFor: RuntimeSong | null = null
 
   /** The melody button: there for a song that has a melody, pressed while it is shown as the sheet */
-  async showMelody(song: RuntimeSong | null): Promise<void> {
+  async showScore(song: RuntimeSong | null): Promise<void> {
     const appHeader = this.#find<AppHeader>('#app-header')
     /* v8 ignore next -- the header is there whenever the page is */
     if (!appHeader) return

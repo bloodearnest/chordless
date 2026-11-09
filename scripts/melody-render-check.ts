@@ -8,13 +8,13 @@
  */
 import { readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Melody } from '../src/js/melody.ts'
-import { writeMusicXml } from '../src/js/melody-musicxml.ts'
-import { renderMelodyHere } from '../src/js/melody-render-engine.ts'
-import { transposeMelody } from '../src/js/melody-transpose.ts'
+import type { Score } from '../src/js/score.ts'
+import { writeMusicXml } from '../src/js/score-musicxml.ts'
+import { renderScoreHere } from '../src/js/score-render-engine.ts'
+import { transposeScore } from '../src/js/score-transpose.ts'
 import { transposeKeyName } from '../src/js/transpose.ts'
 import { readPdf } from './melody-pdf-spike.ts'
-import { readMelodySvg } from './melody-xml.ts'
+import { readScoreSvg } from './melody-xml.ts'
 
 const dir = process.argv[2] as string
 const only = process.argv[3]
@@ -24,7 +24,7 @@ const only = process.argv[3]
  * line that comes in late (a cue line over a rest), so the reader of it counts from the line's first note;
  * voices, ids and the cue flag are reading details too.
  */
-const notesOf = (m: Melody) =>
+const notesOf = (m: Score) =>
   m.measures
     .flatMap((x, i) =>
       x.voices
@@ -35,7 +35,7 @@ const notesOf = (m: Melody) =>
     )
     .sort()
 /** The syllables of the melody, as text without its hyphens, extenders and verse numbers */
-const syllablesOf = (m: Melody) =>
+const syllablesOf = (m: Score) =>
   m.measures
     .flatMap(x =>
       x.voices
@@ -92,13 +92,13 @@ for (const f of readdirSync(dir)
   songs++
   const { melody } = readPdf(join(dir, f))
   const xml = writeMusicXml(melody)
-  const out = await renderMelodyHere(xml)
+  const out = await renderScoreHere(xml)
   if (!out) {
     bad.push(`${id} Verovio could not read the MusicXML`)
     continue
   }
   rendered++
-  const back = readMelodySvg(out.pages)
+  const back = readScoreSvg(out.pages)
   const a = notesOf(melody)
   const b = new Set(notesOf(back))
   const same = a.filter(n => b.has(n)).length
@@ -117,11 +117,11 @@ for (const f of readdirSync(dir)
   if (out.log.trim()) warned++
   // and moved three semitones up: the MusicXML of a transposed melody, with its new key and spelling
   const from = MAJOR[(melody.measures[0]?.fifths ?? 0) + 7] as string
-  const moved = transposeMelody(melody, from, transposeKeyName(from, 3))
-  const movedOut = await renderMelodyHere(writeMusicXml(moved))
+  const moved = transposeScore(melody, from, transposeKeyName(from, 3))
+  const movedOut = await renderScoreHere(writeMusicXml(moved))
   if (movedOut) {
     const x = notesOf(moved)
-    const y = new Set(notesOf(readMelodySvg(movedOut.pages)))
+    const y = new Set(notesOf(readScoreSvg(movedOut.pages)))
     movedNotes += x.length
     movedSame += x.filter(n => y.has(n)).length
   } else movedBad++

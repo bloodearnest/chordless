@@ -6,7 +6,7 @@
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { readMelodyPdf } from '../src/js/melody-pdfjs.ts'
+import { readScorePdf } from '../src/js/score-pdfjs.ts'
 import { readPdf } from './melody-pdf-spike.ts'
 
 /** What a melody says, without the ids of its elements (they count what was drawn, and differ in how) */
@@ -25,8 +25,8 @@ for (const f of readdirSync(dir)
   .filter(x => x.endsWith('.pdf'))
   .sort()) {
   const bytes = readFileSync(join(dir, f))
-  const stats = { warnings: [] as string[] } as Parameters<typeof readMelodyPdf>[1]
-  const viaPdfjs = await readMelodyPdf(
+  const stats = { warnings: [] as string[] } as Parameters<typeof readScorePdf>[1]
+  const viaPdfjs = await readScorePdf(
     bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     stats
   )
