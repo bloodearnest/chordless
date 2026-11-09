@@ -232,4 +232,29 @@ describe('MusicXML beams', () => {
     ])
     assert.deepEqual(beamsIn(writeMusicXml(melodyOf(null, [cue]))), [])
   })
+
+  it('puts a forward hook on a sixteenth that starts a beam, and beams a chord with its note', () => {
+    const hook = bar([
+      note('E', 4, { start: 0, duration: 0.25 }),
+      note('F', 4, { start: 0.25, duration: 0.5 }),
+      note('G', 4, { start: 1, duration: 1 }),
+    ])
+    assert.deepEqual(beamsIn(writeMusicXml(melodyOf(null, [hook]))), [
+      '1begin',
+      '2forward hook',
+      '1end',
+    ])
+    const chord = bar([
+      note('E', 4, { start: 0, duration: 0.5 }),
+      note('G', 4, { start: 0, duration: 0.5, withPrevious: true }),
+      note('F', 4, { start: 0.5, duration: 0.5 }),
+      note('A', 4, { start: 0.5, duration: 0.5, withPrevious: true }),
+    ])
+    assert.deepEqual(beamsIn(writeMusicXml(melodyOf(null, [chord]))), [
+      '1begin',
+      '1begin',
+      '1end',
+      '1end',
+    ])
+  })
 })
