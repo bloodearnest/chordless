@@ -329,5 +329,4 @@ describe('sync (against the memory backend)', () => {
       expect(driveSetlist(setlist.id).name).to.equal('Old record, edited')
     })
   })
-
 })
