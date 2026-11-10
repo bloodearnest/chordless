@@ -6,6 +6,7 @@ import {
   getKeepAwakeMinutes,
   getKeepAwakePreference,
   getMusicianType,
+  getScrollToTopOnSwipe,
   getTelemetryPreference,
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
@@ -18,6 +19,7 @@ import {
   setKeepAwakeMinutes,
   setKeepAwakePreference,
   setMusicianType,
+  setScrollToTopOnSwipe,
   setTelemetryPreference,
   setUseNashvilleNumbers,
   setUseUnicodeAccidentals,
@@ -43,6 +45,7 @@ export class AppPreferences extends LitElement {
     useUnicodeAccidentals: { type: Boolean, attribute: false },
     musicianType: { type: String, attribute: false },
     capoEnabled: { type: Boolean, attribute: false },
+    scrollToTop: { type: Boolean, attribute: false },
     sharedAnnotations: { type: Boolean, attribute: false },
     myAnnotations: { type: Boolean, attribute: false },
     keepAwake: { type: Boolean, attribute: false },
@@ -55,6 +58,7 @@ export class AppPreferences extends LitElement {
   declare useUnicodeAccidentals: boolean
   declare musicianType: MusicianType
   declare capoEnabled: boolean
+  declare scrollToTop: boolean
   declare sharedAnnotations: boolean
   declare myAnnotations: boolean
   declare keepAwake: boolean
@@ -162,6 +166,7 @@ export class AppPreferences extends LitElement {
     this.useUnicodeAccidentals = getUseUnicodeAccidentals()
     this.musicianType = getMusicianType()
     this.capoEnabled = getCapoPreference()
+    this.scrollToTop = getScrollToTopOnSwipe()
     this.sharedAnnotations = getAnnotationsPreference().shared
     this.myAnnotations = getAnnotationsPreference().mine
     this.keepAwake = getKeepAwakePreference()
@@ -394,6 +399,24 @@ export class AppPreferences extends LitElement {
         </div>
 
         <div class="panel">
+          <h3>Moving between songs</h3>
+          <p>
+            Start each song at its top when you swipe to it. Turn this off to find a song where you
+            left it.
+          </p>
+          <label class="toggle" for="toggle-scroll-to-top">
+            <input
+              type="checkbox"
+              id="toggle-scroll-to-top"
+              name="scroll-to-top-on-swipe"
+              ?checked=${this.scrollToTop}
+              @change=${this._onScrollToTopToggle}
+            />
+            <span>Start songs at the top</span>
+          </label>
+        </div>
+
+        <div class="panel">
           <h3>Annotations</h3>
           <p>Show the handwritten annotations on a chart. Annotations are made in edit mode.</p>
           <label class="toggle" for="toggle-shared-annotations">
@@ -574,6 +597,12 @@ export class AppPreferences extends LitElement {
   _onMyAnnotationsToggle(event: Event): void {
     this.myAnnotations = (event.currentTarget as HTMLInputElement).checked
     setAnnotationsPreference('mine', this.myAnnotations)
+  }
+
+  _onScrollToTopToggle(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).checked
+    this.scrollToTop = value
+    setScrollToTopOnSwipe(value)
   }
 
   _onCapoToggle(event: Event): void {
