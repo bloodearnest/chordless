@@ -21,6 +21,7 @@ const KEYS = [
   'enable_capo',
   'enabled_capo',
   'keep_screen_awake',
+  'scroll_to_top_on_swipe',
   'keep_awake_minutes',
   'show_shared_annotations',
   'show_my_annotations',
@@ -82,6 +83,7 @@ describe('app-preferences', () => {
         ['#toggle-shared-annotations', 'show_shared_annotations', 'false'],
         ['#toggle-my-annotations', 'show_my_annotations', 'false'],
         ['#toggle-keep-awake', 'keep_screen_awake', 'false'],
+        ['#toggle-scroll-to-top', 'scroll_to_top_on_swipe', 'false'],
         ['#toggle-telemetry', 'telemetry', 'false'],
       ] as const) {
         control<HTMLInputElement>(el, id).click()
