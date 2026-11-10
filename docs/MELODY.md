@@ -341,8 +341,8 @@ choice in the part's Show options (All, Lyrics, Chords, **Melody**, None), `Hide
   once it has.
 - **Seen in the chart.** A part the sheet has notes for has a music note by its title (in every mode: dimmed, and lit
   while the notes are what is shown), so a player can tell there is a melody to switch to; the switch itself is in the
-  Show options in edit mode. The sheet of a part fades into the page at its top and bottom (a mask, so a light sheet does
-  not end in a hard edge on a dark page). Chord symbols use the letters "b" and "#" of the chart's own chords, which sit
+  Show options in edit mode. The sheet of a part fades into the page on all four sides, by a short 0.4rem (a mask, so a light sheet
+  does not end in a hard edge on a dark page; a tablet shows the left and right edges too). Chord symbols use the letters "b" and "#" of the chart's own chords, which sit
   close to the root, unless the preference for ♯ and ♭ is on (`withTextAccidentals`, applied by `<score-view>`: Verovio
   draws the signs in a music font the page does not have, and a text font's ♭ has a wide space of its own). There is no
   collapse chevron outside edit mode: on a phone it wrapped under the title and made a line of its own.

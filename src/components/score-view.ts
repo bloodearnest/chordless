@@ -88,24 +88,20 @@ export class ScoreView extends LitElement {
       display: none;
     }
     /* A few measures in a section of the chart: nothing floats over their foot, and the paper fades
-       into the page at its top and bottom, so a light sheet does not end in a hard edge on a dark page
-       (the padding keeps the music clear of the fade) */
+       into the page on all four sides, so a light sheet does not end in a hard edge on a dark page (on
+       a tablet its left and right are seen too). The fade is short, and the padding keeps the music
+       clear of it */
     :host([data-slice]) {
-      padding-block: 0.9rem;
-      -webkit-mask-image: linear-gradient(
-        to bottom,
-        transparent,
-        black 0.9rem,
-        black calc(100% - 0.9rem),
-        transparent
-      );
-      mask-image: linear-gradient(
-        to bottom,
-        transparent,
-        black 0.9rem,
-        black calc(100% - 0.9rem),
-        transparent
-      );
+      --fade: 0.4rem;
+      padding: 0.5rem var(--fade);
+      -webkit-mask-image:
+        linear-gradient(to bottom, transparent, black var(--fade), black calc(100% - var(--fade)), transparent),
+        linear-gradient(to right, transparent, black var(--fade), black calc(100% - var(--fade)), transparent);
+      -webkit-mask-composite: source-in;
+      mask-image:
+        linear-gradient(to bottom, transparent, black var(--fade), black calc(100% - var(--fade)), transparent),
+        linear-gradient(to right, transparent, black var(--fade), black calc(100% - var(--fade)), transparent);
+      mask-composite: intersect;
     }
     /* what Verovio's own <style> says, which the page's policy would not allow in the SVG */
     .page g.ending,
