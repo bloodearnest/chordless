@@ -492,6 +492,25 @@ export function createDriveApi({
     return response.arrayBuffer()
   }
 
+  /** A file's content as it arrives (pad audio passed on by the team service) */
+  async function downloadFileStream(fileId: string): Promise<ReadableStream<Uint8Array>> {
+    const token = await getAccessToken()
+
+    const response = await doFetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media&${ALL_DRIVES}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok || !response.body) {
+      throw Object.assign(new Error(`Drive download error: ${response.statusText}`), {
+        status: response.status,
+      })
+    }
+
+    return response.body
+  }
+
   /**
    * Folder Management
    */
@@ -584,8 +603,12 @@ export function createDriveApi({
     }
   }
 
-  async function getPadsRootFolder(): Promise<string> {
-    const rootFolderId = await findOrCreateRootFolder()
+  /**
+   * The folder the pad sets are kept in: the account's (`Chordless/pads/`, a personal space's) or,
+   * given a team space's folder, that space's own `pads/` (docs/SPACES.md, "Pads in team spaces")
+   */
+  async function getPadsRootFolder(spaceFolderId?: string): Promise<string> {
+    const rootFolderId = spaceFolderId ?? (await findOrCreateRootFolder())
     let padsFolderId = await findSubfolder(rootFolderId, PADS_FOLDER_NAME)
     if (!padsFolderId) {
       padsFolderId = await createSubfolder(rootFolderId, PADS_FOLDER_NAME)
@@ -593,8 +616,8 @@ export function createDriveApi({
     return padsFolderId
   }
 
-  async function listPadSetFolders(): Promise<DriveFile[]> {
-    const padsRootId = await getPadsRootFolder()
+  async function listPadSetFolders(spaceFolderId?: string): Promise<DriveFile[]> {
+    const padsRootId = await getPadsRootFolder(spaceFolderId)
     const query = `'${padsRootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
     const result = await driveRequest(
       `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)`
@@ -602,8 +625,8 @@ export function createDriveApi({
     return result.files
   }
 
-  async function ensurePadSetFolder(padSetName: string): Promise<string> {
-    const padsRootId = await getPadsRootFolder()
+  async function ensurePadSetFolder(padSetName: string, spaceFolderId?: string): Promise<string> {
+    const padsRootId = await getPadsRootFolder(spaceFolderId)
     const query = `name=${queryString(padSetName)} and '${padsRootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
     const result = await driveRequest(
       `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)`
@@ -879,6 +902,7 @@ export function createDriveApi({
     findSpaceFolderByName,
     findOrCreateRootFolder,
     findOrCreateSpaceFolder,
+    downloadFileStream,
     getPadsRootFolder,
     listPadSetFolders,
     ensurePadSetFolder,

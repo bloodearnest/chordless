@@ -10,7 +10,7 @@
  * listing, an inventory or a create returns covers them. A ref that none of these has shown is not
  * known (a read of it is a 404 until the next listing).
  */
-import type { SpaceStorage } from '../../src/js/storage/types.ts'
+import type { PadStorage, SpaceStorage } from '../../src/js/storage/types.ts'
 import type { TeamSpaceApi } from './team-state.ts'
 
 /** The space's storage, noting each ref it shows before the answer goes on */
@@ -62,5 +62,30 @@ export function notingRefs(
     updateMany: items => space.updateMany(items),
     unpublish: ref => space.unpublish(ref),
     trash: ref => space.trash(ref),
+  }
+}
+
+/** The space's pad sets, noting the sets and files they show (a file is read only once listed) */
+export function notingPadRefs(pads: PadStorage, room: Pick<TeamSpaceApi, 'addRefs'>): PadStorage {
+  return {
+    async listSets() {
+      const sets = await pads.listSets()
+      await room.addRefs(sets.map(set => set.ref))
+      return sets
+    },
+    async ensureSet(name) {
+      const ref = await pads.ensureSet(name)
+      await room.addRefs([ref])
+      return ref
+    },
+    async listFiles(setRef) {
+      const files = await pads.listFiles(setRef)
+      await room.addRefs(files.map(file => file.ref))
+      return files
+    },
+    addFile: (setRef, padKey, audio) => pads.addFile(setRef, padKey, audio),
+    trashFiles: setRef => pads.trashFiles(setRef),
+    read: fileRef => pads.read(fileRef),
+    readStream: fileRef => pads.readStream(fileRef),
   }
 }

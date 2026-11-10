@@ -12,7 +12,7 @@ import { authenticate, googleProvider, type IdentityProvider } from './identity.
 import type { AdminContext } from './team-admin.ts'
 import type { TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'
-import { notingRefs } from './team-refs.ts'
+import { notingPadRefs, notingRefs } from './team-refs.ts'
 import { tracedFetch, tracedStub } from './trace.ts'
 
 /** What a test replaces; the real ones are the defaults */
@@ -63,6 +63,10 @@ export function createTeamContext(
     async space(spaceId) {
       const found = await drive(spaceId)
       return found && notingRefs(found.backend.space(found.info.rootRef), room(spaceId))
+    },
+    async pads(spaceId) {
+      const found = await drive(spaceId)
+      return found && notingPadRefs(found.backend.padsIn(found.info.rootRef), room(spaceId))
     },
     async root(spaceId) {
       const found = await drive(spaceId)

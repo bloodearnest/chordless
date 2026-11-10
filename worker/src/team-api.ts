@@ -22,19 +22,22 @@
  *   POST /files/<ref>/unpublish             writers; ends a share link
  *   POST /files/<ref>/trash                 writers
  *   PUT  /people/<id>/name  {name}          any member: the name of the person who is them
+ *   …    /pads…                             the space's pad sets (team-pads.ts)
  *
- * Bodies are text. Share links and pad audio are not served yet.
+ * Bodies are text, but for pad audio.
  */
 import type { SpaceMember } from '../../src/js/data-types.ts'
 import {
   ChangeTokenLost,
   type Collection,
   type FileInput,
+  type PadStorage,
   type SpaceStorage,
 } from '../../src/js/storage/types.ts'
 import { atLeast, type TeamRole } from '../../src/js/team-roles.ts'
 import { answering, isRecord, jsonResponse, Refusal, readJson } from './http.ts'
 import type { Identity } from './identity.ts'
+import { handlePadRequest } from './team-pads.ts'
 
 /** Why a request may do nothing in a space */
 export type NoAccess = 'unauthenticated' | 'not-a-member'
@@ -43,6 +46,8 @@ export type NoAccess = 'unauthenticated' | 'not-a-member'
 export interface TeamContext {
   /** The space's files; null if there is no such space */
   space(spaceId: string): Promise<SpaceStorage | null>
+  /** The pad sets in the space's own folder; null if there is no such space */
+  pads(spaceId: string): Promise<PadStorage | null>
   /** The space's root, for `GET /root` */
   root(spaceId: string): Promise<{ ref: string; name: string; trashed: boolean } | null>
   /**
@@ -166,6 +171,15 @@ export async function handleTeamRequest(
     }
     const owned = async (ref: string) => (await context.owns(spaceId, ref)) === true
     const ownedOf = async (refs: string[]) => new Set(await context.ownedAmong(spaceId, refs))
+
+    if (rest === '/pads' || rest.startsWith('/pads/')) {
+      const pads = await context.pads(spaceId)
+      if (!pads) return jsonResponse({ error: 'No such space' }, 404)
+      return (
+        (await handlePadRequest(request, rest, { pads, role, owned })) ??
+        jsonResponse({ error: 'Not found' }, 404)
+      )
+    }
 
     if (method === 'GET' && rest === '/root') {
       const root = await context.root(spaceId)

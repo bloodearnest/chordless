@@ -18,6 +18,7 @@ import { teamDrive } from '../worker/src/team-drive.ts'
 import { TeamSpaceState } from '../worker/src/team-state.ts'
 import { FakeDrive } from './fake-drive.ts'
 import { MapStore } from './map-store.ts'
+import { must } from './must.ts'
 
 const ORIGIN = 'https://chordless.test'
 const SPACE = 'space-aaaaaaaa'
@@ -306,6 +307,46 @@ describe('the owner’s Drive credential', () => {
   })
 })
 
+describe('a team space’s pads, over the owner’s Drive', () => {
+  test('are kept in the space’s own folder, apart from the owner’s, and streamed to a member', async () => {
+    const { call, backend, root, drive } = await world()
+    // (the owner has pads of their own too: those are not the team's)
+    await backend.pads.ensureSet('Ann’s own')
+
+    const made = await call(`${SPACE}/pads`, cat, post({ name: 'Team pads' }))
+    assert.equal(made.status, 200)
+    const { ref } = (await json(made)) as { ref: string }
+    const padsFolder = must(drive.files.get(must(drive.files.get(ref)).parents[0]))
+    assert.equal(padsFolder.name, 'pads')
+    assert.deepEqual(padsFolder.parents, [root])
+
+    const audio = new Uint8Array([0, 1, 2, 254, 255])
+    const put = await call(`${SPACE}/pads/${ref}/files/${encodeURIComponent('C#')}`, cat, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'audio/mpeg' },
+      body: new Blob([audio], { type: 'audio/mpeg' }),
+    })
+    assert.equal(put.status, 204)
+
+    const sets = (await json(await call(`${SPACE}/pads`, bob))) as unknown as { name: string }[]
+    assert.deepEqual(
+      sets.map(set => set.name),
+      ['Team pads']
+    )
+    const files = (await (await call(`${SPACE}/pads/${ref}/files`, bob)).json()) as {
+      ref: string
+      padKey: string
+    }[]
+    assert.deepEqual(
+      files.map(file => file.padKey),
+      ['C#']
+    )
+    const read = await call(`${SPACE}/pads/files/${files[0]?.ref}`, bob)
+    assert.equal(read.status, 200)
+    assert.deepEqual([...new Uint8Array(await read.arrayBuffer())], [...audio])
+  })
+})
+
 describe('the context', () => {
   test('says there is no such space, and no root, for an id with no space', async () => {
     const { env, deps } = await world()
@@ -313,6 +354,7 @@ describe('the context', () => {
     const context = createTeamContext(env, env.TEAM_SPACE, deps)
     assert.equal(await context.space('space-cccccccc'), null)
     assert.equal(await context.root('space-cccccccc'), null)
+    assert.equal(await context.pads('space-cccccccc'), null)
     assert.equal(await context.owns('space-cccccccc', 'anything'), false)
   })
 })

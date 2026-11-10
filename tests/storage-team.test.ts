@@ -7,7 +7,7 @@ import { TeamError } from '../src/js/worker-call.ts'
 import { makeSetlist } from './builders.ts'
 import { memoryFolderLink } from './drive-harness.ts'
 import { must } from './must.ts'
-import { describeSpaceStorage } from './storage-conformance.ts'
+import { describePadStorage, describeSpaceStorage } from './storage-conformance.ts'
 import { makeTeamRig, ORIGIN } from './team-context.ts'
 
 const { describe, it } = window
@@ -35,6 +35,13 @@ describeSpaceStorage('team space (over the Worker, on memory)', async () => {
     },
     scoped: true,
   }
+})
+
+// (as an admin: only an admin replaces a set; what the other roles may do is in team-pads.node.test.ts)
+describePadStorage('a team space’s (over the Worker, on memory)', async () => {
+  const rig = await makeTeamRig()
+  rig.roles.set('admin-token', 'admin')
+  return teamFor(rig, 'admin-token').padsIn('space-1')
 })
 
 describe('TeamStorage', () => {
@@ -197,8 +204,21 @@ describe('TeamStorage', () => {
     )
     expect(await failure(() => team.ensureRoot())).to.match(/joined/)
     expect(await failure(() => team.renameRoot())).to.equal('')
-    expect(await failure(() => team.pads)).to.match(/Pad sets/)
+    expect(await failure(() => team.pads)).to.match(/pad sets are its own/)
     expect(await team.findRootByName()).to.equal(null)
+  })
+
+  it('passes on a failure to list a set’s files that is not that the set is not there', async () => {
+    const rig = await makeTeamRig()
+    rig.roles.set('admin-token', 'admin')
+    const pads = teamFor(rig, 'admin-token').padsIn('space-1')
+    const set = await pads.ensureSet('Warm')
+    rig.storage.fail('listPadFiles', { status: 500 })
+    let failure: unknown
+    await pads.listFiles(set).catch(error => {
+      failure = error
+    })
+    expect((failure as TeamError).status).to.equal(502)
   })
 
   it('is available when it has a token, and not when it has none', async () => {

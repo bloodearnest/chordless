@@ -168,9 +168,9 @@ export interface PadFileEntry {
 }
 
 /**
- * The pad sets: audio the user uploads, one set per folder. For now they are the account's, not a
- * space's (docs/SPACES.md, "Pads in team spaces", moves them into the space); they are read-only
- * to members and large, so a backend streams them and keeps nothing.
+ * The pad sets: audio the user uploads, one set per folder. A personal space's are the account's
+ * (`StorageBackend.pads`); a team space's are in its own folder (`padsIn`, docs/SPACES.md, "Pads in
+ * team spaces"). They are large, so the team service streams them and keeps nothing.
  */
 export interface PadStorage {
   listSets(): Promise<PadSetEntry[]>
@@ -182,6 +182,8 @@ export interface PadStorage {
   /** Put every file of a set in the bin, and leave the set */
   trashFiles(setRef: string): Promise<void>
   read(fileRef: string): Promise<ArrayBuffer>
+  /** A file's audio as it arrives, for passing on without holding it (the team service) */
+  readStream(fileRef: string): Promise<ReadableStream<Uint8Array>>
 }
 
 /** A backend: where spaces are found, made and opened */
@@ -196,7 +198,10 @@ export interface StorageBackend {
   ensureRoot(name: string, spaceId: string): Promise<{ ref: string; isNew: boolean }>
   renameRoot(ref: string, name: string): Promise<void>
   space(rootRef: string): SpaceStorage
+  /** The account's pad sets: those of a personal space */
   readonly pads: PadStorage
+  /** The pad sets kept in a space's own folder: those of a team space */
+  padsIn(rootRef: string): PadStorage
   /**
    * How many writes the backend has refused for lack of permission (not for a rate limit), since
    * it was loaded. The sync asks after a push to find out whether the person can only read.
