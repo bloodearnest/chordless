@@ -60,6 +60,15 @@ describe('song-section', () => {
     }
   })
 
+  it('has no collapse chevron outside edit mode, which took a line of its own on a phone', async () => {
+    await setUp({ editMode: false })
+    const toggle = () => section.shadowRoot.querySelector('.section-collapse-toggle')
+    expect(getComputedStyle(toggle()).display).to.equal('none')
+    section.editMode = true
+    await section.updateComplete
+    expect(getComputedStyle(toggle()).display).to.not.equal('none')
+  })
+
   it('sends section-action for the option pressed', async () => {
     await setUp()
     let detail: { songIndex: number; sectionIndex: number; action: string } | null = null
@@ -128,6 +137,22 @@ describe('song-section', () => {
         'Melody',
         'None',
       ])
+    })
+
+    it('marks the part with a music note where the sheet has its notes, lit when they are shown', async () => {
+      await setUp()
+      expect(section.shadowRoot.querySelector('.melody-mark')).to.equal(null)
+      await withMelody()
+      const mark = () => section.shadowRoot.querySelector('.melody-mark')
+      expect(mark().getAttribute('aria-label')).to.equal(
+        'The lead sheet has the melody for this part'
+      )
+      expect(mark().querySelector('app-icon').getAttribute('name')).to.equal('music')
+      expect(getComputedStyle(mark()).opacity).to.equal('0.6')
+      section.hideMode = 'melody'
+      await section.updateComplete
+      expect(mark().getAttribute('aria-label')).to.equal('Showing the melody')
+      expect(getComputedStyle(mark()).opacity).to.equal('1')
     })
 
     it('sends section-action show-melody for the option', async () => {

@@ -1,6 +1,7 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import { type ScoreView, ScoreViewErrorEvent } from '../src/components/score-view.ts'
 import '../src/components/score-view.ts'
+import { setUseUnicodeAccidentals } from '../src/js/preferences.ts'
 import { sampleScore } from './score-sample.ts'
 
 const { describe, it } = window
@@ -36,7 +37,28 @@ describe('score-view', () => {
     expect(notes(sheet)).to.equal(3)
     expect(sheet.shadowRoot?.querySelector('.title') === null).to.equal(true)
     expect(sheet.shadowRoot?.querySelector('.notice') === null).to.equal(true)
-    expect(getComputedStyle(sheet).paddingBottom).to.equal('0px')
+    // (no room kept for the player, and the paper fades into the page above and below)
+    expect(getComputedStyle(sheet).paddingBottom).to.equal(getComputedStyle(sheet).paddingTop)
+    expect(getComputedStyle(sheet).maskImage).to.contain('linear-gradient')
+  })
+
+  it('writes a flat chord as the letter b, close to its root, or as the sign if that is the preference', async () => {
+    const melody = {
+      ...sampleScore,
+      measures: sampleScore.measures.map(m => ({ ...m, chords: [{ start: 0, text: 'Bbm' }] })),
+    }
+    const chordText = (sheet: ScoreView) =>
+      [...(sheet.shadowRoot?.querySelectorAll('.page g.harm text') ?? [])]
+        .map(t => t.textContent?.replace(/\s+/g, ''))
+        .join(' ')
+    const sheet = await shown({ melody, melodyKey: 'C', songKey: 'C' })
+    expect(chordText(sheet)).to.equal('Bbm')
+    setUseUnicodeAccidentals(true)
+    try {
+      await waitUntil(() => chordText(sheet) === 'B♭m', undefined, { timeout: 3000 })
+    } finally {
+      setUseUnicodeAccidentals(false)
+    }
   })
 
   it('has no title line for a sheet that has none', async () => {

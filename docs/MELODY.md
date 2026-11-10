@@ -339,6 +339,13 @@ choice in the part's Show options (All, Lyrics, Chords, **Melody**, None), `Hide
   `<song-section>` its `melody` and `melodyMeasures`; it runs where the song's sheet is asked for (the
   setlist's `applyMelodyMode`, the library's `#applyMelody`), and the setlist works the sections' states out again
   once it has.
+- **Seen in the chart.** A part the sheet has notes for has a music note by its title (in every mode: dimmed, and lit
+  while the notes are what is shown), so a player can tell there is a melody to switch to; the switch itself is in the
+  Show options in edit mode. The sheet of a part fades into the page at its top and bottom (a mask, so a light sheet does
+  not end in a hard edge on a dark page). Chord symbols use the letters "b" and "#" of the chart's own chords, which sit
+  close to the root, unless the preference for ♯ and ♭ is on (`withTextAccidentals`, applied by `<score-view>`: Verovio
+  draws the signs in a music font the page does not have, and a text font's ♭ has a wide space of its own). There is no
+  collapse chevron outside edit mode: on a phone it wrapped under the title and made a line of its own.
 - **The engraver is the heavy part**: it loads in a worker the first time a part is shown as music, as for the
   song's sheet (the page's plan for pulling Verovio and pdf.js in after load applies to both).
 - Not done: a way to say which sheet section is which when the match fails (an instrumental the sheet does not name); sung melody for any part (the

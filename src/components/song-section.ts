@@ -16,6 +16,7 @@ import type { BarGroupData, Measure } from './bar-group.ts'
 import './bar-group.ts'
 import { annotationStyles, renderAnnotations } from './chart-annotation.ts'
 import './chord-display.ts'
+import './icon.ts'
 
 /** A Show option or the collapse button was pressed: action is show-all, show-lyrics, show-chords, show-none or collapse */
 export class SectionActionEvent extends Event {
@@ -267,8 +268,22 @@ export class SongSection extends LitElement {
       opacity: 1;
     }
 
+    /* (no room for it outside edit mode: on a phone it wrapped under the title, a line of its own) */
     :host(:not([edit-mode])) .song-section-wrapper .section-collapse-toggle {
-      pointer-events: none;
+      display: none;
+    }
+
+    /* The lead sheet has notes for this part: shown in full when it is the part's view */
+    .song-section-wrapper .melody-mark {
+      display: inline-flex;
+      align-items: center;
+      color: var(--text-secondary, #5f6b6d);
+      opacity: 0.6;
+    }
+
+    .song-section-wrapper.melody-shown .melody-mark {
+      opacity: 1;
+      color: var(--chord-color, #2980b9);
     }
 
     .song-section-wrapper .section-collapse-toggle:hover {
@@ -833,6 +848,7 @@ export class SongSection extends LitElement {
             <div class="section-title-wrapper">
               <h3 class="section-title" data-annotation-target="title">${label}</h3>
               ${this.note ? html`<span class="section-note">${this.note}</span>` : ''}
+              ${this._renderMelodyMark()}
               ${renderAnnotations(this.titleAnnotations)}
               ${this._renderCollapseToggle()}
             </div>
@@ -902,6 +918,19 @@ export class SongSection extends LitElement {
         ${label}
       </button>
     `
+  }
+
+  /** A music note by the title where the lead sheet has notes for the part (shown as them, or one tap away in edit mode) */
+  _renderMelodyMark() {
+    if (!this._hasMelody()) return nothing
+    const shown = this._showsMelody()
+    return html`<span
+      class="melody-mark"
+      role="img"
+      aria-label=${shown ? 'Showing the melody' : 'The lead sheet has the melody for this part'}
+      title=${shown ? 'Showing the melody' : 'The lead sheet has the melody for this part'}
+      ><app-icon name="music" size="18"></app-icon
+    ></span>`
   }
 
   _renderCollapseToggle() {

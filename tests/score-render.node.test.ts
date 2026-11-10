@@ -116,10 +116,24 @@ describe('engraving a melody with Verovio', () => {
     const text =
       '<tspan font-size="405px" x="1" y="2">B</tspan>\n<tspan font-family="Leipzig" font-size="720px">\uEA64</tspan>\n<tspan font-size="405px">m7</tspan>'
     assert.equal(
-      withTextAccidentals(text),
+      withTextAccidentals(text, true),
       '<tspan font-size="405px" x="1" y="2">B</tspan>\n<tspan font-size="405px">♭</tspan>\n<tspan font-size="405px">m7</tspan>'
     )
-    assert.match(withTextAccidentals('<tspan font-family="Leipzig">\uEA63</tspan>'), /♯<\/tspan>/)
+    assert.match(
+      withTextAccidentals('<tspan font-family="Leipzig">\uEA63</tspan>', true),
+      /♯<\/tspan>/
+    )
+  })
+
+  it('writes them as the letters b and # of the chart when the signs are not asked for, so the chord stays compact', () => {
+    const text =
+      '<tspan font-size="405px" x="1" y="2">B</tspan>\n<tspan font-family="Leipzig" font-size="720px">\uEA64</tspan>\n<tspan font-size="405px">m7</tspan>'
+    assert.equal(
+      withTextAccidentals(text),
+      '<tspan font-size="405px" x="1" y="2">B</tspan>\n<tspan font-size="405px">b</tspan>\n<tspan font-size="405px">m7</tspan>'
+    )
+    assert.match(withTextAccidentals('<tspan font-family="Leipzig">\uEA63</tspan>'), />#<\/tspan>/)
+    assert.match(withTextAccidentals('<tspan font-family="Leipzig">\uEA65</tspan>'), />♮<\/tspan>/)
   })
 
   it('has no Leipzig character left in a chord symbol of a melody with flat chords', async () => {
@@ -129,7 +143,7 @@ describe('engraving a melody with Verovio', () => {
     }
     const out = await renderScoreHere(writeMusicXml(flat))
     assert.ok(out)
-    const shown = out.pages.map(withTextAccidentals).join('')
+    const shown = out.pages.map(page => withTextAccidentals(page, true)).join('')
     assert.doesNotMatch(shown, /font-family="Leipzig"[^>]*>[\uEA63-\uEA65]/)
     assert.match(shown, /♭/)
   })

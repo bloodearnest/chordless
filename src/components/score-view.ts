@@ -1,10 +1,13 @@
+import { ContextConsumer } from '@lit/context'
 import { css, html, LitElement, nothing, type PropertyValues } from 'lit'
 import { unsafeSVG } from 'lit/directives/unsafe-svg.js'
+import { displayPreferencesContext } from '../js/display-preferences.ts'
 import type { Score } from '../js/score.ts'
 import { writeMusicXml, writeSectionsMusicXml } from '../js/score-musicxml.ts'
 import { layoutNotice } from '../js/score-notice.ts'
 import { renderScore } from '../js/score-render.ts'
 import { sliceMeasures } from '../js/score-section.ts'
+import { withTextAccidentals } from '../js/score-svg-text.ts'
 import { transposeScore } from '../js/score-transpose.ts'
 
 /**
@@ -84,9 +87,25 @@ export class ScoreView extends LitElement {
     :host([hidden]) {
       display: none;
     }
-    /* (a few measures in a section of the chart: nothing floats over their foot) */
+    /* A few measures in a section of the chart: nothing floats over their foot, and the paper fades
+       into the page at its top and bottom, so a light sheet does not end in a hard edge on a dark page
+       (the padding keeps the music clear of the fade) */
     :host([data-slice]) {
-      padding-bottom: 0;
+      padding-block: 0.9rem;
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        black 0.9rem,
+        black calc(100% - 0.9rem),
+        transparent
+      );
+      mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        black 0.9rem,
+        black calc(100% - 0.9rem),
+        transparent
+      );
     }
     /* what Verovio's own <style> says, which the page's policy would not allow in the SVG */
     .page g.ending,
@@ -172,6 +191,12 @@ export class ScoreView extends LitElement {
       padding: 1rem;
     }
   `
+
+  /** How chords are shown: the ♭ and ♯ signs or the letters "b" and "#" (a preference) */
+  _display = new ContextConsumer(this, {
+    context: displayPreferencesContext,
+    subscribe: true,
+  })
 
   constructor() {
     super()
@@ -317,7 +342,7 @@ export class ScoreView extends LitElement {
           </div>`
           : nothing
       }
-      ${this._pages.map(page => html`<div class="page">${unsafeSVG(page)}</div>`)}
+      ${this._pages.map(page => html`<div class="page">${unsafeSVG(withTextAccidentals(page, this._display.value?.unicodeAccidentals ?? false))}</div>`)}
       ${
         shown && footer.length
           ? html`<div class="notice">${footer.map(line => html`<p>${line}</p>`)}</div>`
