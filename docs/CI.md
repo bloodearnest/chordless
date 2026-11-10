@@ -33,7 +33,7 @@ its pull request (`"#42"`), and `docs/stats.jsonl` records each run's tree as we
 | End to end | Linux, Chromium | `just test-e2e chromium` | - |
 | End to end | macOS, WebKit | `just test-e2e webkit` | - |
 | End to end | Windows, Edge | `just test-e2e msedge` | - |
-| Advisories | Linux | `just advisories` | only when `package-lock.json` changed |
+| Advisories | Linux | `just advisories` (advisory: not in `ci-ok`) | only when `package-lock.json` changed |
 | Terraform | Linux | `just lint-infra` | only when `infra/` changed |
 | Changes | Linux | `scripts/ci/changes.sh` | - |
 | `ci-ok` | | every job above passed or was skipped | all |
@@ -80,8 +80,8 @@ npm registry with a sha512 hash (`scripts/check-lockfile.sh`, so a lockfile chan
 tarball elsewhere), and must carry the registry's signature (and its provenance, where it publishes one).
 Those are in `just lint`. Known advisories are not: a new one fails with no change of ours, and would
 block every pull request and deploy until fixed. `just advisories` (`scripts/audit-deps.ts`) is a
-CI job only when a pull request changes `package-lock.json` (the new versions are then its doing; it is
-in `ci-ok`), and otherwise its own daily workflow (`.github/workflows/advisories.yml`), which holds
+CI job only when a pull request changes `package-lock.json` (the new versions are then its doing), shown
+on the pull request but not in `ci-ok`, so it blocks no merge; and otherwise its own daily workflow (`.github/workflows/advisories.yml`), which holds
 nothing up: a production dependency with a high or critical advisory whose fix is over a week old fails
 it, and GitHub emails about the run. The dev tools' advisories are listed without failing: they never reach users.
 
