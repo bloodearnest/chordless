@@ -12,6 +12,7 @@ interface WaitEvent {
 }
 
 interface WorkerMessage {
+  waitUntil(promise: Promise<unknown>): void
   data?: { type?: string; data?: AuthMessageData; messageId?: string } | null
   ports?: readonly MessagePort[]
 }
@@ -34,10 +35,15 @@ export interface WorkerScope {
   addEventListener(type: 'fetch', listener: (event: WorkerFetch) => void): void
 }
 
-/** What the build gives the worker: the files to precache, and the version they make */
+/**
+ * What the build gives the worker: the files to precache, and the version they make; and the
+ * heavy files to fetch later, when the page asks, with a version of their own
+ */
 export interface WorkerConfig {
   precache: string[]
   cacheVersion: string
+  deferred: string[]
+  deferredVersion: string
   releasedAt: string
 }
 
@@ -50,6 +56,8 @@ export function startServiceWorker(
   const PRECACHE = config.precache
   const PRECACHED = new Set(PRECACHE)
   const CACHE_NAME = `cache-${config.cacheVersion}`
+  const DEFERRED_URLS = new Set(config.deferred)
+  const DEFERRED_CACHE_NAME = `deferred-${config.deferredVersion}`
   const PAD_CACHE_NAME = 'padsets-cache-v1'
   const RUNTIME_CACHE_NAME = 'runtime-v1'
 
@@ -75,6 +83,7 @@ export function startServiceWorker(
           cacheNames.map(cacheName => {
             if (
               cacheName !== CACHE_NAME &&
+              cacheName !== DEFERRED_CACHE_NAME &&
               cacheName !== PAD_CACHE_NAME &&
               cacheName !== RUNTIME_CACHE_NAME &&
               cacheName !== SHARED_CACHE_NAME
@@ -110,6 +119,15 @@ export function startServiceWorker(
           scope.skipWaiting()
           break
 
+        case 'PRECACHE_DEFERRED':
+          // (waitUntil is called before anything is awaited, so the worker is kept alive for it)
+          event.waitUntil(
+            fetchDeferred().then(progress =>
+              respondToClient(event, messageId, { success: true, ...progress })
+            )
+          )
+          break
+
         default:
           // The sign-in's messages (auth-messages.ts): a page it does not control answers them itself
           if (isAuthMessage(type)) {
@@ -123,6 +141,48 @@ export function startServiceWorker(
       respondToClient(event, messageId, { success: false, error: errorMessage(error) })
     }
   })
+
+  /**
+   * Whether a response is the file asked for. The host answers a path it has no file for with the
+   * app shell (200, HTML): that must never be kept as a script or a picture.
+   */
+  function isTheFile(response: Response, pathname: string) {
+    if (!response.ok) return false
+    const type = response.headers.get('Content-Type') ?? ''
+    return pathname.endsWith('.html') || !type.startsWith('text/html')
+  }
+
+  let fetching: Promise<{ done: number; total: number }> | null = null
+
+  /**
+   * Fetch the deferred files the device does not have yet, one at a time and at low priority, and
+   * keep them. What it cannot get now (offline, a server error) it leaves for the next time the
+   * page asks, which is every time the app loads. Says how many of them are kept.
+   */
+  function fetchDeferred() {
+    fetching ??= (async () => {
+      const cache = await caches.open(DEFERRED_CACHE_NAME)
+      let done = 0
+      for (const path of config.deferred) {
+        try {
+          if (await cache.match(path)) {
+            done++
+            continue
+          }
+          const response = await doFetch(path, { priority: 'low' } as RequestInit)
+          if (!isTheFile(response, path)) continue
+          await cache.put(path, response)
+          done++
+        } catch {
+          // Offline, or no room: not kept, and tried again next time
+        }
+      }
+      return { done, total: config.deferred.length }
+    })().finally(() => {
+      fetching = null
+    })
+    return fetching
+  }
 
   // Helper to respond to client messages
   function respondToClient(
@@ -176,6 +236,25 @@ export function startServiceWorker(
     // API and auth requests (the worker's) - pass through to network
     if (['/api/', '/oauth/', '/session/'].some(prefix => url.pathname.startsWith(prefix))) {
       event.respondWith(doFetch(event.request))
+      return
+    }
+
+    // The heavy files fetched after the app loaded (fetchDeferred): named by hash, or versioned
+    // with their cache, so what is kept is right and is used without asking the network. Fetched
+    // and kept now if it is not there yet (the first use came before the page asked).
+    if (DEFERRED_URLS.has(url.pathname)) {
+      event.respondWith(
+        caches.open(DEFERRED_CACHE_NAME).then(async cache => {
+          const cached = await cache.match(url.pathname)
+          if (cached) return cached
+          const response = await doFetch(event.request)
+          if (isTheFile(response, url.pathname)) {
+            const copy = response.clone()
+            cache.put(url.pathname, copy).catch(() => {})
+          }
+          return response
+        })
+      )
       return
     }
 

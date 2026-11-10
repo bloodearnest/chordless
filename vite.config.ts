@@ -40,8 +40,8 @@ export default defineConfig(({ command, isPreview }) => {
       emptyOutDir: true,
       target: TARGET,
       // The chunks over the default 500 kB are pdf.js (1.6 MB) and Verovio (7.2 MB, 2.2 MB compressed:
-      // WebAssembly in the module), each already its own lazily loaded chunk and not precached (see
-      // NOT_PRECACHED): they are as split as they can be. The limit is just above them, so a
+      // WebAssembly in the module), each already its own lazily loaded chunk and deferred (see
+      // DEFERRED): they are as split as they can be. The limit is just above them, so a
       // third large chunk still warns.
       chunkSizeWarningLimit: 7300,
     },

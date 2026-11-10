@@ -67,10 +67,53 @@ test('the files it caches are the files the build made', { tag: '@logic' }, asyn
   // The lazily loaded views and their code
   expect(cached.filter(path => /\/assets\/.*-view-.*\.js$/.test(path)).length).toBeGreaterThan(5)
   expect(cached).not.toContain('/service-worker.js')
-  // Reading a PDF (a chart shared to the app) is loaded when first needed, not precached
-  expect(cached.filter(path => /pdfjs/.test(path))).toEqual([])
-  // ...and so are the Help pictures: not core, so not part of the first visit's download
+  // The heavy files (the PDF reader, Verovio, the Help pictures) are not part of the first
+  // visit's download: the page asks for them once it is idle (the test below)
+  expect(cached.filter(path => /pdfjs|verovio/.test(path))).toEqual([])
   expect(cached.filter(path => path.startsWith('/help/'))).toEqual([])
+})
+
+test('the heavy files are fetched after the page has loaded, and work with no network', async ({
+  page,
+  context,
+}) => {
+  await page.goto('/')
+  await waitForServiceWorker(page)
+  const expected = readdirSync('dist/client/assets').filter(name =>
+    /^(score-)?pdfjs-|^verovio-/.test(name)
+  ).length
+  expect(expected).toBeGreaterThan(1)
+  // (the page asks once it is idle; asking again is what a later load does, and costs nothing)
+  const progress = await page.evaluate(async () => {
+    const { controller } = navigator.serviceWorker
+    return new Promise<{ done: number; total: number }>(resolve => {
+      const channel = new MessageChannel()
+      channel.port1.onmessage = event => resolve(event.data)
+      controller?.postMessage({ type: 'PRECACHE_DEFERRED', messageId: 'test' }, [channel.port2])
+    })
+  })
+  expect(progress.done).toBe(progress.total)
+  expect(progress.total).toBeGreaterThan(expected)
+
+  const kept = await page.evaluate(async () => {
+    const names = (await caches.keys()).filter(name => /^deferred-[0-9a-f]{12}$/.test(name))
+    const cache = await caches.open(names[0])
+    return (await cache.keys()).map(request => new URL(request.url).pathname)
+  })
+  expect(kept.filter(path => /verovio-/.test(path)).length).toBeGreaterThan(0)
+  expect(kept.filter(path => /pdfjs-/.test(path)).length).toBeGreaterThan(0)
+  expect(kept.filter(path => path.startsWith('/help/')).length).toBeGreaterThan(0)
+
+  // A kept file is served from the cache, and a Help picture opens offline
+  await context.setOffline(true)
+  try {
+    for (const path of kept) {
+      const status = await page.evaluate(async url => (await fetch(url)).status, path)
+      expect(status, path).toBe(200)
+    }
+  } finally {
+    await context.setOffline(false)
+  }
 })
 
 test('the privacy, terms and licences pages are styled under the page security policy', async ({

@@ -1,9 +1,10 @@
 // Builds src/service-worker.ts as a classic (non-module) script, so it also runs where
 // module service workers don't (Chrome before 91, older Firefox), with its one import bundled in.
 //
-// In a production build it also injects the precache: every file the build emitted, so the
-// whole app, including the views loaded on demand, is cached when the worker installs and
-// works offline from the first visit. The cache's name carries a hash of those files, so a
+// In a production build it also injects the precache: every file the build emitted, bar the few
+// heavy ones listed below, so the whole app, including the views loaded on demand, is cached
+// when the worker installs and works offline from the first visit. Those heavy ones are injected
+// as a second list, fetched shortly after the app has loaded. The cache's name carries a hash of those files, so a
 // changed build is a changed worker, and the old cache goes when the new one takes over.
 //
 // In dev the precache is empty (Vite serves modules on demand) and the worker is bundled
@@ -16,27 +17,30 @@ import { join, relative, sep } from 'node:path'
 import { build, type Plugin } from 'vite'
 
 const FILE = 'service-worker.js'
-// Never precached: the worker itself, Cloudflare's asset filter and headers file (which it
-// reads and does not serve), source maps, and the PDF reader (1.6 MB, and the lead sheet reader that goes with it, for the one case of a PDF
-// shared to the app: the worker caches it when it is first fetched), Verovio (7.2 MB, the lead sheet view's
-// engraver: the same), the iOS startup images (iOS
-// reads them itself when the app is launched from the home screen) and the Help pictures (public/help:
-// 240 KB, for something that is not core: the app is normally online, and the setlist is what has
-// to work offline. Opened offline before ever being seen, Help shows its words without them)
-const NOT_PRECACHED = (path: string) =>
+// Never cached ahead of use: the worker itself, Cloudflare's asset filter and headers file (which it
+// reads and does not serve), source maps, and the iOS startup images (iOS reads them itself when
+// the app is launched from the home screen)
+const NEVER_CACHED = (path: string) =>
   path === FILE ||
   path === '.assetsignore' ||
   path === '_headers' ||
   path.endsWith('.map') ||
+  path.startsWith('icons/splash/')
+
+// Not precached, so the install stays quick, but fetched and kept shortly after the app has
+// loaded (the page asks: src/js/precache-deferred.ts), so they work offline too: the PDF reader
+// (1.6 MB, and the lead sheet reader that goes with it, for a PDF shared to the app), Verovio
+// (7.2 MB, the lead sheet view's engraver) and the Help pictures (public/help)
+const DEFERRED = (path: string) =>
   /^assets\/(score-)?pdfjs-/.test(path) ||
   /^assets\/verovio-/.test(path) ||
-  path.startsWith('help/') ||
-  path.startsWith('icons/splash/')
+  path.startsWith('help/')
 
 async function bundle(
   root: string,
   precache: string[],
   version: string,
+  deferred: { urls: string[]; version: string },
   { minify, target, released }: { minify: boolean; target?: string[]; released: string }
 ) {
   const result = await build({
@@ -47,6 +51,8 @@ async function bundle(
     define: {
       __PRECACHE__: JSON.stringify(precache),
       __CACHE_VERSION__: JSON.stringify(version),
+      __DEFERRED__: JSON.stringify(deferred.urls),
+      __DEFERRED_VERSION__: JSON.stringify(deferred.version),
       __RELEASE_DATE__: JSON.stringify(released),
     },
     build: {
@@ -100,18 +106,33 @@ function releaseDate(projectRoot: string): string {
   }
 }
 
-/** The URLs to precache, and a hash of their contents */
+/**
+ * The URLs to precache, and a hash of their contents; and the URLs to fetch once the app has
+ * loaded, with a hash of theirs. The deferred files have a hash of their own so that a release
+ * that does not change them (most) keeps what a device has already fetched.
+ */
 function precacheFor(outDir: string) {
   const hash = createHash('sha256')
+  const deferredHash = createHash('sha256')
   const urls: string[] = []
+  const deferred: string[] = []
   for (const file of listFiles(outDir).sort()) {
     const path = relative(outDir, file).split(sep).join('/')
-    if (NOT_PRECACHED(path)) continue
+    if (NEVER_CACHED(path)) continue
+    if (DEFERRED(path)) {
+      deferred.push(`/${path}`)
+      deferredHash.update(path).update(readFileSync(file))
+      continue
+    }
     // The app shell is served at /, whatever URL the visitor asked for
     urls.push(path === 'index.html' ? '/' : `/${path}`)
     hash.update(path).update(readFileSync(file))
   }
-  return { urls, version: hash.digest('hex').slice(0, 12) }
+  return {
+    urls,
+    version: hash.digest('hex').slice(0, 12),
+    deferred: { urls: deferred, version: deferredHash.digest('hex').slice(0, 12) },
+  }
 }
 
 /** `target` is the build target of the rest of the app, so the worker matches it */
@@ -131,7 +152,13 @@ export function serviceWorker({ target }: { target?: string[] } = {}): Plugin {
       server.middlewares.use(async (req, res, next) => {
         if (req.url?.split('?')[0] !== `/${FILE}`) return next()
         try {
-          const code = await bundle(root, [], 'dev', { minify: false, target, released })
+          const code = await bundle(
+            root,
+            [],
+            'dev',
+            { urls: [], version: 'dev' },
+            { minify: false, target, released }
+          )
           res.setHeader('Content-Type', 'text/javascript')
           res.setHeader('Cache-Control', 'no-cache')
           res.end(code)
@@ -144,8 +171,8 @@ export function serviceWorker({ target }: { target?: string[] } = {}): Plugin {
     async writeBundle(options) {
       if (this.environment?.name !== 'client') return
       if (!options.dir) return
-      const { urls, version } = precacheFor(options.dir)
-      const code = await bundle(root, urls, version, { minify: true, target, released })
+      const { urls, version, deferred } = precacheFor(options.dir)
+      const code = await bundle(root, urls, version, deferred, { minify: true, target, released })
       writeFileSync(join(options.dir, FILE), code)
     },
   }

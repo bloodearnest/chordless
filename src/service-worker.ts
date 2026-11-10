@@ -10,6 +10,8 @@ declare const self: ServiceWorkerGlobalScope
 startServiceWorker(self as unknown as WorkerScope, caches, (input, init) => fetch(input, init), {
   precache: __PRECACHE__,
   cacheVersion: __CACHE_VERSION__,
+  deferred: __DEFERRED__,
+  deferredVersion: __DEFERRED_VERSION__,
   releasedAt: __RELEASE_DATE__,
 })
 /* v8 ignore stop */
