@@ -73,8 +73,7 @@ describe('the service worker', () => {
   const config = (overrides: Partial<WorkerConfig> = {}): WorkerConfig => ({
     precache: [],
     cacheVersion: 'v1',
-    deferred: [],
-    deferredVersion: 'd1',
+    deferred: {},
     releasedAt: '2026-10-01',
     ...overrides,
   })
@@ -200,13 +199,18 @@ describe('the service worker', () => {
     })
 
     describe('fetching the deferred files', () => {
-      const files = ['/assets/verovio-a.js', '/help/one.png']
-      const deferredCache = () => caches.open('deferred-d1')
+      const hashes = { '/assets/verovio-a.js': 'aaa', '/help/one.png': 'bbb' }
+      const files = Object.keys(hashes)
+      const keyed = ['/assets/verovio-a.js?v=aaa', '/help/one.png?v=bbb']
+      const deferredCache = () => caches.open('deferred-v1')
       const kept = async () =>
-        (await (await deferredCache()).keys()).map(request => new URL(request.url).pathname)
+        (await (await deferredCache()).keys()).map(request => {
+          const { pathname, search } = new URL(request.url)
+          return pathname + search
+        })
       beforeEach(() => {
         scope = fakeScope()
-        start({ deferred: files })
+        start({ deferred: hashes })
         fetchImpl = async request =>
           new Response('file', {
             headers: {
@@ -226,11 +230,11 @@ describe('the service worker', () => {
           done: 2,
           total: 2,
         })
-        expect(await kept()).to.deep.equal(files)
+        expect(await kept()).to.deep.equal(keyed)
       })
 
       it('fetches only what it does not have', async () => {
-        await (await deferredCache()).put(files[0] as string, new Response('kept'))
+        await (await deferredCache()).put(keyed[0] as string, new Response('kept'))
         await send({ type: 'PRECACHE_DEFERRED' })
         expect(fetched).to.deep.equal(['/help/one.png'])
       })
@@ -260,24 +264,27 @@ describe('the service worker', () => {
         expect(await send({ type: 'PRECACHE_DEFERRED' })).to.include({ done: 1, total: 2 })
         fetchImpl = good
         expect(await send({ type: 'PRECACHE_DEFERRED' })).to.include({ done: 2, total: 2 })
-        expect(await kept()).to.deep.equal(files)
+        expect(await kept()).to.deep.equal(keyed)
       })
 
       it('serves a kept file without the network, and fetches and keeps one that is not there yet', async () => {
-        await (await deferredCache()).put(files[0] as string, new Response('kept'))
+        await (await deferredCache()).put(keyed[0] as string, new Response('kept'))
         expect(await textOf(await fetchEvent(files[0] as string))).to.equal('kept')
         expect(fetched).to.deep.equal([])
         expect(await textOf(await fetchEvent('/help/one.png?t=1'))).to.equal('file')
-        await until(async () => (await kept()).includes('/help/one.png'))
+        await until(async () => (await kept()).includes(keyed[1] as string))
       })
 
-      it('keeps the caches of its own version when it activates, and drops other versions', async () => {
-        await caches.open('deferred-d1')
-        await caches.open('deferred-old')
+      it('keeps the cache when it activates, dropping the files that changed or went', async () => {
+        const cache = await deferredCache()
+        for (const key of [...keyed, '/help/one.png?v=old', '/assets/verovio-gone.js?v=zzz']) {
+          await cache.put(key, new Response('x'))
+        }
         let waited: Promise<unknown> = Promise.resolve()
         scope.listeners.activate({ waitUntil: (p: Promise<unknown>) => (waited = p) } as never)
         await waited
-        expect(await caches.names()).to.deep.equal(['deferred-d1'])
+        expect(await caches.names()).to.deep.equal(['deferred-v1'])
+        expect((await kept()).sort()).to.deep.equal(keyed)
       })
     })
 

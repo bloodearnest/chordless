@@ -37,13 +37,12 @@ export interface WorkerScope {
 
 /**
  * What the build gives the worker: the files to precache, and the version they make; and the
- * heavy files to fetch later, when the page asks, with a version of their own
+ * heavy files to fetch later, when the page asks, each with a hash of its contents
  */
 export interface WorkerConfig {
   precache: string[]
   cacheVersion: string
-  deferred: string[]
-  deferredVersion: string
+  deferred: Record<string, string>
   releasedAt: string
 }
 
@@ -56,8 +55,10 @@ export function startServiceWorker(
   const PRECACHE = config.precache
   const PRECACHED = new Set(PRECACHE)
   const CACHE_NAME = `cache-${config.cacheVersion}`
-  const DEFERRED_URLS = new Set(config.deferred)
-  const DEFERRED_CACHE_NAME = `deferred-${config.deferredVersion}`
+  const DEFERRED_CACHE_NAME = 'deferred-v1'
+  /** A deferred file is kept under its path and the hash of its contents: a changed file is a new key */
+  const deferredKey = (path: string) => `${path}?v=${config.deferred[path]}`
+  const isDeferred = (path: string) => Object.hasOwn(config.deferred, path)
   const PAD_CACHE_NAME = 'padsets-cache-v1'
   const RUNTIME_CACHE_NAME = 'runtime-v1'
 
@@ -75,10 +76,22 @@ export function startServiceWorker(
     if (!scope.registration.active) scope.skipWaiting()
   })
 
+  /** Drop the deferred files that are not this version's: ones that changed or went */
+  async function pruneDeferred() {
+    if (!(await caches.has(DEFERRED_CACHE_NAME))) return
+    const cache = await caches.open(DEFERRED_CACHE_NAME)
+    const current = new Set(Object.keys(config.deferred).map(deferredKey))
+    for (const request of await cache.keys()) {
+      const { pathname, search } = new URL(request.url)
+      if (!current.has(pathname + search)) await cache.delete(request)
+    }
+  }
+
   // Activate and clean up old caches
   scope.addEventListener('activate', event => {
     event.waitUntil(
-      caches.keys().then(cacheNames => {
+      caches.keys().then(async cacheNames => {
+        await pruneDeferred()
         return Promise.all(
           cacheNames.map(cacheName => {
             if (
@@ -163,21 +176,22 @@ export function startServiceWorker(
     fetching ??= (async () => {
       const cache = await caches.open(DEFERRED_CACHE_NAME)
       let done = 0
-      for (const path of config.deferred) {
+      const paths = Object.keys(config.deferred)
+      for (const path of paths) {
         try {
-          if (await cache.match(path)) {
+          if (await cache.match(deferredKey(path))) {
             done++
             continue
           }
           const response = await doFetch(path, { priority: 'low' } as RequestInit)
           if (!isTheFile(response, path)) continue
-          await cache.put(path, response)
+          await cache.put(deferredKey(path), response)
           done++
         } catch {
           // Offline, or no room: not kept, and tried again next time
         }
       }
-      return { done, total: config.deferred.length }
+      return { done, total: paths.length }
     })().finally(() => {
       fetching = null
     })
@@ -242,15 +256,15 @@ export function startServiceWorker(
     // The heavy files fetched after the app loaded (fetchDeferred): named by hash, or versioned
     // with their cache, so what is kept is right and is used without asking the network. Fetched
     // and kept now if it is not there yet (the first use came before the page asked).
-    if (DEFERRED_URLS.has(url.pathname)) {
+    if (isDeferred(url.pathname)) {
       event.respondWith(
         caches.open(DEFERRED_CACHE_NAME).then(async cache => {
-          const cached = await cache.match(url.pathname)
+          const cached = await cache.match(deferredKey(url.pathname))
           if (cached) return cached
           const response = await doFetch(event.request)
           if (isTheFile(response, url.pathname)) {
             const copy = response.clone()
-            cache.put(url.pathname, copy).catch(() => {})
+            cache.put(deferredKey(url.pathname), copy).catch(() => {})
           }
           return response
         })

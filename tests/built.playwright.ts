@@ -96,7 +96,7 @@ test('the heavy files are fetched after the page has loaded, and work with no ne
   expect(progress.total).toBeGreaterThan(expected)
 
   const kept = await page.evaluate(async () => {
-    const names = (await caches.keys()).filter(name => /^deferred-[0-9a-f]{12}$/.test(name))
+    const names = (await caches.keys()).filter(name => name === 'deferred-v1')
     const cache = await caches.open(names[0])
     return (await cache.keys()).map(request => new URL(request.url).pathname)
   })

@@ -54,11 +54,9 @@ needs are unusual:
   the Help pictures (`public/help/`) are left out of the install, which keeps the first visit
   quick (`DEFERRED` in the plugin; the plugin injects them as `__DEFERRED__`). Once the page has loaded and is idle
   (a few seconds), `src/js/precache-deferred.ts` sends the worker `PRECACHE_DEFERRED`, and the worker fetches
-  what its `deferred-<hash>` cache does not have yet, one file at a time at low priority, and keeps it.
+  what its `deferred-v1` cache does not have yet, one file at a time at low priority, and keeps it.
   So they work offline, and it is done on every load: with everything kept it costs a few cache lookups and
-  no network, and a failure (offline, no room) is silent and left for the next load. The cache's name is a
-  hash of the deferred files alone, so a release that does not change them (most) keeps what a device has
-  fetched, and the worker deletes the other `deferred-` caches when it activates. Kept files are served
+  no network, and a failure (offline, no room) is silent and left for the next load. Each file is kept under its path and a hash of its contents (`/assets/verovio-x.js?v=<hash>`), so a release that changes one file fetches only that one (the hash in the name of a built file already says so; the Help pictures have none), and the worker deletes the keys that are no longer in the list when it activates. Kept files are served
   from the cache first, without asking the network. A deferred file used before the page asked is fetched
   and kept then. A response is kept only if it is the file: the host answers a path it has no file for
   with the app shell (200, HTML), which is never kept as a script. Never cached ahead of use: the worker,

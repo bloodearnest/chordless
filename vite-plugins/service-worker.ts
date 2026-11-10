@@ -40,7 +40,7 @@ async function bundle(
   root: string,
   precache: string[],
   version: string,
-  deferred: { urls: string[]; version: string },
+  deferred: Record<string, string>,
   { minify, target, released }: { minify: boolean; target?: string[]; released: string }
 ) {
   const result = await build({
@@ -51,8 +51,7 @@ async function bundle(
     define: {
       __PRECACHE__: JSON.stringify(precache),
       __CACHE_VERSION__: JSON.stringify(version),
-      __DEFERRED__: JSON.stringify(deferred.urls),
-      __DEFERRED_VERSION__: JSON.stringify(deferred.version),
+      __DEFERRED__: JSON.stringify(deferred),
       __RELEASE_DATE__: JSON.stringify(released),
     },
     build: {
@@ -107,32 +106,30 @@ function releaseDate(projectRoot: string): string {
 }
 
 /**
- * The URLs to precache, and a hash of their contents; and the URLs to fetch once the app has
- * loaded, with a hash of theirs. The deferred files have a hash of their own so that a release
- * that does not change them (most) keeps what a device has already fetched.
+ * The URLs to precache, and a hash of their contents; and the files to fetch once the app has
+ * loaded, each with a hash of its own (so that a release that changes one keeps the others a
+ * device has already fetched, and a file with no hash in its name, such as a Help picture, is
+ * fetched again when it changes).
  */
 function precacheFor(outDir: string) {
   const hash = createHash('sha256')
-  const deferredHash = createHash('sha256')
   const urls: string[] = []
-  const deferred: string[] = []
+  const deferred: Record<string, string> = {}
   for (const file of listFiles(outDir).sort()) {
     const path = relative(outDir, file).split(sep).join('/')
     if (NEVER_CACHED(path)) continue
     if (DEFERRED(path)) {
-      deferred.push(`/${path}`)
-      deferredHash.update(path).update(readFileSync(file))
+      deferred[`/${path}`] = createHash('sha256')
+        .update(readFileSync(file))
+        .digest('hex')
+        .slice(0, 12)
       continue
     }
     // The app shell is served at /, whatever URL the visitor asked for
     urls.push(path === 'index.html' ? '/' : `/${path}`)
     hash.update(path).update(readFileSync(file))
   }
-  return {
-    urls,
-    version: hash.digest('hex').slice(0, 12),
-    deferred: { urls: deferred, version: deferredHash.digest('hex').slice(0, 12) },
-  }
+  return { urls, version: hash.digest('hex').slice(0, 12), deferred }
 }
 
 /** `target` is the build target of the rest of the app, so the worker matches it */
@@ -152,13 +149,7 @@ export function serviceWorker({ target }: { target?: string[] } = {}): Plugin {
       server.middlewares.use(async (req, res, next) => {
         if (req.url?.split('?')[0] !== `/${FILE}`) return next()
         try {
-          const code = await bundle(
-            root,
-            [],
-            'dev',
-            { urls: [], version: 'dev' },
-            { minify: false, target, released }
-          )
+          const code = await bundle(root, [], 'dev', {}, { minify: false, target, released })
           res.setHeader('Content-Type', 'text/javascript')
           res.setHeader('Cache-Control', 'no-cache')
           res.end(code)
