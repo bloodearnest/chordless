@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { chartTexts, cueMeasures, sliceMeasures, songCues } from '../src/js/score-section.ts'
-import { bar, melodyOf, note } from './score-build.ts'
+import { bar, melodyOf, note, rest } from './score-build.ts'
 
 /** An intro of two cue-size bars, a verse of sung bars, an instrumental of one bar, a chorus */
 const sheet = melodyOf('Song', [
@@ -157,6 +157,29 @@ describe('the notes of a chart section', () => {
       ]),
       [null]
     )
+  })
+
+  it('skips a first measure with only the held note, stops at a measure with no notes, and keeps one with a harmony line after it', () => {
+    const sheet2 = melodyOf('Song', [
+      bar([note('E', 4, { duration: 4, syllables: ['sing'] })], { number: 1, section: 'VERSE' }),
+      // (only the note held over, and a rest)
+      bar([note('E', 4, { duration: 4, tieStop: true, syllables: [''] }), rest({ start: 3 })], {
+        number: 2,
+        section: 'INSTRUMENTAL',
+      }),
+      bar([note('G', 5, { cue: true, duration: 4 })], { number: 3 }),
+      // (nothing at all: the part ends)
+      bar([rest({ duration: 4, wholeMeasure: true })], { number: 4 }),
+      // (later, a harmony line over singing is not more of the instrumental)
+      bar(
+        [
+          note('A', 4, { duration: 4, syllables: ['la'] }),
+          note('C', 5, { cue: true, duration: 4 }),
+        ],
+        { number: 5 }
+      ),
+    ])
+    assert.deepEqual(cueMeasures(sheet2, [{ label: 'Instrumental', text: '' }]), [[2]])
   })
 
   it('gives nothing for a part with words, even when the sheet has cue notes for it', () => {
