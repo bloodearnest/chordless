@@ -803,11 +803,19 @@ describe('the setlist page: header, menu and keys', () => {
         }
       })
 
-      it('gives a part of the chart the notes of the sheet that are its own', async () => {
-        // (a bar of cue-size notes in the sheet's VERSE 1, which the chart's Verse 1 is by name)
-        const cue = melodyOf('Alpha', [measure(1, ['C4:4:'], { section: 'VERSE 1' })])
+      it('gives a part of the chart with no words the notes of the sheet that are its own', async () => {
+        // (a bar of cue-size notes in the sheet's INTRO, which the chart's wordless Intro is by name)
+        const cue = melodyOf('Alpha', [measure(1, ['C4:4:'], { section: 'INTRO' })])
         for (const e of cue.measures[0].voices[0]) e.cue = true
         await rig.db.saveScore(scoreRecord(rig.songs[0].uuid, writeMusicXml(cue), 'G'))
+        const song = await rig.db.getSong(rig.songs[0].uuid)
+        await rig.db.saveChordPro({
+          id: song?.chordproFileId as string,
+          content:
+            '{title: Alpha}\n{key: G}\n\n{comment: Intro}\n[G] [C]\n\n{comment: Verse 1}\n[G]Amazing [C]grace',
+          contentHash: 'with-intro',
+          lastModified: Date.now(),
+        })
         try {
           await rig.open()
           rig.page.showSong(0, true)
@@ -817,9 +825,10 @@ describe('the setlist page: header, menu and keys', () => {
                 .querySelectorAll('#song-0 song-display')[0]
                 ?.shadowRoot?.querySelectorAll('song-section') ?? []
             ) as unknown as { label: string; melodyMeasures: number[] | null }[]
-          await until(() => sections().find(s => s.label === 'Verse 1')?.melodyMeasures)
-          expect(sections().find(s => s.label === 'Verse 1')?.melodyMeasures).to.deep.equal([0])
-          expect(sections().find(s => s.label === 'Chorus')?.melodyMeasures).to.equal(null)
+          await until(() => sections().find(s => s.label === 'Intro')?.melodyMeasures)
+          expect(sections().find(s => s.label === 'Intro')?.melodyMeasures).to.deep.equal([0])
+          // (a part with words is for singing: no staff)
+          expect(sections().find(s => s.label === 'Verse 1')?.melodyMeasures).to.equal(null)
         } finally {
           await rig.db.deleteScore(rig.songs[0].uuid, { remember: false })
         }
