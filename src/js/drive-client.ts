@@ -53,6 +53,11 @@ const WRITE_FIELDS = 'id,name,mimeType,createdTime,modifiedTime,md5Checksum,appP
 const ALL_DRIVES = 'supportsAllDrives=true'
 const ALL_DRIVES_LIST = `${ALL_DRIVES}&includeItemsFromAllDrives=true`
 
+/** A value as a string in a Drive query: its backslashes and quotes escaped, so a name cannot change the query */
+function queryString(value: string): string {
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+}
+
 export function allDrivesUrl(endpoint: string, method = 'GET'): string {
   if (!/^\/files(\/|\?|$)/.test(endpoint)) return endpoint
   const isList = method === 'GET' && /^\/files(\?|$)/.test(endpoint)
@@ -500,7 +505,7 @@ export function createDriveApi({
    */
   async function findSpaceFolderByName(spaceName: string): Promise<DriveFile | null> {
     const rootFolderId = await findOrCreateRootFolder()
-    const query = `name='${spaceName}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    const query = `name=${queryString(spaceName)} and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
     const result = await driveRequest(
       `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`
     )
@@ -541,7 +546,7 @@ export function createDriveApi({
     const rootFolderId = await findOrCreateRootFolder()
 
     // Search for existing space folder by name and parent
-    const query = `name='${spaceName}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    const query = `name=${queryString(spaceName)} and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
     const result = await driveRequest(
       `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties)`
     )
@@ -599,7 +604,7 @@ export function createDriveApi({
 
   async function ensurePadSetFolder(padSetName: string): Promise<string> {
     const padsRootId = await getPadsRootFolder()
-    const query = `name='${padSetName}' and '${padsRootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    const query = `name=${queryString(padSetName)} and '${padsRootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
     const result = await driveRequest(
       `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)`
     )
@@ -701,7 +706,7 @@ export function createDriveApi({
    * Find subfolder by name within a parent
    */
   async function findSubfolder(parentId: string, name: string): Promise<string | null> {
-    const query = `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    const query = `name=${queryString(name)} and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
     const result = await driveRequest(
       `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`
     )

@@ -504,7 +504,7 @@ function splitAnd(q) {
   return parts.map(p => p.trim())
 }
 
-const unquote = s => s.replace(/\\'/g, "'")
+const unquote = s => s.replace(/\\(.)/g, '$1')
 
 function compileClause(clause) {
   let m = clause.match(/^'([^']+)' in parents$/)
