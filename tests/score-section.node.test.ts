@@ -114,6 +114,51 @@ describe('the notes of a chart section', () => {
     assert.deepEqual(found, [[0, 1], null, [3, 4]])
   })
 
+  it('skips a first measure that holds a note over from the part before, and finds names that differ', () => {
+    const held = melodyOf('Song', [
+      bar([note('E', 4, { duration: 4, syllables: ['sing'] })], { number: 1, section: 'VERSE' }),
+      // (a sung note tied over, then the cue notes)
+      bar(
+        [
+          note('E', 4, { duration: 4, tieStop: true, syllables: [''] }),
+          note('G', 5, { cue: true, start: 2, duration: 2 }),
+        ],
+        { number: 2, section: 'INTRO / TURNAROUND' }
+      ),
+      bar([note('A', 5, { cue: true, duration: 4 })], { number: 3 }),
+      bar([note('B', 4, { duration: 4, syllables: ['sing'] })], { number: 4, section: 'CHORUS' }),
+    ])
+    const found = cueMeasures(held, [
+      { label: 'Verse', text: 'sing' },
+      { label: 'Intro', text: '' },
+      { label: 'Turnaround 1b', text: '(To Br.)' },
+    ])
+    // (one sheet section with two names gives its notes to both, and brackets are not words)
+    assert.deepEqual(found, [null, [1, 2], [1, 2]])
+    const labelled = cueMeasures(held, [
+      { label: 'Outro  -  5/4', text: '' },
+      { label: 'Intro / Turnaround', text: '' },
+    ])
+    assert.deepEqual(labelled, [null, [1, 2]])
+  })
+
+  it('gives nothing for an instrumental that the singing interrupts, and the next one when it is whole', () => {
+    const broken = melodyOf('Song', [
+      bar([note('E', 5, { cue: true, duration: 4 })], { number: 1, section: 'INSTRUMENTAL' }),
+      bar([note('E', 4, { duration: 4, syllables: ['oh'] })], { number: 2 }),
+      bar([note('G', 5, { cue: true, duration: 4 })], { number: 3 }),
+      bar([note('A', 5, { cue: true, duration: 4 })], { number: 4, section: 'INSTRUMENTAL' }),
+    ])
+    const found = cueMeasures(broken, [{ label: 'Instrumental', text: '' }])
+    assert.deepEqual(found, [[3]])
+    assert.deepEqual(
+      cueMeasures({ ...broken, measures: broken.measures.slice(0, 3) }, [
+        { label: 'Instrumental', text: '' },
+      ]),
+      [null]
+    )
+  })
+
   it('gives nothing for a part with words, even when the sheet has cue notes for it', () => {
     const found = cueMeasures(sheet, [{ label: 'Intro', text: 'oh oh oh' }])
     assert.deepEqual(found, [null])
