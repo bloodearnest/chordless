@@ -44,7 +44,7 @@ import { getSpacePeople, identifyMe, settleLeader } from './people.ts'
 import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import type { Score } from './score.ts'
-import { keepSheet, scoreWithKey, shownSheet, showScore } from './score-shown.ts'
+import { attachCues, keepSheet, scoreWithKey, shownSheet, showScore } from './score-shown.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
 import { AnnotationsController } from './setlist/annotations-controller.ts'
 import { enterEditMode, isEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
@@ -1499,7 +1499,13 @@ export class SetlistPage {
     const song = this.songs[index]
     const content = this.root.querySelector<HTMLElement>(`#song-${index} .song-content`)
     if (!song || !content) return
-    const found = this._melodyOn.has(index) ? await this.melodyOf(song) : null
+    const melody = await this.melodyOf(song)
+    // (the parts of the song that have notes in the sheet can show them: which is a part's default if it has no words)
+    if (attachCues(content, melody)) {
+      await content.querySelector<SongDisplay>('song-display')?.updateComplete
+      this.sections.applyAll(content)
+    }
+    const found = this._melodyOn.has(index) ? melody : null
     // (a song with no melody stays in its lyrics)
     if (!found) this._melodyOn.delete(index)
     await showScore(content, found && { ...found, songKey: song.currentKey ?? found.key })

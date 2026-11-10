@@ -58,9 +58,10 @@ export interface ParsedChart {
 
 /**
  * What a section hides: nothing, its chords (lyrics only) or its lyrics (chords only); or the
- * whole section is collapsed or hidden
+ * whole section is collapsed or hidden. 'melody' shows an instrumental section as a line of music in
+ * place of its chords (docs/MELODY.md, "In the chart"); only a section with notes in the lead sheet has it.
  */
-export type HideMode = 'none' | 'chords' | 'lyrics' | 'collapse' | 'hide'
+export type HideMode = 'none' | 'chords' | 'lyrics' | 'melody' | 'collapse' | 'hide'
 
 export interface SectionState {
   hideMode: HideMode

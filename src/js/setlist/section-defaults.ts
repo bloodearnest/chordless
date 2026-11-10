@@ -42,6 +42,8 @@ export function defaultHideMode(
   const choice = label && Object.hasOwn(defaults, label) ? defaults[label] : defaults.all
   const wanted = hideModeForChoice(choice)
   if (wanted === 'none') return recommended
+  // (notes in place of the chords: a part with no words, so words only leaves nothing, as chords only does)
+  if (recommended === 'melody') recommended = 'lyrics'
   // Chords only, for a part with only words (or the other way round)
   if (wanted === 'chords' && recommended === 'lyrics') return 'collapse'
   if (wanted === 'lyrics' && recommended === 'chords') return 'collapse'

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { cueMeasures, sliceMeasures } from '../src/js/score-section.ts'
+import { chartTexts, cueMeasures, sliceMeasures, songCues } from '../src/js/score-section.ts'
 import { bar, melodyOf, note } from './score-build.ts'
 
 /** An intro of two cue-size bars, a verse of sung bars, an instrumental of one bar, a chorus */
@@ -69,5 +69,47 @@ describe('the notes of a chart section', () => {
         [2, null],
       ]
     )
+  })
+})
+
+describe('the cues of a song', () => {
+  const parsed = {
+    metadata: {},
+    sections: [
+      {
+        type: 'section' as const,
+        label: 'Intro',
+        lines: [{ segments: [{ chord: 'G', lyrics: '' }] }],
+      },
+      {
+        type: 'section' as const,
+        label: null,
+        lines: [
+          {
+            segments: [
+              { chord: 'G', lyrics: 'Lord ' },
+              { chord: 'C', lyrics: 'hear' },
+            ],
+          },
+        ],
+      },
+    ],
+  } as unknown as Parameters<typeof songCues>[1]
+
+  it('reads the words of each chart section', () => {
+    assert.deepEqual(chartTexts(parsed as NonNullable<typeof parsed>), [
+      { label: 'Intro', text: '' },
+      { label: '', text: 'Lord hear' },
+    ])
+  })
+
+  it('has the measures of each section of the chart, and none for a song with nothing to show', () => {
+    const cues = songCues({ melody: sheet, key: 'C' }, parsed)
+    assert.equal(cues?.key, 'C')
+    assert.deepEqual(cues?.measures, [[0, 1], null])
+    assert.equal(songCues(null, parsed), null)
+    assert.equal(songCues({ melody: sheet, key: 'C' }, null), null)
+    const bare = melodyOf('Song', [bar([note('C', 4, { duration: 4 })])])
+    assert.equal(songCues({ melody: bare, key: 'C' }, parsed), null)
   })
 })

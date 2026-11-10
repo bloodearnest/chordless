@@ -4,6 +4,7 @@ import type { Score } from '../js/score.ts'
 import { writeMusicXml, writeSectionsMusicXml } from '../js/score-musicxml.ts'
 import { layoutNotice } from '../js/score-notice.ts'
 import { renderScore } from '../js/score-render.ts'
+import { sliceMeasures } from '../js/score-section.ts'
 import { transposeScore } from '../js/score-transpose.ts'
 
 /**
@@ -18,6 +19,7 @@ import { transposeScore } from '../js/score-transpose.ts'
  * @property {Score|null} melody - The melody, in `melodyKey`
  * @property {string} melodyKey - The key the melody is written in
  * @property {string} songKey - The key to show it in
+ * @property {number[]|null} measures - Only these measures (indices) of the melody, as a line of one section of the chart (`score-section.ts`): no title or notice
  *
  * Events: `score-view:error` when the sheet could not be engraved
  */
@@ -54,6 +56,7 @@ export class ScoreView extends LitElement {
     melody: { attribute: false },
     melodyKey: { type: String, attribute: 'melody-key' },
     songKey: { type: String, attribute: 'song-key' },
+    measures: { attribute: false },
     _pages: { state: true },
     _failed: { state: true },
   }
@@ -61,6 +64,7 @@ export class ScoreView extends LitElement {
   declare melody: Score | null
   declare melodyKey: string
   declare songKey: string
+  declare measures: number[] | null
   declare _pages: string[]
   declare _failed: boolean
   /** How much of the width the music is drawn at, so that a sheet that all but fits the screen does: 1 when it does not need to */
@@ -79,6 +83,10 @@ export class ScoreView extends LitElement {
     }
     :host([hidden]) {
       display: none;
+    }
+    /* (a few measures in a section of the chart: nothing floats over their foot) */
+    :host([data-slice]) {
+      padding-bottom: 0;
     }
     /* what Verovio's own <style> says, which the page's policy would not allow in the SVG */
     .page g.ending,
@@ -170,6 +178,7 @@ export class ScoreView extends LitElement {
     this.melody = null
     this.melodyKey = ''
     this.songKey = ''
+    this.measures = null
     this._pages = []
     this._failed = false
   }
@@ -233,7 +242,13 @@ export class ScoreView extends LitElement {
   }
 
   override willUpdate(changed: PropertyValues): void {
-    if (changed.has('melody') || changed.has('melodyKey') || changed.has('songKey')) {
+    if (changed.has('measures')) this.toggleAttribute('data-slice', !!this.measures)
+    if (
+      changed.has('melody') ||
+      changed.has('melodyKey') ||
+      changed.has('songKey') ||
+      changed.has('measures')
+    ) {
       void this._engrave()
     }
   }
@@ -247,10 +262,12 @@ export class ScoreView extends LitElement {
     const asked = ++this._asked
     try {
       // (a key that is not known leaves the notes as they were written)
-      const moved =
+      const whole =
         this.melodyKey && this.songKey
           ? transposeScore(melody, this.melodyKey, this.songKey)
           : melody
+      // (cut after the notes are moved, so a few measures sit in the octave the whole sheet chose)
+      const moved = this.measures ? sliceMeasures(whole, this.measures) : whole
       const narrow = this.clientWidth > 0 && this.clientWidth < NARROW_BELOW
       const result = await renderScore(writeMusicXml(moved), {
         pageWidth: narrow ? NARROW_PAGE : WIDE_PAGE,
@@ -275,11 +292,13 @@ export class ScoreView extends LitElement {
     if (this._failed && !this._pages.length) {
       return html`<p class="failed" role="alert">The lead sheet could not be shown for this song.</p>`
     }
-    const sections = (this.melody?.measures ?? []).flatMap(m => (m.section ? [m.section] : []))
-    const title = this.melody?.title ?? ''
+    // (a few measures of a section have no title or notice: the song's own sheet has them)
+    const melody = this.measures ? null : this.melody
+    const sections = (melody?.measures ?? []).flatMap(m => (m.section ? [m.section] : []))
+    const title = melody?.title ?? ''
     const { subtitle, credits, footer } = layoutNotice(
-      this.melody?.notice ?? [],
-      this.melody?.title ?? null,
+      melody?.notice ?? [],
+      melody?.title ?? null,
       sections
     )
     const shown = this._pages.length > 0

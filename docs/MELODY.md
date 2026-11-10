@@ -305,6 +305,35 @@ a PRS/PPL question and not a CCLI one, which the practice-only rule below stays 
   only if wanted.
 - **Export** to MusicXML for a band that wants to open it in their own software.
 
+## In the chart: the notes of an instrumental part
+
+Most of a band plays from the chart in a set, and uses the lead sheet to check a tune or a rhythm in
+rehearsal. What they want in the chart itself is the small notes of an instrumental line (an intro, a
+turnaround). So a part of the chart can be shown as that line of music, in place of its chords: a fifth
+choice in the part's Show options (All, Lyrics, Chords, **Melody**, None), `HideMode` `'melody'`.
+
+- **Which parts have it.** `cueMeasures` (`src/js/score-section.ts`) finds the sheet's section for each
+  chart section with `matchChart` (an instrumental has no words, so it goes by name: Intro to INTRO) and keeps
+  it only if it has notes and none is sung (`sungNotes`: cue-size notes, and full-size ones with no lyric under
+  them). A section of the sheet that is played more than once gives its first go. A sung part that has a
+  harmony line over it has no Melody option: its words are what the part is for. Where nothing matches, there
+  is no option and no staff, never a wrong one.
+- **What it shows.** The measures of that section (`sliceMeasures`: no title, notice or section box), in the
+  key the song is shown in, by `<score-view>`, which takes the whole melody and the `measures` to show. The
+  notes are moved before they are cut, so a few measures are in the octave the whole sheet chose. The chords
+  are the sheet's own, written as `<harmony>` as ever. The notice is on the song's own sheet, not repeated.
+- **The default.** A part with no words and notes in the sheet shows them (`getRecommendedHideMode`), unless
+  the preference is words only (the part then collapses, as for chords only). A chart with no stored lead
+  sheet is as it was. The library's song page has the option but not the default: it keeps no defaults.
+- **Where it is wired.** `attachCues` (`score-shown.ts`) gives `<song-display>` its `cues` and so each
+  `<song-section>` its `melody` and `melodyMeasures`; it runs where the song's sheet is asked for (the
+  setlist's `applyMelodyMode`, the library's `#applyMelody`), and the setlist works the sections' states out again
+  once it has.
+- **The engraver is the heavy part**: it loads in a worker the first time a part is shown as music, as for the
+  song's sheet (the page's plan for pulling Verovio and pdf.js in after load applies to both).
+- Not done: a way to say which sheet section is which when the match fails; sung melody for any part (the
+  slice is general, the matching and the choice of parts are not); a harmony line shown over a sung part.
+
 ## Risks
 
 - **SongSelect changes its renderer.** The shapes are the renderer's. Tests keep the failures

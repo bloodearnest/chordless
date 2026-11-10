@@ -39,4 +39,13 @@ describe('what a part of a song shows by default', () => {
     expect(defaultHideMode('', 'chords', { all: 'lyrics' })).to.equal('chords')
     expect(defaultHideMode('', 'lyrics', { all: 'chords' })).to.equal('lyrics')
   })
+
+  it('shows the notes of a part with no words by default, unless chords or words only was chosen', () => {
+    expect(defaultHideMode('', 'melody', {})).to.equal('melody')
+    expect(defaultHideMode('', 'melody', { all: 'all' })).to.equal('melody')
+    // (the notes stand in for the chords: words only leaves a part with no words nothing to show)
+    expect(defaultHideMode('', 'melody', { all: 'lyrics' })).to.equal('collapse')
+    expect(defaultHideMode('', 'melody', { all: 'chords' })).to.equal('lyrics')
+    expect(defaultHideMode('intro', 'melody', { intro: 'hide' })).to.equal('hide')
+  })
 })
