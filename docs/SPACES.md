@@ -9,8 +9,8 @@ SYNC_ARCHITECTURE.md.
 > team space is built end to end for the owner's-token credential (the Worker's team service, roles,
 > invites, joining, the Account and Teams page) and tried with real accounts, before the move to the
 > `chordless-app` Google project (docs/CLOUD_MIGRATION.md; its settings were carried over by
-> Terraform, so it was not run again). Pads in team spaces are built (2026-11-10, on fakes). The
-> service account, copy/move UI and the rest are **designed, not built**. The order of work, a status list and where work
+> Terraform, so it was not run again). Pads in team spaces and team-managed storage (the service
+> account) are built (2026-11-10, on fakes). The copy/move UI and the rest are **designed, not built**. The order of work, a status list and where work
 > stopped are at the end. The code and docs
 > call it a space throughout (it was "organisation" until 2026-10-20: see "Naming").
 
@@ -333,6 +333,21 @@ identity of its own, not subject to app verification, seeing only what is shared
 someone's My Drive folder, but files it creates in a shared drive belong to the drive. That is also
 what makes ownership disappear as a problem.
 
+**Built 2026-11-10, tested on fakes** (the token request signed with a test key and checked at a
+stand-in for Google's endpoint, the folder check on FakeDrive, the routes end to end through the
+router): `worker/src/service-account.ts` makes the account's tokens (RS256, signed with `jose`, kept in
+the isolate's memory for their hour) from the Worker secret `TEAM_STORAGE_KEY`; the space's Durable
+Object records which credential it uses (`credential`: `owner` or `service-account`); the owner's
+page has "Team storage" beside the Team's people (`team-storage-panel.ts`). Routes:
+`GET /credential` (admin: which, and the address), `POST /credential/service-account` (owner: check,
+then switch), and the existing `PUT /credential` with a sign-in, which switches back. **Not yet:** a
+key made and put in the secret (by hand: `gcloud iam service-accounts keys create` for
+`team-storage@chordless-app.iam.gserviceaccount.com`, then `wrangler secret put TEAM_STORAGE_KEY`),
+and a real run on a Workspace shared drive. Without the key the panel shows nothing, and nothing
+changes. Step 1 below (moving the folder into a shared drive) is not built: the check says so when
+the folder is in a My Drive. Unchecked on a real drive: that Drive's feed of changes, asked by the
+service account, covers a shared drive's files (`includeItemsFromAllDrives` is sent).
+
 **Upgrade flow (team space settings → "Team-managed storage"):**
 1. Choose or create the shared drive and move the team folder there if it isn't (the copy/move tool).
 2. Show the service-account address and the exact role to grant: Content manager. Contributor can't
@@ -340,7 +355,9 @@ what makes ownership disappear as a problem.
    (only a Manager can; checked 2026-10-19 with a Content manager's token: `canTrash` true,
    `canDelete` false, and a permanent delete answers "File not found"), which is why the app only
    ever trashes.
-3. "Verify" makes the Worker test read/write/trash with the service account.
+3. "Check and switch" makes the Worker test, with the service account, that it sees the folder, that
+   the folder is in a shared drive (`driveId`) it can add to and trash in, and that it can make a
+   file there, read it back and put it in the bin. Each failure says what to do.
 4. The Worker switches that team space's transport to the service account and **deletes the owner's
    stored token blob** (which also removes the broad personal token from the Durable Object).
 5. Rollback by re-adding an owner token. Members' experience doesn't change.
@@ -914,8 +931,9 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
    the shared-drive choice and the service account; header switcher (Separate), then Merged
    and the preference. Needs the Picker (item 3) and setlist deletion (SYNC_ARCHITECTURE.md) first.
 9. [ ] Space-aware immediate sync for team spaces: it works for Drive; the Worker needs a feed of changes.
-10. [ ] Team-managed storage: service-account provider, upgrade flow, deletion of the owner's token on
-    switch, "Verify" and rollback. Spike item 7 passed.
+10. [x] Team-managed storage: service-account provider, upgrade flow, deletion of the owner's token on
+    switch, "Check and switch" and rollback (2026-11-10, on fakes). Left: the key in the Worker secret,
+    a real run, and moving a folder into a shared drive (step 1 of the upgrade flow).
 
 Items carried over from the TODO (space section): a media-team email config option; define
 users, leaders, permissions; join/invite/remove user; restrict editing others' setlists by `ownerId`
@@ -938,8 +956,9 @@ Object), and since tried with real accounts on the deployed Worker under the old
 
 1. ~~A real-account run first~~ (done, under the old Google project; not run again under
    `chordless-app`, whose settings Terraform carried over).
-2. Service-account credential (item 10), so a shared drive needs no owner token. The spike's account
-   was proven under the old project; the one in `chordless-app` has had no key made or used yet.
+2. ~~Service-account credential~~ (item 10, built 2026-11-10, on fakes). The spike's account was
+   proven under the old project; the one in `chordless-app` has had no key made or used yet: the
+   real run is with its key in `TEAM_STORAGE_KEY`.
 3. ~~Pads in team spaces~~ (item 6, built 2026-11-10, on fakes).
 4. ~~Share links from a team space~~ (built 2026-10-22, tested on fakes: the team service passes
    `publicLink` for shares and `unpublish` through to the owner's Drive; check on the real run).
