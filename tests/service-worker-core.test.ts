@@ -244,6 +244,11 @@ describe('the service worker', () => {
         expect(await kept()).to.deep.equal([])
       })
 
+      it('keeps a file the host gave no type for', async () => {
+        fetchImpl = async () => new Response(new Uint8Array([1, 2, 3]))
+        expect(await send({ type: 'PRECACHE_DEFERRED' })).to.include({ done: 2, total: 2 })
+      })
+
       it('keeps what it got when the network fails part way, and tries the rest next time', async () => {
         const good = fetchImpl
         fetchImpl = async request => {

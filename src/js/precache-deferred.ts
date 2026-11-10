@@ -25,7 +25,7 @@ const ANSWER_WITHIN_MS = 10 * 60 * 1000
 
 /** Ask the controlling worker now; null if there is none, or it does not answer */
 export function askForDeferredFiles(
-  container: Pick<WorkerContainer, 'controller'> | undefined = navigator.serviceWorker
+  container: Pick<WorkerContainer, 'controller'> | undefined
 ): Promise<DeferredProgress | null> {
   const controller = container?.controller
   if (!controller) return Promise.resolve(null)
@@ -51,7 +51,7 @@ export function askForDeferredFiles(
  * once: asking sooner would find no one to ask.)
  */
 export async function startDeferredPrecache(
-  container: WorkerContainer | undefined = navigator.serviceWorker,
+  container: WorkerContainer | undefined,
   settle: () => Promise<void> = settled
 ): Promise<DeferredProgress | null> {
   if (!container) return null
