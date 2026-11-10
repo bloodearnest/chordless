@@ -40,6 +40,9 @@ describe('score-view', () => {
     // (no room kept for the player, and the paper fades into the page above and below)
     expect(getComputedStyle(sheet).paddingBottom).to.equal(getComputedStyle(sheet).paddingTop)
     expect(getComputedStyle(sheet).maskImage).to.contain('linear-gradient')
+    // (and at its left and right, which a tablet shows)
+    expect(getComputedStyle(sheet).maskImage.match(/linear-gradient/g)).to.have.length(2)
+    expect(getComputedStyle(sheet).paddingLeft).to.equal(getComputedStyle(sheet).paddingRight)
   })
 
   it('writes a flat chord as the letter b, close to its root, or as the sign if that is the preference', async () => {
