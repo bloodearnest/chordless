@@ -125,7 +125,7 @@ JSON with the PDF in base64, like the ChordPro (the endpoint's answer was not se
 The import page (`song-import.ts`) reads the range, writes it into the chart as the directive
 (`src/js/chart-range.ts`), and drops the PDF: **a lead sheet is never kept** (Chordless stores no
 copyrighted content: CLAUDE.md, "Spaces and copyright"). The PDF reader is a 1.6 MB chunk the app
-already loads only when a PDF is shared to it, and is not precached. A lead sheet that cannot be
+already loads only when a PDF is shared to it, and is deferred rather than precached (docs/BUILD.md). A lead sheet that cannot be
 fetched or read never stops the song being imported: it comes with no range, which can be typed in.
 **Files chosen together.** The file picker (and files opened with or shared to Chordless) takes a
 ChordPro and its lead sheet PDF together, as the bookmarklet sends them. Each PDF goes with the

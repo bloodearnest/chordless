@@ -67,8 +67,6 @@ help
   places in the app only so far)
 - check the help at phone width on a real device: the pictures are shown at half their pixels
   and wrapped in a 90% wide modal
-- pictures are not precached (not core: see docs/BUILD.md), so Help opened offline for the first
-  time has no pictures. If that matters, a "Help downloaded" step after first load would do
 
 bugs
 - tests are checked with strict on except noImplicitAny (tsconfig.tests.json, tsconfig.node.json):

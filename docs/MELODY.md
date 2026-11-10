@@ -456,7 +456,7 @@ from each PDF, engrave it, read Verovio's SVG back with the SVG reader, and comp
   have it: a worker has the policy of its own response, so `public/_headers` gives the files named `verovio-*` (the worker
   and its modules) a policy of their own, `default-src 'none'; script-src 'self' 'wasm-unsafe-eval'` (with a `!` line to take
   off the page's policy first, as two policies on one file are both enforced). The 7 MB module is also compiled off the
-  thread the lyrics scroll on. The files are not precached (`NOT_PRECACHED`, like the PDF reader).
+  thread the lyrics scroll on. The files are not precached but deferred (`DEFERRED`, like the PDF reader): fetched shortly after the app loads, so the sheet works offline (docs/BUILD.md).
   Checked on a real build with a temporary import: the page's policy has no `wasm-unsafe-eval`, the three `verovio-*`
   files have only the tight one, a sheet is engraved with no violations, and without the `_headers` rule the worker fails
   with the policy's CompileError. A browser unit test runs `renderScore` through a real worker. When the view lands, add the

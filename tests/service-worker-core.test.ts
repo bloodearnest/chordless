@@ -73,6 +73,8 @@ describe('the service worker', () => {
   const config = (overrides: Partial<WorkerConfig> = {}): WorkerConfig => ({
     precache: [],
     cacheVersion: 'v1',
+    deferred: [],
+    deferredVersion: 'd1',
     releasedAt: '2026-10-01',
     ...overrides,
   })
@@ -173,7 +175,11 @@ describe('the service worker', () => {
         channel.port1.onmessage = event => resolve(event.data)
         setTimeout(() => resolve(null), 150)
       })
-      scope.listeners.message({ data: message, ports: withPort ? [channel.port2] : [] } as never)
+      scope.listeners.message({
+        data: message,
+        ports: withPort ? [channel.port2] : [],
+        waitUntil: () => {},
+      } as never)
       return reply
     }
 
@@ -191,6 +197,83 @@ describe('the service worker', () => {
     it('skips waiting when asked', async () => {
       await send({ type: 'SKIP_WAITING' })
       expect(scope.log).to.deep.equal(['skipWaiting'])
+    })
+
+    describe('fetching the deferred files', () => {
+      const files = ['/assets/verovio-a.js', '/help/one.png']
+      const deferredCache = () => caches.open('deferred-d1')
+      const kept = async () =>
+        (await (await deferredCache()).keys()).map(request => new URL(request.url).pathname)
+      beforeEach(() => {
+        scope = fakeScope()
+        start({ deferred: files })
+        fetchImpl = async request =>
+          new Response('file', {
+            headers: {
+              'Content-Type': String(typeof request === 'string' ? request : request).endsWith(
+                '.png'
+              )
+                ? 'image/png'
+                : 'text/javascript',
+            },
+          })
+      })
+
+      it('fetches and keeps them, and says how many it has', async () => {
+        expect(await send({ type: 'PRECACHE_DEFERRED', messageId: 'p' })).to.deep.equal({
+          messageId: 'p',
+          success: true,
+          done: 2,
+          total: 2,
+        })
+        expect(await kept()).to.deep.equal(files)
+      })
+
+      it('fetches only what it does not have', async () => {
+        await (await deferredCache()).put(files[0] as string, new Response('kept'))
+        await send({ type: 'PRECACHE_DEFERRED' })
+        expect(fetched).to.deep.equal(['/help/one.png'])
+      })
+
+      it('keeps nothing from an answer that is not the file, and says so', async () => {
+        // (the host answers a path it has no file for with the app shell)
+        fetchImpl = async () => new Response('<html>', { headers: { 'Content-Type': 'text/html' } })
+        expect(await send({ type: 'PRECACHE_DEFERRED' })).to.include({ done: 0, total: 2 })
+        fetchImpl = async () => new Response('gone', { status: 404 })
+        expect(await send({ type: 'PRECACHE_DEFERRED' })).to.include({ done: 0, total: 2 })
+        expect(await kept()).to.deep.equal([])
+      })
+
+      it('keeps what it got when the network fails part way, and tries the rest next time', async () => {
+        const good = fetchImpl
+        fetchImpl = async request => {
+          if (String(typeof request === 'string' ? request : request.url).endsWith('.png')) {
+            throw new TypeError('offline')
+          }
+          return good(request)
+        }
+        expect(await send({ type: 'PRECACHE_DEFERRED' })).to.include({ done: 1, total: 2 })
+        fetchImpl = good
+        expect(await send({ type: 'PRECACHE_DEFERRED' })).to.include({ done: 2, total: 2 })
+        expect(await kept()).to.deep.equal(files)
+      })
+
+      it('serves a kept file without the network, and fetches and keeps one that is not there yet', async () => {
+        await (await deferredCache()).put(files[0] as string, new Response('kept'))
+        expect(await textOf(await fetchEvent(files[0] as string))).to.equal('kept')
+        expect(fetched).to.deep.equal([])
+        expect(await textOf(await fetchEvent('/help/one.png?t=1'))).to.equal('file')
+        await until(async () => (await kept()).includes('/help/one.png'))
+      })
+
+      it('keeps the caches of its own version when it activates, and drops other versions', async () => {
+        await caches.open('deferred-d1')
+        await caches.open('deferred-old')
+        let waited: Promise<unknown> = Promise.resolve()
+        scope.listeners.activate({ waitUntil: (p: Promise<unknown>) => (waited = p) } as never)
+        await waited
+        expect(await caches.names()).to.deep.equal(['deferred-d1'])
+      })
     })
 
     it('keeps, gives back, exports, imports and deletes the blob', async () => {

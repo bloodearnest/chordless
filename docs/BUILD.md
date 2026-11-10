@@ -50,10 +50,20 @@ needs are unusual:
   the shell (`/`) too, at once, so a slow or hung network can't hold up an app that is already on
   the device. It is never replaced, so it always matches the cached files; a new version comes as a
   new worker. (Without a precache, in dev, the shell is fetched from the network first.)
-- **Not precached:** the worker, source maps, the PDF reader, Verovio (the lead sheet view's engraver, 7.2 MB) and the Help pictures (`public/help/`,
-  240 KB): the app is normally online, and what has to work offline is the core, setlist navigation.
-  Those are cached when first fetched, in `runtime-v1`. Pad audio, and
-  other things fetched while running, go in `runtime-v1` and `padsets-cache-v1`, which survive
+- **Deferred, not precached:** the PDF reader, Verovio (the lead sheet view's engraver, 7.2 MB) and
+  the Help pictures (`public/help/`) are left out of the install, which keeps the first visit
+  quick (`DEFERRED` in the plugin; the plugin injects them as `__DEFERRED__`). Once the page has loaded and is idle
+  (a few seconds), `src/js/precache-deferred.ts` sends the worker `PRECACHE_DEFERRED`, and the worker fetches
+  what its `deferred-<hash>` cache does not have yet, one file at a time at low priority, and keeps it.
+  So they work offline, and it is done on every load: with everything kept it costs a few cache lookups and
+  no network, and a failure (offline, no room) is silent and left for the next load. The cache's name is a
+  hash of the deferred files alone, so a release that does not change them (most) keeps what a device has
+  fetched, and the worker deletes the other `deferred-` caches when it activates. Kept files are served
+  from the cache first, without asking the network. A deferred file used before the page asked is fetched
+  and kept then. A response is kept only if it is the file: the host answers a path it has no file for
+  with the app shell (200, HTML), which is never kept as a script. Never cached ahead of use: the worker,
+  source maps, `_headers` and the iOS startup images.
+  Pad audio, and other things fetched while running, go in `runtime-v1` and `padsets-cache-v1`, which survive
   an update.
 
 In dev the precache is empty and the worker caches what it sees, as it always did, so the

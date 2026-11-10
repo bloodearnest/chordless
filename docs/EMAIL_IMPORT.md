@@ -68,4 +68,4 @@ service worker keeps it for `/import-song` (`shared-incoming.ts`), which reads i
 and `parseChartText`, and matches it as an emailed chart is (`matchLibrary`). A song found goes into
 the usual import choices (sing it, or add it to a setlist); one not found links to SongSelect, and
 close titles are offered. The PDF is never imported. The PDF reader (`assets/pdfjs-*.js`, 1.6 MB)
-is not precached: it is fetched the first time (so that needs the network), then cached.
+is not precached but deferred: it is fetched and kept shortly after the app loads (docs/BUILD.md), so it works offline; before that it is fetched the first time it is needed.
