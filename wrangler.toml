@@ -93,6 +93,9 @@ new_sqlite_classes = ["ShareRoom"]
 # - GOOGLE_API_KEY: Google API key restricted to the Drive API, for share link downloads
 # - PICKER_API_KEY: the Team Key (browser key restricted to the Picker API and our addresses), which the
 #   page fetches from /api/config for the team space folder picker
+# - TEAM_STORAGE_KEY: the key file (JSON) of team-storage@chordless-app.iam.gserviceaccount.com, for
+#   team-managed storage (worker/src/service-account.ts, docs/SPACES.md "Credentials"); optional:
+#   without it, team spaces use their owner's sign-in only. Made by hand, never in Terraform
 # - OTLP_HEADERS: `x-honeycomb-team=<ingest key>` (infra/honeycomb output prod_ingest_key), for the
 #   page's traces sent to Honeycomb (worker/src/telemetry.ts); optional: without it they are dropped
 

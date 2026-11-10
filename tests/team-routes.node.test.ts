@@ -11,6 +11,7 @@ import { encryptBlob } from '../worker/src/blob.ts'
 import type { Env } from '../worker/src/env.ts'
 import { googleProvider, type Identity } from '../worker/src/identity.ts'
 import { handleRequest } from '../worker/src/router.ts'
+import { forgetServiceAccountTokens } from '../worker/src/service-account.ts'
 import type { ShareCache } from '../worker/src/share.ts'
 import { handleCreateSpace } from '../worker/src/team-admin.ts'
 import { createAdminContext, createTeamContext, type TeamDeps } from '../worker/src/team-context.ts'
@@ -344,6 +345,101 @@ describe('a team space’s pads, over the owner’s Drive', () => {
     const read = await call(`${SPACE}/pads/files/${files[0]?.ref}`, bob)
     assert.equal(read.status, 200)
     assert.deepEqual([...new Uint8Array(await read.arrayBuffer())], [...audio])
+  })
+})
+
+describe('team-managed storage (the service account)', () => {
+  const ADDRESS = 'team-storage@chordless-app.iam.gserviceaccount.com'
+  const key = async () => {
+    const { privateKey: signing } = await jose.generateKeyPair('RS256', { extractable: true })
+    return JSON.stringify({ client_email: ADDRESS, private_key: await jose.exportPKCS8(signing) })
+  }
+
+  /** The world, with the service account's key, Google's token endpoint, and the owner's refreshes counted */
+  async function managed({ withKey = true } = {}) {
+    forgetServiceAccountTokens()
+    const w = await world()
+    const counts = { grants: 0, refreshes: 0 }
+    const env = { ...w.env, ...(withKey ? { TEAM_STORAGE_KEY: await key() } : {}) }
+    const deps: TeamDeps = {
+      ...w.deps,
+      google: {
+        refreshAccessToken: (async () => {
+          counts.refreshes++
+          return { access_token: TOKEN, expires_in: 3600 }
+        }) as never,
+      },
+      tokenFetch: (async () => {
+        counts.grants++
+        return Response.json({ access_token: TOKEN, expires_in: 3600 })
+      }) as typeof fetch,
+    }
+    // (the team's folder is in a shared drive)
+    must(w.drive.files.get(w.root)).driveId = 'shared-drive-1'
+    const call = (path: string, who: Identity, init: RequestInit = {}) =>
+      w.call(path, who, init, env, deps)
+    return { ...w, env, deps, counts, call, raw: w.call }
+  }
+
+  test('is shown to an admin, with the address to add, and the space starts on the owner’s sign-in', async () => {
+    const { call } = await managed()
+    const shown = await json(await call(`${SPACE}/credential`, dan))
+    assert.deepEqual(shown, { kind: 'owner', serviceAccount: ADDRESS })
+    assert.equal((await call(`${SPACE}/credential`, bob)).status, 403)
+  })
+
+  test('is switched to by the owner only, once the folder passes the check: then their sign-in is gone', async () => {
+    const { call, room, counts } = await managed()
+    assert.equal((await call(`${SPACE}/credential/service-account`, dan, post({}))).status, 403)
+
+    const switched = await call(`${SPACE}/credential/service-account`, ann, post({}))
+    assert.equal(switched.status, 200)
+    assert.deepEqual(await json(switched), { kind: 'service-account', serviceAccount: ADDRESS })
+    assert.equal(await room.credential(), 'service-account')
+    assert.equal(await room.ownerBlob(), null)
+
+    // A member's call now goes with the service account's token, not the owner's
+    const before = { ...counts }
+    assert.equal((await call(`${SPACE}/files?collection=songs`, bob)).status, 200)
+    assert.equal(counts.refreshes, before.refreshes)
+    assert.ok(counts.grants > 0)
+  })
+
+  test('is not switched to when the folder fails the check, and the owner’s sign-in stays', async () => {
+    const { call, room, drive, root } = await managed()
+    delete must(drive.files.get(root)).driveId
+    const refused = await call(`${SPACE}/credential/service-account`, ann, post({}))
+    assert.equal(refused.status, 409)
+    assert.match(String((await json(refused)).error), /shared drive/)
+    assert.equal(await room.credential(), 'owner')
+    assert.notEqual(await room.ownerBlob(), null)
+  })
+
+  test('is not offered where the server has no key', async () => {
+    const { call } = await managed({ withKey: false })
+    assert.deepEqual(await json(await call(`${SPACE}/credential`, ann)), {
+      kind: 'owner',
+      serviceAccount: null,
+    })
+    assert.equal((await call(`${SPACE}/credential/service-account`, ann, post({}))).status, 503)
+  })
+
+  test('is left by the owner giving their sign-in again', async () => {
+    const { call, room } = await managed()
+    await call(`${SPACE}/credential/service-account`, ann, post({}))
+    const back = await call(`${SPACE}/credential`, ann, send('PUT', { blob: await blobFor(ann) }))
+    assert.equal(back.status, 204)
+    assert.equal(await room.credential(), 'owner')
+    assert.notEqual(await room.ownerBlob(), null)
+  })
+
+  test('says so to a member when the server has lost its key', async () => {
+    const w = await managed()
+    await w.call(`${SPACE}/credential/service-account`, ann, post({}))
+    const { TEAM_STORAGE_KEY: _, ...without } = w.env
+    const answer = await w.raw(`${SPACE}/files?collection=songs`, bob, {}, without, w.deps)
+    assert.equal(answer.status, 409)
+    assert.match(String((await json(answer)).error), /not set up/)
   })
 })
 

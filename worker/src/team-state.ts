@@ -1,7 +1,7 @@
 /**
  * What a team space's Durable Object knows (docs/SPACES.md, "Setting up and joining a team space"):
  * who owns the space, who its members are and their roles, which Drive files are in its tree, and
- * the owner's encrypted token blob. It holds **no song, setlist or pad content**: only these
+ * the owner's encrypted token blob, or that the space uses Chordless's service account instead. It holds **no song, setlist or pad content**: only these
  * records (CLAUDE.md, "Spaces and copyright"). Every method takes and returns plain data, so the
  * Durable Object (`team-space.ts`) is a thin wrapper and the rules are tested in Node.
  *
@@ -31,6 +31,12 @@ export interface SpaceInfo {
   owner: Identity
   createdAt: string
 }
+
+/**
+ * How the Worker reaches the space's Drive (docs/SPACES.md, "Credentials"): with the owner's own
+ * sign-in (the blob), or with Chordless's service account, a member of the team's shared drive
+ */
+export type SpaceCredential = 'owner' | 'service-account'
 
 interface InviteRecord {
   email: string
@@ -100,8 +106,16 @@ export interface TeamSpaceApi {
   ownedAmong(refs: string[]): Promise<string[]>
   /** The owner's token blob, as encrypted by the Worker's key; null if there is none */
   ownerBlob(): Promise<string | null>
+  /** Keep the owner's sign-in, and use it: the space is the owner's to reach again */
   setOwnerBlob(blob: string): Promise<void>
   clearOwnerBlob(): Promise<void>
+  /** Which credential the space uses ('owner' until it is switched) */
+  credential(): Promise<SpaceCredential>
+  /**
+   * Use the service account, and forget the owner's sign-in: the switch first, so a failure between
+   * the two leaves the old sign-in kept but no longer used, never the space with neither
+   */
+  useServiceAccount(): Promise<void>
   /**
    * A device going live (a WebSocket upgrade, which the Worker has authorised; live-relay.ts). Only
    * the Durable Object has it: the state in tests has none
@@ -111,6 +125,7 @@ export interface TeamSpaceApi {
 
 const SPACE = 'space'
 const BLOB = 'ownerBlob'
+const CREDENTIAL = 'credential'
 const MEMBER = 'member:'
 const REF = 'ref:'
 const INVITE = 'invite:'
@@ -268,7 +283,16 @@ export class TeamSpaceState implements TeamSpaceApi {
   }
 
   async setOwnerBlob(blob: string): Promise<void> {
-    await this.#store.put({ [BLOB]: blob })
+    await this.#store.put({ [BLOB]: blob, [CREDENTIAL]: 'owner' })
+  }
+
+  async credential(): Promise<SpaceCredential> {
+    return (await this.#store.get<SpaceCredential>(CREDENTIAL)) ?? 'owner'
+  }
+
+  async useServiceAccount(): Promise<void> {
+    await this.#store.put({ [CREDENTIAL]: 'service-account' })
+    await this.#store.delete(BLOB)
   }
 
   async clearOwnerBlob(): Promise<void> {

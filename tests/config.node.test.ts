@@ -28,6 +28,26 @@ test('the telemetry headers may be left out, and are name=value pairs when set',
   assert.doesNotMatch(problems[0], /hcaik/)
 })
 
+test('the team storage key may be left out, and one that is not a key file is said without repeating it', () => {
+  const key = JSON.stringify({
+    client_email: 'team-storage@chordless-app.iam.gserviceaccount.com',
+    private_key: '-----BEGIN PRIVATE KEY-----\nsecret-part\n-----END PRIVATE KEY-----\n',
+  })
+  assert.deepEqual(configProblems({ ...good, TEAM_STORAGE_KEY: key }), [])
+  assert.deepEqual(configProblems({ ...good, TEAM_STORAGE_KEY: '' }), [])
+  const notJson = configProblems({ ...good, TEAM_STORAGE_KEY: 'secret-part' })
+  assert.deepEqual(notJson, ['TEAM_STORAGE_KEY is not JSON (the key file, on one line)'])
+  for (const value of [
+    '{"private_key": "secret-part"}',
+    'null',
+    '{"client_email": "a", "private_key": "secret-part"}',
+  ]) {
+    const [problem] = configProblems({ ...good, TEAM_STORAGE_KEY: value })
+    assert.match(problem ?? '', /is not a service account key file/)
+    assert.doesNotMatch(problem ?? '', /secret-part/)
+  }
+})
+
 test('a missing required secret is named, with what it is for', () => {
   const problems = configProblems({ ...good, GOOGLE_CLIENT_SECRET: undefined, GOOGLE_API_KEY: '' })
   assert.equal(problems.length, 2)

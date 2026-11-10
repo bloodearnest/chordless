@@ -492,8 +492,10 @@ export interface DriveFile {
   parents?: string[]
   trashed?: boolean
   appProperties?: Record<string, string>
+  /** The shared drive it is in, if it is in one (a request for `driveId`) */
+  driveId?: string
   /** What the user may do with it (a request for `capabilities`) */
-  capabilities?: { canEdit?: boolean; canAddChildren?: boolean }
+  capabilities?: { canEdit?: boolean; canAddChildren?: boolean; canTrash?: boolean }
 }
 
 /** One entry of Drive's feed of changes: a file that changed, or one that is gone for good */

@@ -62,6 +62,24 @@ export const SECRETS: SecretSpec[] = [
     problem: value => (/^AIza[\w-]{30,}$/.test(value) ? null : 'is not a Google API key'),
   },
   {
+    name: 'TEAM_STORAGE_KEY',
+    required: false,
+    about:
+      'The team storage service account\'s key file, as JSON (docs/SPACES.md, "Credentials"); without it, team spaces use their owner\'s sign-in only',
+    problem: value => {
+      try {
+        const key = JSON.parse(value) as { client_email?: unknown; private_key?: unknown }
+        return typeof key?.client_email === 'string' &&
+          typeof key.private_key === 'string' &&
+          key.private_key.includes('PRIVATE KEY')
+          ? null
+          : 'is not a service account key file (no client_email or private_key)'
+      } catch {
+        return 'is not JSON (the key file, on one line)'
+      }
+    },
+  },
+  {
     name: 'OTLP_HEADERS',
     required: false,
     about:
