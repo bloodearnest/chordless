@@ -58,6 +58,14 @@ describe('the notes of a chart section', () => {
     assert.deepEqual(found[2], [2])
   })
 
+  it('gives nothing for a sheet section whose name the chart has used up', () => {
+    const twice = melodyOf('Song', [
+      bar([note('E', 5, { cue: true, duration: 4 })], { section: 'INSTRUMENTAL' }),
+      bar([note('G', 5, { cue: true, duration: 4 })], { section: 'INSTRUMENTAL' }),
+    ])
+    assert.deepEqual(cueMeasures(twice, [{ label: 'Instrumental', text: '' }]), [[0]])
+  })
+
   it('cuts the measures out with no title, notice or section box', () => {
     const cut = sliceMeasures({ ...sheet, notice: ['CCLI 1'] }, [0, 1])
     assert.equal(cut.title, null)

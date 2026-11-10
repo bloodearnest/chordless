@@ -32,8 +32,11 @@ import { type SongInfoDialog, SongRangeChangedEvent } from '../src/components/so
 import { SongChangeEvent } from '../src/js/app-events.ts'
 import type { Person, Setlist } from '../src/js/data-types.ts'
 import { setCapoPreference } from '../src/js/preferences.ts'
+import { writeMusicXml } from '../src/js/score-musicxml.ts'
+import { scoreRecord } from '../src/js/score-record.ts'
 import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
+import { measure, melodyOf } from './score-build.ts'
 import { sampleRecord } from './score-sample.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
 import { nextTimestamp, nothingFor, shownToast } from './test-helpers.ts'
@@ -795,6 +798,28 @@ describe('the setlist page: header, menu and keys', () => {
           watching = false
           expect(sheetOf(0) === before, 'the same sheet').to.equal(true)
           expect(lyricsSeen, 'the lyrics were shown').to.equal(false)
+        } finally {
+          await rig.db.deleteScore(rig.songs[0].uuid, { remember: false })
+        }
+      })
+
+      it('gives a part of the chart the notes of the sheet that are its own', async () => {
+        // (a bar of cue-size notes in the sheet's VERSE 1, which the chart's Verse 1 is by name)
+        const cue = melodyOf('Alpha', [measure(1, ['C4:4:'], { section: 'VERSE 1' })])
+        for (const e of cue.measures[0].voices[0]) e.cue = true
+        await rig.db.saveScore(scoreRecord(rig.songs[0].uuid, writeMusicXml(cue), 'G'))
+        try {
+          await rig.open()
+          rig.page.showSong(0, true)
+          const sections = () =>
+            Array.from(
+              rig.root
+                .querySelectorAll('#song-0 song-display')[0]
+                ?.shadowRoot?.querySelectorAll('song-section') ?? []
+            ) as unknown as { label: string; melodyMeasures: number[] | null }[]
+          await until(() => sections().find(s => s.label === 'Verse 1')?.melodyMeasures)
+          expect(sections().find(s => s.label === 'Verse 1')?.melodyMeasures).to.deep.equal([0])
+          expect(sections().find(s => s.label === 'Chorus')?.melodyMeasures).to.equal(null)
         } finally {
           await rig.db.deleteScore(rig.songs[0].uuid, { remember: false })
         }
