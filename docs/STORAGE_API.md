@@ -36,13 +36,20 @@ people who lead setlists, one JSON file each: `docs/IDENTITIES.md`), and the `sh
 
 ## Pad sets
 
-`backend.pads` (a `PadStorage`) lists the sets, makes or finds one by name, lists its files, adds
-a file for a key, puts a set's files in the bin and reads one file's audio. The pad sets are still
-the account's, not a space's, so they hang off the backend, not a `SpaceStorage`; when they move
-into the space (docs/SPACES.md, "Pads in team spaces") `pads` moves to `SpaceStorage` and the
-Worker serves it to members, streaming the audio. `pad-set-service.ts` takes its storage from
-`setPadStorage` (Drive's by default), as the engine takes `storage`. Its device-side cache (the
-service worker cache, and `padset-cache-state` in localStorage) is the app's own and unchanged.
+A `PadStorage` lists the sets, makes or finds one by name, lists its files, adds a file for a key,
+puts a set's files in the bin and reads one file's audio, whole (`read`) or as it arrives
+(`readStream`, for the Worker to pass on). There are two kinds, both on the backend:
+`backend.pads` is the account's (a personal space's: `Chordless/pads/` in Drive), and
+`backend.padsIn(rootRef)` is a team space's, in its own folder (`<team folder>/pads/`; docs/SPACES.md,
+"Pads in team spaces"). A personal space has no pads of its own, so its pads stay the account's,
+shared by every personal space, and nothing moved. For a team member `TeamStorage.padsIn(spaceId)`
+calls the Worker (`worker/src/team-pads.ts`), and `TeamStorage.pads` throws: a team backend has no
+account. `pad-set-service.ts` lists from every place at once (the account's, and each team space
+on the device: the owner straight in Drive, a member through the Worker), and a test gives it its
+own with `setPadStorage(storage, teamSources)`. Its device-side cache (the service worker cache,
+and `padset-cache-state` in localStorage) is the app's own, kept by Drive file id, which is unique
+across spaces. The conformance suite for pads (`describePadStorage`) runs on the account's and a
+space's pads of each backend, and on a team's over the Worker.
 
 ## Why refs and props, not paths
 
@@ -102,7 +109,7 @@ the request, the asker's role (settled first, in `team-routes.ts`) and a `TeamCo
 give it the in-memory storage; the real context is the Durable Object and the owner's token or
 service account, and the route is not in `router.ts` yet. Roles are enforced in the handler
 (reader reads, writer writes and bins, `canWrite` in the root), a file outside the space is
-404 (null in a batch), bodies are text only, and pads answer "not yet". Share links work (2026-10-22): `publicLink` is
+404 (null in a batch), bodies are text only but for pad audio (below). Share links work (2026-10-22): `publicLink` is
 accepted for the `shares` collection only and `unpublish` is passed through, and because a team
 space's refs are Drive file ids, the Worker's `/api/share/<id>` serves a share from a team space
 unchanged (ciphertext only, as ever). The space-level conformance suite (`describeSpaceStorage`, split from the
@@ -148,8 +155,10 @@ How each call maps:
 - `findRootByName`, `ensureRoot`, `renameRoot`: first-sync-on-a-device calls that do not apply to
   a member, whose space is issued an id and `rootRef`. Open question: a small "join an issued
   space" call in the interface, so a team backend is not left with stubs. Rename is admin-only.
-- Pads: `PadStorage` must first move from the backend to `SpaceStorage` ("Pad sets"), then the
-  Worker streams audio: any member uploads, admin and up deletes.
+- Pads (built 2026-11-10): `/api/space/<id>/pads…` (`team-pads.ts`) streams a file's audio out as
+  Drive sends it; an upload (MP3, up to 20 MB a file) is held in the Worker's memory while it is
+  sent on, never stored. Any member uploads, but below an admin an upload only adds (a set or a
+  key that is there is refused with 409); admin and up bins a set's files to replace them.
 - Share links: `/api/share/<id>` is Drive-specific. Team spaces work today because their refs are
   Drive file ids; a backend with other refs (a service account on another store) would need it
   generalised.
@@ -178,7 +187,6 @@ primitives are not enough.
 - **Share links** are Drive-specific on the Worker's side: `/api/share/<id>` reads a Drive file id
   with the sharing key, so a share link works only for Drive-backed spaces (team spaces included,
   as their refs are Drive ids) until that is generalised.
-- **Pad sets** are the account's, not a space's: they move into `SpaceStorage` with the team spaces.
 - **Names**: `sync-manager.ts`, `SyncManager`, `driveStorage` and some messages still say Drive.
   They are accurate while Drive is the only backend.
 - **`driveClientId`** on the space record is still Drive's (which Google client linked the folder).

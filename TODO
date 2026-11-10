@@ -41,6 +41,11 @@ song data
 
 
 spaces (personal and team): the plan, the order of work and the status list are in docs/SPACES.md
+- a team space's default pad set, chosen by a worship leader and synced with the space, which a
+  device can still change for itself (today the choice is each device's: docs/SPACES.md, "Pads in
+  team spaces")
+- a team member's half-uploaded pad set (the upload stopped part way) can be finished but not
+  started again under the same name: fine while it is rare; say so in the upload form if it is not
 
 preferences
 - Date format: the copied song list ("Songs for Sunday 18th October") is UK style for now; let the

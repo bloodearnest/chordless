@@ -7,8 +7,10 @@ SYNC_ARCHITECTURE.md.
 
 > **Status:** the personal space and the single-user sync described under "Today" are built. The
 > team space is built end to end for the owner's-token credential (the Worker's team service, roles,
-> invites, joining, the Account and Teams page), tested against fakes only; the service account, pads, copy/move
-> UI and the rest are **designed, not built**. The order of work, a status list and where work
+> invites, joining, the Account and Teams page) and tried with real accounts, before the move to the
+> `chordless-app` Google project (docs/CLOUD_MIGRATION.md; its settings were carried over by
+> Terraform, so it was not run again). Pads in team spaces are built (2026-11-10, on fakes). The
+> service account, copy/move UI and the rest are **designed, not built**. The order of work, a status list and where work
 > stopped are at the end. The code and docs
 > call it a space throughout (it was "organisation" until 2026-10-20: see "Naming").
 
@@ -296,8 +298,8 @@ Steps, each on the one page:
      them (as "Copy and move" says), so this is that code and not the export file's import.
    - The space is made first. If bringing things across then fails, the result page says why and
      offers "Try again" (it is re-runnable: what is there is skipped).
-   - **Pads are not in this step yet.** They are the account's, not a space's (item 6), and need
-     Drive calls. When they are, the checkbox is hidden if there are none.
+   - **Pads are not in this step yet.** A team space has pads of its own now (item 6), but bringing
+     the account's across needs Drive calls. When it does, the checkbox is hidden if there are none.
 4. **Invite people** (built 2026-10-22; `team-invite-step.ts`, on the result page once the space
    exists, since an invite needs its id). The setlists brought across have leaders (people,
    with emails). Leaders with an email are listed once each (`leadersOf`), ticked, with a
@@ -382,8 +384,8 @@ Agreed with the owner of the project:
   and the page then sends Google's ID token to the team service, renewed in `/session/refresh`. A member needs only
   `openid email profile`: all their Drive traffic for the team space goes through the Worker, so
   an unticked Drive box affects only their personal space.
-- **Pad sets** are not in the team service's first cut: they are the account's today
-  (docs/STORAGE_API.md); they move into the space, then the Worker streams them.
+- **Pad sets** of a team space are in its folder, and the Worker streams them to members ("Pads in
+  team spaces", below).
 
 Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
 - **Making a space:** `POST /api/spaces` with the page's blob, the folder and a name. The Worker
@@ -450,14 +452,38 @@ SYNC_ARCHITECTURE.md), and an admin's finer powers.
 
 ## Pads in team spaces
 
-Pads move from account-global to per-space (`pad-set-service.ts`, `pad-keys.ts`, `drive-api.ts`, the
-service-worker cache `padsets-cache-v1`; the cache key gains the space id). The upload dialog gets a
-"Save to" choice (your personal space, or any team space you're a member of). The pad picker lists
-pads from all your spaces tagged by source, like songs. Audio is large: the Worker **streams** it
-through (no buffering, no cache). Check Worker body-size limits in the spike. A signed, short-lived
-direct download is *not* possible under `drive.file`, so if pad audio can't go through reasonably
-the fallback is "pads for team spaces only via the owner's direct path" (members upload through the
-Worker in chunks, or the size cap is lowered).
+Built 2026-11-10, tested on fakes (the memory storage, FakeDrive, the Worker's router end to end in
+`team-contract.test.ts`); not yet on a deployed Worker.
+
+- **Where they are.** A team space's pads are in its own folder, `<team folder>/pads/<set>/`. A
+  personal space's stay the account's, `Chordless/pads/`, shared by every personal space, so nobody's
+  pads moved and nothing was migrated (`backend.pads` and `backend.padsIn(rootRef)`: STORAGE_API.md,
+  "Pad sets").
+- **Reaching them.** The owner straight in Drive; a member through the Worker
+  (`/api/space/<id>/pads…`, `worker/src/team-pads.ts`), which streams a file's audio out as Drive
+  sends it, with `Cache-Control: no-store`, and keeps nothing. An upload is one MP3 per key, up to
+  20 MB, held in the Worker's memory while it is sent on to Drive (never stored). A set or file is
+  reached only once the space's tree holds it (a listing notes it, as for charts), so a ref from
+  another space or the owner's own `Chordless/pads/` is a 404. Body-size limits on a deployed
+  Worker are still unchecked (a pad is a few MB, well under them).
+- **Roles.** Any member reads and uploads, readers too. Below an admin an upload only **adds**: a set
+  of a name that is there, or a key the set already has, is refused (409, "give yours another
+  name"), so a team member cannot wipe the team's pads by mistake (decided 2026-11-10). An admin (or
+  the owner) replaces a set as before: its files go to the bin, and it is filled again. A key the set
+  lacks can be added by anyone, so an upload that stopped half way can be finished.
+- **The picker** lists the sets of every place at once: the account's, and each team space on the
+  device. With a team's sets among them they are grouped, "Personal" first, then each team under its
+  name; with none, there are no headings. **The choice is per device**, as before: each musician
+  picks their own sound (decided 2026-11-10; a team default a leader sets is in the TODO). The
+  choice keeps its space (`spaceId` on the stored set), and the audio kept offline is by Drive file
+  id, unique across spaces, so what devices had kept still serves.
+- **The upload form** has "Save to" (Personal, or each team space on the device), starting at the
+  space the app is in; it is not shown with no team spaces.
+- **Export and import** take the space's own pads: a team space's for a team space, the account's
+  for a personal one.
+- Not built: bringing pads across in the wizard, and copying or moving them between spaces
+  (copy/move, above). A signed, short-lived direct download is *not* possible under `drive.file`,
+  which is why the audio goes through the Worker.
 
 ## Presenting spaces: user preference
 
@@ -877,7 +903,8 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
    Not done: the UI, and pads (Drive calls).
 5. [x] Read-only rework: gates removed, `syncsBack`, pull skips records with local changes, "differs
    from official" button with revert (setlists). Left: what-differs list, charts' marker, role from the Worker.
-6. [ ] Per-space pads and the "Save to" upload choice.
+6. [x] Per-space pads and the "Save to" upload choice (2026-11-10: "Pads in team spaces"). Left:
+   bringing pads across in the wizard, and copy/move (item 4).
 7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below), and so is the Durable Object's state (`team-state.ts`, `team-space.ts`, 2026-10-21: owner, members and roles, the refs in the tree, the owner's blob) the owner-token source for Drive (`team-drive.ts`), the route (`router.ts`, `team-routes.ts`, `team-context.ts`), making a space, invites, joining and looking after the people (`team-admin.ts`); the join page (`/join#<space id>.<code>`, `team-join.ts`) is built, including for a link opened in the installed app (`launch.ts` hands the page the fragment of any link it is launched with, tagged with the path it came for: `incoming-link.ts`), and the Account and Teams page works for a member and has a Team Space panel (`team-share-panel.ts`): share the current space, invite by email (the link is shown once, to send), change roles, remove people, withdraw invites, stop sharing, or leave; the space list (`select-space.ts`, on the Account and Teams page) says which spaces are a team's and the role in each, and how one is joined; not yet the service account, the pads, or a switcher in the header): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
    pad rules, no song or pad content persisted (a test asserts no storage writes of bodies; the live channel holds only the hash of a share's sender secret, LIVE_SYNC.md).
 8. [ ] UI: the team space wizard ("Creating a team space": name, where the files live, what to
@@ -894,10 +921,10 @@ Items carried over from the TODO (space section): a media-team email config opti
 users, leaders, permissions; join/invite/remove user; restrict editing others' setlists by `ownerId`
 (see SYNC_ARCHITECTURE.md).
 
-## Where work stopped (2026-10-21)
+## Where work stopped (2026-10-21; updated 2026-11-10)
 
-Built and committed, all verified against fakes (fake Drive, in-memory storage, workerd for the
-Durable Object) and never against a real deployed Worker, a real Google sign-in or an installed app:
+Built and committed, verified against fakes (fake Drive, in-memory storage, workerd for the Durable
+Object), and since tried with real accounts on the deployed Worker under the old Google project:
 
 - Identity: the Google ID token as the per-request proof, behind `IdentityProvider`; members are keyed
   by `provider:sub`. Sign-in without Drive; `connectDrive()` adds `drive.file` later.
@@ -909,11 +936,11 @@ Durable Object) and never against a real deployed Worker, a real Google sign-in 
 
 **Not built**, in the order I would take them:
 
-1. **A real-account run first.** Expect surprises in Google's consent screen, the Durable Object
-   migration `v1` on the first deploy, and Drive permissions on the owner's folder. Two accounts, one
-   installed app.
-2. Service-account credential (item 10), so a shared drive needs no owner token.
-3. Pads in team spaces (item 6).
+1. ~~A real-account run first~~ (done, under the old Google project; not run again under
+   `chordless-app`, whose settings Terraform carried over).
+2. Service-account credential (item 10), so a shared drive needs no owner token. The spike's account
+   was proven under the old project; the one in `chordless-app` has had no key made or used yet.
+3. ~~Pads in team spaces~~ (item 6, built 2026-11-10, on fakes).
 4. ~~Share links from a team space~~ (built 2026-10-22, tested on fakes: the team service passes
    `publicLink` for shares and `unpublish` through to the owner's Drive; check on the real run).
 5. A switcher in the header, then Merged and Separate (item 8).
