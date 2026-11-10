@@ -161,13 +161,29 @@ describe('the owner blob', () => {
   })
 })
 
-test('stores nothing but the space, its members, its refs and the blob', async () => {
+test('stores nothing but the space, its members, its refs, the blob and which credential it uses', async () => {
   const { store, state } = await made()
   await state.setMember(bob, 'writer')
   await state.addRefs(['file-1'])
   await state.setOwnerBlob('blob')
   const kinds = new Set([...store.entries.keys()].map(key => key.split(':')[0]))
-  assert.deepEqual([...kinds].sort(), ['member', 'ownerBlob', 'ref', 'space'])
+  assert.deepEqual([...kinds].sort(), ['credential', 'member', 'ownerBlob', 'ref', 'space'])
+  // (the credential is one word: which sign-in the Worker uses, never a key or a token)
+  assert.equal(store.entries.get('credential'), 'owner')
+})
+
+describe('the credential', () => {
+  test('is the owner’s until switched; the switch forgets their sign-in, and a new one switches back', async () => {
+    const { state } = await made()
+    assert.equal(await state.credential(), 'owner')
+    await state.setOwnerBlob('blob')
+    await state.useServiceAccount()
+    assert.equal(await state.credential(), 'service-account')
+    assert.equal(await state.ownerBlob(), null)
+    await state.setOwnerBlob('new blob')
+    assert.equal(await state.credential(), 'owner')
+    assert.equal(await state.ownerBlob(), 'new blob')
+  })
 })
 
 describe('members, by email', () => {

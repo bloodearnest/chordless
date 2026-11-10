@@ -11,7 +11,12 @@ import type { InviteInfo, MemberRole, TeamMember, TeamRole } from '../../src/js/
 import type { Env } from './env.ts'
 import type { Identity } from './identity.ts'
 import { judge, type LiveAttachment } from './live-relay.ts'
-import { type SpaceInfo, type TeamSpaceApi, TeamSpaceState } from './team-state.ts'
+import {
+  type SpaceCredential,
+  type SpaceInfo,
+  type TeamSpaceApi,
+  TeamSpaceState,
+} from './team-state.ts'
 
 export class TeamSpace extends DurableObject<Env> implements TeamSpaceApi {
   #state = new TeamSpaceState(this.ctx.storage)
@@ -137,6 +142,12 @@ export class TeamSpace extends DurableObject<Env> implements TeamSpaceApi {
   }
   clearOwnerBlob(): Promise<void> {
     return this.#state.clearOwnerBlob()
+  }
+  credential(): Promise<SpaceCredential> {
+    return this.#state.credential()
+  }
+  useServiceAccount(): Promise<void> {
+    return this.#state.useServiceAccount()
   }
 }
 /* v8 ignore stop */

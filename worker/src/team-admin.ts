@@ -10,7 +10,10 @@
  *   PUT    /api/space/<id>/members/<email> {role}               admin: change a role
  *   DELETE /api/space/<id>/members/<email>                      admin: remove
  *   POST   /api/space/<id>/leave                                a member: leave
- *   PUT    /api/space/<id>/credential   {blob}                  owner: a new sign-in for Drive
+ *   GET    /api/space/<id>/credential                           admin: how the Worker reaches the folder
+ *   PUT    /api/space/<id>/credential   {blob}                  owner: a new sign-in for Drive (and
+ *                                                               back to it from team storage)
+ *   POST   /api/space/<id>/credential/service-account           owner: check team storage, and use it
  *   DELETE /api/space/<id>                                      owner: end sharing
  *
  * A role may only act on those below it: an admin looks after writers and readers, the owner after
@@ -28,7 +31,7 @@ import type { BlobData } from './blob.ts'
 import { answering, jsonResponse, Refusal, readJson } from './http.ts'
 import type { Identity } from './identity.ts'
 import { refusal } from './team-api.ts'
-import type { TeamSpaceApi } from './team-state.ts'
+import type { SpaceInfo, TeamSpaceApi } from './team-state.ts'
 
 /** What these routes need from the Worker */
 export interface AdminContext {
@@ -43,6 +46,10 @@ export interface AdminContext {
   ): Promise<{ trashed: boolean; canWrite: boolean | null } | null>
   /** The blob's contents; throws if it is not one of ours */
   openBlob(blob: string): Promise<BlobData>
+  /** The service account's address (team-managed storage), or null where it is not set up */
+  serviceAccount(): string | null
+  /** Why the service account cannot keep the folder's files, or null if it can (service-account.ts) */
+  checkServiceAccount(rootRef: string, address: string): Promise<string | null>
   /** A new id for a space */
   newSpaceId(): string
 }
@@ -199,6 +206,29 @@ const ADMIN_ROUTES: AdminRoute[] = [
       if (role === 'owner') throw new Refusal(400, 'The owner cannot leave: end sharing instead')
       await room.removeMember(identity)
       return done()
+    },
+  },
+  {
+    methods: ['GET'],
+    path: /^\/credential$/,
+    needs: 'admin',
+    run: async ({ ctx, room }) =>
+      jsonResponse({ kind: await room.credential(), serviceAccount: ctx.serviceAccount() }),
+  },
+  {
+    methods: ['POST'],
+    path: /^\/credential\/service-account$/,
+    needs: 'owner',
+    async run({ ctx, room }) {
+      const serviceAccount = ctx.serviceAccount()
+      if (!serviceAccount)
+        throw new Refusal(503, 'Team-managed storage is not set up on this server')
+      // (the space is there: the asker's role in it was found)
+      const { rootRef } = (await room.info()) as SpaceInfo
+      const problem = await ctx.checkServiceAccount(rootRef, serviceAccount)
+      if (problem) throw new Refusal(409, problem)
+      await room.useServiceAccount()
+      return jsonResponse({ kind: 'service-account', serviceAccount })
     },
   },
   {

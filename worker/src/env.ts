@@ -1,10 +1,11 @@
 import type { RateLimit } from './email.ts'
 import type { GoogleEnv } from './google-auth.ts'
+import type { ServiceAccountEnv } from './service-account.ts'
 import type { ShareEnv } from './share.ts'
 import type { TeamSpaceApi } from './team-state.ts'
 
 /** The worker's bindings, variables and secrets (see wrangler.toml) */
-export interface Env extends GoogleEnv, ShareEnv {
+export interface Env extends GoogleEnv, ShareEnv, ServiceAccountEnv {
   /** The team spaces' Durable Objects, one per space, named by the space's id (team-space.ts): unset in tests that do not touch team spaces */
   TEAM_SPACE?: {
     idFromName(name: string): unknown

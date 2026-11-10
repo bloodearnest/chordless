@@ -5,10 +5,13 @@
  * (the identity providers) and the space's Durable Object. Who is asking, and their role, is
  * settled in team-routes.ts before either is used.
  */
+
+import { createDriveApi } from '../../src/js/drive-client.ts'
 import { decryptBlob } from './blob.ts'
 import type { Env } from './env.ts'
 import { type GoogleApi, realGoogle } from './google-auth.ts'
 import { authenticate, googleProvider, type IdentityProvider } from './identity.ts'
+import { checkTeamStorage, serviceAccountAddress, serviceAccountToken } from './service-account.ts'
 import type { AdminContext } from './team-admin.ts'
 import type { TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'
@@ -21,6 +24,8 @@ export interface TeamDeps {
   google?: Pick<GoogleApi, 'refreshAccessToken'>
   /** The `fetch` that reaches Drive */
   fetch?: typeof fetch
+  /** The `fetch` that reaches Google's token endpoint, for the service account */
+  tokenFetch?: typeof fetch
   now?: () => number
 }
 
@@ -50,7 +55,10 @@ export function createTeamContext(
   async function open(spaceId: string) {
     const info = await room(spaceId).info()
     if (!info) return null
-    const token = ownerAccessToken({ room: room(spaceId), info, env, google, now })
+    const token =
+      (await room(spaceId).credential()) === 'service-account'
+        ? serviceAccountToken({ env, fetch: tracedFetch(deps.tokenFetch), now })
+        : ownerAccessToken({ room: room(spaceId), info, env, google, now })
     return { info, backend: teamDrive(token, tracedFetch(deps.fetch)) }
   }
   const drive = (spaceId: string) => {
@@ -102,6 +110,12 @@ export function createAdminContext(
       return root && { trashed: root.trashed, canWrite: root.canWrite }
     },
     openBlob: blob => decryptBlob(blob, env),
+    serviceAccount: () => serviceAccountAddress(env),
+    async checkServiceAccount(rootRef, address) {
+      const token = serviceAccountToken({ env, fetch: tracedFetch(deps.tokenFetch), now })
+      const api = createDriveApi({ getAccessToken: token, fetch: tracedFetch(deps.fetch) })
+      return checkTeamStorage(api, rootRef, address)
+    },
     newSpaceId: () => crypto.randomUUID(),
   }
 }

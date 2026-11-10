@@ -20,5 +20,9 @@ JWE_ENCRYPTION_KEY=
 # `just tf honeycomb output -raw dev_ingest_key`. Leave empty and they are taken and dropped.
 OTLP_HEADERS=
 
+# Team-managed storage (docs/SPACES.md, "Credentials"): the key file of a service account, as one line
+# of JSON. Leave empty and team spaces use their owner's sign-in only. Never the production key.
+TEAM_STORAGE_KEY=
+
 # Used when the client sends no redirect_uri
 GOOGLE_REDIRECT_URI=

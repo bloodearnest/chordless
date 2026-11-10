@@ -455,7 +455,11 @@ export class FakeDrive {
     for (const name of names) {
       if (name === 'capabilities') {
         if (!this.omitCapabilities)
-          out.capabilities = { canEdit: !this.readOnly, canAddChildren: !this.readOnly }
+          out.capabilities = {
+            canEdit: !this.readOnly,
+            canAddChildren: !this.readOnly,
+            canTrash: !this.readOnly,
+          }
       } else if (name === 'size') out.size = String(file.content?.length ?? 0)
       else if (file[name] !== undefined && name !== 'content')
         out[name] = structuredClone(file[name])
