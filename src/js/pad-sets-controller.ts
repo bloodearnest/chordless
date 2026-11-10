@@ -74,6 +74,28 @@ export class PadSetsController implements ReactiveController {
   }
 
   /**
+   * The sets by the space they are kept in, to show under its name: the account's ("Personal")
+   * first, then each team space's. With no team's sets there is one group with no name, as there
+   * is nothing to tell apart.
+   */
+  get groups(): { name: string | null; sets: PadSet[] }[] {
+    const bySpace = new Map<string | null, PadSet[]>()
+    for (const set of this.list) {
+      const key = set.spaceId ?? null
+      bySpace.set(key, [...(bySpace.get(key) ?? []), set])
+    }
+    if (![...bySpace.keys()].some(key => key !== null)) {
+      return this.list.length ? [{ name: null, sets: this.list }] : []
+    }
+    return [...bySpace.entries()]
+      .sort(([a], [b]) => (a === null ? -1 : b === null ? 1 : 0))
+      .map(([spaceId, sets]) => ({
+        name: spaceId === null ? 'Personal' : (sets[0]?.spaceName ?? 'Team'),
+        sets,
+      }))
+  }
+
+  /**
    * Make a pad set the active one. Shows it as active straight away, and
    * goes back to the previous one (and rethrows) if switching fails.
    */

@@ -1,5 +1,6 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { loadMediaSettings, type MediaSettings, saveMediaSettings } from '../js/media-settings.ts'
+import type { PadSet } from '../js/pad-set-service.ts'
 import { PadSetsController } from '../js/pad-sets-controller.ts'
 import './pad-set-upload.ts'
 import { fieldStyles, switchStyles } from './shared-styles.ts'
@@ -225,6 +226,20 @@ export class MediaPlayerSettings extends LitElement {
   /** What the select's "Upload a new pad set…" has for a value (no pad set has this id) */
   static readonly UPLOAD = 'upload-a-new-pad-set'
 
+  /** The options for these pad sets */
+  _renderPadOptions(sets: PadSet[]) {
+    return sets.map(
+      set => html`
+        <option
+          value=${set.id}
+          .selected=${!this._uploadOpen && set.id === this._padSets.activeId}
+        >
+          ${set.name}
+        </option>
+      `
+    )
+  }
+
   /** A pad set was uploaded: the form has done its work, and the list has another set */
   async _onUploaded(): Promise<void> {
     this._uploadOpen = false
@@ -404,15 +419,12 @@ export class MediaPlayerSettings extends LitElement {
                             ? nothing
                             : html`<option value="" selected disabled>Choose a pad set</option>`
                         }
-                        ${this._padSets.list.map(
-                          set => html`
-                            <option
-                              value=${set.id}
-                              .selected=${!this._uploadOpen && set.id === this._padSets.activeId}
-                            >
-                              ${set.name}
-                            </option>
-                          `
+                        ${this._padSets.groups.map(group =>
+                          group.name === null
+                            ? this._renderPadOptions(group.sets)
+                            : html`<optgroup label=${group.name}>
+                                ${this._renderPadOptions(group.sets)}
+                              </optgroup>`
                         )}
                       `
                     : this._uploadOpen

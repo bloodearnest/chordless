@@ -57,6 +57,32 @@ describe('media-player-settings', () => {
     expect(select.value).to.equal('drive-warm')
   })
 
+  it('shows a team space’s pad sets under its name, and the account’s under Personal', async () => {
+    settings = document.createElement('media-player-settings')
+    document.body.appendChild(settings)
+    await settings.updateComplete
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    settings._padSets.list = [
+      { id: 'mine', name: 'Warm Pads' },
+      { id: 'ours', name: 'Church Pads', spaceId: 'team-1', spaceName: 'St Mark’s' },
+    ]
+    settings._padSets.activeId = 'ours'
+    settings.requestUpdate()
+    await settings.updateComplete
+
+    const select = settings.shadowRoot.querySelector('select')
+    const groups = [...select.querySelectorAll('optgroup')].map(group => [
+      group.label,
+      [...group.querySelectorAll('option')].map(option => option.textContent.trim()),
+    ])
+    expect(groups).to.deep.equal([
+      ['Personal', ['Warm Pads']],
+      ['St Mark’s', ['Church Pads']],
+    ])
+    expect(select.value).to.equal('ours')
+  })
+
   it('is accessible', async () => {
     settings = document.createElement('media-player-settings')
     document.body.appendChild(settings)

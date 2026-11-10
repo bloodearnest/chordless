@@ -1,7 +1,8 @@
-import { css, html, LitElement } from 'lit'
+import { css, html, LitElement, nothing } from 'lit'
 import { ifDefined } from 'lit/directives/if-defined.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
-import { derivePadSetName, uploadPadSet } from '../js/pad-set-service.ts'
+import { derivePadSetName, listPadDestinations, uploadPadSet } from '../js/pad-set-service.ts'
+import { getCurrentSpace } from '../js/space.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles, fieldStyles } from './shared-styles.ts'
 
@@ -18,6 +19,9 @@ export class PadSetUploadedEvent extends Event {
  * select on the media player page, opened by the select's "Upload a new pad set…". The set is kept
  * on this device and uploaded to Google Drive when the person is signed in.
  *
+ * With team spaces on the device, "Save to" chooses where: the account's own pads (Personal) or a
+ * team space's, for everyone in it; it starts at the space the app is in.
+ *
  * @fires PadSetUploadedEvent - when the set is uploaded
  */
 export class PadSetUpload extends LitElement {
@@ -27,6 +31,8 @@ export class PadSetUpload extends LitElement {
     _error: { state: true },
     _padSetName: { state: true },
     _fileName: { state: true },
+    _destinations: { state: true },
+    _destination: { state: true },
   }
 
   declare _uploading: boolean
@@ -35,6 +41,10 @@ export class PadSetUpload extends LitElement {
   declare _error: string
   declare _padSetName: string
   declare _fileName: string
+  /** Where a set can be saved: the account's pads (spaceId null) and each team space's */
+  declare _destinations: { spaceId: string | null; name: string }[]
+  /** The team space chosen to save to, or null for the account's */
+  declare _destination: string | null
 
   _fileInput: Ref<HTMLInputElement> = createRef()
   _selectedFile: File | null = null
@@ -95,6 +105,19 @@ export class PadSetUpload extends LitElement {
     this._error = ''
     this._padSetName = ''
     this._fileName = ''
+    this._destinations = []
+    this._destination = null
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback()
+    this._loadDestinations()
+  }
+
+  async _loadDestinations(): Promise<void> {
+    this._destinations = await listPadDestinations()
+    const current = getCurrentSpace().id
+    this._destination = this._destinations.some(each => each.spaceId === current) ? current : null
   }
 
   _handleFileChange(event: Event): void {
@@ -134,9 +157,14 @@ export class PadSetUpload extends LitElement {
 
     this._uploading = true
     try {
-      await uploadPadSet(this._selectedFile, this._padSetName, (done, total) => {
-        this._progress = { done, total }
-      })
+      await uploadPadSet(
+        this._selectedFile,
+        this._padSetName,
+        (done, total) => {
+          this._progress = { done, total }
+        },
+        this._destination
+      )
       this._selectedFile = null
       this._padSetName = ''
       this._fileName = ''
@@ -166,6 +194,37 @@ export class PadSetUpload extends LitElement {
             placeholder="e.g. Warm Pads - Churchfront"
           />
         </div>
+
+        ${
+          this._destinations.length > 1
+            ? html`<div>
+                <label for="padset-destination">Save to</label>
+                <select
+                  id="padset-destination"
+                  class="field"
+                  ?disabled=${this._uploading}
+                  @change=${(event: Event) => {
+                    const value = (event.target as HTMLSelectElement).value
+                    this._destination = value || null
+                  }}
+                >
+                  ${this._destinations.map(
+                    each => html`<option
+                      value=${each.spaceId ?? ''}
+                      .selected=${each.spaceId === this._destination}
+                    >
+                      ${each.spaceId ? `${each.name} (Team)` : 'Personal'}
+                    </option>`
+                  )}
+                </select>
+                ${
+                  this._destination
+                    ? html`<div class="meta">Everyone in the team can use it</div>`
+                    : nothing
+                }
+              </div>`
+            : nothing
+        }
 
         <div>
           <label for="padset-file-input">Zip file of the pads</label>
