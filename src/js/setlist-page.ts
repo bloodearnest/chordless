@@ -41,7 +41,12 @@ import { goTo, setPageTitle } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getSpacePeople, identifyMe, settleLeader } from './people.ts'
-import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
+import {
+  CapoPreferenceEvent,
+  getCapoPreference,
+  getScrollToTopOnSwipe,
+  SectionDefaultsEvent,
+} from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import type { Score } from './score.ts'
 import { attachCues, keepSheet, scoreWithKey, shownSheet, showScore } from './score-shown.ts'
@@ -94,6 +99,7 @@ const CONFIG = {
   KEYBOARD_SCROLL_AMOUNT: 200, // px - scroll distance for up/down arrows
 
   // Intersection Observer
+  SCROLL_RESET_DELAY: 700, // ms - after a swipe, before the song left is put back to its top
   VISIBILITY_THRESHOLD: 0.5, // 50% - section must be this visible to be considered "current"
 }
 
@@ -307,6 +313,8 @@ export class SetlistPage {
     const scrolls = this._restoredState?.scrolls
     this._restoredState = undefined
     for (const [id, top] of Object.entries(scrolls ?? {})) {
+      // (songs start at their top, the one shown apart)
+      if (getScrollToTopOnSwipe() && id !== this._lastVisibleSection) continue
       const section = this.root.querySelector<HTMLElement>(`#${id}`)
       if (section) section.scrollTop = top
     }
@@ -579,7 +587,23 @@ export class SetlistPage {
     return fragment
   }
 
+  /**
+   * Put a section the user has left back to its top (if they prefer: "Start songs at the top"),
+   * once it is out of sight so that it doesn't jump while it slides away. Not if they are back
+   * on it by then.
+   */
+  _scrollToTopLater(sectionId: string | null | undefined) {
+    if (!sectionId || !getScrollToTopOnSwipe()) return
+    setTimeout(() => {
+      if (this._disposed || this._lastVisibleSection === sectionId) return
+      this.root
+        .querySelector<HTMLElement>(`#${sectionId}`)
+        ?.scrollTo({ top: 0, behavior: 'instant' })
+    }, CONFIG.SCROLL_RESET_DELAY)
+  }
+
   showOverview(instant = false) {
+    this._scrollToTopLater(this._lastVisibleSection)
     // Update the last visible section to prevent observer from triggering
     this._lastVisibleSection = 'overview'
 
@@ -593,6 +617,7 @@ export class SetlistPage {
   }
 
   showSong(index: number, instant = false) {
+    this._scrollToTopLater(this._lastVisibleSection)
     // Update the last visible section to prevent observer from triggering
     this._lastVisibleSection = `song-${index}`
 
@@ -941,6 +966,7 @@ export class SetlistPage {
           // Skip if this is the same section we just updated
           if (sectionId === this._lastVisibleSection) return
 
+          this._scrollToTopLater(this._lastVisibleSection)
           this._lastVisibleSection = sectionId
 
           if (sectionId === 'overview') {

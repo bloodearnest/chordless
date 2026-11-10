@@ -246,10 +246,63 @@ describe('the setlist page: header, menu and keys', () => {
       must(section.querySelector<HTMLElement>('.song-content')).style.height = '2000px'
       section.scrollTop = 50
       expect(rig.page.captureViewState()?.scrolls?.['song-0']).to.equal(section.scrollTop)
-      rig.page._restoredState = { scrolls: { 'song-0': 30, 'song-9': 5 } }
-      rig.page._restoreScrolls()
-      expect(section.scrollTop).to.equal(30)
-      expect(rig.page._restoredState).to.equal(undefined)
+      localStorage.setItem('scroll_to_top_on_swipe', 'false')
+      try {
+        rig.page._restoredState = { scrolls: { 'song-0': 30, 'song-9': 5 } }
+        rig.page._restoreScrolls()
+        expect(section.scrollTop).to.equal(30)
+        expect(rig.page._restoredState).to.equal(undefined)
+      } finally {
+        localStorage.removeItem('scroll_to_top_on_swipe')
+      }
+    })
+
+    describe('starting songs at the top', () => {
+      /** Song 0 and 1, tall enough to scroll, with song 0 scrolled and shown */
+      async function scrolledSong() {
+        await rig.open()
+        const first = must($<HTMLElement>('#song-0'))
+        first.style.overflow = 'auto'
+        first.style.height = '20px'
+        must(first.querySelector<HTMLElement>('.song-content')).style.height = '2000px'
+        rig.page.showSong(0, true)
+        first.scrollTop = 50
+        return first
+      }
+      afterEach(() => localStorage.removeItem('scroll_to_top_on_swipe'))
+
+      it('puts a song back to its top once it is left', async () => {
+        const first = await scrolledSong()
+        rig.page.showSong(1, true)
+        expect(first.scrollTop).to.equal(50) // (not while it may still be sliding away)
+        await new Promise(resolve => setTimeout(resolve, 800))
+        expect(first.scrollTop).to.equal(0)
+      })
+
+      it('leaves it where it was if the user has turned that off', async () => {
+        localStorage.setItem('scroll_to_top_on_swipe', 'false')
+        const first = await scrolledSong()
+        rig.page.showSong(1, true)
+        await new Promise(resolve => setTimeout(resolve, 800))
+        expect(first.scrollTop).to.equal(50)
+      })
+
+      it('does not move a song the user has come back to', async () => {
+        const first = await scrolledSong()
+        rig.page.showSong(1, true)
+        rig.page.showSong(0, true)
+        await new Promise(resolve => setTimeout(resolve, 800))
+        expect(first.scrollTop).to.equal(50)
+      })
+
+      it('puts back only the song shown when the page is returned to', async () => {
+        const first = await scrolledSong()
+        first.scrollTop = 0
+        rig.page._restoredState = { scrolls: { 'song-0': 30, 'song-1': 20 } }
+        rig.page._lastVisibleSection = 'song-0'
+        rig.page._restoreScrolls()
+        expect(first.scrollTop).to.equal(30)
+      })
     })
 
     it('tells the media player the song, with this user’s choices for it', async () => {

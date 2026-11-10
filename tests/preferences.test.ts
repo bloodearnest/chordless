@@ -18,6 +18,7 @@ const KEYS = [
   'enabled_capo',
   'setup-done',
   'keep_screen_awake',
+  'scroll_to_top_on_swipe',
   'keep_awake_minutes',
   'show_shared_annotations',
   'show_my_annotations',
@@ -166,6 +167,18 @@ describe('preferences', () => {
       expect(preferences.getSectionDefaults()).to.deep.equal({ all: 'all' })
       localStorage.setItem('section_defaults', '7')
       expect(preferences.getSectionDefaults()).to.deep.equal({ all: 'all' })
+    })
+  })
+
+  describe('starting songs at the top', () => {
+    it('is on unless turned off', async () => {
+      const preferences = await fresh()
+      expect(preferences.getScrollToTopOnSwipe()).to.equal(true)
+      preferences.setScrollToTopOnSwipe(false)
+      expect(localStorage.getItem('scroll_to_top_on_swipe')).to.equal('false')
+      expect(preferences.getScrollToTopOnSwipe()).to.equal(false)
+      preferences.setScrollToTopOnSwipe(true)
+      expect(preferences.getScrollToTopOnSwipe()).to.equal(true)
     })
   })
 

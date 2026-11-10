@@ -190,6 +190,15 @@ const showMyAnnotations = definePreference<boolean>({
   blocked: true,
 })
 
+// A song starts at its top when swiped to (on unless turned off): the one left is put back
+// to its top once it is out of sight
+const scrollToTopOnSwipe = definePreference<boolean>({
+  keys: ['scroll_to_top_on_swipe'],
+  read: ([stored]) => stored !== 'false',
+  write: on => (on ? 'true' : 'false'),
+  blocked: true,
+})
+
 const keepAwake = definePreference<boolean>({
   keys: ['keep_screen_awake'],
   read: ([stored]) => stored !== 'false',
@@ -266,6 +275,10 @@ export function setAnnotationsPreference(which: 'shared' | 'mine', on: boolean) 
   const { shared, mine } = getAnnotationsPreference()
   window.dispatchEvent(new AnnotationsPreferenceEvent(shared, mine))
 }
+
+/** Whether a song is put back to its top once swiped away from: on unless the user turned it off */
+export const getScrollToTopOnSwipe = (): boolean => scrollToTopOnSwipe.get()
+export const setScrollToTopOnSwipe = (value: boolean) => scrollToTopOnSwipe.set(!!value)
 
 /** Whether to keep the screen awake while a setlist is open: on unless the user turned it off */
 export const getKeepAwakePreference = (): boolean => keepAwake.get()
