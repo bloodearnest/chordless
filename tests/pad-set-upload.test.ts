@@ -7,8 +7,10 @@ import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/pad-set-upload.ts'
 import { type PadSetUpload, PadSetUploadedEvent } from '../src/components/pad-set-upload.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
-import { listPadSets } from '../src/js/pad-set-service.ts'
+import { listPadSets, setPadStorage } from '../src/js/pad-set-service.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { installFakeDrive } from './fake-drive.ts'
+import { MemoryStorage } from './memory-storage.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip } from './zip.ts'
@@ -180,6 +182,76 @@ describe('the pad set upload', () => {
       )
       expect(uploaded).to.equal(0)
       expect(button().textContent).to.contain('Upload pad set')
+    })
+  })
+
+  describe('with a team space on the device', () => {
+    let storage: MemoryStorage
+
+    beforeEach(() => {
+      storage = new MemoryStorage()
+      setPadStorage(storage.pads, [
+        { spaceId: 'team-1', name: 'St Mark’s', storage: storage.padsIn('team-root') },
+      ])
+    })
+
+    afterEach(() => setPadStorage(null))
+
+    const destination = () => root().querySelector<HTMLSelectElement>('#padset-destination')
+
+    it('starts at the team space the app is in', async () => {
+      const before = getCurrentSpace()
+      const space = await createSpace(`Pads ${crypto.randomUUID().slice(0, 8)}`)
+      setPadStorage(storage.pads, [{ spaceId: space.id, name: 'Here', storage: storage.pads }])
+      await setCurrentSpace(space.id, space.name)
+      try {
+        await show()
+        await waitUntil(() => destination(), 'the Save to choice')
+        expect(must(destination()).value).to.equal(space.id)
+        expect(form._destination).to.equal(space.id)
+        form.remove()
+
+        // (in a personal space, it starts at Personal)
+        const own = await createSpace(`Own ${crypto.randomUUID().slice(0, 8)}`)
+        await setCurrentSpace(own.id, own.name)
+        await show()
+        await waitUntil(() => destination(), 'the Save to choice')
+        expect(form._destination).to.equal(null)
+        await deleteSpace(own.id)
+      } finally {
+        await deleteSpace(space.id)
+        if (before.id) await setCurrentSpace(before.id, before.name)
+      }
+    })
+
+    it('offers Personal or the team, and saves to the one chosen, for everyone in it', async () => {
+      await show()
+      await waitUntil(() => destination(), 'the Save to choice')
+      const select = must(destination())
+      expect([...select.options].map(option => option.textContent?.trim())).to.deep.equal([
+        'Personal',
+        'St Mark’s (Team)',
+      ])
+      expect(select.value).to.equal('')
+      expect(text()).to.not.contain('Everyone in the team')
+
+      select.value = 'team-1'
+      select.dispatchEvent(new Event('change'))
+      await form.updateComplete
+      expect(text()).to.contain('Everyone in the team can use it')
+
+      choose(await padZip())
+      submit()
+      await waitUntil(() => uploaded === 1, 'the upload')
+      expect((await storage.padsIn('team-root').listSets()).map(set => set.name)).to.deep.equal([
+        'Warm Pads',
+      ])
+      expect(await storage.pads.listSets()).to.deep.equal([])
+
+      select.value = ''
+      select.dispatchEvent(new Event('change'))
+      await form.updateComplete
+      expect(form._destination).to.equal(null)
     })
   })
 })

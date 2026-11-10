@@ -299,10 +299,15 @@ export function importIntoSpace(
 }
 
 /**
- * Put pad sets from an export into Drive (the user is signed in). A pad set with the same name as
- * one in Drive replaces it. Returns the names imported.
+ * Put pad sets from an export into Drive (the user is signed in): the account's, or a team space's
+ * (`spaceId`). A pad set with the same name as one there replaces it (in a team space, only an
+ * admin may: `uploadPadSet`). Returns the names imported.
  */
-export async function importPadSets(exported: SpaceExport, names: string[]): Promise<string[]> {
+export async function importPadSets(
+  exported: SpaceExport,
+  names: string[],
+  spaceId: string | null = null
+): Promise<string[]> {
   const imported: string[] = []
   for (const { name, dir } of exported.manifest.padSets) {
     if (!names.includes(name)) continue
@@ -310,7 +315,7 @@ export async function importPadSets(exported: SpaceExport, names: string[]): Pro
     const zip = await writeZip(
       [...audio].map(([key, data]) => ({ name: `${key}.mp3`, data, compress: false }))
     )
-    await uploadPadSet(new File([zip], `${name}.zip`), name)
+    await uploadPadSet(new File([zip], `${name}.zip`), name, undefined, spaceId)
     imported.push(name)
   }
   return imported

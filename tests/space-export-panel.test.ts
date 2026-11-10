@@ -6,7 +6,7 @@ import {
 } from '../src/components/space-export-panel.ts'
 import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
-import { uploadPadSet } from '../src/js/pad-set-service.ts'
+import { setPadStorage, uploadPadSet } from '../src/js/pad-set-service.ts'
 import { addChart, hashText } from '../src/js/song-utils.ts'
 import {
   createSpace,
@@ -18,6 +18,7 @@ import {
 import { createExport } from '../src/js/space-export.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
+import { MemoryStorage } from './memory-storage.ts'
 import { must } from './must.ts'
 import { deleteDatabase, nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip } from './zip.ts'
@@ -479,6 +480,39 @@ describe('the export panel', () => {
         must(el.shadowRoot?.querySelector<HTMLInputElement>('#import-pads')).disabled
       ).to.equal(true)
       expect(text(el)).to.contain('connect with Google first')
+    })
+
+    it('offers only the space’s own: a team space’s sets, or the account’s for a personal space', async () => {
+      const storage = new MemoryStorage()
+      const team = storage.padsIn('team-root')
+      setPadStorage(storage.pads, [{ spaceId, name: 'Team', storage: team }])
+      try {
+        await storage.pads.ensureSet('Mine')
+        for (const name of ['Ours', 'Also ours']) {
+          const ref = await team.ensureSet(name)
+          for (const key of PAD_FILE_KEYS) await team.addFile(ref, key, new Blob([audioOf(key)]))
+        }
+        const personal = await mount({ signedIn: true })
+        await waitUntil(() => personal.shadowRoot?.querySelector('#include-pads'), 'the choice')
+        expect(text(personal)).to.contain('Include my pad sets (1,')
+
+        const space = must(await getSpaceById(spaceId))
+        const teamPanel = await fixture<SpaceExportPanel>(
+          html`<space-export-panel .space=${{ ...space, team: { id: 'team-1', role: 'owner' } }} signed-in show-pads></space-export-panel>`
+        )
+        await waitUntil(() => teamPanel.shadowRoot?.querySelector('#include-pads'), 'the choice')
+        expect(text(teamPanel)).to.contain('Include my pad sets (2,')
+
+        // (a set whose size cannot be read leaves the pad sets out, as when offline)
+        storage.fail('listPadFiles', { times: 10 })
+        const failing = await fixture<SpaceExportPanel>(
+          html`<space-export-panel .space=${{ ...space, team: { id: 'team-1', role: 'owner' } }} signed-in show-pads></space-export-panel>`
+        )
+        await nothingFor()
+        expect(failing.shadowRoot?.querySelector('#include-pads')).to.equal(null)
+      } finally {
+        setPadStorage(null)
+      }
     })
 
     it('leaves out the pad sets when Drive cannot be asked', async () => {

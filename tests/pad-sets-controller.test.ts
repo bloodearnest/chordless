@@ -7,10 +7,12 @@ import {
   listPadSets,
   PadSetChangedEvent,
   PadSetListUpdatedEvent,
+  setPadStorage,
 } from '../src/js/pad-set-service.ts'
 import { PadSetsController } from '../src/js/pad-sets-controller.ts'
 import { makePadSet } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
+import { MemoryStorage } from './memory-storage.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
@@ -145,6 +147,49 @@ describe('PadSetsController', () => {
       expect(padSets.activeId).to.equal(before)
       expect(padSets.error).to.contain('missing files')
       expect(padSets.switching).to.equal(false)
+    })
+  })
+
+  describe('grouping the sets by space', () => {
+    afterEach(() => setPadStorage(null))
+
+    it('has one group with no name when only the account has sets', async () => {
+      const storage = new MemoryStorage()
+      setPadStorage(storage.pads, [])
+      await storage.pads.ensureSet('Mine')
+      const padSets = await setUp()
+      await padSets.load(true)
+      expect(padSets.groups.map(group => [group.name, group.sets.length])).to.deep.equal([
+        [null, 1],
+      ])
+    })
+
+    it('names each space’s group when a team space has sets, Personal first', async () => {
+      const storage = new MemoryStorage()
+      const team = storage.padsIn('team-root')
+      const other = storage.padsIn('other-root')
+      setPadStorage(storage.pads, [
+        { spaceId: 'team-1', name: 'St Mark’s', storage: team },
+        { spaceId: 'team-2', name: 'Youth', storage: other },
+      ])
+      await team.ensureSet('Ours')
+      await other.ensureSet('Theirs')
+      await storage.pads.ensureSet('Mine')
+      const padSets = await setUp()
+      await padSets.load(true)
+      expect(
+        padSets.groups.map(group => [group.name, group.sets.map(set => set.name)])
+      ).to.deep.equal([
+        ['Personal', ['Mine']],
+        ['St Mark’s', ['Ours']],
+        ['Youth', ['Theirs']],
+      ])
+    })
+
+    it('has no groups with no sets', async () => {
+      setPadStorage(new MemoryStorage().pads, [])
+      const padSets = await setUp()
+      expect(padSets.groups).to.deep.equal([])
     })
   })
 })

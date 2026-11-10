@@ -130,7 +130,10 @@ export class SpaceExportPanel extends LitElement {
     if (changed.has('signedIn') || changed.has('showPads')) void this._loadPadSets()
   }
 
-  /** The pad sets in Drive and their sizes; none if the user is not signed in or is offline */
+  /**
+   * The space's pad sets in Drive and their sizes (a team space's own, or the account's for a
+   * personal space); none if the user is not signed in or is offline
+   */
   async _loadPadSets() {
     if (!this.signedIn || !this.showPads) {
       this._padSets = []
@@ -138,7 +141,9 @@ export class SpaceExportPanel extends LitElement {
       return
     }
     try {
-      const sets = await listPadSets()
+      const sets = (await listPadSets()).filter(
+        padSet => (padSet.spaceId ?? null) === this._padSpaceId
+      )
       this._padSets = await Promise.all(
         sets.map(async padSet => ({ padSet, bytes: await padSetSize(padSet) }))
       )
@@ -147,6 +152,11 @@ export class SpaceExportPanel extends LitElement {
       this._padSets = []
       this._includePads = false
     }
+  }
+
+  /** The team space whose pads are this space's, or null for the account's (a personal space) */
+  get _padSpaceId(): string | null {
+    return this.space?.team ? this.space.id : null
   }
 
   get _padBytes(): number {
@@ -207,7 +217,8 @@ export class SpaceExportPanel extends LitElement {
         pending.pads && this.signedIn
           ? await importPadSets(
               exported,
-              exported.manifest.padSets.map(set => set.name)
+              exported.manifest.padSets.map(set => set.name),
+              this._padSpaceId
             )
           : []
       this._pending = null
