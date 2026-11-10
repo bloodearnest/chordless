@@ -29,6 +29,7 @@ describe('fetching the deferred files', () => {
 
   it('has no one to ask without a worker in control', async () => {
     expect(await askForDeferredFiles({ controller: null })).to.equal(null)
+    expect(await askForDeferredFiles(undefined)).to.equal(null)
   })
 
   it('takes a failed answer as no answer', async () => {
@@ -61,5 +62,6 @@ describe('fetching the deferred files', () => {
     }
     expect(await startDeferredPrecache(container, async () => {})).to.equal(null)
     expect(messages).to.have.length(0)
+    expect(await startDeferredPrecache(undefined)).to.equal(null)
   })
 })
