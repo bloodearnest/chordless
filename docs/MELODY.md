@@ -312,12 +312,15 @@ rehearsal. What they want in the chart itself is the small notes of an instrumen
 turnaround). So a part of the chart can be shown as that line of music, in place of its chords: a fifth
 choice in the part's Show options (All, Lyrics, Chords, **Melody**, None), `HideMode` `'melody'`.
 
-- **Which parts have it.** `cueMeasures` (`src/js/score-section.ts`) finds the sheet's section for each
-  chart section with `matchChart` (an instrumental has no words, so it goes by name: Intro to INTRO) and keeps
-  it only if it has notes and none is sung (`sungNotes`: cue-size notes, and full-size ones with no lyric under
-  them). A section of the sheet that is played more than once gives its first go. A sung part that has a
-  harmony line over it has no Melody option: its words are what the part is for. Where nothing matches, there
-  is no option and no staff, never a wrong one.
+- **Which parts have it.** Only a part of the chart with no words (an intro, an instrumental): a part to sing has the
+  words as its content. `cueMeasures` (`src/js/score-section.ts`) matches it to the sheet's section by name (Intro
+  to INTRO, ignoring case and marks) and takes the measures from the box's start for as long as they are cue notes
+  with nothing sung. It is a run, not the whole box, because the sheets do not always box what follows an
+  instrumental (the sung bars after Adonai's INSTRUMENTAL belong to no box of their own). A last measure may
+  have a sung note in its final beat, the pickup into the next part (Holy Forever's intro ends so); it stays in, and
+  `sliceMeasures` leaves the sung note out. Two sheet quirks are handled: a lead-in measure before the intro's box
+  is the intro's, and a first part with no box at all (Adonai) is the intro. Where nothing matches there is
+  no option and no staff, never a wrong one. A sheet section that is played more than once gives its first go.
 - **What it shows.** The measures of that section (`sliceMeasures`: no title, notice or section box), in the
   key the song is shown in, by `<score-view>`, which takes the whole melody and the `measures` to show. The
   notes are moved before they are cut, so a few measures are in the octave the whole sheet chose. The chords
@@ -331,7 +334,7 @@ choice in the part's Show options (All, Lyrics, Chords, **Melody**, None), `Hide
   once it has.
 - **The engraver is the heavy part**: it loads in a worker the first time a part is shown as music, as for the
   song's sheet (the page's plan for pulling Verovio and pdf.js in after load applies to both).
-- Not done: a way to say which sheet section is which when the match fails; sung melody for any part (the
+- Not done: a way to say which sheet section is which when the match fails (an instrumental the sheet does not name); sung melody for any part (the
   slice is general, the matching and the choice of parts are not); a harmony line shown over a sung part.
 
 ## Risks

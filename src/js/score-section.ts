@@ -1,61 +1,104 @@
 /**
- * The notes of one chart section, from the song's lead sheet: `docs/MELODY.md`, "In the chart". An
- * instrumental section (an intro, a turnaround: the sheet has notes in it and none are sung) can be
- * shown as a line of music in place of its chords and lyrics. `cueMeasures` finds which measures of the
- * sheet are which chart section's, and `sliceMeasures` cuts them out of a melody (that is already
- * in the song's key, so the octave is the whole sheet's choice and not the slice's).
+ * The notes of one chart section, from the song's lead sheet: `docs/MELODY.md`, "In the chart". A part
+ * of the chart with no words (an intro, an instrumental) can be shown as the cue-size notes the sheet
+ * has for it, a line of music in place of its chords. `cueMeasures` finds which measures of the sheet
+ * are which chart section's, and `sliceMeasures` cuts them out of a melody (that is already in the
+ * song's key, so the octave is the whole sheet's choice and not the slice's).
  */
 import type { ParsedChart } from './data-types.ts'
 import type { Score, ScoreMeasure } from './score.ts'
-import { type ChartText, matchChart, playSteps } from './score-structure.ts'
+import { type ChartText, sheetSections } from './score-structure.ts'
 import { sungNotes } from './score-transpose.ts'
+import { lyricWords } from './utils/lyric-words.ts'
+
+/** A name as the sheet and the chart are compared by: "INTRO" and "Intro", "Pre-Chorus" and "PRE CHORUS" */
+const plain = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
 
 /**
- * For each section of the chart, the measures (indices into the melody) that are its notes, or null
- * where it has none to show: the sheet has no section for it, or the section has anything sung in it.
- * A section the sheet plays more than once is given its first go.
+ * How many measures from `from` are cue notes and nothing sung, up to the next section's box. The sheets do
+ * not always box what follows an instrumental, so the run ends where the singing starts and not at the next
+ * box. One last measure may have a sung note in its final beat: the pickup into the part after (its note
+ * is left out of the slice, `sliceMeasures`).
+ */
+function cueRun(melody: Score, from: number, to: number): number[] {
+  const sung = sungNotes(melody)
+  const run: number[] = []
+  for (let i = from; i < to; i++) {
+    const m = melody.measures[i] as ScoreMeasure
+    let cues = 0
+    let singing = false
+    let pickup = false
+    for (const voice of m.voices)
+      for (const e of voice) {
+        if (e.kind !== 'note') continue
+        if (e.cue) cues++
+        else if (sung(i, e)) {
+          if (e.start >= m.length - 1) pickup = true
+          else singing = true
+        }
+      }
+    if (singing || cues === 0) break
+    run.push(i)
+    if (pickup) break
+  }
+  return run
+}
+
+/**
+ * For each section of the chart, the measures (indices into the melody) that are its notes, or null where it
+ * has none to show: it has words (a part to sing has no staff of its own), or the sheet has no section of its
+ * name, or that section opens with singing. A sheet's section that comes first with no box of its name is the
+ * intro, and a short lead-in measure before the intro's box is part of it. Sections of one name go in turn.
  */
 export function cueMeasures(melody: Score, chart: ChartText[]): (number[] | null)[] {
   const out: (number[] | null)[] = chart.map(() => null)
-  const sung = sungNotes(melody)
-  const steps = playSteps(melody)
+  const sections = sheetSections(melody)
   const claimed = new Set<number>()
-  for (const { step, label } of matchChart(melody, steps, chart)) {
-    if (!label) continue
-    // (two sections with one name go in turn: the sheet's first Instrumental to the chart's first)
-    const at = chart.findIndex((c, i) => c.label === label && !claimed.has(i))
-    if (at < 0) continue
-    claimed.add(at)
-    const measures = step.spans.flatMap(([from, to]) =>
-      Array.from({ length: to - from }, (_, i) => from + i)
+  sections.forEach((section, k) => {
+    let name = plain(section.name)
+    let from = section.from
+    if (k === 0 && !name) {
+      // (a lead-in before the intro's box is the intro's, and a first part with no box at all is the intro)
+      if (melody.measures[0]?.full === false && section.to === 1 && sections.length > 1) return
+      name = 'intro'
+    }
+    const next = sections[k + 1]
+    if (
+      k === 1 &&
+      !sections[0]?.name &&
+      melody.measures[0]?.full === false &&
+      sections[0]?.to === 1
+    ) {
+      from = 0
+    }
+    const at = chart.findIndex(
+      (c, i) => !claimed.has(i) && plain(c.label) === name && lyricWords(c.text).length === 0
     )
-    let notes = 0
-    let singing = false
-    for (const index of measures)
-      for (const voice of (melody.measures[index] as ScoreMeasure).voices)
-        for (const e of voice)
-          if (e.kind === 'note') {
-            notes++
-            if (sung(index, e)) singing = true
-          }
-    if (notes > 0 && !singing) out[at] = measures
-  }
+    if (at < 0) return
+    claimed.add(at)
+    const run = cueRun(melody, from, next?.from ?? melody.measures.length)
+    if (run.length) out[at] = run
+  })
   return out
 }
 
 /**
  * The melody cut to these measures: no title or notice (they are on the sheet of the whole song, and
- * the section's own label is above), and no section box on its first measure
+ * the section's own label is above), no section box on the first, and only the cue notes: the sung ones (a
+ * pickup into the next part) and the rests of the voice that sings are left out
  */
 export function sliceMeasures(melody: Score, measures: number[]): Score {
   return {
     ...melody,
     title: null,
     notice: [],
-    measures: measures.map(index => ({
-      ...(melody.measures[index] as ScoreMeasure),
-      section: null,
-    })),
+    measures: measures.map(index => {
+      const m = melody.measures[index] as ScoreMeasure
+      const cues = m.voices
+        .map(voice => voice.filter(e => e.cue))
+        .filter(voice => voice.some(e => e.kind === 'note'))
+      return { ...m, section: null, voices: cues.length ? cues : m.voices }
+    }),
   }
 }
 

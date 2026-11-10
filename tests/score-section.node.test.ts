@@ -66,6 +66,59 @@ describe('the notes of a chart section', () => {
     assert.deepEqual(cueMeasures(twice, [{ label: 'Instrumental', text: '' }]), [[0]])
   })
 
+  it('takes a lead-in bar before the intro box, and ends a pickup into the verse at its cue notes', () => {
+    // (as one sheet has it: a short bar, INTRO of three bars, the last with a sung pickup note and a cue note)
+    const lead = melodyOf('Song', [
+      bar([note('B', 3, { cue: true, duration: 3 })], { number: 1, full: false, length: 3 }),
+      bar([note('G', 3, { cue: true, duration: 4 })], { number: 2, section: 'INTRO' }),
+      bar([note('C', 4, { cue: true, duration: 4 })], { number: 3 }),
+      bar(
+        [
+          note('B', 3, { cue: true, duration: 4 }),
+          note('B', 3, { start: 3.75, duration: 0.25, syllables: ['A'] }),
+        ],
+        { number: 4 }
+      ),
+      bar([note('D', 4, { duration: 4, syllables: ['thousand'] })], {
+        number: 5,
+        section: 'VERSE 1',
+      }),
+    ])
+    const found = cueMeasures(lead, [
+      { label: 'Intro', text: '' },
+      { label: 'Verse 1', text: 'A thousand generations' },
+    ])
+    assert.deepEqual(found, [[0, 1, 2, 3], null])
+    const cut = sliceMeasures(lead, [3])
+    assert.deepEqual(
+      cut.measures[0]?.voices.flat().map(e => e.kind === 'note' && e.cue),
+      [true]
+    )
+  })
+
+  it('takes a first part with no box as the intro, and ends an instrumental where the singing starts', () => {
+    const open = melodyOf('Song', [
+      bar([note('C', 4, { cue: true, duration: 4 })], { number: 1 }),
+      bar([note('D', 4, { cue: true, duration: 4 })], { number: 2 }),
+      bar([note('E', 4, { duration: 4, syllables: ['sing'] })], { number: 3, section: 'VERSE' }),
+      bar([note('G', 4, { cue: true, duration: 4 })], { number: 4, section: 'INSTRUMENTAL' }),
+      bar([note('A', 4, { cue: true, duration: 4 })], { number: 5 }),
+      // (the sheet does not box what follows)
+      bar([note('B', 4, { duration: 4, syllables: ['sing'] })], { number: 6 }),
+    ])
+    const found = cueMeasures(open, [
+      { label: 'Intro', text: '' },
+      { label: 'Verse 1', text: 'sing sing' },
+      { label: 'Instrumental', text: '' },
+    ])
+    assert.deepEqual(found, [[0, 1], null, [3, 4]])
+  })
+
+  it('gives nothing for a part with words, even when the sheet has cue notes for it', () => {
+    const found = cueMeasures(sheet, [{ label: 'Intro', text: 'oh oh oh' }])
+    assert.deepEqual(found, [null])
+  })
+
   it('cuts the measures out with no title, notice or section box', () => {
     const cut = sliceMeasures({ ...sheet, notice: ['CCLI 1'] }, [0, 1])
     assert.equal(cut.title, null)
