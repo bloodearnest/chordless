@@ -22,6 +22,7 @@ export interface WorkerCall {
   /** From the origin: `/api/...` */
   path: string
   query?: Record<string, string>
+  /** Sent as JSON, but a Blob, which is sent as it is with its type (pad audio) */
   body?: unknown
 }
 
@@ -57,12 +58,13 @@ export async function callWorker(
   for (const [key, value] of Object.entries(query ?? {})) url.searchParams.set(key, value)
   const token = await connection.token()
   const headers: Record<string, string> = { Authorization: `Bearer ${token}` }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const raw = body instanceof Blob
+  if (body !== undefined) headers['Content-Type'] = raw ? body.type : 'application/json'
   // (a span for the call, with its traceparent: the Worker's span is its child)
   const response = await timedFetch('worker', connection.fetch)(url, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
   })
   if (response.ok) return response
   const reason = await reasonOf(response)

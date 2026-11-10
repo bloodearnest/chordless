@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import type { Identity } from '../worker/src/identity.ts'
 import { handleTeamRequest, type TeamContext } from '../worker/src/team-api.ts'
-import { notingRefs } from '../worker/src/team-refs.ts'
+import { notingPadRefs, notingRefs } from '../worker/src/team-refs.ts'
 import { TeamSpaceState } from '../worker/src/team-state.ts'
 import { MapStore } from './map-store.ts'
 import { MemoryStorage } from './memory-storage.ts'
@@ -159,11 +159,29 @@ describe('the feed of changes through the Worker', () => {
   })
 })
 
+describe('noting pad refs', () => {
+  test('notes the sets a listing shows and the files of a set, and reads straight through', async () => {
+    const { storage, root, state } = await made()
+    const set = await storage.padsIn(root).ensureSet('Warm')
+    await storage.padsIn(root).addFile(set, 'C', new Blob([new Uint8Array([5])]))
+    const pads = notingPadRefs(storage.padsIn(root), state)
+    assert.equal(await state.owns(set), false)
+    await pads.listSets()
+    assert.equal(await state.owns(set), true)
+    const [file] = await pads.listFiles(set)
+    assert.equal(await state.owns(must(file).ref), true)
+    assert.deepEqual([...new Uint8Array(await pads.read(must(file).ref))], [5])
+    const made2 = await pads.ensureSet('Bright')
+    assert.equal(await state.owns(made2), true)
+  })
+})
+
 describe('a member of the team, with the owner syncing straight to Drive', () => {
   async function team() {
     const rig = await made()
     const context: TeamContext = {
       space: async () => rig.space,
+      pads: async () => notingPadRefs(rig.storage.padsIn(rig.root), rig.state),
       root: async () => ({ ref: rig.root, name: 'Team', trashed: false }),
       owns: (_, ref) => rig.state.owns(ref),
       ownedAmong: (_, refs) => rig.state.ownedAmong(refs),

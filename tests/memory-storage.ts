@@ -130,6 +130,8 @@ export interface MemoryPadFile {
 /** A pad set, as the memory backend keeps it */
 export interface MemoryPadSet {
   ref: string
+  /** The root of the space it is kept in, or '' for the account's */
+  root: string
   name: string
   modified: string
 }
@@ -137,7 +139,17 @@ export interface MemoryPadSet {
 export class MemoryStorage implements StorageBackend {
   padSets = new Map<string, MemoryPadSet>()
   padFiles = new Map<string, MemoryPadFile>()
-  pads: PadStorage = new MemoryPads(this)
+  pads: PadStorage = new MemoryPads(this, '')
+  #spacePads = new Map<string, PadStorage>()
+
+  padsIn(rootRef: string): PadStorage {
+    let pads = this.#spacePads.get(rootRef)
+    if (!pads) {
+      pads = new MemoryPads(this, rootRef)
+      this.#spacePads.set(rootRef, pads)
+    }
+    return pads
+  }
 
   roots = new Map<string, MemoryRoot>()
   files = new Map<string, MemoryFile>()
@@ -476,14 +488,21 @@ export class MemoryStorage implements StorageBackend {
 
 class MemoryPads implements PadStorage {
   #storage: MemoryStorage
+  #root: string
 
-  constructor(storage: MemoryStorage) {
+  constructor(storage: MemoryStorage, root: string) {
     this.#storage = storage
+    this.#root = root
+  }
+
+  /** The sets kept where this is */
+  #sets(): MemoryPadSet[] {
+    return [...this.#storage.padSets.values()].filter(set => set.root === this.#root)
   }
 
   async listSets(): Promise<PadSetEntry[]> {
     this.#storage.enter('listPadSets')
-    return [...this.#storage.padSets.values()].map(set => ({
+    return this.#sets().map(set => ({
       ref: set.ref,
       name: set.name,
       modified: set.modified,
@@ -493,9 +512,9 @@ class MemoryPads implements PadStorage {
   async ensureSet(name: string): Promise<string> {
     this.#storage.enter('ensurePadSet', name)
     this.#storage.refuseWrites()
-    let set = [...this.#storage.padSets.values()].find(each => each.name === name)
+    let set = this.#sets().find(each => each.name === name)
     if (!set) {
-      set = { ref: `padset-${crypto.randomUUID()}`, name, modified: '' }
+      set = { ref: `padset-${crypto.randomUUID()}`, root: this.#root, name, modified: '' }
       this.#storage.padSets.set(set.ref, set)
     }
     set.modified = this.#storage.now()
@@ -543,6 +562,10 @@ class MemoryPads implements PadStorage {
     const file = this.#storage.padFiles.get(fileRef)
     if (!file || file.trashed) throw new StorageError(`File not found: ${fileRef}`, 404)
     return file.bytes.slice().buffer
+  }
+
+  async readStream(fileRef: string): Promise<ReadableStream<Uint8Array>> {
+    return new Blob([await this.read(fileRef)]).stream()
   }
 }
 

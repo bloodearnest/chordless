@@ -1,14 +1,32 @@
+import type { Space } from './data-types.ts'
 import { wantsPads } from './media-player-loader.ts'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.ts'
+import { listSpaces } from './space.ts'
 import { driveStorage } from './storage/browser-drive.ts'
+import { isTeamMember, storageFor } from './storage/space-storage.ts'
 import type { PadStorage } from './storage/types.ts'
 import { readZip, type ZipArchive } from './utils/zip.ts'
 
-/** A set of pads: a folder of them in the storage (the app ships none: the pads are the user's own) */
+/**
+ * A set of pads: a folder of them in the storage (the app ships none: the pads are the user's own).
+ * It is the account's (a personal space's), or a team space's, kept in that space's folder.
+ */
 export interface PadSet {
   id: string
   name: string
   modifiedTime?: string | null
+  /** The team space it is kept in; none for the account's */
+  spaceId?: string | null
+  /** That space's name, to show beside the set */
+  spaceName?: string
+}
+
+/** Where pad sets are kept: the account's, or a team space's folder */
+export interface PadSource {
+  /** The team space; null for the account's */
+  spaceId: string | null
+  name: string
+  storage: PadStorage
 }
 
 /** Where a pad's audio is in the storage (`fileId` is its ref; the name is what devices have kept) */
@@ -47,11 +65,64 @@ const PAD_SET_SELECTION_KEY = 'padset-selection'
 const PAD_SET_CACHE_STATE_KEY = 'padset-cache-state'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 
-// Where the pad sets are kept: Google Drive, unless a test says otherwise
-let padStorage: PadStorage = driveStorage.pads
+// Where the pad sets are kept: the account's in Google Drive, and each team space's, unless a test
+// says otherwise
+let accountPads: PadStorage = driveStorage.pads
+let teamSourcesGiven: PadSource[] | null = null
 
-export function setPadStorage(storage?: PadStorage | null) {
-  padStorage = storage ?? driveStorage.pads
+/**
+ * Keep the account's pad sets in this storage, and the team spaces' in these (a test's); with
+ * none, the account's Google Drive and the team spaces on this device
+ */
+export function setPadStorage(storage?: PadStorage | null, teamSources: PadSource[] = []) {
+  accountPads = storage ?? driveStorage.pads
+  teamSourcesGiven = storage ? teamSources : null
+  // (a list made from the storage before is not this one's)
+  padSetListCache = null
+}
+
+/** A team space's pads: in its folder, straight in Drive for its owner, through the Worker for anyone else */
+function teamSource(space: Space): PadSource | null {
+  if (!space.team) return null
+  const storage = isTeamMember(space)
+    ? storageFor(space).padsIn(space.team.id)
+    : space.rootRef
+      ? driveStorage.padsIn(space.rootRef)
+      : null
+  return storage && { spaceId: space.id, name: space.name, storage }
+}
+
+/** Every place pad sets are kept, the account's first */
+async function padSources(): Promise<PadSource[]> {
+  const spaces = teamSourcesGiven
+    ? []
+    : await listSpaces().catch(
+        /* v8 ignore next 4 -- the device's own database not opening: the account's pads still play */
+        error => {
+          console.warn('[PadSetService] Failed to find the team spaces:', error)
+          return []
+        }
+      )
+  const teams =
+    teamSourcesGiven ??
+    spaces.flatMap(space => {
+      const source = teamSource(space)
+      return source ? [source] : []
+    })
+  return [{ spaceId: null, name: 'Personal', storage: accountPads }, ...teams]
+}
+
+/** Where a set (or a space's sets: null for the account's) is kept */
+async function sourceOf(spaceId: string | null | undefined): Promise<PadSource> {
+  const sources = await padSources()
+  const source = sources.find(each => each.spaceId === (spaceId ?? null))
+  if (!source) throw new Error('That pad set’s team space is not on this device')
+  return source
+}
+
+/** The places a pad set can be uploaded to: the account, and each team space on this device */
+export async function listPadDestinations(): Promise<{ spaceId: string | null; name: string }[]> {
+  return (await padSources()).map(({ spaceId, name }) => ({ spaceId, name }))
 }
 
 const PAD_SET_METADATA_CACHE = new Map<string, PadSetMetadata>()
@@ -86,12 +157,25 @@ export async function listPadSets(force = false): Promise<PadSet[]> {
 
   padSetListPromise = (async () => {
     const sets: PadSet[] = []
-    try {
-      for (const set of await padStorage.listSets()) {
-        sets.push({ id: set.ref, name: set.name, modifiedTime: set.modified })
+    const sources = await padSources()
+    // (each place on its own: one that cannot be reached leaves the others' sets)
+    const listed = await Promise.all(
+      sources.map(source =>
+        source.storage.listSets().catch(error => {
+          console.warn(`[PadSetService] Failed to list the pad sets of ${source.name}:`, error)
+          return []
+        })
+      )
+    )
+    for (const [index, source] of sources.entries()) {
+      for (const set of listed[index]) {
+        sets.push({
+          id: set.ref,
+          name: set.name,
+          modifiedTime: set.modified,
+          ...(source.spaceId ? { spaceId: source.spaceId, spaceName: source.name } : {}),
+        })
       }
-    } catch (error) {
-      console.warn('[PadSetService] Failed to list pad sets from Drive:', error)
     }
 
     padSetListCache = sets
@@ -102,10 +186,16 @@ export async function listPadSets(force = false): Promise<PadSet[]> {
   return padSetListPromise
 }
 
+/**
+ * Upload a pad set: to the account's pads, or to a team space's (`spaceId`). A set of the same name
+ * there is replaced; in a team space only an admin may do that, and anyone else is told to give it
+ * another name (the Worker's rule: worker/src/team-pads.ts).
+ */
 export async function uploadPadSet(
   zipFile: File | null | undefined,
   padSetName?: string,
-  onProgress?: (uploaded: number, total: number) => void
+  onProgress?: (uploaded: number, total: number) => void,
+  spaceId: string | null = null
 ): Promise<PadSet> {
   if (!zipFile) {
     throw new Error('Please select a pad set ZIP file.')
@@ -124,11 +214,14 @@ export async function uploadPadSet(
     throw new Error(`Missing keys in pad set: ${missingKeys.join(', ')}`)
   }
 
+  const source = await sourceOf(spaceId)
+  const padStorage = source.storage
+
   // Ensure folder exists
   const folderId = await padStorage.ensureSet(normalizedName)
 
-  // Clear old contents and cached media
-  await padStorage.trashFiles(folderId)
+  // Clear old contents (a set that was there: a new one has none) and cached media
+  if ((await padStorage.listFiles(folderId)).length > 0) await padStorage.trashFiles(folderId)
   await invalidatePadSetCache(folderId)
 
   // Upload each file
@@ -144,7 +237,11 @@ export async function uploadPadSet(
   padSetListCache = null
   window.dispatchEvent(new PadSetListUpdatedEvent())
 
-  const padSet: PadSet = { id: folderId, name: normalizedName }
+  const padSet: PadSet = {
+    id: folderId,
+    name: normalizedName,
+    ...(source.spaceId ? { spaceId: source.spaceId, spaceName: source.name } : {}),
+  }
   // The first set uploaded is the one to use: there is no default to fall back on
   if (!getActivePadSet()) await selectPadSet(folderId)
   return padSet
@@ -152,16 +249,17 @@ export async function uploadPadSet(
 
 /** How many bytes of audio a pad set holds in Drive (for an export to say how big it would be) */
 export async function padSetSize(padSet: PadSet): Promise<number> {
-  const files = await padStorage.listFiles(padSet.id)
+  const files = await (await sourceOf(padSet.spaceId)).storage.listFiles(padSet.id)
   return files.reduce((total, file) => total + file.size, 0)
 }
 
 /** A pad set's audio, by key, read from Drive (or what was kept of it) */
 export async function readPadSetAudio(padSet: PadSet): Promise<Map<string, ArrayBuffer>> {
   const files = await ensurePadSetMetadata(padSet)
+  const { storage } = await sourceOf(padSet.spaceId)
   const audio = new Map<string, ArrayBuffer>()
   for (const key of PAD_FILE_KEYS) {
-    audio.set(key, await padStorage.read((files[key] as PadFile).fileId))
+    audio.set(key, await storage.read((files[key] as PadFile).fileId))
   }
   return audio
 }
@@ -209,7 +307,16 @@ export async function ensurePadKeyCached(padSet: PadSet, key: string): Promise<v
       throw new Error(`Pad set "${padSet.name}" is missing key: ${normalizedKey}`)
     }
 
-    const buffer = await padStorage.read(entry.fileId)
+    const { storage } = await sourceOf(padSet.spaceId)
+    const buffer = await storage.read(entry.fileId).catch(async error => {
+      // (a file this device knew of that the storage does not have, or that the team service has
+      // not been shown yet: the set is listed again, and its file for the key read once more)
+      if ((error as { status?: number }).status !== 404) throw error
+      forgetPadSetFiles(padSet.id)
+      // (a set listed again has every key, or it would have thrown)
+      const again = (await ensurePadSetMetadata(padSet))[normalizedKey] as PadFile
+      return storage.read(again.fileId)
+    })
     const blob = new Blob([buffer], { type: entry.mimeType })
     await cache.put(
       request,
@@ -336,7 +443,7 @@ async function ensurePadSetMetadata(padSet: PadSet): Promise<Record<string, PadF
     return storedEntry.files
   }
 
-  const files = await padStorage.listFiles(padSet.id)
+  const files = await (await sourceOf(padSet.spaceId)).storage.listFiles(padSet.id)
   const fileMap: Record<string, PadFile> = {}
 
   for (const file of files) {
@@ -367,13 +474,18 @@ function metadataMatches(entry: PadSetMetadata, padSet: PadSet): boolean {
   return !padSet.modifiedTime || entry.modifiedTime === padSet.modifiedTime
 }
 
-async function invalidatePadSetCache(padSetId: string): Promise<void> {
+/** Forget what was kept of a set's files, so they are listed again (the audio kept stays) */
+function forgetPadSetFiles(padSetId: string): void {
   PAD_SET_METADATA_CACHE.delete(padSetId)
   const cacheState = getCacheState()
   if (cacheState[padSetId]) {
     delete cacheState[padSetId]
     saveCacheState(cacheState)
   }
+}
+
+async function invalidatePadSetCache(padSetId: string): Promise<void> {
+  forgetPadSetFiles(padSetId)
 
   if (typeof caches !== 'undefined') {
     const cache = await caches.open(PAD_CACHE_NAME)

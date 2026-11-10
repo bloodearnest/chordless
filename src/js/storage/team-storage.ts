@@ -3,8 +3,8 @@
  * Worker (`worker/src/team-api.ts`), which checks the member's role and passes it on to the
  * space's Drive. Nothing is cached or kept here. See docs/STORAGE_API.md, "The team backend".
  *
- * A team space's root ref is the space's id (issued, not found by name), and bodies are text:
- * share links and pad audio are not served for team spaces yet.
+ * A team space's root ref is the space's id (issued, not found by name), and bodies are text, but
+ * for the audio of the space's pad sets (`padsIn`).
  */
 import { jwtClaims } from '../base64url.ts'
 import type { SpaceMember } from '../data-types.ts'
@@ -16,6 +16,8 @@ import {
   type FileBody,
   type FileInput,
   type FileStatus,
+  type PadFileEntry,
+  type PadSetEntry,
   type PadStorage,
   type RootInfo,
   type SpaceStorage,
@@ -26,6 +28,70 @@ import {
 
 /** What a call to the Worker is: its path is from the space's own (`/api/space/<id>`) */
 type Call = Omit<WorkerCall, 'method'> & { method?: 'GET' | 'POST' | 'PUT' }
+
+/** The space's pad sets, through the Worker (worker/src/team-pads.ts) */
+class TeamPads implements PadStorage {
+  #client: TeamClient
+  #id: string
+
+  constructor(client: TeamClient, id: string) {
+    this.#client = client
+    this.#id = id
+  }
+
+  listSets(): Promise<PadSetEntry[]> {
+    return this.#client.json(this.#id, { path: '/pads' })
+  }
+
+  async ensureSet(name: string): Promise<string> {
+    const { ref } = await this.#client.json<{ ref: string }>(this.#id, {
+      method: 'POST',
+      path: '/pads',
+      body: { name },
+    })
+    return ref
+  }
+
+  async listFiles(setRef: string): Promise<PadFileEntry[]> {
+    try {
+      return await this.#client.json(this.#id, {
+        path: `/pads/${encodeURIComponent(setRef)}/files`,
+      })
+    } catch (error) {
+      // (a set that is not there has no files)
+      if (error instanceof TeamError && error.status === 404) return []
+      throw error
+    }
+  }
+
+  addFile(setRef: string, padKey: string, audio: Blob): Promise<void> {
+    return this.#client.run(this.#id, {
+      method: 'PUT',
+      path: `/pads/${encodeURIComponent(setRef)}/files/${encodeURIComponent(padKey)}`,
+      body: new Blob([audio], { type: 'audio/mpeg' }),
+    })
+  }
+
+  trashFiles(setRef: string): Promise<void> {
+    return this.#client.run(this.#id, {
+      method: 'POST',
+      path: `/pads/${encodeURIComponent(setRef)}/trash`,
+    })
+  }
+
+  async read(fileRef: string): Promise<ArrayBuffer> {
+    return (await this.#file(fileRef)).arrayBuffer()
+  }
+
+  async readStream(fileRef: string): Promise<ReadableStream<Uint8Array>> {
+    // (an answer with audio always has a body)
+    return (await this.#file(fileRef)).body as ReadableStream<Uint8Array>
+  }
+
+  #file(fileRef: string): Promise<Response> {
+    return this.#client.response(this.#id, { path: `/pads/files/${encodeURIComponent(fileRef)}` })
+  }
+}
 
 class TeamClient {
   #connection: WorkerConnection
@@ -65,6 +131,11 @@ class TeamClient {
   /** The answer's text */
   async text(spaceId: string, call: Call): Promise<string> {
     return (await this.#send(spaceId, call)).text()
+  }
+
+  /** The answer as it came (a body that is not JSON or text: pad audio) */
+  response(spaceId: string, call: Call): Promise<Response> {
+    return this.#send(spaceId, call)
   }
 
   /** Make the call, and say nothing of the answer */
@@ -217,7 +288,7 @@ class TeamSpace implements SpaceStorage {
 
 /**
  * The backend for a team space. A space is joined, not found or made from here, so there is no
- * root to look up by name; pads follow when they move into the space.
+ * root to look up by name. Its pads are the space's own (`padsIn`): it has none of the account's.
  */
 export class TeamStorage implements StorageBackend {
   #client: TeamClient
@@ -229,7 +300,11 @@ export class TeamStorage implements StorageBackend {
   }
 
   get pads(): PadStorage {
-    throw new Error('Pad sets are not served for team spaces yet')
+    throw new Error('A team space’s pad sets are its own: there are no account pad sets here')
+  }
+
+  padsIn(rootRef: string): PadStorage {
+    return new TeamPads(this.#client, rootRef)
   }
 
   async available(): Promise<boolean> {

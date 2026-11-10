@@ -36,11 +36,22 @@ export async function makeTeamRig(): Promise<TeamRig> {
   const roles = new Map<string, TeamRole | 'none'>([['writer-token', 'writer']])
   const emails = new Map<string, string>()
   const rootOf = (id: string) => spaces.find(space => space.id === id)?.root
+  /** The refs of the pad sets kept in a space's folder, and of their files */
+  const padRefsOf = (root: string | undefined) => {
+    const sets = [...storage.padSets.values()].filter(set => root && set.root === root)
+    const setRefs = new Set(sets.map(set => set.ref))
+    const files = [...storage.padFiles.values()].filter(file => setRefs.has(file.set))
+    return new Set([...setRefs, ...files.map(file => file.ref)])
+  }
 
   const context: TeamContext = {
     async space(id) {
       const root = rootOf(id)
       return root ? storage.space(root) : null
+    },
+    async pads(id) {
+      const root = rootOf(id)
+      return root ? storage.padsIn(root) : null
     },
     async root(id) {
       const root = rootOf(id)
@@ -50,11 +61,17 @@ export async function makeTeamRig(): Promise<TeamRig> {
     async owns(id, ref) {
       // (a file in the bin is still the space's: its status says so)
       const root = rootOf(id)
-      return storage.everything(f => f.root === root && f.ref === ref).length > 0
+      return (
+        storage.everything(f => f.root === root && f.ref === ref).length > 0 ||
+        padRefsOf(root).has(ref)
+      )
     },
     async ownedAmong(id, refs) {
       const root = rootOf(id)
-      const here = new Set(storage.everything(f => f.root === root).map(f => f.ref))
+      const here = new Set([
+        ...storage.everything(f => f.root === root).map(f => f.ref),
+        ...padRefsOf(root),
+      ])
       return refs.filter(ref => here.has(ref))
     },
   }

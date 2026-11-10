@@ -10,6 +10,13 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { createTeamFolder, driveApi } from '../src/js/drive-api.ts'
+import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
+import {
+  ensurePadKeyCached,
+  getPadCacheUrl,
+  listPadSets,
+  uploadPadSet,
+} from '../src/js/pad-set-service.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import { deleteSpace, getSpaceById } from '../src/js/space.ts'
 import { storageFor } from '../src/js/storage/space-storage.ts'
@@ -27,6 +34,7 @@ import { installFakeDrive } from './fake-drive.ts'
 import { MapStore } from './map-store.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
+import { buildZip } from './zip.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -270,6 +278,61 @@ describe('a team space, end to end', () => {
     )
     expect(lists).to.have.length(1)
     expect(lists[0].params.get('q')).to.contain("mimeType='application/vnd.google-apps.folder'")
+  })
+
+  it('has a member play the team’s pads, and add a set of their own, but not replace one', async () => {
+    const zip = () =>
+      buildZip(PAD_FILE_KEYS.map(key => ({ name: `${key}.mp3`, data: new Uint8Array([7, 8]) })))
+    try {
+      // The owner uploads a set to the team space: straight to its folder in Drive
+      await signInAs(ann, true)
+      const parent = await createTeamFolder('root', 'Church Drive')
+      const owned = await createTeamSpace(
+        `Pads ${crypto.randomUUID().slice(0, 8)}`,
+        parent,
+        driveApi
+      )
+      made.push(owned.id)
+      const team = must(owned.team)
+      const theirs = await uploadPadSet(await zip(), 'Team Pads', undefined, owned.id)
+      expect(theirs.spaceId).to.equal(owned.id)
+      // (a folder in the fake Drive, by its id: `listFiles` leaves folders out)
+      const folderOf = (id: string) => must(drive.files.get(id))
+      const padsFolder = folderOf(folderOf(theirs.id).parents[0])
+      expect(padsFolder.parents).to.deep.equal([owned.rootRef])
+
+      // A team member joins, and finds the set among their pads, through the Worker
+      const { code } = await teamApi.createInvite(team.id, 'reader', bob.email)
+      await signInAs(bob)
+      const joined = await joinSpace(
+        team.id,
+        code,
+        storageFor({ team: { id: team.id, role: 'reader' } })
+      )
+      made.push(joined.id)
+      const listed = must(
+        (await listPadSets(true)).find(set => set.spaceId === joined.id && set.name === 'Team Pads')
+      )
+      expect(listed.id).to.equal(theirs.id)
+      await ensurePadKeyCached(listed, 'C')
+      const cached = await (await caches.open('padsets-cache-v1')).match(
+        getPadCacheUrl(listed.id, 'C')
+      )
+      expect([...new Uint8Array(await must(cached).arrayBuffer())]).to.deep.equal([7, 8])
+
+      // They cannot replace it, but can add one of their own, which goes in the team's folder
+      let refused = ''
+      await uploadPadSet(await zip(), 'Team Pads', undefined, joined.id).catch(error => {
+        refused = (error as Error).message
+      })
+      expect(refused).to.match(/give yours another name/)
+      const mine = await uploadPadSet(await zip(), 'Bob Pads', undefined, joined.id)
+      expect(folderOf(mine.id).parents).to.deep.equal([padsFolder.id])
+    } finally {
+      await caches.delete('padsets-cache-v1')
+      localStorage.removeItem('padset-selection')
+      localStorage.removeItem('padset-cache-state')
+    }
   })
 
   it('refuses someone who is not in the space, and says who and which space', async () => {
