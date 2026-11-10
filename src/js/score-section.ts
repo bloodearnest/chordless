@@ -6,7 +6,7 @@
  * in the song's key, so the octave is the whole sheet's choice and not the slice's).
  */
 import type { ParsedChart } from './data-types.ts'
-import type { Score } from './score.ts'
+import type { Score, ScoreMeasure } from './score.ts'
 import { type ChartText, matchChart, playSteps } from './score-structure.ts'
 import { sungNotes } from './score-transpose.ts'
 
@@ -32,7 +32,7 @@ export function cueMeasures(melody: Score, chart: ChartText[]): (number[] | null
     let notes = 0
     let singing = false
     for (const index of measures)
-      for (const voice of melody.measures[index]?.voices ?? [])
+      for (const voice of (melody.measures[index] as ScoreMeasure).voices)
         for (const e of voice)
           if (e.kind === 'note') {
             notes++
@@ -52,10 +52,10 @@ export function sliceMeasures(melody: Score, measures: number[]): Score {
     ...melody,
     title: null,
     notice: [],
-    measures: measures.flatMap(index => {
-      const m = melody.measures[index]
-      return m ? [{ ...m, section: null }] : []
-    }),
+    measures: measures.map(index => ({
+      ...(melody.measures[index] as ScoreMeasure),
+      section: null,
+    })),
   }
 }
 

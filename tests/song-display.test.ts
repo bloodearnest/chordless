@@ -4,6 +4,7 @@ import { ContextProvider } from '@lit/context'
 import type { SongDisplay } from '../src/components/song-display.ts'
 import type { SongSection } from '../src/components/song-section.ts'
 import { ChordProParser } from '../src/js/parser.ts'
+import { attachCues } from '../src/js/score-shown.ts'
 
 const { describe, it } = window
 
@@ -78,5 +79,30 @@ describe('song-display', () => {
     expect(sections(display)[0].displayAsNashville).to.equal(false)
     expect(sections(display)[0].unicodeAccidentals).to.equal(true)
     host.remove()
+  })
+
+  it('gives each section the notes of the lead sheet that are its own, where it has any', async () => {
+    const melody = { title: null, notice: [], measures: [] }
+    const display = await show({
+      parsed: parse('{title: A}\n{key: G}\n\n{comment: Intro}\n[G]\n\n{comment: Verse}\n[G]One'),
+      cues: { melody, key: 'C', measures: [[0, 1], null] },
+    })
+    const [intro, verse] = sections(display) as unknown as {
+      melody: unknown
+      melodyKey: string
+      melodyMeasures: number[] | null
+    }[]
+    expect(intro.melody).to.equal(melody)
+    expect(intro.melodyKey).to.equal('C')
+    expect(intro.melodyMeasures).to.deep.equal([0, 1])
+    expect(verse.melody).to.equal(null)
+    expect(verse.melodyMeasures).to.equal(null)
+    display.cues = null
+    await display.updateComplete
+    expect((sections(display)[0] as unknown as { melody: unknown }).melody).to.equal(null)
+  })
+
+  it('has no cues to attach to content with no song in it', () => {
+    expect(attachCues(document.createElement('div'), null)).to.equal(false)
   })
 })

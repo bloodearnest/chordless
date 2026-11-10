@@ -21,19 +21,19 @@
     "functions": 0
   },
   "src/js/score-pdf.ts": {
-    "lines": 100,
-    "branches": 61,
-    "functions": 31
+    "lines": 60,
+    "branches": 57,
+    "functions": 24
   },
   "src/js/score-pdfjs.ts": {
-    "lines": 11,
-    "branches": 7,
+    "lines": 1,
+    "branches": 6,
     "functions": 0
   },
   "src/js/score-read.ts": {
-    "lines": 101,
-    "branches": 43,
-    "functions": 10
+    "lines": 63,
+    "branches": 40,
+    "functions": 9
   },
   "src/js/score-render-engine.ts": {
     "lines": 1,
@@ -70,7 +70,7 @@
     "lines": 0,
     "branches": 0,
     "functions": 0,
-    "unloaded": 20
+    "unloaded": 16
   },
   "src/js/xml.ts": {
     "lines": 0,

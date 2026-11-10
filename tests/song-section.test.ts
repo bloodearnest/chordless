@@ -157,6 +157,13 @@ describe('song-section', () => {
       expect(sheet.songKey).to.equal('C')
     })
 
+    it('engraves in the key the notes were written in when the song has none shown', async () => {
+      await withMelody({ hideMode: 'melody' })
+      section.displayKey = ''
+      await section.updateComplete
+      expect(section.shadowRoot.querySelector('score-view').songKey).to.equal('C')
+    })
+
     it('shows the lines again for a section with no notes, whatever its mode', async () => {
       await setUp({ hideMode: 'melody' })
       expect(section.shadowRoot.querySelector('score-view')).to.equal(null)
