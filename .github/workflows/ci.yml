@@ -242,8 +242,10 @@ jobs:
         with:
           setup: ${{ steps.setup.outputs.save }}
 
-  # Only when the lockfile changed: the new versions are then the pull request's doing. Any other
-  # day's new advisory is the Advisories workflow's, which holds nothing up
+  # Only when the lockfile changed: the new versions are then the pull request's doing. Advisory only:
+  # not in `ci-ok`, so a failure shows on the pull request but blocks no merge (a new advisory is not
+  # always the change's doing, and Dependabot's pull requests are all lockfile changes). Any other
+  # day's new advisory is the Advisories workflow's
   advisories:
     name: Advisories
     needs: changes
@@ -284,7 +286,7 @@ jobs:
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [changes, lint, node, unit, coverage, e2e-linux, e2e, advisories, infra]
+    needs: [changes, lint, node, unit, coverage, e2e-linux, e2e, infra]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
