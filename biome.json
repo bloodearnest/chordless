@@ -168,7 +168,6 @@
           "__PRECACHE__",
           "__CACHE_VERSION__",
           "__DEFERRED__",
-          "__DEFERRED_VERSION__",
           "__RELEASE_DATE__"
         ]
       }
