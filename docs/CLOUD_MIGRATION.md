@@ -2,7 +2,8 @@
 
 **Status (2026-10-21): the app has moved to `chordless-app`.** Its sign-in is verified and production
 uses it. The old project is deleted. This document is the record of
-the move, and what is left of it is step 6 (a project of its own for the service account).
+the move. Step 6 (a project of its own for the service account) is not being done: decided
+2026-11-10, the service account stays in `chordless-app`.
 
 | Step | State |
 |---|---|
@@ -12,7 +13,7 @@ the move, and what is left of it is step 6 (a project of its own for the service
 | 3. Wire it in | Done and deployed: client id in `google-auth.ts`, Worker secrets (`wrangler secret put`), Picker app id. |
 | 4. Move the data | Done: **Start over in Drive** (below) replaces export and import, and the checks passed. |
 | 5. Retire the old project | Done 2026-10-21: deleted at Google. |
-| 6. Team storage project | Not yet. |
+| 6. Team storage project | Not done: the service account stays in `chordless-app` (decided 2026-11-10). |
 
 What was made:
 
@@ -154,8 +155,12 @@ Made (2026-10-20):
   members, so it says what it is).
 - **No organisation.** The Google account has none.
 - **Terraform**, not OpenTofu, with local state in `infra/` (gitignored, cheap to lose: `infra/README.md`).
+- **The service account stays in `chordless-app`** (2026-11-10), with its key in the Worker secret
+  `TEAM_STORAGE_KEY`. A project of its own (step 6) would keep that key apart from the sign-in and
+  the verified brand, but the address a team adds to its drive names the project and cannot change
+  later, so the choice was made before any team adds it. The risk is the one the key always has:
+  it reaches every connected team's drive, so it stays out of Terraform and can be replaced.
 
 Still open:
 
-- Whether the service account moves to its own team storage project (step 6), and what that project is called.
 - Whether the Gmail download script has its own client or uses this one.
