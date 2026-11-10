@@ -22,6 +22,13 @@ async function call<T>(method: WorkerCall['method'], path: string, body?: unknow
   return response.status === 204 ? (undefined as T) : response.json()
 }
 
+/** How the Worker reaches a team space's folder (docs/SPACES.md, "Credentials") */
+export interface TeamCredential {
+  kind: 'owner' | 'service-account'
+  /** The address a team adds to its shared drive; null where the server has no team storage */
+  serviceAccount: string | null
+}
+
 const space = (id: string) => `/api/space/${encodeURIComponent(id)}`
 
 export const teamApi = {
@@ -60,6 +67,14 @@ export const teamApi = {
   /** The owner's new sign-in, when Google no longer honours the one the space holds */
   replaceCredential: (id: string, blob: string) =>
     call<void>('PUT', `${space(id)}/credential`, { blob }),
+  /**
+   * How the Worker reaches the space's folder: the owner's sign-in, or team-managed storage
+   * (Chordless's service account), whose address is given where the server has one
+   */
+  credential: (id: string) => call<TeamCredential>('GET', `${space(id)}/credential`),
+  /** Check that team storage can keep the folder's files, and use it (the owner's sign-in is then forgotten) */
+  useTeamStorage: (id: string) =>
+    call<TeamCredential>('POST', `${space(id)}/credential/service-account`),
   /** End sharing: the Worker forgets the space; the Drive folder and its files stay */
   endSharing: (id: string) => call<void>('DELETE', space(id)),
 }

@@ -100,6 +100,16 @@ export function inviteLink(origin: string, teamId: string, code: string): string
   return `${origin}/join#${teamId}.${code}`
 }
 
+/**
+ * Reach a team space's folder with this person's own Google sign-in again, after team-managed
+ * storage (or when Google no longer honours the sign-in the space holds): they are its owner
+ */
+export async function returnToOwnSignIn(teamId: string): Promise<void> {
+  const stored = await getStoredBlob()
+  if (!stored) throw new Error('Sign in with Google first')
+  await teamApi.replaceCredential(teamId, stored.blob)
+}
+
 /** Stop sharing a space of this person's: the Worker forgets it, and it is theirs alone again */
 export async function stopSharing(spaceId: string): Promise<Space> {
   const space = await getSpaceById(spaceId)
