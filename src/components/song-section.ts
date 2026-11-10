@@ -4,6 +4,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { listenForLongPress } from '../js/annotations/long-press.ts'
 import { nudgeLine } from '../js/annotations/nudge.ts'
 import type { ChartLine, ChartSegment, HideMode, ShownAnnotation } from '../js/data-types.ts'
+import type { Score } from '../js/score.ts'
 import { chordFitsOverWords, groupSegmentsIntoUnits } from '../js/utils/chart-line-units.ts'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
 import {
@@ -129,6 +130,10 @@ export class SongSection extends LitElement {
     capo: { type: Number },
     /** @type {string} Target key after applying capo */
     capoKey: { type: String, attribute: 'capo-key' },
+    /** The song's lead sheet and the key it is written in, and which of its measures are this section's (docs/MELODY.md, "In the chart"); none where it has no notes to show */
+    melody: { attribute: false },
+    melodyKey: { type: String, attribute: false },
+    melodyMeasures: { attribute: false },
   }
 
   declare songIndex: number
@@ -145,6 +150,9 @@ export class SongSection extends LitElement {
   declare displayKey: string
   declare capo: number
   declare capoKey: string
+  declare melody: Score | null
+  declare melodyKey: string
+  declare melodyMeasures: number[] | null
 
   _wrapper: Ref<HTMLElement>
   _lines: ChartLine[] | undefined
@@ -597,6 +605,14 @@ export class SongSection extends LitElement {
     this.displayKey = ''
     this.capo = 0
     this.capoKey = ''
+    this.melody = null
+    this.melodyKey = ''
+    this.melodyMeasures = null
+  }
+
+  /** The lead sheet has notes for this section, to show as music */
+  _hasMelody(): boolean {
+    return Boolean(this.melody && this.melodyMeasures?.length)
   }
 
   /**
@@ -647,9 +663,11 @@ export class SongSection extends LitElement {
 
   /**
    * Get the recommended hideMode based on content analysis
-   * @returns Recommended hideMode: 'lyrics' (show chords only), 'chords' (show lyrics only), or 'none' (show all)
+   * @returns Recommended hideMode: 'melody' (show the notes), 'lyrics' (show chords only), 'chords' (show lyrics only), or 'none' (show all)
    */
-  getRecommendedHideMode(): 'lyrics' | 'chords' | 'none' {
+  getRecommendedHideMode(): 'lyrics' | 'chords' | 'melody' | 'none' {
+    // (the notes, where the sheet has them for a part with no words)
+    if (!this._hasAnyLyrics && this._hasMelody()) return 'melody'
     if (!this._hasAnyLyrics && this._hasAnyChords) {
       // Only chords, show chords only
       return 'lyrics'
@@ -786,6 +804,7 @@ export class SongSection extends LitElement {
       'section-collapsed': this.hideMode === 'collapse',
       'chords-hidden': this.hideMode === 'chords',
       'lyrics-hidden': this.hideMode === 'lyrics',
+      'melody-shown': this._showsMelody(),
       'edit-mode-active': !!this.editMode,
     }
     const label = (this.label || '').trim()
@@ -835,7 +854,11 @@ export class SongSection extends LitElement {
   }
 
   _renderControls() {
-    const showAllActive = !this.isHidden && (!this.hideMode || this.hideMode === 'none')
+    const showAllActive =
+      !this.isHidden &&
+      (!this.hideMode ||
+        this.hideMode === 'none' ||
+        (this.hideMode === 'melody' && !this._hasMelody()))
     const showLyricsActive = !this.isHidden && this.hideMode === 'chords'
     const showChordsActive = !this.isHidden && this.hideMode === 'lyrics'
     const showNoneActive = this.isHidden || this.hideMode === 'hide'
@@ -845,8 +868,9 @@ export class SongSection extends LitElement {
     const canShowChords = this._hasAnyChords
     const canShowAll = canShowLyrics && canShowChords
 
+    const melodyActive = !this.isHidden && this._showsMelody()
     if (this.style) {
-      this.style.setProperty('--pill-option-count', '4')
+      this.style.setProperty('--pill-option-count', this._hasMelody() ? '5' : '4')
     }
     return html`
       <div class="section-controls" role="group" aria-label="Show content options">
@@ -855,6 +879,7 @@ export class SongSection extends LitElement {
           ${this._renderControlButton('show-all', 'All', showAllActive, !canShowAll)}
           ${this._renderControlButton('show-lyrics', 'Lyrics', showLyricsActive, !canShowLyrics)}
           ${this._renderControlButton('show-chords', 'Chords', showChordsActive, !canShowChords)}
+          ${this._hasMelody() ? this._renderControlButton('show-melody', 'Melody', melodyActive) : nothing}
           ${this._renderControlButton('show-none', 'None', showNoneActive)}
         </div>
       </div>
@@ -899,7 +924,22 @@ export class SongSection extends LitElement {
     `
   }
 
+  /** The section is shown as the notes of the lead sheet (and the sheet has them) */
+  _showsMelody(): boolean {
+    return this.hideMode === 'melody' && this._hasMelody()
+  }
+
   _renderContent() {
+    if (this._showsMelody()) {
+      // (the engraver is large: loaded the first time a section is shown as music)
+      void import('./score-view.ts')
+      return html`<score-view
+        .melody=${this.melody}
+        .melodyKey=${this.melodyKey}
+        .songKey=${this.displayKey || this.melodyKey}
+        .measures=${this.melodyMeasures}
+      ></score-view>`
+    }
     if (!this._contentBlocks || this._contentBlocks.length === 0) {
       return nothing
     }

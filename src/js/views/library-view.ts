@@ -48,7 +48,7 @@ import {
   withSpaceName,
 } from '../other-songs.ts'
 import { buildUrl, type Route } from '../router.ts'
-import { scoreWithKey, shownSheet, showScore } from '../score-shown.ts'
+import { attachCues, scoreWithKey, shownSheet, showScore } from '../score-shown.ts'
 import { isEditMode, setBodyEditMode } from '../setlist/edit-mode-ui.ts'
 import { createLibrarySongModel } from '../song-model-factory.ts'
 import { setSongUserPref } from '../song-user-prefs.ts'
@@ -178,6 +178,7 @@ export class LibraryView extends PageView {
     const found = scoreWithKey(await (await getCurrentDB()).getScore(song.uuid), song.originalKey)
     // (the song may have changed while this was read)
     if (this.#song !== song) return
+    if (this.#content.value) attachCues(this.#content.value, found)
     header.showMelodyToggle = true
     header.melodyUnavailable = !found
     if (!found) this.#melodyOn = false
@@ -511,6 +512,7 @@ export class LibraryView extends PageView {
       'show-all': 'none',
       'show-lyrics': 'chords',
       'show-chords': 'lyrics',
+      'show-melody': 'melody',
       'show-none': 'hide',
     }
     const mappedMode = explicitShowMap[mode] || (mode as HideMode)

@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import '../src/components/song-section.ts'
+import { measure, melodyOf } from './score-build.ts'
 import { A11Y } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
@@ -95,5 +96,81 @@ describe('song-section', () => {
     section.editMode = false
     await section.updateComplete
     await expect(section).to.be.accessible(a11y)
+  })
+
+  describe('with notes from the lead sheet', () => {
+    const melody = melodyOf('Test', [
+      measure(1, ['C4:4:'], { section: 'INTRO' }),
+      measure(2, ['D4:4:']),
+    ])
+    const withMelody = async (over = {}) => {
+      await setUp(over)
+      section.melody = melody
+      section.melodyKey = 'C'
+      section.melodyMeasures = [0, 1]
+      section.displayKey = 'C'
+      await section.updateComplete
+    }
+
+    it('offers Melody only where the sheet has notes for the section', async () => {
+      await setUp()
+      expect(showButtons().map(b => b.textContent.trim())).to.deep.equal([
+        'All',
+        'Lyrics',
+        'Chords',
+        'None',
+      ])
+      await withMelody()
+      expect(showButtons().map(b => b.textContent.trim())).to.deep.equal([
+        'All',
+        'Lyrics',
+        'Chords',
+        'Melody',
+        'None',
+      ])
+    })
+
+    it('sends section-action show-melody for the option', async () => {
+      await withMelody()
+      let action = ''
+      section.addEventListener('song-section:action', event => {
+        action = event.action
+      })
+      showButtons()[3].click()
+      expect(action).to.equal('show-melody')
+    })
+
+    it('shows the notes in place of the lines, and the option pressed', async () => {
+      await withMelody({ hideMode: 'melody' })
+      expect(section.shadowRoot.querySelector('score-view')).to.not.equal(null)
+      expect(section.shadowRoot.querySelector('.chord-line')).to.equal(null)
+      const pressed = showButtons().map(b => [b.textContent.trim(), b.getAttribute('aria-pressed')])
+      expect(pressed).to.deep.equal([
+        ['All', 'false'],
+        ['Lyrics', 'false'],
+        ['Chords', 'false'],
+        ['Melody', 'true'],
+        ['None', 'false'],
+      ])
+      const sheet = section.shadowRoot.querySelector('score-view')
+      expect(sheet.measures).to.deep.equal([0, 1])
+      expect(sheet.songKey).to.equal('C')
+    })
+
+    it('shows the lines again for a section with no notes, whatever its mode', async () => {
+      await setUp({ hideMode: 'melody' })
+      expect(section.shadowRoot.querySelector('score-view')).to.equal(null)
+      expect(section.shadowRoot.querySelector('.chord-line')).to.not.equal(null)
+      expect(showButtons()[0].getAttribute('aria-pressed')).to.equal('true')
+    })
+
+    it('recommends the notes for a part with no words, else what it recommended', async () => {
+      await withMelody()
+      expect(section.getRecommendedHideMode()).to.equal('none')
+      section.lines = [{ segments: [{ chord: 'G', lyrics: '' }] }]
+      expect(section.getRecommendedHideMode()).to.equal('melody')
+      section.melodyMeasures = null
+      expect(section.getRecommendedHideMode()).to.equal('lyrics')
+    })
   })
 })

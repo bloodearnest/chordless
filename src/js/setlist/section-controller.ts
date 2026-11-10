@@ -179,6 +179,7 @@ export class SectionController {
       'show-all': 'none',
       'show-lyrics': 'chords',
       'show-chords': 'lyrics',
+      'show-melody': 'melody',
       'show-none': 'hide',
     }
     const mappedMode = (explicitShowMap[mode] || mode) as HideMode

@@ -5,6 +5,7 @@
  * sheet are which chart section's, and `sliceMeasures` cuts them out of a melody (that is already
  * in the song's key, so the octave is the whole sheet's choice and not the slice's).
  */
+import type { ParsedChart } from './data-types.ts'
 import type { Score } from './score.ts'
 import { type ChartText, matchChart, playSteps } from './score-structure.ts'
 import { sungNotes } from './score-transpose.ts'
@@ -56,4 +57,30 @@ export function sliceMeasures(melody: Score, measures: number[]): Score {
       return m ? [{ ...m, section: null }] : []
     }),
   }
+}
+
+/** A song's lead sheet and the measures of it that are each section of the chart's (null where a section has no notes to show) */
+export interface SongCues {
+  melody: Score
+  /** The key the melody is written in */
+  key: string
+  measures: (number[] | null)[]
+}
+
+/** The sections of a chart as the sheet is matched to them: the label and the words of each */
+export function chartTexts(parsed: ParsedChart): ChartText[] {
+  return parsed.sections.map(section => ({
+    label: section.label ?? '',
+    text: section.lines.map(line => line.segments.map(s => s.lyrics).join('')).join(' '),
+  }))
+}
+
+/** The cues of a song from its melody; null if no section of the chart has notes to show */
+export function songCues(
+  found: { melody: Score; key: string } | null,
+  parsed: ParsedChart | null
+): SongCues | null {
+  if (!found || !parsed?.sections) return null
+  const measures = cueMeasures(found.melody, chartTexts(parsed))
+  return measures.some(Boolean) ? { melody: found.melody, key: found.key, measures } : null
 }

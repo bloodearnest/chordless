@@ -4,6 +4,7 @@ import { ContextConsumer } from '@lit/context'
 import { attachAnnotations, type ChartAnnotations } from '../js/annotations/shown.ts'
 import type { ChartSection, ParsedChart } from '../js/data-types.ts'
 import { displayPreferencesContext } from '../js/display-preferences.ts'
+import type { SongCues } from '../js/score-section.ts'
 import { isEditMode } from '../js/setlist/edit-mode-ui.ts'
 import { transposeKeyName } from '../js/transpose.ts'
 import { annotationStyles, renderAnnotations } from './chart-annotation.ts'
@@ -30,12 +31,15 @@ export class SongDisplay extends LitElement {
     capo: { type: Number },
     /** The song's annotations, placed on its sections (docs/ANNOTATIONS.md) */
     annotations: { attribute: false },
+    /** The notes of the song's lead sheet that its sections show (docs/MELODY.md, "In the chart") */
+    cues: { attribute: false },
   }
 
   declare parsed: ParsedChart | null
   declare songIndex: number
   declare capo: number
   declare annotations: ChartAnnotations | null
+  declare cues: SongCues | null
 
   _display: ContextConsumer<typeof displayPreferencesContext, SongDisplay>
 
@@ -82,6 +86,7 @@ export class SongDisplay extends LitElement {
     this.songIndex = 0
     this.capo = 0
     this.annotations = null
+    this.cues = null
     // How chords are shown (Nashville numbers, unicode accidentals), passed
     // down to the sections; re-renders when a preference changes
     this._display = new ContextConsumer(this, {
@@ -162,6 +167,9 @@ export class SongDisplay extends LitElement {
         .displayKey=${displayKey}
         .capo=${capoValue}
         .capoKey=${capoKey}
+        .melody=${this.cues?.measures[index] ? this.cues.melody : null}
+        .melodyKey=${this.cues?.key ?? ''}
+        .melodyMeasures=${this.cues?.measures[index] ?? null}
         song-index=${this.songIndex}
         section-index=${index}
         data-label=${section.label || ''}

@@ -24,6 +24,21 @@ describe('score-view', () => {
     expect(sheet.shadowRoot?.querySelectorAll('.notice p')).to.have.length(2)
   })
 
+  it('engraves only the measures it is given, with no title or notice', async () => {
+    const melody = {
+      ...sampleScore,
+      notice: ['CCLI 1234'],
+      measures: [...sampleScore.measures, ...sampleScore.measures.map(m => ({ ...m, number: 2 }))],
+    }
+    const whole = await shown({ melody, melodyKey: 'C', songKey: 'C' })
+    expect(notes(whole)).to.equal(6)
+    const sheet = await shown({ melody, melodyKey: 'C', songKey: 'C', measures: [1] })
+    expect(notes(sheet)).to.equal(3)
+    expect(sheet.shadowRoot?.querySelector('.title') === null).to.equal(true)
+    expect(sheet.shadowRoot?.querySelector('.notice') === null).to.equal(true)
+    expect(getComputedStyle(sheet).paddingBottom).to.equal('0px')
+  })
+
   it('has no title line for a sheet that has none', async () => {
     const melody = { ...sampleScore, title: null, notice: ['(a subtitle)', 'CCLI Song # 1'] }
     const sheet = await shown({ melody, melodyKey: 'C', songKey: 'C' })
