@@ -25,7 +25,11 @@
       <h2>In short</h2>
       <ul>
         <li>Your songs and setlists live on your device, and in your own Google Drive if you sign in.</li>
-        <li>Chordless has no database of its own. We do not keep your songs, setlists or Google data on any server.</li>
+        <li>
+          We do not keep your songs, setlists or Google data on any server. The only thing Chordless
+          keeps about a Team space is a register of the Team itself (see
+          <a href="#teams">Team spaces</a>).
+        </li>
         <li>We do not sell, share or use your data for advertising. There are no ads and no tracking across sites.</li>
         <li>
           Chordless sends anonymous reports of how it runs, to find and fix problems. You can turn
@@ -75,6 +79,22 @@
         Cloudflare, which hosts the app, handles the web requests and may keep standard server logs,
         such as your IP address, under <a href="https://www.cloudflare.com/privacypolicy/">its own
         privacy policy</a>. Chordless does not use cookies.
+      </p>
+
+      <h2 id="teams">Team spaces</h2>
+      <p>
+        A Team space is shared by several people. To run it, Chordless's server keeps the Team's name,
+        who owns it, who its members are and their roles, and the owner's encrypted Google sign-in
+        (or notes that it uses Chordless's own service account to reach the Team's shared drive). It
+        never keeps the Team's songs, setlists or pads: those pass through to the Team's Google Drive.
+      </p>
+      <p>
+        It also keeps a <strong>register of Teams</strong>, in a database, which stays after a Team
+        stops sharing. For each Team it holds the name, the owner's email address, when it was made
+        and when sharing ended, how many people are in it, the CCLI licence number the Team gave (and
+        who changed it, and when), and nothing else. The register is a record for CCLI, who may ask
+        which churches use Chordless under which licence, and for working out what to charge. It
+        does not name the other members.
       </p>
 
       <h2 id="reports">Anonymous usage reports</h2>

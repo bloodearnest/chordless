@@ -20,6 +20,7 @@ import { TeamSpaceState } from '../worker/src/team-state.ts'
 import { FakeDrive } from './fake-drive.ts'
 import { MapStore } from './map-store.ts'
 import { must } from './must.ts'
+import { registerDb } from './register-db.ts'
 
 const ORIGIN = 'https://chordless.test'
 const SPACE = 'space-aaaaaaaa'
@@ -874,6 +875,149 @@ describe('the CCLI licence number', () => {
       post({ blob: await blobFor(eve), rootRef: w.root, name: 'Eve Church', ccliLicence: 5 })
     )
     assert.equal(bad.status, 400)
+  })
+})
+
+describe('the register of teams', () => {
+  /** The world with a database for the register */
+  async function registered() {
+    const w = await world()
+    const { db, sql, fail } = registerDb()
+    const env = { ...w.env, DB: db } satisfies Env
+    const call = (path: string, who: Identity | null, init: RequestInit = {}) =>
+      w.call(path, who, init, env)
+    const all = (query: string) =>
+      sql
+        .prepare(query)
+        .all()
+        .map(row => ({ ...row }))
+    return { ...w, call, all, fail, env }
+  }
+  const put = (number: unknown) => send('PUT', { ccliLicence: number })
+
+  test('notes a space when it is made, with its owner, its licence number and one member', async () => {
+    const w = await registered()
+    const made = await w.call(
+      '/api/spaces',
+      eve,
+      post({
+        blob: await blobFor(eve),
+        rootRef: w.root,
+        name: 'Eve Church',
+        ccliLicence: '2345678',
+      })
+    )
+    const { spaceId } = (await json(made)) as { spaceId: string }
+    assert.deepEqual(
+      w.all('SELECT space_id, name, owner_email, ccli_licence, members, ended_at FROM teams'),
+      [
+        {
+          space_id: spaceId,
+          name: 'Eve Church',
+          owner_email: 'eve@example.com',
+          ccli_licence: '2345678',
+          members: 1,
+          ended_at: null,
+        },
+      ]
+    )
+    assert.deepEqual(w.all('SELECT kind, by_email FROM team_events ORDER BY id'), [
+      { kind: 'created', by_email: 'eve@example.com' },
+      { kind: 'licence', by_email: 'eve@example.com' },
+    ])
+  })
+
+  test('notes each change of the licence number with who made it, and nothing where it changed nothing', async () => {
+    const w = await registered()
+    await w.call(`${SPACE}/licence`, bob, put('471102'))
+    await w.call(`${SPACE}/licence`, bob, put('471102'))
+    await w.call(`${SPACE}/licence`, dan, put('471103'))
+    assert.deepEqual(
+      w
+        .all("SELECT by_email, detail FROM team_events WHERE kind = 'licence' ORDER BY id")
+        .map(({ by_email, detail }) => [by_email, JSON.parse(String(detail))]),
+      [
+        ['bob@example.com', { from: null, to: '471102' }],
+        ['dan@example.com', { from: '471102', to: '471103' }],
+      ]
+    )
+    assert.equal(w.all('SELECT ccli_licence FROM teams')[0].ccli_licence, '471103')
+  })
+
+  test('notes a space made with no licence number with none, and a cleared one as cleared', async () => {
+    const w = await registered()
+    const made = await w.call(
+      '/api/spaces',
+      eve,
+      post({ blob: await blobFor(eve), rootRef: w.root, name: 'Eve Church' })
+    )
+    const { spaceId } = (await json(made)) as { spaceId: string }
+    assert.equal(w.all('SELECT ccli_licence FROM teams')[0].ccli_licence, null)
+    assert.deepEqual(
+      w.all('SELECT kind FROM team_events').map(each => each.kind),
+      ['created']
+    )
+    await w.call(`${spaceId}/licence`, eve, put('471102'))
+    await w.call(`${spaceId}/licence`, eve, put(''))
+    const [row] = w.all('SELECT ccli_licence FROM teams')
+    assert.equal(row.ccli_licence, null)
+    const last = w.all("SELECT detail FROM team_events WHERE kind = 'licence' ORDER BY id DESC")[0]
+    assert.deepEqual(JSON.parse(String(last.detail)), { from: '471102', to: null })
+  })
+
+  test('keeps count of the people as they join, leave and are removed', async () => {
+    const w = await registered()
+    const count = () => w.all('SELECT members FROM teams')[0]?.members
+    const invite = await json(
+      await w.call(`${SPACE}/invites`, ann, post({ role: 'writer', email: stranger.email }))
+    )
+    const joined = await w.call(
+      '/api/spaces/join',
+      stranger,
+      post({ spaceId: SPACE, code: invite.code })
+    )
+    assert.equal(joined.status, 200)
+    assert.equal(count(), 5)
+    assert.equal((await w.call(`${SPACE}/leave`, stranger, post({}))).status, 204)
+    assert.equal(count(), 4)
+    assert.equal(
+      (await w.call(`${SPACE}/members/bob%40example.com`, ann, send('DELETE'))).status,
+      204
+    )
+    assert.equal(count(), 3)
+  })
+
+  test('keeps a space that ended, marked, with its number and what happened to it', async () => {
+    const w = await registered()
+    await w.call(`${SPACE}/licence`, bob, put('471102'))
+    assert.equal((await w.call(SPACE, ann, send('DELETE'))).status, 204)
+    const [team] = w.all('SELECT name, ccli_licence, ended_at FROM teams')
+    assert.equal(team.name, 'Team')
+    assert.equal(team.ccli_licence, '471102')
+    assert.match(String(team.ended_at), /^20\d\d-/)
+    assert.deepEqual(
+      w.all('SELECT kind, by_email FROM team_events ORDER BY id').map(each => each.kind),
+      ['licence', 'ended']
+    )
+    assert.equal((await w.call(`${SPACE}/licence`, ann)).status, 403)
+  })
+
+  test('is not needed: a Worker with no database does all of this, and a database that is down stops nothing', async () => {
+    const w = await registered()
+    w.fail(true)
+    const quiet = console.error
+    const heard: unknown[][] = []
+    console.error = (...args: unknown[]) => void heard.push(args)
+    try {
+      assert.equal((await w.call(`${SPACE}/licence`, bob, put('471102'))).status, 200)
+      assert.equal((await w.room.licence()).ccliLicence, '471102')
+    } finally {
+      console.error = quiet
+    }
+    assert.equal(heard.length, 1)
+    assert.deepEqual(w.all('SELECT * FROM teams'), [])
+    const bare = await world()
+    assert.equal((await bare.call(`${SPACE}/licence`, bob, put('471102'))).status, 200)
   })
 })
 

@@ -69,12 +69,27 @@ must work, as must a church outside the countries CCLI serves.
   on the first SongSelect chart of each import: a number already there is copied to the device and
   never written over; one kept only on the device (the Worker was out of reach) is sent. It can be
   typed when a team is made, and changed in the Team's "Users" window (`team-licence-panel.ts`).
-- **What the log does not do.** It goes when sharing ends (`destroy` forgets the whole space), and
-  there is no way yet to ask "which teams use licence N" or "which teams exist": a Durable Object
-  per team cannot be listed. A register of teams that outlives them (a D1 table written when a
-  space is made, renamed or ended, and when its licence changes) is the next step if a real audit
-  or charging needs one. It would hold what the Worker already holds: ids, names, owners' emails,
-  licence numbers, dates.
+- **The register of teams.** The log above goes when sharing ends, so the Worker also writes a
+  **D1 table** (`migrations/0001_team_register.sql`, `worker/src/team-register.ts`) that outlives
+  a team, for CCLI and for charging. `teams` has a row per team: its id, name, owner's email, when it
+  was made, its licence number as it stands, how many people are in it, and when sharing ended
+  (the row stays). `team_events` is added to and never changed: `created`, `licence` (from, to, and
+  who) and `ended`. It holds nothing about songs or pads and no member's address but the owner's
+  (CLAUDE.md; `src/privacy.html` says so). It is written when a team is made, when its licence
+  changes, as people join, leave or are removed, and when sharing ends.
+  - **Best effort.** A team works without it: a Worker with no database does everything, and a write
+    that fails is logged and lost. Every write first makes the team's row from what its Durable Object
+    says, so the next write for the team puts right what a lost one missed.
+  - **Setting it up.** `wrangler.toml` has a `[[d1_databases]]` binding `DB` with no `database_id`:
+    wrangler makes the database, named `chordless-teams`, on the first deploy, and the deploy then
+    applies `migrations/`. The Cloudflare token the deploy uses needs **D1: Edit**. In development
+    it is a local database; `just db-local` makes its tables.
+  - **Asking it.** There is no route that reads it: the operator asks with wrangler, for example
+    `npx wrangler d1 execute chordless-teams --remote --command "SELECT name, owner_email, members FROM teams WHERE ccli_licence = '471102'"`,
+    or which teams share a licence number: `SELECT ccli_licence, COUNT(*) AS teams FROM teams WHERE ended_at IS NULL AND ccli_licence IS NOT NULL GROUP BY ccli_licence HAVING teams > 1`.
+  - **Not covered.** Only teams made after it exists are in it (older ones enter at their next
+    licence, join or leave write, or never if nothing touches them), and a team's renaming is not
+    noted (a team cannot be renamed yet).
 
 Who imported a song, when and from where is already kept on it (`importUser`, `importDate`,
 `importSource`). Planned, not built: the licence a song came in under; asking before a copy of

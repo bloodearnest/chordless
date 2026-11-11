@@ -69,9 +69,10 @@ they must be able to. Overly restrictive is an antipattern here.
 **Chordless never stores copyrighted content; it only passes access on to it.** Charts, lyrics and pad
 audio live in the user's own browser and in a Drive the user (or their team space's owner) controls.
 The Worker passes team-space traffic through (streamed, never buffered to storage) without
-persisting or caching it: no KV, R2, Durable Object or Cache API entry may hold song or pad
+persisting or caching it: no KV, R2, D1, Durable Object or Cache API entry may hold song or pad
 content. They hold only membership, roles, a team's CCLI licence number and the log of who changed
-it (a record CCLI may ask for, and of the teams using Chordless: `docs/SPACES.md`), the owner's encrypted token blob (or that a space uses Chordless's
+it (a record CCLI may ask for), the D1 register of teams that outlives them (name, owner's email,
+member count, licence number, dates: `docs/SPACES.md`), the owner's encrypted token blob (or that a space uses Chordless's
 service account instead), checksums, and, for
 the live channel (`docs/LIVE_SYNC.md`), the hash of the secret a share's sender proved. The channel's
 sockets carry one word, "changed", never a setlist, chart or key: the content moves by the sync, as ever.

@@ -116,6 +116,12 @@ test-node:
 serve:
     npm run dev
 
+# Make the tables of the register of teams (migrations/) in the local database that `just serve` uses;
+# do it once, and again when a migration is added. Without them the Worker carries on and logs that the
+# register could not be written.
+db-local:
+    npx wrangler d1 migrations apply DB --local --env dev
+
 # The same, for trying live sync (docs/LIVE_SYNC.md): the Worker is its own process (wrangler dev), as the
 # Vite plugin cannot pass WebSockets to it. Slower to start and heavier; `just serve` is for everything else
 serve-live:

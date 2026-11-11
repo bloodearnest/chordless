@@ -2,6 +2,7 @@ import type { RateLimit } from './email.ts'
 import type { GoogleEnv } from './google-auth.ts'
 import type { ServiceAccountEnv } from './service-account.ts'
 import type { ShareEnv } from './share.ts'
+import type { RegisterDb } from './team-register.ts'
 import type { TeamSpaceApi } from './team-state.ts'
 
 /** The worker's bindings, variables and secrets (see wrangler.toml) */
@@ -16,6 +17,8 @@ export interface Env extends GoogleEnv, ShareEnv, ServiceAccountEnv {
     idFromName(name: string): unknown
     get(id: unknown): { fetch(request: Request): Response | Promise<Response> }
   }
+  /** The register of teams (wrangler.toml `[[d1_databases]]`, worker/src/team-register.ts): unset in tests and where there is none */
+  DB?: RegisterDb
   ASSETS: { fetch(request: Request): Promise<Response> }
   /** Set only in [env.dev]: serve the component playgrounds */
   DEV_PAGES?: string
