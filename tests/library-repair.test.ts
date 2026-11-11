@@ -14,6 +14,7 @@ import {
   compareCharts,
   hasCcliBumph,
   keyOfChart,
+  licenceOfChart,
   originOfChart,
   planImporters,
   planLinks,
@@ -314,6 +315,16 @@ describe('a chart, set apart from what is about the song', () => {
 const record = (overrides: Partial<SongRecord> = {}): SongRecord =>
   ({ ...makeSong(), tempo: null, originalTempo: null, ...overrides }) as SongRecord
 const withText = (song: SongRecord, text: string): SongWithText => ({ song, text })
+
+describe('the licence number on a SongSelect chart', () => {
+  it('is read from the directive or the trailer, and is empty where there is none', () => {
+    expect(licenceOfChart('{title: X}\n{ccli_license: 471102}\n[G]x')).to.equal('471102')
+    expect(licenceOfChart('[G]x\n\nCCLI Song # 7102401\nCCLI License # 471102')).to.equal('471102')
+    expect(licenceOfChart('CCLI® Licence No. 123 4567')).to.equal('1234567')
+    expect(licenceOfChart('CCLI Song # 7102401\n© 2020 A Publisher')).to.equal('')
+    expect(licenceOfChart('{title: X}\n[G]x')).to.equal('')
+  })
+})
 
 describe('which songs are the same song twice', () => {
   const june = record({

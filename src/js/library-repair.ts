@@ -41,6 +41,17 @@ export function hasCcliBumph(chordpro: string): boolean {
   return /CCLI Song #|SongSelect|CCLI Licen[cs]e|\{\s*ccli_license/i.test(chordpro)
 }
 
+/**
+ * The church's CCLI licence number that SongSelect puts on a chart it downloads for that church:
+ * the `{ccli_license: N}` directive, or the trailer's "CCLI License # N" (also "Licence No. N").
+ * Empty where the chart has none.
+ */
+export function licenceOfChart(chordpro: string): string {
+  const directive = /\{\s*ccli_license\s*:\s*([^}\s]+)\s*\}/i.exec(chordpro)
+  const trailer = /CCLI®?\s+Licen[cs]e\s*(?:#|No\.?|Number)?\s*:?\s*(\d[\d ]*\d|\d)/i.exec(chordpro)
+  return (directive?.[1] ?? trailer?.[1] ?? '').replace(/\s+/g, '')
+}
+
 /** Sources that only say how a chart arrived (as a file, as pasted text, shared), not where it is from */
 const ARRIVALS = new Set(['file', 'paste', 'share'])
 

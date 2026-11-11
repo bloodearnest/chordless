@@ -29,7 +29,8 @@ export interface TeamFolders {
 export async function createTeamSpace(
   name: string,
   parentId: string,
-  folders: TeamFolders
+  folders: TeamFolders,
+  options: { ccliLicence?: string } = {}
 ): Promise<Space> {
   const teamName = name.trim()
   if (!teamName) throw new Error('A team space needs a name')
@@ -43,7 +44,22 @@ export async function createTeamSpace(
     name: teamName,
   })
   const space = await createSpace(await freeName(teamName))
-  return updateSpace(space.id, { rootRef, team: { id: spaceId, role } })
+  const ccliLicence = cleanLicence(options.ccliLicence)
+  return updateSpace(space.id, {
+    rootRef,
+    team: { id: spaceId, role },
+    ...(ccliLicence ? { ccliLicence } : {}),
+  })
+}
+
+/**
+ * A CCLI licence number as typed, tidied: spaces and a leading "#" or "CCLI" dropped. Only
+ * tidied, never judged (the formats differ by country), and empty if nothing is left.
+ */
+export function cleanLicence(typed: string | undefined): string {
+  return (typed ?? '')
+    .replace(/^\s*(ccli)?\s*(licen[cs]e)?\s*(no\.?|number|#)?\s*:?/i, '')
+    .replace(/\s+/g, '')
 }
 
 /** The Drive folder's name: it says what it is, as it sits beside folders that are not Chordless's */

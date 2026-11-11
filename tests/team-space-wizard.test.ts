@@ -206,6 +206,23 @@ describe('team-space-wizard', () => {
     expect(getCurrentSpace().id).to.equal(made.id)
   })
 
+  it('keeps the CCLI licence number on the new space if one was typed, and does not need it', async () => {
+    await open()
+    await until(() => page.shadowRoot?.querySelector('#name'), 'the form')
+    const name = `${prefix} ${crypto.randomUUID().slice(0, 8)}`
+    await type(name)
+    const licence = must(page.shadowRoot?.querySelector<HTMLInputElement>('#licence'))
+    licence.value = '7654321'
+    licence.dispatchEvent(new Event('input'))
+    await page.updateComplete
+    button('Choose a folder').click()
+    await until(() => text().includes('Church Drive'), 'the folder is shown')
+    button('Create team space').click()
+    await until(() => text().includes('is ready'), 'created')
+    const made = must((await listSpaces()).find(space => space.name === name))
+    expect(made.ccliLicence).to.equal('7654321')
+  })
+
   it('says what the Worker said, and leaves the form to try again', async () => {
     workerAnswer = () => Response.json({ error: 'Not allowed' }, { status: 403 })
     await open()

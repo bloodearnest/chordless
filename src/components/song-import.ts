@@ -14,7 +14,13 @@ import { parseChartText, songOfChart } from '../js/email-setlist.ts'
 import { type LibrarySong, matchLibrary } from '../js/import-plan.ts'
 import { libraryForMatching } from '../js/import-setlist.ts'
 import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
-import { compareCharts, keyOfChart, originOfChart, sourceToImprove } from '../js/library-repair.ts'
+import {
+  compareCharts,
+  keyOfChart,
+  licenceOfChart,
+  originOfChart,
+  sourceToImprove,
+} from '../js/library-repair.ts'
 import { type SongDetails, songDetailsToChordpro } from '../js/lyrics-chordpro.ts'
 import { ChordProParser } from '../js/parser.ts'
 import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../js/people.ts'
@@ -60,7 +66,7 @@ import { goTo, loadPage } from '../js/navigation.ts'
 import { describeSignature, noteName } from '../js/pitch.ts'
 import type { Score } from '../js/score.ts'
 import { SONGSELECT } from '../js/song-source.ts'
-import { ensureCurrentSpace, setCurrentSpace } from '../js/space.ts'
+import { ensureCurrentSpace, getSpaceById, setCurrentSpace, updateSpace } from '../js/space.ts'
 import { visibleSpaces } from '../js/space-tabs.ts'
 import { songImportStyles } from './song-import-styles.ts'
 
@@ -501,6 +507,18 @@ export class SongImport extends LitElement {
   }
 
   /**
+   * A chart from SongSelect carries the church's CCLI licence number. A space that has none yet
+   * takes the first one it sees, for its records (docs/SPACES.md, "SongSelect's terms"); one it
+   * has already is left, whatever a later chart says.
+   */
+  async _noteLicence(chordproText: string): Promise<void> {
+    const licence = licenceOfChart(chordproText)
+    if (!licence) return
+    const space = await getSpaceById(this._spaceId)
+    if (space && !space.ccliLicence) await updateSpace(space.id, { ccliLicence: licence })
+  }
+
+  /**
    * Import songs: [{chordproText, metadata: {title, ccliNumber}, source, name}].
    * Saves each to the library, unless a copy is already there, and shows the
    * choices. A song with `skip` (a reason) is listed as not imported.
@@ -540,6 +558,7 @@ export class SongImport extends LitElement {
 
         // (a download from SongSelect is SongSelect's, though it came as a file or as text)
         const origin = originOfChart(source, chordproText)
+        if (origin === SONGSELECT) await this._noteLicence(chordproText)
         const existing = await findExistingSong(ccliNumber, title, db)
         const song =
           existing ||

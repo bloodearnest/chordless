@@ -232,6 +232,7 @@ export class SpaceCard extends LitElement {
               : '…'
           }
         </p>
+        ${space.ccliLicence ? html`<p class="line">CCLI licence ${space.ccliLicence}</p>` : nothing}
         <p class="line ${this._error ? 'error' : ''}" role=${this._error ? 'alert' : nothing}>
           ${
             this._syncing

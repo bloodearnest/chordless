@@ -7,6 +7,7 @@ import {
   createSpace,
   deleteSpace,
   ensureCurrentSpace,
+  getSpaceById,
   setCurrentSpace,
   updateSpace,
 } from '../src/js/space.ts'
@@ -221,6 +222,28 @@ describe('song-import', () => {
       await element.importFiles([file('a.cho', fromSongSelect(unique('Downloaded')))])
       expect(element._imports[0].source).to.equal('songselect')
       expect(await sourceOf(element._imports[0].song.uuid)).to.equal('songselect')
+    })
+
+    it('gives a space with no CCLI licence number the first one a SongSelect chart carries, and keeps it', async () => {
+      const { id } = await ensureCurrentSpace()
+      await updateSpace(id, { ccliLicence: undefined })
+      const element: any = await importer()
+      await element.importFiles([file('a.cho', fromSongSelect(unique('Licensed')))])
+      expect(must(await getSpaceById(id)).ccliLicence).to.equal('471102')
+      const other: any = await importer()
+      await other.importFiles([
+        file('b.cho', fromSongSelect(unique('Other')).replace('471102', '999')),
+      ])
+      expect(must(await getSpaceById(id)).ccliLicence).to.equal('471102')
+      await updateSpace(id, { ccliLicence: undefined })
+    })
+
+    it('leaves a space without a licence number when the chart is not from SongSelect', async () => {
+      const { id } = await ensureCurrentSpace()
+      await updateSpace(id, { ccliLicence: undefined })
+      const element: any = await importer()
+      await element.importFiles([file('c.cho', chart(unique('Typed')))])
+      expect((await getSpaceById(id))?.ccliLicence).to.equal(undefined)
     })
 
     it('is a file when the chart has no such material', async () => {
