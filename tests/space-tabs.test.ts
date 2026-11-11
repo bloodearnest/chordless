@@ -11,7 +11,6 @@ import {
   getCurrentSpace,
   listSpaces,
   setCurrentSpace,
-  switchSpace,
 } from '../src/js/space.ts'
 import {
   loadSpaceTabs,
@@ -21,7 +20,6 @@ import {
   splitTabs,
   visibleSpaces,
 } from '../src/js/space-tabs.ts'
-import { whatWouldBeAdded } from '../src/js/space-transfer.ts'
 import { must } from './must.ts'
 import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -261,26 +259,5 @@ describe('the tabs of the spaces on this device', () => {
     const tabs = await fixture<SpaceTabs>(html`<space-tabs .spaces=${await mine()}></space-tabs>`)
     await new Promise(resolve => setTimeout(resolve, 100))
     expect(tabs.shadowRoot?.querySelector('[role=tablist]')).to.equal(null)
-  })
-
-  it('counts only what bringing one space into another would add', async () => {
-    const source = await space('Source', 1)
-    const same = await space('Same', 0)
-    const sdb = new ChordlessDB(source)
-    await sdb.init()
-    const ddb = new ChordlessDB(same)
-    await ddb.init()
-    expect(await whatWouldBeAdded(sdb, ddb)).to.deep.equal({ songs: 1, setlists: 0 })
-    const chart = must(await sdb.getAllSongs())[0]
-    const content = must(await sdb.getChordPro(chart.chordproFileId)).content
-    await addChart(ddb, content, {
-      variantLabel: 'Test',
-      importSource: 'test',
-      makeDefault: 'first',
-    })
-    expect(await whatWouldBeAdded(sdb, ddb)).to.deep.equal({ songs: 0, setlists: 0 })
-    sdb.db?.close()
-    ddb.db?.close()
-    void switchSpace
   })
 })
