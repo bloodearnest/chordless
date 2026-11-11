@@ -217,7 +217,9 @@ One run, in order, so a deploy never runs before what it depends on:
    has this build's hash (`force` overrides); the live site is asked, not a record kept, so a failed or
    rolled back deploy is tried again. Otherwise: the Worker's secrets are checked
    (`check-prod-secrets.ts`), `wrangler deploy` runs from the built artifact, `scripts/ci/smoke.sh` waits
-   for the site to run that hash and answer, and on failure `wrangler rollback` puts the previous version
+   for the site to run that hash and answer (the migrations of the register of teams' D1 database,
+   `migrations/`, are applied between the two; they only add, so the previous Worker still runs on
+   them), and on failure `wrangler rollback` puts the previous version
    back (Durable Object migrations only add, so they stay).
    (That is for a build that fails its smoke test, which no device has updated to. Once devices have, a rollback would
    leave them unable to open a database a newer build upgraded: a bad release is fixed by a new one, `docs/MIGRATIONS.md`.)

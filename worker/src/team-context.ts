@@ -16,6 +16,7 @@ import type { AdminContext } from './team-admin.ts'
 import type { TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'
 import { notingPadRefs, notingRefs } from './team-refs.ts'
+import { TeamRegister } from './team-register.ts'
 import { tracedFetch, tracedStub } from './trace.ts'
 
 /** What a test replaces; the real ones are the defaults */
@@ -117,5 +118,6 @@ export function createAdminContext(
       return checkTeamStorage(api, rootRef, address)
     },
     newSpaceId: () => crypto.randomUUID(),
+    register: () => (env.DB ? new TeamRegister(env.DB) : null),
   }
 }

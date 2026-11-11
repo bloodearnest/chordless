@@ -78,6 +78,15 @@ class_name = "TeamSpace"
 name = "SHARE_ROOM"
 class_name = "ShareRoom"
 
+# The register of teams (worker/src/team-register.ts, docs/SPACES.md): which teams use Chordless, who owns
+# them and what CCLI licence they hold, kept after a team ends. No database_id: wrangler makes the
+# database on the first deploy and finds it by name after (automatic provisioning). The tables are the
+# files in migrations/, applied by the deploy before it goes live (docs/CI.md). Never song or pad content.
+[[d1_databases]]
+binding = "DB"
+database_name = "chordless-teams"
+migrations_dir = "migrations"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["TeamSpace"]
@@ -123,6 +132,12 @@ namespace_id = "7303"
 simple = { limit = 600, period = 60 }
 
 # (so do Durable Objects and their migrations)
+# (the register in dev is a local database: `just db-local` makes its tables)
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "chordless-teams-dev"
+migrations_dir = "migrations"
+
 [[env.dev.durable_objects.bindings]]
 name = "TEAM_SPACE"
 class_name = "TeamSpace"

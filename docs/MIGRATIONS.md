@@ -83,6 +83,16 @@ read from either of its names (`type: 'melody'` or `'score'`), `legacyFile` to r
 long as they might be there. Older clients skip what they do not know: a file in `songs/` whose `type` is not
 `chordpro` is ignored.
 
+## The register of teams (D1)
+
+The register of teams (`docs/SPACES.md`, "SongSelect's terms") is a D1 database in Cloudflare, whose
+tables are the files in `migrations/`, numbered (`0001_...sql`), applied in order by the deploy
+(`wrangler d1 migrations apply`, after `wrangler deploy`) and for development by `just db-local`.
+Roll forward only, as everywhere: a change is a new file, never an edit of one that has been applied. It
+must only add (a column with a default, a table, an index), because the Worker that was running
+before the deploy keeps running on it for a moment, and again after a rollback. The tests run the files
+as they stand against SQLite (`tests/register-db.ts`).
+
 ## Tests
 
 - `tests/old-database.ts` makes a database as an older version left it (a written-out schema, and records), and
