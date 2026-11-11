@@ -1,7 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { AppUpdate, AppUpdateChangeEvent, type UpdateContainer } from '../src/js/app-update.ts'
 import { must } from './must.ts'
-import { settle } from './test-helpers.ts'
+import { settle, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -17,6 +17,13 @@ class FakeWorker extends EventTarget {
 /** A ServiceWorkerRegistration with the parts AppUpdate uses */
 class FakeRegistration extends EventTarget {
   waiting: FakeWorker | null = null
+  unregistered = 0
+  failUnregister = false
+  async unregister() {
+    this.unregistered++
+    if (this.failUnregister) throw new TypeError('Unregistering failed')
+    return true
+  }
   installing: FakeWorker | null = null
   updates = 0
   failUpdate = false
@@ -44,11 +51,12 @@ describe('AppUpdate', () => {
 
   const onChange = (event: AppUpdateChangeEvent) => changes.push(event.ready)
 
-  const start = async () => {
+  const start = async (takeoverWaitMs = 20) => {
     update = new AppUpdate(
       container as unknown as UpdateContainer,
       () => reloads++,
-      () => clock
+      () => clock,
+      takeoverWaitMs
     )
     await update.start()
   }
@@ -219,6 +227,48 @@ describe('AppUpdate', () => {
     // A second press does not ask again
     update.apply()
     expect(waiting.messages).to.have.length(1)
+  })
+
+  it('does not leave the button dead when the waiting worker never takes over: it removes the registration and reloads', async () => {
+    const waiting = new FakeWorker()
+    const registration = must(container.registration)
+    registration.waiting = waiting
+    await start()
+
+    update.apply()
+    expect(reloads).to.equal(0)
+    await wait(60)
+    expect(registration.unregistered).to.equal(1)
+    expect(reloads).to.equal(1)
+
+    // (and the button works again: it is not a one-shot, and the second press is dealt with the same way)
+    update.apply()
+    expect(waiting.messages).to.have.length(2)
+    await wait(60)
+    expect(registration.unregistered).to.equal(2)
+    expect(reloads).to.equal(2)
+  })
+
+  it('reloads even when the registration cannot be removed', async () => {
+    const registration = must(container.registration)
+    registration.waiting = new FakeWorker()
+    registration.failUnregister = true
+    await start()
+    update.apply()
+    await wait(60)
+    expect(reloads).to.equal(1)
+  })
+
+  it('does not take the harder way once the worker has taken over', async () => {
+    const registration = must(container.registration)
+    registration.waiting = new FakeWorker()
+    await start()
+    update.apply()
+    container.dispatchEvent(new Event('controllerchange'))
+    expect(reloads).to.equal(1)
+    await wait(60)
+    expect(registration.unregistered).to.equal(0)
+    expect(reloads).to.equal(1)
   })
 
   it('reloads straight away when told to apply an update that has no waiting worker', async () => {
