@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
+import { goTo } from '../js/navigation.ts'
 import { getCurrentSpace, listSpaces, switchSpace } from '../js/space.ts'
 import { AccountStateEvent } from './account-card.ts'
 import './account-card.ts'
@@ -190,9 +191,14 @@ export class AccountPage extends LitElement {
     void this.load()
   }
 
-  /** The space was deleted: close its modal, and read the list again */
-  _onGone = (): void => {
+  /**
+   * The space was deleted: close its modal, and read the list again. If it was the one in use the
+   * app has another now, so the app starts again in it, as a switch does.
+   */
+  _onGone = (event: Event): void => {
     this._modal.value?.close()
+    if (!(event as SpaceGoneEvent).wasCurrent) return
+    void (this.show ? this.show() : goTo('/', { fresh: true }))
   }
 
   /** The modal closed, however: what was done in it may have changed the cards */

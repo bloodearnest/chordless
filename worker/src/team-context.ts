@@ -17,7 +17,7 @@ import type { AdminContext } from './team-admin.ts'
 import type { TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'
 import { notingPadRefs, notingRefs } from './team-refs.ts'
-import { type LiveSockets, TeamSpaceState } from './team-state.ts'
+import { type LiveSockets, type SpaceInfo, TeamSpaceState } from './team-state.ts'
 import { tracedFetch, tracedStub } from './trace.ts'
 
 /** What a test replaces; the real ones are the defaults */
@@ -125,5 +125,17 @@ export function createAdminContext(env: Env, deps: TeamDeps = {}): AdminContext 
       return checkTeamStorage(api, rootRef, address)
     },
     newSpaceId: () => crypto.randomUUID(),
+    async trashRoot(spaceId) {
+      const room = roomsOf(env)(spaceId)
+      // (the space is there: whoever asks has a role in it)
+      const info = (await room.info()) as SpaceInfo
+      const token =
+        (await room.credential()) === 'service-account'
+          ? serviceAccountToken({ env, fetch: tracedFetch(deps.tokenFetch), now })
+          : ownerAccessToken({ room, info, env, google, now })
+      await createDriveApi({ getAccessToken: token, fetch: tracedFetch(deps.fetch) }).trashFile(
+        info.rootRef
+      )
+    },
   }
 }

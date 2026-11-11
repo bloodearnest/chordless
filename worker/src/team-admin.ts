@@ -19,6 +19,8 @@
  *   PUT    /api/space/<id>/licence      {ccliLicence}           a writer sets it where there is none;
  *                                                               an admin changes or clears it
  *   DELETE /api/space/<id>                                      owner: end sharing
+ *   DELETE /api/space/<id>/everything                           admin: put the Drive folder in the trash, then
+ *                                                               end sharing
  *
  * A role may only act on those below it: an admin looks after writers and readers, the owner after
  * admins too. The owner is never a member to change or remove.
@@ -57,6 +59,8 @@ export interface AdminContext {
   checkServiceAccount(rootRef: string, address: string): Promise<string | null>
   /** A new id for a space */
   newSpaceId(): string
+  /** Put the space's Drive folder, with all in it, in the trash, with the space's own credential */
+  trashRoot(spaceId: string): Promise<void>
 }
 
 function asRole(value: unknown): MemberRole {
@@ -148,6 +152,7 @@ interface AdminCall {
   request: Request
   ctx: AdminContext
   room: TeamSpaceApi
+  spaceId: string
   identity: Identity
   role: TeamRole
   /** What the route's path captured */
@@ -284,6 +289,17 @@ const ADMIN_ROUTES: AdminRoute[] = [
   },
   {
     methods: ['DELETE'],
+    path: /^\/everything$/,
+    needs: 'admin',
+    async run({ ctx, room, spaceId, identity }) {
+      // (the folder first: if it cannot be trashed, nothing is ended, and it can be tried again)
+      await ctx.trashRoot(spaceId)
+      await room.destroy(identity)
+      return done()
+    },
+  },
+  {
+    methods: ['DELETE'],
     path: /^\/$/,
     needs: 'owner',
     async run({ room, identity }) {
@@ -316,6 +332,7 @@ export function handleSpaceAdmin(
         request,
         ctx,
         room: ctx.room(spaceId),
+        spaceId,
         identity,
         role,
         params: match.slice(1),

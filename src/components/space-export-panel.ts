@@ -2,9 +2,8 @@ import { css, html, LitElement, nothing } from 'lit'
 import type { Space } from '../js/data-types.ts'
 import { withSource } from '../js/other-songs.ts'
 import { listPadSets, type PadSet, padSetSize } from '../js/pad-set-service.ts'
+import { downloadBackup } from '../js/space-backup.ts'
 import {
-  createExport,
-  exportFileName,
   importIntoSpace,
   importPadSets,
   readExport,
@@ -171,14 +170,9 @@ export class SpaceExportPanel extends LitElement {
       const pads = this._includePads
         ? await readPadSetsForExport(this._padSets.map(set => set.padSet))
         : []
-      const blob = await withSource(this.space.id, db => createExport(db, name, pads))
-      const link = document.createElement('a')
-      link.href = URL.createObjectURL(blob)
-      link.download = exportFileName(name)
-      link.click()
-      setTimeout(() => URL.revokeObjectURL(link.href), 10_000)
+      const { fileName, bytes } = await downloadBackup({ id: this.space.id, name }, pads)
       this._message = {
-        text: `Exported as ${link.download} (${megabytes(blob.size)}).`,
+        text: `Exported as ${fileName} (${megabytes(bytes)}).`,
         kind: 'info',
       }
     } catch (error) {
