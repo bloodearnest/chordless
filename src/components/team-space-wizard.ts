@@ -375,6 +375,7 @@ export class TeamSpaceWizard extends LitElement {
           }
           <team-invite-step
             .team=${this._created?.team}
+            .teamName=${this._created?.name}
             .leaders=${this._leaders}
           ></team-invite-step>
           <div class="actions">

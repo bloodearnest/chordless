@@ -227,6 +227,11 @@ describe('the team share panel', () => {
         `${window.location.origin}/join#${TEAM}.CODE1234567890ab`
       )
       expect(email.value).to.equal('')
+      // (and a way to hand it on, for the role chosen)
+      const send = must(panel.shadowRoot?.querySelector('invite-send'))
+      expect(send.email).to.equal('fay@example.com')
+      expect(send.role).to.equal('reader')
+      expect(send.url).to.contain(`/join#${TEAM}.`)
     })
 
     it('copies the link, or selects it when it cannot', async () => {

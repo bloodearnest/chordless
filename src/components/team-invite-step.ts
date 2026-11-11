@@ -4,6 +4,7 @@ import { teamApi } from '../js/team-client.ts'
 import { MEMBER_ROLES, type MemberRole } from '../js/team-roles.ts'
 import { inviteLink, type Leader, roleLabel } from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
+import './invite-send.ts'
 import { buttonStyles } from './shared-styles.ts'
 
 /** Someone to invite, and the role to give them */
@@ -18,6 +19,7 @@ interface Entry {
 interface Outcome {
   email: string
   url?: string
+  role?: MemberRole
   error?: string
 }
 
@@ -31,6 +33,7 @@ interface Outcome {
 export class TeamInviteStep extends LitElement {
   static override properties = {
     team: { attribute: false },
+    teamName: { type: String },
     leaders: { attribute: false },
     _entries: { state: true },
     _outcomes: { state: true },
@@ -40,6 +43,8 @@ export class TeamInviteStep extends LitElement {
 
   /** The team space to invite people to */
   declare team: TeamLink
+  /** Its name, for the message that goes with a link */
+  declare teamName: string
   /** The people its setlists name as leaders */
   declare leaders: Leader[]
   declare _entries: Entry[]
@@ -121,6 +126,7 @@ export class TeamInviteStep extends LitElement {
         const { code } = await teamApi.createInvite(this.team.id, entry.role, entry.email)
         outcomes.push({
           email: entry.email,
+          role: entry.role,
           url: inviteLink(window.location.origin, this.team.id, code),
         })
       } catch (error) {
@@ -216,6 +222,12 @@ export class TeamInviteStep extends LitElement {
                     <button class="btn" @click=${() => this._copy(outcome)}>
                       ${this._copied === outcome.email ? '✓ Copied' : 'Copy the link'}
                     </button>
+                    <invite-send
+                      .teamName=${this.teamName}
+                      .role=${outcome.role as MemberRole}
+                      .email=${outcome.email}
+                      .url=${outcome.url}
+                    ></invite-send>
                   </li>`
                   : html`<li class="error" role="alert">${outcome.email}: ${outcome.error}</li>`
               )}

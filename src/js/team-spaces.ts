@@ -100,6 +100,26 @@ export function inviteLink(origin: string, teamId: string, code: string): string
   return `${origin}/join#${teamId}.${code}`
 }
 
+/** What to say with an invite's link, to the person it is for */
+export function inviteMessage(teamName: string, role: TeamRole, email: string): string {
+  return `You are invited to join ${teamName} on Chordless as ${roleWithArticle(role)}. Sign in with the Google account ${email}; the link works once, for a week.`
+}
+
+/** The ways to hand an invite on where the browser has no share sheet: WhatsApp, and Gmail's compose window (a mailto: link does nothing on a desktop with no mail app) */
+export function inviteSendLinks(
+  teamName: string,
+  role: TeamRole,
+  email: string,
+  url: string
+): { whatsapp: string; gmail: string } {
+  const message = inviteMessage(teamName, role, email)
+  const subject = `Join ${teamName} on Chordless`
+  return {
+    whatsapp: `https://wa.me/?text=${encodeURIComponent(`${message}\n\n${url}`)}`,
+    gmail: `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${message}\n\n${url}\n`)}`,
+  }
+}
+
 /**
  * Reach a team space's folder with this person's own Google sign-in again, after team-managed
  * storage (or when Google no longer honours the sign-in the space holds): they are its owner
