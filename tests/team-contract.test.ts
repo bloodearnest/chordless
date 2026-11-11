@@ -1,6 +1,6 @@
 /**
  * The team space from end to end, with the real code on both sides of the wire: the page's sync
- * and storage client, the Worker's router and team API, the Durable Object's rules (over a Map) and
+ * and storage client, the Worker's router and team API, the team's rules (over D1, a SQLite with the migrations applied) and
  * the owner's Drive (FakeDrive). Only Google is faked: its Drive, and the check of an ID token.
  *
  * The other tests of the team service each run one side against a fake of the other, which is how
@@ -24,14 +24,14 @@ import { createSyncOrchestrator } from '../src/js/sync-orchestrator.ts'
 import { teamApi } from '../src/js/team-client.ts'
 import { createTeamSpace, joinSpace, syncTeamSpace } from '../src/js/team-spaces.ts'
 import { encryptBlob } from '../worker/src/blob.ts'
+import type { D1Db } from '../worker/src/d1.ts'
 import type { Env } from '../worker/src/env.ts'
 import type { IdentityProvider } from '../worker/src/identity.ts'
 import { handleRequest } from '../worker/src/router.ts'
-import { TeamSpaceState } from '../worker/src/team-state.ts'
 import { makeSetlist } from './builders.ts'
+import { browserD1 } from './d1-browser.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
-import { MapStore } from './map-store.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip } from './zip.ts'
@@ -63,7 +63,7 @@ describe('a team space, end to end', () => {
   let auth: ReturnType<typeof installFakeAuthWorker>
   let worker: FakeAuthWorker
   const realFetch = window.fetch
-  let objects: Map<string, TeamSpaceState>
+  let d1: D1Db
   const made: string[] = []
   const dbs: ChordlessDB[] = []
 
@@ -102,13 +102,19 @@ describe('a team space, end to end', () => {
     return db
   }
 
-  beforeEach(() => {
+  /** The spaces the Worker knows of, by id */
+  const spacesKnown = async () =>
+    (await d1.prepare('SELECT space_id FROM teams').all<{ space_id: string }>()).results.map(
+      row => row.space_id
+    )
+
+  beforeEach(async () => {
     drive = installFakeDrive()
     auth = installFakeAuthWorker()
     worker = auth.worker
-    objects = new Map()
+    d1 = await browserD1()
 
-    // The Worker: its router over Durable Objects that are a state over a Map, with Google's
+    // The Worker: its router over a D1 that is a SQLite with the migrations applied, with Google's
     // check of an ID token replaced by reading the claims, and its Drive the same FakeDrive
     const provider: IdentityProvider = {
       id: 'google',
@@ -123,15 +129,7 @@ describe('a team space, end to end', () => {
       GOOGLE_CLIENT_SECRET: 'secret',
       JWE_ENCRYPTION_KEY: KEY,
       ASSETS: { fetch: async () => new Response('assets') },
-      TEAM_SPACE: {
-        idFromName: (name: string) => name,
-        get(id: unknown) {
-          const name = String(id)
-          const state = objects.get(name) ?? new TeamSpaceState(new MapStore())
-          objects.set(name, state)
-          return state
-        },
-      },
+      DB: d1,
     } as unknown as Env
     const deps = {
       providers: [provider],
@@ -203,8 +201,8 @@ describe('a team space, end to end', () => {
     expect(must(await memberDb.getSetlist('sunday')).name).to.equal('Sunday')
     expect((await memberDb.getAllSongs()).map(each => each.title)).to.deep.equal(['Alpha'])
 
-    // Nothing the member did went to any object but the space's own
-    expect([...objects.keys()]).to.deep.equal([team.id])
+    // Nothing the member did made any space but the one
+    expect(await spacesKnown()).to.deep.equal([team.id])
 
     // The member changes the setlist and adds one, and the owner gets both
     const sunday = must(await memberDb.getSetlist('sunday'))
@@ -220,7 +218,7 @@ describe('a team space, end to end', () => {
     await syncTeamSpace(must(await getSpaceById(owned.id)))
     expect(must(await ownerDb.getSetlist('sunday')).name).to.equal('Sunday (changed)')
     expect(must(await ownerDb.getSetlist('extra')).name).to.equal('Extra')
-    expect([...objects.keys()]).to.deep.equal([team.id])
+    expect(await spacesKnown()).to.deep.equal([team.id])
   })
 
   it('has a member who has synced get the owner’s later changes from the feed, listing nothing', async () => {

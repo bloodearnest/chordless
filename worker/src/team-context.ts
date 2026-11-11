@@ -2,12 +2,13 @@
  * The team space API's context (team-api.ts) as the Worker has it: the space's Drive (the owner's
  * access token, team-drive.ts) with the refs it shows noted (team-refs.ts), and what is in the
  * space's tree; and, for making and joining spaces and looking after their people, who is asking
- * (the identity providers) and the space's Durable Object. Who is asking, and their role, is
+ * (the identity providers) and the space's state in D1. Who is asking, and their role, is
  * settled in team-routes.ts before either is used.
  */
 
 import { createDriveApi } from '../../src/js/drive-client.ts'
 import { decryptBlob } from './blob.ts'
+import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
 import { type GoogleApi, realGoogle } from './google-auth.ts'
 import { authenticate, googleProvider, type IdentityProvider } from './identity.ts'
@@ -16,7 +17,7 @@ import type { AdminContext } from './team-admin.ts'
 import type { TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'
 import { notingPadRefs, notingRefs } from './team-refs.ts'
-import { TeamRegister } from './team-register.ts'
+import { type LiveSockets, TeamSpaceState } from './team-state.ts'
 import { tracedFetch, tracedStub } from './trace.ts'
 
 /** What a test replaces; the real ones are the defaults */
@@ -39,17 +40,27 @@ function resolve(env: Env, deps: TeamDeps) {
   }
 }
 
-/** A space's Durable Object, by the space's id */
-const roomsOf = (teamSpaces: NonNullable<Env['TEAM_SPACE']>) => (spaceId: string) =>
-  tracedStub(teamSpaces.get(teamSpaces.idFromName(spaceId)), 'TeamSpace')
+/** A space's live room, asked for only when a socket is opened or closed */
+function socketsOf(rooms: NonNullable<Env['TEAM_ROOM']>, spaceId: string): LiveSockets {
+  const room = () => rooms.get(rooms.idFromName(spaceId))
+  return {
+    fetch: request => room().fetch(request),
+    dropSockets: identity => room().dropSockets(identity),
+  }
+}
 
-export function createTeamContext(
-  env: Env,
-  teamSpaces: NonNullable<Env['TEAM_SPACE']>,
-  deps: TeamDeps = {}
-): TeamContext {
+/** A space, by its id: its state is in D1 (team-state.ts), its sockets in its live room */
+const roomsOf = (env: Env) => (spaceId: string) =>
+  tracedStub(
+    new TeamSpaceState(env.DB as D1Db, spaceId, {
+      sockets: env.TEAM_ROOM && socketsOf(env.TEAM_ROOM, spaceId),
+    }),
+    'TeamSpace'
+  )
+
+export function createTeamContext(env: Env, deps: TeamDeps = {}): TeamContext {
   const { google, now } = resolve(env, deps)
-  const room = roomsOf(teamSpaces)
+  const room = roomsOf(env)
 
   // (a request's space is looked up once; its token source is shared by the calls it makes)
   const drives = new Map<string, ReturnType<typeof open>>()
@@ -88,15 +99,11 @@ export function createTeamContext(
 }
 
 /** What making a space, joining one and looking after its people need */
-export function createAdminContext(
-  env: Env,
-  teamSpaces: NonNullable<Env['TEAM_SPACE']>,
-  deps: TeamDeps = {}
-): AdminContext {
+export function createAdminContext(env: Env, deps: TeamDeps = {}): AdminContext {
   const { providers, google, now } = resolve(env, deps)
   return {
     identify: request => authenticate(request, providers),
-    room: roomsOf(teamSpaces),
+    room: roomsOf(env),
     async inspectRoot(blob, owner, rootRef) {
       // (the blob is not stored yet: it is what the space would be made from)
       const info = { rootRef, name: '', owner, createdAt: '' }
@@ -118,6 +125,5 @@ export function createAdminContext(
       return checkTeamStorage(api, rootRef, address)
     },
     newSpaceId: () => crypto.randomUUID(),
-    register: () => (env.DB ? new TeamRegister(env.DB) : null),
   }
 }

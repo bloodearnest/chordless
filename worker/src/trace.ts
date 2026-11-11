@@ -230,7 +230,7 @@ export function tracedFetch(
 }
 
 /**
- * A Durable Object's stub with a span for each call made through it while a request is traced
+ * A space's state, or a Durable Object's stub, with a span for each call made through it while a request is traced
  * (`chordless.worker.do`, the method and the object's class), ended when the call is answered
  */
 export function tracedStub<T extends object>(stub: T, className: string): T {

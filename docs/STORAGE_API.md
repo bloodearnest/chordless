@@ -106,7 +106,7 @@ the Worker running over `fake-drive.ts`.
 (`handleTeamRequest`; the routes are listed at the top of that file). The API is a function of
 the request, the asker's role (settled first, in `team-routes.ts`) and a `TeamContext`: the space's
 `SpaceStorage` (`space`), its root (`root`) and whether files are in its tree (`owns`, `ownedAmong`). Tests
-give it the in-memory storage; the real context is the Durable Object and the owner's token or
+give it the in-memory storage; the real context is the team's state in D1 and the owner's token or
 service account, and the route is not in `router.ts` yet. Roles are enforced in the handler
 (reader reads, writer writes and bins, `canWrite` in the root), a file outside the space is
 404 (null in a batch), bodies are text only but for pad audio (below). Share links work (2026-10-22): `publicLink` is
@@ -115,7 +115,7 @@ space's refs are Drive file ids, the Worker's `/api/share/<id>` serves a share f
 unchanged (ciphertext only, as ever). The space-level conformance suite (`describeSpaceStorage`, split from the
 backend suite) runs over `TeamStorage` through the handler, and `team-api.node.test.ts` covers
 the roles, the refusals and the scoping. `owns` is the part that needs care in the real context:
-it must include binned files, and be cheap (the Durable Object keeping the refs, not a walk of
+it must include binned files, and be cheap (D1 keeping the refs, not a walk of
 Drive per call): `TeamSpaceState.addRefs` and `owns` (`worker/src/team-state.ts`) keep them, and
 a ref stays noted when its file is binned.
 `notingRefs` (`worker/src/team-refs.ts`) fills it: it wraps the space's storage and notes the refs a
@@ -125,7 +125,7 @@ root. A ref no listing has shown is unknown (a 404) until the next one; there is
 that walks a file's parents. A team space's root ref is the space id. The client's `token` option is `getIdentityToken()` (`google-auth.ts`), Google's ID token, which the Worker checks (`worker/src/identity.ts`; docs/SPACES.md, "Sign-in model").
 
 On the Worker each call is: check the ID token, look up the member's role in the space's
-Durable Object, check it against the collection and ref, make the Drive call with the owner's token
+state (D1), check it against the collection and ref, make the Drive call with the owner's token
 (later the service account's) and stream the answer back. Nothing is stored. The Worker reuses
 `createDriveStorage` with another token source (`worker/src/team-drive.ts`, built 2026-10-21), so there
 stays one Drive implementation: `ownerAccessToken` opens the owner's blob from the space's Durable
@@ -133,7 +133,7 @@ Object, checks it is the owner's (`owner_sub`), refreshes an access token for it
 isolate's memory for its hour, made once for a whole batch) and says "sharing is not set up" (no
 blob) or "the owner needs to reconnect Google Drive" (`invalid_grant`, or a blob it can no longer
 decrypt) as a 409. A service account
-would be another source. Wired into the route (`worker/src/router.ts`, `team-context.ts`, 2026-10-21): the ID token is checked first, then the role from the Durable Object, then Drive with the owner's token, with the refs each listing shows noted. Spaces are made and joined through `team-admin.ts` (docs/SPACES.md), not through this API.
+would be another source. Wired into the route (`worker/src/router.ts`, `team-context.ts`, 2026-10-21): the ID token is checked first, then the role from D1, then Drive with the owner's token, with the refs each listing shows noted. Spaces are made and joined through `team-admin.ts` (docs/SPACES.md), not through this API.
 
 **On the device (built 2026-10-21):** a space shared with a team has `team: {id, role}` on its
 record (`Space.team`). `storageFor(space)` (`storage/space-storage.ts`) gives the backend: Drive for
@@ -149,7 +149,7 @@ yet.
 How each call maps:
 - `list`, `inventory`, `status`, `readText`, `create`, `createMany`, `update`: straight through;
   writes need writer or above.
-- `members()`: from the Durable Object, not Drive permissions.
+- `members()`: from D1, not Drive permissions.
 - `inspectRoot`: answers with the member's role as `canWrite`, which replaces `writeRefusals()`
   and the Drive-capabilities guess (the "role from the Worker" to-do in SPACES.md).
 - `findRootByName`, `ensureRoot`, `renameRoot`: first-sync-on-a-device calls that do not apply to
@@ -175,7 +175,7 @@ Batching is therefore in the interface (built 2026-10-20): `readMany`, `createMa
 `updateMany`. The engine hands a backend a batch of 50 (`BATCH_SIZE`, `sync/session.ts`) and
 does not say how it is done. `DriveStorage` keeps what it had: 10 reads or updates in flight,
 30 uploads in flight (Google's Batch API cannot carry file content). `TeamStorage` sends a
-batch as one request, which the Worker fans out to Drive, with one Durable Object role check for
+batch as one request, which the Worker fans out to Drive, with one role check (D1) for
 the whole batch. A batch call is still partial-failure tolerant (null in a slot), and a batch that
 throws is retried one record at a time on a push and counted as unread on a pull. Not batched:
 `trash` and `unpublish` (rare, small). "Send the revs I know, get back what changed" would be a

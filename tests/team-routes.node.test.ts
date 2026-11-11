@@ -1,7 +1,7 @@
 /**
  * The team space API as the Worker serves it (worker/src/router.ts, team-context.ts): a Google ID
- * token is checked first, then the member's role in the space's Durable Object, then the owner's
- * Drive. The Durable Object is its state over a Map, Drive is the in-memory one, and the ID tokens
+ * token is checked first, then the member's role in the space's state, then the owner's
+ * Drive. The state is over a SQLite with the migrations applied (d1-db.ts), Drive is the in-memory one, and the ID tokens
  * are signed with a key made here that stands in for Google's.
  */
 import assert from 'node:assert/strict'
@@ -17,10 +17,9 @@ import { handleCreateSpace } from '../worker/src/team-admin.ts'
 import { createAdminContext, createTeamContext, type TeamDeps } from '../worker/src/team-context.ts'
 import { teamDrive } from '../worker/src/team-drive.ts'
 import { TeamSpaceState } from '../worker/src/team-state.ts'
+import { d1Db } from './d1-db.ts'
 import { FakeDrive } from './fake-drive.ts'
-import { MapStore } from './map-store.ts'
 import { must } from './must.ts'
-import { registerDb } from './register-db.ts'
 
 const ORIGIN = 'https://chordless.test'
 const SPACE = 'space-aaaaaaaa'
@@ -77,29 +76,30 @@ async function world() {
   const backend = teamDrive(async () => TOKEN, viaFake)
   const root = (await backend.ensureRoot('Team', SPACE)).ref
 
-  /** The Durable Objects: one state per name, and a note of which names were asked for */
-  const states = new Map<string, TeamSpaceState>()
+  /** The database the spaces are in, and the live rooms (Durable Objects) asked for: a note of which names */
+  const { db, sql, fail } = d1Db()
   const asked: string[] = []
-  /** The sockets asked of the objects (the Durable Object's own side of a live socket is tested in workerd) */
+  /** The sockets asked of the rooms (the room's own side of a live socket is tested in workerd) */
   const live: { space: string; request: Request }[] = []
-  const teamSpaces = {
+  /** The accounts whose sockets the rooms were told to close: undefined for all of them */
+  const dropped: { space: string; identity?: string }[] = []
+  const teamRooms = {
     idFromName(name: string) {
       asked.push(name)
       return name
     },
     get(id: unknown) {
       const name = String(id)
-      const state = states.get(name) ?? new TeamSpaceState(new MapStore())
-      states.set(name, state)
-      return Object.assign(state, {
+      return {
         fetch: async (request: Request) => {
           live.push({ space: name, request })
           return new Response('socket', { status: 200 })
         },
-      })
+        dropSockets: async (identity?: string) => void dropped.push({ space: name, identity }),
+      }
     },
   }
-  const room = teamSpaces.get(SPACE) as TeamSpaceState
+  const room = new TeamSpaceState(db, SPACE)
   await room.create({ rootRef: root, name: 'Team', owner: ann })
   await room.setMember(bob, 'writer')
   await room.setMember(cat, 'reader')
@@ -110,7 +110,8 @@ async function world() {
   const env = {
     ...env0,
     ASSETS: { fetch: async () => new Response('assets') },
-    TEAM_SPACE: teamSpaces,
+    DB: db,
+    TEAM_ROOM: teamRooms,
   } satisfies Env
   const deps: TeamDeps = {
     providers: [googleProvider(env0, keys)],
@@ -146,7 +147,29 @@ async function world() {
   /** What the owner's own sync makes, straight in Drive */
   const direct = async (name: string, body = `${name} text`) =>
     (await backend.space(root).create('songs', input(name), body)).file.ref
-  return { drive, backend, root, room, env, deps, asked, call, direct, teamSpaces, states, live }
+  /** Rows of the database, as plain objects */
+  const all = (query: string) =>
+    sql
+      .prepare(query)
+      .all()
+      .map(row => ({ ...row }))
+  return {
+    drive,
+    backend,
+    root,
+    room,
+    env,
+    deps,
+    asked,
+    call,
+    direct,
+    teamRooms,
+    live,
+    dropped,
+    db,
+    all,
+    fail,
+  }
 }
 
 const json = async (response: Response) => (await response.json()) as Record<string, unknown>
@@ -158,9 +181,9 @@ const send = (method: string, body?: unknown): RequestInit => ({
 const post = (body: unknown) => send('POST', body)
 
 describe('the route', () => {
-  test('says team spaces are not available where the Worker has no Durable Object binding', async () => {
+  test('says team spaces are not available where the Worker has no database', async () => {
     const { call, env } = await world()
-    const { TEAM_SPACE: _, ...without } = env
+    const { DB: _, ...without } = env
     const answer = await call(`${SPACE}/root`, ann, {}, without)
     assert.equal(answer.status, 503)
   })
@@ -447,8 +470,7 @@ describe('team-managed storage (the service account)', () => {
 describe('the context', () => {
   test('says there is no such space, and no root, for an id with no space', async () => {
     const { env, deps } = await world()
-    assert.ok(env.TEAM_SPACE)
-    const context = createTeamContext(env, env.TEAM_SPACE, deps)
+    const context = createTeamContext(env, deps)
     assert.equal(await context.space('space-cccccccc'), null)
     assert.equal(await context.root('space-cccccccc'), null)
     assert.equal(await context.pads('space-cccccccc'), null)
@@ -490,7 +512,7 @@ describe('making a space', () => {
 
   test('refuses a sign-in that is not ours, or not theirs, and makes nothing', async () => {
     const w = await world()
-    const before = w.states.size
+    const before = w.all('SELECT * FROM teams').length
     const garbage = await w.call(
       '/api/spaces',
       eve,
@@ -503,7 +525,7 @@ describe('making a space', () => {
       post({ blob: await blobFor(ann), rootRef: w.root, name: 'x' })
     )
     assert.equal(theirs.status, 403)
-    assert.equal(w.states.size, before)
+    assert.equal(w.all('SELECT * FROM teams').length, before)
   })
 
   test('refuses a folder that is not there, is in the bin, or cannot be written', async () => {
@@ -540,8 +562,7 @@ describe('making a space', () => {
 
   test('does not make a space over one that exists, if an id were ever to repeat', async () => {
     const w = await world()
-    assert.ok(w.env.TEAM_SPACE)
-    const admin = createAdminContext(w.env, w.env.TEAM_SPACE, w.deps)
+    const admin = createAdminContext(w.env, w.deps)
     const request = new Request(`${ORIGIN}/api/spaces`, {
       ...post({ blob: await blobFor(eve), rootRef: w.root, name: 'Eve Church' }),
       headers: {
@@ -862,7 +883,7 @@ describe('the CCLI licence number', () => {
       ccliLicence: '2345678',
       history: [
         {
-          at: (await w.states.get(spaceId)?.licence())?.history[0]?.at,
+          at: (await new TeamSpaceState(w.db, spaceId).licence()).history[0]?.at,
           by: 'eve@example.com',
           from: null,
           to: '2345678',
@@ -879,24 +900,14 @@ describe('the CCLI licence number', () => {
 })
 
 describe('the register of teams', () => {
-  /** The world with a database for the register */
-  async function registered() {
-    const w = await world()
-    const { db, sql, fail } = registerDb()
-    const env = { ...w.env, DB: db } satisfies Env
-    const call = (path: string, who: Identity | null, init: RequestInit = {}) =>
-      w.call(path, who, init, env)
-    const all = (query: string) =>
-      sql
-        .prepare(query)
-        .all()
-        .map(row => ({ ...row }))
-    return { ...w, call, all, fail, env }
-  }
   const put = (number: unknown) => send('PUT', { ccliLicence: number })
+  const eventsOf = (w: Awaited<ReturnType<typeof world>>, spaceId: string) =>
+    w.all(
+      `SELECT kind, by_email, detail FROM team_events WHERE space_id = '${spaceId}' ORDER BY id`
+    )
 
-  test('notes a space when it is made, with its owner, its licence number and one member', async () => {
-    const w = await registered()
+  test('has a space when it is made, with its owner, its licence number and its history', async () => {
+    const w = await world()
     const made = await w.call(
       '/api/spaces',
       eve,
@@ -909,65 +920,74 @@ describe('the register of teams', () => {
     )
     const { spaceId } = (await json(made)) as { spaceId: string }
     assert.deepEqual(
-      w.all('SELECT space_id, name, owner_email, ccli_licence, members, ended_at FROM teams'),
+      w.all(
+        `SELECT space_id, name, owner_email, ccli_licence, ended_at FROM teams WHERE space_id = '${spaceId}'`
+      ),
       [
         {
           space_id: spaceId,
           name: 'Eve Church',
           owner_email: 'eve@example.com',
           ccli_licence: '2345678',
-          members: 1,
           ended_at: null,
         },
       ]
     )
-    assert.deepEqual(w.all('SELECT kind, by_email FROM team_events ORDER BY id'), [
-      { kind: 'created', by_email: 'eve@example.com' },
-      { kind: 'licence', by_email: 'eve@example.com' },
-    ])
+    assert.deepEqual(
+      eventsOf(w, spaceId).map(({ kind, by_email }) => ({ kind, by_email })),
+      [
+        { kind: 'created', by_email: 'eve@example.com' },
+        { kind: 'licence', by_email: 'eve@example.com' },
+      ]
+    )
   })
 
   test('notes each change of the licence number with who made it, and nothing where it changed nothing', async () => {
-    const w = await registered()
+    const w = await world()
     await w.call(`${SPACE}/licence`, bob, put('471102'))
     await w.call(`${SPACE}/licence`, bob, put('471102'))
     await w.call(`${SPACE}/licence`, dan, put('471103'))
     assert.deepEqual(
-      w
-        .all("SELECT by_email, detail FROM team_events WHERE kind = 'licence' ORDER BY id")
+      eventsOf(w, SPACE)
+        .filter(each => each.kind === 'licence')
         .map(({ by_email, detail }) => [by_email, JSON.parse(String(detail))]),
       [
         ['bob@example.com', { from: null, to: '471102' }],
         ['dan@example.com', { from: '471102', to: '471103' }],
       ]
     )
-    assert.equal(w.all('SELECT ccli_licence FROM teams')[0].ccli_licence, '471103')
+    assert.equal(
+      w.all(`SELECT ccli_licence FROM teams WHERE space_id = '${SPACE}'`)[0].ccli_licence,
+      '471103'
+    )
   })
 
   test('notes a space made with no licence number with none, and a cleared one as cleared', async () => {
-    const w = await registered()
+    const w = await world()
     const made = await w.call(
       '/api/spaces',
       eve,
       post({ blob: await blobFor(eve), rootRef: w.root, name: 'Eve Church' })
     )
     const { spaceId } = (await json(made)) as { spaceId: string }
-    assert.equal(w.all('SELECT ccli_licence FROM teams')[0].ccli_licence, null)
+    const licence = () =>
+      w.all(`SELECT ccli_licence FROM teams WHERE space_id = '${spaceId}'`)[0].ccli_licence
+    assert.equal(licence(), null)
     assert.deepEqual(
-      w.all('SELECT kind FROM team_events').map(each => each.kind),
+      eventsOf(w, spaceId).map(each => each.kind),
       ['created']
     )
     await w.call(`${spaceId}/licence`, eve, put('471102'))
     await w.call(`${spaceId}/licence`, eve, put(''))
-    const [row] = w.all('SELECT ccli_licence FROM teams')
-    assert.equal(row.ccli_licence, null)
-    const last = w.all("SELECT detail FROM team_events WHERE kind = 'licence' ORDER BY id DESC")[0]
-    assert.deepEqual(JSON.parse(String(last.detail)), { from: '471102', to: null })
+    assert.equal(licence(), null)
+    const last = eventsOf(w, spaceId).at(-1)
+    assert.deepEqual(JSON.parse(String(last?.detail)), { from: '471102', to: null })
   })
 
-  test('keeps count of the people as they join, leave and are removed', async () => {
-    const w = await registered()
-    const count = () => w.all('SELECT members FROM teams')[0]?.members
+  test('has the people as they join, leave and are removed, and closes the sockets of those who go', async () => {
+    const w = await world()
+    const count = () =>
+      Number(w.all(`SELECT COUNT(*) AS n FROM team_members WHERE space_id = '${SPACE}'`)[0].n)
     const invite = await json(
       await w.call(`${SPACE}/invites`, ann, post({ role: 'writer', email: stranger.email }))
     )
@@ -977,47 +997,47 @@ describe('the register of teams', () => {
       post({ spaceId: SPACE, code: invite.code })
     )
     assert.equal(joined.status, 200)
-    assert.equal(count(), 5)
-    assert.equal((await w.call(`${SPACE}/leave`, stranger, post({}))).status, 204)
     assert.equal(count(), 4)
+    assert.equal((await w.call(`${SPACE}/leave`, stranger, post({}))).status, 204)
+    assert.equal(count(), 3)
     assert.equal(
       (await w.call(`${SPACE}/members/bob%40example.com`, ann, send('DELETE'))).status,
       204
     )
-    assert.equal(count(), 3)
+    assert.equal(count(), 2)
+    assert.deepEqual(w.dropped.at(-1), { space: SPACE, identity: 'google:g-bob' })
   })
 
-  test('keeps a space that ended, marked, with its number and what happened to it', async () => {
-    const w = await registered()
+  test('keeps a space that ended, marked, with its number and what happened to it, and forgets its people', async () => {
+    const w = await world()
     await w.call(`${SPACE}/licence`, bob, put('471102'))
     assert.equal((await w.call(SPACE, ann, send('DELETE'))).status, 204)
-    const [team] = w.all('SELECT name, ccli_licence, ended_at FROM teams')
+    const [team] = w.all(
+      `SELECT name, ccli_licence, ended_at FROM teams WHERE space_id = '${SPACE}'`
+    )
     assert.equal(team.name, 'Team')
     assert.equal(team.ccli_licence, '471102')
     assert.match(String(team.ended_at), /^20\d\d-/)
     assert.deepEqual(
-      w.all('SELECT kind, by_email FROM team_events ORDER BY id').map(each => each.kind),
-      ['licence', 'ended']
+      eventsOf(w, SPACE).map(each => each.kind),
+      ['created', 'licence', 'ended']
     )
+    assert.deepEqual(w.all(`SELECT * FROM team_members WHERE space_id = '${SPACE}'`), [])
+    assert.deepEqual(w.all(`SELECT * FROM team_credentials WHERE space_id = '${SPACE}'`), [])
     assert.equal((await w.call(`${SPACE}/licence`, ann)).status, 403)
+    assert.deepEqual(w.dropped.at(-1), { space: SPACE, identity: undefined })
   })
 
-  test('is not needed: a Worker with no database does all of this, and a database that is down stops nothing', async () => {
-    const w = await registered()
+  test('is the space itself: with the database down a team call fails, rather than carrying on without it', async () => {
+    const w = await world()
     w.fail(true)
     const quiet = console.error
-    const heard: unknown[][] = []
-    console.error = (...args: unknown[]) => void heard.push(args)
+    console.error = () => {}
     try {
-      assert.equal((await w.call(`${SPACE}/licence`, bob, put('471102'))).status, 200)
-      assert.equal((await w.room.licence()).ccliLicence, '471102')
+      assert.ok((await w.call(`${SPACE}/licence`, bob, put('471102'))).status >= 500)
     } finally {
       console.error = quiet
     }
-    assert.equal(heard.length, 1)
-    assert.deepEqual(w.all('SELECT * FROM teams'), [])
-    const bare = await world()
-    assert.equal((await bare.call(`${SPACE}/licence`, bob, put('471102'))).status, 200)
   })
 })
 
@@ -1068,14 +1088,18 @@ describe('the live route', () => {
     },
   })
 
-  test('hands a member’s socket to the space’s object, and says who they are', async () => {
+  test('hands a member’s socket to the space’s live room, and says which account and space', async () => {
     const w = await world()
     const answer = await w.call(`${SPACE}/live`, null, await upgrade(bob))
     assert.equal(answer.status, 200, 'the object’s answer, as it is')
     assert.equal(await answer.text(), 'socket')
     const [{ space, request }] = w.live
     assert.equal(space, SPACE)
-    assert.deepEqual(JSON.parse(request.headers.get('X-Live-Identity') ?? ''), bob)
+    assert.deepEqual(JSON.parse(request.headers.get('X-Live-Identity') ?? ''), {
+      provider: bob.provider,
+      sub: bob.sub,
+      spaceId: SPACE,
+    })
     assert.equal(request.headers.get('Upgrade'), 'websocket')
     assert.equal(request.headers.get('Authorization'), null, 'the token goes no further')
   })
@@ -1085,14 +1109,18 @@ describe('the live route', () => {
     assert.equal((await w.call(`${SPACE}/live`, null, await upgrade(cat))).status, 200)
   })
 
-  test('does not let a page say who it is: the object has only what the Worker settled', async () => {
+  test('does not let a page say who it is: the room has only what the Worker settled', async () => {
     const w = await world()
     await w.call(
       `${SPACE}/live`,
       null,
       await upgrade(cat, { 'X-Live-Identity': JSON.stringify(ann) })
     )
-    assert.deepEqual(JSON.parse(w.live[0].request.headers.get('X-Live-Identity') ?? ''), cat)
+    assert.deepEqual(JSON.parse(w.live[0].request.headers.get('X-Live-Identity') ?? ''), {
+      provider: cat.provider,
+      sub: cat.sub,
+      spaceId: SPACE,
+    })
   })
 
   test('asks who it is before any object is touched: no token, a bad one, or one in the wrong place', async () => {
@@ -1136,11 +1164,9 @@ describe('the live route', () => {
 
   test('says so where the object cannot take a socket', async () => {
     const w = await world()
-    const state = w.states.get(SPACE)
-    assert.ok(state)
-    delete (state as { fetch?: unknown }).fetch
-    w.teamSpaces.get = id => w.states.get(String(id)) as never
-    assert.equal((await w.call(`${SPACE}/live`, null, await upgrade(bob))).status, 503)
+    const { TEAM_ROOM: _, ...without } = w.env
+    const answer = await w.call(`${SPACE}/live`, null, await upgrade(bob), without)
+    assert.equal(answer.status, 503)
   })
 
   test('does not make an object for an id that is not a space’s', async () => {

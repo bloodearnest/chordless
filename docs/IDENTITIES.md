@@ -30,7 +30,7 @@ Person {
 ```
 
 A person's names are not copyrighted content, so they may live in the space and in Drive. Roles are
-**not** stored on a person: in a team space the role is read from the Durable Object by
+**not** stored on a person: in a team space the role is read from the team's state in D1 by
 `teamMember`, which keeps the Worker as the one place that decides who may do what.
 
 ## Setlists
@@ -125,7 +125,7 @@ people as they are.
   which is what an invite is bound to, and a person has the addresses. So a person is the member
   whose email is among theirs. (`teamMember` stays in the type, unused, for a provider whose emails
   cannot be trusted.)
-- The Team's members (the Durable Object's, with their roles, cached in `space.members` at each sync)
+- The Team's members (the team's rows in D1, with their roles, cached in `space.members` at each sync)
   already become people, by email (`getSpacePeople`). **The role is shown beside the person** in the
   Leaders list ("Worship leader", "Team member", "Admin", "Owner": `roleLabel`), by the address the
   Team knows them by. A person with no member (a visiting leader typed in by name, or one with no
@@ -143,7 +143,7 @@ link between the spaces except what identifies them: the same `teamMember` (`pro
 same emails. Consequences:
 
 - Names and emails may differ per space (a nickname in one team); nothing reconciles them.
-- Their role is per team, read from each team's Durable Object by the address that team knows them by.
+- Their role is per team, read from each team's state in D1 by the address that team knows them by.
 - "Me" in a space is the one chosen on this device, else the person whose email is mine.
 - Copying or moving a setlist to another space remaps `leaderId` there: by email,
   then name, else a new person is made. The id is never carried across.

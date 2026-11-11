@@ -1,6 +1,6 @@
 /**
  * How a team space comes to know which files are in its tree (worker/src/team-refs.ts): the refs
- * a listing, an inventory or a create shows are noted in the space's Durable Object state, and
+ * a listing, an inventory or a create shows are noted in the space's state, and
  * `owns` answers from them. The files are in the in-memory storage; the state is over a Map.
  */
 import assert from 'node:assert/strict'
@@ -9,7 +9,7 @@ import type { Identity } from '../worker/src/identity.ts'
 import { handleTeamRequest, type TeamContext } from '../worker/src/team-api.ts'
 import { notingPadRefs, notingRefs } from '../worker/src/team-refs.ts'
 import { TeamSpaceState } from '../worker/src/team-state.ts'
-import { MapStore } from './map-store.ts'
+import { d1Db } from './d1-db.ts'
 import { MemoryStorage } from './memory-storage.ts'
 import { must } from './must.ts'
 
@@ -21,7 +21,7 @@ async function made() {
   const storage = new MemoryStorage()
   const root = (await storage.ensureRoot('Team', 'space-1')).ref
   const other = (await storage.ensureRoot('Elsewhere', 'space-2')).ref
-  const state = new TeamSpaceState(new MapStore())
+  const state = new TeamSpaceState(d1Db().db, 'space-test')
   await state.create({ rootRef: root, name: 'Team', owner: ann })
   /** What the owner's own sync makes, straight in Drive: the Worker never sees it */
   const direct = async (name: string, where = root) =>
@@ -105,7 +105,7 @@ describe('noting refs', () => {
     await space.unpublish(ref)
   })
 
-  test('the members are the Durable Object’s, not the Drive folder’s permissions', async () => {
+  test('the members are the space’s, not the Drive folder’s permissions', async () => {
     const { storage, root, state } = await made()
     await state.setMember(bob, 'writer')
     const space = notingRefs(storage.space(root), state)

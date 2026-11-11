@@ -12,7 +12,7 @@ import { handleTeamRequest, type TeamContext } from '../worker/src/team-api.ts'
 import { MAX_PAD_BYTES } from '../worker/src/team-pads.ts'
 import { notingPadRefs, notingRefs } from '../worker/src/team-refs.ts'
 import { TeamSpaceState } from '../worker/src/team-state.ts'
-import { MapStore } from './map-store.ts'
+import { d1Db } from './d1-db.ts'
 import { MemoryStorage } from './memory-storage.ts'
 
 const ann: Identity = { provider: 'google', sub: 'g-1', email: 'ann@example.com' }
@@ -23,7 +23,7 @@ async function made() {
   const storage = new MemoryStorage()
   const root = (await storage.ensureRoot('Team', 'space-1')).ref
   const elsewhere = (await storage.ensureRoot('Elsewhere', 'space-2')).ref
-  const state = new TeamSpaceState(new MapStore())
+  const state = new TeamSpaceState(d1Db().db, 'space-test')
   await state.create({ rootRef: root, name: 'Team', owner: ann })
   const context: TeamContext = {
     space: async () => notingRefs(storage.space(root), state),

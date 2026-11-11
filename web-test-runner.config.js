@@ -3,6 +3,7 @@ import { availableParallelism } from 'node:os'
 import { esbuildPlugin } from '@web/dev-server-esbuild'
 import { defaultReporter } from '@web/test-runner'
 import { playwrightLauncher } from '@web/test-runner-playwright'
+import { d1Plugin } from './scripts/wtr-d1-plugin.js'
 import { statsReporter } from './scripts/wtr-stats-reporter.js'
 
 // What Vite gives the page from .env.development (npm run dev), which the unit tests run with too
@@ -36,6 +37,8 @@ export default {
   nodeResolve: { browser: true, exportConditions: ['browser'] },
   // Types are erased, nothing else: the browser gets the same code it would from Vite
   plugins: [
+    // A SQLite for the tests of the Worker's D1 code, which a page cannot run itself
+    d1Plugin(),
     // Node's own modules, which the Worker's code (loaded by some of these tests) imports
     {
       name: 'node-builtins',

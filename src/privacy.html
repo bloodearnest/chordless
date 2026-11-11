@@ -83,18 +83,19 @@
 
       <h2 id="teams">Team spaces</h2>
       <p>
-        A Team space is shared by several people. To run it, Chordless's server keeps the Team's name,
-        who owns it, who its members are and their roles, and the owner's encrypted Google sign-in
-        (or notes that it uses Chordless's own service account to reach the Team's shared drive). It
-        never keeps the Team's songs, setlists or pads: those pass through to the Team's Google Drive.
+        A Team space is shared by several people. To run it, Chordless's server keeps, in a database,
+        the Team's name, who owns it, who its members are and their roles, the invitations that are
+        open, the ids of the files in the Team's Google Drive folder, and the owner's encrypted
+        Google sign-in (or a note that it uses Chordless's own service account to reach the Team's
+        shared drive). It never keeps the Team's songs, setlists or pads: those pass through to the
+        Team's Google Drive.
       </p>
       <p>
-        It also keeps a <strong>register of Teams</strong>, in a database, which stays after a Team
-        stops sharing. For each Team it holds the name, the owner's email address, when it was made
-        and when sharing ended, how many people are in it, the CCLI licence number the Team gave (and
-        who changed it, and when), and nothing else. The register is a record for CCLI, who may ask
-        which churches use Chordless under which licence, and for working out what to charge. It
-        does not name the other members.
+        When a Team stops sharing, the members, invitations, file ids and sign-in are deleted. What
+        stays is a <strong>register</strong> of the Team: its name, the owner's email address, when it
+        was made and when sharing ended, the CCLI licence number it gave (and who changed it, and
+        when). The register is a record for CCLI, who may ask which churches use Chordless under which
+        licence, and for working out what to charge. It does not name the other members.
       </p>
 
       <h2 id="reports">Anonymous usage reports</h2>

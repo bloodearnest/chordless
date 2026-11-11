@@ -1,9 +1,9 @@
 /**
- * Notes, in the team space's Durable Object, the refs of the files a space's storage reveals
+ * Notes, in the team space's D1 rows, the refs of the files a space's storage reveals
  * (`TeamSpaceState.addRefs`, team-state.ts), so the Worker can tell cheaply which files are in the
  * space's tree (`owns`, team-api.ts).
  *
- * It also makes the space's members the Durable Object's, not the permissions of the Drive folder.
+ * It also makes the space's members the database's, not the permissions of the Drive folder.
  *
  * The files are not all made through the Worker: the owner syncs straight to Drive. But a listing
  * of the space is already scoped to its root, and a member lists before they read, so noting what a
@@ -30,7 +30,7 @@ export function notingRefs(
         return { ...result, gone: await room.ownedAmong(result.gone) }
       },
     },
-    // (the people of a team space are the Durable Object's, not Drive's folder permissions)
+    // (the people of a team space are the database's, not Drive's folder permissions)
     members: () => room.members(),
     async list(collection) {
       const files = await space.list(collection)

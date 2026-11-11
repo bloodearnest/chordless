@@ -19,7 +19,7 @@ SYNC_ARCHITECTURE.md.
 **Chordless never stores copyrighted content; it only passes access on to it.** Charts, lyrics and pad
 audio live in the user's own browser and in a Drive the user (or their team space's owner) controls.
 The Worker passes team-space traffic through (streamed, never buffered to storage) without
-persisting or caching it: no KV, R2, Durable Object or Cache API entry may hold song or pad
+persisting or caching it: no KV, R2, D1, Durable Object or Cache API entry may hold song or pad
 content. They hold only membership, roles, the owner's encrypted token blob, checksums, and, for
 the live channel, the hash of the secret a share's sender proved (LIVE_SYNC.md): its sockets carry one
 word, "changed", and never a setlist, chart or key. (Share
@@ -54,9 +54,9 @@ What Chordless does about it: each space can hold its church's **CCLI licence nu
 records. It is never checked and never a gate: a team made before anyone has the number to hand
 must work, as must a church outside the countries CCLI serves.
 
-- **Where it is kept.** A Team's number is kept **by the Worker, in the team's Durable Object**
-  (`licence`, with an append-only log, `licenceLog:`, of who set, changed or cleared it, and when:
-  `LicenceChange`). It is the team's record, not a user's: CCLI may ask who a licence is used by,
+- **Where it is kept.** A Team's number is kept **by the Worker, in D1**, on the team's row
+  (`teams.ccli_licence`), with who set, changed or cleared it, and when, in `team_events`
+  (`LicenceChange`). It is the team's record, not a user's: CCLI may ask who a licence is used by,
   and a record of the teams using Chordless is wanted for compliance and perhaps for charging. It
   is not song content, so it is within what the Worker may hold (CLAUDE.md). The device keeps a
   copy to show (`Space.ccliLicence`). A personal space's number is kept on the device alone.
@@ -69,27 +69,39 @@ must work, as must a church outside the countries CCLI serves.
   on the first SongSelect chart of each import: a number already there is copied to the device and
   never written over; one kept only on the device (the Worker was out of reach) is sent. It can be
   typed when a team is made, and changed in the Team's "Users" window (`team-licence-panel.ts`).
-- **The register of teams.** The log above goes when sharing ends, so the Worker also writes a
-  **D1 table** (`migrations/0001_team_register.sql`, `worker/src/team-register.ts`) that outlives
-  a team, for CCLI and for charging. `teams` has a row per team: its id, name, owner's email, when it
-  was made, its licence number as it stands, how many people are in it, and when sharing ended
-  (the row stays). `team_events` is added to and never changed: `created`, `licence` (from, to, and
-  who) and `ended`. It holds nothing about songs or pads and no member's address but the owner's
-  (CLAUDE.md; `src/privacy.html` says so). It is written when a team is made, when its licence
-  changes, as people join, leave or are removed, and when sharing ends.
-  - **Best effort.** A team works without it: a Worker with no database does everything, and a write
-    that fails is logged and lost. Every write first makes the team's row from what its Durable Object
-    says, so the next write for the team puts right what a lost one missed.
+- **The register of teams is the team.** A team space's state is in **D1**
+  (`migrations/0001_team_register.sql`, `0002_team_state.sql`, `worker/src/team-state.ts`), not in a
+  Durable Object, so it can be asked across teams and outlives them. `teams` has a row per team:
+  its id, name, owner (account and email), its Drive folder, which credential it uses, its licence
+  number, when it was made, and when sharing ended (the row stays). `team_members` (account, email,
+  role, since), `team_invites` (the hash of the code, never the code), `team_refs` (the Drive file
+  ids in its tree) and `team_credentials` (the owner's encrypted token, a table of its own so a
+  query about teams never selects it; a team on the service account has no row) are deleted when
+  sharing ends, so the register that outlives a team names no member. `team_events` is added to and
+  never changed: `created`, `licence` (from, to, and who) and `ended`. Nothing in D1 is song,
+  setlist or pad content, and an email other than the owner's is kept only while its member is in
+  (CLAUDE.md; `src/privacy.html` says so).
+  - **The Durable Object keeps only the live sockets** (`TeamRoom`, binding `TEAM_ROOM`,
+    `worker/src/team-room.ts`), which a hibernating WebSocket needs, and no storage. A socket's
+    attachment is its account and space (no email); when a message arrives the room asks D1 for the
+    sender's role, and when someone's role changes or they go, the Worker tells the room to close
+    their sockets. This replaced `TeamSpace`, whose objects held the state: the migration `v3` in
+    `wrangler.toml` deleted that class with everything in it (one team existed, defunct), so nothing
+    was copied across.
+  - **D1 is a dependency of every team call**, as the object was. A Worker with no database says team
+    spaces are not available (503); with the database down a team call fails, and devices carry on
+    from their own copy (offline first). Nothing about a team is best effort now: the audit trail
+    is written in the same batch as the change it records.
   - **Setting it up.** `wrangler.toml` has a `[[d1_databases]]` binding `DB` with no `database_id`:
     wrangler makes the database, named `chordless-teams`, on the first deploy, and the deploy then
     applies `migrations/`. The Cloudflare token the deploy uses needs **D1: Edit**. In development
-    it is a local database; `just db-local` makes its tables.
-  - **Asking it.** There is no route that reads it: the operator asks with wrangler, for example
-    `npx wrangler d1 execute chordless-teams --remote --command "SELECT name, owner_email, members FROM teams WHERE ccli_licence = '471102'"`,
-    or which teams share a licence number: `SELECT ccli_licence, COUNT(*) AS teams FROM teams WHERE ended_at IS NULL AND ccli_licence IS NOT NULL GROUP BY ccli_licence HAVING teams > 1`.
-  - **Not covered.** Only teams made after it exists are in it (older ones enter at their next
-    licence, join or leave write, or never if nothing touches them), and a team's renaming is not
-    noted (a team cannot be renamed yet).
+    it is a local database; `just db-local` makes its tables. Tests run the migration files against
+    SQLite (`tests/d1-db.ts`; in the browser, through Web Test Runner, `tests/d1-browser.ts`).
+  - **Asking it.** There is no route that reads the register: the operator asks with wrangler, for
+    example `npx wrangler d1 execute chordless-teams --remote --command "SELECT name, owner_email FROM teams WHERE ccli_licence = '471102'"`,
+    or how many people a team has: `SELECT t.name, COUNT(m.identity) + 1 AS people FROM teams t LEFT JOIN team_members m USING (space_id) WHERE t.ended_at IS NULL GROUP BY t.space_id`,
+    or the teams a person is in: `SELECT t.name FROM team_members m JOIN teams t USING (space_id) WHERE m.email = 'x@example.com'`.
+  - **Not covered.** A team's renaming is not noted (a team cannot be renamed yet).
 
 Who imported a song, when and from where is already kept on it (`importUser`, `importDate`,
 `importSource`). Planned, not built: the licence a song came in under; asking before a copy of
@@ -203,7 +215,7 @@ another. With the team service, the member list comes from the Worker instead.
 
 ### Sign-in model
 
-The Worker keeps no per-user state (until the team service adds its Durable Objects).
+The Worker keeps no per-user state (a team's members are the team's, in D1).
 
 - **Signing in:** Google sign-in (GSI) runs in a popup, and the page posts the code and ID token to
   `/oauth/callback`. The Worker verifies the ID token, exchanges the code for tokens, encrypts the
@@ -279,13 +291,13 @@ The Worker keeps no per-user state (until the team service adds its Durable Obje
    ```
    page ── ID token ──► Worker /api/space/<id>/read-many
                                1. verify the ID token: who is this?
-                               2. ask the space's Durable Object: what role?
+                               2. ask the space (D1): what role?
                                3. refuse, or carry on
                                4. use the space's Drive credential ──► Drive
    page ◄── the files ─────────┘
    ```
    The member's own Drive access plays no part, and the member needs none. The Worker uses the
-   space's credential (the owner's token from the owner's blob in the Durable Object, later the
+   space's credential (the owner's token from the owner's blob in D1, later the
    service account), so Drive sees one account acting for the whole team.
 5. **The space's owner syncs** directly, as in 3: they own the folder.
 
@@ -313,7 +325,7 @@ else made. Access is per user and per file (shared drives not tested; expected t
 
 **The design:** the Worker acts with the owner's access on members' behalf.
 1. The owner presses "Enable sharing". The Worker keeps the owner's token (the encrypted blob it
-   already issues) in the team space's Durable Object, with its member list and a role for each.
+   already issues) in the team space's rows in D1, with its member list and a role for each.
 2. A member signs in with the ordinary `drive.file` scope (no warning screen). Their app sends its
    Drive calls to `/api/space/<id>/drive/...` with their Google ID token. The Worker checks the
    member list and forwards the call with the **owner's** token, which covers every file the
@@ -322,7 +334,7 @@ else made. Access is per user and per file (shared drives not tested; expected t
    on the server and nobody needs the Drive folder shared with them. The client change is small:
    `drive-api.ts` already has `setAccessTokenProvider`.
 
-Costs and risks: the Worker carries the traffic; the Durable Object holds a token that reaches
+Costs and risks: the Worker carries the traffic; D1 holds a token that reaches
 everything the owner's app made; if the owner revokes the app or the token expires, sync stops for
 everyone (the consent screen must be "In production": refresh tokens last 7 days in "Testing").
 
@@ -395,7 +407,7 @@ identity of its own, not subject to app verification, seeing only what is shared
 | | Owner-token (default) | Team-managed (service account) |
 |---|---|---|
 | Works for | any Google account, My Drive or shared drive | **shared drives only**, so Workspace (check the nonprofit tier includes them) |
-| Credential in the Durable Object | the owner's encrypted refresh token | none per team: the team shares its drive with Chordless's service-account address; the key is a Worker secret |
+| Credential in D1 | the owner's encrypted refresh token | none per team: the team shares its drive with Chordless's service-account address; the key is a Worker secret |
 | Single owner? | yes; owner leaving or revoking stops sync; succession by copy | **no**: the files belong to the shared drive; any number of Chordless admins |
 | Blast radius | one person's `drive.file` files | whatever each team shared with the account; a Worker bug could touch every team that did |
 | Setup | automatic | "Add `<address>` as Content manager of your shared drive" → "Verify" |
@@ -430,7 +442,7 @@ service account, covers a shared drive's files (`includeItemsFromAllDrives` is s
    the folder is in a shared drive (`driveId`) it can add to and trash in, and that it can make a
    file there, read it back and put it in the bin. Each failure says what to do.
 4. The Worker switches that team space's transport to the service account and **deletes the owner's
-   stored token blob** (which also removes the broad personal token from the Durable Object).
+   stored token blob** (which also removes the broad personal token from D1).
 5. Rollback by re-adding an owner token. Members' experience doesn't change.
 
 **Restrictions:** the account can only reach what was shared; recommend a dedicated shared drive for
@@ -772,11 +784,11 @@ carry, and the menu already has "Import Songs" and "Import a Setlist", which are
   own token; member → `/api/space/<id>/drive/...` with their Google ID token. One engine
   (`sync-manager.ts`, `sync/*`).
 - **Conflicts:** personal spaces are single-writer: keep Drive wins plus a conflict copy of dropped
-  local edits. Team spaces add the Worker checksum precondition (409) and a Durable Object per space
+  local edits. Team spaces add the Worker checksum precondition (409) and, planned, a Durable Object per space
   to serialise writes (SYNC_ARCHITECTURE.md).
 - **Owner goes direct**, so it works if the team service is down.
-- **Worker state:** one Durable Object per team space: members, roles, encrypted token blob. Never
-  content. If the owner revokes the app, members see "owner needs to sign in again".
+- **Worker state:** a team space's rows in D1: members, roles, encrypted token blob (and a live room,
+  a Durable Object with no storage). Never content. If the owner revokes the app, members see "owner needs to sign in again".
 - **Immediate/offline sync** (SYNC_ARCHITECTURE.md) is made space-aware: a local save sends
   `LocalChangeEvent`, and the page's `AutoSync` runs an incremental sync of the space in use after ~2s of
   quiet (a service worker is not needed: the app is a single page). For a team space it needs the Worker to

@@ -65,12 +65,12 @@ binding = "ASSETS"
 # /dev is listed so the worker can hide the dev-only pages in production.
 run_worker_first = ["/oauth/*", "/session/*", "/api/config", "/api/otlp/*", "/api/share/*", "/api/space/*", "/api/spaces", "/api/spaces/*", "/s/*", "/dev", "/dev/*"]
 
-# One Durable Object per team space (worker/src/team-space.ts): its members and roles, the files in
-# its tree, and the owner's encrypted token blob. Never song, setlist or pad content.
-# It also holds the space's live channel (docs/LIVE_SYNC.md): WebSockets that carry one word, "changed".
+# One Durable Object per team space (worker/src/team-room.ts): the space's live channel
+# (docs/LIVE_SYNC.md), WebSockets that carry one word, "changed". It keeps no storage: the space itself
+# (members, roles, files, the owner's encrypted token blob) is in D1 above. Never song, setlist or pad content.
 [[durable_objects.bindings]]
-name = "TEAM_SPACE"
-class_name = "TeamSpace"
+name = "TEAM_ROOM"
+class_name = "TeamRoom"
 
 # One per share file (worker/src/share-room.ts): the live room of a share, which holds only the hash
 # of the secret its sharer proved. Never a setlist or a chart.
@@ -78,8 +78,9 @@ class_name = "TeamSpace"
 name = "SHARE_ROOM"
 class_name = "ShareRoom"
 
-# The register of teams (worker/src/team-register.ts, docs/SPACES.md): which teams use Chordless, who owns
-# them and what CCLI licence they hold, kept after a team ends. No database_id: wrangler makes the
+# The team spaces and the register of teams (worker/src/team-state.ts, docs/SPACES.md): which teams use
+# Chordless, who owns them, their members and what CCLI licence they hold; a team that ends stays as a
+# row. No database_id: wrangler makes the
 # database on the first deploy and finds it by name after (automatic provisioning). The tables are the
 # files in migrations/, applied by the deploy before it goes live (docs/CI.md). Never song or pad content.
 [[d1_databases]]
@@ -94,6 +95,13 @@ new_sqlite_classes = ["TeamSpace"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["ShareRoom"]
+
+# The team spaces' state moved to D1 (migrations/0002_team_state.sql), and TeamSpace is deleted: this drops
+# every object of the class with its storage (one team existed, defunct). TeamRoom holds only sockets.
+[[migrations]]
+tag = "v3"
+deleted_classes = ["TeamSpace"]
+new_sqlite_classes = ["TeamRoom"]
 
 # Secrets (set via `wrangler secret put`):
 # - JWE_ENCRYPTION_KEY: Symmetric key for encrypting/decrypting token blobs (base64 encoded)
@@ -139,8 +147,8 @@ database_name = "chordless-teams-dev"
 migrations_dir = "migrations"
 
 [[env.dev.durable_objects.bindings]]
-name = "TEAM_SPACE"
-class_name = "TeamSpace"
+name = "TEAM_ROOM"
+class_name = "TeamRoom"
 
 [[env.dev.durable_objects.bindings]]
 name = "SHARE_ROOM"
@@ -153,6 +161,11 @@ new_sqlite_classes = ["TeamSpace"]
 [[env.dev.migrations]]
 tag = "v2"
 new_sqlite_classes = ["ShareRoom"]
+
+[[env.dev.migrations]]
+tag = "v3"
+deleted_classes = ["TeamSpace"]
+new_sqlite_classes = ["TeamRoom"]
 
 [env.dev.version_metadata]
 binding = "CF_VERSION_METADATA"

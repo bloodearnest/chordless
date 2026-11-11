@@ -1,24 +1,30 @@
+import type { D1Db } from './d1.ts'
 import type { RateLimit } from './email.ts'
 import type { GoogleEnv } from './google-auth.ts'
 import type { ServiceAccountEnv } from './service-account.ts'
 import type { ShareEnv } from './share.ts'
-import type { RegisterDb } from './team-register.ts'
-import type { TeamSpaceApi } from './team-state.ts'
+import type { LiveSockets } from './team-state.ts'
 
 /** The worker's bindings, variables and secrets (see wrangler.toml) */
 export interface Env extends GoogleEnv, ShareEnv, ServiceAccountEnv {
-  /** The team spaces' Durable Objects, one per space, named by the space's id (team-space.ts): unset in tests that do not touch team spaces */
-  TEAM_SPACE?: {
+  /**
+   * The live rooms of team spaces, one per space, named by the space's id (team-room.ts): they hold
+   * the sockets of the devices that are live, and nothing else. Unset in tests that do not touch them
+   */
+  TEAM_ROOM?: {
     idFromName(name: string): unknown
-    get(id: unknown): TeamSpaceApi
+    get(id: unknown): LiveSockets
   }
   /** The live rooms of shares, one per share file, named by its id (share-room.ts): unset in tests that do not touch them */
   SHARE_ROOM?: {
     idFromName(name: string): unknown
     get(id: unknown): { fetch(request: Request): Response | Promise<Response> }
   }
-  /** The register of teams (wrangler.toml `[[d1_databases]]`, worker/src/team-register.ts): unset in tests and where there is none */
-  DB?: RegisterDb
+  /**
+   * D1 (wrangler.toml `[[d1_databases]]`, migrations/): the team spaces and the register of teams
+   * (team-state.ts). Unset in tests that do not touch team spaces
+   */
+  DB?: D1Db
   ASSETS: { fetch(request: Request): Promise<Response> }
   /** Set only in [env.dev]: serve the component playgrounds */
   DEV_PAGES?: string

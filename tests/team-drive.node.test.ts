@@ -1,6 +1,6 @@
 /**
  * How the Worker reaches a team space's Drive (worker/src/team-drive.ts): the owner's access token
- * made from the blob the space's Durable Object holds, and the app's own Drive code run with it
+ * made from the blob the space's state holds, and the app's own Drive code run with it
  * against the in-memory Drive.
  */
 import assert from 'node:assert/strict'
@@ -9,8 +9,8 @@ import { type BlobData, encryptBlob } from '../worker/src/blob.ts'
 import type { Identity } from '../worker/src/identity.ts'
 import { CredentialError, ownerAccessToken, teamDrive } from '../worker/src/team-drive.ts'
 import { type SpaceInfo, TeamSpaceState } from '../worker/src/team-state.ts'
+import { d1Db } from './d1-db.ts'
 import { FakeDrive } from './fake-drive.ts'
-import { MapStore } from './map-store.ts'
 
 const env = {
   JWE_ENCRYPTION_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
@@ -50,7 +50,7 @@ function google(over: Partial<{ expires_in: number; fail: unknown }> = {}) {
 }
 
 async function space(blob?: string) {
-  const state = new TeamSpaceState(new MapStore())
+  const state = new TeamSpaceState(d1Db().db, 'space-test')
   await state.create({ rootRef: 'root-1', name: 'Team', owner: ann })
   if (blob) await state.setOwnerBlob(blob)
   return { state, info: (await state.info()) as SpaceInfo }
