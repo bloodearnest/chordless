@@ -794,6 +794,89 @@ describe('looking after the people', () => {
   })
 })
 
+describe('the CCLI licence number', () => {
+  const put = (number: unknown) => send('PUT', { ccliLicence: number })
+
+  test('is set by a writer where there is none, tidied, and any member can read it', async () => {
+    const { call, room } = await world()
+    assert.deepEqual(await json(await call(`${SPACE}/licence`, cat)), { ccliLicence: null })
+    const set = await call(`${SPACE}/licence`, bob, put(' CCLI Licence # 471 102 '))
+    assert.equal(set.status, 200)
+    assert.deepEqual(await json(set), { ccliLicence: '471102' })
+    assert.equal((await room.licence()).ccliLicence, '471102')
+    assert.deepEqual(await json(await call(`${SPACE}/licence`, cat)), { ccliLicence: '471102' })
+  })
+
+  test('is changed or cleared by an admin only; a writer who sets the same number changes nothing', async () => {
+    const { call, room } = await world()
+    await call(`${SPACE}/licence`, bob, put('471102'))
+    assert.equal((await call(`${SPACE}/licence`, bob, put('999'))).status, 403)
+    assert.equal((await call(`${SPACE}/licence`, bob, put(''))).status, 403)
+    assert.equal((await call(`${SPACE}/licence`, bob, put('471102'))).status, 200)
+    assert.equal((await call(`${SPACE}/licence`, cat, put('1'))).status, 403)
+    assert.equal((await call(`${SPACE}/licence`, dan, put('999'))).status, 200)
+    assert.equal((await call(`${SPACE}/licence`, ann, put(''))).status, 200)
+    assert.equal((await room.licence()).ccliLicence, null)
+  })
+
+  test('shows its log to an admin and to no one below', async () => {
+    const { call } = await world()
+    await call(`${SPACE}/licence`, bob, put('471102'))
+    await call(`${SPACE}/licence`, dan, put('471103'))
+    const admin = (await json(await call(`${SPACE}/licence`, dan))) as {
+      history: { by: string; from: string | null; to: string | null }[]
+    }
+    assert.deepEqual(
+      admin.history.map(({ by, from, to }) => ({ by, from, to })),
+      [
+        { by: 'bob@example.com', from: null, to: '471102' },
+        { by: 'dan@example.com', from: '471102', to: '471103' },
+      ]
+    )
+    assert.equal('history' in (await json(await call(`${SPACE}/licence`, bob))), false)
+  })
+
+  test('needs a sign-in and a membership, and refuses what is not a number in text', async () => {
+    const { call } = await world()
+    assert.equal((await call(`${SPACE}/licence`, null)).status, 401)
+    assert.equal((await call(`${SPACE}/licence`, stranger)).status, 403)
+    assert.equal((await call(`${SPACE}/licence`, ann, put(471102))).status, 400)
+    assert.equal((await call(`${SPACE}/licence`, ann, put('1'.repeat(33)))).status, 400)
+  })
+
+  test('can be given when the space is made, and is then logged to its owner', async () => {
+    const w = await world()
+    const made = await w.call(
+      '/api/spaces',
+      eve,
+      post({
+        blob: await blobFor(eve),
+        rootRef: w.root,
+        name: 'Eve Church',
+        ccliLicence: '#2345678',
+      })
+    )
+    const { spaceId } = (await json(made)) as { spaceId: string }
+    assert.deepEqual(await json(await w.call(`${spaceId}/licence`, eve)), {
+      ccliLicence: '2345678',
+      history: [
+        {
+          at: (await w.states.get(spaceId)?.licence())?.history[0]?.at,
+          by: 'eve@example.com',
+          from: null,
+          to: '2345678',
+        },
+      ],
+    })
+    const bad = await w.call(
+      '/api/spaces',
+      eve,
+      post({ blob: await blobFor(eve), rootRef: w.root, name: 'Eve Church', ccliLicence: 5 })
+    )
+    assert.equal(bad.status, 400)
+  })
+})
+
 describe('the owner’s own routes', () => {
   test('a new sign-in replaces the stored one, if it is theirs and sees the folder', async () => {
     const w = await world()

@@ -21,6 +21,7 @@ import './space-manager.ts'
 import './storage-summary.ts'
 import { TeamShareLeftEvent } from './team-share-panel.ts'
 import './team-share-panel.ts'
+import './team-licence-panel.ts'
 import './team-storage-panel.ts'
 import './space-people.ts'
 
@@ -259,6 +260,7 @@ export class AccountPage extends LitElement {
                 .space=${this._users}
                 @team-share-panel:changed=${() => this._usersModal.value?.close()}
               ></team-share-panel>
+              <team-licence-panel .space=${this._users}></team-licence-panel>
               <team-storage-panel .space=${this._users}></team-storage-panel>
             </div>`
             : nothing

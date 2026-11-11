@@ -66,7 +66,8 @@ import { goTo, loadPage } from '../js/navigation.ts'
 import { describeSignature, noteName } from '../js/pitch.ts'
 import type { Score } from '../js/score.ts'
 import { SONGSELECT } from '../js/song-source.ts'
-import { ensureCurrentSpace, getSpaceById, setCurrentSpace, updateSpace } from '../js/space.ts'
+import { ensureCurrentSpace, getSpaceById, setCurrentSpace } from '../js/space.ts'
+import { noteLicence } from '../js/space-licence.ts'
 import { visibleSpaces } from '../js/space-tabs.ts'
 import { songImportStyles } from './song-import-styles.ts'
 
@@ -180,6 +181,8 @@ export class SongImport extends LitElement {
   declare _spaceId: string
   /** The space the app is in, which may not be the one importing into */
   _currentSpaceId = ''
+  /** The batch being imported has already told its space the licence number its charts carry */
+  _licenceNoted = false
   /** What was last read, to read again if the space it goes to is changed */
   _incoming: IncomingSong[] = []
   /** The songs this import made new in the space (taken back if it is changed) */
@@ -512,10 +515,13 @@ export class SongImport extends LitElement {
    * has already is left, whatever a later chart says.
    */
   async _noteLicence(chordproText: string): Promise<void> {
+    // (once for a batch: the Worker is asked, for a Team)
+    if (this._licenceNoted) return
     const licence = licenceOfChart(chordproText)
     if (!licence) return
+    this._licenceNoted = true
     const space = await getSpaceById(this._spaceId)
-    if (space && !space.ccliLicence) await updateSpace(space.id, { ccliLicence: licence })
+    if (space) await noteLicence(space, licence)
   }
 
   /**
@@ -525,6 +531,7 @@ export class SongImport extends LitElement {
    */
   async receiveAll(songs: IncomingSong[]): Promise<void> {
     this._error = ''
+    this._licenceNoted = false
     this._incoming = songs
     this._created = []
     try {

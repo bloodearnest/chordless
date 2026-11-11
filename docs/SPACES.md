@@ -50,18 +50,36 @@ change without notice):
   documented and may change.
 - The service lasts only while the church's licence does; Chordless cannot see that.
 
-What Chordless does about it: each space can hold its church's **CCLI licence number**
-(`Space.ccliLicence`), for records. A chart downloaded from SongSelect carries it (the
-`{ccli_license}` directive or the trailer's "CCLI License # N"), so **a space with none takes the
-first one a SongSelect import brings** (`licenceOfChart`, `SongImport._noteLicence`), silently,
-and keeps it whatever a later chart says. It can also be typed when a team is made. It is
-optional, never checked, and never a gate: a team made before anyone has the number to hand must work, as must a church
-outside the countries CCLI serves. For now it is kept on the device that made the space. The
-Worker's team record is the natural place to share it with the members, when that is wanted.
+What Chordless does about it: each space can hold its church's **CCLI licence number**, for
+records. It is never checked and never a gate: a team made before anyone has the number to hand
+must work, as must a church outside the countries CCLI serves.
+
+- **Where it is kept.** A Team's number is kept **by the Worker, in the team's Durable Object**
+  (`licence`, with an append-only log, `licenceLog:`, of who set, changed or cleared it, and when:
+  `LicenceChange`). It is the team's record, not a user's: CCLI may ask who a licence is used by,
+  and a record of the teams using Chordless is wanted for compliance and perhaps for charging. It
+  is not song content, so it is within what the Worker may hold (CLAUDE.md). The device keeps a
+  copy to show (`Space.ccliLicence`). A personal space's number is kept on the device alone.
+- **Who sets it.** Anyone who can write sets it where there is none; changing or clearing it takes
+  an admin (the owner included), who also sees the log. A reader sees the number only.
+  `GET`/`PUT /api/space/<id>/licence`; it can also be given when the space is made.
+- **How it gets there.** A chart downloaded from SongSelect carries it (the `{ccli_license}`
+  directive or the trailer's "CCLI License # N"), so **the first SongSelect import into a space
+  with none sets it**, silently (`licenceOfChart`, `noteLicence`). For a Team the Worker is asked
+  on the first SongSelect chart of each import: a number already there is copied to the device and
+  never written over; one kept only on the device (the Worker was out of reach) is sent. It can be
+  typed when a team is made, and changed in the Team's "Users" window (`team-licence-panel.ts`).
+- **What the log does not do.** It goes when sharing ends (`destroy` forgets the whole space), and
+  there is no way yet to ask "which teams use licence N" or "which teams exist": a Durable Object
+  per team cannot be listed. A register of teams that outlives them (a D1 table written when a
+  space is made, renamed or ended, and when its licence changes) is the next step if a real audit
+  or charging needs one. It would hold what the Worker already holds: ids, names, owners' emails,
+  licence numbers, dates.
+
 Who imported a song, when and from where is already kept on it (`importUser`, `importDate`,
-`importSource`). Planned, not built: the licence a song came in under; editing the number later;
-ask before a copy of such a chart goes to a space with a different licence number (a
-confirmation, not a block); and count the songs imported this term against 200.
+`importSource`). Planned, not built: the licence a song came in under; asking before a copy of
+a SongSelect chart goes to a space with a different licence number (a confirmation, not a block);
+and a count of the songs imported this term against 200.
 
 ## Naming
 

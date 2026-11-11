@@ -186,6 +186,41 @@ describe('the credential', () => {
   })
 })
 
+describe('the CCLI licence number', () => {
+  test('is none until set; setting, changing and clearing it are each logged, in order, with who and when', async () => {
+    const { state } = await made()
+    assert.deepEqual(await state.licence(), { ccliLicence: null, history: [] })
+    assert.equal(await state.setLicence('471102', ann), true)
+    assert.equal(await state.setLicence('471103', bob), true)
+    assert.equal(await state.setLicence(null, ann), true)
+    const { ccliLicence, history } = await state.licence()
+    assert.equal(ccliLicence, null)
+    const at = NOW.toISOString()
+    assert.deepEqual(history, [
+      { at, by: 'ann@example.com', from: null, to: '471102' },
+      { at, by: 'bob@example.com', from: '471102', to: '471103' },
+      { at, by: 'ann@example.com', from: '471103', to: null },
+    ])
+  })
+
+  test('says no, and logs nothing, where it is already that', async () => {
+    const { state } = await made()
+    assert.equal(await state.setLicence(null, ann), false)
+    await state.setLicence('471102', ann)
+    assert.equal(await state.setLicence('471102', bob), false)
+    assert.equal((await state.licence()).history.length, 1)
+  })
+
+  test('cannot be set for a space that was never made, and goes with the space', async () => {
+    const state = new TeamSpaceState(new MapStore())
+    await assert.rejects(state.setLicence('1', ann), /No such space/)
+    const { state: made1 } = await made()
+    await made1.setLicence('471102', ann)
+    await made1.destroy()
+    assert.deepEqual(await made1.licence(), { ccliLicence: null, history: [] })
+  })
+})
+
 describe('members, by email', () => {
   test('change role, and are removed, by email in any case; a stranger is false', async () => {
     const { state } = await made()

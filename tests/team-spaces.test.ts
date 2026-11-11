@@ -5,6 +5,7 @@
  * a fake one (fake-auth-worker.ts).
  */
 import { expect } from '@open-wc/testing'
+import { cleanLicence } from '../src/js/ccli-licence.ts'
 import type { Space } from '../src/js/data-types.ts'
 import {
   createSpace,
@@ -22,7 +23,6 @@ import { createSyncManager, isSyncAvailable } from '../src/js/sync-manager.ts'
 import { teamApi } from '../src/js/team-client.ts'
 import { outranks } from '../src/js/team-roles.ts'
 import {
-  cleanLicence,
   createTeamSpace,
   inviteLink,
   joinSpace,

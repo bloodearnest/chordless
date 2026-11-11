@@ -9,6 +9,7 @@
  * for matching an invite, but it is the account that is a member.
  */
 import { toBase64Url } from '../../src/js/base64url.ts'
+import type { LicenceChange } from '../../src/js/ccli-licence.ts'
 import type { InviteInfo, MemberRole, TeamMember, TeamRole } from '../../src/js/team-roles.ts'
 import { sha256Hex } from '../../src/js/utils/bytes.ts'
 import { type Identity, identityKey } from './identity.ts'
@@ -116,6 +117,13 @@ export interface TeamSpaceApi {
    * the two leaves the old sign-in kept but no longer used, never the space with neither
    */
   useServiceAccount(): Promise<void>
+  /** The team's CCLI licence number (null if none was given) and the log of its changes, oldest first */
+  licence(): Promise<{ ccliLicence: string | null; history: LicenceChange[] }>
+  /**
+   * Set the licence number (null to clear it), logging who did it and when. False, and no log
+   * entry, where it is already that. The log is only ever added to (until the space is forgotten).
+   */
+  setLicence(ccliLicence: string | null, by: Identity): Promise<boolean>
   /**
    * A device going live (a WebSocket upgrade, which the Worker has authorised; live-relay.ts). Only
    * the Durable Object has it: the state in tests has none
@@ -129,6 +137,8 @@ const CREDENTIAL = 'credential'
 const MEMBER = 'member:'
 const REF = 'ref:'
 const INVITE = 'invite:'
+const LICENCE = 'licence'
+const LICENCE_LOG = 'licenceLog:'
 /** Cloudflare's limit on the entries of one put */
 const PUT_LIMIT = 128
 
@@ -297,5 +307,32 @@ export class TeamSpaceState implements TeamSpaceApi {
 
   async clearOwnerBlob(): Promise<void> {
     await this.#store.delete(BLOB)
+  }
+
+  async licence(): Promise<{ ccliLicence: string | null; history: LicenceChange[] }> {
+    const log = await this.#store.list<LicenceChange>({ prefix: LICENCE_LOG })
+    return {
+      ccliLicence: (await this.#store.get<string>(LICENCE)) ?? null,
+      history: [...log].sort(([a], [b]) => a.localeCompare(b)).map(([, change]) => change),
+    }
+  }
+
+  async setLicence(ccliLicence: string | null, by: Identity): Promise<boolean> {
+    if (!(await this.info())) throw new Error('No such space')
+    const { ccliLicence: from, history } = await this.licence()
+    if (from === ccliLicence) return false
+    const change: LicenceChange = {
+      at: this.#now().toISOString(),
+      by: by.email.toLowerCase(),
+      from,
+      to: ccliLicence,
+    }
+    // (numbered, so the log keeps its order, and nothing in it is written over)
+    await this.#store.put({
+      [LICENCE_LOG + String(history.length).padStart(6, '0')]: change,
+      ...(ccliLicence ? { [LICENCE]: ccliLicence } : {}),
+    })
+    if (!ccliLicence) await this.#store.delete(LICENCE)
+    return true
   }
 }
