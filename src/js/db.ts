@@ -209,6 +209,12 @@ async function tellDatabaseWasUpgraded(): Promise<void> {
   })
 }
 
+/** A setlist taken out by `removeSetlist`, as it was, with this device's state for it */
+export interface RemovedSetlist {
+  setlist: Setlist
+  local: SetlistLocalState
+}
+
 export class ChordlessDB {
   dbName: string
   spaceId: string
@@ -611,19 +617,51 @@ export class ChordlessDB {
   }
 
   /**
-   * Delete a setlist that is not in Google Drive (it has never been synced), with this
-   * device's state for it. A setlist that is in Drive cannot be deleted yet: sync would
-   * put it back from either side (see docs/SYNC_ARCHITECTURE.md, "Deleting setlists").
-   * @throws if the setlist is in Drive
+   * Delete a setlist, with this device's state for it. If it has a file in Drive, that is noted,
+   * for the next sync to put in the Drive trash (where it can be restored from): without that,
+   * the file would bring the setlist back (docs/SYNC_ARCHITECTURE.md, "Deleting setlists").
+   * @returns what was removed, for `restoreSetlist` (undefined if there was no such setlist)
    */
-  async deleteUnsyncedSetlist(id: string): Promise<void> {
+  async removeSetlist(id: string): Promise<RemovedSetlist | undefined> {
     const setlist = await this.getSetlist(id)
-    if (!setlist) return
+    if (!setlist) return undefined
+    const local = await this.getLocalState(id)
+    const tx = this.#transaction(['setlists', 'setlist_local', 'pending_deletions'], 'readwrite')
+    tx.objectStore('setlists').delete(id)
+    tx.objectStore('setlist_local').delete(id)
     if (setlist.fileRef) {
-      throw new Error('This setlist is in Google Drive, so it cannot be deleted here')
+      const pending: PendingDeletion = {
+        ref: setlist.fileRef,
+        kind: 'setlist',
+        deletedAt: new Date().toISOString(),
+      }
+      tx.objectStore('pending_deletions').put(pending)
     }
-    await this.deleteSetlist(id)
-    await this.deleteLocalState(id)
+    await transactionDone(tx)
+    this.#changed('setlist', [id])
+    return { setlist, local }
+  }
+
+  /**
+   * Put back a setlist `removeSetlist` removed. If its file has not been put in the Drive trash
+   * yet, that is called off and the setlist is as it was. If it has, the setlist is made again
+   * without its link to the file, so the next sync sends it as a new file (the old one stays in
+   * the trash, from where it could also be restored).
+   */
+  async restoreSetlist(removed: RemovedSetlist): Promise<void> {
+    const { setlist, local } = removed
+    const pending = setlist.fileRef
+      ? (await this.getPendingDeletions()).find(entry => entry.ref === setlist.fileRef)
+      : undefined
+    let restored = setlist
+    if (pending) {
+      await this.clearPendingDeletion(pending.ref)
+    } else if (setlist.fileRef) {
+      restored = { ...setlist }
+      for (const field of SYNC_LINK_FIELDS) delete restored[field]
+    }
+    await this.saveSetlist(restored)
+    await this.saveLocalState(local)
   }
 
   // Song operations (per-space)

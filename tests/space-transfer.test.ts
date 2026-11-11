@@ -217,14 +217,17 @@ describe('Copying and moving between spaces', () => {
     expect(await source.getSetlist('set-1')).to.equal(undefined)
   })
 
-  it('leaves a moved setlist that is in Drive in the source, and says so', async () => {
+  it('removes a moved setlist that is in Drive from the source, and notes its file for the Drive trash', async () => {
     const alpha = await addChart(source, ALPHA, ADD)
     const set = await setlistWith('set-1', alpha)
     await source.saveSetlist({ ...set, fileRef: 'drive-1' })
     const report = await transferSetlists(source, destination, null, 'move')
-    expect(report.setlistsLeftInSource).to.equal(1)
+    expect(report.setlistsLeftInSource).to.equal(0)
     expect(await destination.getSetlist('set-1')).to.not.equal(undefined)
-    expect(await source.getSetlist('set-1')).to.not.equal(undefined)
+    expect(await source.getSetlist('set-1')).to.equal(undefined)
+    expect((await source.getPendingDeletions()).map(entry => entry.ref)).to.deep.equal(['drive-1'])
+    // (the destination makes its own file: it has no link to the source's)
+    expect((await destination.getSetlist('set-1'))?.fileRef).to.equal(undefined)
   })
 
   it('does not move over a setlist the destination has under that id, nor delete the source', async () => {

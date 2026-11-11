@@ -23,6 +23,18 @@ export class SetlistInfoSaveEvent extends Event {
   }
 }
 
+/** Move was pressed, with the space chosen: the page asks, then moves the setlist there */
+export class SetlistInfoMoveEvent extends Event {
+  static readonly type = 'setlist-info-dialog:move'
+  readonly setlistId: string
+  readonly spaceId: string
+  constructor(setlistId: string, spaceId: string) {
+    super(SetlistInfoMoveEvent.type, { bubbles: true, composed: true })
+    this.setlistId = setlistId
+    this.spaceId = spaceId
+  }
+}
+
 /** Delete was pressed on a setlist that can be deleted: the page asks, then deletes */
 export class SetlistInfoDeleteEvent extends Event {
   static readonly type = 'setlist-info-dialog:delete'
@@ -49,8 +61,10 @@ export class SetlistInfoDeleteEvent extends Event {
  *
  * Events:
  * @fires SetlistInfoSaveEvent - setlistId, and changes: {date, time, type, name, leaderId, newLeader}
- * @fires SetlistInfoDeleteEvent - setlistId; only offered, while editing, for a setlist that is
- *   not in Google Drive
+ * @fires SetlistInfoDeleteEvent - setlistId; only offered, while editing, unless `deleteBlocked`
+ *   says why not
+ * @fires SetlistInfoMoveEvent - setlistId and spaceId; offered, while editing, when there is a
+ *   space (`moveTargets`) to move it to, to put right a setlist added to the wrong space
  */
 export class SetlistInfoDialog extends LitElement {
   static override properties = {
@@ -61,6 +75,10 @@ export class SetlistInfoDialog extends LitElement {
     askWho: { type: Boolean },
     /** A setlist received by link: no editing or deleting */
     readonly: { type: Boolean },
+    /** Why this setlist cannot be deleted (or moved, which deletes it from here), if it cannot */
+    deleteBlocked: { attribute: false },
+    /** The other spaces on this device the setlist could be moved to */
+    moveTargets: { attribute: false },
     _setlist: { state: true },
     _editing: { state: true },
   }
@@ -75,6 +93,11 @@ export class SetlistInfoDialog extends LitElement {
         gap: 0.5rem;
       }
 
+      .delete-setlist select {
+        font: inherit;
+        padding: 0.5rem;
+      }
+
       .delete-setlist p {
         margin: 0;
         font-size: var(--font-ui-small);
@@ -87,6 +110,8 @@ export class SetlistInfoDialog extends LitElement {
   declare meId: string | null
   declare askWho: boolean
   declare readonly: boolean
+  declare deleteBlocked: string | null
+  declare moveTargets: { id: string; name: string }[]
   declare _setlist: Setlist | null
   declare _editing: boolean
 
@@ -99,6 +124,8 @@ export class SetlistInfoDialog extends LitElement {
     this.meId = null
     this.askWho = false
     this.readonly = false
+    this.deleteBlocked = null
+    this.moveTargets = []
     this._setlist = null
     this._editing = false
   }
@@ -133,14 +160,20 @@ export class SetlistInfoDialog extends LitElement {
     }
   }
 
-  /** Only a setlist that is not in Google Drive can be deleted (see Database.deleteUnsyncedSetlist) */
   _deletable(): boolean {
-    return Boolean(this._setlist && !this._setlist.fileRef)
+    return Boolean(this._setlist && !this.deleteBlocked)
   }
 
   _delete(): void {
     if (this._setlist && this._deletable()) {
       this.dispatchEvent(new SetlistInfoDeleteEvent(this._setlist.id))
+    }
+  }
+
+  _move(): void {
+    const select = this.renderRoot.querySelector<HTMLSelectElement>('#move-setlist-space')
+    if (this._setlist && this._deletable() && select?.value) {
+      this.dispatchEvent(new SetlistInfoMoveEvent(this._setlist.id, select.value))
     }
   }
 
@@ -188,11 +221,26 @@ export class SetlistInfoDialog extends LitElement {
                 @setlist-details-form:save=${this._save}
                 @setlist-details-form:cancel=${this._cancel}
               ></setlist-details-form>
+              ${
+                this._deletable() && this.moveTargets.length > 0
+                  ? html`
+                    <div class="delete-setlist">
+                      <label for="move-setlist-space">Added to the wrong space?</label>
+                      <select id="move-setlist-space">
+                        ${this.moveTargets.map(
+                          space => html`<option value=${space.id}>${space.name}</option>`
+                        )}
+                      </select>
+                      <button class="btn" @click=${this._move}>Move to this space</button>
+                    </div>
+                  `
+                  : ''
+              }
               <div class="delete-setlist">
                 ${
                   this._deletable()
                     ? html`<button class="btn danger" @click=${this._delete}>Delete setlist</button>`
-                    : html`<p>This setlist is in Google Drive, so it can't be deleted here.</p>`
+                    : html`<p>${this.deleteBlocked}</p>`
                 }
               </div>
             `
@@ -220,5 +268,6 @@ declare global {
   interface GlobalEventHandlersEventMap {
     [SetlistInfoSaveEvent.type]: SetlistInfoSaveEvent
     [SetlistInfoDeleteEvent.type]: SetlistInfoDeleteEvent
+    [SetlistInfoMoveEvent.type]: SetlistInfoMoveEvent
   }
 }

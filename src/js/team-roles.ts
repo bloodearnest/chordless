@@ -46,3 +46,13 @@ export function outranks(mine: TeamRole, target: TeamRole): boolean {
 export function asMemberRole(value: unknown): MemberRole | null {
   return MEMBER_ROLES.find(each => each === value) ?? null
 }
+
+/**
+ * Whether someone may delete a setlist (docs/SYNC_ARCHITECTURE.md, "Who can delete"): in a
+ * personal space (`role` null) its owner, anything; in a team space a worship leader (`writer`)
+ * the setlists they lead, an admin or the owner any, a team member (`reader`) none.
+ */
+export function mayDeleteSetlist(role: TeamRole | null, leadsIt: boolean): boolean {
+  if (role === null || atLeast(role, 'admin')) return true
+  return role === 'writer' && leadsIt
+}
