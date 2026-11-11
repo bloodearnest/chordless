@@ -28,6 +28,41 @@ links are the one exception: the Worker caches ciphertext it cannot read.)
 Churches using Chordless are expected to hold a CCLI licence, which covers sharing charts with the
 members of their church. Each space is self-contained, so copyright compliance is per space.
 
+### SongSelect's terms (read 2026-11-11, terms updated 2026-10-30)
+
+What the SongSelect Terms of Use say that matters here (a summary, not legal advice; the terms can
+change without notice):
+
+- **The subscriber is a church, not a person**, and there is no price per user: a church has
+  unlimited users, each with their own CCLI Profile linked to the church's account. A chart
+  downloaded is a "Digital Fixation", for that church's own non-commercial ministry. It may be used
+  by its "staff or volunteers" only; the service is "exclusive to your church" and "confidential".
+- **Charts do not move between churches.** The Church Copyright Licence covers the *words* of a
+  song for any church; a SongSelect chart (chords, lead sheet) is the subscribing church's. A
+  chart in one church's space is not covered by another church's licence by having a CCLI number.
+- **200 songs a year.** The Advanced and Premium tiers let a church print or download the charts
+  of 200 songs per annual term (counted from the purchase date); more costs extra. The
+  bookmarklet's downloads count, as do any made on SongSelect directly, so Chordless can only
+  know a lower bound.
+- **No passwords to outsiders.** The bookmarklet runs in the person's own signed-in tab. A
+  SongSelect login, cookie or token must never reach the Worker or any server of ours.
+- The terms say nothing about bookmarklets or automation, but the endpoints it calls are not
+  documented and may change.
+- The service lasts only while the church's licence does; Chordless cannot see that.
+
+What Chordless does about it: each space can hold its church's **CCLI licence number**
+(`Space.ccliLicence`), for records. A chart downloaded from SongSelect carries it (the
+`{ccli_license}` directive or the trailer's "CCLI License # N"), so **a space with none takes the
+first one a SongSelect import brings** (`licenceOfChart`, `SongImport._noteLicence`), silently,
+and keeps it whatever a later chart says. It can also be typed when a team is made. It is
+optional, never checked, and never a gate: a team made before anyone has the number to hand must work, as must a church
+outside the countries CCLI serves. For now it is kept on the device that made the space. The
+Worker's team record is the natural place to share it with the members, when that is wanted.
+Who imported a song, when and from where is already kept on it (`importUser`, `importDate`,
+`importSource`). Planned, not built: the licence a song came in under; editing the number later;
+ask before a copy of such a chart goes to a space with a different licence number (a
+confirmation, not a block); and count the songs imported this term against 200.
+
 ## Naming
 
 - The umbrella word is **space**, and there are two kinds: a **personal space** (yours alone, in

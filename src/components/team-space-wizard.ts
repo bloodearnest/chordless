@@ -47,6 +47,7 @@ export class TeamSpaceWizard extends LitElement {
   static override properties = {
     _state: { state: true },
     _name: { state: true },
+    _licence: { state: true },
     _parent: { state: true },
     _message: { state: true },
     _created: { state: true },
@@ -65,6 +66,8 @@ export class TeamSpaceWizard extends LitElement {
 
   declare _state: State
   declare _name: string
+  /** The church's CCLI licence number, as typed (optional) */
+  declare _licence: string
   declare _parent: PickedFolder | null
   /** What went wrong, if something did */
   declare _message: string
@@ -128,6 +131,7 @@ export class TeamSpaceWizard extends LitElement {
     super()
     this._state = 'checking'
     this._name = ''
+    this._licence = ''
     this._parent = null
     this._message = ''
     this._created = null
@@ -209,6 +213,10 @@ export class TeamSpaceWizard extends LitElement {
     this._name = (event.target as HTMLInputElement).value
   }
 
+  _reLicence(event: Event): void {
+    this._licence = (event.target as HTMLInputElement).value
+  }
+
   async _create(event?: Event): Promise<void> {
     event?.preventDefault()
     if (!this._name.trim() || !this._parent) return
@@ -217,7 +225,9 @@ export class TeamSpaceWizard extends LitElement {
     this._stage = 'Making the space…'
     this._state = 'creating'
     try {
-      this._created = await createTeamSpace(this._name, this._parent.id, this.folders)
+      this._created = await createTeamSpace(this._name, this._parent.id, this.folders, {
+        ccliLicence: this._licence,
+      })
     } catch (error) {
       this._message = errorMessage(error)
       this._state = 'form'
@@ -504,6 +514,19 @@ export class TeamSpaceWizard extends LitElement {
           autocomplete="off"
           required
         />
+        <label for="licence">CCLI licence number (optional)</label>
+        <input
+          id="licence"
+          .value=${this._licence}
+          @input=${this._reLicence}
+          ?disabled=${busy}
+          inputmode="numeric"
+          autocomplete="off"
+        />
+        <p class="hint">
+          Your church's Church Copyright Licence number, kept for your records. It is not checked,
+          and you can leave it blank for now.
+        </p>
         <label>Where to keep it in Google Drive</label>
         <div class="folder">
           <button type="button" class="btn" ?disabled=${busy} @click=${this._choose}>

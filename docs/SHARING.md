@@ -260,7 +260,9 @@ and add-song modal show one database today), and "Add to my library", which copi
 from another database into the current space. A setlist can only point at songs in its
 own space's database, so adding is always a copy: deduplicated by content hash, then
 by the song's deterministic id, as a variant if the song is there in another form. It is up
-to the user to add: a song with a CCLI number is covered by any church's licence anyway.
+to the user to add. A copy of a chart from SongSelect into another church's space is a
+transfer between churches, which SongSelect's terms do not allow (SPACES.md, "SongSelect's
+terms"), so that copy is to ask first, once songs record the licence they came in under.
 Explicit song deletion is separate: a synced song deleted only here would come back at the
 next sync, so it waits for the Drive trash design planned for setlists
 (SYNC_ARCHITECTURE.md). Songs received by link have no Drive copy, so those can be deleted

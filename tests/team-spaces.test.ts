@@ -22,6 +22,7 @@ import { createSyncManager, isSyncAvailable } from '../src/js/sync-manager.ts'
 import { teamApi } from '../src/js/team-client.ts'
 import { outranks } from '../src/js/team-roles.ts'
 import {
+  cleanLicence,
   createTeamSpace,
   inviteLink,
   joinSpace,
@@ -240,6 +241,27 @@ describe('team spaces on this device', () => {
       expect(created.name).to.equal(name)
       expect(created.rootRef).to.equal('new-folder')
       expect(created.team).to.deep.equal({ id: 'space-bbbb2222', role: 'owner' })
+    })
+
+    it('keeps the CCLI licence number if given, tidied, and none if not', async () => {
+      routes['POST /api/spaces'] = () => json({ spaceId: 'space-eeee5555', role: 'owner' })
+      const withNumber = await createTeamSpace(unique('Licensed'), 'p', folders(), {
+        ccliLicence: ' CCLI Licence No: 123 4567 ',
+      })
+      made.push(withNumber.id)
+      expect(withNumber.ccliLicence).to.equal('1234567')
+      const without = await createTeamSpace(unique('Unlicensed'), 'p', folders(), {
+        ccliLicence: '  ',
+      })
+      made.push(without.id)
+      expect('ccliLicence' in without).to.equal(false)
+    })
+
+    it('tidies a licence number without judging it', () => {
+      expect(cleanLicence(undefined)).to.equal('')
+      expect(cleanLicence('#2345678')).to.equal('2345678')
+      expect(cleanLicence('CCLI 98 76 54')).to.equal('987654')
+      expect(cleanLicence('AB-12')).to.equal('AB-12')
     })
 
     it('does not touch the personal space, and renames only if the name is taken here', async () => {

@@ -398,6 +398,11 @@ export interface Space {
   readOnly?: boolean
   /** Set once the space is shared with a team */
   team?: TeamLink
+  /**
+   * The church's CCLI licence number, for records (docs/SPACES.md, "Licensing"). Optional and
+   * never checked: nothing is blocked for lack of it. Kept on this device only for now.
+   */
+  ccliLicence?: string
 }
 
 /**
