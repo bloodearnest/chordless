@@ -288,7 +288,7 @@ class TeamSpace implements SpaceStorage {
 
 /**
  * The backend for a team space. A space is joined, not found or made from here, so there is no
- * root to look up by name. Its pads are the space's own (`padsIn`): it has none of the account's.
+ * root to look up by name. Its pads are the space's own (`padsIn`).
  */
 export class TeamStorage implements StorageBackend {
   #client: TeamClient
@@ -297,10 +297,6 @@ export class TeamStorage implements StorageBackend {
   constructor(options: WorkerConnection) {
     this.#client = new TeamClient(options)
     this.#options = options
-  }
-
-  get pads(): PadStorage {
-    throw new Error('A team space’s pad sets are its own: there are no account pad sets here')
   }
 
   padsIn(rootRef: string): PadStorage {

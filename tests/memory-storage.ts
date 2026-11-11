@@ -11,6 +11,7 @@
  * FakeDrive, with the same conformance suite (tests/storage-conformance.ts).
  */
 import type { SpaceMember } from '../src/js/data-types.ts'
+import type { PadSource } from '../src/js/pad-set-service.ts'
 import {
   type ChangeFeed,
   ChangeTokenLost,
@@ -139,6 +140,7 @@ export interface MemoryPadSet {
 export class MemoryStorage implements StorageBackend {
   padSets = new Map<string, MemoryPadSet>()
   padFiles = new Map<string, MemoryPadFile>()
+  /** A personal space's pads, in the tests (the app keeps each space's in its own folder: `padsIn`) */
   pads: PadStorage = new MemoryPads(this, '')
   #spacePads = new Map<string, PadStorage>()
 
@@ -772,4 +774,18 @@ class MemorySpace implements SpaceStorage {
     }
     return results
   }
+}
+
+/** The id of the personal space `padSources` puts a storage's `pads` in */
+export const PERSONAL_PADS = 'personal-pads'
+
+/** Where the pad sets are kept in a test: `storage.pads` as a personal space's, and these team spaces' */
+export function padSources(
+  storage: MemoryStorage,
+  teams: { spaceId: string; name: string; storage: PadStorage }[] = []
+): PadSource[] {
+  return [
+    { spaceId: PERSONAL_PADS, name: 'Personal', team: false, storage: storage.pads },
+    ...teams.map(team => ({ ...team, team: true })),
+  ]
 }

@@ -604,20 +604,22 @@ export function createDriveApi({
   }
 
   /**
-   * The folder the pad sets are kept in: the account's (`Chordless/pads/`, a personal space's) or,
-   * given a team space's folder, that space's own `pads/` (docs/SPACES.md, "Pads in team spaces")
+   * The folder a space's pad sets are kept in: its own `pads/` (docs/SPACES.md, "Pads in team
+   * spaces"). There is none that is the account's: a `Chordless/pads/` was found by the name of
+   * `Chordless`, which can be a folder that holds other people's spaces.
    */
-  async function getPadsRootFolder(spaceFolderId?: string): Promise<string> {
-    const rootFolderId = spaceFolderId ?? (await findOrCreateRootFolder())
-    let padsFolderId = await findSubfolder(rootFolderId, PADS_FOLDER_NAME)
+  async function getPadsRootFolder(spaceFolderId: string): Promise<string> {
+    let padsFolderId = await findSubfolder(spaceFolderId, PADS_FOLDER_NAME)
     if (!padsFolderId) {
-      padsFolderId = await createSubfolder(rootFolderId, PADS_FOLDER_NAME)
+      padsFolderId = await createSubfolder(spaceFolderId, PADS_FOLDER_NAME)
     }
     return padsFolderId
   }
 
-  async function listPadSetFolders(spaceFolderId?: string): Promise<DriveFile[]> {
-    const padsRootId = await getPadsRootFolder(spaceFolderId)
+  /** The sets of a space: reading them makes nothing, so a space with no pads keeps no `pads/` folder */
+  async function listPadSetFolders(spaceFolderId: string): Promise<DriveFile[]> {
+    const padsRootId = await findSubfolder(spaceFolderId, PADS_FOLDER_NAME)
+    if (!padsRootId) return []
     const query = `'${padsRootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
     const result = await driveRequest(
       `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)`
@@ -625,7 +627,7 @@ export function createDriveApi({
     return result.files
   }
 
-  async function ensurePadSetFolder(padSetName: string, spaceFolderId?: string): Promise<string> {
+  async function ensurePadSetFolder(padSetName: string, spaceFolderId: string): Promise<string> {
     const padsRootId = await getPadsRootFolder(spaceFolderId)
     const query = `name=${queryString(padSetName)} and '${padsRootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
     const result = await driveRequest(

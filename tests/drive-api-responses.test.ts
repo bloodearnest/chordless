@@ -315,22 +315,26 @@ describe('drive-api, given what Drive answers', () => {
       expect(await findSharesFolder('space')).to.equal(null)
     })
 
-    it('finds the pads folder, or makes it', async () => {
-      script({ files: [{ id: 'root' }] }, { files: [{ id: 'pads' }] })
-      expect(await getPadsRootFolder()).to.equal('pads')
-      script({ files: [{ id: 'root' }] }, { files: [] }, { id: 'new-pads' })
-      expect(await getPadsRootFolder()).to.equal('new-pads')
+    it('finds the space’s pads folder, or makes it', async () => {
+      script({ files: [{ id: 'pads' }] })
+      expect(await getPadsRootFolder('space')).to.equal('pads')
+      script({ files: [] }, { id: 'new-pads' })
+      expect(await getPadsRootFolder('space')).to.equal('new-pads')
     })
   })
 
   describe('pad sets', () => {
-    const padsRoot = [{ files: [{ id: 'root' }] }, { files: [{ id: 'pads' }] }]
+    const padsRoot = [{ files: [{ id: 'pads' }] }]
 
     it('lists the pad sets and their files, with none when Drive lists none', async () => {
       script(...padsRoot, { files: [{ id: 'set1' }] })
-      expect(await listPadSetFolders()).to.deep.equal([{ id: 'set1' }])
+      expect(await listPadSetFolders('space')).to.deep.equal([{ id: 'set1' }])
       script(...padsRoot, { files: [] })
-      expect(await listPadSetFolders()).to.deep.equal([])
+      expect(await listPadSetFolders('space')).to.deep.equal([])
+      // (a space with no pads folder has no sets, and listing does not make the folder)
+      script({ files: [] })
+      expect(await listPadSetFolders('space')).to.deep.equal([])
+      expect(calls.at(-1)?.init?.method ?? 'GET').to.equal('GET')
       script({ files: [{ id: 'pad1' }] })
       expect(await listPadSetFiles('set')).to.deep.equal([{ id: 'pad1' }])
       script({ files: [] })
@@ -339,10 +343,10 @@ describe('drive-api, given what Drive answers', () => {
 
     it('uses the folder of a pad set that exists, and makes one that does not', async () => {
       script(...padsRoot, { files: [{ id: 'set1' }] }, { id: 'set1' })
-      expect(await ensurePadSetFolder('Warm')).to.equal('set1')
+      expect(await ensurePadSetFolder('Warm', 'space')).to.equal('set1')
       expect(calls.at(-1)?.init?.method).to.equal('PATCH')
       script(...padsRoot, { files: [] }, { id: 'set2' })
-      expect(await ensurePadSetFolder('Cool')).to.equal('set2')
+      expect(await ensurePadSetFolder('Cool', 'space')).to.equal('set2')
     })
 
     it('moves the files of a pad set to the trash, or nothing when it has none', async () => {

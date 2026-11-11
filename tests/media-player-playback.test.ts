@@ -71,7 +71,10 @@ describe('the media player starting a song', () => {
 
   beforeEach(async () => {
     // (the pad set the device uses: the app has none of its own)
-    localStorage.setItem('padset-selection', JSON.stringify({ id: 'pads', name: 'Pads' }))
+    localStorage.setItem(
+      'padset-selection',
+      JSON.stringify({ id: 'pads', name: 'Pads', spaceId: 'personal-pads' })
+    )
     player = document.createElement('media-player')
     document.body.append(player)
     await player.updateComplete

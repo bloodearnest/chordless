@@ -79,9 +79,12 @@ export const makeSong = (overrides: Partial<SongInput> = {}): SongInput => ({
   ...overrides,
 })
 
+/** (in the personal space the pad tests keep sets in: PERSONAL_PADS in tests/memory-storage.ts) */
 export const makePadSet = (overrides: Partial<PadSet> = {}): PadSet => ({
   id: 'drive-pads',
   name: 'Pads',
+  spaceId: 'personal-pads',
+  spaceName: 'Personal',
   ...overrides,
 })
 

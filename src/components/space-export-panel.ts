@@ -130,8 +130,7 @@ export class SpaceExportPanel extends LitElement {
   }
 
   /**
-   * The space's pad sets in Drive and their sizes (a team space's own, or the account's for a
-   * personal space); none if the user is not signed in or is offline
+   * The space's pad sets in Drive and their sizes; none if the user is not signed in or is offline
    */
   async _loadPadSets() {
     if (!this.signedIn || !this.showPads) {
@@ -140,9 +139,7 @@ export class SpaceExportPanel extends LitElement {
       return
     }
     try {
-      const sets = (await listPadSets()).filter(
-        padSet => (padSet.spaceId ?? null) === this._padSpaceId
-      )
+      const sets = (await listPadSets()).filter(padSet => padSet.spaceId === this._padSpaceId)
       this._padSets = await Promise.all(
         sets.map(async padSet => ({ padSet, bytes: await padSetSize(padSet) }))
       )
@@ -153,9 +150,9 @@ export class SpaceExportPanel extends LitElement {
     }
   }
 
-  /** The team space whose pads are this space's, or null for the account's (a personal space) */
+  /** The space whose pads are this space's: each keeps its own */
   get _padSpaceId(): string | null {
-    return this.space?.team ? this.space.id : null
+    return this.space?.id ?? null
   }
 
   get _padBytes(): number {

@@ -7,12 +7,13 @@ import {
   listPadSets,
   PadSetChangedEvent,
   PadSetListUpdatedEvent,
-  setPadStorage,
+  setPadSources,
 } from '../src/js/pad-set-service.ts'
 import { PadSetsController } from '../src/js/pad-sets-controller.ts'
 import { makePadSet } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
-import { MemoryStorage } from './memory-storage.ts'
+import { MemoryStorage, padSources } from './memory-storage.ts'
+import { DRIVE_PADS_ROOT, padSourcesInFakeDrive } from './pad-test-sources.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
@@ -93,7 +94,10 @@ describe('PadSetsController', () => {
   })
 
   it('starts with the pad set chosen on this device, and goes back to it', async () => {
-    localStorage.setItem('padset-selection', JSON.stringify({ id: 'drive-chosen', name: 'Chosen' }))
+    localStorage.setItem(
+      'padset-selection',
+      JSON.stringify({ id: 'drive-chosen', name: 'Chosen', spaceId: 'personal-pads' })
+    )
     try {
       const padSets = await setUp()
       expect(padSets.activeId).to.equal('drive-chosen')
@@ -111,13 +115,15 @@ describe('PadSetsController', () => {
       await caches.delete('padsets-cache-v1')
       localStorage.removeItem('padset-cache-state')
       localStorage.removeItem('padset-selection')
+      setPadSources(null)
       await listPadSets(true)
       drive?.uninstall()
     })
 
     it('shows the chosen set as active, and is not switching once it is', async () => {
       drive = installFakeDrive()
-      const folderId = await ensurePadSetFolder('A whole set')
+      setPadSources(padSourcesInFakeDrive())
+      const folderId = await ensurePadSetFolder('A whole set', DRIVE_PADS_ROOT)
       for (const key of PAD_FILE_KEYS) {
         await uploadPadFile(folderId, key, new Blob([new Uint8Array([1])], { type: 'audio/mpeg' }))
       }
@@ -131,7 +137,8 @@ describe('PadSetsController', () => {
 
     it('goes back to the set it had, and says why, when the new one cannot be used', async () => {
       drive = installFakeDrive()
-      const folderId = await ensurePadSetFolder('Half a set')
+      setPadSources(padSourcesInFakeDrive())
+      const folderId = await ensurePadSetFolder('Half a set', DRIVE_PADS_ROOT)
       await uploadPadFile(folderId, 'A', new Blob([new Uint8Array([1])], { type: 'audio/mpeg' }))
       const padSets = await setUp()
       await padSets.load(true)
@@ -151,11 +158,11 @@ describe('PadSetsController', () => {
   })
 
   describe('grouping the sets by space', () => {
-    afterEach(() => setPadStorage(null))
+    afterEach(() => setPadSources(null))
 
     it('has one group with no name when only the account has sets', async () => {
       const storage = new MemoryStorage()
-      setPadStorage(storage.pads, [])
+      setPadSources(padSources(storage))
       await storage.pads.ensureSet('Mine')
       const padSets = await setUp()
       await padSets.load(true)
@@ -168,10 +175,12 @@ describe('PadSetsController', () => {
       const storage = new MemoryStorage()
       const team = storage.padsIn('team-root')
       const other = storage.padsIn('other-root')
-      setPadStorage(storage.pads, [
-        { spaceId: 'team-1', name: 'St Mark’s', storage: team },
-        { spaceId: 'team-2', name: 'Youth', storage: other },
-      ])
+      setPadSources(
+        padSources(storage, [
+          { spaceId: 'team-1', name: 'St Mark’s', storage: team },
+          { spaceId: 'team-2', name: 'Youth', storage: other },
+        ])
+      )
       await team.ensureSet('Ours')
       await other.ensureSet('Theirs')
       await storage.pads.ensureSet('Mine')
@@ -187,7 +196,7 @@ describe('PadSetsController', () => {
     })
 
     it('has no groups with no sets', async () => {
-      setPadStorage(new MemoryStorage().pads, [])
+      setPadSources(padSources(new MemoryStorage()))
       const padSets = await setUp()
       expect(padSets.groups).to.deep.equal([])
     })

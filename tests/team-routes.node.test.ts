@@ -333,10 +333,8 @@ describe('the owner’s Drive credential', () => {
 })
 
 describe('a team space’s pads, over the owner’s Drive', () => {
-  test('are kept in the space’s own folder, apart from the owner’s, and streamed to a member', async () => {
-    const { call, backend, root, drive } = await world()
-    // (the owner has pads of their own too: those are not the team's)
-    await backend.pads.ensureSet('Ann’s own')
+  test('are kept in the space’s own folder, and streamed to a member', async () => {
+    const { call, root, drive } = await world()
 
     const made = await call(`${SPACE}/pads`, cat, post({ name: 'Team pads' }))
     assert.equal(made.status, 200)

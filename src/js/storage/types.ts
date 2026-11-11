@@ -168,9 +168,10 @@ export interface PadFileEntry {
 }
 
 /**
- * The pad sets: audio the user uploads, one set per folder. A personal space's are the account's
- * (`StorageBackend.pads`); a team space's are in its own folder (`padsIn`, docs/SPACES.md, "Pads in
- * team spaces"). They are large, so the team service streams them and keeps nothing.
+ * The pad sets: audio the user uploads, one set per folder. Every space keeps its own, in its own
+ * folder (`StorageBackend.padsIn`, docs/SPACES.md, "Pads in team spaces"); there are none that
+ * belong to the account, which are what once made a `pads` folder beside the spaces' folders.
+ * They are large, so the team service streams them and keeps nothing.
  */
 export interface PadStorage {
   listSets(): Promise<PadSetEntry[]>
@@ -198,9 +199,7 @@ export interface StorageBackend {
   ensureRoot(name: string, spaceId: string): Promise<{ ref: string; isNew: boolean }>
   renameRoot(ref: string, name: string): Promise<void>
   space(rootRef: string): SpaceStorage
-  /** The account's pad sets: those of a personal space */
-  readonly pads: PadStorage
-  /** The pad sets kept in a space's own folder: those of a team space */
+  /** The pad sets kept in a space's own folder */
   padsIn(rootRef: string): PadStorage
   /**
    * How many writes the backend has refused for lack of permission (not for a rate limit), since

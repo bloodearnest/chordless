@@ -152,7 +152,7 @@ folder and how data reaches Drive.
 | Identity | the folder named `Chordless` | server-issued space id; folder found by stored `rootRef`, never by name |
 | Drive access | direct, your `drive.file` token | owner: direct. Members: via a Worker route using the owner's token |
 | Roles | you | owner / admin / writer / reader, enforced by the Worker |
-| Pads | `Chordless/pads/` | `<team folder>/pads/` |
+| Pads | `<space folder>/pads/` | `<team folder>/pads/` |
 
 **Folder choice.** On create, the owner picks a *parent* folder; the app then creates `<team name> Chordless/`
 (so it is told apart in Drive from the personal `Chordless` and from other folders; the space's own name is
@@ -378,8 +378,8 @@ Steps, each on the one page:
      them (as "Copy and move" says), so this is that code and not the export file's import.
    - The space is made first. If bringing things across then fails, the result page says why and
      offers "Try again" (it is re-runnable: what is there is skipped).
-   - **Pads are not in this step yet.** A team space has pads of its own now (item 6), but bringing
-     the account's across needs Drive calls. When it does, the checkbox is hidden if there are none.
+   - **Pads are not in this step yet.** Every space has pads of its own (item 6), but bringing
+     another space's across needs Drive calls. When it does, the checkbox is hidden if there are none.
 4. **Invite people** (built 2026-10-22; `team-invite-step.ts`, on the result page once the space
    exists, since an invite needs its id). The setlists brought across have leaders (people,
    with emails). Leaders with an email are listed once each (`leadersOf`), ticked, with a
@@ -561,32 +561,34 @@ SYNC_ARCHITECTURE.md), and an admin's finer powers.
 Built 2026-11-10, tested on fakes (the memory storage, FakeDrive, the Worker's router end to end in
 `team-contract.test.ts`); not yet on a deployed Worker.
 
-- **Where they are.** A team space's pads are in its own folder, `<team folder>/pads/<set>/`. A
-  personal space's stay the account's, `Chordless/pads/`, shared by every personal space, so nobody's
-  pads moved and nothing was migrated (`backend.pads` and `backend.padsIn(rootRef)`: STORAGE_API.md,
-  "Pad sets").
+- **Where they are.** Every space's pads are in its own folder, `<space folder>/pads/<set>/`, a
+  personal space's as well as a team's (`backend.padsIn(rootRef)`: STORAGE_API.md, "Pad sets"). There
+  were once pads that belonged to the account, in `Chordless/pads/`, shared by every personal space
+  (changed 2026-11-11, nothing migrated: a set uploaded before must be uploaded again). That folder was
+  found by the name `Chordless`, which can be a folder that holds other spaces' folders, and listing the
+  pads made it when it was missing: it came back after being deleted. A space not in Drive yet has no
+  folder, so no pads; and reading a space's sets makes no `pads/` folder, only an upload does.
 - **Reaching them.** The owner straight in Drive; a member through the Worker
   (`/api/space/<id>/pads…`, `worker/src/team-pads.ts`), which streams a file's audio out as Drive
   sends it, with `Cache-Control: no-store`, and keeps nothing. An upload is one MP3 per key, up to
   20 MB, held in the Worker's memory while it is sent on to Drive (never stored). A set or file is
   reached only once the space's tree holds it (a listing notes it, as for charts), so a ref from
-  another space or the owner's own `Chordless/pads/` is a 404. Body-size limits on a deployed
+  another space is a 404. Body-size limits on a deployed
   Worker are still unchecked (a pad is a few MB, well under them).
 - **Roles.** Any member reads and uploads, readers too. Below an admin an upload only **adds**: a set
   of a name that is there, or a key the set already has, is refused (409, "give yours another
   name"), so a team member cannot wipe the team's pads by mistake (decided 2026-11-10). An admin (or
   the owner) replaces a set as before: its files go to the bin, and it is filled again. A key the set
   lacks can be added by anyone, so an upload that stopped half way can be finished.
-- **The picker** lists the sets of every place at once: the account's, and each team space on the
-  device. With a team's sets among them they are grouped, "Personal" first, then each team under its
-  name; with none, there are no headings. **The choice is per device**, as before: each musician
+- **The picker** lists the sets of every space on the device at once. With the sets of more than one
+  space they are grouped under the space's name, the personal spaces first; with one, there are no
+  headings. **The choice is per device**, as before: each musician
   picks their own sound (decided 2026-11-10; a team default a leader sets is in the TODO). The
   choice keeps its space (`spaceId` on the stored set), and the audio kept offline is by Drive file
   id, unique across spaces, so what devices had kept still serves.
-- **The upload form** has "Save to" (Personal, or each team space on the device), starting at the
-  space the app is in; it is not shown with no team spaces.
-- **Export and import** take the space's own pads: a team space's for a team space, the account's
-  for a personal one.
+- **The upload form** has "Save to" (each space on the device that is in Drive), starting at the
+  space the app is in; it is not shown with only one.
+- **Export and import** take the space's own pads.
 - Not built: bringing pads across in the wizard, and copying or moving them between spaces
   (copy/move, above). A signed, short-lived direct download is *not* possible under `drive.file`,
   which is why the audio goes through the Worker.
@@ -638,12 +640,14 @@ never meet a "Personal" space they did not ask for.
 
 **Joining by invite**
 - Accepting an invite makes the team the current space and the first tab.
-- **Bring across what is new.** If the personal space holds anything the team does not already have,
-  ask once: "You have 14 songs and 3 setlists in Personal. Bring them into Gateway Church?" It uses
-  `contentsOf` and `bringAcross`, skipping anything the team space has already (songs by song id,
-  setlists by id), and counts only what would be added. No prompt when nothing would be. Songs are
-  copied; setlists moved or copied, as in the wizard. Declining is harmless and the same action stays
-  on the Account page, on each space's card with its counts.
+- **Nothing is offered from a personal space** (decided 2026-11-11). It used to ask once, after the
+  first sync, "You have 14 songs and 3 setlists in Personal. Bring them into Gateway Church?" with
+  "Bring them in" as the main button. One press moved a whole personal library into a team (a second
+  browser, joining a new events team, put 92 church setlists into it). A move cannot yet remove what
+  is in Drive from the personal space, so it came back with the next team joined. Joining adds nothing
+  but the team's own files. The wizard's "What to bring" step, on making a team, stays: it is a
+  deliberate choice, with counts. Moving one setlist to another space is a separate action on the
+  setlist (docs/SYNC_ARCHITECTURE.md, "Deleting setlists").
 - **No Personal space for someone whose first contact is an invite.** It is created lazily
   (`ensureCurrentSpace`, `getCurrentSpaceFull` in `space.ts`, only when no current space is set). The
   launch path sees an invite link before any space exists, signs in and joins, so the team is
@@ -661,9 +665,6 @@ never meet a "Personal" space they did not ask for.
   to that page. (Making `shared-with-me` the current space would put sync and the space record
   on a database that has neither.)
 - "More" is a native `<select>`; the most recently used tabs (kept in `space-tabs-recent`) stay shown.
-- The offer to bring across is made on the join page once the first sync has run, looking at each
-  personal space in turn; setlists are moved (the wizard's default). The matching action on the
-  Account page's cards is **not built yet**: until it is, the wizard's step is the only other way.
 - Nothing on the invite path makes Personal: the first-use question and the start-up access check
   both wait when there is no space and the page is `/join`. Sign-in rename, repair page and export
   all work from the current space and need no Personal one.

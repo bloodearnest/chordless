@@ -11,8 +11,9 @@ import { RouteChangeEvent } from '../src/js/app-router.ts'
 import { ensurePadSetFolder } from '../src/js/drive-api.ts'
 import { normalizeTempoNote } from '../src/js/metronome-controller.ts'
 import { PadAudioController } from '../src/js/pad-audio-controller.ts'
-import { listPadSets, PadSetChangedEvent } from '../src/js/pad-set-service.ts'
+import { listPadSets, PadSetChangedEvent, setPadSources } from '../src/js/pad-set-service.ts'
 import { installFakeDrive } from './fake-drive.ts'
+import { DRIVE_PADS_ROOT, padSourcesInFakeDrive } from './pad-test-sources.ts'
 import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
@@ -657,14 +658,16 @@ describe('the media player', () => {
   describe('the pad set of a song', () => {
     it('is the song’s own when it is a set on this device', async () => {
       const drive = installFakeDrive()
+      setPadSources(padSourcesInFakeDrive())
       try {
         await show()
-        const folderId = await ensurePadSetFolder('Warm')
+        const folderId = await ensurePadSetFolder('Warm', DRIVE_PADS_ROOT)
         await listPadSets(true)
         player._currentPadSetId = folderId
         await player._updatePadSetForSong()
         expect(player._activePadSet?.id).to.equal(folderId)
       } finally {
+        setPadSources(null)
         drive.uninstall()
         localStorage.removeItem('padset-selection')
       }

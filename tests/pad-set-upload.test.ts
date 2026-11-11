@@ -7,11 +7,12 @@ import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/pad-set-upload.ts'
 import { type PadSetUpload, PadSetUploadedEvent } from '../src/components/pad-set-upload.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
-import { listPadSets, setPadStorage } from '../src/js/pad-set-service.ts'
+import { listPadSets, setPadSources } from '../src/js/pad-set-service.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { installFakeDrive } from './fake-drive.ts'
-import { MemoryStorage } from './memory-storage.ts'
+import { MemoryStorage, PERSONAL_PADS, padSources } from './memory-storage.ts'
 import { must } from './must.ts'
+import { padSourcesInFakeDrive } from './pad-test-sources.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip } from './zip.ts'
 
@@ -58,6 +59,8 @@ describe('the pad set upload', () => {
 
   beforeEach(() => {
     drive = installFakeDrive()
+    // (one personal space, whose pads are in its folder in Drive)
+    setPadSources(padSourcesInFakeDrive())
     uploaded = 0
   })
 
@@ -68,6 +71,7 @@ describe('the pad set upload', () => {
     localStorage.removeItem('padset-selection')
     // (the list the service keeps would have this test's sets in it)
     await listPadSets(true)
+    setPadSources(null)
     drive.uninstall()
   })
 
@@ -190,19 +194,23 @@ describe('the pad set upload', () => {
 
     beforeEach(() => {
       storage = new MemoryStorage()
-      setPadStorage(storage.pads, [
-        { spaceId: 'team-1', name: 'St Mark’s', storage: storage.padsIn('team-root') },
-      ])
+      setPadSources(
+        padSources(storage, [
+          { spaceId: 'team-1', name: 'St Mark’s', storage: storage.padsIn('team-root') },
+        ])
+      )
     })
 
-    afterEach(() => setPadStorage(null))
+    afterEach(() => setPadSources(null))
 
     const destination = () => root().querySelector<HTMLSelectElement>('#padset-destination')
 
     it('starts at the team space the app is in', async () => {
       const before = getCurrentSpace()
       const space = await createSpace(`Pads ${crypto.randomUUID().slice(0, 8)}`)
-      setPadStorage(storage.pads, [{ spaceId: space.id, name: 'Here', storage: storage.pads }])
+      setPadSources(
+        padSources(storage, [{ spaceId: space.id, name: 'Here', storage: storage.pads }])
+      )
       await setCurrentSpace(space.id, space.name)
       try {
         await show()
@@ -211,12 +219,12 @@ describe('the pad set upload', () => {
         expect(form._destination).to.equal(space.id)
         form.remove()
 
-        // (in a personal space, it starts at Personal)
+        // (in a space that has nowhere for pads yet, it starts at the first place there is)
         const own = await createSpace(`Own ${crypto.randomUUID().slice(0, 8)}`)
         await setCurrentSpace(own.id, own.name)
         await show()
         await waitUntil(() => destination(), 'the Save to choice')
-        expect(form._destination).to.equal(null)
+        expect(form._destination).to.equal(PERSONAL_PADS)
         await deleteSpace(own.id)
       } finally {
         await deleteSpace(space.id)
@@ -224,7 +232,7 @@ describe('the pad set upload', () => {
       }
     })
 
-    it('offers Personal or the team, and saves to the one chosen, for everyone in it', async () => {
+    it('offers each space, and saves to the one chosen, saying a team’s is for everyone in it', async () => {
       await show()
       await waitUntil(() => destination(), 'the Save to choice')
       const select = must(destination())
@@ -232,7 +240,7 @@ describe('the pad set upload', () => {
         'Personal',
         'St Mark’s (Team)',
       ])
-      expect(select.value).to.equal('')
+      expect(select.value).to.equal(PERSONAL_PADS)
       expect(text()).to.not.contain('Everyone in the team')
 
       select.value = 'team-1'
@@ -248,10 +256,11 @@ describe('the pad set upload', () => {
       ])
       expect(await storage.pads.listSets()).to.deep.equal([])
 
-      select.value = ''
+      select.value = PERSONAL_PADS
       select.dispatchEvent(new Event('change'))
       await form.updateComplete
-      expect(form._destination).to.equal(null)
+      expect(form._destination).to.equal(PERSONAL_PADS)
+      expect(text()).to.not.contain('Everyone in the team')
     })
   })
 })

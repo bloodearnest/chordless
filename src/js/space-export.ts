@@ -299,14 +299,14 @@ export function importIntoSpace(
 }
 
 /**
- * Put pad sets from an export into Drive (the user is signed in): the account's, or a team space's
- * (`spaceId`). A pad set with the same name as one there replaces it (in a team space, only an
- * admin may: `uploadPadSet`). Returns the names imported.
+ * Put pad sets from an export into the space's folder in Drive (the user is signed in). A pad set
+ * with the same name as one there replaces it (in a team space, only an admin may: `uploadPadSet`).
+ * Returns the names imported.
  */
 export async function importPadSets(
   exported: SpaceExport,
   names: string[],
-  spaceId: string | null = null
+  spaceId: string | null
 ): Promise<string[]> {
   const imported: string[] = []
   for (const { name, dir } of exported.manifest.padSets) {

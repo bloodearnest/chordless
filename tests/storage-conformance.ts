@@ -418,20 +418,17 @@ export function describeStorage(label: string, makeHarness: () => Promise<Storag
       })
     })
 
-    describePadStorage('the account’s', async () => backend.pads)
-
     describePadStorage('a space’s own', async () => {
       const { ref } = await backend.ensureRoot('Team pads', 'space-pads')
       return backend.padsIn(ref)
     })
 
-    it('keeps the account’s pad sets apart from a space’s, and one space’s from another', async () => {
+    it('keeps one space’s pad sets apart from another’s', async () => {
       const one = backend.padsIn((await backend.ensureRoot('One', 'space-one')).ref)
       const two = backend.padsIn((await backend.ensureRoot('Two', 'space-two')).ref)
       await one.ensureSet('Warm pads')
       expect((await one.listSets()).map(set => set.name)).to.deep.equal(['Warm pads'])
       expect(await two.listSets()).to.deep.equal([])
-      expect(await backend.pads.listSets()).to.deep.equal([])
     })
   })
 }

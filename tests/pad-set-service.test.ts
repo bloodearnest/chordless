@@ -16,20 +16,28 @@ import {
   preloadPadKeys,
   preloadPadKeysForSongs,
   selectPadSet,
-  setPadStorage,
+  setPadSources,
   uploadPadSet,
 } from '../src/js/pad-set-service.ts'
 import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
 import { TeamStorage } from '../src/js/storage/team-storage.ts'
 import type { PadStorage } from '../src/js/storage/types.ts'
 import { makePadSet } from './builders.ts'
-import { MemoryStorage } from './memory-storage.ts'
+import { MemoryStorage, PERSONAL_PADS, padSources } from './memory-storage.ts'
 import { must } from './must.ts'
 import { makeTeamRig, ORIGIN } from './team-context.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip, type ZipEntry } from './zip.ts'
 
 const { describe, it, beforeEach, afterEach } = window
+
+/** Upload to the personal space's pads, unless a space is given */
+const upload = (
+  zip: File | null | undefined,
+  name?: string,
+  onProgress?: (uploaded: number, total: number) => void,
+  spaceId: string | null = PERSONAL_PADS
+) => uploadPadSet(zip, name, onProgress, spaceId)
 
 suppressConsoleLogs()
 
@@ -45,11 +53,11 @@ describe('pad sets', () => {
 
   beforeEach(() => {
     storage = new MemoryStorage()
-    setPadStorage(storage.pads)
+    setPadSources(padSources(storage))
   })
 
   afterEach(async () => {
-    setPadStorage(null)
+    setPadSources(null)
     await caches.delete(PAD_CACHE_NAME)
     localStorage.removeItem('padset-cache-state')
     localStorage.removeItem('padset-selection')
@@ -315,9 +323,14 @@ describe('pad sets', () => {
     it('puts a file for each key in the storage, and returns the set', async () => {
       const zip = await buildZip(entriesFor(allKeys), 'Warm_Pad-Set.zip')
 
-      const padSet = await uploadPadSet(zip)
+      const padSet = await upload(zip)
 
-      expect(padSet).to.deep.equal({ id: padSet.id, name: 'Warm Pad Set' })
+      expect(padSet).to.deep.equal({
+        id: padSet.id,
+        name: 'Warm Pad Set',
+        spaceId: PERSONAL_PADS,
+        spaceName: 'Personal',
+      })
       // the first set uploaded is the one in use: there is no other
       expect(getActivePadSet()?.id).to.equal(padSet.id)
       const files = filesIn(padSet.id)
@@ -330,11 +343,14 @@ describe('pad sets', () => {
     it('keeps the pads of a set that the storage gave no modified time for, as of when they were listed', async () => {
       // (uploading forgets anything kept under the set's id, which a fake Drive repeats; and a
       // set already in use means the upload does not choose this one, which would list it)
-      localStorage.setItem('padset-selection', JSON.stringify({ id: 'other', name: 'Other' }))
-      const padSet = await uploadPadSet(await buildZip(entriesFor(allKeys), 'Fresh.zip'))
+      localStorage.setItem(
+        'padset-selection',
+        JSON.stringify({ id: 'other', name: 'Other', spaceId: 'personal-pads' })
+      )
+      const padSet = await upload(await buildZip(entriesFor(allKeys), 'Fresh.zip'))
       await caches.delete(PAD_CACHE_NAME)
 
-      await ensurePadKeyCached({ id: padSet.id, name: padSet.name }, 'C')
+      await ensurePadKeyCached({ id: padSet.id, name: padSet.name, spaceId: padSet.spaceId }, 'C')
 
       expect(await isPadKeyCached(padSet, 'C')).to.equal(true)
       const kept = JSON.parse(localStorage.getItem('padset-cache-state') ?? '{}')[padSet.id]
@@ -350,8 +366,11 @@ describe('pad sets', () => {
 
     it('is listed once for two askers at the same time, after an upload cleared the list', async () => {
       // (a set already in use, so the upload does not choose its set, and list the sets again)
-      localStorage.setItem('padset-selection', JSON.stringify({ id: 'other', name: 'Other' }))
-      await uploadPadSet(await buildZip(entriesFor(allKeys), 'Listed.zip'))
+      localStorage.setItem(
+        'padset-selection',
+        JSON.stringify({ id: 'other', name: 'Other', spaceId: 'personal-pads' })
+      )
+      await upload(await buildZip(entriesFor(allKeys), 'Listed.zip'))
       const before = listings('listPadSets')
 
       const [first, second] = await Promise.all([listPadSets(), listPadSets()])
@@ -368,7 +387,7 @@ describe('pad sets', () => {
     it('reads files the zip tool deflated', async () => {
       const zip = await buildZip(entriesFor(allKeys, { method: 'deflate' }))
 
-      const padSet = await uploadPadSet(zip, 'Deflated')
+      const padSet = await upload(zip, 'Deflated')
 
       expect(filesIn(padSet.id)['G#.mp3']).to.deep.equal(audioOf('Pads/Warm Pad - G#.mp3'))
     })
@@ -376,8 +395,8 @@ describe('pad sets', () => {
     it('is named by the name it is given, else by its file', async () => {
       const zip = await buildZip(entriesFor(allKeys), 'from-file.zip')
 
-      expect((await uploadPadSet(zip, '  Chosen name ')).name).to.equal('Chosen name')
-      expect((await uploadPadSet(zip)).name).to.equal('from file')
+      expect((await upload(zip, '  Chosen name ')).name).to.equal('Chosen name')
+      expect((await upload(zip)).name).to.equal('from file')
     })
 
     it('takes flats as the sharps the keys are named by', async () => {
@@ -386,7 +405,7 @@ describe('pad sets', () => {
       const names = allKeys.map(key => (sharps.includes(key) ? flats[sharps.indexOf(key)] : key))
       const zip = await buildZip(names.map(name => mp3(`${name}.mp3`)))
 
-      const padSet = await uploadPadSet(zip, 'Flats')
+      const padSet = await upload(zip, 'Flats')
 
       expect(Object.keys(filesIn(padSet.id)).sort()).to.deep.equal(
         allKeys.map(key => `${key}.mp3`).sort()
@@ -402,7 +421,7 @@ describe('pad sets', () => {
         ...entriesFor(allKeys),
       ])
 
-      const padSet = await uploadPadSet(zip, 'Mixed')
+      const padSet = await upload(zip, 'Mixed')
 
       expect(Object.keys(filesIn(padSet.id))).to.have.length(12)
     })
@@ -414,7 +433,7 @@ describe('pad sets', () => {
         ...entriesFor(allKeys.filter(key => key !== 'C')),
       ])
 
-      const padSet = await uploadPadSet(zip, 'Doubled')
+      const padSet = await upload(zip, 'Doubled')
 
       expect(filesIn(padSet.id)['C.mp3']).to.deep.equal(audioOf('C.mp3'))
     })
@@ -425,7 +444,7 @@ describe('pad sets', () => {
       window.addEventListener(PadSetListUpdatedEvent.type, listener)
       try {
         await listPadSets(true)
-        const padSet = await uploadPadSet(await buildZip(entriesFor(allKeys)), 'Listed')
+        const padSet = await upload(await buildZip(entriesFor(allKeys)), 'Listed')
         expect(told).to.equal(1)
         expect((await listPadSets()).map(set => set.id)).to.include(padSet.id)
       } finally {
@@ -435,11 +454,11 @@ describe('pad sets', () => {
 
     it('replaces what was in the folder, and what was kept of it for offline', async () => {
       const zip = await buildZip(entriesFor(allKeys))
-      const first = await uploadPadSet(zip, 'Same name')
+      const first = await upload(zip, 'Same name')
       await ensurePadKeyCached(makePadSet({ id: first.id, name: first.name }), 'C')
       expect(await cachedBytes(first as PadSet, 'C')).to.not.equal(null)
 
-      const again = await uploadPadSet(
+      const again = await upload(
         await buildZip(entriesFor(allKeys).map(entry => ({ ...entry, data: audioOf('new') }))),
         'Same name'
       )
@@ -459,35 +478,31 @@ describe('pad sets', () => {
       const nothingMade = () => expect(storage.padSets.size).to.equal(0)
 
       it('no file', async () => {
-        expect(await failureOf(uploadPadSet(null))).to.equal('Please select a pad set ZIP file.')
+        expect(await failureOf(upload(null))).to.equal('Please select a pad set ZIP file.')
         nothingMade()
       })
 
       it('a name of only spaces', async () => {
         const zip = await buildZip(entriesFor(allKeys), 'pads.zip')
-        expect(await failureOf(uploadPadSet(zip, '   '))).to.equal('Please provide a pad set name.')
+        expect(await failureOf(upload(zip, '   '))).to.equal('Please provide a pad set name.')
         nothingMade()
       })
 
       it('a zip missing keys, naming them', async () => {
         const zip = await buildZip(entriesFor(allKeys.filter(key => key !== 'D' && key !== 'F#')))
-        expect(await failureOf(uploadPadSet(zip, 'Short'))).to.equal(
-          'Missing keys in pad set: D, F#'
-        )
+        expect(await failureOf(upload(zip, 'Short'))).to.equal('Missing keys in pad set: D, F#')
         nothingMade()
       })
 
       it('a file that is not a zip', async () => {
         const notZip = new File([new Uint8Array(100)], 'pads.zip')
-        expect(await failureOf(uploadPadSet(notZip, 'Bad'))).to.equal(
-          'Invalid ZIP file (EOCD not found)'
-        )
+        expect(await failureOf(upload(notZip, 'Bad'))).to.equal('Invalid ZIP file (EOCD not found)')
         nothingMade()
       })
 
       it('an encrypted zip', async () => {
         const zip = await buildZip(entriesFor(allKeys, { flags: 1 }))
-        expect(await failureOf(uploadPadSet(zip, 'Secret'))).to.equal(
+        expect(await failureOf(upload(zip, 'Secret'))).to.equal(
           'Encrypted ZIP archives are not supported.'
         )
         nothingMade()
@@ -495,7 +510,7 @@ describe('pad sets', () => {
 
       it('a zip using a compression it cannot read', async () => {
         const zip = await buildZip(entriesFor(allKeys, { rawMethod: 12 }))
-        expect(await failureOf(uploadPadSet(zip, 'Bzip'))).to.equal(
+        expect(await failureOf(upload(zip, 'Bzip'))).to.equal(
           'Unsupported ZIP compression method: 12'
         )
         nothingMade()
@@ -611,17 +626,17 @@ describe('pad sets', () => {
     it('with no entries it can find, as having no keys', async () => {
       // The central directory is not where it says it is
       const zip = await corrupted(await buildZip(entries()), [0x50, 0x4b, 0x01, 0x02])
-      expect(await messageOf(uploadPadSet(zip, 'Broken'))).to.contain('Missing keys in pad set')
+      expect(await messageOf(upload(zip, 'Broken'))).to.contain('Missing keys in pad set')
     })
 
     it('with a file whose own header is not there', async () => {
       const zip = await corrupted(await buildZip(entries()), [0x50, 0x4b, 0x03, 0x04])
-      expect(await messageOf(uploadPadSet(zip, 'Broken'))).to.equal('Invalid ZIP local header')
+      expect(await messageOf(upload(zip, 'Broken'))).to.equal('Invalid ZIP local header')
     })
 
     it('with files that are not the deflated data they say', async () => {
       const zip = await buildZip(entries({ data: new Uint8Array(40).fill(255), rawMethod: 8 }))
-      expect(await messageOf(uploadPadSet(zip, 'Broken'))).to.equal(
+      expect(await messageOf(upload(zip, 'Broken'))).to.equal(
         'Browser does not support deflate decompression for ZIP uploads'
       )
     })
@@ -665,22 +680,22 @@ describe('pad sets', () => {
 
     /** The account's pads and a team space's, both in the memory storage */
     function withTeam(pads: PadStorage = storage.padsIn('team-root')) {
-      setPadStorage(storage.pads, [{ spaceId: 'team-1', name: 'St Mark’s', storage: pads }])
+      setPadSources(padSources(storage, [{ spaceId: 'team-1', name: 'St Mark’s', storage: pads }]))
       return pads
     }
 
-    it('lists the account’s sets and each team space’s, each with the space it is in', async () => {
+    it('lists each space’s sets, each with the space it is in, the personal ones first', async () => {
       const team = withTeam()
       await storage.pads.ensureSet('Mine')
       await team.ensureSet('Ours')
       const sets = await listPadSets(true)
       expect(sets.map(set => [set.name, set.spaceId, set.spaceName])).to.deep.equal([
-        ['Mine', undefined, undefined],
+        ['Mine', PERSONAL_PADS, 'Personal'],
         ['Ours', 'team-1', 'St Mark’s'],
       ])
       expect(await listPadDestinations()).to.deep.equal([
-        { spaceId: null, name: 'Personal' },
-        { spaceId: 'team-1', name: 'St Mark’s' },
+        { spaceId: PERSONAL_PADS, name: 'Personal', team: false },
+        { spaceId: 'team-1', name: 'St Mark’s', team: true },
       ])
     })
 
@@ -694,7 +709,7 @@ describe('pad sets', () => {
 
     it('uploads to the team space chosen, and keeps its pads from there', async () => {
       const team = withTeam()
-      const padSet = await uploadPadSet(await zipOf(), 'Ours', undefined, 'team-1')
+      const padSet = await upload(await zipOf(), 'Ours', undefined, 'team-1')
       expect(padSet).to.deep.include({ name: 'Ours', spaceId: 'team-1', spaceName: 'St Mark’s' })
       expect(await storage.pads.listSets()).to.deep.equal([])
       expect(await team.listFiles(padSet.id)).to.have.length(12)
@@ -706,7 +721,7 @@ describe('pad sets', () => {
     })
 
     it('finds the team spaces on this device: the owner’s in its folder, a member’s through the Worker', async () => {
-      setPadStorage(null)
+      setPadSources(null)
       const owned = await createSpace(`Owned ${crypto.randomUUID().slice(0, 8)}`)
       const joined = await createSpace(`Joined ${crypto.randomUUID().slice(0, 8)}`)
       const unlinked = await createSpace(`Unlinked ${crypto.randomUUID().slice(0, 8)}`)
@@ -716,19 +731,21 @@ describe('pad sets', () => {
         await updateSpace(joined.id, { rootRef: 't2', team: { id: 't2', role: 'reader' } })
         // (an owner's space not linked to its folder yet has nowhere for pads)
         await updateSpace(unlinked.id, { team: { id: 't3', role: 'owner' } })
+        // (and a personal space's are in its own folder, once it has one)
+        await updateSpace(personal.id, { rootRef: 'personal-folder' })
         const names = (await listPadDestinations()).map(each => each.name)
-        expect(names[0]).to.equal('Personal')
-        expect(names).to.include.members([owned.name, joined.name])
-        expect(names).to.not.include.members([unlinked.name, personal.name])
+        expect(names).to.include.members([personal.name, owned.name, joined.name])
+        expect(names).to.not.include(unlinked.name)
+        expect(names.indexOf(personal.name)).to.be.below(names.indexOf(owned.name))
       } finally {
         for (const space of [owned, joined, unlinked, personal]) await deleteSpace(space.id)
       }
     })
 
-    it('says so when the set’s team space is not on this device', async () => {
+    it('says so when the set’s space is not available', async () => {
       withTeam()
-      expect(await messageOf(uploadPadSet(await zipOf(), 'Ours', undefined, 'gone'))).to.match(
-        /not on this device/
+      expect(await messageOf(upload(await zipOf(), 'Ours', undefined, 'gone'))).to.match(
+        /not available/
       )
     })
 
@@ -741,9 +758,9 @@ describe('pad sets', () => {
         fetch: rig.fetch,
       })
       withTeam(member.padsIn('space-1'))
-      const first = await uploadPadSet(await zipOf(), 'Ours', undefined, 'team-1')
+      const first = await upload(await zipOf(), 'Ours', undefined, 'team-1')
       expect(first.spaceId).to.equal('team-1')
-      expect(await messageOf(uploadPadSet(await zipOf(), 'Ours', undefined, 'team-1'))).to.match(
+      expect(await messageOf(upload(await zipOf(), 'Ours', undefined, 'team-1'))).to.match(
         /already a pad set called “Ours” here: give yours another name/
       )
     })

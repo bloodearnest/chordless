@@ -120,9 +120,9 @@ can be found and switched on. **Everything about the media player is on that pag
 Preferences**: the enabled switch at its top, then (when it is on) the settings (pads, metronome,
 stereo split) and the Pad sets (upload, list, delete). The page shows nothing of pads while the
 player is off. The player's own settings popover keeps using the same settings component. Pad sets
-leave the Account and Teams page: they are the account's today (docs/STORAGE_API.md), the one large
-thing in the device's cache, and useful only with the player. When pads become per-space
-(docs/SPACES.md, item 6) they move into each space's Manage modal.
+leave the Account and Teams page: they are large, the biggest thing in the device's cache, and
+useful only with the player. Pads are per space now (docs/SPACES.md, "Pads in team spaces"); they
+may move into each space's Manage modal.
 
 ## What changes in the code
 
