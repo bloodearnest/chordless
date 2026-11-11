@@ -32,11 +32,14 @@ export interface UpdateContainer extends EventTarget {
 const MIN_CHECK_GAP_MS = 10 * 60 * 1000
 /** How often it checks while open */
 const CHECK_EVERY_MS = 3 * 60 * 60 * 1000
+/** How long a waiting version has to take over, once asked, before it is dealt with another way */
+const TAKEOVER_WAIT_MS = 3000
 
 export class AppUpdate {
   #container: UpdateContainer | undefined
   #reload: () => void
   #now: () => number
+  #takeoverWaitMs: number
   #registration: ServiceWorkerRegistration | undefined
   #ready = false
   #applying = false
@@ -52,11 +55,13 @@ export class AppUpdate {
     /* v8 ignore next 2 -- reloading the page would end the test run: tests give their own */
     // biome-ignore lint/plugin: a new version has to be loaded afresh: the page's own files are the old version's
     reload: () => void = () => location.reload(),
-    now: () => number = Date.now
+    now: () => number = Date.now,
+    takeoverWaitMs: number = TAKEOVER_WAIT_MS
   ) {
     this.#container = container
     this.#reload = reload
     this.#now = now
+    this.#takeoverWaitMs = takeoverWaitMs
   }
 
   /** Whether a new version is installed and waiting */
@@ -163,17 +168,42 @@ export class AppUpdate {
     this.#changed()
   }
 
-  /** Take the new version: the waiting worker takes over, and the page reloads under it */
+  /**
+   * Take the new version: the waiting worker takes over, and the page reloads under it. If it does
+   * not (it was replaced by a newer one while waiting, or never activates), the page cannot be left
+   * with buttons that do nothing: after a few seconds the stuck worker is unregistered and the page
+   * reloaded, so a fresh one is installed and takes over at once (as a first visit does).
+   */
   apply(): void {
-    const waiting = this.#registration?.waiting
+    const registration = this.#registration
+    const waiting = registration?.waiting
     if (this.#applying) return
     this.#applying = true
     if (!waiting || !this.#container) {
       this.#reload()
       return
     }
-    this.#container.addEventListener('controllerchange', () => this.#reload(), { once: true })
+    const gave = setTimeout(() => void this.#unstick(registration), this.#takeoverWaitMs)
+    this.#container.addEventListener(
+      'controllerchange',
+      () => {
+        clearTimeout(gave)
+        this.#reload()
+      },
+      { once: true }
+    )
     waiting.postMessage({ type: 'SKIP_WAITING' })
+  }
+
+  /** The waiting version did not take over: remove the registration, and reload to make a new one */
+  async #unstick(registration: ServiceWorkerRegistration | undefined): Promise<void> {
+    try {
+      await registration?.unregister()
+    } catch {
+      // (the reload is the point: a registration that stays is tried again by the next press)
+    }
+    this.#applying = false
+    this.#reload()
   }
 
   #set(ready: boolean): void {
