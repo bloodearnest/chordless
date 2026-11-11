@@ -92,6 +92,14 @@ describe('space-card', () => {
     expect(text(el)).to.match(/1 song · 1 setlist · about \d+ B/)
   })
 
+  it('shows the CCLI licence number when the space has one, and nothing when it has none', async () => {
+    expect(text(await card('signed-out'))).to.not.contain('CCLI licence')
+    const licensed = await make(`Licensed ${crypto.randomUUID().slice(0, 6)}`, {
+      ccliLicence: '471102',
+    })
+    expect(text(await card('signed-out', { space: licensed }))).to.contain('CCLI licence 471102')
+  })
+
   it('puts the labels after the name on the left, and Current flush right, whatever the labels', async () => {
     const team = await make(`Team ${crypto.randomUUID().slice(0, 8)}`, {
       team: { id: 't-9', role: 'writer' },
