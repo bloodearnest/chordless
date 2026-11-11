@@ -130,6 +130,8 @@ export async function pullSetlists(
 
   for (const driveFile of driveSetlists) {
     try {
+      // A setlist deleted here, whose file could not be put in the trash yet, is not to come back
+      if (run.pendingDeletedRefs.has(driveFile.ref)) continue
       const setlistId = setlistIdOf(driveFile)
 
       // Check if we have this setlist locally

@@ -136,10 +136,17 @@ export function setlistTemplate({
         confirm-label="Delete"
         cancel-label="Cancel"
       >
-        <p>
-          This deletes the setlist from this device. It was never saved to Google Drive, so it
-          cannot be brought back.
-        </p>
+        <p id="delete-setlist-text"></p>
+      </app-modal>
+
+      <app-modal
+        id="move-setlist-modal"
+        type="confirm"
+        heading="Move Setlist?"
+        confirm-label="Move"
+        cancel-label="Cancel"
+      >
+        <p id="move-setlist-text"></p>
       </app-modal>
 
       <app-modal

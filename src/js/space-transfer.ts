@@ -26,8 +26,8 @@ export interface TransferSource {
   getAllSetlists(): Promise<Setlist[]>
   /** The people who lead the setlists */
   getAllPeople(): Promise<Person[]>
-  /** Only a move deletes from the source */
-  deleteUnsyncedSetlist?(id: string): Promise<void>
+  /** Only a move deletes from the source (a setlist in Drive goes to its trash at the next sync) */
+  removeSetlist?(id: string): Promise<unknown>
 }
 
 /** What a transfer did, for the user to be told */
@@ -41,8 +41,8 @@ export interface TransferReport {
   /** Setlist entries whose song is not in the source, so they point at nothing in the destination */
   entriesWithoutSong: number
   /**
-   * A move removes the setlist from the source, but a setlist that is in Drive can't be deleted
-   * yet (docs/SYNC_ARCHITECTURE.md, "Deleting setlists"): those stay in the source, counted here
+   * A move removes the setlist from the source, but a source that can't delete (an export file)
+   * keeps them: counted here
    */
   setlistsLeftInSource: number
 }
@@ -196,8 +196,8 @@ function sameSetlist(a: Setlist, b: Setlist): boolean {
  * Copy or move setlists (all of the source's, or only these ids), with the songs they use.
  * - copy: new ids, and a setlist the destination has already (same event, same songs) is skipped
  * - move: the ids are kept, a setlist whose id the destination has is skipped, and the source's
- *   copy (with this device's state for it) is deleted once it is in the destination. One that
- *   is in Drive can't be deleted yet, so it stays (see the report).
+ *   copy (with this device's state for it) is deleted once it is in the destination; one that is
+ *   in Drive has its file put in the Drive trash at the source's next sync.
  */
 export async function transferSetlists(
   source: TransferSource,
@@ -239,8 +239,8 @@ export async function transferSetlists(
     existing.push(made)
     report.setlistsAdded++
     if (mode === 'move') {
-      if (setlist.fileRef || !source.deleteUnsyncedSetlist) report.setlistsLeftInSource++
-      else await source.deleteUnsyncedSetlist(setlist.id)
+      if (!source.removeSetlist) report.setlistsLeftInSource++
+      else await source.removeSetlist(setlist.id)
     }
   }
   return report

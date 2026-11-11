@@ -17,6 +17,7 @@ import { type SetlistDiffers, SetlistRevertedEvent } from '../components/setlist
 import {
   SetlistInfoDeleteEvent,
   type SetlistInfoDialog,
+  SetlistInfoMoveEvent,
   SetlistInfoSaveEvent,
 } from '../components/setlist-info-dialog.ts'
 import { type SetlistShare, SetlistShareChangeEvent } from '../components/setlist-share.ts'
@@ -33,8 +34,8 @@ import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
 import { hasUnsentChanges } from './auto-sync.ts'
 import { DataChangeEvent, touches } from './data-changes.ts'
 import type { Setlist, SetlistEntry, SharedChartAnnotation, SongWithContent } from './data-types.ts'
-import { type ChordlessDB, getCurrentDB, NO_CHANGE } from './db.ts'
-import { leaderName } from './leaders.ts'
+import { type ChordlessDB, getCurrentDB, NO_CHANGE, openSpace, type RemovedSetlist } from './db.ts'
+import { leaderName, resolvePerson } from './leaders.ts'
 import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
 import { LiveSyncStatusEvent } from './live-sync-status.ts'
 import { goTo, setPageTitle } from './navigation.ts'
@@ -67,9 +68,11 @@ import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setli
 import { SectionController } from './setlist/section-controller.ts'
 import { SetlistHeader } from './setlist/setlist-header.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
-import { getSpaceById } from './space.ts'
+import { getCurrentSpaceFull, getSpaceById, listSpaces } from './space.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
+import { transferSetlists } from './space-transfer.ts'
+import { mayDeleteSetlist } from './team-roles.ts'
 import {
   editModeEntered,
   endSetlistSession,
@@ -154,6 +157,7 @@ export class SetlistPage {
   _setlistDetailsSaveHandler?: (event: SetlistInfoSaveEvent) => void
   _rangeChangedHandler?: (event: SongRangeChangedEvent) => void
   _setlistDeleteHandler?: (event: SetlistInfoDeleteEvent) => void
+  _setlistMoveHandler?: (event: SetlistInfoMoveEvent) => void
   _identifyHandler?: (event: SetlistDetailsIdentifyEvent) => void
   _lastVisibleSection?: string | null
   _isProgrammaticScroll?: boolean
@@ -784,6 +788,10 @@ export class SetlistPage {
       this._setlistDeleteHandler = () => this.deleteSetlist()
       dialog.addEventListener(SetlistInfoDeleteEvent.type, this._setlistDeleteHandler)
     }
+    if (!this._setlistMoveHandler) {
+      this._setlistMoveHandler = event => this.moveSetlist(event.spaceId)
+      dialog.addEventListener(SetlistInfoMoveEvent.type, this._setlistMoveHandler)
+    }
     if (!this._identifyHandler) {
       this._identifyHandler = async event => {
         await identifyMe(this._database(), event.personId)
@@ -793,6 +801,7 @@ export class SetlistPage {
     }
     dialog.readonly = this._readOnly
     await this._loadDialogPeople(dialog)
+    await this._loadDialogActions(dialog, this.currentSetlist)
     await dialog.show(this.currentSetlist)
   }
 
@@ -814,16 +823,47 @@ export class SetlistPage {
   }
 
   /**
-   * Delete this setlist, after asking, and go home. Only for a setlist that is not in
-   * Google Drive: the dialog only offers it then, and the database refuses otherwise.
+   * Tell the info dialog whether this setlist may be deleted (or moved, which deletes it from
+   * here), and which other spaces on this device it could be moved to
+   */
+  async _loadDialogActions(dialog: SetlistInfoDialog, setlist: Setlist) {
+    dialog.deleteBlocked = null
+    dialog.moveTargets = []
+    if (dialog.readonly) return
+    const [space, spaces] = await Promise.all([getCurrentSpaceFull(), listSpaces()])
+    const role = space.team?.role ?? null
+    const leader = resolvePerson(dialog.people, setlist.leaderId)
+    const leadsIt = Boolean(leader && dialog.meId && leader.id === dialog.meId)
+    if (!mayDeleteSetlist(role, leadsIt)) {
+      dialog.deleteBlocked = `In ${space.name}, only the leader of a setlist or an admin can delete it.`
+      return
+    }
+    dialog.moveTargets = spaces
+      .filter(other => other.id !== space.id && other.team?.role !== 'reader')
+      .map(other => ({ id: other.id, name: other.name }))
+  }
+
+  /**
+   * Delete this setlist, after asking, and go home. One that is in Google Drive has its file
+   * put in the Drive trash at the next sync. A toast offers Undo for a while.
    */
   async deleteSetlist() {
     const setlist = this.currentSetlist
     if (!setlist) return
     const modal = this.root.querySelector<AppModal>('#delete-setlist-modal')
+    const text = modal?.querySelector('#delete-setlist-text')
+    if (text) {
+      const space = await getCurrentSpaceFull()
+      text.textContent = setlist.fileRef
+        ? `This deletes the setlist for everyone in ${space.name}. Its file goes to the Google Drive trash at the next sync, and it can be restored from there.`
+        : 'This deletes the setlist from this device. It was never saved to Google Drive.'
+    }
     if (!(await modal?.ask())) return
+    const database = this._database()
+    const spaceId = database.spaceId
+    let removed: RemovedSetlist | undefined
     try {
-      await this._database().deleteUnsyncedSetlist(setlist.id)
+      removed = await database.removeSetlist(setlist.id)
     } catch (error) {
       console.error('[SetlistInfo] Failed to delete the setlist:', error)
       toast("Couldn't delete the setlist.", { kind: 'error', details: errorMessage(error) })
@@ -837,6 +877,51 @@ export class SetlistPage {
     }
     this.root.querySelector<SetlistInfoDialog>('#setlist-info-dialog')?.close()
     await goTo(buildUrl({ name: 'home' }))
+    if (removed) {
+      const gone = removed
+      toast(`Deleted ${setlistTitle(setlist, 'short')}.`, {
+        action: { label: 'Undo', run: () => void restoreSetlist(spaceId, gone) },
+      })
+    }
+  }
+
+  /**
+   * Move this setlist to another space on this device, after asking: it is added there (with
+   * the charts it uses, and its leader as a person of that space), then removed from this one
+   * (its file in Drive goes to the Drive trash at the next sync). The other space sends it to its
+   * own Drive when it next syncs.
+   */
+  async moveSetlist(spaceId: string) {
+    const setlist = this.currentSetlist
+    if (!setlist) return
+    const [here, target] = await Promise.all([getCurrentSpaceFull(), getSpaceById(spaceId)])
+    if (!target) return
+    const title = setlistTitle(setlist, 'short')
+    const modal = this.root.querySelector<AppModal>('#move-setlist-modal')
+    const text = modal?.querySelector('#move-setlist-text')
+    if (text) {
+      text.textContent = `Moves ${title} from ${here.name} to ${target.name}. The charts it uses are copied, and its leader is added to ${target.name} if they are not there already. It is removed from ${here.name}${setlist.fileRef ? ', and its file goes to the Google Drive trash' : ''}.`
+    }
+    if (!(await modal?.ask())) return
+    try {
+      const destination = await openSpace(target.id)
+      try {
+        const report = await transferSetlists(this._database(), destination, [setlist.id], 'move')
+        if (report.setlistsAdded === 0) {
+          toast(`${title} is already in ${target.name}, so it was left here.`)
+          return
+        }
+      } finally {
+        destination.db?.close()
+      }
+    } catch (error) {
+      console.error('[SetlistInfo] Failed to move the setlist:', error)
+      toast("Couldn't move the setlist.", { kind: 'error', details: errorMessage(error) })
+      return
+    }
+    this.root.querySelector<SetlistInfoDialog>('#setlist-info-dialog')?.close()
+    await goTo(buildUrl({ name: 'home' }))
+    toast(`Moved ${title} to ${target.name}.`)
   }
 
   /**
@@ -1845,5 +1930,21 @@ export class SetlistPage {
         display.capo = 0
       }
     })
+  }
+}
+
+/** Undo a deletion: put the setlist back in the space it was deleted from */
+async function restoreSetlist(spaceId: string, removed: RemovedSetlist): Promise<void> {
+  try {
+    const database = await openSpace(spaceId)
+    try {
+      await database.restoreSetlist(removed)
+    } finally {
+      database.db?.close()
+    }
+    toast(`Brought back ${setlistTitle(removed.setlist, 'short')}.`)
+  } catch (error) {
+    console.error('[SetlistInfo] Failed to bring the setlist back:', error)
+    toast("Couldn't bring the setlist back.", { kind: 'error', details: errorMessage(error) })
   }
 }
