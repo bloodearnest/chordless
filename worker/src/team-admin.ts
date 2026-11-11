@@ -36,7 +36,6 @@ import type { BlobData } from './blob.ts'
 import { answering, jsonResponse, Refusal, readJson } from './http.ts'
 import type { Identity } from './identity.ts'
 import { refusal } from './team-api.ts'
-import type { RegisteredTeam, TeamRegister } from './team-register.ts'
 import type { SpaceInfo, TeamSpaceApi } from './team-state.ts'
 
 /** What these routes need from the Worker */
@@ -58,8 +57,6 @@ export interface AdminContext {
   checkServiceAccount(rootRef: string, address: string): Promise<string | null>
   /** A new id for a space */
   newSpaceId(): string
-  /** The register of teams, or null where there is no database for it (team-register.ts) */
-  register(): TeamRegister | null
 }
 
 function asRole(value: unknown): MemberRole {
@@ -76,39 +73,6 @@ function licenceFrom(value: unknown): string {
   if (licence.length > MAX_LICENCE_LENGTH) throw new Refusal(400, 'That licence number is too long')
   return licence
 }
-
-/**
- * Note something in the register of teams. Best effort: the register is a record for CCLI and for
- * billing, not part of how a team works, so a database that is down must not stop a team being made
- * or looked after. A write that fails is lost but the next one for the team puts its row right.
- */
-async function register(
-  ctx: AdminContext,
-  room: TeamSpaceApi,
-  spaceId: string,
-  write: (register: TeamRegister, team: RegisteredTeam) => Promise<unknown>
-): Promise<void> {
-  const target = ctx.register()
-  if (!target) return
-  try {
-    // (the space is there: whoever is acting on it has a role in it)
-    const info = (await room.info()) as SpaceInfo
-    await write(target, {
-      spaceId,
-      name: info.name,
-      ownerEmail: info.owner.email,
-      createdAt: info.createdAt,
-    })
-  } catch (error) {
-    console.error('Team register: a write failed', error)
-  }
-}
-
-/** The team has as many people as its Durable Object lists now */
-const noteMembers = (ctx: AdminContext, room: TeamSpaceApi, spaceId: string) =>
-  register(ctx, room, spaceId, async (target, team) =>
-    target.members(team, (await room.members()).length)
-  )
 
 /** Check that a blob is this person's, and that they can write to the folder with it */
 async function checkSharing(ctx: AdminContext, identity: Identity, blob: string, rootRef: string) {
@@ -149,9 +113,6 @@ export function handleCreateSpace(request: Request, ctx: AdminContext): Promise<
     }
     await room.setOwnerBlob(blob)
     if (ccliLicence) await room.setLicence(ccliLicence, identity)
-    await register(ctx, room, spaceId, (target, team) =>
-      target.created(team, identity.email, ccliLicence || null, 1)
-    )
     return jsonResponse({ spaceId, role: 'owner' })
   })
 }
@@ -170,9 +131,9 @@ export function handleJoin(request: Request, ctx: AdminContext): Promise<Respons
       // (they hold the code, so telling them it is for someone else gives nothing away)
       return jsonResponse({ error: 'This invite was sent to a different Google account' }, 403)
     }
-    if (!role) return jsonResponse({ error: 'This invite is not valid' }, 404)
-    await noteMembers(ctx, ctx.room(spaceId), spaceId)
-    return jsonResponse({ spaceId, role })
+    return role
+      ? jsonResponse({ spaceId, role })
+      : jsonResponse({ error: 'This invite is not valid' }, 404)
   })
 }
 
@@ -187,7 +148,6 @@ interface AdminCall {
   request: Request
   ctx: AdminContext
   room: TeamSpaceApi
-  spaceId: string
   identity: Identity
   role: TeamRole
   /** What the route's path captured */
@@ -240,7 +200,7 @@ const ADMIN_ROUTES: AdminRoute[] = [
     methods: ['PUT', 'DELETE'],
     path: /^\/members\/([^/]+)$/,
     needs: 'admin',
-    async run({ request, ctx, room, spaceId, params: [who], above }) {
+    async run({ request, room, params: [who], above }) {
       const email = decodeURIComponent(who).toLowerCase()
       const current = (await room.members()).find(each => each.email === email)
       if (!current) return jsonResponse({ error: 'No such member' }, 404)
@@ -251,7 +211,6 @@ const ADMIN_ROUTES: AdminRoute[] = [
         await room.setRoleByEmail(email, target)
       } else {
         await room.removeByEmail(email)
-        await noteMembers(ctx, room, spaceId)
       }
       return done()
     },
@@ -259,10 +218,9 @@ const ADMIN_ROUTES: AdminRoute[] = [
   {
     methods: ['POST'],
     path: /^\/leave$/,
-    async run({ ctx, room, spaceId, identity, role }) {
+    async run({ room, identity, role }) {
       if (role === 'owner') throw new Refusal(400, 'The owner cannot leave: end sharing instead')
       await room.removeMember(identity)
-      await noteMembers(ctx, room, spaceId)
       return done()
     },
   },
@@ -314,17 +272,13 @@ const ADMIN_ROUTES: AdminRoute[] = [
     methods: ['PUT'],
     path: /^\/licence$/,
     needs: 'writer',
-    async run({ request, ctx, room, spaceId, identity, role }) {
+    async run({ request, room, identity, role }) {
       const next = licenceFrom((await readJson(request)).ccliLicence)
       const { ccliLicence: current } = await room.licence()
       if (current && current !== next && !atLeast(role, 'admin')) {
         throw new Refusal(403, 'Only an admin can change the licence number')
       }
-      if (await room.setLicence(next || null, identity)) {
-        await register(ctx, room, spaceId, (target, team) =>
-          target.licence(team, identity.email, current, next || null)
-        )
-      }
+      await room.setLicence(next || null, identity)
       return jsonResponse({ ccliLicence: next || null })
     },
   },
@@ -332,10 +286,8 @@ const ADMIN_ROUTES: AdminRoute[] = [
     methods: ['DELETE'],
     path: /^\/$/,
     needs: 'owner',
-    async run({ ctx, room, spaceId, identity }) {
-      // (noted first: once the space is destroyed there is no one to ask what it was called)
-      await register(ctx, room, spaceId, (target, team) => target.ended(team, identity.email))
-      await room.destroy()
+    async run({ room, identity }) {
+      await room.destroy(identity)
       return done()
     },
   },
@@ -364,7 +316,6 @@ export function handleSpaceAdmin(
         request,
         ctx,
         room: ctx.room(spaceId),
-        spaceId,
         identity,
         role,
         params: match.slice(1),

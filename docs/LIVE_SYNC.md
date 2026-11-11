@@ -17,7 +17,8 @@ The content moves the way it always does (Drive, or the team service, through th
   arrive, no merging, and no "who is the leader" rule: whoever has pushed, tells.
 - The Worker holds nothing. No setlist, chart or key crosses the socket, so the copyright rule
   (CLAUDE.md) is not stretched. The only thing a Durable Object keeps for the channel is, for a
-  share's room, the hash of the secret its sender proved.
+  share's room, the hash of the secret its sender proved. A team's room keeps no storage at all:
+  who may send is asked of D1.
 - If the channel is down, nothing is lost: the tick carries on, and a reconnect syncs once to
   catch up. The channel is an accelerator.
 
@@ -55,9 +56,9 @@ no one, where a relay would still have worked.
   object is touched. A stranger and a space that is not there get the same answer (SECURITY.md).
   The router's cross-origin check covers the upgrade. The Worker passes the object a fresh header
   with who the device is, which a browser's request cannot reach it with.
-- **The object** (`team-space.ts`, the hibernation API): `ctx.acceptWebSocket` and the handler
+- **The object** (`team-room.ts`, the hibernation API): `ctx.acceptWebSocket` and the handler
   methods, so a quiet space is out of memory and costs nothing. The socket's attachment is the
-  identity, and nothing else is known of it between messages. **Writers send, readers only listen**
+  account and the space (no email), and nothing else is known of it between messages. **Writers send, readers only listen**
   (`live-relay.ts`), and the role is the space's *now* (looked up on every message), so a member who
   was removed or demoted is refused at once. Their sockets are also closed when their membership
   changes. (The test harness does not tell a client of a close made outside a message, so that

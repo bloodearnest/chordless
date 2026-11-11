@@ -4,7 +4,7 @@
  * - Exchanges auth codes for tokens, encrypts refresh tokens as JWE blobs
  * - Refreshes access tokens on-demand
  * - Serves share links: the encrypted download from Drive, and the page's preview tags
- * - Serves the team spaces' API, with their Durable Objects
+ * - Serves the team spaces' API, over D1 and their live rooms (Durable Objects)
  * - Answers the setlist emails forwarded to the import address
  */
 
@@ -17,7 +17,7 @@ import { handleRequest } from './router.ts'
 import type { ShareCache } from './share.ts'
 
 export { ShareRoom } from './share-room.ts'
-export { TeamSpace } from './team-space.ts'
+export { TeamRoom } from './team-room.ts'
 
 /**
  * The Worker's entry: what only the Worker has (the cache, `cloudflare:email`) goes in here, and

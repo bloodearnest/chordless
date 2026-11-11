@@ -4,7 +4,7 @@
  * A request carries an identity provider's ID token as `Authorization: Bearer`. Each provider
  * says which issuers it answers for and how to verify a token; nothing past `authenticate` knows
  * which provider was used. Google is the only one. The token says who someone is, not what they
- * may do: roles are the space's (the Durable Object's).
+ * may do: roles are the space's (kept in D1).
  */
 import * as jose from 'jose'
 import { type GoogleEnv, ISSUERS, verifyIdToken } from './google-auth.ts'
@@ -28,7 +28,7 @@ export interface IdentityProvider {
 }
 
 /** The key a member is stored under: `sub` is unique only within a provider */
-export function identityKey({ provider, sub }: Identity): string {
+export function identityKey({ provider, sub }: Pick<Identity, 'provider' | 'sub'>): string {
   return `${provider}:${sub}`
 }
 

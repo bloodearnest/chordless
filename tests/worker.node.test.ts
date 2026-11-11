@@ -8,11 +8,12 @@
  */
 
 import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
 import { after, before, describe, test } from 'node:test'
 import { createTestHarness } from 'wrangler'
 import type { Env } from '../worker/src/env.ts'
 import type { Identity } from '../worker/src/identity.ts'
-import type { TeamSpaceApi } from '../worker/src/team-state.ts'
+import { type TeamSpaceApi, TeamSpaceState } from '../worker/src/team-state.ts'
 import { email } from './make-email.ts'
 
 const secrets = {
@@ -227,16 +228,38 @@ test('an email with no songs in it is answered with why, and no link', async () 
   assert.ok(!plainTextOf(result.replies[0].raw).includes('import-setlist#'))
 })
 
-// A team space's Durable Object (worker/src/team-space.ts), through its binding in the real runtime
-describe('a team space Durable Object', () => {
+// A team space's state in D1 and its live room, a Durable Object (worker/src/team-state.ts, team-room.ts),
+// through their bindings in the real runtime
+describe('a team space', () => {
   const ann = { provider: 'google', sub: 'g-1', email: 'ann@example.com' }
   const bob = { provider: 'google', sub: 'g-2', email: 'bob@example.com' }
 
-  /** A space's object, through the binding */
+  /** The migrations in migrations/, applied once to the harness's local D1 (each statement ends at its `;`) */
+  let migrated: Promise<unknown> | undefined
+  const migrate = async (db: NonNullable<Env['DB']>) => {
+    const dir = new URL('../migrations/', import.meta.url)
+    for (const file of readdirSync(dir).sort()) {
+      const statements = readFileSync(new URL(file, dir), 'utf8')
+        .split('\n')
+        .filter(line => !line.trim().startsWith('--'))
+        .join('\n')
+        .split(';')
+        .map(statement => statement.trim())
+        .filter(Boolean)
+      await db.batch(statements.map(statement => db.prepare(statement)))
+    }
+  }
+
+  /** A space, through the database, with its live room told of changes as the Worker tells it */
   const inSpace = async <T>(name: string, use: (team: TeamSpaceApi) => Promise<T>) => {
     const env = await worker.getWorker<Env>().getEnv()
-    assert.ok(env.TEAM_SPACE, 'wrangler.toml binds TEAM_SPACE')
-    return use(env.TEAM_SPACE.get(env.TEAM_SPACE.idFromName(name)))
+    assert.ok(env.DB, 'wrangler.toml binds DB')
+    assert.ok(env.TEAM_ROOM, 'wrangler.toml binds TEAM_ROOM')
+    const { DB, TEAM_ROOM } = env
+    migrated ??= migrate(DB)
+    await migrated
+    const room = TEAM_ROOM.get(TEAM_ROOM.idFromName(name))
+    return use(new TeamSpaceState(DB, name, { sockets: room }))
   }
 
   test('keeps a space, its members and its files, and serves them over the binding', async () => {
@@ -255,7 +278,7 @@ describe('a team space Durable Object', () => {
     })
   })
 
-  test('is one object per space: another id has nothing of the first', async () => {
+  test('is one space per id: another id has nothing of the first', async () => {
     await inSpace('team-b', async team => {
       assert.equal(await team.info(), null)
       assert.equal(await team.roleOf(ann), null)
@@ -296,15 +319,18 @@ describe('a team space Durable Object', () => {
     /** A device going live in a space, as the Worker passes it on after settling who it is (team-live.ts) */
     const goLive = async (name: string, who: Identity) => {
       const env = await worker.getWorker<Env>().getEnv()
-      assert.ok(env.TEAM_SPACE)
-      const stub = env.TEAM_SPACE.get(env.TEAM_SPACE.idFromName(name))
-      assert.ok(stub.fetch)
+      assert.ok(env.TEAM_ROOM)
+      const stub = env.TEAM_ROOM.get(env.TEAM_ROOM.idFromName(name))
       const answer = (await stub.fetch(
         new Request('https://chordless.test/api/space/x/live', {
           headers: {
             Upgrade: 'websocket',
             'Sec-WebSocket-Protocol': 'chordless',
-            'X-Live-Identity': JSON.stringify(who),
+            'X-Live-Identity': JSON.stringify({
+              provider: who.provider,
+              sub: who.sub,
+              spaceId: name,
+            }),
           },
         })
       )) as Response & { webSocket: (WebSocket & { accept(): void }) | null }
@@ -401,7 +427,7 @@ describe('a team space Durable Object', () => {
       const name = await space('live-f')
       const writer = await goLive(name, cat)
       const listener = await goLive(name, ann)
-      await inSpace(name, team => team.destroy())
+      await inSpace(name, team => team.destroy(ann))
 
       writer.socket.send(changed)
       await settle()
@@ -504,11 +530,11 @@ describe('a team space Durable Object', () => {
     })
   })
 
-  test('persists a space that was made', async () => {
+  test('has a live room for a space that went live', async () => {
     const handle = worker.getWorker<Env>()
     const env = await handle.getEnv()
-    assert.ok(env.TEAM_SPACE)
-    const persisted = await handle.listDurableObjectIds('TEAM_SPACE')
-    assert.ok(persisted.includes(String(env.TEAM_SPACE.idFromName('team-a'))))
+    assert.ok(env.TEAM_ROOM)
+    const persisted = await handle.listDurableObjectIds('TEAM_ROOM')
+    assert.ok(persisted.includes(String(env.TEAM_ROOM.idFromName('live-a'))))
   })
 })

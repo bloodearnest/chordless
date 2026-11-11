@@ -16,36 +16,36 @@ Not designed or checked against the code yet. What is known from the design (202
 
 **The blob key.** Blobs carry a `kid`, so the Worker can hold old and new keys together, decrypt by
 `kid` and encrypt new blobs with the new key (whether `blob.ts` supports several keys is unchecked).
-Blobs live in users' IndexedDB (`auth`) and, for an owner-token team space, in that space's Durable
-Object. If the old key is dropped before they are re-encrypted, every user gets "sign in again" and
-sync stops for every team whose owner's blob is in a Durable Object, until that owner reconnects.
+Blobs live in users' IndexedDB (`auth`) and, for an owner-token team space, in that space's
+`team_credentials` row in D1. If the old key is dropped before they are re-encrypted, every user gets "sign in again" and
+sync stops for every team whose owner's blob is in D1, until that owner reconnects.
 So the order is:
 
 1. Add the new key beside the old one.
-2. Re-wrap the Durable Objects' blobs under it (on next use, or by a sweep).
+2. Re-wrap the blobs in `team_credentials` under it (on next use, or by a sweep: now one query).
 3. Retire the old key once nothing uses it.
 
-The Durable Object's stored blob must therefore be re-wrappable: design for that when building the
+The stored blob must therefore be re-wrappable: design for that when building the
 team service.
 
 **A compromised key is different.** The key plus a stolen blob gives a refresh token, so overlap is
 not safe. Rotate hard, revoke the owners' grants at Google, and make everyone sign in again.
 
-To decide when this is done: how a rotation is triggered, how the sweep of Durable Objects runs, and
+To decide when this is done: how a rotation is triggered, how the sweep of `team_credentials` runs, and
 a test that a blob made under the old key still opens during the overlap and not after it.
 
 ## Probing for team spaces (to do)
 
-A team space's Durable Object is named by the space's id (`idFromName`), so a request for any id
-makes that object, empty, on first use: a read of an unknown id leaves a persisted entry (seen
-locally, 2026-10-21). That is cheap, but it is unbounded, and anyone signed in could ask for random
-ids. Done when the route was wired (2026-10-21): the ID token is verified before any object is
-touched, a stranger and an unknown space get the same 403, and an id that is not 8 to 64 letters,
-digits, `-` or `_` is a 404 with no object made. Still to do: unguessable ids and per-account rate
-limits. The original list:
+A team space's id is the key of its rows in D1, so a request for any id reads a row that is not there:
+it makes nothing and costs a query. Anyone signed in could still ask for random ids. Done when the route
+was wired (2026-10-21): the ID token is verified before the database is touched, a stranger and an
+unknown space get the same 403, and an id that is not 8 to 64 letters, digits, `-` or `_` is a 404 with
+no query made. Still to do: unguessable ids and per-account rate limits. (While the state was in
+Durable Objects, a read of an unknown id made a persisted empty object; that is gone with them.) The
+original list:
 
-- Verify the ID token **before** touching a Durable Object, so only signed-in accounts can.
+- Verify the ID token **before** touching the database, so only signed-in accounts can.
 - Answer a stranger and an unknown space the same (403), so the answer does not say which ids exist.
 - Make ids unguessable (random, 128 bits). Option: sign the id with a Worker secret
-  (`<random>.<mac>`), so the Worker can reject a forged id without making an object.
+  (`<random>.<mac>`), so the Worker can reject a forged id without a query.
 - Rate-limit by account (as the email handler does with `[[ratelimits]]`).

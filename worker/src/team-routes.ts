@@ -27,10 +27,9 @@ export async function handleTeamRoutes(
   env: Env,
   deps?: TeamDeps
 ): Promise<Response> {
-  if (!env.TEAM_SPACE) return jsonResponse({ error: 'Team spaces are not available' }, 503)
-  const spaces = env.TEAM_SPACE
+  if (!env.DB) return jsonResponse({ error: 'Team spaces are not available' }, 503)
   const path = new URL(request.url).pathname
-  const admin = createAdminContext(env, spaces, deps)
+  const admin = createAdminContext(env, deps)
 
   // A device going live: the answer carries a socket, which the wrapper below would drop
   const liveSpace = livePathSpace(path)
@@ -53,7 +52,7 @@ export async function handleTeamRoutes(
     if (!team || !SPACE_ID.test(team.spaceId)) return jsonResponse({ error: 'No such space' }, 404)
 
     // Who is asking, and their role in the space: settled before anything else is looked at. The
-    // ID token is checked before any Durable Object is touched, so only signed-in accounts can
+    // ID token is checked before the database is touched, so only signed-in accounts can
     // ask for one; a stranger and a space that is not there get the same answer
     // (docs/SECURITY.md, "Probing for team spaces")
     const identity = await admin.identify(request)
@@ -62,7 +61,7 @@ export async function handleTeamRoutes(
     if (!role) return refusal('not-a-member')
 
     if (isAdminRoute(team.rest)) return handleSpaceAdmin(request, team, admin, { identity, role })
-    return handleTeamRequest(request, team, createTeamContext(env, spaces, deps), role, identity)
+    return handleTeamRequest(request, team, createTeamContext(env, deps), role, identity)
   })()
 
   // (a member's files, and the codes of invites, are not kept by anything on the way)

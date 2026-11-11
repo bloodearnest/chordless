@@ -42,7 +42,7 @@ import { handlePadRequest } from './team-pads.ts'
 /** Why a request may do nothing in a space */
 export type NoAccess = 'unauthenticated' | 'not-a-member'
 
-/** What the team space's Durable Object and its credentials provide (src: the next step) */
+/** What the team space's state (D1) and its credentials provide (src: the next step) */
 export interface TeamContext {
   /** The space's files; null if there is no such space */
   space(spaceId: string): Promise<SpaceStorage | null>

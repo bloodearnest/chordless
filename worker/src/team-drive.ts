@@ -2,7 +2,7 @@
  * How the Worker reaches a team space's Drive (docs/SPACES.md, "Credentials: two ways to back a
  * team space"). The Drive code is the app's own (`createDriveStorage`, src/js/storage), given
  * access tokens by a source instead of the signed-in user: here, the owner's, made from the
- * encrypted blob the space's Durable Object holds. A service account would be another source.
+ * encrypted blob the space's row in D1 holds. A service account would be another source.
  *
  * Access tokens are made on demand and kept in this isolate's memory, for their hour at most;
  * nothing is stored. A blob is opened only to make one.
@@ -49,7 +49,7 @@ export interface OwnerTokenOptions {
 
 /**
  * Where a space's Drive calls get their access token: the owner's, from the blob in the space's
- * Durable Object. Many calls at once (a batch) make one token between them.
+ * D1. Many calls at once (a batch) make one token between them.
  */
 export function ownerAccessToken({
   room,

@@ -1,7 +1,7 @@
 /**
  * `GET /api/space/<id>/live` with `Upgrade: websocket`: a device going live joins its space's live
  * channel (live-relay.ts, docs/LIVE_SYNC.md). It is asked as every team route is: the ID token is
- * checked before any Durable Object is touched, then the role, and a stranger and a space that is
+ * checked before the database or any live room is touched, then the role, and a stranger and a space that is
  * not there get the same answer (docs/SECURITY.md). The token comes in the subprotocol, since a
  * browser cannot set `Authorization` on a WebSocket and a URL gets logged.
  */
@@ -19,7 +19,7 @@ export function livePathSpace(path: string): string | null {
 }
 
 /**
- * The answer: the Durable Object's 101 with the socket (which must reach the browser as it is: it
+ * The answer: the live room's 101 with the socket (which must reach the browser as it is: it
  * is not rebuilt as the other routes' answers are), or a refusal
  */
 export async function handleLive(
@@ -49,7 +49,11 @@ export async function handleLive(
     new Request(request.url, {
       headers: {
         Upgrade: 'websocket',
-        'X-Live-Identity': JSON.stringify(identity),
+        'X-Live-Identity': JSON.stringify({
+          provider: identity.provider,
+          sub: identity.sub,
+          spaceId,
+        }),
         'Sec-WebSocket-Protocol': LIVE_PROTOCOL,
       },
     })
