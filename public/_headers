@@ -8,7 +8,12 @@
 # accounts.google.com: Google Identity Services (the sign-in script, its styles and frame).
 # www.googleapis.com: the Drive API. *.googleusercontent.com: the Google account photo.
 # apis.google.com, www.gstatic.com, docs.google.com: the Google Picker (folder choice for a team
-# space; its page is Google's, in a frame). Not yet seen running: watch the console for "Refused to".
+# space; its page is Google's, in a frame). The Picker puts one inline <style> element on the page (the
+# layout of its dialog); without it the dialog is bare text with a frame below, as first seen on the first
+# real run. It is allowed by hash (style-src 'sha256-...'), not with 'unsafe-inline', so a <style> element
+# of any other content is still refused. The hash is the same for every locale, device and colour scheme
+# (checked 2026-11-12). If Google changes the style the dialog goes bare again: the console says
+# "Applying inline style violates ... a hash ('sha256-...')" with the new one (docs/BUILD.md).
 # wss://chordless.app: the live channel (docs/LIVE_SYNC.md). 'self' should cover it, but older Safari
 # took 'self' to mean http(s) only; naming it costs nothing, and it is our own address.
 # songselect.ccli.com: its icon in the song info dialog.
@@ -19,7 +24,7 @@
 # `!` line takes off the page's policy first: two policies on one file are both enforced.
 # style-src-attr 'unsafe-inline' allows style="" attributes only: no <style> elements.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client https://apis.google.com https://www.gstatic.com; style-src 'self' https://accounts.google.com/gsi/style; style-src-attr 'unsafe-inline'; connect-src 'self' wss://chordless.app https://www.googleapis.com https://accounts.google.com/gsi/ https://*.googleusercontent.com; img-src 'self' data: https://*.googleusercontent.com https://songselect.ccli.com; media-src 'self' blob:; frame-src https://accounts.google.com/gsi/ https://docs.google.com https://content.googleapis.com; worker-src 'self'; manifest-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client https://apis.google.com https://www.gstatic.com; style-src 'self' https://accounts.google.com/gsi/style 'sha256-O5RJqRuy+/mksltO9mWs9LuNKQs/41ZS8QoMC9SP/Fg='; style-src-attr 'unsafe-inline'; connect-src 'self' wss://chordless.app https://www.googleapis.com https://accounts.google.com/gsi/ https://*.googleusercontent.com; img-src 'self' data: https://*.googleusercontent.com https://songselect.ccli.com; media-src 'self' blob:; frame-src https://accounts.google.com/gsi/ https://docs.google.com https://content.googleapis.com; worker-src 'self'; manifest-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()

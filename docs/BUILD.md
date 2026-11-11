@@ -108,6 +108,12 @@ header, so its `connect-src` must cover what it fetches.
 
 Below the floor (`.browserslistrc`), `public/floor.js` replaces the page with a plain "Please update your device" message and stops it loading the app. It is a classic script in syntax any browser parses, and tests `scrollend` (the check that sets the floor), `:has()` and `structuredClone`. "Try it anyway" is remembered in localStorage, so a wrong guess never locks anyone out.
 
+The one exception to "no `<style>` elements" is the Google Picker's, which puts a single inline `<style>`
+on the page (the layout of its dialog). It is allowed by its hash in `style-src`, because without it the
+folder picker for a team space shows as bare text. The hash does not vary with locale, device or colour
+scheme. Google could change the style: if the picker looks unstyled again, open it with the console
+open, and the "Applying inline style violates ..." message names the new hash to put in `public/_headers`.
+
 The page has no inline script (`public/floor.js` and `public/boot.js` are the classic scripts), so scripts need no
 `'unsafe-inline'`. Style attributes are allowed (`style-src-attr`), `<style>` elements are not.
 
