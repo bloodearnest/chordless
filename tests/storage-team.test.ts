@@ -204,7 +204,6 @@ describe('TeamStorage', () => {
     )
     expect(await failure(() => team.ensureRoot())).to.match(/joined/)
     expect(await failure(() => team.renameRoot())).to.equal('')
-    expect(await failure(() => team.pads)).to.match(/pad sets are its own/)
     expect(await team.findRootByName()).to.equal(null)
   })
 

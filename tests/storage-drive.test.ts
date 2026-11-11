@@ -120,9 +120,9 @@ describe('Google Drive (on FakeDrive): what the interface leaves to it', () => {
   it('names a pad set by its pad set name, else by its folder, else by its id', async () => {
     const fake = installFakeDrive()
     drive = fake
-    const ref = await driveStorage.pads.ensureSet('Warm pads')
+    const ref = await driveStorage.padsIn('space-root').ensureSet('Warm pads')
     const nameOf = async () =>
-      (await driveStorage.pads.listSets()).find(set => set.ref === ref)?.name
+      (await driveStorage.padsIn('space-root').listSets()).find(set => set.ref === ref)?.name
     expect(await nameOf()).to.equal('Warm pads')
     fake.files.get(ref).appProperties = {}
     fake.files.get(ref).name = 'Folder name'
@@ -134,23 +134,21 @@ describe('Google Drive (on FakeDrive): what the interface leaves to it', () => {
   it('takes a pad file with no type or size to be audio with no size, and one with no name or properties to have none', async () => {
     const fake = installFakeDrive()
     drive = fake
-    const ref = await driveStorage.pads.ensureSet('Warm pads')
-    await driveStorage.pads.addFile(
-      ref,
-      'C',
-      new Blob([new Uint8Array([1, 2])], { type: 'audio/mpeg' })
-    )
+    const ref = await driveStorage.padsIn('space-root').ensureSet('Warm pads')
+    await driveStorage
+      .padsIn('space-root')
+      .addFile(ref, 'C', new Blob([new Uint8Array([1, 2])], { type: 'audio/mpeg' }))
     const stored = [...fake.files.values()].find((file: any) => file.name === 'C.mp3')
     stored.mimeType = undefined
     stored.content = undefined
-    const [file] = await driveStorage.pads.listFiles(ref)
+    const [file] = await driveStorage.padsIn('space-root').listFiles(ref)
     expect(file.type).to.equal('audio/mpeg')
     expect(file.padKey).to.equal('C')
     expect(file.size).to.equal(0)
     // ...and one with no name or properties
     stored.name = undefined
     stored.appProperties = undefined
-    const [bare] = await driveStorage.pads.listFiles(ref)
+    const [bare] = await driveStorage.padsIn('space-root').listFiles(ref)
     expect([bare.name, bare.padKey]).to.deep.equal(['', null])
   })
 

@@ -6,7 +6,7 @@ import {
 } from '../src/components/space-export-panel.ts'
 import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
-import { setPadStorage, uploadPadSet } from '../src/js/pad-set-service.ts'
+import { setPadSources, uploadPadSet } from '../src/js/pad-set-service.ts'
 import { addChart, hashText } from '../src/js/song-utils.ts'
 import {
   createSpace,
@@ -18,8 +18,9 @@ import {
 import { createExport } from '../src/js/space-export.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
-import { MemoryStorage } from './memory-storage.ts'
+import { MemoryStorage, PERSONAL_PADS, padSources } from './memory-storage.ts'
 import { must } from './must.ts'
+import { padSourcesInFakeDrive } from './pad-test-sources.ts'
 import { deleteDatabase, nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip } from './zip.ts'
 
@@ -403,13 +404,19 @@ describe('the export panel', () => {
     const audioOf = (key: string) =>
       new Uint8Array([...new TextEncoder().encode(`audio:${key}`), 0, 255])
 
+    // (the pad sets of the space made for the test: each space keeps its own, in its own folder)
+    beforeEach(() => setPadSources(padSourcesInFakeDrive(spaceId)))
+    afterEach(() => setPadSources(null))
+
     async function uploadSet(name: string) {
       return uploadPadSet(
         await buildZip(
           PAD_FILE_KEYS.map(key => ({ name: `${name} - ${key}.mp3`, data: audioOf(key) })),
           `${name}.zip`
         ),
-        name
+        name,
+        undefined,
+        spaceId
       )
     }
 
@@ -482,21 +489,23 @@ describe('the export panel', () => {
       expect(text(el)).to.contain('connect with Google first')
     })
 
-    it('offers only the space’s own: a team space’s sets, or the account’s for a personal space', async () => {
+    it('offers only the space’s own pad sets, a personal space’s and a team’s alike', async () => {
       const storage = new MemoryStorage()
       const team = storage.padsIn('team-root')
-      setPadStorage(storage.pads, [{ spaceId, name: 'Team', storage: team }])
+      setPadSources(padSources(storage, [{ spaceId, name: 'Team', storage: team }]))
       try {
         await storage.pads.ensureSet('Mine')
         for (const name of ['Ours', 'Also ours']) {
           const ref = await team.ensureSet(name)
           for (const key of PAD_FILE_KEYS) await team.addFile(ref, key, new Blob([audioOf(key)]))
         }
-        const personal = await mount({ signedIn: true })
+        const space = must(await getSpaceById(spaceId))
+        const personal = await fixture<SpaceExportPanel>(
+          html`<space-export-panel .space=${{ ...space, id: PERSONAL_PADS }} signed-in show-pads></space-export-panel>`
+        )
         await waitUntil(() => personal.shadowRoot?.querySelector('#include-pads'), 'the choice')
         expect(text(personal)).to.contain('Include my pad sets (1,')
 
-        const space = must(await getSpaceById(spaceId))
         const teamPanel = await fixture<SpaceExportPanel>(
           html`<space-export-panel .space=${{ ...space, team: { id: 'team-1', role: 'owner' } }} signed-in show-pads></space-export-panel>`
         )
@@ -511,7 +520,7 @@ describe('the export panel', () => {
         await nothingFor()
         expect(failing.shadowRoot?.querySelector('#include-pads')).to.equal(null)
       } finally {
-        setPadStorage(null)
+        setPadSources(null)
       }
     })
 

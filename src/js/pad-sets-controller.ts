@@ -74,25 +74,18 @@ export class PadSetsController implements ReactiveController {
   }
 
   /**
-   * The sets by the space they are kept in, to show under its name: the account's ("Personal")
-   * first, then each team space's. With no team's sets there is one group with no name, as there
-   * is nothing to tell apart.
+   * The sets by the space they are kept in, to show under its name, in the order the spaces are
+   * listed (the personal ones first). With the sets of one space there is one group with no name,
+   * as there is nothing to tell apart.
    */
   get groups(): { name: string | null; sets: PadSet[] }[] {
-    const bySpace = new Map<string | null, PadSet[]>()
+    const bySpace = new Map<string, PadSet[]>()
     for (const set of this.list) {
-      const key = set.spaceId ?? null
+      const key = set.spaceId ?? ''
       bySpace.set(key, [...(bySpace.get(key) ?? []), set])
     }
-    if (![...bySpace.keys()].some(key => key !== null)) {
-      return this.list.length ? [{ name: null, sets: this.list }] : []
-    }
-    return [...bySpace.entries()]
-      .sort(([a], [b]) => (a === null ? -1 : b === null ? 1 : 0))
-      .map(([spaceId, sets]) => ({
-        name: spaceId === null ? 'Personal' : (sets[0]?.spaceName ?? 'Team'),
-        sets,
-      }))
+    if (bySpace.size <= 1) return this.list.length ? [{ name: null, sets: this.list }] : []
+    return [...bySpace.values()].map(sets => ({ name: sets[0]?.spaceName ?? 'Team', sets }))
   }
 
   /**

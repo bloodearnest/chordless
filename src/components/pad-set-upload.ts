@@ -19,8 +19,8 @@ export class PadSetUploadedEvent extends Event {
  * select on the media player page, opened by the select's "Upload a new pad set…". The set is kept
  * on this device and uploaded to Google Drive when the person is signed in.
  *
- * With team spaces on the device, "Save to" chooses where: the account's own pads (Personal) or a
- * team space's, for everyone in it; it starts at the space the app is in.
+ * With more than one space on the device, "Save to" chooses where: a pad set is kept in a space's
+ * folder, and for a team's is for everyone in it; it starts at the space the app is in.
  *
  * @fires PadSetUploadedEvent - when the set is uploaded
  */
@@ -41,9 +41,9 @@ export class PadSetUpload extends LitElement {
   declare _error: string
   declare _padSetName: string
   declare _fileName: string
-  /** Where a set can be saved: the account's pads (spaceId null) and each team space's */
-  declare _destinations: { spaceId: string | null; name: string }[]
-  /** The team space chosen to save to, or null for the account's */
+  /** Where a set can be saved: each space on the device that is in Google Drive */
+  declare _destinations: { spaceId: string; name: string; team: boolean }[]
+  /** The space chosen to save to, or null when there is none to choose */
   declare _destination: string | null
 
   _fileInput: Ref<HTMLInputElement> = createRef()
@@ -117,7 +117,9 @@ export class PadSetUpload extends LitElement {
   async _loadDestinations(): Promise<void> {
     this._destinations = await listPadDestinations()
     const current = getCurrentSpace().id
-    this._destination = this._destinations.some(each => each.spaceId === current) ? current : null
+    this._destination = this._destinations.some(each => each.spaceId === current)
+      ? current
+      : (this._destinations[0]?.spaceId ?? null)
   }
 
   _handleFileChange(event: Event): void {
@@ -210,15 +212,15 @@ export class PadSetUpload extends LitElement {
                 >
                   ${this._destinations.map(
                     each => html`<option
-                      value=${each.spaceId ?? ''}
+                      value=${each.spaceId}
                       .selected=${each.spaceId === this._destination}
                     >
-                      ${each.spaceId ? `${each.name} (Team)` : 'Personal'}
+                      ${each.team ? `${each.name} (Team)` : each.name}
                     </option>`
                   )}
                 </select>
                 ${
-                  this._destination
+                  this._destinations.find(each => each.spaceId === this._destination)?.team
                     ? html`<div class="meta">Everyone in the team can use it</div>`
                     : nothing
                 }

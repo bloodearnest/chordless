@@ -1,7 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
-import { listPadSets, padSetSize, uploadPadSet } from '../src/js/pad-set-service.ts'
+import { listPadSets, padSetSize, setPadSources, uploadPadSet } from '../src/js/pad-set-service.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import {
   createExport,
@@ -15,6 +15,7 @@ import { readZip, writeZip } from '../src/js/utils/zip.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { binaryStringToBytes, installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
+import { DRIVE_PADS_SPACE, padSourcesInFakeDrive } from './pad-test-sources.ts'
 import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip } from './zip.ts'
 
@@ -252,9 +253,11 @@ describe('Exporting a space, and importing one', () => {
 
     beforeEach(() => {
       drive = installFakeDrive()
+      setPadSources(padSourcesInFakeDrive())
     })
 
     afterEach(async () => {
+      setPadSources(null)
       drive.uninstall()
       await caches.delete(PAD_CACHE_NAME)
       localStorage.removeItem('padset-cache-state')
@@ -266,7 +269,7 @@ describe('Exporting a space, and importing one', () => {
         PAD_FILE_KEYS.map(key => ({ name: `${name} - ${key}.mp3`, data: audioOf(key) })),
         `${name}.zip`
       )
-      return uploadPadSet(zip, name)
+      return uploadPadSet(zip, name, undefined, DRIVE_PADS_SPACE)
     }
 
     it('are left out unless asked for, and their size is known beforehand', async () => {
@@ -294,8 +297,10 @@ describe('Exporting a space, and importing one', () => {
         drive.files.delete(file.id)
       }
       drive.files.delete(set.id)
-      expect(await importPadSets(exported, ['Not in it'])).to.deep.equal([])
-      expect(await importPadSets(exported, ['Warm Pad'])).to.deep.equal(['Warm Pad'])
+      expect(await importPadSets(exported, ['Not in it'], DRIVE_PADS_SPACE)).to.deep.equal([])
+      expect(await importPadSets(exported, ['Warm Pad'], DRIVE_PADS_SPACE)).to.deep.equal([
+        'Warm Pad',
+      ])
 
       const imported = must((await listPadSets(true)).find(each => each.name === 'Warm Pad'))
       const files = drive.listFiles((f: any) => f.parents?.includes(imported.id))
@@ -312,7 +317,7 @@ describe('Exporting a space, and importing one', () => {
       )
       let message = ''
       try {
-        await importPadSets(exported, ['Short'])
+        await importPadSets(exported, ['Short'], DRIVE_PADS_SPACE)
       } catch (error) {
         message = (error as Error).message
       }

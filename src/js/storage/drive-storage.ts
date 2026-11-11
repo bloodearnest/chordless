@@ -387,8 +387,8 @@ class DriveSpace implements SpaceStorage {
   }
 }
 
-/** The pad sets in a space's folder, or the account's when there is none (drive-client.ts) */
-function drivePads(api: DriveApi, spaceFolderId?: string): PadStorage {
+/** The pad sets in a space's folder (drive-client.ts) */
+function drivePads(api: DriveApi, spaceFolderId: string): PadStorage {
   return {
     async listSets(): Promise<PadSetEntry[]> {
       return (await api.listPadSetFolders(spaceFolderId)).map(folder => ({
@@ -432,8 +432,6 @@ function drivePads(api: DriveApi, spaceFolderId?: string): PadStorage {
  */
 export function createDriveStorage(api: DriveApi): StorageBackend {
   return {
-    pads: drivePads(api),
-
     padsIn: rootRef => drivePads(api, rootRef),
 
     available: () => api.checkDriveAccess(),

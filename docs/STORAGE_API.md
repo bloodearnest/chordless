@@ -38,17 +38,16 @@ people who lead setlists, one JSON file each: `docs/IDENTITIES.md`), and the `sh
 
 A `PadStorage` lists the sets, makes or finds one by name, lists its files, adds a file for a key,
 puts a set's files in the bin and reads one file's audio, whole (`read`) or as it arrives
-(`readStream`, for the Worker to pass on). There are two kinds, both on the backend:
-`backend.pads` is the account's (a personal space's: `Chordless/pads/` in Drive), and
-`backend.padsIn(rootRef)` is a team space's, in its own folder (`<team folder>/pads/`; docs/SPACES.md,
-"Pads in team spaces"). A personal space has no pads of its own, so its pads stay the account's,
-shared by every personal space, and nothing moved. For a team member `TeamStorage.padsIn(spaceId)`
-calls the Worker (`worker/src/team-pads.ts`), and `TeamStorage.pads` throws: a team backend has no
-account. `pad-set-service.ts` lists from every place at once (the account's, and each team space
-on the device: the owner straight in Drive, a member through the Worker), and a test gives it its
-own with `setPadStorage(storage, teamSources)`. Its device-side cache (the service worker cache,
+(`readStream`, for the Worker to pass on). Every space has its own, in its own folder:
+`backend.padsIn(rootRef)` (`<space folder>/pads/`; docs/SPACES.md, "Pads in team spaces"). There are
+none that belong to the account (there was a `Chordless/pads/`, found by the name `Chordless`;
+changed 2026-11-11, with no migration). Reading a space's sets makes no folder; adding a set does.
+For a team member `TeamStorage.padsIn(spaceId)` calls the Worker (`worker/src/team-pads.ts`).
+`pad-set-service.ts` lists from every space on the device at once (the owner, and a personal space,
+straight in Drive, a member through the Worker), and a test gives it its own with
+`setPadSources(sources)`. Its device-side cache (the service worker cache,
 and `padset-cache-state` in localStorage) is the app's own, kept by Drive file id, which is unique
-across spaces. The conformance suite for pads (`describePadStorage`) runs on the account's and a
+across spaces. The conformance suite for pads (`describePadStorage`) runs on a
 space's pads of each backend, and on a team's over the Worker.
 
 ## Why refs and props, not paths

@@ -174,15 +174,14 @@ describe('team pad sets', () => {
     }
   })
 
-  test('reaches nothing outside the space’s pads: not another space’s, nor the account’s', async () => {
+  test('reaches nothing outside the space’s pads: not another space’s', async () => {
     const { storage, elsewhere, call, put } = await made()
     const theirs = await storage.padsIn(elsewhere).ensureSet('Theirs')
     await storage.padsIn(elsewhere).addFile(theirs, 'C', mp3())
     const [theirFile] = await storage.padsIn(elsewhere).listFiles(theirs)
-    const account = await storage.pads.ensureSet('The owner’s own')
 
     assert.deepEqual(await (await call('reader', '/pads')).json(), [])
-    for (const ref of [theirs, account]) {
+    for (const ref of [theirs]) {
       assert.equal((await call('admin', `/pads/${ref}/files`)).status, 404)
       assert.equal((await call('admin', `/pads/${ref}/files/C`, put(mp3()))).status, 404)
       assert.equal((await call('admin', `/pads/${ref}/trash`, { method: 'POST' })).status, 404)

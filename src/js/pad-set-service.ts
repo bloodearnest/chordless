@@ -9,23 +9,24 @@ import { readZip, type ZipArchive } from './utils/zip.ts'
 
 /**
  * A set of pads: a folder of them in the storage (the app ships none: the pads are the user's own).
- * It is the account's (a personal space's), or a team space's, kept in that space's folder.
+ * It is kept in the folder of the space it belongs to, a personal space's or a team's.
  */
 export interface PadSet {
   id: string
   name: string
   modifiedTime?: string | null
-  /** The team space it is kept in; none for the account's */
+  /** The space it is kept in (a choice made before pads were kept in spaces has none, and is dropped) */
   spaceId?: string | null
   /** That space's name, to show beside the set */
   spaceName?: string
 }
 
-/** Where pad sets are kept: the account's, or a team space's folder */
+/** Where pad sets are kept: a space's folder */
 export interface PadSource {
-  /** The team space; null for the account's */
-  spaceId: string | null
+  spaceId: string
   name: string
+  /** Whether the space is a team's (a personal space's come first) */
+  team: boolean
   storage: PadStorage
 }
 
@@ -65,64 +66,64 @@ const PAD_SET_SELECTION_KEY = 'padset-selection'
 const PAD_SET_CACHE_STATE_KEY = 'padset-cache-state'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 
-// Where the pad sets are kept: the account's in Google Drive, and each team space's, unless a test
-// says otherwise
-let accountPads: PadStorage = driveStorage.pads
-let teamSourcesGiven: PadSource[] | null = null
+// Where the pad sets are kept: each space's own folder, unless a test says otherwise
+let sourcesGiven: PadSource[] | null = null
 
-/**
- * Keep the account's pad sets in this storage, and the team spaces' in these (a test's); with
- * none, the account's Google Drive and the team spaces on this device
- */
-export function setPadStorage(storage?: PadStorage | null, teamSources: PadSource[] = []) {
-  accountPads = storage ?? driveStorage.pads
-  teamSourcesGiven = storage ? teamSources : null
-  // (a list made from the storage before is not this one's)
+/** Keep the pad sets in these places (a test's); with none, the spaces on this device, in Google Drive */
+export function setPadSources(sources?: PadSource[] | null) {
+  sourcesGiven = sources ?? null
+  // (a list made from the sources before is not this one's)
   padSetListCache = null
 }
 
-/** A team space's pads: in its folder, straight in Drive for its owner, through the Worker for anyone else */
-function teamSource(space: Space): PadSource | null {
-  if (!space.team) return null
-  const storage = isTeamMember(space)
-    ? storageFor(space).padsIn(space.team.id)
-    : space.rootRef
-      ? driveStorage.padsIn(space.rootRef)
-      : null
-  return storage && { spaceId: space.id, name: space.name, storage }
+/**
+ * A space's pads: in its folder, straight in Drive for a personal space's and a team's owner,
+ * through the Worker for anyone else. A space not in Drive yet has no folder, so none.
+ */
+function spaceSource(space: Space): PadSource | null {
+  const storage =
+    space.team && isTeamMember(space)
+      ? storageFor(space).padsIn(space.team.id)
+      : space.rootRef
+        ? driveStorage.padsIn(space.rootRef)
+        : null
+  return storage && { spaceId: space.id, name: space.name, team: Boolean(space.team), storage }
 }
 
-/** Every place pad sets are kept, the account's first */
+/** Every place pad sets are kept: the personal spaces' first, then the teams' */
 async function padSources(): Promise<PadSource[]> {
-  const spaces = teamSourcesGiven
-    ? []
-    : await listSpaces().catch(
-        /* v8 ignore next 4 -- the device's own database not opening: the account's pads still play */
-        error => {
-          console.warn('[PadSetService] Failed to find the team spaces:', error)
-          return []
-        }
-      )
-  const teams =
-    teamSourcesGiven ??
-    spaces.flatMap(space => {
-      const source = teamSource(space)
-      return source ? [source] : []
-    })
-  return [{ spaceId: null, name: 'Personal', storage: accountPads }, ...teams]
+  if (sourcesGiven) return sourcesGiven
+  const spaces = await listSpaces().catch(
+    /* v8 ignore next 4 -- the device's own database not opening: there is nowhere to look */
+    error => {
+      console.warn('[PadSetService] Failed to find the spaces:', error)
+      return []
+    }
+  )
+  const sources = spaces.flatMap(space => {
+    const source = spaceSource(space)
+    return source ? [source] : []
+  })
+  return [...sources.filter(source => !source.team), ...sources.filter(source => source.team)]
 }
 
-/** Where a set (or a space's sets: null for the account's) is kept */
+/** Where a space's sets are kept */
 async function sourceOf(spaceId: string | null | undefined): Promise<PadSource> {
   const sources = await padSources()
-  const source = sources.find(each => each.spaceId === (spaceId ?? null))
-  if (!source) throw new Error('That pad set’s team space is not on this device')
+  const source = sources.find(each => each.spaceId === spaceId)
+  if (!source) {
+    throw new Error(
+      'That pad set’s space is not available: pad sets are kept in a space’s folder in Google Drive'
+    )
+  }
   return source
 }
 
-/** The places a pad set can be uploaded to: the account, and each team space on this device */
-export async function listPadDestinations(): Promise<{ spaceId: string | null; name: string }[]> {
-  return (await padSources()).map(({ spaceId, name }) => ({ spaceId, name }))
+/** The places a pad set can be uploaded to: each space on this device that is in Drive */
+export async function listPadDestinations(): Promise<
+  { spaceId: string; name: string; team: boolean }[]
+> {
+  return (await padSources()).map(({ spaceId, name, team }) => ({ spaceId, name, team }))
 }
 
 const PAD_SET_METADATA_CACHE = new Map<string, PadSetMetadata>()
@@ -138,7 +139,8 @@ export function getActivePadSet(): PadSet | null {
   if (stored) {
     try {
       const parsed = JSON.parse(stored)
-      return parsed
+      // (a choice made when the pad sets were the account's names no space: there is no pad set)
+      return parsed?.spaceId ? parsed : null
     } catch (err) {
       console.warn('[PadSetService] Failed to parse active pad set from localStorage:', err)
     }
@@ -173,7 +175,8 @@ export async function listPadSets(force = false): Promise<PadSet[]> {
           id: set.ref,
           name: set.name,
           modifiedTime: set.modified,
-          ...(source.spaceId ? { spaceId: source.spaceId, spaceName: source.name } : {}),
+          spaceId: source.spaceId,
+          spaceName: source.name,
         })
       }
     }
@@ -187,15 +190,15 @@ export async function listPadSets(force = false): Promise<PadSet[]> {
 }
 
 /**
- * Upload a pad set: to the account's pads, or to a team space's (`spaceId`). A set of the same name
- * there is replaced; in a team space only an admin may do that, and anyone else is told to give it
- * another name (the Worker's rule: worker/src/team-pads.ts).
+ * Upload a pad set to a space's pads (`spaceId`). A set of the same name there is replaced; in a
+ * team space only an admin may do that, and anyone else is told to give it another name (the
+ * Worker's rule: worker/src/team-pads.ts).
  */
 export async function uploadPadSet(
   zipFile: File | null | undefined,
   padSetName?: string,
   onProgress?: (uploaded: number, total: number) => void,
-  spaceId: string | null = null
+  spaceId?: string | null
 ): Promise<PadSet> {
   if (!zipFile) {
     throw new Error('Please select a pad set ZIP file.')
@@ -240,7 +243,8 @@ export async function uploadPadSet(
   const padSet: PadSet = {
     id: folderId,
     name: normalizedName,
-    ...(source.spaceId ? { spaceId: source.spaceId, spaceName: source.name } : {}),
+    spaceId: source.spaceId,
+    spaceName: source.name,
   }
   // The first set uploaded is the one to use: there is no default to fall back on
   if (!getActivePadSet()) await selectPadSet(folderId)
