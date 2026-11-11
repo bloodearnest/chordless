@@ -17,6 +17,7 @@ import {
   listSpaces,
   setCurrentSpace,
 } from '../src/js/space.ts'
+import type { ProgressCallback } from '../src/js/sync-manager.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
@@ -298,6 +299,35 @@ describe('team-space-wizard', () => {
     await until(() => text().includes('is ready'), 'created')
     expect(synced).to.deep.equal([name])
     expect(text()).to.not.contain('Couldn’t save')
+  })
+
+  it('shows how far the save to Drive has got, with a bar from the start, and not once it is ready', async () => {
+    await open()
+    await until(() => page.shadowRoot?.querySelector('#name'), 'the form')
+    await type(`${prefix} progress ${crypto.randomUUID().slice(0, 8)}`)
+    button('Choose a folder').click()
+    await until(() => text().includes('Church Drive'), 'the folder is shown')
+    let release = () => {}
+    const held = new Promise<void>(resolve => {
+      release = resolve
+    })
+    let report: ProgressCallback | undefined
+    page.syncSpace = async (_space, onProgress) => {
+      report = onProgress
+      await held
+    }
+    button('Create team space').click()
+    await until(() => report, 'saving')
+    const bar = () => must(page.shadowRoot?.querySelector('progress-bar'))
+    expect(bar().total).to.equal(undefined)
+
+    must(report)({ stage: 'pushing', message: 'Uploaded 3/12 songs', current: 3, total: 12 })
+    await until(() => text().includes('Uploaded 3/12 songs'), 'the progress')
+    expect([bar().current, bar().total]).to.deep.equal([3, 12])
+
+    release()
+    await until(() => text().includes('is ready'), 'created')
+    expect(page.shadowRoot?.querySelector('progress-bar')).to.equal(null)
   })
 
   it('keeps the space and offers another try when saving to Drive does not work', async () => {

@@ -21,6 +21,7 @@ import {
   type TransferReport,
 } from '../js/space-transfer.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
+import type { ProgressCallback, SyncProgress } from '../js/sync-manager.ts'
 import {
   createTeamSpace,
   type Leader,
@@ -32,6 +33,7 @@ import { formatBytes } from '../js/utils/bytes.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
+import './progress-bar.ts'
 import { buttonStyles } from './shared-styles.ts'
 import './team-invite-step.ts'
 
@@ -61,6 +63,7 @@ export class TeamSpaceWizard extends LitElement {
     _bringError: { state: true },
     _syncError: { state: true },
     _stage: { state: true },
+    _progress: { state: true },
     _leaders: { state: true },
   }
 
@@ -89,6 +92,8 @@ export class TeamSpaceWizard extends LitElement {
   declare _syncError: string
   /** What is being done, while the space is being made */
   declare _stage: string
+  /** How far the save to Drive has got, while it runs */
+  declare _progress: SyncProgress | null
   /** The people the brought setlists name as leaders, to suggest inviting */
   declare _leaders: Leader[]
   /** What each of the sources holds */
@@ -102,7 +107,7 @@ export class TeamSpaceWizard extends LitElement {
   pick: () => Promise<PickedFolder | null> = () => pickFolder()
   folders: TeamFolders = driveApi
   /** Saves the new space's songs and setlists to Drive for the team to get (a test gives its own) */
-  syncSpace: (space: Space) => Promise<void> = syncTeamSpace
+  syncSpace: (space: Space, onProgress?: ProgressCallback) => Promise<void> = syncTeamSpace
   /** Shows the space once it is the one in use (a test gives its own; by default the home page, afresh) */
   show: (() => unknown) | undefined = undefined
 
@@ -146,6 +151,7 @@ export class TeamSpaceWizard extends LitElement {
     this._bringError = ''
     this._syncError = ''
     this._stage = ''
+    this._progress = null
     this._leaders = []
   }
 
@@ -258,11 +264,14 @@ export class TeamSpaceWizard extends LitElement {
   async _save(): Promise<void> {
     this._syncError = ''
     try {
-      await this.syncSpace(this._created as Space)
+      await this.syncSpace(this._created as Space, progress => {
+        this._progress = progress
+      })
       this._saved = true
     } catch (error) {
       this._syncError = errorMessage(error)
     }
+    this._progress = null
   }
 
   /** What to bring across, as chosen (nothing if there is no source) */
@@ -550,6 +559,20 @@ export class TeamSpaceWizard extends LitElement {
             ${busy ? this._stage || 'Creating…' : 'Create team space'}
           </button>
         </div>
+        ${
+          busy
+            ? html`
+              <div role="status" aria-live="polite">
+                ${this._progress?.message ?? ''}
+                <progress-bar
+                  label=${this._stage}
+                  .current=${this._progress?.current}
+                  .total=${this._progress?.total}
+                ></progress-bar>
+              </div>
+            `
+            : nothing
+        }
       </form>
       <app-modal ${ref(this._modal)} type="confirm" size="small"></app-modal>
     `

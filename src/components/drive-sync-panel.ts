@@ -14,6 +14,7 @@ import {
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
+import './progress-bar.ts'
 import { buttonStyles, spinnerStyles } from './shared-styles.ts'
 
 /** What the panel shows of a sync: how far it has got (the panel also adds a 'success' stage) */
@@ -119,22 +120,6 @@ export class DriveSyncPanel extends LitElement {
 
     .status-text {
       flex: 1;
-    }
-
-    .progress-bar {
-      width: 100%;
-      height: 4px;
-      background: var(--tint);
-      border-radius: 2px;
-      overflow: hidden;
-      margin-top: 0.5rem;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: var(--color-primary, #2477ad);
-      transition: width 0.3s;
-      border-radius: 2px;
     }
 
     .last-sync {
@@ -428,14 +413,11 @@ export class DriveSyncPanel extends LitElement {
 
   _renderProgressBar() {
     const { current, total } = this.syncProgress as PanelProgress
-    const hasProgress = typeof current === 'number' && typeof total === 'number' && total > 0
-    const percent = hasProgress ? Math.min(100, Math.round((current / total) * 100)) : null
-    const width = percent !== null ? `${percent}%` : '50%'
-    return html`
-      <div class="progress-bar">
-        <div class="progress-fill" style="width: ${width}"></div>
-      </div>
-    `
+    return html`<progress-bar
+      label="Sync progress"
+      .current=${current}
+      .total=${total}
+    ></progress-bar>`
   }
 
   _formatSyncTime(isoString: string): string {
