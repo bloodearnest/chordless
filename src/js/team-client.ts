@@ -84,6 +84,11 @@ export const teamApi = {
   /** Set it (empty to clear it): a writer may set it where there is none; changing it takes an admin */
   setLicence: (id: string, ccliLicence: string) =>
     call<TeamLicence>('PUT', `${space(id)}/licence`, { ccliLicence }),
+  /**
+   * Delete the Team everywhere: the Worker puts its Drive folder in the trash with the Team's own
+   * credential, then ends sharing. An admin or the owner.
+   */
+  deleteEverything: (id: string) => call<void>('DELETE', `${space(id)}/everything`),
   /** End sharing: the Worker forgets the space; the Drive folder and its files stay */
   endSharing: (id: string) => call<void>('DELETE', space(id)),
 }

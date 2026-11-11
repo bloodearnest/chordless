@@ -1056,6 +1056,40 @@ Object), and since tried with real accounts on the deployed Worker under the old
    (SECURITY.md).
 7. ~~The personal-space notice~~ (built); a toast after sign-in for "Drive not connected" is left, and may not be needed.
 
+## Deleting a space
+
+Built 2026-11-12 (`space-deletion.ts`, `space-delete-everywhere.ts`, the Worker's
+`DELETE /api/space/<id>/everything`). Two ways, both on the space's Data window:
+
+- **From this device.** Its database here, and nothing else: the Drive folder stays, and a Team stays
+  shared (the person can join again with a new invite).
+- **Everywhere.** The space's Drive folder, with everything in it, goes to the **Drive trash**
+  (recoverable there for thirty days; emptying the trash makes it permanent), and then it is gone from
+  this device. Drive first: if the folder cannot be trashed, nothing is deleted and it can be tried again.
+  - **Who may.** A personal space: the person using it. A Team: an **admin or the owner** (the
+    Worker enforces it; a writer or reader is told it is for admins). A Team's folder is the owner's, or
+    on a shared drive the service account's, so the Worker trashes it, with the space's own credential
+    (`AdminContext.trashRoot`), and then ends sharing (`destroy`), so the members, invites and token go and
+    only the team's register row and events stay, marked ended (see "SongSelect's terms").
+  - **Three things asked before it does.** A **backup** the page makes itself and hands to the browser
+    (`downloadBackup`, the same export as the export panel: songs and setlists as they are on this device,
+    no audio pads; a sync first if others changed it), the space's **name typed**, and a press of a button
+    that says what it does. It cannot be known that the browser saved the file; only that it was made
+    and handed over. The audio pads in a Team's folder go to the trash with it.
+  - **Other devices** of the same person stop syncing it rather than bring it back: the sync finds the
+    linked folder trashed and stops with `DriveFolderGoneError` ("this space's Drive folder is gone",
+    `startOver()` the way on). A Team's other members' devices find the space gone from the Worker.
+  - **Needs Drive reached**: a sign-in with Drive (for a Team a sign-in alone, as the Worker holds the
+    credential). Signed out, only "from this device" is possible.
+- **The space in use may be deleted** either way. It is replaced by another space on the device, or none
+  (Personal is made again when the app needs one), and the page starts again in it. (The old rule
+  "switch to another first" was about the open database connection, which a window of the app lets go of
+  when asked to: `onversionchange`.)
+- **Not built: deleting things in a space that stays.** A move into a Team still copies songs, and
+  leaves the setlists that are in Drive: removing those needs the sync's pending deletions
+  (`docs/SYNC_ARCHITECTURE.md`, "Deleting setlists"). Until then the way to clear a personal space after
+  moving everything is to delete it everywhere.
+
 ## Risks
 
 - Consent screen must be "In production" or refresh tokens die in 7 days. **Met:** it has been In

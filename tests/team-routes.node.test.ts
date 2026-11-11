@@ -439,6 +439,16 @@ describe('team-managed storage (the service account)', () => {
     assert.notEqual(await room.ownerBlob(), null)
   })
 
+  test('trashes the folder with the service account when the space uses it, and ends the space', async () => {
+    const { call, room, counts, drive, root } = await managed()
+    await call(`${SPACE}/credential/service-account`, ann, post({}))
+    const refreshes = counts.refreshes
+    assert.equal((await call(SPACE + '/everything', dan, send('DELETE'))).status, 204)
+    assert.equal(must(drive.files.get(root)).trashed, true)
+    assert.equal(counts.refreshes, refreshes, 'the owner’s sign-in was not used')
+    assert.equal(await room.info(), null)
+  })
+
   test('is not offered where the server has no key', async () => {
     const { call } = await managed({ withKey: false })
     assert.deepEqual(await json(await call(`${SPACE}/credential`, ann)), {
@@ -1038,6 +1048,57 @@ describe('the register of teams', () => {
     } finally {
       console.error = quiet
     }
+  })
+})
+
+describe('deleting a space everywhere', () => {
+  const folderTrashed = (w: Awaited<ReturnType<typeof world>>) =>
+    must(w.drive.files.get(w.root)).trashed === true
+
+  test('is for an admin or the owner: the Drive folder goes to the trash, then sharing ends and the people are forgotten', async () => {
+    for (const who of [dan, ann]) {
+      const w = await world()
+      assert.equal((await w.call(`${SPACE}/everything`, who, send('DELETE'))).status, 204)
+      assert.equal(folderTrashed(w), true)
+      assert.equal(await w.room.info(), null)
+      const [team] = w.all(`SELECT ended_at FROM teams WHERE space_id = '${SPACE}'`)
+      assert.match(String(team.ended_at), /^20\d\d-/)
+      assert.deepEqual(w.all(`SELECT * FROM team_members WHERE space_id = '${SPACE}'`), [])
+      assert.deepEqual(
+        w
+          .all(`SELECT kind, by_email FROM team_events WHERE space_id = '${SPACE}' ORDER BY id`)
+          .map(each => `${each.kind} ${each.by_email}`),
+        ['created ann@example.com', `ended ${who.email}`]
+      )
+    }
+  })
+
+  test('is not for a writer or a reader, or a stranger, and changes nothing', async () => {
+    const w = await world()
+    for (const who of [bob, cat]) {
+      assert.equal((await w.call(`${SPACE}/everything`, who, send('DELETE'))).status, 403)
+    }
+    assert.equal((await w.call(`${SPACE}/everything`, stranger, send('DELETE'))).status, 403)
+    assert.equal((await w.call(`${SPACE}/everything`, null, send('DELETE'))).status, 401)
+    assert.equal(folderTrashed(w), false)
+    assert.notEqual(await w.room.info(), null)
+  })
+
+  test('does not end the space when the folder cannot be trashed, so it can be tried again', async () => {
+    const w = await world()
+    await w.room.clearOwnerBlob()
+    const refused = await w.call(`${SPACE}/everything`, dan, send('DELETE'))
+    assert.equal(refused.status, 409)
+    assert.match(String((await json(refused)).error), /not set up/)
+    assert.notEqual(await w.room.info(), null)
+    assert.equal(folderTrashed(w), false)
+  })
+
+  test('is fine for a folder that is already gone', async () => {
+    const w = await world()
+    w.drive.files.delete(w.root)
+    assert.equal((await w.call(`${SPACE}/everything`, ann, send('DELETE'))).status, 204)
+    assert.equal(await w.room.info(), null)
   })
 })
 

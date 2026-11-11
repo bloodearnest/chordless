@@ -5,6 +5,7 @@
  */
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
+import { SpaceDeletedEvent } from '../src/components/space-delete-everywhere.ts'
 import { SpaceImportedEvent } from '../src/components/space-export-panel.ts'
 import { SpaceGoneEvent, type SpaceManager } from '../src/components/space-manager.ts'
 import '../src/components/space-manager.ts'
@@ -199,15 +200,69 @@ describe('space-manager', () => {
   })
 
   describe('the space in use', () => {
-    it('is marked as current, and cannot be deleted', async () => {
+    it('is marked as current, and can be deleted: it says another is taken, and the page is told', async () => {
       const mine = await space('Mine')
+      const other = await space('Other')
       await setCurrentSpace(mine.id, mine.name)
       const el = await page(mine.id)
       expect(text(el)).to.contain('Current')
-      expect(must(el.shadowRoot?.querySelector<HTMLButtonElement>('#delete')).disabled).to.equal(
-        true
+      const button = must(el.shadowRoot?.querySelector<HTMLButtonElement>('#delete'))
+      expect(button.disabled).to.equal(false)
+      expect(text(el)).to.contain('you will be taken to another')
+
+      let wasCurrent: boolean | undefined
+      el.addEventListener(SpaceGoneEvent.type, event => {
+        wasCurrent = (event as SpaceGoneEvent).wasCurrent
+      })
+      button.click()
+      const modal = await answer(el, 'Delete from this device?', true)
+      expect(modal.message).to.contain('It is the one you are in')
+      await waitUntil(() => wasCurrent !== undefined)
+      expect(wasCurrent).to.equal(true)
+      expect(await getSpaceById(mine.id)).to.equal(undefined)
+      expect(getCurrentSpace().id).to.not.equal(mine.id)
+      expect(await getSpaceById(other.id)).to.not.equal(undefined)
+    })
+
+    it('says a space not in use was not', async () => {
+      const mine = await space('Mine')
+      const other = await space('Other')
+      await setCurrentSpace(other.id, other.name)
+      const el = await page(mine.id)
+      let wasCurrent: boolean | undefined
+      el.addEventListener(SpaceGoneEvent.type, event => {
+        wasCurrent = (event as SpaceGoneEvent).wasCurrent
+      })
+      must(el.shadowRoot?.querySelector<HTMLButtonElement>('#delete')).click()
+      await answer(el, 'Delete from this device?', true)
+      await waitUntil(() => wasCurrent !== undefined)
+      expect(wasCurrent).to.equal(false)
+    })
+  })
+
+  describe('deleting everywhere', () => {
+    it('is offered for a space, with what it does, and a Team’s writer is told it is for admins', async () => {
+      const mine = await space('Mine')
+      const el = await page(mine.id)
+      expect(has(el, 'space-delete-everywhere')).to.equal(true)
+      expect(text(el)).to.contain('Delete everywhere')
+      const team = await space('Team', { team: { id: 'space-jjjj1010', role: 'writer' } })
+      const teamEl = await page(team.id)
+      const panel = must(teamEl.shadowRoot?.querySelector('space-delete-everywhere'))
+      expect(panel.shadowRoot?.textContent).to.contain('Only an admin')
+    })
+
+    it('tells the page the space is gone, and whether it was the one in use, when it is done', async () => {
+      const mine = await space('Mine')
+      const el = await page(mine.id)
+      let wasCurrent: boolean | undefined
+      el.addEventListener(SpaceGoneEvent.type, event => {
+        wasCurrent = (event as SpaceGoneEvent).wasCurrent
+      })
+      must(el.shadowRoot?.querySelector('space-delete-everywhere')).dispatchEvent(
+        new SpaceDeletedEvent(true)
       )
-      expect(text(el)).to.contain('switch to another first')
+      expect(wasCurrent).to.equal(true)
     })
   })
 

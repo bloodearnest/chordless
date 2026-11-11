@@ -87,6 +87,7 @@ it has. The cost is that a space's management has no address of its own.
 | Google Drive   [Reset from Google Drive]  Start over...      |
 | Export and import   [Export...]  [Import...]                 |
 | Delete from this device   [Delete...]                        |
+| Delete everywhere         [Delete everywhere...]             |
 +--------------------------------------------------------------+
 ```
 
@@ -97,6 +98,14 @@ because the first sync takes the space's own database (`syncTeamSpace`), export 
 that database, and the people and invite calls need only the team id. Every destructive action asks
 first (CLAUDE.md: friction, not prohibition). Deleting a space closes the modal (`SpaceGoneEvent`)
 and the list is read again; closing it any other way reads the list again too.
+
+**Deleting.** Both ways work on any space, **the one in use included** (2026-11-12): it is not a
+reason to refuse. The one in use is replaced by another (or none: Personal is made again when the
+app needs one), and the page starts again in it, as a switch does (`SpaceGoneEvent.wasCurrent`).
+"Delete from this device" leaves the Drive folder. "Delete everywhere" is `space-delete-everywhere.ts`
+(`docs/SPACES.md`, "Deleting a space"): it needs Drive reached (a sign-in with Drive; for a Team a
+sign-in alone), so it is disabled while signed out, which is the one thing on this page that signed out
+does disable; deleting from the device still works.
 
 Who leads a space's setlists is under **Leaders**, on every space's card (after Data): `space-people.ts`
 in a modal (docs/IDENTITIES.md, "People page"). A Team's members are in a second modal, from a **Users** button on a Team's card (after Data): who is in
@@ -130,4 +139,5 @@ thing in the device's cache, and useful only with the player. When pads become p
 ## Decided
 
 Decided 2026-10-22: there is no "clear everything on this device"; a space is deleted one at a time,
-from its Manage modal, after a confirmation. The media page's menu entry is always shown.
+from its Manage modal, after a confirmation. (2026-11-12: and may be deleted from Drive too, with a
+backup first, and the one in use may be deleted.) The media page's menu entry is always shown.

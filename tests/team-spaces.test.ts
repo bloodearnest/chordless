@@ -124,6 +124,13 @@ describe('team spaces on this device', () => {
       expect(requests[0].path).to.equal('/api/space/a%2Fb/members/ann%40example.com')
     })
 
+    it('ask for a Team to be deleted everywhere with a DELETE of its everything', async () => {
+      routes['DELETE /api/space/space-1/everything'] = () => new Response(null, { status: 204 })
+      expect(await teamApi.deleteEverything('space-1')).to.equal(undefined)
+      expect(requests[0].method).to.equal('DELETE')
+      expect(requests[0].path).to.equal('/api/space/space-1/everything')
+    })
+
     it('say what the Worker said, with its status, or just the status', async () => {
       routes['POST /api/spaces/join'] = () => json({ error: 'This invite is not valid' }, 404)
       const refused = await teamApi.join('space-1', 'code').catch(error => error)

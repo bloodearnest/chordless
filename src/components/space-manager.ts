@@ -2,9 +2,9 @@ import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
-import { forgetSync } from '../js/last-sync.ts'
 import { loadMediaSettings } from '../js/media-settings.ts'
-import { deleteSpace, getCurrentSpace, getSpaceById } from '../js/space.ts'
+import { getCurrentSpace, getSpaceById } from '../js/space.ts'
+import { removeSpaceFromDevice } from '../js/space-deletion.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
@@ -14,13 +14,20 @@ import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './drive-sync-panel.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
+import './space-delete-everywhere.ts'
+import type { SpaceDeletedEvent } from './space-delete-everywhere.ts'
 import './space-export-panel.ts'
 
-/** The space is gone from this device (deleted): whoever shows this can close it */
+/**
+ * The space is gone from this device (deleted): whoever shows this can close it. If it was the one in
+ * use the app has another now (or none), and the page should start again in it.
+ */
 export class SpaceGoneEvent extends Event {
   static readonly type = 'space-manager:gone'
-  constructor() {
+  readonly wasCurrent: boolean
+  constructor(wasCurrent = false) {
     super(SpaceGoneEvent.type, { bubbles: true, composed: true })
+    this.wasCurrent = wasCurrent
   }
 }
 
@@ -135,6 +142,7 @@ export class SpaceManager extends LitElement {
     modal.message =
       `Delete "${space.name}" from this device? Its songs and setlists here are deleted, and ` +
       'anything not yet synced to Google Drive is lost. Its folder in Google Drive is not touched.' +
+      (this._current ? ' It is the one you are in: you will be taken to another.' : '') +
       (isTeamMember(space)
         ? ' You stay in the Team: to get it back on this device, ask for a new invite link.'
         : '') +
@@ -142,9 +150,8 @@ export class SpaceManager extends LitElement {
     if (!(await modal.ask())) return
     this._error = ''
     try {
-      await deleteSpace(space.id)
-      forgetSync(space.id)
-      this.dispatchEvent(new SpaceGoneEvent())
+      const { wasCurrent } = await removeSpaceFromDevice(space)
+      this.dispatchEvent(new SpaceGoneEvent(wasCurrent))
     } catch (error) {
       console.error('[SpaceManager] Failed to delete the space:', error)
       this._error = errorMessage(error)
@@ -225,13 +232,27 @@ export class SpaceManager extends LitElement {
         <div class="panel danger-zone">
           <h3>Delete from this device</h3>
           <p>
-            Remove this ${space.team ? 'Team' : 'space'} and its songs and setlists from this device.
-            ${this._current ? 'To delete the one you are working in, switch to another first.' : ''}
+            Remove this ${space.team ? 'Team' : 'space'} and its songs and setlists from this device. Its
+            folder in Google Drive stays.
+            ${this._current ? 'It is the one you are in: you will be taken to another.' : ''}
           </p>
-          <button class="btn danger" id="delete" ?disabled=${this._current} @click=${this._delete}>
-            Delete…
-          </button>
+          <button class="btn danger" id="delete" @click=${this._delete}>Delete…</button>
           ${this._error ? html`<p class="error" role="alert">Failed to delete it: ${this._error}</p>` : nothing}
+        </div>
+
+        <div class="panel danger-zone">
+          <h3>Delete everywhere</h3>
+          <p>
+            Delete this ${space.team ? 'Team' : 'space'} from this device <em>and</em> from Google
+            Drive, whose trash keeps its folder for thirty days. It asks for a backup first.
+          </p>
+          <space-delete-everywhere
+            .space=${space}
+            .summary=${this._summary}
+            .signIn=${this._signIn}
+            @space-delete-everywhere:deleted=${(event: SpaceDeletedEvent) =>
+              this.dispatchEvent(new SpaceGoneEvent(event.wasCurrent))}
+          ></space-delete-everywhere>
         </div>
       </div>
       <app-modal

@@ -201,6 +201,26 @@ describe('account-page', () => {
       expect(cards(el).some(card => card.space.id === first.id)).to.equal(false)
     })
 
+    it('starts the app again in the space now in use when the one deleted was in use, and not otherwise', async () => {
+      const first = await space('First')
+      const second = await space('Second')
+      const el = await page()
+      let shown = 0
+      el.show = () => {
+        shown++
+      }
+      await manage(el, first.id)
+      await deleteSpace(first.id)
+      must(manager(el)).dispatchEvent(new SpaceGoneEvent(false))
+      await waitUntil(() => !modal(el).open)
+      await nothingFor(50)
+      expect(shown).to.equal(0)
+
+      await manage(el, second.id)
+      must(manager(el)).dispatchEvent(new SpaceGoneEvent(true))
+      await waitUntil(() => shown === 1)
+    })
+
     it('does nothing for a space that is not on the list', async () => {
       const el = await page()
       el.dispatchEvent(new SpaceManageEvent('no-such-space'))
