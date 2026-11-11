@@ -82,6 +82,7 @@ describe('team-invite-step', () => {
   async function open(leaders: { name: string; email: string | null }[]) {
     page = document.createElement('team-invite-step')
     page.team = { id: 'space-eeee5555', role: 'owner' }
+    page.teamName = 'Grace Church'
     page.leaders = leaders
     document.body.append(page)
     await page.updateComplete
@@ -157,6 +158,12 @@ describe('team-invite-step', () => {
     // (those done with leave the list; the one not ticked stays)
     expect(boxes()).to.have.length(1)
     expect(text()).to.contain('Links to send')
+    // (each with a way to hand it on, carrying its own role and the team's name)
+    const sends = Array.from(page.shadowRoot?.querySelectorAll('invite-send') ?? [])
+    expect(sends).to.have.length(2)
+    expect(sends.map(each => each.url)).to.deep.equal(links.map(link => link.value))
+    expect(sends.map(each => each.role)).to.deep.equal(['writer', 'reader'])
+    expect(sends.every(each => each.teamName === 'Grace Church')).to.equal(true)
   })
 
   it('copies a link, and says so', async () => {

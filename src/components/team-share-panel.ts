@@ -20,6 +20,7 @@ import {
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
+import './invite-send.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 
 /** The space was shared or stopped being shared: the page should read it again */
@@ -67,7 +68,7 @@ export class TeamSharePanel extends LitElement {
   declare _error: string
   declare _busy: boolean
   /** The invite just made: its link is shown once, to send */
-  declare _link: { email: string; url: string } | null
+  declare _link: { email: string; url: string; role: MemberRole } | null
   declare _copied: boolean
 
   _modal: Ref<AppModal> = createRef()
@@ -217,6 +218,7 @@ export class TeamSharePanel extends LitElement {
       this._link = {
         email: email.value.trim().toLowerCase(),
         url: inviteLink(window.location.origin, team.id, code),
+        role: role.value as MemberRole,
       }
       this._copied = false
       email.value = ''
@@ -338,6 +340,12 @@ export class TeamSharePanel extends LitElement {
             <strong>Link for ${this._link.email}</strong>
             <input class="link" readonly .value=${this._link.url} aria-label="Invite link" />
             <button class="btn" @click=${this._copy}>${this._copied ? '✓ Copied' : 'Copy the link'}</button>
+            <invite-send
+              .teamName=${this._current.name}
+              .role=${this._link.role}
+              .email=${this._link.email}
+              .url=${this._link.url}
+            ></invite-send>
             <p>It is shown once. Send it to them yourself.</p>
           </div>`
           : nothing

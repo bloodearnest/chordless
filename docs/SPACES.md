@@ -308,6 +308,9 @@ Steps, each on the one page:
    each invite is a link, shown once, to copy and pass on. A leader typed by name alone has no
    email and is listed as someone who cannot be invited. A refused invite stays in the list to try
    again. Invites are the existing ones (single use, bound to the email, a week).
+   Each link has a "Send…" button next to "Copy the link" (`invite-send.ts`, 2026-11-11, also in the
+   Team Space panel): the share sheet where the browser has one, else WhatsApp and Gmail's compose
+   window to that address. The message comes from the user's own account.
 5. **Progress and result.** The space is made and registered with the Worker *first*, so a failure
    later never loses it. The transfer then runs, and is re-runnable (what is there is skipped), so
    the failure screen offers "Try again". The result says what was added, skipped and removed from
@@ -420,7 +423,13 @@ Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
   nothing. The cost of binding it: a person who signs in with another address than the one invited
   is turned away, and the admin has to invite the address that appears in their Google account (a
   Gmail address with dots or a `+tag` is a different address from the plain one). The link to hand
-  out is the page's, with the space id and code in its fragment (not built).
+  out is the page's, with the space id and code in its fragment (built), and is handed on from the
+  admin's own account by the share sheet, WhatsApp or Gmail (`invite-send.ts`).
+- **Chordless does not email invites itself** (decided 2026-11-11). It would make chordless.app a
+  sender anyone with a team could point at any address (spam and phishing under the domain, which
+  would also hurt Email Routing), and mail from a new domain lands in spam, so "I never got it" would
+  be a support problem. Revisit only if links are shown to get lost; then it needs per-account and
+  per-space rate limits first (the probing protections list).
 - **Looking after people:** a role acts only on those below it (an admin on writers and readers,
   the owner on admins too; nobody on the owner), so an admin cannot make or remove an admin. A
   member can leave; the owner ends sharing instead (`DELETE`), which forgets the space; the owner can
