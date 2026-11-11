@@ -109,28 +109,15 @@ describe('drive-sync-panel', () => {
   })
 
   describe('the progress it shows', () => {
-    it('is a bar that fills as the sync goes, or half when it does not know how far', async () => {
+    it('is a bar that fills as the sync goes, and says it does not know where it does not', async () => {
       const el = await show()
+      const bar = () => must(el.shadowRoot?.querySelector('progress-bar'))
       el.syncProgress = { stage: 'pulling', message: 'Pulling', current: 1, total: 4 }
       await el.updateComplete
-      expect(el.shadowRoot?.querySelector<HTMLElement>('.progress-fill')?.style.width).to.equal(
-        '25%'
-      )
-      el.syncProgress = { stage: 'pulling', message: 'Pulling', current: 9, total: 4 }
-      await el.updateComplete
-      expect(el.shadowRoot?.querySelector<HTMLElement>('.progress-fill')?.style.width).to.equal(
-        '100%'
-      )
+      expect([bar().current, bar().total]).to.deep.equal([1, 4])
       el.syncProgress = { stage: 'pulling', message: 'Pulling' }
       await el.updateComplete
-      expect(el.shadowRoot?.querySelector<HTMLElement>('.progress-fill')?.style.width).to.equal(
-        '50%'
-      )
-      el.syncProgress = { stage: 'pulling', message: 'Pulling', current: 0, total: 0 }
-      await el.updateComplete
-      expect(el.shadowRoot?.querySelector<HTMLElement>('.progress-fill')?.style.width).to.equal(
-        '50%'
-      )
+      expect([bar().current, bar().total]).to.deep.equal([undefined, undefined])
     })
 
     it('is marked done or failed, with no bar', async () => {
@@ -138,7 +125,7 @@ describe('drive-sync-panel', () => {
       el.syncProgress = { stage: 'complete', message: 'Done' }
       await el.updateComplete
       expect(el.shadowRoot?.querySelector('.sync-status.success')).to.not.equal(null)
-      expect(el.shadowRoot?.querySelector('.progress-bar')).to.equal(null)
+      expect(el.shadowRoot?.querySelector('progress-bar')).to.equal(null)
       el.syncProgress = { stage: 'error', message: 'Broke' }
       await el.updateComplete
       expect(el.shadowRoot?.querySelector('.sync-status.error')).to.not.equal(null)

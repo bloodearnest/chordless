@@ -12,6 +12,7 @@ import { resolvePerson } from './leaders.ts'
 import { createSpace, deleteSpace, getSpaceById, listSpaces, updateSpace } from './space.ts'
 import { storageFor } from './storage/space-storage.ts'
 import type { TeamStorage } from './storage/team-storage.ts'
+import type { ProgressCallback } from './sync/session.ts'
 import { teamApi } from './team-client.ts'
 import type { TeamRole } from './team-roles.ts'
 
@@ -188,16 +189,17 @@ export function leadersOf(setlists: Setlist[], people: Person[], own?: string | 
  * Bring a team space's files into step with the team's: the first sync of a space just made or
  * joined, so the songs and setlists are on this device (for a member) or in the team's folder (for
  * the owner) before anyone is told it is ready. The space is not the one in use yet, so its own
- * database is given to the sync: left to itself the sync works on the space in use.
+ * database is given to the sync: left to itself the sync works on the space in use. It can be long
+ * (every file comes through the Worker), so the sync's progress goes to `onProgress`.
  */
-export async function syncTeamSpace(space: Space): Promise<void> {
+export async function syncTeamSpace(space: Space, onProgress?: ProgressCallback): Promise<void> {
   const { SyncManager } = await import('./sync-manager.ts')
   const db = new ChordlessDB(space.id)
   await db.init()
   try {
     const manager = await SyncManager.open(space.name, space.id, { db, storage: storageFor(space) })
     await manager.init()
-    await manager.sync()
+    await manager.sync(onProgress ?? null)
   } finally {
     db.db?.close()
   }

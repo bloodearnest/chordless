@@ -64,6 +64,24 @@ describe('syncTeamSpace', () => {
     if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
+  it('says how the sync is getting on, to whoever asked, from the start to the end', async () => {
+    const parent = await createTeamFolder('root', 'Parent')
+    const folder = await createTeamFolder(parent, 'Progress')
+    const team = await createSpace(`Progress ${crypto.randomUUID().slice(0, 8)}`)
+    made.push(team.id)
+    await updateSpace(team.id, { rootRef: folder, team: { id: 'space-aaaa7777', role: 'owner' } })
+    const db = new ChordlessDB(team.id)
+    await db.init()
+    await db.saveSetlist(makeSetlist({ id: 'progress-list', date: '2026-12-06' }))
+    db.db?.close()
+
+    const stages: string[] = []
+    await syncTeamSpace(must(await getSpaceById(team.id)), progress => stages.push(progress.stage))
+    expect(stages[0]).to.equal('starting')
+    expect(stages.at(-1)).to.equal('complete')
+    expect(stages).to.include('pushing')
+  })
+
   it('has a sync manager made for a space work on that space, whichever is in use', async () => {
     const parent = await createTeamFolder('root', 'Parent')
     const folder = await createTeamFolder(parent, 'Other')

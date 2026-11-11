@@ -17,6 +17,7 @@ import {
   listSpaces,
   setCurrentSpace,
 } from '../src/js/space.ts'
+import type { ProgressCallback } from '../src/js/sync-manager.ts'
 import { makeSetlist } from './builders.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
@@ -337,6 +338,32 @@ describe('the join page', () => {
     button('Not now').click()
     await until(() => !text().includes('Bring them into'), 'the question to go')
     expect(text()).to.not.contain('Brought')
+  })
+
+  it('shows how far the first sync has got while it runs, and the bar goes when it is done', async () => {
+    await open()
+    await until(() => text().includes('Join the team space'), 'the offer')
+    let release = () => {}
+    const held = new Promise<void>(resolve => {
+      release = resolve
+    })
+    let report: ProgressCallback | undefined
+    page.syncSpace = async (_space, onProgress) => {
+      report = onProgress
+      await held
+    }
+    button('Join the team space').click()
+    await until(() => text().includes("Getting the team's songs and setlists"), 'syncing')
+    const bar = () => must(page.shadowRoot?.querySelector('progress-bar'))
+    expect(bar().total, 'it does not know how far yet').to.equal(undefined)
+
+    must(report)({ stage: 'pulling', message: 'Downloaded 20/80 songs', current: 20, total: 80 })
+    await until(() => text().includes('Downloaded 20/80 songs'), 'the progress')
+    expect([bar().current, bar().total]).to.deep.equal([20, 80])
+
+    release()
+    await until(() => text().includes('You have joined'), 'to be joined')
+    expect(page.shadowRoot?.querySelector('progress-bar')).to.equal(null)
   })
 
   it('joins all the same when the first sync does not work, and offers to try again', async () => {

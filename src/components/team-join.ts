@@ -12,9 +12,11 @@ import { withSource } from '../js/other-songs.ts'
 import { listSpaces, setCurrentSpace, switchSpace } from '../js/space.ts'
 import { bringAcross, type TransferReport, whatWouldBeAdded } from '../js/space-transfer.ts'
 import { isTeamMember, storageFor } from '../js/storage/space-storage.ts'
+import type { ProgressCallback, SyncProgress } from '../js/sync-manager.ts'
 import { joinSpace, roleWithArticle, syncTeamSpace } from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { TeamError } from '../js/worker-call.ts'
+import './progress-bar.ts'
 import { buttonStyles } from './shared-styles.ts'
 
 type State =
@@ -60,6 +62,7 @@ export class TeamJoin extends LitElement {
     _offer: { state: true },
     _brought: { state: true },
     _bringError: { state: true },
+    _progress: { state: true },
   }
 
   declare _state: State
@@ -71,6 +74,8 @@ export class TeamJoin extends LitElement {
   declare _role: string
   /** Why the first sync did not work, if it did not */
   declare _syncError: string
+  /** How far the first sync has got, while it runs */
+  declare _progress: SyncProgress | null
   /** What there is to bring across from a personal space, until it is brought or declined */
   declare _offer: Offer | null
   /** What bringing it across did */
@@ -79,8 +84,8 @@ export class TeamJoin extends LitElement {
 
   /** Shows the space once it is the one in use (a test gives its own; by default the home page, afresh) */
   show: (() => unknown) | undefined = undefined
-  /** Gets the team's files for the space just joined (a test gives its own) */
-  syncSpace: (space: Space) => Promise<void> = syncTeamSpace
+  /** Gets the team's files for the space just joined, saying how far it has got (a test gives its own) */
+  syncSpace: (space: Space, onProgress?: ProgressCallback) => Promise<void> = syncTeamSpace
   /** The invite, once the link is read */
   _invite: { teamId: string; code: string } | null = null
   /** The link's fragment (a test gives its own) */
@@ -108,6 +113,7 @@ export class TeamJoin extends LitElement {
     this._joined = null
     this._role = ''
     this._syncError = ''
+    this._progress = null
     this._offer = null
     this._brought = null
     this._bringError = ''
@@ -197,11 +203,15 @@ export class TeamJoin extends LitElement {
   async _sync(): Promise<void> {
     this._state = 'syncing'
     this._syncError = ''
+    this._progress = null
     try {
-      await this.syncSpace(this._joined as Space)
+      await this.syncSpace(this._joined as Space, progress => {
+        this._progress = progress
+      })
     } catch (error) {
       this._syncError = this._explain(error)
     }
+    this._progress = null
     await this._findOffer()
     this._state = 'joined'
   }
@@ -348,7 +358,16 @@ export class TeamJoin extends LitElement {
       case 'joining':
         return html`<p class="status" role="status">Joining…</p>`
       case 'syncing':
-        return html`<p class="status" role="status">Getting the team's songs and setlists…</p>`
+        return html`
+          <p class="status" role="status">
+            ${this._progress?.message ?? "Getting the team's songs and setlists…"}
+          </p>
+          <progress-bar
+            label="Getting the team's songs and setlists"
+            .current=${this._progress?.current}
+            .total=${this._progress?.total}
+          ></progress-bar>
+        `
       case 'joined':
         return html`
           <h2>You have joined ${this._joined?.name}</h2>
