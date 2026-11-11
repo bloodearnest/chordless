@@ -4,6 +4,7 @@
  * person's Google ID token (`getIdentityToken`); the files themselves go through `TeamStorage`.
  */
 
+import type { TeamLicence } from './ccli-licence.ts'
 import type { Person } from './data-types.ts'
 import { getIdentityToken } from './google-auth.ts'
 import type { StoredFile } from './storage/types.ts'
@@ -33,7 +34,7 @@ const space = (id: string) => `/api/space/${encodeURIComponent(id)}`
 
 export const teamApi = {
   /** Share a folder you own as a team space; `blob` is the page's own sign-in */
-  createSpace: (details: { blob: string; rootRef: string; name: string }) =>
+  createSpace: (details: { blob: string; rootRef: string; name: string; ccliLicence?: string }) =>
     call<{ spaceId: string; role: TeamRole }>('POST', '/api/spaces', details),
 
   /** Join a space with the code from an invite sent to your Google address */
@@ -75,6 +76,14 @@ export const teamApi = {
   /** Check that team storage can keep the folder's files, and use it (the owner's sign-in is then forgotten) */
   useTeamStorage: (id: string) =>
     call<TeamCredential>('POST', `${space(id)}/credential/service-account`),
+  /**
+   * The team's CCLI licence number, which the Worker keeps with the team for its records; an admin
+   * also gets the log of its changes (docs/SPACES.md, "SongSelect's terms")
+   */
+  licence: (id: string) => call<TeamLicence>('GET', `${space(id)}/licence`),
+  /** Set it (empty to clear it): a writer may set it where there is none; changing it takes an admin */
+  setLicence: (id: string, ccliLicence: string) =>
+    call<TeamLicence>('PUT', `${space(id)}/licence`, { ccliLicence }),
   /** End sharing: the Worker forgets the space; the Drive folder and its files stay */
   endSharing: (id: string) => call<void>('DELETE', space(id)),
 }

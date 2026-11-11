@@ -6,6 +6,7 @@
  */
 /* v8 ignore start -- needs `cloudflare:workers`: only workerd has it (worker.node.test.ts runs it there, unmeasured) */
 import { DurableObject, type DurableObjectState } from 'cloudflare:workers'
+import type { LicenceChange } from '../../src/js/ccli-licence.ts'
 import { CHANGED, LIVE_PROTOCOL, PING, PONG } from '../../src/js/live-protocol.ts'
 import type { InviteInfo, MemberRole, TeamMember, TeamRole } from '../../src/js/team-roles.ts'
 import type { Env } from './env.ts'
@@ -148,6 +149,12 @@ export class TeamSpace extends DurableObject<Env> implements TeamSpaceApi {
   }
   useServiceAccount(): Promise<void> {
     return this.#state.useServiceAccount()
+  }
+  licence(): Promise<{ ccliLicence: string | null; history: LicenceChange[] }> {
+    return this.#state.licence()
+  }
+  setLicence(ccliLicence: string | null, by: Identity): Promise<boolean> {
+    return this.#state.setLicence(ccliLicence, by)
   }
 }
 /* v8 ignore stop */

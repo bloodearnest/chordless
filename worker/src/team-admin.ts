@@ -2,7 +2,7 @@
  * Making a team space, joining one, and looking after its people (docs/SPACES.md, "Setting up and
  * joining a team space"). The storage API (team-api.ts) is for files; this is for the space itself.
  *
- *   POST   /api/spaces                  {blob, rootRef, name}   make a space from a folder you own
+ *   POST   /api/spaces                  {blob, rootRef, name, ccliLicence?}  make a space from a folder you own
  *   POST   /api/spaces/join             {spaceId, code}         join with an invite
  *   GET    /api/space/<id>/invites                              admin: the open invites
  *   POST   /api/space/<id>/invites      {role, email}           admin: a new one, with its code
@@ -14,12 +14,17 @@
  *   PUT    /api/space/<id>/credential   {blob}                  owner: a new sign-in for Drive (and
  *                                                               back to it from team storage)
  *   POST   /api/space/<id>/credential/service-account           owner: check team storage, and use it
+ *   GET    /api/space/<id>/licence                              a member: the CCLI licence number (an admin
+ *                                                               also gets the log of its changes)
+ *   PUT    /api/space/<id>/licence      {ccliLicence}           a writer sets it where there is none;
+ *                                                               an admin changes or clears it
  *   DELETE /api/space/<id>                                      owner: end sharing
  *
  * A role may only act on those below it: an admin looks after writers and readers, the owner after
  * admins too. The owner is never a member to change or remove.
  */
 
+import { cleanLicence, MAX_LICENCE_LENGTH } from '../../src/js/ccli-licence.ts'
 import {
   asMemberRole,
   atLeast,
@@ -60,6 +65,15 @@ function asRole(value: unknown): MemberRole {
   return role
 }
 
+/** A licence number as the body gave it: tidied, and refused where it is not text or is too long */
+function licenceFrom(value: unknown): string {
+  if (typeof value !== 'string')
+    throw new Refusal(400, 'A licence number is text (empty to clear it)')
+  const licence = cleanLicence(value)
+  if (licence.length > MAX_LICENCE_LENGTH) throw new Refusal(400, 'That licence number is too long')
+  return licence
+}
+
 /** Check that a blob is this person's, and that they can write to the folder with it */
 async function checkSharing(ctx: AdminContext, identity: Identity, blob: string, rootRef: string) {
   let data: BlobData
@@ -89,6 +103,7 @@ export function handleCreateSpace(request: Request, ctx: AdminContext): Promise<
       throw new Refusal(400, 'A blob and a folder are needed')
     }
     if (!name || name.length > 200) throw new Refusal(400, 'A space needs a name')
+    const ccliLicence = body.ccliLicence === undefined ? '' : licenceFrom(body.ccliLicence)
     await checkSharing(ctx, identity, blob, rootRef)
 
     const spaceId = ctx.newSpaceId()
@@ -97,6 +112,7 @@ export function handleCreateSpace(request: Request, ctx: AdminContext): Promise<
       throw new Refusal(409, 'That space already exists')
     }
     await room.setOwnerBlob(blob)
+    if (ccliLicence) await room.setLicence(ccliLicence, identity)
     return jsonResponse({ spaceId, role: 'owner' })
   })
 }
@@ -242,6 +258,28 @@ const ADMIN_ROUTES: AdminRoute[] = [
       await checkSharing(ctx, identity, blob, info.rootRef)
       await room.setOwnerBlob(blob)
       return done()
+    },
+  },
+  {
+    methods: ['GET'],
+    path: /^\/licence$/,
+    async run({ room, role }) {
+      const { ccliLicence, history } = await room.licence()
+      return jsonResponse(atLeast(role, 'admin') ? { ccliLicence, history } : { ccliLicence })
+    },
+  },
+  {
+    methods: ['PUT'],
+    path: /^\/licence$/,
+    needs: 'writer',
+    async run({ request, room, identity, role }) {
+      const next = licenceFrom((await readJson(request)).ccliLicence)
+      const { ccliLicence: current } = await room.licence()
+      if (current && current !== next && !atLeast(role, 'admin')) {
+        throw new Refusal(403, 'Only an admin can change the licence number')
+      }
+      await room.setLicence(next || null, identity)
+      return jsonResponse({ ccliLicence: next || null })
     },
   },
   {

@@ -4,6 +4,7 @@
  * (team-client.ts); the space's files are synced as any space's, by whichever backend
  * `storageFor` gives it.
  */
+import { cleanLicence } from './ccli-licence.ts'
 import type { Person, Setlist, Space } from './data-types.ts'
 import { ChordlessDB } from './db.ts'
 import { getStoredBlob } from './google-auth.ts'
@@ -37,29 +38,21 @@ export async function createTeamSpace(
   const stored = await getStoredBlob()
   if (!stored) throw new Error('Sign in with Google first')
 
+  const ccliLicence = cleanLicence(options.ccliLicence)
   const rootRef = await folders.createTeamFolder(parentId, teamFolderName(teamName))
+  // (the Worker keeps the number with the team; this device keeps a copy to show)
   const { spaceId, role } = await teamApi.createSpace({
     blob: stored.blob,
     rootRef,
     name: teamName,
+    ...(ccliLicence ? { ccliLicence } : {}),
   })
   const space = await createSpace(await freeName(teamName))
-  const ccliLicence = cleanLicence(options.ccliLicence)
   return updateSpace(space.id, {
     rootRef,
     team: { id: spaceId, role },
     ...(ccliLicence ? { ccliLicence } : {}),
   })
-}
-
-/**
- * A CCLI licence number as typed, tidied: spaces and a leading "#" or "CCLI" dropped. Only
- * tidied, never judged (the formats differ by country), and empty if nothing is left.
- */
-export function cleanLicence(typed: string | undefined): string {
-  return (typed ?? '')
-    .replace(/^\s*(ccli)?\s*(licen[cs]e)?\s*(no\.?|number|#)?\s*:?/i, '')
-    .replace(/\s+/g, '')
 }
 
 /** The Drive folder's name: it says what it is, as it sits beside folders that are not Chordless's */
