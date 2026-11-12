@@ -16,6 +16,7 @@ import {
   isSyncAvailable,
   SyncManager,
 } from './sync-manager.ts'
+import { trackSync } from './sync-status.ts'
 import { phase, traced } from './telemetry/telemetry.ts'
 import { toast } from './toast.ts'
 import { setlistTitle } from './utils/date-utils.ts'
@@ -155,28 +156,32 @@ export class SyncOrchestrator {
     return traced(
       'chordless.sync.run',
       { 'chordless.sync.operation': name, 'chordless.sync.trigger': trigger },
-      async () => {
-        if (!this.syncManager) await phase('chordless.sync.init', {}, () => this.init())
-        const syncManager = this.syncManager as SyncManager
-        const send = (progress: SyncProgress) =>
-          progressCallback?.({ ...progress, timestamp: new Date().toISOString() })
+      () =>
+        // (told to the pages that say a space is syncing, and noted as the space's last sync)
+        trackSync(this.spaceId, async report => {
+          if (!this.syncManager) await phase('chordless.sync.init', {}, () => this.init())
+          const syncManager = this.syncManager as SyncManager
+          const send = (progress: SyncProgress) => {
+            report(progress)
+            progressCallback?.({ ...progress, timestamp: new Date().toISOString() })
+          }
 
-        try {
-          if (messages.starting) send({ stage: 'starting', message: messages.starting })
-          await operation(syncManager, send)
-          if (messages.complete) send({ stage: 'complete', message: messages.complete })
-          return { success: true } as const
-        } catch (error) {
-          console.error(`[SyncOrchestrator] ${name} failed:`, error)
-          progressCallback?.({
-            stage: 'error',
-            message: errorMessage(error),
-            error: errorMessage(error),
-            timestamp: new Date().toISOString(),
-          })
-          throw error
-        }
-      },
+          try {
+            if (messages.starting) send({ stage: 'starting', message: messages.starting })
+            await operation(syncManager, send)
+            if (messages.complete) send({ stage: 'complete', message: messages.complete })
+            return { success: true } as const
+          } catch (error) {
+            console.error(`[SyncOrchestrator] ${name} failed:`, error)
+            progressCallback?.({
+              stage: 'error',
+              message: errorMessage(error),
+              error: errorMessage(error),
+              timestamp: new Date().toISOString(),
+            })
+            throw error
+          }
+        }),
       // (the timer's syncs are the many, and mostly find nothing: the sampler reports one in ten of
       // them, going by the trigger above)
       { trackCalls: true }

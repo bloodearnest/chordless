@@ -6,6 +6,7 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { createTeamFolder } from '../src/js/drive-api.ts'
+import { forgetSync, lastSyncOf } from '../src/js/last-sync.ts'
 import {
   createSpace,
   deleteSpace,
@@ -15,6 +16,7 @@ import {
   updateSpace,
 } from '../src/js/space.ts'
 import { createSyncManager } from '../src/js/sync-manager.ts'
+import { SyncStatusEvent, syncRunning } from '../src/js/sync-status.ts'
 import { syncTeamSpace } from '../src/js/team-spaces.ts'
 import { makeSetlist } from './builders.ts'
 import { useFakeDriveRig } from './drive-harness.ts'
@@ -76,10 +78,25 @@ describe('syncTeamSpace', () => {
     db.db?.close()
 
     const stages: string[] = []
-    await syncTeamSpace(must(await getSpaceById(team.id)), progress => stages.push(progress.stage))
+    const seen: boolean[] = []
+    const onStatus = () => seen.push(syncRunning(team.id) !== null)
+    window.addEventListener(SyncStatusEvent.type, onStatus)
+    expect(lastSyncOf(team.id)).to.equal(null)
+    try {
+      await syncTeamSpace(must(await getSpaceById(team.id)), progress =>
+        stages.push(progress.stage)
+      )
+    } finally {
+      window.removeEventListener(SyncStatusEvent.type, onStatus)
+    }
     expect(stages[0]).to.equal('starting')
     expect(stages.at(-1)).to.equal('complete')
     expect(stages).to.include('pushing')
+    // (it was told to be running while it ran, and not running once it was done, and it is the space's last sync)
+    expect(seen[0]).to.equal(true)
+    expect(seen.at(-1)).to.equal(false)
+    expect(lastSyncOf(team.id)).to.not.equal(null)
+    forgetSync(team.id)
   })
 
   it('has a sync manager made for a space work on that space, whichever is in use', async () => {

@@ -16,13 +16,16 @@ import type { SetlistGroup, SetlistRow } from '../../components/setlist-group.ts
 import '../../components/setlist-group.ts'
 import '../../components/space-tabs.ts'
 import '../../components/status-message.ts'
-import type { Person, Setlist } from '../data-types.ts'
+import type { Person, Setlist, Space } from '../data-types.ts'
 import { watchData } from '../data-watcher.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
+import { emptySpaceKind } from '../empty-space-kind.ts'
 import { leaderName } from '../leaders.ts'
 import { goTo } from '../navigation.ts'
 import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
+import { getCurrentSpaceFull } from '../space.ts'
+import { SyncStatusEvent } from '../sync-status.ts'
 import { toast } from '../toast.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
 import { errorMessage } from '../utils/errors.ts'
@@ -110,12 +113,17 @@ export class HomeView extends PageView {
   }
 
   #groups = new Task(this, {
-    task: async (): Promise<{ groups: SetlistYear[]; shared: SetlistYear[] }> => {
+    task: async (): Promise<{
+      groups: SetlistYear[]
+      shared: SetlistYear[]
+      space?: Space
+    }> => {
       if (this.#sharedOnly) {
         return { groups: [], shared: sharedGroup(await listSharedWithMe().catch(() => [])) }
       }
       const db = await getCurrentDB()
       return {
+        space: await getCurrentSpaceFull(),
         groups: groupSetlistsByYear(
           await db.getAllSetlists(),
           new Date().getFullYear(),
@@ -133,6 +141,23 @@ export class HomeView extends PageView {
     watchData(this, ['setlist'], () => {
       if (!this.#sharedOnly) void this.#groups.run()
     })
+  }
+
+  /** A space started or finished syncing: an empty one says which, and shows what came when it is done */
+  #onSyncStatus = (event: SyncStatusEvent): void => {
+    if (!this.#sharedOnly && event.spaceId === this.#groups.value?.space?.id) {
+      void this.#groups.run()
+    }
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback()
+    window.addEventListener(SyncStatusEvent.type, this.#onSyncStatus)
+  }
+
+  override disconnectedCallback(): void {
+    window.removeEventListener(SyncStatusEvent.type, this.#onSyncStatus)
+    super.disconnectedCallback()
   }
 
   /** Give the form the people there are now, and who is using the app among them */
@@ -202,8 +227,21 @@ export class HomeView extends PageView {
    * with none of their own, the shared ones are all there is: they come first, in place of the
    * welcome card, if there are any.
    */
-  #renderGroups({ groups, shared }: { groups: SetlistYear[]; shared: SetlistYear[] }) {
+  #renderGroups({
+    groups,
+    shared,
+    space,
+  }: {
+    groups: SetlistYear[]
+    shared: SetlistYear[]
+    space?: Space
+  }) {
     if (groups.length === 0 && shared.length === 0) {
+      // A space that is a team's, or being fetched, is not a new user's: it says what it is
+      if (space && emptySpaceKind(space) !== 'first-use') {
+        void import('../../components/empty-space.ts')
+        return html`<empty-space .space=${space}></empty-space>`
+      }
       // A new user's first sight: loaded only now, as most visits have setlists
       void import('../../components/welcome-card.ts')
       return html`<welcome-card></welcome-card>`

@@ -13,6 +13,7 @@ import { createSpace, deleteSpace, getSpaceById, listSpaces, updateSpace } from 
 import { storageFor } from './storage/space-storage.ts'
 import type { TeamStorage } from './storage/team-storage.ts'
 import type { ProgressCallback } from './sync/session.ts'
+import { trackSync } from './sync-status.ts'
 import { teamApi } from './team-client.ts'
 import type { TeamRole } from './team-roles.ts'
 
@@ -264,7 +265,12 @@ export async function syncTeamSpace(space: Space, onProgress?: ProgressCallback)
   try {
     const manager = await SyncManager.open(space.name, space.id, { db, storage: storageFor(space) })
     await manager.init()
-    await manager.sync(onProgress ?? null)
+    await trackSync(space.id, report =>
+      manager.sync(progress => {
+        report(progress)
+        onProgress?.(progress)
+      })
+    )
   } finally {
     db.db?.close()
   }
