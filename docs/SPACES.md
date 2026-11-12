@@ -5,14 +5,16 @@ people are invited, how data moves between spaces, and how read-only works. Shar
 setlist sent to people without an account) are in SHARING.md. How sync itself works is in
 SYNC_ARCHITECTURE.md.
 
-> **Status:** the personal space and the single-user sync described under "Today" are built. The
-> team space is built end to end for the owner's-token credential (the Worker's team service, roles,
-> invites, joining, the Account and Teams page) and tried with real accounts, before the move to the
-> `chordless-app` Google project (docs/CLOUD_MIGRATION.md; its settings were carried over by
-> Terraform, so it was not run again). Pads in team spaces and team-managed storage (the service
-> account) are built (2026-11-10, on fakes). The copy/move UI and the rest are **designed, not built**. The order of work, a status list and where work
-> stopped are at the end. The code and docs
-> call it a space throughout (it was "organisation" until 2026-10-20: see "Naming").
+> **Status (checked against the code 2026-11-12):** the personal space, the team space for both
+> credentials (the owner's token, and team-managed storage on Chordless's service account), roles,
+> invites, joining, the Account and Teams page, the tabs, pads per space, a team's changes feed and
+> live channel, deleting a space, deleting and moving a setlist, and a device setting up its own teams
+> are **built**, and have been tried with real accounts (the service-account teams on 2026-11-12).
+> The tests run on fakes. **Not built:** the default space ("Presenting spaces"), bringing pads
+> across spaces, the shared-drive choice in the wizard, the Worker's checks on who may delete a
+> song or a setlist, the checksum precondition on writes, and a few smaller things listed under
+> "Order of work and status". The code and docs call it a space throughout (it was "organisation"
+> until 2026-10-20: see "Naming").
 
 ## Principle
 
@@ -20,9 +22,10 @@ SYNC_ARCHITECTURE.md.
 audio live in the user's own browser and in a Drive the user (or their team space's owner) controls.
 The Worker passes team-space traffic through (streamed, never buffered to storage) without
 persisting or caching it: no KV, R2, D1, Durable Object or Cache API entry may hold song or pad
-content. They hold only membership, roles, the owner's encrypted token blob, checksums, and, for
-the live channel, the hash of the secret a share's sender proved (LIVE_SYNC.md): its sockets carry one
-word, "changed", and never a setlist, chart or key. (Share
+content. They hold only membership, roles, invites, the ids of the Drive files in a team's tree, a
+team's CCLI licence number and the log of who changed it, the register of teams (below), the owner's
+encrypted token blob, checksums, and, for the live channel, the hash of the secret a share's sender
+proved (LIVE_SYNC.md): its sockets carry one word, "changed", and never a setlist, chart or key. (Share
 links are the one exception: the Worker caches ciphertext it cannot read.)
 
 Churches using Chordless are expected to hold a CCLI licence, which covers sharing charts with the
@@ -133,8 +136,9 @@ and a count of the songs imported this term against 200.
 
 A space is made for a team: there is no button that makes an empty one. The personal space is made
 automatically, and a team space comes with its folder, its sharing and its members, made together
-by the wizard (see "Creating a team space", below). The Account and Teams page's Space section therefore only
-lists the spaces on this device and switches between them; it no longer has "Create New Space".
+by the wizard (see "Creating a team space", below). The Account and Teams page therefore lists the
+spaces on this device (a card each, with Switch, Sync and Data) and has no "Create New Space"; the
+tabs under the header (below) switch too.
 
 **A personal space is never turned into a team space** (decided 2026-10-22). The first cut had a
 "Share this space" button that registered the current space's folder with the Worker. It was
@@ -162,8 +166,9 @@ inside it (`songs/`, `setlists/`, `shares/`, `pads/`). Because the app creates t
 2026-10-13 finding), so the picked folder must not be the team folder itself. The picker copy
 recommends a **shared drive** (members can see the files in Drive, the files survive the owner
 leaving, Google backs them up) but a My Drive folder is fine. Shared drives need `supportsAllDrives`
-and `includeItemsFromAllDrives` on every Drive call (not in `drive-api.ts` today) and the Picker API
-(API key, app id `818185619377` (the `chordless-app` project number), CSP for `apis.google.com`, `docs.google.com`, `www.gstatic.com`).
+and `includeItemsFromAllDrives` on every Drive call (built: `allDrivesUrl`, `drive-client.ts`) and the Picker API
+(`folder-picker.ts`: the key is `PICKER_API_KEY` on the Worker, served at `/api/config`; app id `818185619377`, the
+`chordless-app` project number; the CSP allows `apis.google.com`, `docs.google.com`, `www.gstatic.com`).
 
 **A team space with only its owner needs no Worker** and syncs like a personal space. "Enable
 sharing" is the opt-in that hands the Worker the owner's token. One owner per team space (a person
@@ -185,14 +190,14 @@ a re-pointing of the folder.
   (`current-space-name`) for synchronous rendering.
 - On first load a default space named "Personal" is created and made current. On a first Google
   sign-in, a space still called "Personal" is renamed to the user's name (metadata only).
-- **Deleting a space:** a space's Manage modal on Account and Teams, "Delete from this device":
-  not available for the space being worked in (switch first), and after a confirmation that names it. It removes the space's record and
-  its local database (setlists, songs, charts); nothing in Google Drive is touched, so a folder it
-  synced to stays there for the user to delete.
-- Spaces are completely isolated: songs and setlists belong to exactly one; switching shows the
-  home page afresh on the other database (no page reload: `switchSpace` in `space.ts` sets the
-  current space, tells `SpaceChangeEvent`, and goes to `/` with `{ fresh: true }`); a setlist references only its own space's songs; the same CCLI song in
-  two spaces is two separate instances.
+- **Deleting a space:** from this device only, or everywhere (the Drive folder to the trash):
+  see "Deleting a space", below.
+- Spaces are completely isolated: songs and setlists belong to exactly one; switching (a tab, or
+  Switch on a space's card) shows the home page afresh on the other database (no page reload:
+  `switchSpace` in `space.ts` sets the current space, tells `SpaceChangeEvent`, and goes to `/` with
+  `{ fresh: true }`); a setlist references only its own space's songs; the same CCLI song in
+  two spaces is two separate instances. The library alone can list other spaces' songs
+  (`other-songs.ts`, "Add to my library").
 
 ### Finding the Drive folder
 
@@ -203,8 +208,8 @@ a re-pointing of the folder.
   the device has nothing synced yet, it joins that existing folder instead.
 - If the linked folder is trashed or gone, sync stops with an explanation rather than creating a
   new one.
-- Finding by name goes away for team spaces (the id is issued and stored); it stays for the
-  personal space.
+- A team space never finds its folder by name (the id is issued and stored); a personal space does
+  on the first sync of a new device.
 
 ### Setlist leaders
 
@@ -301,8 +306,8 @@ The Worker keeps no per-user state (a team's members are the team's, in D1).
    service account), so Drive sees one account acting for the whole team.
 5. **The space's owner syncs** directly, as in 3: they own the folder.
 
-The ID token is for the Worker's access control only: it says who is asking, the Durable
-Object says what they may do, and the Drive credential does the reading and writing.
+The ID token is for the Worker's access control only: it says who is asking, the space's rows in D1
+say what they may do, and the Drive credential does the reading and writing.
 
 ## Why the Worker serves members (verified 2026-10-13, real second account)
 
@@ -340,7 +345,7 @@ everyone (the consent screen must be "In production": refresh tokens last 7 days
 
 ## Creating a team space (the wizard)
 
-**Decided 2026-10-22, not built.** The adoption path is: someone at a church tries Chordless on
+**Decided 2026-10-22, built except where marked.** The adoption path is: someone at a church tries Chordless on
 their own, in the personal space, then decides the team should use it. Making that step easy is
 the job of one dedicated page (a route, `/account/new`, not a modal on the Account and Teams page: it has
 several steps, and a route gives it the back button, reload and a URL, see ROUTING.md). It is
@@ -355,9 +360,10 @@ Steps, each on the one page:
    - *The team has a Google shared drive*: recommended (the files outlive any one person, members can
      see them in Drive, Google backs them up). This is also the way in to the **service account**
      ("Team-managed storage"): the wizard shows the address to add as Content manager, "Verify"s it,
-     and the owner's token is never stored. Not built; the step is there so the wizard does not
-     have to change shape when it is. Until then it picks a folder on the shared drive and uses the
-     owner's token like any other.
+     and the owner's token is never stored. **Not in the wizard:** it has one folder choice
+     ("Where to keep it in Google Drive", with a hint that a shared drive is best) and starts every
+     team on the owner's token. The switch is made afterwards from "Team storage" on the Team's
+     page (`team-storage-panel.ts`, "Credentials" below).
    - *No shared drive*: pick a parent folder in My Drive with the Picker. The owner-token path, and
      the default for free Gmail users. Shared drives need Workspace, so this cannot be dropped.
    Either way the app creates `<name>/` inside the picked parent (with `songs/`, `setlists/`,
@@ -416,18 +422,17 @@ identity of its own, not subject to app verification, seeing only what is shared
 someone's My Drive folder, but files it creates in a shared drive belong to the drive. That is also
 what makes ownership disappear as a problem.
 
-**Built 2026-11-10, tested on fakes** (the token request signed with a test key and checked at a
+**Built 2026-11-10, tested on fakes, and tried 2026-11-12 with two real teams on the service account** (the token request signed with a test key and checked at a
 stand-in for Google's endpoint, the folder check on FakeDrive, the routes end to end through the
 router): `worker/src/service-account.ts` makes the account's tokens (RS256, signed with `jose`, kept in
-the isolate's memory for their hour) from the Worker secret `TEAM_STORAGE_KEY`; the space's Durable
-Object records which credential it uses (`credential`: `owner` or `service-account`); the owner's
+the isolate's memory for their hour) from the Worker secret `TEAM_STORAGE_KEY`; the space's row in D1
+records which credential it uses (`credential`: `owner` or `service-account`); the owner's
 page has "Team storage" beside the Team's people (`team-storage-panel.ts`). Routes:
 `GET /credential` (admin: which, and the address), `POST /credential/service-account` (owner: check,
-then switch), and the existing `PUT /credential` with a sign-in, which switches back. **Not yet:** a
-key made and put in the secret (by hand: `gcloud iam service-accounts keys create` for
-`team-storage@chordless-app.iam.gserviceaccount.com`, then `wrangler secret put TEAM_STORAGE_KEY`),
-and a real run on a Workspace shared drive. Without the key the panel shows nothing, and nothing
-changes. Step 1 below (moving the folder into a shared drive) is not built: the check says so when
+then switch), and the existing `PUT /credential` with a sign-in, which switches back. The key is made by hand
+(`gcloud iam service-accounts keys create` for `team-storage@chordless-app.iam.gserviceaccount.com`,
+then `wrangler secret put TEAM_STORAGE_KEY`); without it the panel shows nothing, and nothing
+changes. **Not built:** step 1 below (moving the folder into a shared drive): the check says so when
 the folder is in a My Drive. Unchecked on a real drive: that Drive's feed of changes, asked by the
 service account, covers a shared drive's files (`includeItemsFromAllDrives` is sent).
 
@@ -490,8 +495,8 @@ Agreed with the owner of the project:
 Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
 - **Making a space:** `POST /api/spaces` with the page's blob, the folder and a name. The Worker
   checks the blob is the caller's (`owner_sub` against the ID token) and that it sees the folder,
-  writable and not in the bin, then issues the space's id and keeps the blob in a new Durable
-  Object. The owner's client keeps the id (nothing records a folder against an id on the Worker, so
+  writable and not in the bin, then issues the space's id and keeps the blob in D1
+  (`team_credentials`). The owner's client keeps the id (nothing records a folder against an id on the Worker, so
   sharing the same folder twice makes two spaces).
 - **Invites are for an email address.** An admin makes one for a role and an email
   (`POST /invites`) and gets its code once. Only the code's hash is kept; it lasts a week, is used
@@ -552,8 +557,12 @@ owner (implicitly admin) > admin > writer > reader. Worker enforcement:
 - **In a personal space the person is implicitly an admin** and may delete anything: they are a
   grown-up, and the backup (export) feature is there. **Every delete asks for confirmation, in every
   case**, danger-styled, naming the effect (CLAUDE.md: friction, not prohibition).
-- How a deletion works is in SYNC_ARCHITECTURE.md, "Deleting setlists". The Worker checks the role
-  on the server. To know who leads a setlist without reading its body, the setlist's file would carry
+- How a deletion works is in SYNC_ARCHITECTURE.md, "Deleting setlists". **What the Worker enforces
+  today:** a reader changes no file (`write()` in `team-api.ts` needs a writer), pad rules are
+  enforced, and so are the admin routes (people, invites, credential, licence, deleting the space).
+  **The two delete rules above are not:** the page checks them (`mayDeleteSetlist`, `team-roles.ts`),
+  but a writer's token can trash any file of the space (`POST /files/<ref>/trash`), a song's included.
+  To know who leads a setlist without reading its body, the setlist's file would carry
   the leader's person id (`leaderId`) as a file property (kept current on every push; not built), and the storage API's `status` returns
   a file's collection and its properties. Until restrictions on editing others' setlists exist
   (SYNC_ARCHITECTURE.md), a writer can make themselves the leader first, so the rule guards against
@@ -566,7 +575,7 @@ SYNC_ARCHITECTURE.md), and an admin's finer powers.
 ## Pads in team spaces
 
 Built 2026-11-10, tested on fakes (the memory storage, FakeDrive, the Worker's router end to end in
-`team-contract.test.ts`); not yet on a deployed Worker.
+`team-contract.test.ts`); no real run of the pad routes is recorded here.
 
 - **Where they are.** Every space's pads are in its own folder, `<space folder>/pads/<set>/`, a
   personal space's as well as a team's (`backend.padsIn(rootRef)`: STORAGE_API.md, "Pad sets"). There
@@ -600,25 +609,36 @@ Built 2026-11-10, tested on fakes (the memory storage, FakeDrive, the Worker's r
   (copy/move, above). A signed, short-lived direct download is *not* possible under `drive.file`,
   which is why the audio goes through the Worker.
 
-## Presenting spaces: user preference
+## Presenting spaces
 
-Setting "Spaces: Merged / Separate" in Preferences.
-- **Hidden entirely with one space** (the common case): no switcher, no badges, no choice.
-- **Merged (default once there is more than one space):** Home lists setlists from all spaces
-  badged/grouped by space; the library already merges (`other-songs.ts`), with a filter bar over the list (`library-space-filter.ts`, shown with two or more places) to switch a space's songs off; what is left out is kept in this browser (`library-spaces.ts`). New setlist uses a default
-  space (last used, changeable).
-- **Separate:** one active space, header switcher, everything scoped to it (today's model, with the
-  switcher moved from the Account and Teams page to the header).
-- A setlist belongs to exactly one space and references only that space's songs.
+**As built.** The tabs under the header (next section) are how a person sees a space's setlists,
+library and Add Song page, and the Account and Teams page has the data and sync of each. One space
+is in use at a time ("current"), and a tab is the switch. There is no "Merged / Separate"
+preference and no switcher in the header, and none is planned (decided 2026-11-12: the tabs do the
+job). Three things are shared across spaces:
+- **The library** lists other spaces' songs too (`other-songs.ts`), with a filter bar
+  (`library-space-filter.ts`, shown with two or more places) to switch a space's songs off; what is
+  left out is kept in this browser (`library-spaces.ts`).
+- **Pads:** the picker lists the sets of every space ("Pads in team spaces").
+- **Hidden entirely with one space** (the common case): no tabs, no labels, no choice.
 
-Ship Separate first (mostly today's code: `getCurrentDB()`, switch = reload). Merged needs setlist
-routes to resolve a space from the id and views to query several databases.
+A setlist belongs to exactly one space and references only that space's songs.
 
-**Creating a setlist.** The form always says which space it is created in (a header line "New
-setlist in Grace Church", plus the kind label when you have more than one space). With one place to
-save there is nothing to choose. With more than one (Merged), it is a "Save to" field pre-filled
-with the last one used, offering only places you can write to; in Separate mode it is the active
-space, read-only text. A wrong choice is fixed with "Move to…" (keeps the setlist id).
+**Creating a setlist** is in the current space. The form says which ("New setlist in Grace Church",
+plus the kind label when you have more than one space). A wrong choice is fixed with "Move to this
+space" in the setlist's info dialog, in edit mode (keeps the setlist id: SYNC_ARCHITECTURE.md,
+"Deleting setlists").
+
+**A default space (proposed 2026-11-12, not built, to be confirmed).** One space on a device is
+marked "default" ("Set as default", on a space's card and in a tab's menu):
+- it is the leftmost tab, the others keeping their fixed order;
+- it is where new things go: the "Save to" of the upload form, Add Song, imports and a new setlist
+  are pre-filled with it (a pre-fill, never a lock). If the default is one the person cannot write
+  to, the next space they can write to is used and the form says so;
+- with no choice made it is the first team joined or made, else Personal; leaving or deleting it
+  falls back the same way;
+- kept per device, in this browser; it does not decide which tab the app opens on (to be
+  confirmed: the last tab used is the better start in a service).
 
 ## Space tabs, and joining by invite (decided and built 2026-10-23)
 
@@ -632,17 +652,17 @@ never meet a "Personal" space they did not ask for.
 - One tab per place: each Team (by its own name), Personal (by the person's name once signed in),
   and **Shared** (the `shared-with-me` database, `docs/SHARING.md`). A small Team/Personal label sits
   beside the name, so two teams are never both "Team".
-- **Only tabs that exist.** One place means no tab bar (the rule under "Presenting spaces"); Shared
+- **Only tabs that exist.** One place means no tab bar; Shared
   appears only when something was shared; a Personal space with nothing in it (and not the current
   one) has no tab. It returns as soon as something is saved there, and the Account and Teams page can
   always show it.
 - Fixed order (Teams, Personal, Shared), the current tab marked. About three or four fit a phone;
   beyond that the rest go under a "More" menu, the most recently used staying as tabs.
-- A tab is the space switch (the home page, made afresh: no reload). Reading another space's database
-  without switching the app is "Merged" (above), later.
+- A tab is the space switch (the home page, made afresh: no reload). Reading another space's
+  database without switching the app is done only by the library (above).
 - A `role="tablist"` under the header, with arrow keys (as `chart-diff` does), never in the header,
   so it stays clear of the live-setlist controls. Account and Teams stays for managing spaces
-  (create, leave, rename), not for switching.
+  (create, leave, delete, sync), and its cards can switch too.
 - "Shared" is a tab of its own, not only a group at the foot of the home page.
 
 **Joining by invite**
@@ -717,10 +737,13 @@ Google accounts.
   `addParents/removeParents` for a move; `supportsAllDrives` for shared-drive targets), not through
   the local DB.
 - **Migration:** the "Creating a team space" wizard does this as one of its steps: the space is
-  created, then songs, setlists and pads are moved (the default) or copied from the personal space.
-  The personal space is then empty and stays as the place for private sets. A move deletes
-  the setlists, those in Drive too (their files go to the Drive trash: "Deleting setlists",
-  SYNC_ARCHITECTURE.md). The same tool serves succession, handing over or splitting a team space.
+  created, then songs (copied) and setlists (moved by default, or copied) are brought across. Pads
+  are not. A move deletes the setlists, those in Drive too (their files go to the Drive trash:
+  "Deleting setlists", SYNC_ARCHITECTURE.md). The same tool should serve succession, handing over or
+  splitting a team space.
+- **Built:** the core (`space-transfer.ts`: `copySongs`, `transferSetlists`, `transferSpace`,
+  `bringAcross`, `contentsOf`), the wizard step, and moving one setlist from its info dialog.
+  **Not built:** a "copy/move" for songs, or for a whole existing space, from the UI; and pads.
 - Copying out of a team space into your personal space is allowed for any member (it is local data
   in Drives they control). The library's "Add to my library" for a song from another database is
   the one-song version.
@@ -731,10 +754,11 @@ Google accounts.
 the `isReadOnlySpace()` gates are gone (setlist page, library, home, imports, nav menu, the
 key and BPM controls). The one boolean left is `syncsBack()` (`space.ts`), and it removes
 only what needs Drive: sharing by link (the song list to paste stays).
-- The trigger is still Drive's folder `capabilities` or a refused upload (`refreshAccess()`,
-  `space-access.ts`), kept as `readOnly` on the space record and in localStorage. Under
-  `drive.file` it cannot fire for a person with only read access to someone else's folder, so until
-  the Worker reports a role this only covers a folder that really is read-only.
+- For a personal space or an owner's, the trigger is Drive's folder `capabilities` or a refused
+  upload (`refreshAccess()`, `space-access.ts`), kept as `readOnly` on the space record and in
+  localStorage. For a team member it is the role the Worker reports: a reader's space is made
+  `readOnly` when the team is joined or found (`team-spaces.ts`, `team-memberships.ts`, which also
+  brings a known team's role up to date).
 - Their changes are **never pushed**. They last on this device until a pull finds Drive's copy
   changed:
   - a **setlist** they changed is then replaced by the leader's version (the official plan wins; it
@@ -754,17 +778,16 @@ only what needs Drive: sharing by link (the song list to paste stays).
   added and removed, a different order, a key or tempo, the details) and offers **Undo**, which puts
   their version back (still never uploaded). Undo lasts as long as the toast (15 seconds).
 - **No guard for a setlist that is open or live, on purpose.** A leader's last-minute song must reach
-  a live follower: blocking it would go against "permissive in the moment". Today it cannot happen
-  mid-service anyway, because a sync only runs when the user presses it on the Account and Teams page. When
-  updates can arrive while a setlist is open (an immediate sync, which the live channel's "changed"
-  asks for, LIVE_SYNC.md), apply them in place: keep the current song by its song id, say what changed with the same
-  summary, and keep Undo. The diff is pure so both sources can share it.
+  a live follower: blocking it would go against "permissive in the moment". It can happen
+  mid-service, since the app syncs by itself (SYNC_ARCHITECTURE.md, "Immediate background sync"):
+  the open setlist is updated in place (`applyChangedSetlist`), keeping the current song by its song
+  id, saying what changed with the same summary, and keeping Undo.
 - The marker does not yet list *what* differs (their value, the official one, whether the official
   one changed since). That, and a per-field merge, are the device layer in SYNC_ARCHITECTURE.md,
   "Several people editing a setlist".
 
-**To do:** when the Worker reports roles, `syncsBack(space)` comes from the role and the
-Drive-capabilities trigger and the refusal counting can go. Anyone (a writer too) could choose "keep
+**To do:** the Drive-capabilities trigger and the refusal counting can go for team spaces, whose
+role is known. Anyone (a writer too) could choose "keep
 this set local" later. A received share (the `readOnly` page option) should allow local edits the
 same way: it is kept on the device on its own, so a key change there is harmless.
 
@@ -816,18 +839,20 @@ carry, and the menu already has "Import Songs" and "Import a Setlist", which are
 - **Transport per space** (the `setAccessTokenProvider` seam): personal/owner → googleapis with the
   own token; member → `/api/space/<id>/drive/...` with their Google ID token. One engine
   (`sync-manager.ts`, `sync/*`).
-- **Conflicts:** personal spaces are single-writer: keep Drive wins plus a conflict copy of dropped
-  local edits. Team spaces add the Worker checksum precondition (409) and, planned, a Durable Object per space
-  to serialise writes (SYNC_ARCHITECTURE.md).
+- **Conflicts:** Drive wins and the local edit is dropped, with a console warning, in every space
+  (`sync/pull.ts`). Planned, not built: a conflict copy of dropped local edits; for team spaces the
+  Worker's checksum precondition (409) and serialised writes (SYNC_ARCHITECTURE.md, "Several people
+  editing a setlist").
 - **Owner goes direct**, so it works if the team service is down.
-- **Worker state:** a team space's rows in D1: members, roles, encrypted token blob (and a live room,
-  a Durable Object with no storage). Never content. If the owner revokes the app, members see "owner needs to sign in again".
-- **Immediate/offline sync** (SYNC_ARCHITECTURE.md) is made space-aware: a local save sends
-  `LocalChangeEvent`, and the page's `AutoSync` runs an incremental sync of the space in use after ~2s of
-  quiet (a service worker is not needed: the app is a single page). For a team space it needs the Worker to
-  have a feed of changes (until then a team member's edit goes with the next full sync). No extra offline queue: a dropped push
-  leaves the record "changed" (content hash vs `syncedContentHash`). 401/403/409 keep the local
-  change and surface it. Role and membership are cached locally so a team space opens offline.
+- **Worker state:** a team space's rows in D1: members, roles, invites, the refs in its tree, the
+  encrypted token blob (and a live room, a Durable Object with no storage). Never content. If the owner revokes the app, members see "owner needs to sign in again".
+- **Immediate sync** (SYNC_ARCHITECTURE.md) is space-aware and built for both: a local save sends
+  `DataChangeEvent`, and the page's `AutoSync` runs an incremental sync of the space in use after ~2 s
+  of quiet, and on a tick (every 60 s in a team space, 5 minutes in a personal one). A team space has
+  a feed of changes from the Worker (`/changes/start`, `/changes`) and a live channel, so a member
+  sees an edit within seconds. No extra offline queue: a dropped push leaves the record "changed"
+  (content hash vs `syncedContentHash`). 401/403/409 keep the local change and surface it. Role and
+  membership are cached locally so a team space opens offline.
 
 ## Per-team-space encryption key: recommend no
 
@@ -900,7 +925,7 @@ member), a throwaway dev Worker and a service account. Detail of each run is bel
   sharing policy than the test one, and whether shared drives exist on the nonprofit tier.
 - A permanent delete by a Content manager answered 404, not 403: unresolved, and it does not matter.
 - Clock-time costs: Drive calls took 1 s or more each through the Worker, and `changes.list` runs
-  3 to 6 s behind a change. Pulls by a timer are fine; anything wanting faster has the live channel (a WebSocket in the space's Durable Object that makes the others sync now; it still waits for the feed: LIVE_SYNC.md).
+  3 to 6 s behind a change. Pulls by a timer are fine; anything wanting faster has the live channel (a WebSocket in the space's room, a Durable Object with no storage, that makes the others sync now: LIVE_SYNC.md).
 
 The throwaway code (`worker/src/spike-broker.ts`, `spike-service-account.ts`, `src/dev/broker-spike.*`,
 `src/dev/shared-drive-probe.*`, `src/dev/picker.js`, and their tests) was deleted on 2026-10-20 when the
@@ -1023,71 +1048,42 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 
 ## Order of work and status
 
-1. [ ] Principle in CLAUDE.md; this doc and the consolidation.
+Checked against the code 2026-11-12.
+
+1. [x] Principle in CLAUDE.md and this doc.
 2. [x] Spike (above): passed, see "Spike results".
-3. [ ] Space abstraction: space id + `rootRef` identity, folder-location Picker on create,
-   shared-drive flags, no name matching, per-space transport. **The storage API (docs/STORAGE_API.md)
-   is built:** the sync engine and share links work through `StorageBackend` / `SpaceStorage`, so
-   per-space transport is a matter of which backend a space is given, and the team service (item 7) is
-   another backend for it.
-   Done: `supportsAllDrives` (and `includeItemsFromAllDrives` on listings) on every call on files in
-   `drive-api.ts` and on the share download in the Worker (`allDrivesUrl`; tested against FakeDrive,
-   and since checked against a real shared drive: spike 2 passed). The folder is already found by `rootRef`
-   after the first sync. The Picker is built (2026-10-22: `folder-picker.ts`; its key is `PICKER_API_KEY` on the Worker, served at `/api/config`; the CSP is a first guess, not yet seen running). Not done: the space id and kind on the record, no name matching.
-   The UI, code and docs say "space" (renamed from "organisation" on 2026-10-20).
-4. [ ] Copy/move between spaces (an export and import, above, is built and does the hop between
-   accounts) (songs, setlists, pads, whole space); migrate personal data.
-   Done: the core for songs, setlists and whole spaces (`src/js/space-transfer.ts`, tested on local
-   databases). A move leaves a setlist that is in Drive in the source (deleting those is not built).
-   Not done: the UI, and pads (Drive calls).
-5. [x] Read-only rework: gates removed, `syncsBack`, pull skips records with local changes, "differs
-   from official" button with revert (setlists). Left: what-differs list, charts' marker, role from the Worker.
-6. [x] Per-space pads and the "Save to" upload choice (2026-11-10: "Pads in team spaces"). Left:
-   bringing pads across in the wizard, and copy/move (item 4).
-7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below), and so is the Durable Object's state (`team-state.ts`, `team-space.ts`, 2026-10-21: owner, members and roles, the refs in the tree, the owner's blob) the owner-token source for Drive (`team-drive.ts`), the route (`router.ts`, `team-routes.ts`, `team-context.ts`), making a space, invites, joining and looking after the people (`team-admin.ts`); the join page (`/join#<space id>.<code>`, `team-join.ts`) is built, including for a link opened in the installed app (`launch.ts` hands the page the fragment of any link it is launched with, tagged with the path it came for: `incoming-link.ts`), and the Account and Teams page works for a member and has a Team Space panel (`team-share-panel.ts`): share the current space, invite by email (the link is shown once, to send), change roles, remove people, withdraw invites, stop sharing, or leave; the space list (`select-space.ts`, on the Account and Teams page) says which spaces are a team's and the role in each, and how one is joined; not yet the service account, the pads, or a switcher in the header): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
-   pad rules, no song or pad content persisted (a test asserts no storage writes of bodies; the live channel holds only the hash of a share's sender secret, LIVE_SYNC.md).
-8. [ ] UI: the team space wizard ("Creating a team space": name, where the files live, what to
-   bring, invite, progress). **Built so far (2026-10-22): `/account/new` (`team-space-wizard.ts`) asks
-   for the name and the parent folder, makes `<name>/` in it, registers it and offers to open it;
-   "Share this space" is gone (the Team Space panel links to the wizard). What to bring (songs, setlists; not pads) and the invite step are built too. Not built:
-   the shared-drive choice and the service account; header switcher (Separate), then Merged
-   and the preference. Needs the Picker (item 3) and setlist deletion (SYNC_ARCHITECTURE.md) first.
-9. [ ] Space-aware immediate sync for team spaces: it works for Drive; the Worker needs a feed of changes.
-10. [x] Team-managed storage: service-account provider, upgrade flow, deletion of the owner's token on
-    switch, "Check and switch" and rollback (2026-11-10, on fakes). Left: the key in the Worker secret,
-    a real run, and moving a folder into a shared drive (step 1 of the upgrade flow).
+3. [x] Space abstraction: space id and `rootRef`, the folder Picker, the shared-drive flags,
+   per-space transport through `StorageBackend` (docs/STORAGE_API.md). Left: the space's kind is
+   not a field of its own (a team space has `team` set, personal does not).
+4. [ ] Copy/move between spaces. Built: the core for songs, setlists and whole spaces
+   (`space-transfer.ts`), the wizard's step, moving a setlist (also out of Drive in the source), and
+   export and import for the hop between accounts. Not built: a UI to copy or move songs or a whole
+   space, and pads (Drive calls).
+5. [x] Read-only rework: gates removed, `syncsBack`, pull skips records with local changes, the
+   "differs from official" button with revert (setlists), the role from the Worker for team members.
+   Left: the what-differs list, charts' marker, dropping the capabilities trigger for teams.
+6. [x] Per-space pads and "Save to" (2026-11-10). Left: the team default pad sound (TODO), and
+   bringing pads across (item 4).
+7. [x] Worker team service: the API for members, identity, D1 state, the register, invites, joining,
+   roles, licence, deleting a space, the changes feed, the live channel, pads, the Account and Teams
+   page and the join page. Left: the Worker's checks of the delete rules ("Roles"), the checksum
+   precondition on writes (409), and probing protections (item 11).
+8. [ ] The team space wizard. Built: name, parent folder (Picker), bring songs and setlists, invite,
+   result and retry. Not built: the shared-drive choice and the service account in the wizard, and
+   pads. The header switcher and Merged/Separate are dropped; the default space ("Presenting
+   spaces") replaces them, proposed.
+9. [x] Space-aware immediate sync for team spaces, with the Worker's feed of changes and the live
+   channel.
+10. [x] Team-managed storage: the service-account provider, "Check and switch" and rollback, deleting
+    the owner's token on the switch. Tried with real teams 2026-11-12. Left: moving a folder into a
+    shared drive (step 1 of the upgrade flow).
+11. [ ] Probing protections: unguessable or signed space ids, per-account rate limits, key rotation
+    (SECURITY.md).
+12. [x] Teams on another device (`GET /api/spaces`), tabs, invites bound to an email, Send…, deleting
+    a space, deleting and moving a setlist.
 
-Items carried over from the TODO (space section): a media-team email config option; define
-users, leaders, permissions; join/invite/remove user; restrict editing others' setlists by `ownerId`
-(see SYNC_ARCHITECTURE.md).
-
-## Where work stopped (2026-10-21; updated 2026-11-10)
-
-Built and committed, verified against fakes (fake Drive, in-memory storage, workerd for the Durable
-Object), and since tried with real accounts on the deployed Worker under the old Google project:
-
-- Identity: the Google ID token as the per-request proof, behind `IdentityProvider`; members are keyed
-  by `provider:sub`. Sign-in without Drive; `connectDrive()` adds `drive.file` later.
-- The Durable Object per team space; the owner-token credential; the storage API for members;
-  `TeamStorage` on the client; making a space, invites (bound to one email, single use, 7 days),
-  joining, roles, leaving, ending sharing.
-- Pages: `/join`, the Team Space panel on the Account and Teams page, and the space list showing kind and role.
-  The installed app hands the fragment of any link to the page (`incoming-link.ts`).
-
-**Not built**, in the order I would take them:
-
-1. ~~A real-account run first~~ (done, under the old Google project; not run again under
-   `chordless-app`, whose settings Terraform carried over).
-2. ~~Service-account credential~~ (item 10, built 2026-11-10, on fakes). The spike's account was
-   proven under the old project; the one in `chordless-app` has had no key made or used yet: the
-   real run is with its key in `TEAM_STORAGE_KEY`.
-3. ~~Pads in team spaces~~ (item 6, built 2026-11-10, on fakes).
-4. ~~Share links from a team space~~ (built 2026-10-22, tested on fakes: the team service passes
-   `publicLink` for shares and `unpublish` through to the owner's Drive; check on the real run).
-5. A switcher in the header, then Merged and Separate (item 8).
-6. Probing protections: unguessable or signed space ids, per-account rate limits, key rotation
-   (SECURITY.md).
-7. ~~The personal-space notice~~ (built); a toast after sign-in for "Drive not connected" is left, and may not be needed.
+Items carried over from the TODO (space section): a media-team email config option; restrict
+editing others' setlists by `ownerId` (SYNC_ARCHITECTURE.md, "Several people editing a setlist").
 
 ## Deleting a space
 
@@ -1147,6 +1143,6 @@ Built 2026-11-12 (`space-deletion.ts`, `space-delete-everywhere.ts`, the Worker'
 `fake-drive.ts` extended with a second user and shared-drive flags. To cover: create a team space
 with a chosen parent; enable sharing; join; reader edits stay local and survive a pull; reader can
 upload but not delete pads; admin can delete; move personal → team keeps setlist ids and moves pads;
-Merged/Separate with 1 vs 2 spaces (switcher hidden with 1); the Worker never persists bodies.
+tabs hidden with 1 space and shown with 2; the default space, once built; the Worker never persists bodies.
 Manual two-account run for the spike and the team-service and UI steps. Log real defects in
 `docs/test-catches.jsonl`.

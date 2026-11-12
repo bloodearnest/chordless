@@ -9,7 +9,7 @@ the designs for what's next.
   - [Immediate background sync](#immediate-background-sync) (built)
   - [Later](#later)
 
-Last updated 2026-10-23: the sync by itself (an incremental sync from the storage's feed of changes, on
+Checked against the code 2026-11-12 (first written 2026-10-23): the sync by itself (an incremental sync from the storage's feed of changes, on
 timers and after a local save, one at a time) is built; it is in Part 2, "Pulling while the app is open"
 and "Immediate background sync". Part 1 below describes the full sync, which is still the fallback, the
 Sync button and the first sync. Supersedes the earlier "Phase 2.5 / Phase 3" version of this
@@ -31,10 +31,14 @@ document and SETLIST_DELETION.md.
     <Space name>/
       setlists/  <date>-<leader>-<type>[-<name>].json   one per setlist
       songs/     <title>[-<ccli>].txt                    one chord chart per song variant
-    pads/
+      people/    <name>-<id>.json                        one per person (below)
+      shares/                                            share links' ciphertext (docs/SHARING.md)
+      pads/      <set>/<KEY>.mp3                         the space's pad sets (docs/SPACES.md)
   ```
 
-  Drive is the shared copy; each device syncs its local database with it. A song's melody (docs/MELODY.md) is
+  That is a personal space. A team space's folder is `<Team name> Chordless/` in the parent its owner
+  picked (docs/SPACES.md), with the same four folders inside. Drive is the shared copy; each device
+  syncs its local database with it. A song's melody (docs/MELODY.md) is
   a third kind of file in `songs/`, an `.mxl` (zipped MusicXML) `<title>[-<ccli>].lead-sheet.mxl` beside its chart (plain
   `.lead-sheet.musicxml` in a space that holds text only; `.melody.mxl` before the rename).
 
@@ -52,26 +56,28 @@ File metadata             drive-metadata.ts: names, types and properties of the 
         │
 Storage API               storage/types.ts: roots, and a space's files by `ref`, `props` and `rev`
         │                 (docs/STORAGE_API.md)
-Backend                   storage/drive-storage.ts → drive-api.ts: REST calls via fetch
+Backend                   storage/drive-storage.ts → drive-api.ts: REST calls via fetch (personal
+                          spaces and a team's owner); storage/team-storage.ts: the Worker's
+                          /api/space/<id> routes (a team's members)
 ```
 
 The engine does not know it is Drive: it takes a `StorageBackend` (`SyncManager`'s `storage`
 option, Google Drive unless a test says otherwise). A record keeps the file's `ref` and `rev`
 as `fileRef` and `fileRev`.
 
-Sync currently runs on the **main thread**, started by the user from the Storage
-page. The orchestrator and engine have no DOM dependencies, so they could run in the
-service worker too (planned below).
+Sync runs on the **main thread**: by itself (`auto-sync.ts`, Part 2) and when the user presses Sync
+on a space's card on the Account and Teams page. The orchestrator and engine have no DOM
+dependencies, so they could run in the service worker too (planned below).
 
 **Auth:** the service worker holds the session (a JWE blob from the worker). Pages
 get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
-`/session/refresh` when expired. `drive-api.js` lets the token source be replaced (`drive-client.ts` makes a Drive client for any source: the Worker makes one per team space)
+`/session/refresh` when expired. `drive-api.ts` lets the token source be replaced (`drive-client.ts` makes a Drive client for any source: the Worker makes one per team space)
 (`setAccessTokenProvider`), which tests use and a service-worker sync will need.
 
 ### A full sync (`SyncManager.sync()`)
 
 1. **Refresh members:** list who the space folder is shared with
-   (`permissions.list`) and cache it on the space record. Feeds the setlist
+   (`permissions.list`; for a team member the Worker's `GET /members`) and cache it on the space record. Feeds the setlist
    Leader dropdown. Failure is logged, not fatal.
 2. **Inventory:** list every file in the space folder (all pages,
    recursively). If listing fails, the "missing from Drive" checks below are skipped
@@ -131,8 +137,8 @@ does not see the renamed file, so it lets go of its copy until it is updated (a 
 Finding a space's Drive folder (by name on the first sync, by `rootRef` after), the setlist
 leaders list and read-only access are per-space matters: see [SPACES.md](SPACES.md).
 In short: a read-only user pulls but does not push, and edits locally; a pull leaves a record they
-changed (SPACES.md, "Read-only: local edits are never blocked"). Today the flag comes from
-Drive's folder capabilities, later from the Worker role.
+changed (SPACES.md, "Read-only: local edits are never blocked"). The flag comes from the Worker's
+role for a team member, and from Drive's folder capabilities otherwise.
 
 ### Change detection (no clock comparisons)
 
@@ -249,14 +255,17 @@ travel as small changes ("song 3 key to D") that merge by field. They do not go 
 opened every few weeks on poor wifi is offline when it edits, and Drive has no compare-and-set
 (to check), so two pushes a moment apart can overwrite each other.
 
-**The Worker, when it serves space writes** (SPACES.md, "Why the Worker serves members"). Every member's Drive call goes through it, so for a space
+**The Worker, when it serves space writes** (today it enforces only reader or writer, and the pad and
+admin routes) (SPACES.md, "Why the Worker serves members"). Every member's Drive call goes through it, so for a space
 it is the one place that can:
 1. **Enforce roles and ownership.** It already enforces reader or writer; it can reject a write
    to a setlist by someone who is not its owner or an editor, so the rule stops being advice.
 2. **Detect conflicts.** The client sends the checksum it last saw (it records `fileRev`
    already); if Drive's differs the Worker answers 409 and nothing is overwritten.
-3. **Make that atomic.** Check-then-write is not atomic, so writes go through one Durable Object
-   per space, which serialises them. A new Cloudflare piece (wrangler.toml has none).
+3. **Make that atomic.** Check-then-write is not atomic, so writes would go through one Durable Object
+   per space, which serialises them. **Not built, and neither is the checksum check (2 above)**: the
+   Worker serves a write as the client sends it. The only Durable Object, `TeamRoom`, holds live
+   sockets and no storage, and team state is in D1.
 
 The Worker detects and the client resolves: after a 409 the client fetches the current setlist,
 merges it with its layer by a three-way merge (it keeps the last-synced copy as the base) and
@@ -327,13 +336,14 @@ Drive** (`SyncManager.resetFromFolderByName`, via `SyncOrchestrator.resetFromFol
 
 ### Tests
 
-- `tests/fake-drive.js`: in-memory Drive (files, folders, `appProperties` vs
+- `tests/fake-drive.ts`: in-memory Drive (files, folders, `appProperties` vs
   `properties`, field projection, paging, `md5Checksum`, permissions, a skewable
   server clock, injected failures). Errors on anything it doesn't model.
 - `tests/drive-sync.test.ts`: the real `SyncManager` for two simulated devices
   sharing one fake Drive: push/pull, conflicts, clock skew, failures part-way,
   paging, spaces and renames, reset, metadata, members.
-- `tests/drive-metadata.test.ts`, `tests/fake-drive.test.ts`.
+- `tests/drive-metadata.test.ts`, `tests/fake-drive.test.ts`, `tests/team-contract.test.ts` (the same
+  engine against the Worker's team routes).
 - Not yet: integration tests against real Drive, using a separate Google test account
   with its refresh token in `.dev.vars`. First things to confirm there: uploads
   return `md5Checksum`, and whether metadata-only updates change `modifiedTime`.
@@ -368,16 +378,11 @@ not. A field changed on both is left: the change here is sent, and wins. A song 
 
 ### Deleting setlists
 
-**Built: setlists that are not in Drive.** The setlist info dialog's edit view (the pencil)
-has a **Delete setlist** button when the setlist has no `fileRef`, i.e. it has never been
-synced (or sync is not set up). It asks first (`#delete-setlist-modal`), then
-`ChordlessDB.deleteUnsyncedSetlist()` removes the setlist and this device's `setlist_local`
-state, and the page goes home. The database refuses a setlist with a `fileRef`, so the rule
-does not depend on the button. For a setlist that is in Drive the edit view says why it cannot
-be deleted. Because the rule is the local `fileRef`, a setlist another device has already
-uploaded, but this device has not yet synced, can be deleted here and will come back at the
-next sync (nothing in Drive is touched). The rest of this section is the design for setlists
-that are in Drive.
+**Built:** the setlist info dialog's edit view (the pencil) has a **Delete setlist** button; it asks
+first, then the page deletes the setlist and goes home. A setlist that was never synced is simply
+gone. (The first cut, `deleteUnsyncedSetlist`, refused a setlist with a `fileRef`; deleting one that
+is in Drive was added on 2026-11-12, below.) If a setlist cannot be deleted by this person the edit
+view says why (`deleteBlocked`).
 
 **Built (2026-11-12):** a setlist that is in Drive is deleted too. `ChordlessDB.removeSetlist` takes
 the record out and, if it has a file, notes it as a pending deletion (`kind: 'setlist'`, the same store
@@ -391,8 +396,8 @@ Drive can restore it). A dialog button, **Move to this space**, is delete plus `
 (`move`): the setlist is added to the other space first (its charts copied, its leader found there by
 email then name, or made), then removed here. The per-leader rule below is checked by the page
 (`mayDeleteSetlist`); the Worker does **not** yet check it on the server: a worship leader's token can
-trash any file of the space (`POST /files/<ref>/trash`), as before. What follows is the design, with
-that left to do.
+trash any file of the space (`POST /files/<ref>/trash`), as before. What follows is the design as
+first written; the parts not built are marked.
 
 Goal: remove a setlist (e.g. added in error), with the deletion reaching Drive and other devices.
 
@@ -407,8 +412,7 @@ Drive is already removed from devices that haven't edited it; see step 5 of a fu
   actions. Shown only when the setlist is deletable.
 - Confirmation via an `app-modal` of `type="confirm"` and `ask()`: "Delete setlist?
   It's moved to the Google Drive trash on the next sync." Confirm label "Delete".
-- The dialog fires e.g. `setlist-delete` with `{ setlistId }`; the page
-  (`setlist-page.js`, next to `saveSetlistDetails`) deletes it and goes home.
+- The dialog fires `SetlistInfoDeleteEvent`; the page (`setlist-page.ts`) deletes it and goes home.
 
 #### Who can delete
 
@@ -419,9 +423,9 @@ mistakes and not abuse, since anyone could make themselves the leader first):
   `ownerId`; the leader is now a person, `leaderId`, matched to the writer by the person's emails,
   which the Worker will read from the `people` collection), **an admin or
   the owner any setlist.** A writer cannot delete one someone else leads; the button is shown but
-  says why. Deleting songs is admin and up. The Worker checks it on the server from the file's
-  `ownerId` property and collection (docs/SPACES.md, "Roles"), so the rule does not depend on the
-  page.
+  says why. Deleting songs is admin and up. **Built in the page only** (`mayDeleteSetlist`,
+  `team-roles.ts`). Not built: the Worker checking it from the file's leader property and
+  collection (docs/SPACES.md, "Roles"), so that the rule does not depend on the page.
 - **Personal space:** the person using it, anything (implicitly an admin; the export is the backup).
 - **A confirmation always**, in every case.
 - Not signed in, or a space with no Drive: nothing in Drive to trash, so the existing local rule
@@ -440,7 +444,8 @@ mistakes and not abuse, since anyone could make themselves the leader first):
   history and search don't need to know about deleted setlists.
 - If it had been synced, record a **pending deletion** `{ setlistId, fileRef,
   deletedAt }` in a new object store (e.g. `pending_deletions`, keyPath `setlistId`):
-  a `ChordlessDB` version bump (the database is at version 7; this is 8).
+  a `ChordlessDB` version bump (done long since; the database is at version 15 now,
+  `DB_VERSION` in `db.ts`).
 - If it was never synced, it's simply gone. Its `setlist_local` entry can go too.
 
 #### Sync
@@ -484,9 +489,10 @@ Sync (FakeDrive already supports `PATCH { trashed: true }`):
 - update the existing test "re-uploads a setlist whose Drive file was deleted
   elsewhere" to cover the edited-copy case
 
-Database: the v6 upgrade adds the store and existing data survives. UI: the button
-only shows for the owner; Playwright: info → pencil → Delete → confirm → home,
-setlist gone, pending deletion recorded.
+Database: the upgrade adds the store and existing data survives. UI: the button shows only for
+someone who may delete the setlist; Playwright: info → pencil → Delete → confirm → home, setlist
+gone, pending deletion recorded. (This list was the plan; the tests that exist are in
+`tests/drive-sync.test.ts`, the database tests and the Playwright specs for the page.)
 
 ### Immediate background sync
 
@@ -667,9 +673,6 @@ backstop.
   ideally merge setlist field changes. Designed above, "Several people editing a setlist".
 - **Restricting edits to a setlist's owner** (`createdBy` and `ownerId` both write; admins later): designed above,
   first by blocking the sync of non-owners' writes.
-- **Inviting people to a team space:** shared users can't see the folder under
-  `drive.file`; the design (the Worker acts with the owner's access) is in SPACES.md.
-- **Songs:** deletion and the "deletion wins over an unchanged copy" rule for songs.
 - **Real Drive integration tests** (see Tests above).
 
 ## People (added 2026-10-29)
