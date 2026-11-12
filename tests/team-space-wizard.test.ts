@@ -545,7 +545,7 @@ describe('team-space-wizard', () => {
       expect(text()).to.contain('1 song came across')
     })
 
-    it('asks about moving 2 setlists in the plural, and says how many stay behind', async () => {
+    it('asks about moving 2 setlists in the plural, and says they leave the source, those in Drive for its trash', async () => {
       await sourceSpace(true)
       const db = new ChordlessDB(source.id)
       await db.init()
@@ -560,9 +560,11 @@ describe('team-space-wizard', () => {
       const modal = must(page.shadowRoot?.querySelector<AppModal>('app-modal'))
       await until(() => modal.open, 'the question to be asked')
       expect(modal.message).to.contain('2 setlists will move')
+      expect(modal.message).to.contain('Drive trash')
       await answer(true)
       await until(() => text().includes('is ready'), 'created')
-      expect(text()).to.contain('2 setlists are also still in')
+      expect(text()).to.not.contain('also still in')
+      expect(await inSource()).to.have.length(0)
     })
 
     it('offers what a space holds, with counts and sizes, and nothing where it holds nothing', async () => {
@@ -633,7 +635,7 @@ describe('team-space-wizard', () => {
       expect(brought.songs.length + brought.setlists.length).to.equal(0)
     })
 
-    it('says which setlists could not leave the source because they are in Drive', async () => {
+    it('moves a setlist that is in Drive out of the source too, noting its file for the Drive trash', async () => {
       await sourceSpace(true)
       await open()
       await pickSource()
@@ -641,8 +643,12 @@ describe('team-space-wizard', () => {
       button('Create team space').click()
       await answer(true)
       await until(() => text().includes('is ready'), 'created')
-      expect(text()).to.contain('1 setlist is also still in')
-      expect(await inSource()).to.have.length(1)
+      expect(text()).to.not.contain('also still in')
+      expect(await inSource()).to.have.length(0)
+      const sdb = new ChordlessDB(source.id)
+      await sdb.init()
+      expect((await sdb.getPendingDeletions()).length).to.equal(1)
+      sdb.db?.close()
     })
 
     it('keeps the new space and offers another try when bringing them across fails', async () => {

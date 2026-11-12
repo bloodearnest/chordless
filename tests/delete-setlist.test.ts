@@ -73,6 +73,15 @@ describe('ChordlessDB.removeSetlist', () => {
       expect(await db.getPendingDeletions()).to.deep.equal([])
     })
 
+    it('puts back a setlist that was never in Drive as it was', async () => {
+      await db.saveSetlist(makeSetlist({ id: 'local-only', name: 'Mine' }))
+      const removed = must(await db.removeSetlist('local-only'))
+
+      await db.restoreSetlist(removed)
+
+      expect(must(await db.getSetlist('local-only')).name).to.equal('Mine')
+    })
+
     it('makes it again without its link to the file when that is in the trash already', async () => {
       await db.saveSetlist(
         makeSetlist({
