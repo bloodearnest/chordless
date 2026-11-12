@@ -23,6 +23,7 @@ import {
   type SpaceStorage,
   type StorageBackend,
   type StoredFile,
+  type UpdateOptions,
   type WriteResult,
 } from './types.ts'
 
@@ -251,16 +252,21 @@ class TeamSpace implements SpaceStorage {
     return results
   }
 
-  update(ref: string, input: FileInput, body: FileBody): Promise<WriteResult> {
+  update(
+    ref: string,
+    input: FileInput,
+    body: FileBody,
+    { ifRev }: UpdateOptions = {}
+  ): Promise<WriteResult> {
     return this.#client.json(this.#id, {
       method: 'PUT',
       path: `/files/${encodeURIComponent(ref)}`,
-      body: { input, body: textOf(body) },
+      body: { input, body: textOf(body), ifRev },
     })
   }
 
   async updateMany(
-    items: { ref: string; input: FileInput; body: string }[]
+    items: ({ ref: string; input: FileInput; body: string } & UpdateOptions)[]
   ): Promise<(WriteResult | null)[]> {
     if (items.length === 0) return []
     const { results } = await this.#client.json<{ results: (WriteResult | null)[] }>(this.#id, {

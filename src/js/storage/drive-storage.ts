@@ -23,6 +23,7 @@ import {
   type SpaceStorage,
   type StorageBackend,
   type StoredFile,
+  type UpdateOptions,
   type WriteResult,
 } from './types.ts'
 
@@ -358,7 +359,13 @@ class DriveSpace implements SpaceStorage {
     )
   }
 
-  async update(ref: string, input: FileInput, body: FileBody): Promise<WriteResult> {
+  // (`ifRev` is not checked: Drive cannot, and the sync pulls before it pushes)
+  async update(
+    ref: string,
+    input: FileInput,
+    body: FileBody,
+    _options?: UpdateOptions
+  ): Promise<WriteResult> {
     this.#forgetListings()
     // (the type of a file does not change, so it is not sent in the metadata)
     const file = await this.#api.updateFile(
@@ -371,7 +378,7 @@ class DriveSpace implements SpaceStorage {
   }
 
   updateMany(
-    items: { ref: string; input: FileInput; body: string }[]
+    items: ({ ref: string; input: FileInput; body: string } & UpdateOptions)[]
   ): Promise<(WriteResult | null)[]> {
     return inGroups(items, ({ ref, input, body }) => this.update(ref, input, body))
   }

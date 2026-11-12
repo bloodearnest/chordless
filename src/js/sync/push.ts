@@ -21,7 +21,7 @@ import {
 } from '../drive-metadata.ts'
 import { leaderName } from '../leaders.ts'
 import { writeMxl } from '../mxl.ts'
-import type { WriteResult } from '../storage/types.ts'
+import type { UpdateOptions, WriteResult } from '../storage/types.ts'
 import { hashText } from '../utils/hash.ts'
 import {
   driveMarkers,
@@ -35,6 +35,16 @@ import { personContent, personContentHash, personHasLocalChanges } from './perso
 import { BATCH_SIZE, type ProgressCallback, type SyncRun } from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
 import { metadataOfSong } from './song-metadata.ts'
+
+/**
+ * An update is for the file as this device last saw it: a storage that can check (the team
+ * service) refuses it if someone changed the file since, instead of overwriting their change. The
+ * record is left changed, so the next sync pulls what is there first, by the usual rules.
+ */
+function seen(record: { fileRev?: string | null }): UpdateOptions {
+  // (a record that does not know its file's rev, null, sends no condition)
+  return { ifRev: record.fileRev }
+}
 
 /** A setlist's file content in Drive */
 function setlistJson(setlist: Setlist): string {
@@ -273,7 +283,7 @@ export async function pushPeople(
   }
   const uploadOne = async (person: Person) => {
     const result = person.fileRef
-      ? await run.space.update(person.fileRef, metadata(person), personJson(person))
+      ? await run.space.update(person.fileRef, metadata(person), personJson(person), seen(person))
       : await run.space.create('people', metadata(person), personJson(person))
     recordPersonUpload(person, result)
     await run.db.savePeopleSent([person])
@@ -302,6 +312,7 @@ export async function pushPeople(
             ref: person.fileRef as string,
             input: metadata(person),
             body: personJson(person),
+            ...seen(person),
           }))
         )
       ),
@@ -396,6 +407,7 @@ export async function pushSetlists(
             ref: setlist.fileRef as string,
             input: updateInput(setlistMetadata(run, setlist), 'setlist'),
             body: setlistJson(setlist),
+            ...seen(setlist),
           }))
         )
       ),
@@ -413,7 +425,12 @@ export async function pushSetlist(run: SyncRun, setlist: Setlist): Promise<void>
     const metadata = setlistMetadata(run, setlist)
     const result = setlist.fileRef
       ? // (metadata too, so the file name follows e.g. a changed date or leader)
-        await run.space.update(setlist.fileRef, updateInput(metadata, 'setlist'), content)
+        await run.space.update(
+          setlist.fileRef,
+          updateInput(metadata, 'setlist'),
+          content,
+          seen(setlist)
+        )
       : await run.space.create('setlists', fileInput(metadata), content)
     recordSetlistUpload(setlist, result)
     await run.db.saveSetlistsSent([setlist])
@@ -514,6 +531,7 @@ export async function pushSongs(
             ref: song.fileRef as string,
             input: updateInput(songMetadata(run, song, chordproFile), 'song'),
             body: chordproFile.content,
+            ...seen(song),
           }))
         )
       ),
@@ -532,7 +550,12 @@ export async function pushSongVariant(
   try {
     const metadata = songMetadata(run, song, chordproFile)
     const result = song.fileRef
-      ? await run.space.update(song.fileRef, updateInput(metadata, 'song'), chordproFile.content)
+      ? await run.space.update(
+          song.fileRef,
+          updateInput(metadata, 'song'),
+          chordproFile.content,
+          seen(song)
+        )
       : await run.space.create('songs', fileInput(metadata), chordproFile.content)
     recordSongUpload(song, chordproFile, result)
     await run.db.saveSongsSent([song])
@@ -624,7 +647,12 @@ export async function pushScores(
   }
   const write = (upload: ScoreUpload) =>
     upload.record.fileRef
-      ? run.space.update(upload.record.fileRef, updateInput(metadata(upload), 'score'), upload.body)
+      ? run.space.update(
+          upload.record.fileRef,
+          updateInput(metadata(upload), 'score'),
+          upload.body,
+          seen(upload.record)
+        )
       : run.space.create('songs', fileInput(metadata(upload)), upload.body)
   const uploadOne = async (upload: ScoreUpload) => {
     recordScoreUpload(upload, await write(upload))
@@ -672,6 +700,7 @@ export async function pushScores(
                 ref: upload.record.fileRef as string,
                 input: updateInput(metadata(upload), 'score'),
                 body: upload.body as string,
+                ...seen(upload.record),
               }))
             )
       ),

@@ -38,6 +38,16 @@ export interface FileInput {
 
 export type FileBody = string | Blob | ArrayBuffer | Uint8Array
 
+/**
+ * A condition on an update. `ifRev` is the rev the caller last saw the file with: a backend that
+ * can check it (the team service, which answers 409) writes nothing when the file's rev has moved
+ * on, so a change someone else made in between is not overwritten. A backend that cannot (Drive has
+ * no compare-and-set) ignores it, and the sync's own rules (a pull first, Drive wins) stand.
+ */
+export interface UpdateOptions {
+  ifRev?: string | null
+}
+
 /** What a write answers with */
 export interface WriteResult {
   file: StoredFile
@@ -135,13 +145,18 @@ export interface SpaceStorage {
     collection: Collection,
     items: { input: FileInput; body: string }[]
   ): Promise<(WriteResult | null)[]>
-  update(ref: string, input: FileInput, body: FileBody): Promise<WriteResult>
+  update(
+    ref: string,
+    input: FileInput,
+    body: FileBody,
+    options?: UpdateOptions
+  ): Promise<WriteResult>
   /**
    * Update several files at once. One entry per item, in order: null for a file that could not be
-   * updated, so a bad file does not stop the others.
+   * updated (or, with `ifRev`, was not the one expected), so a bad file does not stop the others.
    */
   updateMany(
-    items: { ref: string; input: FileInput; body: string }[]
+    items: ({ ref: string; input: FileInput; body: string } & UpdateOptions)[]
   ): Promise<(WriteResult | null)[]>
   /** Take back a file's public link (the file stays). A file that is gone is fine. */
   unpublish(ref: string): Promise<void>

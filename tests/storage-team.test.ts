@@ -45,6 +45,30 @@ describePadStorage('a team space’s (over the Worker, on memory)', async () => 
 })
 
 describe('TeamStorage', () => {
+  it('sends the rev it last saw with an update, and is refused with 409 when the file has moved on', async () => {
+    const rig = await makeTeamRig()
+    const space = teamFor(rig).space('space-1')
+    const input = { name: 'a.txt', props: {}, type: 'text/plain' }
+    const { file } = must(await space?.create('songs', input, 'one'))
+    rig.storage.edit(file.ref, 'someone else')
+    let error: unknown
+    await space?.update(file.ref, input, 'mine', { ifRev: file.rev }).catch(e => {
+      error = e
+    })
+    expect((error as TeamError).status).to.equal(409)
+    expect(await space?.readText(file.ref)).to.equal('someone else')
+    // (in a batch the file is left alone and has no result; one with no condition is written)
+    const [stale, free] = must(
+      await space?.updateMany([
+        { ref: file.ref, input, body: 'mine', ifRev: file.rev },
+        { ref: file.ref, input, body: 'forced' },
+      ])
+    )
+    expect(stale).to.equal(null)
+    expect(must(free).file.ref).to.equal(file.ref)
+    expect(await space?.readText(file.ref)).to.equal('forced')
+  })
+
   it('describes the space as its role allows: a reader cannot write', async () => {
     const rig = await makeTeamRig()
     rig.roles.set('reader-token', 'reader')

@@ -505,3 +505,77 @@ describe('deleting a setlist: POST /files/<ref>/trash', () => {
     assert.equal(rig.storage.file(song.file.ref).trashed, true)
   })
 })
+
+describe('writing a file as it was last seen: ifRev', () => {
+  async function made() {
+    const rig = await makeTeamRig()
+    const { file: stored } = await rig.storage
+      .space(rig.spaces[0].root)
+      .create(
+        'setlists',
+        { name: 's.json', props: { setlistId: 's1' }, type: 'application/json' },
+        'one'
+      )
+    const input = { name: 's.json', props: { setlistId: 's1' }, type: 'application/json' }
+    const put = (body: string, ifRev?: unknown) =>
+      call(rig, 'PUT', `/files/${stored.ref}`, { body: { input, body, ifRev } })
+    const many = (body: string, ifRev?: string) =>
+      call(rig, 'POST', '/update-many', {
+        body: { items: [{ ref: stored.ref, input, body, ifRev }] },
+      })
+    const content = () => rig.storage.file(stored.ref).content
+    return { rig, stored, put, many, content, input }
+  }
+
+  test('writes when the file is as the writer saw it, and says the new rev', async () => {
+    const { stored, put, content } = await made()
+    const answer = await put('two', stored.rev ?? undefined)
+    assert.equal(answer.status, 200)
+    assert.equal(content(), 'two')
+    assert.notEqual(answer.json().file.rev, stored.rev)
+  })
+
+  test('answers 409 and writes nothing when someone changed the file since', async () => {
+    const { rig, stored, put, content } = await made()
+    rig.storage.edit(stored.ref, 'changed by someone else')
+    const answer = await put('mine', stored.rev ?? undefined)
+    assert.equal(answer.status, 409)
+    assert.match(answer.text, /changed since you last read it/)
+    assert.equal(content(), 'changed by someone else')
+  })
+
+  test('writes with no condition as it always did', async () => {
+    const { rig, stored, put, content } = await made()
+    rig.storage.edit(stored.ref, 'changed by someone else')
+    assert.equal((await put('mine')).status, 200)
+    assert.equal(content(), 'mine')
+    assert.ok(stored)
+  })
+
+  test('refuses a condition that is not a rev', async () => {
+    const { put, content } = await made()
+    assert.equal((await put('mine', 7)).status, 400)
+    assert.equal(content(), 'one')
+  })
+
+  test('leaves out of a batch the files that changed, and says so with no result for them', async () => {
+    const { rig, stored, many, content, input } = await made()
+    const other = await rig.storage.space(rig.spaces[0].root).create('setlists', input, 'other')
+    rig.storage.edit(stored.ref, 'changed by someone else')
+    const answer = await call(rig, 'POST', '/update-many', {
+      body: {
+        items: [
+          { ref: stored.ref, input, body: 'mine', ifRev: stored.rev },
+          { ref: other.file.ref, input, body: 'other two', ifRev: other.file.rev },
+        ],
+      },
+    })
+    assert.equal(answer.status, 200)
+    const { results } = answer.json()
+    assert.equal(results[0], null)
+    assert.equal(results[1].file.ref, other.file.ref)
+    assert.equal(content(), 'changed by someone else')
+    assert.equal(rig.storage.file(other.file.ref).content, 'other two')
+    assert.equal((await many('x', stored.rev ?? undefined)).json().results[0], null)
+  })
+})
