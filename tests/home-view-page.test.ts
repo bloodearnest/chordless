@@ -8,6 +8,7 @@ import {
 } from '../src/components/setlist-details-form.ts'
 import { announceDataChange } from '../src/js/data-changes.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
+import { forgetSync, recordSync } from '../src/js/last-sync.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import {
   createSpace,
@@ -15,7 +16,9 @@ import {
   getCurrentSpace,
   setCurrentSpace,
   setSpaceReadOnly,
+  updateSpace,
 } from '../src/js/space.ts'
+import { SyncStatusEvent, trackSync } from '../src/js/sync-status.ts'
 import '../src/js/views/home-view.ts'
 import { type HomeView, sharedGroup } from '../src/js/views/home-view.ts'
 import { makeSetlist } from './builders.ts'
@@ -133,6 +136,65 @@ describe('the home view', () => {
     await open()
     expect(view.querySelector('welcome-card')).to.not.equal(null)
     expect(view.querySelector('setlist-group')).to.equal(null)
+  })
+
+  describe('a space with no setlists that is not a new user’s', () => {
+    afterEach(() => forgetSync(spaceId))
+    const emptyText = () =>
+      view
+        .querySelector('empty-space')
+        ?.shadowRoot?.querySelector('status-message')
+        ?.getAttribute('message') ?? ''
+    const asTeam = () =>
+      updateSpace(spaceId, {
+        team: { id: 'space-home1234', role: 'writer' },
+        rootRef: 'space-home1234',
+      })
+
+    it('says a team’s files are being fetched, not the welcome, and shows the setlists when they are in', async () => {
+      await asTeam()
+      let finish = () => {}
+      const syncing = trackSync(
+        spaceId,
+        () =>
+          new Promise<void>(resolve => {
+            finish = resolve
+          })
+      )
+      view = document.createElement('home-view')
+      view.route = { name: 'home' }
+      outlet.append(view)
+      await waitUntil(() => view.querySelector('empty-space'), 'the empty space')
+      await waitUntil(() => emptyText().includes('Getting'), 'the sync to show')
+      expect(view.querySelector('welcome-card')).to.equal(null)
+
+      // (the setlists come in as the sync goes on, as they do from Drive)
+      await db.saveSetlist(makeSetlist({ id: 'fetched', date: '2001-03-04' }))
+      announceDataChange({ spaceId, kind: 'setlist', ids: ['fetched'], origin: 'sync' })
+      finish()
+      await syncing
+      await waitUntil(() => view.querySelector('setlist-group'), 'the setlists')
+      expect(view.querySelector('empty-space')).to.equal(null)
+    })
+
+    it('says a team that has been fetched has no setlists, and offers to fetch one that has not', async () => {
+      await asTeam()
+      await open()
+      expect(view.querySelector('welcome-card')).to.equal(null)
+      expect(emptyText()).to.contain('have not been fetched')
+
+      recordSync(spaceId)
+      window.dispatchEvent(new SyncStatusEvent(spaceId))
+      await waitUntil(() => emptyText().includes('has no setlists yet'), 'the empty team')
+    })
+
+    it('ignores the sync of another space', async () => {
+      await open()
+      const before = view.querySelector('welcome-card')
+      window.dispatchEvent(new SyncStatusEvent('another-space'))
+      await new Promise(resolve => setTimeout(resolve, 30))
+      expect(view.querySelector('welcome-card')).to.equal(before)
+    })
   })
 
   it('shows the setlists by year, opening the current year, or the years it was left with', async () => {

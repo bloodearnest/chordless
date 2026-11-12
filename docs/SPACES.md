@@ -684,6 +684,17 @@ never meet a "Personal" space they did not ask for.
   fifteen minutes), and by hand: Account and Teams has **Look for my teams** when signed in. Joining,
   making a team and this check take one Web Lock (`chordless-team-spaces`), so a space half made by a
   join is not made again by a check.
+- **First sync starts at once** (`syncTeamSpace`, as joining does), one team after another. Until it
+  ends, the team's home page does not show the welcome card: that is a new user's, and a team is not
+  new because it has nothing here yet. `emptySpaceKind` (`empty-space-kind.ts`) tells what a space with
+  no setlists is: **first use** (the welcome card: a personal space never synced and not in Drive),
+  **being fetched** (a sync of a space never fetched is running: "Getting St Mark's songs and
+  setlists…" with the sync's progress bar), **not fetched** (in Drive or a team's, never synced, nothing
+  syncing: "Get them now"), or **empty** (fetched, or a team's, with no setlists: "St Mark's has no
+  setlists yet"). "Fetched" is `last-sync.ts`'s note for the space, which every sync that ends well
+  makes (`trackSync`, `sync-status.ts`, around the orchestrator's operations and the first sync of a
+  team); the home page follows `SyncStatusEvent` and shows the setlists when the sync is over. The
+  musician-type question (`first-use-setup`) is the device's, asked once, and is not about the space.
 - **Declined teams.** Taking a team off this device ("Delete from this device") remembers its id in
   this browser (`declined-team-spaces`), so the next check does not put it back; **Look for my
   teams** does, and forgets the declining. This is the only state kept. A team the person has left, or
