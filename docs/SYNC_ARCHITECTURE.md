@@ -162,8 +162,9 @@ Each synced record stores, from its last sync:
   the same file. (Local change detection does not use MD5: setlists are compared by a hash of
   their content without `modifiedDate`, key order or sync fields, which the uploaded bytes
   include.)
-- **Both:** a conflict. Currently **Drive wins** and the local edit is dropped (with
-  a console warning).
+- **Both:** a conflict. A chart or a score: **Drive wins** and the local edit is dropped (with a
+  console warning). A setlist: merged, the leader's version as the base ("When both sides changed a
+  setlist", below).
 - Records synced before these fields existed fall back to timestamp checks (device
   clock only) until their next sync records the hash and checksum, which needs a
   download but no upload.
@@ -176,7 +177,7 @@ Each synced record stores, from its last sync:
 | Local, never synced | uploaded |
 | Local and changed, not changed in Drive | uploaded (file updated in place) |
 | Changed in Drive only | downloaded |
-| Changed both | conflict: Drive wins |
+| Changed both | chart: conflict, Drive wins; setlist: merged, the leader's version as the base |
 | Synced before, **file now missing from Drive** | setlist: **removed here** if unedited since its last sync, **uploaded again** if edited; song: uploaded again |
 
 Uploads of new files are batched (50 setlists / 25 songs at a time, up to 30
@@ -201,11 +202,44 @@ Every upload and update goes through it.
 - Updates send name and `appProperties` with the content in one multipart request,
   so file names follow edits; retired properties from older versions are removed.
 
-### Several people editing a setlist (design, not built)
+### When both sides changed a setlist
 
-Written 2026-10-16. Today a setlist is one JSON file, whoever edits it writes the whole file, and
-a conflict (changed on this device and in Drive) is **Drive wins, the local edit silently
-dropped**. That was fine with one editor. It is a data-loss path for the case that matters most,
+**Built (2026-11-12).** A setlist changed on this device and in Drive (a pull finds Drive's file
+moved on while the record has changes that were not sent) is merged, not replaced
+(`sync/setlist-merge.ts`, called from `downloadSetlist` in `sync/pull.ts`). **The leader's version
+is the base; the other adds to it.**
+
+- **Who leads it** is read from the copy in Drive (`leaderId`), not the one on this device, so that
+  changing the leader here cannot win a conflict. The person using the device leads it if the
+  signed-in account's address is one of the leader's (a merged person is followed), or the leader is
+  the person this device was told is its user (`leadsIt`). Signed out, no leader, or a leader not
+  known: nobody, and Drive's version is the base.
+- **The base keeps** its order, each song's key and tempo, its notes and the setlist's details.
+- **The other side adds** the songs the base lacks that it added (`songId`, and which of that song
+  it is when it appears twice): after the song they followed there, first if they were first, last
+  if that song is gone. And its **annotations**: a new one is kept; one it edited that the base's
+  side did not is taken; one both edited stays the base's and the other's text is kept beside it as
+  a second annotation (its id is made from the text, so every device makes the same one).
+- **Added or removed?** A song or annotation the base lacks was either added by the other side or
+  removed by the base's. Each setlist record keeps what it held when last synced (`syncedShape`: the
+  entries, and each annotation's id with a hash of its text; written by every pull and push, never
+  in Drive) to tell them apart. What the base removed since stays removed. A record synced before
+  this was kept has none: everything the other side has that the base lacks is taken as added, once.
+- **A leader's own device** keeps its version (`kept`) and sends it: the 409 check (below) passes,
+  because the pull has just taken Drive's rev. **Anyone else's** gets the leader's version with
+  what they added (`merged`), which they send too. A reader's stays on the device, as ever.
+- **Told, once** (`tellOfReset`, `sync-orchestrator.ts`): "Your changes to *Sunday* were merged with
+  the leader's version (+ Song, …)", "*Sunday* was changed elsewhere too. Your version was kept…", or,
+  when none of theirs survived, "…were replaced by the leader's version". A reader gets Undo (their
+  version back, still never sent); a writer does not, since putting it back would send it over the
+  leader's.
+- **Not covered:** a chart, whose conflicts are still Drive wins; and a note on a song
+  (`SetlistEntry.notes`), which is the base's.
+
+### Several people editing a setlist (design; the conflict part above is built)
+
+Written 2026-10-16. Before the section above, a conflict (changed on this device and in Drive) was
+**Drive wins, the local edit silently dropped**. That was fine with one editor. It is a data-loss path for the case that matters most,
 a last-minute change on a band member's tablet that the next sync reverts. The principle behind
 the design is in CLAUDE.md, "be permissive in the moment": nobody is stopped from changing what
 they see; rights only decide **what reaches the shared setlist**.
@@ -282,8 +316,17 @@ could run the same module later. A solo user syncing straight to their own Drive
 no server check, but the same layer and merge stop their phone and tablet dropping each other's
 edits.
 
-Order of work: (1) never drop a losing local edit silently (a conflict copy is the cheap first
-step, see the TODO); (2) the device layer and merge module; (3) block the sync of non-owners'
+**Suggestions** (designed 2026-11-12, not built). The leader could be asked instead of overridden: a
+writer who does not lead a setlist presses "Suggest to the leader" and their changes go to the
+leader as a proposal (a file in a `proposals/` folder of the space's own Drive folder, one per
+proposer per setlist, holding the setlist they started from and the one they propose; nothing the
+Worker keeps). The leader's device lists the changes, one row each, with Accept and Reject, applied
+onto the current setlist (what no longer applies is shown as skipped). It would also let the Worker
+refuse a non-leader's write to a setlist file, which is advisory today; that would be a setting a
+leader turns on ("Ask me before others change my setlists"), not the default, so that a late change
+stays possible (CLAUDE.md, "permissive in the moment").
+
+Order of work: (1) the merge when both sides changed it (built, above); (2) the device layer; (3) block the sync of non-owners'
 writes, on the client; (4) the Worker's roles and conflict check, with the team service; (5) editors,
 then suggestions.
 
@@ -678,8 +721,8 @@ backstop.
 - **Full sync in the service worker / periodic sync:** the orchestrator would have to
   broadcast its progress to the pages with `postMessage` (today it calls a callback).
   Periodic Background Sync has the same platform limits.
-- **Conflict resolution:** today Drive wins. At least surface conflicts to the user;
-  ideally merge setlist field changes. Designed above, "Several people editing a setlist".
+- **Conflict resolution:** a setlist is merged (above); a chart is still Drive wins. Surfacing a
+  chart conflict is not built. Suggestions are designed above, "Several people editing a setlist".
 - **Restricting edits to a setlist's owner** (`createdBy` and `ownerId` both write; admins later): designed above,
   first by blocking the sync of non-owners' writes.
 - **Real Drive integration tests** (see Tests above).

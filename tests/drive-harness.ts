@@ -2,6 +2,7 @@ import { expect } from '@open-wc/testing'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import type { StorageBackend } from '../src/js/storage/types.ts'
+import type { Me } from '../src/js/sync/setlist-merge.ts'
 import { type ChangeTokenStore, type FolderLink, SyncManager } from '../src/js/sync-manager.ts'
 import { makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
@@ -90,7 +91,13 @@ export function makeRig(storage: () => StorageBackend | undefined) {
     {
       spaceName = TEST_SPACE.name,
       folderLink = memoryFolderLink(),
-    }: { spaceName?: string; folderLink?: FolderLink & { value?: string | null } } = {}
+      identity,
+    }: {
+      spaceName?: string
+      folderLink?: FolderLink & { value?: string | null }
+      /** Who is using the device, for telling whether they lead a setlist (none: the app's own way, which finds nobody signed in) */
+      identity?: () => Promise<Me>
+    } = {}
   ) {
     const db = new ChordlessDB(`test-sync-${name}-${crypto.randomUUID()}`)
     await db.init()
@@ -111,6 +118,7 @@ export function makeRig(storage: () => StorageBackend | undefined) {
       memberCache,
       changeToken,
       storage: storage(),
+      identity,
     })
     await sync.init()
     const device = { name, db, sync, folderLink, memberCache, changeToken }

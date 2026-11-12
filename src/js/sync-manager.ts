@@ -17,6 +17,7 @@ import { ChordlessDB, getCurrentDB } from './db.ts'
 import { isScoreFile } from './drive-metadata.ts'
 import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { ChordProParser } from './parser.ts'
+import { chosenMeId, getSignedInUser } from './people.ts'
 import { syncShares } from './share-manager.ts'
 import { getCurrentSpace, getSpaceById, setSpaceReadOnly } from './space.ts'
 import { SpaceDB } from './space-db.ts'
@@ -31,6 +32,7 @@ import {
 } from './sync/changes.ts'
 import { pullPeople, pullScores, pullSetlists, pullSongs } from './sync/pull.ts'
 import { pushPeople, pushScores, pushSetlists, pushSongs } from './sync/push.ts'
+import type { Me } from './sync/setlist-merge.ts'
 
 export type { ProgressCallback, SyncProgress } from './sync/session.ts'
 
@@ -61,6 +63,11 @@ export interface ChangeTokenStore {
   clear(): Promise<void>
 }
 
+/** Who is using this device in a space: the signed-in account, and the person it was told is its user */
+async function thisDevice(spaceId: string): Promise<Me> {
+  return { email: (await getSignedInUser())?.email ?? null, chosenPersonId: chosenMeId(spaceId) }
+}
+
 /** How old the cached members may be before an incremental sync reads them again */
 /** How long a check of the user's access to the space's folder stands, for the syncs from the feed (a refused write asks again) */
 export const ACCESS_REFRESH_MS = 5 * 60_000
@@ -87,6 +94,8 @@ export interface SyncManagerOptions {
   changeToken?: ChangeTokenStore | null
   /** Where the space's files are kept. Defaults to Google Drive. Tests pass a fake. */
   storage?: StorageBackend | null
+  /** Who is using this device, for telling whether they lead a setlist both sides changed. Defaults to the signed-in account and the person this device was told is its user. */
+  identity?: (() => Promise<Me>) | null
 }
 
 /**
@@ -248,6 +257,8 @@ export class SyncManager {
   readonly parser = new ChordProParser()
   /** The storage backend (Google Drive unless a test says otherwise) */
   readonly storage: StorageBackend
+  /** Who is using this device */
+  readonly identity: () => Promise<Me>
   /** The space's files, opened once the folder is known and dropped when a run ends */
   #space: SpaceStorage | null = null
   /** What the last check of the user's access to the folder said, and when (see refreshAccess) */
@@ -286,6 +297,7 @@ export class SyncManager {
       memberCache: options.memberCache ?? spaceMemberCache(id, record),
       changeToken: options.changeToken ?? spaceChangeToken(record),
       storage: options.storage ?? driveStorage,
+      identity: options.identity ?? (() => thisDevice(id)),
     })
   }
 
@@ -298,6 +310,7 @@ export class SyncManager {
       memberCache: MemberCache
       changeToken: ChangeTokenStore
       storage: StorageBackend
+      identity: () => Promise<Me>
     }
   ) {
     this.spaceName = spaceName
@@ -307,6 +320,7 @@ export class SyncManager {
     this.memberCache = parts.memberCache
     this.changeToken = parts.changeToken
     this.storage = parts.storage
+    this.identity = parts.identity
   }
 
   /** The space's files, once its folder is known (opened afresh for each sync) */
@@ -418,6 +432,7 @@ export class SyncManager {
       spaceId: this.spaceId,
       space: this.space,
       goneRefs,
+      identity: this.identity,
     })
   }
 

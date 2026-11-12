@@ -44,10 +44,10 @@ describe('SyncOrchestrator', () => {
     | 'resetLocalFromDrive'
 
   /** What a manager's operation resolves to: nothing found that a person must be told of */
-  const report = (resetSetlists: ResetSetlist[] = []) => ({
+  const report = (resetSetlists: ResetSetlist[] = [], readOnly: boolean | null = null) => ({
     heldBack: 0,
     resetSetlists,
-    readOnly: null,
+    readOnly,
     downloadsFailed: false,
   })
 
@@ -57,14 +57,15 @@ describe('SyncOrchestrator', () => {
     reports: object[] = [],
     failure?: Error,
     resetSetlists: ResetSetlist[] = [],
-    db?: ChordlessDB
+    db?: ChordlessDB,
+    readOnly: boolean | null = resetSetlists.length > 0 ? true : null
   ) {
     const manager = {
       db,
       [operation]: async (progress: ProgressCallback) => {
         for (const each of reports) progress(each as Parameters<ProgressCallback>[0])
         if (failure) throw failure
-        return report(resetSetlists)
+        return report(resetSetlists, readOnly)
       },
     }
     const orchestrator = new SyncOrchestrator('Test Church', null)
@@ -188,7 +189,13 @@ describe('SyncOrchestrator', () => {
             .map(el => el.shadowRoot?.textContent ?? '')
             .join(' ')
 
-        const one = orchestratorWith('sync', [], undefined, [{ before: mine, after: theirs }], db)
+        const one = orchestratorWith(
+          'sync',
+          [],
+          undefined,
+          [{ before: mine, after: theirs, how: 'replaced' }],
+          db
+        )
         await one.sync()
         expect(text()).to.contain(`Your changes to ${setlistTitle(mine)} were replaced`)
         expect(text()).to.contain('+ Beta')
@@ -204,8 +211,8 @@ describe('SyncOrchestrator', () => {
           [],
           undefined,
           [
-            { before: mine, after: theirs },
-            { before: { ...mine, id: 's-2' }, after: { ...theirs, id: 's-2' } },
+            { before: mine, after: theirs, how: 'replaced' },
+            { before: { ...mine, id: 's-2' }, after: { ...theirs, id: 's-2' }, how: 'replaced' },
           ],
           db
         )
@@ -217,7 +224,7 @@ describe('SyncOrchestrator', () => {
           'sync',
           [],
           undefined,
-          [{ before: mine, after: { ...mine, modifiedDate: 'later' } }],
+          [{ before: mine, after: { ...mine, modifiedDate: 'later' }, how: 'replaced' }],
           db
         ).sync()
         expect(text()).to.match(/were replaced by the leader's version\./)
@@ -233,10 +240,89 @@ describe('SyncOrchestrator', () => {
           ],
         }
         db.saveSetlist = () => Promise.reject(new Error('disk full'))
-        await orchestratorWith('sync', [], undefined, [{ before: mine, after: long }], db).sync()
+        await orchestratorWith(
+          'sync',
+          [],
+          undefined,
+          [{ before: mine, after: long, how: 'replaced' }],
+          db
+        ).sync()
         expect(text()).to.contain('…')
         toasts().at(-1)?.shadowRoot?.querySelector<HTMLButtonElement>('button.btn')?.click()
         await waitUntil(() => text().includes("Couldn't put your changes back"), 'it says so')
+      } finally {
+        db.db?.close()
+        await deleteDatabase(db.dbName)
+      }
+    })
+
+    it('says when a setlist was merged, or kept because the person leads it, and offers Undo only to a reader', async () => {
+      const db = new ChordlessDB(`merged-${crypto.randomUUID()}`)
+      await db.init()
+      try {
+        await db.saveSong(makeSong({ uuid: 'u-a', id: 'title-alpha', title: 'Alpha' }))
+        await db.saveSong(makeSong({ uuid: 'u-b', id: 'title-beta', title: 'Beta' }))
+        const mine = makeSetlist({
+          id: 's-1',
+          date: '2026-10-18',
+          songs: [makeEntry({ songId: 'title-alpha', songUuid: 'u-a', key: 'G' })],
+        })
+        const after = {
+          ...mine,
+          songs: [
+            ...mine.songs,
+            makeEntry({ songId: 'title-beta', songUuid: 'u-b', key: 'D', order: 1 }),
+          ],
+        }
+        const text = () =>
+          [...document.querySelectorAll('app-toast')]
+            .map(el => el.shadowRoot?.textContent ?? '')
+            .join(' ')
+        const buttons = () =>
+          [...document.querySelectorAll('app-toast')]
+            .at(-1)
+            ?.shadowRoot?.querySelectorAll('button.btn').length
+
+        await orchestratorWith(
+          'sync',
+          [],
+          undefined,
+          [{ before: mine, after, how: 'merged' }],
+          db,
+          true
+        ).sync()
+        expect(text()).to.contain(
+          `Your changes to ${setlistTitle(mine)} were merged with the leader's version`
+        )
+        expect(text()).to.contain('+ Beta')
+        expect(buttons()).to.equal(1)
+
+        // A writer: told too, with nothing to undo (putting theirs back would send it over the leader's)
+        await orchestratorWith(
+          'sync',
+          [],
+          undefined,
+          [{ before: mine, after, how: 'kept' }],
+          db,
+          false
+        ).sync()
+        expect(text()).to.contain(
+          `${setlistTitle(mine)} was changed elsewhere too. Your version was kept`
+        )
+        expect(buttons()).to.equal(0)
+
+        await orchestratorWith(
+          'sync',
+          [],
+          undefined,
+          [
+            { before: mine, after, how: 'kept' },
+            { before: { ...mine, id: 's-2' }, after: { ...after, id: 's-2' }, how: 'merged' },
+          ],
+          db,
+          false
+        ).sync()
+        expect(text()).to.contain('2 setlists you changed were changed elsewhere too')
       } finally {
         db.db?.close()
         await deleteDatabase(db.dbName)

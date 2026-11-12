@@ -8,6 +8,7 @@ import { withNumericTempos } from '../db.ts'
 import type { SpaceStorage } from '../storage/types.ts'
 import { driveMarkers, setlistHasLocalChanges } from './changes.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
+import { shapeOf } from './setlist-merge.ts'
 
 /**
  * Whether a setlist differs from the official one in Drive, which for a user who can only read
@@ -37,5 +38,6 @@ export async function revertSetlistToOfficial(
     ...driveMarkers(file),
     lastSyncedAt: new Date().toISOString(),
     syncedContentHash: setlistContentHash(remote),
+    syncedShape: shapeOf(remote),
   })
 }

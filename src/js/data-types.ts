@@ -314,6 +314,18 @@ export interface ReceivedShare {
   leaderName?: string
 }
 
+/**
+ * What a setlist held when it was last synced, as far as a merge needs to tell what each side
+ * added or removed since (docs/SYNC_ARCHITECTURE.md, "When both sides changed a setlist"): the
+ * songs it had, and each annotation's id with a hash of its text. Never in Drive.
+ */
+export interface SyncedShape {
+  /** The entries, by `songId` and which of that song it is (`songId#0`, `songId#1`) */
+  songs: string[]
+  /** Annotation id → hash of its text */
+  annotations: Record<string, string>
+}
+
 export interface Setlist {
   id: string
   /** YYYY-MM-DD */
@@ -346,6 +358,8 @@ export interface Setlist {
   fileRev?: string | null
   lastSyncedAt?: string | null
   syncedContentHash?: string | null
+  /** What it held when last synced (none on a record synced before this was kept) */
+  syncedShape?: SyncedShape | null
   /** The pre-content-hash field, kept only for old records */
   _lastSyncHash?: string | null
   deletedAt?: string | null

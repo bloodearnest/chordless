@@ -34,6 +34,7 @@ import {
 import { personContent, personContentHash, personHasLocalChanges } from './person-hash.ts'
 import { BATCH_SIZE, type ProgressCallback, type SyncRun } from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
+import { shapeOf } from './setlist-merge.ts'
 import { metadataOfSong } from './song-metadata.ts'
 
 /**
@@ -85,6 +86,7 @@ function recordSetlistUpload(setlist: Setlist, { file, intact }: WriteResult) {
   if (intact) {
     setlist.lastSyncedAt = new Date().toISOString()
     setlist.syncedContentHash = setlistContentHash(setlist)
+    setlist.syncedShape = shapeOf(setlist)
   }
 }
 

@@ -7,6 +7,7 @@ import type { ChordlessDB } from '../db.ts'
 import type { ChordProParser } from '../parser.ts'
 import type { SpaceStorage, StoredFile } from '../storage/types.ts'
 import { setlistIdOf } from './changes.ts'
+import type { Me } from './setlist-merge.ts'
 
 /** What a sync reports while it runs */
 export interface SyncProgress {
@@ -77,17 +78,23 @@ export function inBatchesOfBytes<T, R>(
   return inBatchesOf(refs => space.readManyBytes(refs), items, refOf, work, onGroup)
 }
 
-/** A setlist a pull replaced: what this device had, and what it has now */
+/**
+ * A setlist a pull changed although it had changes here: what this device had, what it has now,
+ * and how. `replaced`: Drive's, nothing of this device's was kept; `merged`: Drive's (the leader's)
+ * with what was added here; `kept`: this device's (it leads the setlist), with what was added
+ * elsewhere (docs/SYNC_ARCHITECTURE.md, "When both sides changed a setlist")
+ */
 export interface ResetSetlist {
   before: Setlist
   after: Setlist
+  how: 'replaced' | 'merged' | 'kept'
 }
 
 /** What a sync reports once it has ended */
 export interface SyncReport {
   /** How many charts the pull left alone because they have local changes that can't go back */
   heldBack: number
-  /** The setlists a pull replaced with Drive's although they had local changes (read-only) */
+  /** The setlists a pull changed although they had local changes here */
   resetSetlists: ResetSetlist[]
   /** Whether the user can only read the folder (null: it was not asked) */
   readOnly: boolean | null
@@ -125,8 +132,10 @@ export class SyncRun {
   readOnly: boolean | null = null
   /** How many charts the pull left alone because they have local changes that can't go back */
   heldBack = 0
-  /** The setlists a pull replaced with Drive's although they had local changes (read-only) */
+  /** The setlists a pull changed although they had local changes here */
   resetSetlists: ResetSetlist[] = []
+  /** Who is using this device, found out when a conflict needs it */
+  readonly identity: () => Promise<Me>
   /** Whether the pull of people failed to read some file, so it may not know them all */
   peoplePullIncomplete = false
   /** Whether the pull of setlists failed to read some file, so it may not know them all */
@@ -146,7 +155,9 @@ export class SyncRun {
     spaceId: string | null
     space: SpaceStorage
     goneRefs?: Set<string> | null
+    identity: () => Promise<Me>
   }) {
+    this.identity = options.identity
     this.db = options.db
     this.parser = options.parser
     this.spaceId = options.spaceId

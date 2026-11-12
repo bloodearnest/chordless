@@ -736,10 +736,12 @@ only what needs Drive: sharing by link (the song list to paste stays).
   brings a known team's role up to date).
 - Their changes are **never pushed**. They last on this device until a pull finds Drive's copy
   changed:
-  - a **setlist** they changed is then replaced by the leader's version (the official plan wins; it
-    is the order, keys and tempos that change at the last minute), and a toast tells them
-    ("Your changes to <setlist> were replaced by the leader's version", `tellOfReset` in
-    `sync-orchestrator.ts`; `resetSetlists` in `sync/pull.ts`). A setlist the leader did not change
+  - a **setlist** they changed is then settled with the leader's version as the base (the official
+    plan wins; it is the order, keys and tempos that change at the last minute), and what they added,
+    new songs and annotations, is kept on top of it. A toast tells them ("Your changes to <setlist>
+    were merged with the leader's version", or "were replaced by the leader's version" when nothing of
+    theirs survived; `tellOfReset` in `sync-orchestrator.ts`; `resetSetlists` in `sync/pull.ts`;
+    SYNC_ARCHITECTURE.md, "When both sides changed a setlist"). A setlist the leader did not change
     keeps their edits.
   - a **chart** they changed is left alone (`heldBack` counts it): chart edits are rare and
     deliberate. The sync says "view-only: your changes stay on this device" and how many differ.
@@ -814,10 +816,11 @@ carry, and the menu already has "Import Songs" and "Import a Setlist", which are
 - **Transport per space** (the `setAccessTokenProvider` seam): personal/owner → googleapis with the
   own token; member → `/api/space/<id>/drive/...` with their Google ID token. One engine
   (`sync-manager.ts`, `sync/*`).
-- **Conflicts:** Drive wins and the local edit is dropped, with a console warning, in every space
-  (`sync/pull.ts`). Planned, not built: a conflict copy of dropped local edits, and serialised writes
-  on the Worker (SYNC_ARCHITECTURE.md, "Several people editing a setlist"). **Built for team spaces:**
-  an update carries the rev the device last synced the file with (`ifRev`), and the Worker answers
+- **Conflicts:** a chart: Drive wins and the local edit is dropped, with a console warning. A
+  setlist both sides changed is merged, the leader's version as the base and the other's new songs
+  and annotations kept (SYNC_ARCHITECTURE.md, "When both sides changed a setlist"). Planned, not
+  built: serialised writes on the Worker (SYNC_ARCHITECTURE.md, "Several people editing a setlist").
+  **Built for team spaces:** an update carries the rev the device last synced the file with (`ifRev`), and the Worker answers
   409 and writes nothing if the file has moved on (check-then-write: two writes a moment apart can
   both pass). The device keeps the record changed, and its next sync pulls first.
 - **Owner goes direct**, so it works if the team service is down.

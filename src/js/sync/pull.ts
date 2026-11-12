@@ -1,9 +1,9 @@
 /**
  * The pull of a Drive sync: what Drive holds that this device doesn't, or holds newer, comes
- * down to the local database. Drive wins a conflict. A user who can only read never uploads, so
- * the leader's version replaces a setlist they changed here (`resetSetlists` says which, for the
- * app to tell them), while a chart they changed is left as it is (`heldBack` counts it): see
- * docs/SPACES.md, "Read-only: local edits are never blocked".
+ * down to the local database. Drive wins a conflict over a chart. A setlist both sides changed is
+ * merged, the leader's version as the base (setlist-merge.ts; `resetSetlists` says which, for the
+ * app to tell the user). A user who can only read never uploads, and a chart they changed is left
+ * as it is (`heldBack` counts it): see docs/SPACES.md, "Read-only: local edits are never blocked".
  */
 
 import type { Person, ScoreRecord, Setlist, SongInput, SongRecord } from '../data-types.ts'
@@ -24,8 +24,15 @@ import {
   songHasLocalChanges,
 } from './changes.ts'
 import { personContent, personContentHash, personHasLocalChanges } from './person-hash.ts'
-import { inBatches, inBatchesOfBytes, type ProgressCallback, type SyncRun } from './session.ts'
+import {
+  inBatches,
+  inBatchesOfBytes,
+  type ProgressCallback,
+  type ResetSetlist,
+  type SyncRun,
+} from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
+import { leadsIt, type Me, mergeSetlists, shapeOf } from './setlist-merge.ts'
 import { metadataOfProps, remoteMetadataChanges } from './song-metadata.ts'
 
 /** A chord chart in Drive that a pull has decided to download */
@@ -45,11 +52,18 @@ interface SetlistDownload {
   adopt?: boolean
 }
 
+/** Who is using this device, and how a setlist both sides changed was settled (by setlist id) */
+interface ConflictContext {
+  me: Me
+  outcomes: Map<string, ResetSetlist['how']>
+}
+
 /** The setlist record to keep for a downloaded file, with its local record (if any) in mind */
 async function downloadSetlist(
   { driveFile, setlistId, localSetlist, adopt }: SetlistDownload,
   text: string,
-  leaders: Leaders
+  leaders: Leaders,
+  conflicts: ConflictContext
 ): Promise<Setlist> {
   // Older setlists in Drive may hold a chart's text as a tempo. Saving
   // converts it too, but convert first: the hash recorded as synced must
@@ -70,6 +84,7 @@ async function downloadSetlist(
         fileRev: driveFile.rev,
         lastSyncedAt: new Date().toISOString(),
         syncedContentHash: remoteHash,
+        syncedShape: shapeOf(remote),
       }
     }
     if (!syncedHash || localHash !== syncedHash) {
@@ -94,20 +109,29 @@ async function downloadSetlist(
       fileRev: driveFile.rev,
     }
   }
+  // Changed both here and in Drive: the leader's version is the base, and the other adds to it.
+  // The leader is the one the copy in Drive names, not the one this device says, so a change of
+  // leader made here cannot win a conflict
+  let content: Setlist = remote
   if (localSetlist && setlistHasLocalChanges(localSetlist)) {
-    // Changed both here and in Drive. For now Drive wins.
-    // TODO: Implement proper conflict resolution
-    console.warn(`[DriveSync] ⚠️ Conflict for setlist ${setlistId}, keeping Drive version`)
+    const mine = leadsIt(remote, leaders.known, conflicts.me)
+    const { merged } = mine
+      ? mergeSetlists(localSetlist, remote, localSetlist.syncedShape)
+      : mergeSetlists(remote, localSetlist, localSetlist.syncedShape)
+    content = merged
+    const same = setlistContentHash(merged) === remoteHash
+    conflicts.outcomes.set(setlistId, same ? 'replaced' : mine ? 'kept' : 'merged')
   }
 
   return {
-    ...setlistContent(remote),
+    ...setlistContent(content),
     id: remote.id || setlistId,
     fileRef: driveFile.ref,
     fileModified: driveFile.modified,
     fileRev: driveFile.rev,
     lastSyncedAt: new Date().toISOString(),
     syncedContentHash: remoteHash,
+    syncedShape: shapeOf(remote),
   }
 }
 
@@ -126,7 +150,7 @@ export async function pullSetlists(
 
   const downloadQueue: SetlistDownload[] = []
   const adopted = new Set<string>()
-  const resetting = new Map<string, Setlist>()
+  const conflicting = new Map<string, Setlist>()
 
   for (const driveFile of driveSetlists) {
     try {
@@ -144,9 +168,7 @@ export async function pullSetlists(
         // Drive's content changed since our last sync if its md5Checksum (computed
         // by Drive) differs from the one we recorded. No clocks involved.
         if (driveFile.rev !== localSetlist.fileRev) {
-          if (run.readOnly && setlistHasLocalChanges(localSetlist)) {
-            resetting.set(setlistId, localSetlist)
-          }
+          if (setlistHasLocalChanges(localSetlist)) conflicting.set(setlistId, localSetlist)
           downloadQueue.push({ driveFile, setlistId, localSetlist })
         }
       } else if (!adopted.has(setlistId) && run.isOrphaned(localSetlist)) {
@@ -182,12 +204,16 @@ export async function pullSetlists(
 
   const setlistsToSave: Setlist[] = []
   const leaders: Leaders = { known: await run.db.getAllPeople(), added: [] }
+  const settling: ConflictContext = {
+    me: conflicting.size > 0 ? await run.identity() : { email: null, chosenPersonId: null },
+    outcomes: new Map(),
+  }
   let completed = 0
   await inBatches(
     run.space,
     downloadQueue,
     item => item.driveFile.ref,
-    (item, text) => downloadSetlist(item, text, leaders),
+    (item, text) => downloadSetlist(item, text, leaders, settling),
     results => {
       for (const result of results) {
         if (result.status === 'fulfilled') {
@@ -213,8 +239,17 @@ export async function pullSetlists(
     await run.db.addPeople(leaders.added)
     await run.db.saveSetlistsBatch(setlistsToSave)
     for (const after of setlistsToSave) {
-      const before = resetting.get(after.id)
-      if (before) run.resetSetlists.push({ before, after })
+      const before = conflicting.get(after.id)
+      const how = settling.outcomes.get(after.id)
+      // (one settled without a conflict, or whose changes here turned out to be Drive's, has
+      // nothing to tell; one kept over changes made elsewhere does, though it is as it was)
+      if (
+        before &&
+        how &&
+        (how !== 'replaced' || setlistContentHash(before) !== setlistContentHash(after))
+      ) {
+        run.resetSetlists.push({ before, after, how })
+      }
     }
   }
 }

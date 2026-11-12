@@ -15,6 +15,7 @@ const SETLIST_SYNC_FIELDS = [
   'fileRev',
   'lastSyncedAt',
   'syncedContentHash',
+  'syncedShape',
   '_lastSyncHash',
 ] as const
 

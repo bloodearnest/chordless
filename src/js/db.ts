@@ -118,8 +118,14 @@ const SYNC_LINK_FIELDS = [
   'fileRev',
   'lastSyncedAt',
   'syncedContentHash',
+  'syncedShape',
   '_lastSyncHash',
 ] as const
+
+/** Copy one of a setlist's sync link fields from a record to another */
+function copyLinkField(to: Setlist, from: Setlist, field: (typeof SYNC_LINK_FIELDS)[number]): void {
+  Object.assign(to, { [field]: from[field] })
+}
 
 /** What a song keeps of its file in Drive, and of what was last sent */
 const SONG_LINK_FIELDS = [
@@ -423,7 +429,7 @@ export class ChordlessDB {
       const current = (await requestResult(store.get(stored.id))) as Setlist | undefined
       if (current?.fileRef) {
         for (const field of SYNC_LINK_FIELDS) {
-          if (current[field] !== undefined) stored[field] = current[field]
+          if (current[field] !== undefined) copyLinkField(stored, current, field)
         }
       }
     }
@@ -472,7 +478,7 @@ export class ChordlessDB {
       if (!current) continue
       const updated = { ...current }
       for (const field of SYNC_LINK_FIELDS) {
-        if (setlist[field] !== undefined) updated[field] = setlist[field]
+        if (setlist[field] !== undefined) copyLinkField(updated, setlist, field)
       }
       store.put(cloneForStorage(updated))
     }
@@ -909,7 +915,13 @@ export class ChordlessDB {
     const songsRequest = songs.getAll()
     setlistsRequest.onsuccess = () => {
       for (const setlist of setlistsRequest.result as Setlist[]) {
-        setlists.put({ ...setlist, ...unlinked, _lastSyncHash: null, share: null })
+        setlists.put({
+          ...setlist,
+          ...unlinked,
+          _lastSyncHash: null,
+          syncedShape: null,
+          share: null,
+        })
       }
     }
     songsRequest.onsuccess = () => {
@@ -963,7 +975,7 @@ export class ChordlessDB {
     setlistsRequest.onsuccess = () => {
       for (const setlist of setlistsRequest.result as Setlist[]) {
         if (!setlist.fileRef || !refs.has(setlist.fileRef)) continue
-        setlists.put({ ...setlist, ...unlinked, _lastSyncHash: null })
+        setlists.put({ ...setlist, ...unlinked, _lastSyncHash: null, syncedShape: null })
         count++
       }
     }

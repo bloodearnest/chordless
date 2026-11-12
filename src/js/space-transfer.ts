@@ -124,6 +124,7 @@ function forDestination(
     fileRev: _driveChecksum,
     lastSyncedAt: _lastSyncedAt,
     syncedContentHash: _syncedContentHash,
+    syncedShape: _syncedShape,
     _lastSyncHash,
     share: _share,
     received: _received,

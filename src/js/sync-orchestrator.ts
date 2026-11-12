@@ -34,13 +34,15 @@ export type BroadcastCallback = (progress: SyncBroadcast) => void
 const SUMMARY_LIMIT = 4
 
 /**
- * A user who can only read never uploads, so the leader's version replaced the setlists they
- * had changed on this device: tell them what the leader's version has that theirs did not, and
- * offer to put theirs back (docs/SPACES.md, "Read-only: local edits are never blocked")
+ * Setlists changed here and elsewhere were settled by the pull (docs/SYNC_ARCHITECTURE.md, "When
+ * both sides changed a setlist"): the leader's version is the base, and the other adds its songs
+ * and notes to it. Tell them what changed against what this device had, and offer to put it back.
+ * A user who can only read never uploads, so their changes stay here (docs/SPACES.md, "Read-only:
+ * local edits are never blocked").
  */
 async function tellOfReset(
   manager: SyncManager,
-  { resetSetlists: reset }: SyncReport
+  { resetSetlists: reset, readOnly }: SyncReport
 ): Promise<void> {
   if (reset.length === 0) return
   const { db } = manager
@@ -60,28 +62,45 @@ async function tellOfReset(
   }
   const only = reset.length === 1 ? reset[0] : null
   const what = only ? summary(only) : ''
-  toast(
-    only
-      ? `Your changes to ${setlistTitle(only.before)} were replaced by the leader's version${what ? ` (${what})` : ''}.`
-      : `Your changes to ${reset.length} setlists were replaced by the leader's versions.`,
-    {
-      details: reset.map(change => `${setlistTitle(change.before)}: ${summary(change)}`).join('\n'),
-      action: {
-        label: 'Undo',
-        run: () => {
-          // Back to what this device had; it is still a change here that is never uploaded
-          for (const { before } of reset) {
-            db.saveSetlist(before).catch(error =>
-              toast("Couldn't put your changes back.", {
-                kind: 'error',
-                details: errorMessage(error),
-              })
-            )
-          }
-        },
-      },
-    }
-  )
+  const in_ = what ? ` (${what})` : ''
+  const hows = new Set(reset.map(change => change.how))
+  const everyHow = hows.size === 1 ? [...hows][0] : null
+  const message = only
+    ? only.how === 'merged'
+      ? `Your changes to ${setlistTitle(only.before)} were merged with the leader's version${in_}.`
+      : only.how === 'kept'
+        ? `${setlistTitle(only.before)} was changed elsewhere too. Your version was kept, with what was added there${in_}.`
+        : `Your changes to ${setlistTitle(only.before)} were replaced by the leader's version${in_}.`
+    : everyHow === 'replaced'
+      ? `Your changes to ${reset.length} setlists were replaced by the leader's versions.`
+      : `${reset.length} setlists you changed were changed elsewhere too, and have been merged.`
+  toast(message, {
+    details: reset.map(change => `${setlistTitle(change.before)}: ${summary(change)}`).join('\n'),
+    // (only for one who cannot send: for a writer, putting their version back would send it over
+    // the leader's)
+    action: readOnly
+      ? {
+          label: 'Undo',
+          run: () => {
+            // Back to what this device had, as a change here that is never uploaded (linked to
+            // the file as it is now, so the next pull does not settle it again)
+            for (const { before, after } of reset) {
+              db.saveSetlist({
+                ...before,
+                fileRef: after.fileRef,
+                fileModified: after.fileModified,
+                fileRev: after.fileRev,
+              }).catch(error =>
+                toast("Couldn't put your changes back.", {
+                  kind: 'error',
+                  details: errorMessage(error),
+                })
+              )
+            }
+          },
+        }
+      : undefined,
+  })
 }
 
 /** What an operation says as it starts and ends (none for a reset, which has its own progress) */
