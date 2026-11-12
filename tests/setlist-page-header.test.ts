@@ -1158,6 +1158,22 @@ describe('the setlist page: header, menu and keys', () => {
       expect(await rig.db.getPendingDeletions()).to.deep.equal([])
     })
 
+    it('lets a worship leader of a team delete a setlist they lead', async () => {
+      const { setlist, dialog } = await ready()
+      const space = getCurrentSpace().id as string
+      try {
+        await updateSpace(space, { team: { id: 'team-1', role: 'writer' } })
+        dialog.people = [{ id: 'ann', name: 'Ann', emails: [], modifiedDate: '' } as Person]
+        dialog.meId = 'ann'
+        await rig.page._loadDialogActions(dialog, { ...setlist, leaderId: 'ann' })
+        expect(dialog.deleteBlocked).to.equal(null)
+        await rig.page._loadDialogActions(dialog, { ...setlist, leaderId: 'bea' })
+        expect(dialog.deleteBlocked).to.contain('only the leader')
+      } finally {
+        await updateSpace(space, { team: undefined })
+      }
+    })
+
     it('says who may not delete it: a worship leader of a team, for a setlist they do not lead', async () => {
       const { setlist, dialog } = await ready()
       const space = getCurrentSpace().id as string
@@ -1286,6 +1302,47 @@ describe('the setlist page: header, menu and keys', () => {
         await rig.page.moveSetlist(target.id)
         expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
       })
+    })
+
+    it('says so, and keeps the setlist, when it cannot be deleted', async () => {
+      const { setlist } = await ready()
+      must($<AppModal>('#delete-setlist-modal')).ask = async () => true
+      const real = Object.getPrototypeOf(rig.db).removeSetlist
+      Object.getPrototypeOf(rig.db).removeSetlist = () => Promise.reject(new Error('disk full'))
+      try {
+        await rig.page.deleteSetlist()
+      } finally {
+        Object.getPrototypeOf(rig.db).removeSetlist = real
+      }
+      expect(shownToast()).to.include({ kind: 'error', details: 'disk full' })
+      expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
+    })
+
+    it('has no Undo to offer for a setlist that had already gone', async () => {
+      const { setlist } = await ready()
+      must($<AppModal>('#delete-setlist-modal')).ask = async () => {
+        await rig.db.deleteSetlist(setlist.id)
+        return true
+      }
+      await rig.page.deleteSetlist()
+      expect(shownToast()?.action).to.equal(undefined)
+    })
+
+    it('says so when Undo cannot put the setlist back', async () => {
+      const { setlist } = await ready()
+      must($<AppModal>('#delete-setlist-modal')).ask = async () => true
+      await rig.page.deleteSetlist()
+      const undo = must(shownToast()?.action)
+      const real = ChordlessDB.prototype.restoreSetlist
+      ChordlessDB.prototype.restoreSetlist = () => Promise.reject(new Error('disk full'))
+      try {
+        undo.run()
+        await waitUntil(() => shownToast()?.kind === 'error', 'the failure')
+      } finally {
+        ChordlessDB.prototype.restoreSetlist = real
+      }
+      expect(shownToast()?.message).to.contain("Couldn't bring the setlist back")
+      expect(await rig.db.getSetlist(setlist.id)).to.equal(undefined)
     })
 
     it('puts up with storage being unavailable', async () => {

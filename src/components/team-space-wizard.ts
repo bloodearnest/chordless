@@ -294,7 +294,7 @@ export class TeamSpaceWizard extends LitElement {
     const count = (this._contents as Contents).setlists.count
     const modal = this._modal.value as AppModal
     modal.heading = 'Move the setlists?'
-    modal.message = `${count} setlist${count === 1 ? '' : 's'} will move out of ${this._sourceName} into the team space. They will no longer be in ${this._sourceName}, only in the team's. Setlists already saved to Google Drive stay in ${this._sourceName} for now.`
+    modal.message = `${count} setlist${count === 1 ? '' : 's'} will move out of ${this._sourceName} into the team space. They will no longer be in ${this._sourceName}, only in the team's. Those saved to Google Drive go to its Drive trash, where they can be restored from.`
     modal.confirmLabel = 'Move them'
     await this.updateComplete
     await modal.updateComplete
@@ -414,11 +414,7 @@ export class TeamSpaceWizard extends LitElement {
     if (report.setlistsAdded) {
       parts.push(`${report.setlistsAdded} setlist${report.setlistsAdded === 1 ? '' : 's'}`)
     }
-    let text = parts.length ? `${parts.join(' and ')} came across. ` : 'Nothing new came across. '
-    if (report.setlistsLeftInSource) {
-      text += `${report.setlistsLeftInSource} setlist${report.setlistsLeftInSource === 1 ? ' is' : 's are'} also still in ${this._sourceName}, as they are saved to Google Drive. `
-    }
-    return text
+    return parts.length ? `${parts.join(' and ')} came across. ` : 'Nothing new came across. '
   }
 
   _renderBring() {

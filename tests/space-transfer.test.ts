@@ -212,7 +212,6 @@ describe('Copying and moving between spaces', () => {
     await source.saveLocalState(makeLocalState('set-1'))
     const report = await transferSetlists(source, destination, null, 'move')
     expect(report.setlistsAdded).to.equal(1)
-    expect(report.setlistsLeftInSource).to.equal(0)
     expect(await destination.getSetlist('set-1')).to.not.equal(undefined)
     expect(await source.getSetlist('set-1')).to.equal(undefined)
   })
@@ -221,13 +220,27 @@ describe('Copying and moving between spaces', () => {
     const alpha = await addChart(source, ALPHA, ADD)
     const set = await setlistWith('set-1', alpha)
     await source.saveSetlist({ ...set, fileRef: 'drive-1' })
-    const report = await transferSetlists(source, destination, null, 'move')
-    expect(report.setlistsLeftInSource).to.equal(0)
+    await transferSetlists(source, destination, null, 'move')
     expect(await destination.getSetlist('set-1')).to.not.equal(undefined)
     expect(await source.getSetlist('set-1')).to.equal(undefined)
     expect((await source.getPendingDeletions()).map(entry => entry.ref)).to.deep.equal(['drive-1'])
     // (the destination makes its own file: it has no link to the source's)
     expect((await destination.getSetlist('set-1'))?.fileRef).to.equal(undefined)
+  })
+
+  it('moves from a source that cannot delete (an export file) by adding only', async () => {
+    const alpha = await addChart(source, ALPHA, ADD)
+    await setlistWith('set-1', alpha)
+    const readOnly = {
+      getAllSongs: () => source.getAllSongs(),
+      getChordPro: (id: string) => source.getChordPro(id),
+      getAllSetlists: () => source.getAllSetlists(),
+      getAllPeople: () => source.getAllPeople(),
+    }
+    const report = await transferSetlists(readOnly, destination, null, 'move')
+    expect(report.setlistsAdded).to.equal(1)
+    expect(await destination.getSetlist('set-1')).to.not.equal(undefined)
+    expect(await source.getSetlist('set-1')).to.not.equal(undefined)
   })
 
   it('does not move over a setlist the destination has under that id, nor delete the source', async () => {

@@ -40,11 +40,6 @@ export interface TransferReport {
   setlistsSkipped: number
   /** Setlist entries whose song is not in the source, so they point at nothing in the destination */
   entriesWithoutSong: number
-  /**
-   * A move removes the setlist from the source, but a source that can't delete (an export file)
-   * keeps them: counted here
-   */
-  setlistsLeftInSource: number
 }
 
 export function emptyReport(): TransferReport {
@@ -54,7 +49,6 @@ export function emptyReport(): TransferReport {
     setlistsAdded: 0,
     setlistsSkipped: 0,
     entriesWithoutSong: 0,
-    setlistsLeftInSource: 0,
   }
 }
 
@@ -238,10 +232,8 @@ export async function transferSetlists(
     await destination.saveSetlist(made)
     existing.push(made)
     report.setlistsAdded++
-    if (mode === 'move') {
-      if (!source.removeSetlist) report.setlistsLeftInSource++
-      else await source.removeSetlist(setlist.id)
-    }
+    // (a source that cannot delete, an export file, keeps it: only a space's database is moved from)
+    if (mode === 'move') await source.removeSetlist?.(setlist.id)
   }
   return report
 }
