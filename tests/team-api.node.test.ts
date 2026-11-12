@@ -382,3 +382,91 @@ describe('naming yourself: PUT /people/<id>/name', () => {
     assert.equal(stored().name, 'Ann')
   })
 })
+
+describe('deleting a setlist: POST /files/<ref>/trash', () => {
+  const setlistFile = { name: 's.json', props: { setlistId: 's1' }, type: 'application/json' }
+  const personFile = (id: string) => ({
+    name: `${id}.json`,
+    props: { personId: id },
+    type: 'application/json',
+  })
+
+  async function rigWith(setlist: Record<string, unknown>, people: Record<string, unknown>[] = []) {
+    const rig = await makeTeamRig()
+    const space = rig.storage.space(rig.spaces[0].root)
+    for (const person of people) {
+      await space.create('people', personFile(String(person.id)), JSON.stringify(person))
+    }
+    const made = await space.create('setlists', setlistFile, JSON.stringify(setlist))
+    rig.roles.set('ann-token', 'writer')
+    rig.emails.set('ann-token', 'ann@example.com')
+    rig.roles.set('admin-token', 'admin')
+    rig.roles.set('reader-token', 'reader')
+    const trash = (token: string) => call(rig, 'POST', `/files/${made.file.ref}/trash`, { token })
+    const trashed = () => rig.storage.file(made.file.ref).trashed
+    return { rig, trash, trashed }
+  }
+
+  const ann = { id: 'ann', emails: ['Ann@Example.com'] }
+
+  test('lets a worship leader bin a setlist they lead, by any of their addresses', async () => {
+    const { trash, trashed } = await rigWith({ leaderId: 'ann' }, [ann])
+    assert.equal((await trash('ann-token')).status, 204)
+    assert.equal(trashed(), true)
+  })
+
+  test('refuses a worship leader a setlist someone else leads, and changes nothing', async () => {
+    const { trash, trashed } = await rigWith({ leaderId: 'bob' }, [
+      ann,
+      { id: 'bob', emails: ['bob@example.com'] },
+    ])
+    const answer = await trash('ann-token')
+    assert.equal(answer.status, 403)
+    assert.match(answer.text, /leader of a setlist or an admin/)
+    assert.equal(trashed(), false)
+  })
+
+  test('lets an admin bin any setlist, including one nobody leads', async () => {
+    const led = await rigWith({ leaderId: 'bob' }, [{ id: 'bob', emails: ['bob@example.com'] }])
+    assert.equal((await led.trash('admin-token')).status, 204)
+    assert.equal(led.trashed(), true)
+    const leaderless = await rigWith({})
+    assert.equal((await leaderless.trash('admin-token')).status, 204)
+  })
+
+  test('refuses a worship leader a setlist with no leader, or a leader who is not there', async () => {
+    for (const setlist of [{}, { leaderId: 'nobody' }, { leaderId: 'ann' }]) {
+      const { trash, trashed } = await rigWith(setlist, setlist.leaderId === 'ann' ? [] : [ann])
+      assert.equal((await trash('ann-token')).status, 403)
+      assert.equal(trashed(), false)
+    }
+  })
+
+  test('follows a merged person to the one they became, and not a deleted one', async () => {
+    const merged = await rigWith({ leaderId: 'old' }, [
+      { id: 'old', emails: [], mergedInto: 'ann' },
+      ann,
+    ])
+    assert.equal((await merged.trash('ann-token')).status, 204)
+    const deleted = await rigWith({ leaderId: 'ann' }, [{ ...ann, deleted: true }])
+    assert.equal((await deleted.trash('ann-token')).status, 403)
+  })
+
+  test('knows a leader written as an email, as older setlists have', async () => {
+    const { trash, trashed } = await rigWith({ ownerId: 'ANN@example.com' })
+    assert.equal((await trash('ann-token')).status, 204)
+    assert.equal(trashed(), true)
+  })
+
+  test('is still refused to a reader, and still lets a writer bin a file that is not a setlist', async () => {
+    const { rig, trash, trashed } = await rigWith({ leaderId: 'ann' }, [ann])
+    assert.equal((await trash('reader-token')).status, 403)
+    assert.equal(trashed(), false)
+    const song = await rig.storage
+      .space(rig.spaces[0].root)
+      .create('songs', { name: 'a.txt', props: { songId: 'x' }, type: 'text/plain' }, 'chart')
+    const binned = await call(rig, 'POST', `/files/${song.file.ref}/trash`, { token: 'ann-token' })
+    assert.equal(binned.status, 204)
+    assert.equal(rig.storage.file(song.file.ref).trashed, true)
+  })
+})

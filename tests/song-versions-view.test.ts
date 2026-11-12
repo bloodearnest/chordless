@@ -4,6 +4,7 @@ import '../src/components/song-versions.ts'
 import type { SongRecord } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import { hashText } from '../src/js/song-utils.ts'
+import { createSpace, deleteSpace, setCurrentSpace, updateSpace } from '../src/js/space.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
 import {
@@ -371,6 +372,49 @@ describe('song-versions', () => {
       }
       expect(shownToast()?.message).to.contain("Couldn't delete the song")
       expect(await db.getSong('only')).to.not.equal(undefined)
+    })
+  })
+
+  describe('in a Team', () => {
+    let spaceId: string
+    let before: string | null
+
+    beforeEach(async () => {
+      before = localStorage.getItem('current-space-id')
+      const space = await createSpace(`Team ${crypto.randomUUID().slice(0, 8)}`)
+      spaceId = space.id
+    })
+
+    afterEach(async () => {
+      if (before) await setCurrentSpace(before)
+      else localStorage.removeItem('current-space-id')
+      await deleteSpace(spaceId)
+    })
+
+    const asRole = async (role: 'owner' | 'admin' | 'writer' | 'reader') => {
+      await updateSpace(spaceId, { team: { id: 't1', role } })
+      await setCurrentSpace(spaceId)
+    }
+
+    it('leaves deleting a song to an admin, but not deleting one of its versions', async () => {
+      await asRole('writer')
+      await add('only')
+      let el = await show()
+      expect($(el, '.delete')).to.equal(null)
+      expect(text($(el, '.only-admin'))).to.equal('Only an admin can delete a song.')
+
+      await add('second', { isDefault: false, variantOf: 'only', variantLabel: 'Capo 3' })
+      el = await show()
+      expect(all(el, '.delete').length).to.equal(2)
+      expect($(el, '.only-admin')).to.equal(null)
+    })
+
+    it('lets an admin delete a song', async () => {
+      await asRole('admin')
+      await add('only')
+      const el = await show()
+      expect($(el, '.delete')).to.not.equal(null)
+      expect($(el, '.only-admin')).to.equal(null)
     })
   })
 })

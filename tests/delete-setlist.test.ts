@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
-import { mayDeleteSetlist } from '../src/js/team-roles.ts'
+import { mayDeleteSetlist, mayDeleteSong } from '../src/js/team-roles.ts'
 import { makeLocalState, makeSetlist } from './builders.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -122,5 +122,18 @@ describe('mayDeleteSetlist', () => {
 
   it('does not let a team member delete any', () => {
     expect(mayDeleteSetlist('reader', true)).to.equal(false)
+  })
+})
+
+describe('mayDeleteSong', () => {
+  it('lets anyone in a personal space, and an admin or the owner of a team', () => {
+    expect(mayDeleteSong(null)).to.equal(true)
+    expect(mayDeleteSong('admin')).to.equal(true)
+    expect(mayDeleteSong('owner')).to.equal(true)
+  })
+
+  it('does not let a worship leader or a team member', () => {
+    expect(mayDeleteSong('writer')).to.equal(false)
+    expect(mayDeleteSong('reader')).to.equal(false)
   })
 })

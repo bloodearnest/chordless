@@ -553,18 +553,24 @@ owner (implicitly admin) > admin > writer > reader. Worker enforcement:
 - **Delete setlists** (decided 2026-10-22): a **writer may delete a setlist they lead** (its
   the person who leads it has their verified email among their addresses: docs/IDENTITIES.md); **only an admin (or the owner) may delete one someone else
   leads.** A reader never.
-- **Delete songs: admin and up.** A song is shared by every setlist that uses it.
+- **Delete songs: admin and up** (decided 2026-11-12). It is for a bad import or a mistake, and it
+  takes the song out of every setlist that has it (`deleteOnlyVersion`). A worship leader can still
+  delete one *version* of a song that has several (setlists using it fall back to the default), and
+  replace a chart on import. The page shows "Only an admin can delete a song." in place of the
+  button (`mayDeleteSong`); the Worker does not check it, because replacing a version bins a chart
+  file in the same call.
 - **In a personal space the person is implicitly an admin** and may delete anything: they are a
   grown-up, and the backup (export) feature is there. **Every delete asks for confirmation, in every
   case**, danger-styled, naming the effect (CLAUDE.md: friction, not prohibition).
 - How a deletion works is in SYNC_ARCHITECTURE.md, "Deleting setlists". **What the Worker enforces
   today:** a reader changes no file (`write()` in `team-api.ts` needs a writer), pad rules are
   enforced, and so are the admin routes (people, invites, credential, licence, deleting the space).
-  **The two delete rules above are not:** the page checks them (`mayDeleteSetlist`, `team-roles.ts`),
-  but a writer's token can trash any file of the space (`POST /files/<ref>/trash`), a song's included.
-  To know who leads a setlist without reading its body, the setlist's file would carry
-  the leader's person id (`leaderId`) as a file property (kept current on every push; not built), and the storage API's `status` returns
-  a file's collection and its properties. Until restrictions on editing others' setlists exist
+  **The setlist rule is enforced too** (`worker/src/team-leaders.ts`): `POST /files/<ref>/trash` on a
+  setlist's file is refused (403) to a writer unless the setlist's leader (`leaderId`, followed
+  through a merged person; an older setlist's `ownerId` email) has the writer's verified email among
+  their addresses. The Worker reads the setlist and the person's file through to decide and keeps
+  nothing; a setlist with no findable leader is for an admin. **The song rule is the page's alone**
+  (`mayDeleteSong`, above): a writer's token can still bin a song's file. Until restrictions on editing others' setlists exist
   (SYNC_ARCHITECTURE.md), a writer can make themselves the leader first, so the rule guards against
   mistakes, not a determined writer.
 - Invite, remove, change roles, enable/disable sharing: admin and up (owner for disable/transfer).
@@ -1077,8 +1083,7 @@ Checked against the code 2026-11-12.
    bringing pads across (item 4).
 7. [x] Worker team service: the API for members, identity, D1 state, the register, invites, joining,
    roles, licence, deleting a space, the changes feed, the live channel, pads, the Account and Teams
-   page and the join page. Left: the Worker's checks of the delete rules ("Roles"), the checksum
-   precondition on writes (409), and probing protections (item 11).
+   page and the join page. Left: the checksum precondition on writes (409), and probing protections (item 11).
 8. [ ] The team space wizard. Built: name, parent folder (Picker), bring songs and setlists, invite,
    result and retry. Not built: the shared-drive choice and the service account in the wizard, and
    pads. The header switcher and Merged/Separate are dropped; the default space ("Presenting

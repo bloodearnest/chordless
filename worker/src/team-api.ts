@@ -37,6 +37,7 @@ import {
 import { atLeast, type TeamRole } from '../../src/js/team-roles.ts'
 import { answering, isRecord, jsonResponse, Refusal, readJson } from './http.ts'
 import type { Identity } from './identity.ts'
+import { isSetlistFile, leadsSetlist } from './team-leaders.ts'
 import { handlePadRequest } from './team-pads.ts'
 
 /** Why a request may do nothing in a space */
@@ -282,7 +283,19 @@ export async function handleTeamRequest(
       if (method === 'POST' && action === '/trash') {
         write()
         // (a file that is not here is as good as gone, which is fine to bin)
-        if (await owned(ref)) await space.trash(ref)
+        if (await owned(ref)) {
+          // A writer bins a setlist they lead, an admin or the owner any (docs/SPACES.md, "Roles").
+          // Songs are left to the page: replacing a version bins a chart file as well
+          if (!atLeast(role, 'admin')) {
+            const found = await space.status(ref)
+            if (found && !found.trashed && isSetlistFile(found.props)) {
+              if (!(await leadsSetlist(space, ref, identity))) {
+                throw new Refusal(403, 'Only the leader of a setlist or an admin can delete it')
+              }
+            }
+          }
+          await space.trash(ref)
+        }
         return new Response(null, { status: 204 })
       }
       if (method === 'POST' && action === '/unpublish') {

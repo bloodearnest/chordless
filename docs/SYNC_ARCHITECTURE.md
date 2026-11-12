@@ -374,7 +374,7 @@ imported it, its song id: `sync/song-metadata.ts`) does not change the file's ch
 to miss it. Each song now keeps what they were when last synced (`syncedMetadata`, written by a push and
 by a download), and a pull takes, field by field, what Drive changed since then and this device did
 not. A field changed on both is left: the change here is sent, and wins. A song with no such record
-(synced before it was kept) has only its empty fields filled from Drive. Who may delete songs in a Team (admin and up) is not yet checked by the Worker.
+(synced before it was kept) has only its empty fields filled from Drive. Who may delete songs in a Team (admin and up) is checked by the page only, not by the Worker.
 
 ### Deleting setlists
 
@@ -395,9 +395,10 @@ link to the file, so the next sync sends it as a new file (the old one stays in 
 Drive can restore it). A dialog button, **Move to this space**, is delete plus `transferSetlists`
 (`move`): the setlist is added to the other space first (its charts copied, its leader found there by
 email then name, or made), then removed here. The per-leader rule below is checked by the page
-(`mayDeleteSetlist`); the Worker does **not** yet check it on the server: a worship leader's token can
-trash any file of the space (`POST /files/<ref>/trash`), as before. What follows is the design as
-first written; the parts not built are marked.
+(`mayDeleteSetlist`) and by the Worker (a worship leader's request to trash a setlist's file they do not
+lead is refused, 403). A device whose role has fallen since keeps the deletion noted and the sync
+logs the refusal each time; handling that refusal (the setlist coming back) is not built. What
+follows is the design as first written; the parts not built are marked.
 
 Goal: remove a setlist (e.g. added in error), with the deletion reaching Drive and other devices.
 
@@ -423,9 +424,10 @@ mistakes and not abuse, since anyone could make themselves the leader first):
   `ownerId`; the leader is now a person, `leaderId`, matched to the writer by the person's emails,
   which the Worker will read from the `people` collection), **an admin or
   the owner any setlist.** A writer cannot delete one someone else leads; the button is shown but
-  says why. Deleting songs is admin and up. **Built in the page only** (`mayDeleteSetlist`,
-  `team-roles.ts`). Not built: the Worker checking it from the file's leader property and
-  collection (docs/SPACES.md, "Roles"), so that the rule does not depend on the page.
+  says why. Deleting songs is admin and up (the page: `mayDeleteSong`). **Built, in the page**
+  (`mayDeleteSetlist`, `team-roles.ts`) **and on the Worker**, which reads the setlist and its
+  leader's file when a writer bins a setlist's file (`worker/src/team-leaders.ts`, docs/SPACES.md,
+  "Roles"); the rule for songs is the page's alone.
 - **Personal space:** the person using it, anything (implicitly an admin; the export is the backup).
 - **A confirmation always**, in every case.
 - Not signed in, or a space with no Drive: nothing in Drive to trash, so the existing local rule
