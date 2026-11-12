@@ -185,7 +185,7 @@ test.describe('Song info', () => {
     await page.locator('#library-app-header').getByRole('button', { name: 'Information' }).click()
 
     const info = page.locator('#library-song-info-dialog song-info')
-    await expect(info).toContainText('Melody Range')
+    await expect(info).toContainText('Lead Sheet Range')
     await expect(info).toContainText('D4–E5 in G')
     await expect(info).toContainText('9 notes wide (14 semitones)')
     await expect(info.locator('.range-badge')).toHaveAttribute('data-direction', 'high')

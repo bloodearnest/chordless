@@ -653,7 +653,7 @@ export async function pullScores(
       if (succeeded > 0) {
         progressCallback?.({
           stage: 'pulling',
-          message: `Downloaded ${downloaded}/${downloads.length} melodies`,
+          message: `Downloaded ${downloaded}/${downloads.length} lead sheets`,
           current: downloaded,
           total: downloads.length,
         })
@@ -689,7 +689,9 @@ async function downloadScore(
   }
   if (local && scoreHasLocalChanges(local)) {
     // Changed here and in Drive. As for a chart, Drive wins.
-    console.warn(`[DriveSync] ⚠️ Conflict for the melody of song ${uuid}, keeping Drive's version`)
+    console.warn(
+      `[DriveSync] ⚠️ Conflict for the lead sheet of song ${uuid}, keeping Drive's version`
+    )
   }
   // (parsed once to know it can be, and not kept: it is parsed when it is wanted)
   if (!readMusicXml(xml)) {

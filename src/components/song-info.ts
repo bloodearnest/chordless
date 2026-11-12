@@ -400,7 +400,7 @@ export class SongInfo extends LitElement {
       return key
         ? html`
           <div class="modal-info-item">
-            <div class="modal-info-label">Melody Range</div>
+            <div class="modal-info-label">Lead Sheet Range</div>
             <div class="modal-info-value range-line">
               <span>None yet</span>
               <button class="btn" type="button" @click=${() => this._editRange(range)}>Add a range</button>
@@ -417,7 +417,7 @@ export class SongInfo extends LitElement {
     const octaves = (used.low - range.low) / 12
     return html`
       <div class="modal-info-item">
-        <div class="modal-info-label">Melody Range</div>
+        <div class="modal-info-label">Lead Sheet Range</div>
         <div class="modal-info-value range-line">
           <span>${noteName(range.low, key)}–${noteName(range.high, key)}${chartKey ? ` in ${chartKey}` : ''}</span>
           ${chartKey ? html`${rangeBadge(note)}<span>${note.words || 'in range'}${octaves ? `, ${Math.abs(octaves) === 1 ? 'an octave' : `${Math.abs(octaves)} octaves`} ${octaves < 0 ? 'lower' : 'higher'}` : ''}</span>` : ''}
@@ -470,7 +470,7 @@ export class SongInfo extends LitElement {
     const wrong = this._low > this._high
     return html`
       <div class="modal-info-item">
-        <div class="modal-info-label">Melody Range</div>
+        <div class="modal-info-label">Lead Sheet Range</div>
         <div class="range-editor">
           ${picker('Lowest note', this._low, midi => (this._low = midi))}
           ${picker('Highest note', this._high, midi => (this._high = midi))}

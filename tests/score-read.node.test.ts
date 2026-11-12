@@ -1,7 +1,7 @@
 /** Reading the tree of a lead sheet as Verovio engraves it (src/js/score-read.ts), from an SVG drawn the same way */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { readScoreSvg } from '../scripts/melody-xml.ts'
+import { readScoreSvg } from './score-svg-read.ts'
 
 /** One measure of 4/4 in the shape Verovio writes, drawn with the glyphs named, as a lead sheet's SVG is */
 function sheet(notes: string, key = ''): string {

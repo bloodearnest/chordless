@@ -78,11 +78,6 @@ bugs
 - noUncheckedIndexedAccess was tried on the app project: 142 errors, mostly false positives
   (regex groups after a match, indexes checked against length just above), so it is off. If it
   is revisited: setlist-page.ts (45) is where `this.songs[i]` is the likeliest real bug
-- Nashville-number charts in a minor key now count from the relative major (6m is the tonic). Left: the
-  nine charts imported by the bookmarklet before its fix are numbers under `{key: C}`, which made
-  "See His Love" show Em D C for Gm (Sunday 18 Oct). Reimport them in the Gateway Church space: Adonai,
-  All Hail King Jesus, Here Is Love, Holy Holy Holy, More Precious Than Silver, Our God He Reigns,
-  See His Love, Washed, What A Friend.
 browser support (the reasoning and the floor are in docs/BUILD.md, "The browser floor")
 - the floor is a claim from reading the code, not tested on an old device (Playwright's WebKit is current): try one.
   iPadOS 15 (Air 2, mini 4) is outside the window on purpose; if it is revisited, the plan is in docs/BUILD.md
@@ -234,7 +229,8 @@ tests
    timing more than the unit suites' (the floor would need a run or two that agree to lower it)
 
 ccli import
- - adding the same song twice to set lists
+ - adding the same song twice to a setlist should be prevented (decided): the add-song modal, import and any other
+   way in say it is already in this set instead of adding it
  - try importing in original key, but record the key that it was set to in the songselect page, and add to setlist in that key
   - handle numbers on import (need to get an original key)
  - make it reuse open windows for import (maybe need to get the default app, not opened via import, to have the tag tag?)

@@ -81,7 +81,7 @@ words). A song with no range, or no key to measure it from, shows the picker as 
 
 ## In the song info
 
-The song's info dialog has a "Melody Range" item under its key: the lowest and highest note in the
+The song's info dialog has a "Lead Sheet Range" item under its key: the lowest and highest note in the
 chart's key ("D4–E5 in G"), how it fits voices as written (the badge and its words, as the picker
 has them), and how wide it is: **"9 notes wide (14 semitones)"**. It is the song's, so it is the
 same whatever key the library has the song in (a different key is not a different song: it takes
@@ -264,7 +264,7 @@ sends).
 
 ## Setting a range by hand
 
-The song info's "Melody Range" item has **Add a range** (when there is none) or **Edit**. Two
+The song info's "Lead Sheet Range" item has **Add a range** (when there is none) or **Edit**. Two
 pickers, "Lowest note" and "Highest note", offer the notes from A2 to C6 (wider if the range is),
 named as the chart's key names them; **Save**, **Cancel**, and **Remove** (when there is one). A
 new range starts at D4 to D5. A lowest note above the highest is not saved, and says so. The notes

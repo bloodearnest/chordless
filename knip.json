@@ -16,5 +16,5 @@
   },
   "ignoreExportsUsedInFile": true,
   "ignoreDependencies": ["@biomejs/biome", "cloudflare", "@fontsource/caveat"],
-  "ignoreBinaries": ["mise", "mutool"]
+  "ignoreBinaries": ["mise"]
 }

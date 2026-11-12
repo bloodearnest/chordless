@@ -134,7 +134,7 @@ export class SongInfoDialog extends LitElement {
       await setSongRange(event.songUuid, event.range, db)
     } catch (error) {
       console.error('[SongInfoDialog] Could not save the range:', error)
-      toast("Couldn't save the melody range.", {
+      toast("Couldn't save the lead sheet range.", {
         kind: 'error',
         details: errorMessage(error),
         action: { label: 'Try again', run: () => void this._saveRange(event) },

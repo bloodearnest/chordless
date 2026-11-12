@@ -11,7 +11,7 @@ be read"; not "sheet music", which is any notation). Its MusicXML is the **score
 `Score` and the `Score*` types (`src/js/score.ts`), the `score-*.ts` modules that read, write, transpose
 and render it, and `ScoreView` for the lead sheet's view. Some code and stored names still say `melody`
 (`melody-analysis.ts`, `x_chordless_range`, the `?melody` URL option, the old Drive names); they are not
-renamed. What is stored: the `scores` store (`getScore`/`saveScore`, `ScoreRecord`), the `score` file type
+renamed, but the screen says "lead sheet" everywhere. What is stored: the `scores` store (`getScore`/`saveScore`, `ScoreRecord`), the `score` file type
 in Drive and, as people see it in Drive, `.lead-sheet.mxl` (docs/SYNC_ARCHITECTURE.md, "Scores").
 
 ## Why
@@ -80,7 +80,7 @@ Checked again on the Holy Forever download in the Bb key (3 pages, A4) against i
 - **Corpus.** A local export holds 137 lead sheet PDFs beside 141 ChordPro files (IronPdf
   throughout, 1 to 6 pages), and 134 embed the music font. The 3 that do not are worth looking at
   first; they have not been opened. The export is copyrighted and carries the church's licence
-  number: it stays out of git, and is a local corpus for the spike, not a fixture.
+  number: it stays out of git and is not a fixture.
 
 ## A better source than the PDF: the page's own SVG
 
@@ -213,7 +213,7 @@ CCLI's terms for keeping and transposing a lead sheet are in [CCLI.md](CCLI.md),
   yet: the beats of the high notes shown
   on it.
 - **View, as first planned**: a lead sheet view in the key in use, rendered by **Verovio**, the engraver SongSelect uses
-  (chosen; see "Rendering with Verovio" in the spike results), so a transposed sheet looks like
+  (chosen; see "Rendering with Verovio" above), so a transposed sheet looks like
   the original. Lazy loaded, and never on the path of the lyrics screen. The chord symbols are
   written into the MusicXML as `<harmony>` from our own transposer, so Nashville numbers and spelling
   are the app's and not the renderer's. The notice (above) goes under it.
@@ -226,7 +226,7 @@ CCLI's terms for keeping and transposing a lead sheet are in [CCLI.md](CCLI.md),
 Most of a band plays from the chart in a set, and uses the lead sheet to check a tune or a rhythm in
 rehearsal. What they want in the chart itself is the small notes of an instrumental line (an intro, a
 turnaround). So a part of the chart can be shown as that line of music, in place of its chords: a fifth
-choice in the part's Show options (All, Lyrics, Chords, **Lead sheet**, None; the button is still labelled "Melody" in the app), `HideMode` `'melody'`.
+choice in the part's Show options (All, Lyrics, Chords, **Lead sheet**, None), `HideMode` `'melody'`.
 
 - **Which parts have it.** Only a part of the chart with no words (an intro, an instrumental; words in brackets, such as
   "(To Br.)", are not words): a part to sing has the words as its content. `cueMeasures` (`src/js/score-section.ts`)
@@ -272,8 +272,8 @@ choice in the part's Show options (All, Lyrics, Chords, **Lead sheet**, None; th
 **Rendering with Verovio (the engraver SongSelect uses; `src/js/score-render.ts`).** The sheet's SVG was written
 by Verovio 6.0.1, so that exact version is the dependency (`verovio@6.0.1`, pinned; `renderScore(musicXml)`
 gives one SVG a page). It is WebAssembly embedded in a 6.4 MB JavaScript module (`verovio/wasm`) with a 14 KB wrapper
-(`verovio/esm`), imported only on first use, in a worker (below). `scripts/melody-render-check.ts` is the test of the MusicXML: write it
-from each PDF, engrave it, read Verovio's SVG back with the SVG reader, and compare with what went in.
+(`verovio/esm`), imported only on first use, in a worker (below). Every lead sheet of the private corpus rendered, with every measure, pitch and length read back the same
+(the one-off check scripts have been removed).
 
 
 - **Wired for the app.** Verovio runs in a

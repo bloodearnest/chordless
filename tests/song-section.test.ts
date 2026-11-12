@@ -134,7 +134,7 @@ describe('song-section', () => {
         'All',
         'Lyrics',
         'Chords',
-        'Melody',
+        'Lead sheet',
         'None',
       ])
     })
@@ -144,14 +144,12 @@ describe('song-section', () => {
       expect(section.shadowRoot.querySelector('.melody-mark')).to.equal(null)
       await withMelody()
       const mark = () => section.shadowRoot.querySelector('.melody-mark')
-      expect(mark().getAttribute('aria-label')).to.equal(
-        'The lead sheet has the melody for this part'
-      )
+      expect(mark().getAttribute('aria-label')).to.equal('The lead sheet has notes for this part')
       expect(mark().querySelector('app-icon').getAttribute('name')).to.equal('music')
       expect(getComputedStyle(mark()).opacity).to.equal('0.6')
       section.hideMode = 'melody'
       await section.updateComplete
-      expect(mark().getAttribute('aria-label')).to.equal('Showing the melody')
+      expect(mark().getAttribute('aria-label')).to.equal('Showing the lead sheet')
       expect(getComputedStyle(mark()).opacity).to.equal('1')
     })
 
@@ -174,7 +172,7 @@ describe('song-section', () => {
         ['All', 'false'],
         ['Lyrics', 'false'],
         ['Chords', 'false'],
-        ['Melody', 'true'],
+        ['Lead sheet', 'true'],
         ['None', 'false'],
       ])
       const sheet = section.shadowRoot.querySelector('score-view')

@@ -674,11 +674,11 @@ export class SongImport extends LitElement {
         : item.leadSheet === 'read'
           ? ', from the lead sheet'
           : ''
-      text = `Melody range ${notes} in ${key}${from}.`
+      text = `Lead sheet range ${notes} in ${key}${from}.`
     } else if (item.leadSheet === 'other-key' && melody) {
       text = `The lead sheet is in another key than the chart (${describeSignature(melody.keySignature)}; the chart is in ${key}), so its range was not used.`
     } else if (item.leadSheet === 'no-melody') {
-      text = 'The lead sheet had no melody to read, so there is no range.'
+      text = 'The lead sheet had no notes to read, so there is no range.'
     } else if (item.leadSheet === 'unreadable') {
       text = 'The lead sheet could not be read, so there is no range.'
     } else if (item.source === 'songselect') {
@@ -751,7 +751,7 @@ export class SongImport extends LitElement {
       await setSongRange(item.song.uuid, range, this._database())
     } catch (error) {
       console.error('[Import] Could not save the range:', error)
-      toast("Couldn't save the melody range.", {
+      toast("Couldn't save the lead sheet range.", {
         kind: 'error',
         details: errorMessage(error),
         action: { label: 'Try again', run: () => void this._setRange(item, key) },

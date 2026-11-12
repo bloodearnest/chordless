@@ -895,7 +895,7 @@ export class SongSection extends LitElement {
           ${this._renderControlButton('show-all', 'All', showAllActive, !canShowAll)}
           ${this._renderControlButton('show-lyrics', 'Lyrics', showLyricsActive, !canShowLyrics)}
           ${this._renderControlButton('show-chords', 'Chords', showChordsActive, !canShowChords)}
-          ${this._hasMelody() ? this._renderControlButton('show-melody', 'Melody', melodyActive) : nothing}
+          ${this._hasMelody() ? this._renderControlButton('show-melody', 'Lead sheet', melodyActive) : nothing}
           ${this._renderControlButton('show-none', 'None', showNoneActive)}
         </div>
       </div>
@@ -927,8 +927,8 @@ export class SongSection extends LitElement {
     return html`<span
       class="melody-mark"
       role="img"
-      aria-label=${shown ? 'Showing the melody' : 'The lead sheet has the melody for this part'}
-      title=${shown ? 'Showing the melody' : 'The lead sheet has the melody for this part'}
+      aria-label=${shown ? 'Showing the lead sheet' : 'The lead sheet has notes for this part'}
+      title=${shown ? 'Showing the lead sheet' : 'The lead sheet has notes for this part'}
       ><app-icon name="music" size="18"></app-icon
     ></span>`
   }

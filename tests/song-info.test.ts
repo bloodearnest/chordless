@@ -72,7 +72,7 @@ describe('song-info', () => {
     it('shows the lowest and highest note, how wide it is, and how it fits', async () => {
       const info = await show({ song: ranged() })
       const shown = text(info)
-      expect(shown).to.contain('Melody Range')
+      expect(shown).to.contain('Lead Sheet Range')
       expect(shown).to.contain('D4–E5 in G')
       expect(shown).to.contain('9 notes wide (14 semitones)')
       // (E5 is the edge: yellow, and the words say so as well as the badge)
@@ -104,12 +104,12 @@ describe('song-info', () => {
 
     it('offers to add one when the chart says none, and says nothing with no key to write it in', async () => {
       const none = text(await show({ song: ranged({}, { x_chordless_range: '' }) }))
-      expect(none).to.contain('Melody Range')
+      expect(none).to.contain('Lead Sheet Range')
       expect(none).to.contain('None yet')
       expect(none).to.contain('Add a range')
       // (a song with no chart key and no key of the record's: no key to write the notes in)
       const keyless = await show({ song: song({ metadata: {}, parsed: { metadata: {} } }) })
-      expect(text(keyless)).to.not.contain('Melody Range')
+      expect(text(keyless)).to.not.contain('Lead Sheet Range')
     })
 
     it('shows the notes, and not how they fit, for a chart with no key to measure from', async () => {

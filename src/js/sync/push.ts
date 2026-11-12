@@ -623,7 +623,7 @@ export async function pushScores(
   const report = (uploaded: number) =>
     progressCallback?.({
       stage: 'pushing',
-      message: `Uploaded ${uploaded}/${total} melodies`,
+      message: `Uploaded ${uploaded}/${total} lead sheets`,
       current: uploaded,
       total,
     })
@@ -669,7 +669,7 @@ export async function pushScores(
         })
       )
     )
-  const describe = ({ record }: ScoreUpload) => `the melody of song ${record.uuid}`
+  const describe = ({ record }: ScoreUpload) => `the lead sheet of song ${record.uuid}`
 
   const uploaded = await uploadInBatches(created, BATCH_SIZE, {
     uploadBatch: async batch =>
