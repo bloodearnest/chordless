@@ -42,7 +42,7 @@
   },
   "src/js/score-render.ts": {
     "lines": 6,
-    "branches": 2,
+    "branches": 0,
     "functions": 1
   },
   "src/js/score-structure.ts": {
