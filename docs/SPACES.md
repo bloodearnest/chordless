@@ -371,8 +371,8 @@ Steps, each on the one page:
    - **Setlists: move** (default) or **keep a copy**. An upgrade means the team's setlists should
      leave the personal space, so move is the default and the wording says so ("they leave your
      personal space"). Moving asks for a confirmation that names how many setlists will go. A
-     setlist already saved to Drive cannot be removed from the source until "Deleting setlists" is
-     built: it stays, and the result says how many.
+     setlist already saved to Drive is removed from the source too: its file goes to the Drive trash at
+     the source's next sync ("Deleting setlists", built 2026-11-12).
    - They go through `space-transfer.ts` (`contentsOf` counts, `bringAcross` does it; the local
      databases, no Drive access to the source needed). A copy gives setlists new ids, a move keeps
      them (as "Copy and move" says), so this is that code and not the export file's import.
@@ -686,9 +686,9 @@ Google accounts.
   the local DB.
 - **Migration:** the "Creating a team space" wizard does this as one of its steps: the space is
   created, then songs, setlists and pads are moved (the default) or copied from the personal space.
-  The personal space is then empty and stays as the place for private sets. A move can delete
-  setlists that are in Drive once "Deleting setlists" (SYNC_ARCHITECTURE.md) is built; until then
-  those stay in the source and are counted in the report. The same tool serves succession, handing over or splitting a team space.
+  The personal space is then empty and stays as the place for private sets. A move deletes
+  the setlists, those in Drive too (their files go to the Drive trash: "Deleting setlists",
+  SYNC_ARCHITECTURE.md). The same tool serves succession, handing over or splitting a team space.
 - Copying out of a team space into your personal space is allowed for any member (it is local data
   in Drives they control). The library's "Add to my library" for a song from another database is
   the one-song version.
@@ -1086,10 +1086,10 @@ Built 2026-11-12 (`space-deletion.ts`, `space-delete-everywhere.ts`, the Worker'
   (Personal is made again when the app needs one), and the page starts again in it. (The old rule
   "switch to another first" was about the open database connection, which a window of the app lets go of
   when asked to: `onversionchange`.)
-- **Not built: deleting things in a space that stays.** A move into a Team still copies songs, and
-  leaves the setlists that are in Drive: removing those needs the sync's pending deletions
-  (`docs/SYNC_ARCHITECTURE.md`, "Deleting setlists"). Until then the way to clear a personal space after
-  moving everything is to delete it everywhere.
+- **Setlists of a space that stays.** A move into a Team copies songs (a deleted chart comes back),
+  and moves the setlists: those in Drive go to the Drive trash too (`docs/SYNC_ARCHITECTURE.md`,
+  "Deleting setlists"). One setlist can be moved from its info dialog, in edit mode, to put right one
+  added to the wrong space.
 
 ## Risks
 

@@ -1001,7 +1001,11 @@ export class SyncManager {
       }
     }
     for (const entry of await this.db.getPendingDeletions()) {
-      unsynced.push({ type: entry.kind, id: entry.ref, label: '(deleted, not yet in the Drive trash)' })
+      unsynced.push({
+        type: entry.kind,
+        id: entry.ref,
+        label: '(deleted, not yet in the Drive trash)',
+      })
     }
     return unsynced
   }
