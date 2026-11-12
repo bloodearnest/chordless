@@ -101,7 +101,10 @@ describe('merging a setlist both sides changed', () => {
     const edited = (text: string) => setlist(entry('a', { annotations: [note('n', text)] }))
     // (only the other edited it)
     const taken = mergeSetlists(edited('original'), edited('their words'), base).merged
-    assert.equal((taken.songs[0].annotations?.[0].body as { text: string }).text, 'their words')
+    assert.deepEqual(
+      taken.songs[0].annotations?.map(each => (each.body as { text: string }).text),
+      ['their words']
+    )
     // (both did: the winner's stays and the other's is kept beside it)
     const clash = mergeSetlists(edited('my words'), edited('their words'), base).merged
     const texts = clash.songs[0].annotations?.map(each => (each.body as { text: string }).text)
