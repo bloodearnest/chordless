@@ -505,6 +505,13 @@ Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
   Gmail address with dots or a `+tag` is a different address from the plain one). The link to hand
   out is the page's, with the space id and code in its fragment (built), and is handed on from the
   admin's own account by the share sheet, WhatsApp or Gmail (`invite-send.ts`).
+  The message says how to make a Google account with an address that is not Gmail's (a link to
+  Google's sign-up and "Use my existing email address"; `googleAccountHelp`). Whether an address is
+  a Google account cannot be known (a Workspace domain or an address made a Google account looks like
+  any other, and probing Google's sign-in is not something Chordless does), so only `gmail.com` and
+  `googlemail.com` leave the text out, and nothing is ever refused for it. The invite carries no name:
+  on joining, the person named by the address alone (a placeholder) is renamed to the Google account's
+  name by `getSpacePeople`; a name someone gave is kept.
 - **Chordless does not email invites itself** (decided 2026-11-11). It would make chordless.app a
   sender anyone with a team could point at any address (spam and phishing under the domain, which
   would also hurt Email Routing), and mail from a new domain lands in spam, so "I never got it" would

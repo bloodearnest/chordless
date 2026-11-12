@@ -5,7 +5,12 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import '../src/components/invite-send.ts'
 import type { InviteSend } from '../src/components/invite-send.ts'
-import { inviteMessage, inviteSendLinks } from '../src/js/team-spaces.ts'
+import {
+  googleAccountHelp,
+  inviteMessage,
+  inviteSendLinks,
+  isGmailAddress,
+} from '../src/js/team-spaces.ts'
 import { must } from './must.ts'
 
 const { describe, it, afterEach } = window
@@ -28,6 +33,20 @@ describe('inviteMessage and inviteSendLinks', () => {
     expect(inviteMessage('Grace Church', 'reader', 'fay@example.com')).to.contain(
       'join Grace Church on Chordless as a team member. Sign in with the Google account fay@example.com'
     )
+  })
+
+  it('tells an address that may not be a Google account how to make one, and leaves it out for Gmail', () => {
+    const other = inviteMessage('Grace Church', 'writer', 'fay@church.org')
+    expect(other).to.contain('https://accounts.google.com/signup')
+    expect(other).to.contain('Use my existing email address')
+    expect(googleAccountHelp('fay@church.org')).to.contain(
+      'fay@church.org is not a Google account yet'
+    )
+    for (const gmail of ['fay@gmail.com', 'Fay@GoogleMail.com ']) {
+      expect(isGmailAddress(gmail)).to.equal(true)
+      expect(inviteMessage('Grace Church', 'writer', gmail)).to.not.contain('signup')
+    }
+    expect(isGmailAddress('fay@notgmail.com')).to.equal(false)
   })
 
   it('makes a WhatsApp link and a Gmail compose link to that address, both carrying the invite link', () => {

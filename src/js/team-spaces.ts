@@ -155,9 +155,29 @@ export function inviteLink(origin: string, teamId: string, code: string): string
   return `${origin}/join#${teamId}.${code}`
 }
 
+/** Google's page for making a Google account with an address from somewhere else */
+export const GOOGLE_SIGNUP_URL = 'https://accounts.google.com/signup'
+
+/**
+ * Whether an address is certainly a Google account's: Gmail's. Any other might be one too (a Google
+ * Workspace domain, or an address made a Google account), and nothing public says; so this is
+ * only for leaving out the how-to-make-one text, never for refusing an invite.
+ */
+export function isGmailAddress(email: string): boolean {
+  return /@(gmail|googlemail)\.com$/i.test(email.trim())
+}
+
+/** The part of an invite's message for an address that may not be a Google account yet; empty for Gmail */
+export function googleAccountHelp(email: string): string {
+  if (isGmailAddress(email)) return ''
+  return `If ${email} is not a Google account yet, make one first at ${GOOGLE_SIGNUP_URL} and choose "Use my existing email address" (you need no Gmail).`
+}
+
 /** What to say with an invite's link, to the person it is for */
 export function inviteMessage(teamName: string, role: TeamRole, email: string): string {
-  return `You are invited to join ${teamName} on Chordless as ${roleWithArticle(role)}. Sign in with the Google account ${email}; the link works once, for a week.`
+  const message = `You are invited to join ${teamName} on Chordless as ${roleWithArticle(role)}. Sign in with the Google account ${email}; the link works once, for a week.`
+  const help = googleAccountHelp(email)
+  return help ? `${message} ${help}` : message
 }
 
 /** The ways to hand an invite on where the browser has no share sheet: WhatsApp, and Gmail's compose window (a mailto: link does nothing on a desktop with no mail app) */

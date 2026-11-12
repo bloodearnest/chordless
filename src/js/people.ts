@@ -142,7 +142,12 @@ export async function getSpacePeople(
         me = keep({ person, changed: [person] })
       }
     } else if (byEmail) {
-      me = byEmail
+      // (a name that is only the address is a placeholder, from the members list or an invite typed
+      // in by address: the Google account's name replaces it, but never one somebody gave)
+      if (byEmail.name === user.email && user.name !== user.email) {
+        const person = { ...byEmail, name: user.name, modifiedDate: new Date().toISOString() }
+        me = keep({ person, changed: [person] })
+      } else me = byEmail
     } else if (byName && byName.emails.length > 0) {
       askWho = true
     } else {
