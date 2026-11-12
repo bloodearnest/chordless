@@ -12,6 +12,8 @@ import {
   setlistsUsing,
   variantsOf,
 } from '../js/song-versions.ts'
+import { getCurrentSpaceFull } from '../js/space.ts'
+import { mayDeleteSong } from '../js/team-roles.ts'
 import { toast } from '../js/toast.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
@@ -48,6 +50,7 @@ export class SongVersions extends LitElement {
     _deleting: { state: true },
     _usedIn: { state: true },
     _mergeFrom: { state: true },
+    _mayDeleteSong: { state: true },
   }
 
   declare songId: string
@@ -61,6 +64,8 @@ export class SongVersions extends LitElement {
   /** How many setlists the song being deleted is in */
   declare _usedIn: number
   declare _mergeFrom: string
+  /** Whether this person may delete the song itself (an admin of a Team, or anyone in their own space) */
+  declare _mayDeleteSong: boolean
 
   static override styles = [
     buttonStyles,
@@ -148,6 +153,7 @@ export class SongVersions extends LitElement {
     this._deleting = null
     this._usedIn = 0
     this._mergeFrom = ''
+    this._mayDeleteSong = true
   }
 
   override willUpdate(changed: Map<string, unknown>): void {
@@ -162,6 +168,7 @@ export class SongVersions extends LitElement {
     try {
       const db = await this._database()
       this._variants = await variantsOf(db, this.songId)
+      this._mayDeleteSong = mayDeleteSong((await getCurrentSpaceFull()).team?.role ?? null)
       const songs = new Map<string, SongRecord>()
       for (const record of await db.getAllSongs()) {
         if (record.id === this.songId) continue
@@ -265,7 +272,9 @@ export class SongVersions extends LitElement {
                 ${
                   deleting
                     ? nothing
-                    : html`<button class="btn delete" @click=${() => this._askToDelete(variant)}>${several ? 'Delete' : 'Delete song'}</button>`
+                    : !several && !this._mayDeleteSong
+                      ? html`<span class="origin only-admin">Only an admin can delete a song.</span>`
+                      : html`<button class="btn delete" @click=${() => this._askToDelete(variant)}>${several ? 'Delete' : 'Delete song'}</button>`
                 }
               </div>
             `

@@ -56,3 +56,13 @@ export function mayDeleteSetlist(role: TeamRole | null, leadsIt: boolean): boole
   if (role === null || atLeast(role, 'admin')) return true
   return role === 'writer' && leadsIt
 }
+
+/**
+ * Whether someone may delete a song, not just one of its versions (docs/SPACES.md, "Roles"): in a
+ * personal space (`role` null) its owner, in a team space an admin or the owner. Deleting a song
+ * is for a bad import or a mistake, and it takes the song out of every setlist. Deleting one
+ * version of several is for any worship leader, so it is not asked of this.
+ */
+export function mayDeleteSong(role: TeamRole | null): boolean {
+  return role === null || atLeast(role, 'admin')
+}
