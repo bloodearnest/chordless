@@ -659,6 +659,31 @@ never meet a "Personal" space they did not ask for.
 - The Import page's "Import into" picker follows the same tabs: a space that is hidden is not
   offered unless it is the only one.
 
+**Teams on another device** (built 2026-11-12; `team-memberships.ts`, `GET /api/spaces`)
+- A team space is on a device because that device joined it, so a second device, or a new browser,
+  signed in as the same person had none of their teams. The Worker knows who is in what (D1:
+  `teams` and `team_members`), so a device **asks**: `GET /api/spaces` lists the still-shared spaces
+  the signed-in account is in, each with its name and the person's role; an owner's entry also has
+  the folder's Drive id (`rootRef`), as an owner's device reaches the folder straight, while a
+  member's goes through the Worker and needs nothing but the space's id. It reveals only the
+  caller's own membership. Nothing new is tracked on the Worker.
+- The device **makes the spaces it lacks**, as joining makes them (named as the team calls it,
+  "(team)" added if the name is taken; a team member's is read only), does their first sync, and
+  tells the person in a toast ("Added the team St Mark's"). A team it already has is not made twice
+  (matched by the team's id), and a known team's role is brought up to date (an owner's never changes).
+  If the device has no space in use, the first one made is. Anything that cannot be reached (not
+  signed in, offline) leaves the device as it was, and the next check tries again.
+- **When:** at start-up, after a sign-in, and when the app comes back to the screen (at most every
+  fifteen minutes), and by hand: Account and Teams has **Look for my teams** when signed in. Joining,
+  making a team and this check take one Web Lock (`chordless-team-spaces`), so a space half made by a
+  join is not made again by a check.
+- **Declined teams.** Taking a team off this device ("Delete from this device") remembers its id in
+  this browser (`declined-team-spaces`), so the next check does not put it back; **Look for my
+  teams** does, and forgets the declining. This is the only state kept. A team the person has left, or
+  that ended, is not listed, and its space stays on the device until they remove it.
+- Not checked on a real Drive account: that an owner's second device can read the folder straight
+  (`drive.file` is per app and account, so it should), and the first sync of a big team on a phone.
+
 **As built** (`space-tabs.ts`, `<space-tabs>`, `team-join.ts`), where it differs from the above:
 - The Shared tab is not a space that the app switches to: it goes to `/?shared` (the route
   `{ name: 'home', shared: true }`, its own view), which lists only what was shared, with the tab marked. On the Library and Add Song pages it is a way

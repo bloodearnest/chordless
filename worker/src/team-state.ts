@@ -153,6 +153,43 @@ function chunks<T>(items: T[], size: number): T[][] {
   return pieces
 }
 
+/** A team space the signed-in person is in, as they are told of it on a device that does not have it yet */
+export interface MySpace {
+  spaceId: string
+  name: string
+  role: TeamRole
+  /** Drive's id of the space's folder: only for the owner, whose device reaches it straight (a member's goes through the Worker) */
+  rootRef?: string
+}
+
+/**
+ * The spaces a person is in, owner or member, that are still shared: what a device that has not
+ * joined them yet (a second device, or a new browser) asks, so it can set them up
+ */
+export async function spacesOf(
+  db: D1Db,
+  identity: Pick<Identity, 'provider' | 'sub'>
+): Promise<MySpace[]> {
+  const key = identityKey(identity)
+  const { results } = await db
+    .prepare(
+      `SELECT t.space_id, t.name, t.root_ref,
+          CASE WHEN t.owner_provider || ':' || t.owner_sub = ? THEN 'owner' ELSE m.role END AS role
+        FROM teams t LEFT JOIN team_members m ON m.space_id = t.space_id AND m.identity = ?
+        WHERE t.ended_at IS NULL
+          AND (t.owner_provider || ':' || t.owner_sub = ? OR m.identity IS NOT NULL)
+        ORDER BY t.created_at, t.space_id`
+    )
+    .bind(key, key, key)
+    .all<{ space_id: string; name: string; root_ref: string; role: TeamRole }>()
+  return results.map(row => ({
+    spaceId: row.space_id,
+    name: row.name,
+    role: row.role,
+    ...(row.role === 'owner' ? { rootRef: row.root_ref } : {}),
+  }))
+}
+
 export class TeamSpaceState implements TeamSpaceApi {
   #db: D1Db
   #id: string

@@ -28,11 +28,20 @@ export interface TeamFolders {
  * the device last, so a failure leaves nothing here that has to be cleaned up; a folder made
  * and not registered is left in Drive for the person to delete.
  */
-export async function createTeamSpace(
+export function createTeamSpace(
   name: string,
   parentId: string,
   folders: TeamFolders,
   options: { ccliLicence?: string } = {}
+): Promise<Space> {
+  return withMembershipLock(() => makeTeamSpace(name, parentId, folders, options))
+}
+
+async function makeTeamSpace(
+  name: string,
+  parentId: string,
+  folders: TeamFolders,
+  options: { ccliLicence?: string }
 ): Promise<Space> {
   const teamName = name.trim()
   if (!teamName) throw new Error('A team space needs a name')
@@ -61,6 +70,15 @@ function teamFolderName(teamName: string): string {
   return `${teamName} Chordless`
 }
 
+/**
+ * Run something that makes or finds team spaces on this device with nothing else doing so: joining,
+ * making one, and asking which the person is in (team-memberships.ts) would otherwise see each
+ * other's half-made space and make it twice. Where there are no Web Locks it just runs.
+ */
+export function withMembershipLock<T>(run: () => Promise<T>): Promise<T> {
+  return navigator.locks ? navigator.locks.request('chordless-team-spaces', run) : run()
+}
+
 /** A name for the new space that no space on this device has */
 async function freeName(wanted: string): Promise<string> {
   const names = new Set((await listSpaces()).map(space => space.name))
@@ -75,7 +93,34 @@ async function freeName(wanted: string): Promise<string> {
  * Join a team space with an invite's code. This device gets a space of its own for it, named as
  * the team calls it, whose files come through the Worker; nothing is synced yet.
  */
-export async function joinSpace(
+export function joinSpace(
+  teamId: string,
+  code: string,
+  backend: Pick<TeamStorage, 'inspectRoot'>
+): Promise<Space> {
+  return withMembershipLock(() => joinTeamSpace(teamId, code, backend))
+}
+
+/**
+ * The space on this device for a team the Worker says the person is in, as joining makes it: named
+ * as the team calls it, a member's reached through the Worker (its id is its `rootRef`), an owner's
+ * straight in the folder they were told of
+ */
+export async function createLocalTeamSpace(team: {
+  spaceId: string
+  name: string
+  role: TeamRole
+  rootRef?: string
+}): Promise<Space> {
+  const space = await createSpace(await freeName(team.name || 'Team'))
+  return updateSpace(space.id, {
+    rootRef: team.role === 'owner' ? team.rootRef : team.spaceId,
+    team: { id: team.spaceId, role: team.role },
+    readOnly: team.role === 'reader',
+  })
+}
+
+async function joinTeamSpace(
   teamId: string,
   code: string,
   backend: Pick<TeamStorage, 'inspectRoot'>

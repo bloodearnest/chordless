@@ -2,6 +2,7 @@
  * Making a team space, joining one, and looking after its people (docs/SPACES.md, "Setting up and
  * joining a team space"). The storage API (team-api.ts) is for files; this is for the space itself.
  *
+ *   GET    /api/spaces                                      the spaces you are in (for a device that has not set them up)
  *   POST   /api/spaces                  {blob, rootRef, name, ccliLicence?}  make a space from a folder you own
  *   POST   /api/spaces/join             {spaceId, code}         join with an invite
  *   GET    /api/space/<id>/invites                              admin: the open invites
@@ -38,13 +39,15 @@ import type { BlobData } from './blob.ts'
 import { answering, jsonResponse, Refusal, readJson } from './http.ts'
 import type { Identity } from './identity.ts'
 import { refusal } from './team-api.ts'
-import type { SpaceInfo, TeamSpaceApi } from './team-state.ts'
+import type { MySpace, SpaceInfo, TeamSpaceApi } from './team-state.ts'
 
 /** What these routes need from the Worker */
 export interface AdminContext {
   /** Who is asking, from the ID token; null if no one */
   identify(request: Request): Promise<Identity | null>
   room(spaceId: string): TeamSpaceApi
+  /** The spaces this person is in */
+  spacesOf(identity: Identity): Promise<MySpace[]>
   /** The folder as the owner's own Drive access sees it, before anything is stored */
   inspectRoot(
     blob: string,
@@ -93,6 +96,15 @@ async function checkSharing(ctx: AdminContext, identity: Identity, blob: string,
   if (!root || root.trashed || root.canWrite === false) {
     throw new Refusal(400, 'That folder is not there, or you cannot change it')
   }
+}
+
+/** GET /api/spaces: the spaces the person is in, with their role in each */
+export function handleListSpaces(request: Request, ctx: AdminContext): Promise<Response> {
+  return answering('Team space admin', async () => {
+    const identity = await ctx.identify(request)
+    if (!identity) return refusal('unauthenticated')
+    return jsonResponse(await ctx.spacesOf(identity))
+  })
 }
 
 /** POST /api/spaces: share a folder you own as a team space; the space's id is issued here */

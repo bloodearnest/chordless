@@ -52,6 +52,8 @@ import('./space-access.ts').then(({ refreshSpaceAccess }) => {
   // ...and again for the space switched to
   window.addEventListener(SpaceChangeEvent.type, () => void refreshSpaceAccess())
 })
+// The teams the person is in that this device has not set up (a second device, a new browser)
+import('./team-memberships.ts').then(({ watchTeamMemberships }) => watchTeamMemberships())
 void appUpdate.start()
 // The heavy files the worker did not install (the PDF reader, Verovio): fetched once the page is idle, for offline
 import('./precache-deferred.ts').then(({ startDeferredPrecache }) =>

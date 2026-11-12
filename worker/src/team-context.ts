@@ -17,7 +17,7 @@ import type { AdminContext } from './team-admin.ts'
 import type { TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'
 import { notingPadRefs, notingRefs } from './team-refs.ts'
-import { type LiveSockets, type SpaceInfo, TeamSpaceState } from './team-state.ts'
+import { type LiveSockets, type SpaceInfo, spacesOf, TeamSpaceState } from './team-state.ts'
 import { tracedFetch, tracedStub } from './trace.ts'
 
 /** What a test replaces; the real ones are the defaults */
@@ -104,6 +104,7 @@ export function createAdminContext(env: Env, deps: TeamDeps = {}): AdminContext 
   return {
     identify: request => authenticate(request, providers),
     room: roomsOf(env),
+    spacesOf: identity => spacesOf(env.DB as D1Db, identity),
     async inspectRoot(blob, owner, rootRef) {
       // (the blob is not stored yet: it is what the space would be made from)
       const info = { rootRef, name: '', owner, createdAt: '' }

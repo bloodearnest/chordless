@@ -14,6 +14,7 @@ import { forgetSync } from './last-sync.ts'
 import { deleteSpace, getCurrentSpace, listSpaces, setCurrentSpace } from './space.ts'
 import { storageFor } from './storage/space-storage.ts'
 import { teamApi } from './team-client.ts'
+import { declineTeam } from './team-memberships.ts'
 import { atLeast } from './team-roles.ts'
 
 /** Whether this person may delete the space everywhere: a Team's admin or owner, or whoever has a personal space */
@@ -44,6 +45,8 @@ export async function removeSpaceFromDevice(
 ): Promise<{ wasCurrent: boolean }> {
   const wasCurrent = getCurrentSpace().id === space.id
   await deleteSpace(space.id)
+  // (taken off this device on purpose: asking which teams there are does not put it back)
+  if (space.team) declineTeam(space.team.id)
   forgetSync(space.id)
   if (wasCurrent) {
     const next = (await spacesHere()).find(other => other.id !== space.id)

@@ -17,6 +17,7 @@ import {
 } from '../src/components/space-card.ts'
 import { SpaceGoneEvent } from '../src/components/space-manager.ts'
 import { TeamShareLeftEvent } from '../src/components/team-share-panel.ts'
+import type { SignInState } from '../src/js/google-auth.ts'
 import {
   createSpace,
   deleteSpace,
@@ -25,6 +26,7 @@ import {
   setCurrentSpace,
   updateSpace,
 } from '../src/js/space.ts'
+import { TeamSpacesAddedEvent } from '../src/js/team-memberships.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { nextTimestamp, nothingFor, suppressConsoleLogs } from './test-helpers.ts'
@@ -322,6 +324,84 @@ describe('account-page', () => {
       el.dispatchEvent(new SpaceUsersEvent(first.id))
       await nothingFor(50)
       expect(modal(el).open).to.equal(false)
+    })
+  })
+
+  describe('looking for the teams a person is in', () => {
+    const button = (el: AccountPage) =>
+      el.shadowRoot?.querySelector<HTMLButtonElement>('button#look-for-teams') ?? null
+    const message = (el: AccountPage) =>
+      el.shadowRoot?.querySelector('#look-message')?.textContent?.replace(/\s+/g, ' ') ?? ''
+    // (the account card tells the page how the sign-in stands, once it has asked: let it, then say)
+    const signedIn = async (el: AccountPage, state: SignInState = 'signed-in') => {
+      await nothingFor(100)
+      el.dispatchEvent(new AccountStateEvent(state))
+      await el.updateComplete
+    }
+
+    it('is offered only when signed in', async () => {
+      const el = await page()
+      await signedIn(el, 'signed-out')
+      expect(button(el)).to.equal(null)
+      await signedIn(el)
+      expect(button(el)).to.not.equal(null)
+    })
+
+    it('asks for the declined teams too, and says what it added', async () => {
+      const el = await page()
+      await signedIn(el)
+      const asked: unknown[] = []
+      const added = await space('Choir')
+      el.checkTeams = async options => {
+        asked.push(options)
+        return { added: [added], declined: [] }
+      }
+      must(button(el)).click()
+      await waitUntil(() => message(el).includes('Added'), 'the answer')
+      expect(asked).to.deep.equal([{ force: true, includeDeclined: true }])
+      expect(message(el)).to.contain(added.name)
+      expect(button(el)?.disabled).to.equal(false)
+    })
+
+    it('says so when there is nothing to add', async () => {
+      const el = await page()
+      await signedIn(el)
+      el.checkTeams = async () => ({ added: [], declined: [] })
+      must(button(el)).click()
+      await waitUntil(() => message(el).includes('Every team you are in'), 'the answer')
+    })
+
+    it('says so, and can be tried again, when it could not look', async () => {
+      const el = await page()
+      await signedIn(el)
+      el.checkTeams = () => Promise.reject(new Error('offline'))
+      must(button(el)).click()
+      await waitUntil(() => message(el).includes('Could not look for your teams: offline'))
+      expect(button(el)?.disabled).to.equal(false)
+    })
+
+    it('is held while it looks', async () => {
+      const el = await page()
+      await signedIn(el)
+      let finish = () => {}
+      el.checkTeams = () =>
+        new Promise(resolve => {
+          finish = () => resolve({ added: [], declined: [] })
+        })
+      must(button(el)).click()
+      await el.updateComplete
+      expect(button(el)?.disabled).to.equal(true)
+      expect(button(el)?.textContent).to.contain('Looking')
+      finish()
+      await waitUntil(() => button(el)?.disabled === false, 'it to be done')
+    })
+
+    it('lists the spaces again when teams were added by itself', async () => {
+      const el = await page()
+      const added = await space('Added')
+      expect(cards(el).map(card => card.space.id)).to.not.include(added.id)
+      window.dispatchEvent(new TeamSpacesAddedEvent([added]))
+      await waitUntil(() => cards(el).some(card => card.space.id === added.id), 'the new card')
     })
   })
 })

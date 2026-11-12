@@ -8,6 +8,7 @@ import { jsonResponse } from './http.ts'
 import {
   handleCreateSpace,
   handleJoin,
+  handleListSpaces,
   handleSpaceAdmin,
   isAdminRoute,
   SPACE_ID,
@@ -37,6 +38,7 @@ export async function handleTeamRoutes(
 
   const answer = await (async () => {
     if (path === '/api/spaces') {
+      if (request.method === 'GET') return handleListSpaces(request, admin)
       return request.method === 'POST'
         ? handleCreateSpace(request, admin)
         : jsonResponse({ error: 'Not found' }, 404)

@@ -232,6 +232,62 @@ describe('who is asking', () => {
   })
 })
 
+describe('the spaces a person is in', () => {
+  const list = async (
+    call: Awaited<ReturnType<typeof world>>['call'],
+    who: Identity | null | string
+  ) => call('/api/spaces', who)
+
+  test('are told to a device that has not set them up: the owner is given the folder, a member is not', async () => {
+    const { call, root } = await world()
+    const owner = await list(call, ann)
+    assert.equal(owner.status, 200)
+    assert.deepEqual(await owner.json(), [
+      { spaceId: SPACE, name: 'Team', role: 'owner', rootRef: root },
+    ])
+    for (const [who, role] of [
+      [bob, 'writer'],
+      [cat, 'reader'],
+      [dan, 'admin'],
+    ] as const) {
+      assert.deepEqual(await (await list(call, who)).json(), [
+        { spaceId: SPACE, name: 'Team', role },
+      ])
+    }
+  })
+
+  test('are none for someone who is in none, and need a signed-in account', async () => {
+    const { call } = await world()
+    assert.deepEqual(await (await list(call, stranger)).json(), [])
+    assert.equal((await list(call, null)).status, 401)
+    assert.equal((await list(call, 'garbage')).status, 401)
+  })
+
+  test('are all of them, each with the person’s role in it, in the order they were made', async () => {
+    const { call, db, root } = await world()
+    const other = new TeamSpaceState(db, 'space-bbbbbbbb', { now: () => new Date('2099-01-01') })
+    await other.create({ rootRef: 'folder-2', name: 'Events', owner: bob })
+    await other.setMember(ann, 'reader')
+    assert.deepEqual(await (await list(call, ann)).json(), [
+      { spaceId: SPACE, name: 'Team', role: 'owner', rootRef: root },
+      { spaceId: 'space-bbbbbbbb', name: 'Events', role: 'reader' },
+    ])
+    assert.deepEqual(await (await list(call, bob)).json(), [
+      { spaceId: SPACE, name: 'Team', role: 'writer' },
+      { spaceId: 'space-bbbbbbbb', name: 'Events', role: 'owner', rootRef: 'folder-2' },
+    ])
+  })
+
+  test('leave out a space that is no longer shared, or that the person has left', async () => {
+    const { call, room } = await world()
+    await room.removeMember(cat)
+    assert.deepEqual(await (await list(call, cat)).json(), [])
+    assert.equal((await call(`/api/space/${SPACE}`, ann, { method: 'DELETE' })).status, 204)
+    assert.deepEqual(await (await list(call, ann)).json(), [])
+    assert.deepEqual(await (await list(call, bob)).json(), [])
+  })
+})
+
 describe('what a role may do', () => {
   test('a reader reads: the root (which says it is not writable), the list and a file', async () => {
     const { call, direct } = await world()
@@ -585,7 +641,7 @@ describe('making a space', () => {
 
   test('refuses other methods', async () => {
     const w = await world()
-    assert.equal((await w.call('/api/spaces', ann)).status, 404)
+    assert.equal((await w.call('/api/spaces', ann, { method: 'PUT' })).status, 404)
     assert.equal((await w.call('/api/spaces/join', ann)).status, 404)
   })
 })
