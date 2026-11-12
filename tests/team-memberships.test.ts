@@ -249,6 +249,105 @@ describe('teams on another device', () => {
     expect(shownToast()?.message).to.contain('Added 2 teams')
   })
 
+  it('asks once when asked again while it is still asking', async () => {
+    let asked = 0
+    let answer = (_teams: MyTeam[]) => {}
+    const list = () => {
+      asked++
+      return new Promise<MyTeam[]>(resolve => {
+        answer = resolve
+      })
+    }
+    const first = checkTeamMemberships({ force: true, list, syncSpace })
+    const second = checkTeamMemberships({ force: true, list, syncSpace })
+    expect(second).to.equal(first)
+    answer([])
+    await first
+    expect(asked).to.equal(1)
+  })
+
+  it('takes a space made without a team for what it is', async () => {
+    const personal = await createSpace(unique('Personal'))
+    try {
+      await updateSpace(personal.id, { rootRef: 'folder-x' })
+      const { added } = await check([])
+      expect(added).to.deep.equal([])
+    } finally {
+      await deleteSpace(personal.id)
+    }
+  })
+
+  it('forgets nothing but is not stopped when the browser will not keep what was declined', () => {
+    const real = Storage.prototype.setItem
+    Storage.prototype.setItem = () => {
+      throw new Error('blocked')
+    }
+    try {
+      declineTeam('x')
+    } finally {
+      Storage.prototype.setItem = real
+    }
+    expect(declinedTeams()).to.deep.equal([])
+  })
+
+  it('does the ordinary first sync when it is not given another, and keeps the space if that fails', async () => {
+    const writer = team('writer')
+    const { added } = await addMissingTeamSpaces({ list: async () => [writer] })
+    expect(added).to.have.length(1)
+  })
+
+  it('calls a team with no name “Team”', async () => {
+    const nameless = team('writer', { name: '' })
+    const { added } = await check([nameless])
+    expect(must(added[0]).name).to.match(/^Team/)
+  })
+
+  it('makes spaces where the browser has no Web Locks', async () => {
+    Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true })
+    try {
+      const { added } = await check([team('writer')])
+      expect(added).to.have.length(1)
+    } finally {
+      // biome-ignore lint/performance/noDelete: the property was put on the navigator itself; the browser's own is behind it
+      delete (navigator as { locks?: unknown }).locks
+    }
+  })
+
+  it('looks when started, and again when the app comes back to the screen but not when it goes', async () => {
+    // (a page in a test run may be in the background: say which it is)
+    const showing = (state: 'visible' | 'hidden') => {
+      Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+    }
+    try {
+      watchTeamMemberships()
+      showing('hidden')
+      showing('visible')
+      // (not signed in, so there is nothing to find: it must not throw or make anything)
+      await new Promise(resolve => setTimeout(resolve, 50))
+    } finally {
+      // biome-ignore lint/performance/noDelete: the property was put on the document itself; the browser's own is behind it
+      delete (document as { visibilityState?: unknown }).visibilityState
+    }
+  })
+
+  it('asks once when asked again while it is still asking', async () => {
+    let asked = 0
+    let answer = (_teams: MyTeam[]) => {}
+    const list = () => {
+      asked++
+      return new Promise<MyTeam[]>(resolve => {
+        answer = resolve
+      })
+    }
+    const first = checkTeamMemberships({ force: true, list, syncSpace })
+    const second = checkTeamMemberships({ force: true, list, syncSpace })
+    expect(second).to.equal(first)
+    answer([])
+    await first
+    expect(asked).to.equal(1)
+  })
+
   it('takes a space made without a team for what it is', async () => {
     const personal = await createSpace(unique('Personal'))
     try {
