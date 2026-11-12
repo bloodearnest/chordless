@@ -1,5 +1,5 @@
 /**
- * A church's CCLI licence number, as kept for a space (docs/SPACES.md, "SongSelect's terms").
+ * A church's CCLI licence number, as kept for a space (docs/CCLI.md).
  * Shared by the page and the Worker, which keeps a team's number with the team and a log of its
  * changes: CCLI may ask who a team's licence is, and a record of teams using Chordless is wanted.
  */

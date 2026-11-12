@@ -236,7 +236,7 @@ const RETIRED_SCORE_PROPERTIES = ['melodyFormat']
 /**
  * The file name of a song's score, which people see in Drive as its lead sheet: its chart's name
  * without the extension, then `.lead-sheet.mxl` (or `.lead-sheet.musicxml` where the space holds text
- * only). Before the rename (docs/MELODY.md, "What is stored") it was `.melody.mxl`.
+ * only). Before the rename (docs/LEAD_SHEETS.md, "What is stored") it was `.melody.mxl`.
  */
 export function scoreFilename(title: string, ccliNumber?: string | null, bytes = true): string {
   return `${chordproFilename(title, ccliNumber).replace(/\.txt$/, '')}.lead-sheet.${bytes ? 'mxl' : 'musicxml'}`

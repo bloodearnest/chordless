@@ -40,7 +40,7 @@ export interface ImportItem {
   leadSheet?: LeadSheetOutcome
   /** What was read from it, to show how */
   melody?: MelodyRead
-  /** Its whole melody, in the chart's key, to be kept with the song the chart goes to (docs/MELODY.md) */
+  /** Its whole melody, in the chart's key, to be kept with the song the chart goes to (docs/LEAD_SHEETS.md) */
   notes?: KeptMelody
   /** Whether it was saved just now (a new song's); undefined while it waits on a choice about a song the library has */
   melodySaved?: boolean

@@ -1,5 +1,5 @@
 /**
- * Engraves a melody as sheet music, in a worker: `docs/MELODY.md`, "Rendering with Verovio". The page
+ * Engraves a melody as sheet music, in a worker: `docs/LEAD_SHEETS.md`, "Rendering with Verovio". The page
  * gives MusicXML (from `writeMusicXml`) and gets SVG, one string a page. Verovio itself runs in
  * `verovio-worker.ts`, which is made on the first call and kept for the next, so the page never
  * compiles the WebAssembly (and its Content-Security-Policy need not allow that) and the 7 MB module is

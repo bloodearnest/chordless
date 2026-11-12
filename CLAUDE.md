@@ -15,10 +15,10 @@ Its key features:
 - songs can be reordered
 - smart layout/zoom to maximise the text size.
 - works offline
+- annotations on a chart ("repeat this 4 times", "drop out here": `docs/ANNOTATIONS.md`)
 
 Extra features I would like to add
 
-- quick way to add annotations (e.g. "repeat this 4 times", "drop out here", etc)
 - quick edit feature for quick song corrections
 
 ## UI
@@ -98,7 +98,7 @@ survives only in names already stored on devices and in Drive.)
 
 - Use `just format lint test` to verify all changes (and `just ci` before a pull request: `docs/CI.md`). This runs formatting, linting (Biome, `tsc -b` over the tsconfig.*.json projects, knip for unused files, exports and dependencies, and a dry-run deploy of `wrangler.toml` that fails on warnings: `scripts/lint-wrangler.sh`), and all three test suites: node tests, browser unit tests (Web Test Runner) and Playwright tests.
 - Never install or fetch npm packages yourself: no `npx <package>` that is not already installed, no `npm install -g`, no `npx @biomejs/biome` (it pulls whatever version is newest, not the pinned one, and has reformatted files and reported errors CI does not). Go through the tooling: `just` recipes, and the `node_modules/.bin` the lockfile installed (`npm ci`, in the checkout you are working in; a git worktree needs its own). If a tool is missing, install the project's dependencies; if a package is needed, add it with `npm install` as a reviewed change to `package.json` and the lockfile.
-- How the tests are organised, and how to write them: `docs/TESTING.md`. The interface between the sync engine and wherever files are kept (Drive now, the Worker's team service next): `docs/STORAGE_API.md`. How navigation works (the app is a single page): `docs/ROUTING.md`. Other design and architecture docs are in `docs/` too (`docs/SPACES.md` for spaces, `docs/SHARING.md` for share links, `docs/ANNOTATIONS.md` for typed notes on a chart, `docs/SYNC_ARCHITECTURE.md` for sync, `docs/MIGRATIONS.md` for changing the shape of stored data (the database on a device, and Drive: roll forward only), `docs/AGENT_VMS.md` for running an agent in an Incus VM away from the developer's computer, `docs/OBSERVABILITY.md` for traces to Honeycomb (what is traced, the session and identity model, the Worker's telemetry route), `docs/ENVIRONMENTS.md` for dev and prod (two Google Cloud projects), `docs/CLOUD_MIGRATION.md` for the planned move to a new Google Cloud project, to be done before going live).
+- How the tests are organised, and how to write them: `docs/TESTING.md`. The interface between the sync engine and wherever files are kept (Drive now, the Worker's team service next): `docs/STORAGE_API.md`. How navigation works (the app is a single page): `docs/ROUTING.md`. Other design and architecture docs are in `docs/` too (`docs/SPACES.md` for spaces, `docs/SHARING.md` for share links, `docs/ANNOTATIONS.md` for typed notes on a chart, `docs/SYNC_ARCHITECTURE.md` for sync, `docs/MIGRATIONS.md` for changing the shape of stored data (the database on a device, and Drive: roll forward only), `docs/AGENT_VMS.md` for running an agent in an Incus VM away from the developer's computer, `docs/OBSERVABILITY.md` for traces to Honeycomb (what is traced, the session and identity model, the Worker's telemetry route), `docs/ENVIRONMENTS.md` for dev and prod (two Google Cloud projects), `docs/CCLI.md` for what CCLI's and SongSelect's terms mean for the app and the licence number, `docs/LEAD_SHEETS.md` for lead sheets kept as MusicXML).
 - TypeScript (erasable syntax only: no enums or parameter properties, so Node and esbuild can strip the types) and Lit, built and served with Vite (with `@cloudflare/vite-plugin`, which runs the Worker next to it). There is no build in dev: Vite serves the modules as they are. Production is `vite build`. Keep it that thin: no frameworks, no transpiling beyond what the browser floor needs. Dependencies are npm packages, imported by name and bundled by Vite
 - Infrastructure that rarely changes is Terraform in `infra/` (`infra/README.md`): the Cloudflare zone side (Email Routing, the Worker's custom domain, DNS, TLS settings) and the Google Cloud project (APIs, API keys, service account). Deploys, and everything in `wrangler.toml`, stay wrangler's: do not move the Worker, its assets, bindings or secrets into Terraform. `gcloud` and `terraform` come from `mise.toml`
 - The service worker is built as a classic script with the whole app precached (`vite-plugins/service-worker.ts`); see `docs/BUILD.md`
@@ -114,8 +114,7 @@ Changes reach `main` only through pull requests (`docs/CI.md`): never commit to 
   `.claude/worktrees/<topic>` (git-ignored; what `claude --worktree` makes), not next to it.
 - Commit as you go, one logical step per commit; keep other people's uncommitted work out of them.
 - Before asking for review: rebase on `origin/main`, run `just ci` (the checks CI runs, on Linux), and
-  `git push --force-with-lease`. Open the pull request as a draft with `gh pr create`, and mark it
-  ready when `just ci` passes.
+  `git push --force-with-lease`. Open the pull request with `gh pr create`, ready for review (a draft only for a spike).
 - Never merge your own pull request. They are merged with "Rebase and merge": no merge commits.
 - At the end of a session, `just wrap-up`: it fast-forwards the primary checkout's `main` to
   `origin/main` and lists the worktrees and branches whose pull request has merged (`--prune`

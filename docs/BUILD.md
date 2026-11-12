@@ -117,6 +117,43 @@ open, and the "Applying inline style violates ..." message names the new hash to
 The page has no inline script (`public/floor.js` and `public/boot.js` are the classic scripts), so scripts need no
 `'unsafe-inline'`. Style attributes are allowed (`style-src-attr`), `<style>` elements are not.
 
+## The browser floor
+
+Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120 (raised to Safari/iOS 17.4 on 2026-10-27, for `scrollend`), set in .browserslistrc
+and TARGET in vite.config.ts (keep them the same). Reasoning: support devices up to about five
+years old; asking people to update their OS is fine, excluding a device that cannot update is
+not, and every iPhone/iPad from 2021 on can run iOS 17 and later (a survey of the worship team:
+all on 26+, lowest 26.5), but some people dislike updating, so the floor is what the code
+needs with margin, not the newest. An audit (grep for version-gated features) found nothing
+between 26.2 and 16.2 that costs anything: the first thing below that is color-mix() (42 uses).
+View transitions are feature-detected. The 2017 iPad (16.7), the Air 2 and the 2019-2020 models
+stuck on iOS 18 or lower are mostly outside the window on purpose. The floor is a claim
+from reading the code, not tested on an old device: do that (Playwright's WebKit is current)
+- A user reported iPadOS 15.8.8 (2026-10-11): so an iPad Air 2 (2014) or iPad mini 4 (2015), the
+last models on iPadOS 15, which cannot update. Outside the window on purpose, so nothing is
+done for now. If it is revisited: lower TARGET and .browserslistrc to Safari 15.4, give the 42
+color-mix() uses fallback colours (Safari 16.2), test on a real device (a module using class
+static blocks or regex lookbehind, Safari 16.4, would not even parse: unknown). The "update
+your device" page below is the cheap part either way
+
+## Tightening the Content-Security-Policy
+
+the Content-Security-Policy is enforced (public/_headers). Not yet checked: the service worker's
+own fetches (its violations are not in the page console: chrome://serviceworker-internals or the
+worker's DevTools), and Safari
+Tightening it further (raised 2026-11-07, after the Verovio worker took `'wasm-unsafe-eval'` off the page):
+- drop `style-src-attr 'unsafe-inline'`, the loosest directive left: it is only for the 26 `style="..."`
+  attributes in 14 files (grep `style="` in src/). Static ones become classes. A style set through the DOM
+  (`element.style`, or Lit's `styleMap`) is not blocked, so the dynamic ones (the media player's rotate and
+  translate) move to that; a `style="...${x}"` binding sets an attribute and is blocked. Check that
+  Google's sign-in button works without it
+- Trusted Types: `require-trusted-types-for 'script'`, so a string cannot reach `innerHTML` and the like.
+  The app has one `innerHTML = ''` (song-view-manager.ts) and Lit has its own policy (`lit-html`); the risk is
+  Google's sign-in and Picker scripts, which may need policies of their own. Try it as
+  `Content-Security-Policy-Report-Only` first and see what is reported
+- `upgrade-insecure-requests` (nothing is http: it costs nothing), and a `report-to` so a violation on a
+  device is heard of (it would go through the Worker's telemetry route; the privacy policy would need a line)
+
 ## Gotchas
 
 - `wrangler.toml` has `html_handling = "none"`. With the default, `/dev/x.html` redirects to

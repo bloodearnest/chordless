@@ -5,7 +5,7 @@ with the view for the URL, the menu (`<nav-menu>`) and the media player, which s
 while views come and go, so music carries on when you move around.
 
 Every URL is served the shell (by the service worker, and by the worker's SPA fallback),
-and `js/app.js` starts the router.
+and `js/app.ts` starts the router.
 
 ## Routes
 
@@ -13,32 +13,33 @@ URLs are paths; the router doesn't use `#hashes` (a lint rule forbids them).
 
 | URL | Route | View |
 | --- | --- | --- |
-| `/`, `/?shared` (what was shared by link: `{ name: 'home', shared: true }`, its own view) | `home` | `home-view.js` |
-| `/songs`, `/songs?q=<search>`, `/songs/<uuid>` (`?melody` on a song: its melody sheet) | `songs` | `library-view.js` |
-| `/setlist/<id>`, `/setlist/<id>/song/<n>`, `/setlist/<id>/song/<n>?melody` | `setlist` (`songIndex` -1 is the overview; `melody: true` is the song as its melody sheet) | `setlist-view.js` |
-| `/account` (Account and Teams, docs/ACCOUNT.md; `/storage` opens it too), `/account/new`, `/media`, `/contact`, `/preferences`, `/import-song`, `/import-setlist`, `/join` | by name | `*-view.js` |
-| anything else | `not-found` | `not-found-view.js` |
+| `/`, `/?shared` (what was shared by link: `{ name: 'home', shared: true }`, its own view) | `home` | `home-view.ts` |
+| `/songs`, `/songs?q=<search>`, `/songs/<uuid>` (`?melody` on a song: its lead sheet) | `songs` | `library-view.ts` |
+| `/setlist/<id>`, `/setlist/<id>/song/<n>`, `/setlist/<id>/song/<n>?melody` | `setlist` (`songIndex` -1 is the overview; `melody: true` is the song as its lead sheet) | `setlist-view.ts` |
+| `/s/<id>`, `/s/<id>/song/<n>` (a received share, read-only: docs/SHARING.md) | `share` | `share-view.ts` |
+| `/account` (Account and Teams, docs/ACCOUNT.md; `/storage` opens it too), `/account/new`, `/media`, `/about`, `/contact`, `/preferences`, `/import-song`, `/import-setlist`, `/join` | by name | `*-view.ts` |
+| anything else | `not-found` | `not-found-view.ts` |
 
-- `js/router.js` is pure: `matchRoute(url)`, `buildUrl(route)`, and `historyAction(from, to,
+- `js/router.ts` is pure: `matchRoute(url)`, `buildUrl(route)`, and `historyAction(from, to,
   state)`, which says whether a move pushes a history entry, replaces it, or goes back.
   Opening a song from a list or overview pushes; song to song replaces; song to the
   list goes back, if you came from it (the entry we pushed is marked `fromParent`).
-- `js/app-router.js` is the runtime: it follows link clicks (including inside shadow DOM)
+- `js/app-router.ts` is the runtime: it follows link clicks (including inside shadow DOM)
   and back/forward, loads a view *before* changing the URL (so a failed load can't leave
   the address bar pointing at nothing), swaps views in a view transition, sets the title,
   tells screen readers (an `aria-live` region), and sends a `RouteChangeEvent`.
-- `js/views/registry.js` lists the views by route name; each loads its module when first
+- `js/views/registry.ts` lists the views by route name; each loads its module when first
   shown. A test checks there is one for every route.
-- The route is also a Lit context (`js/route-context.js`) for components that need it.
+- The route is also a Lit context (`js/route-context.ts`) for components that need it.
 
-To move from code, use `goTo(url)` (`js/navigation.js`), not `location`. Links in markup
+To move from code, use `goTo(url)` (`js/navigation.ts`), not `location`. Links in markup
 (`<a href="/songs">`) need nothing: the router follows them. `goTo(url, { fresh: true })` makes the
 view afresh even when the route is the one shown: for after the space it reads has changed
 (`switchSpace`), as the app does not reload for that.
 
 ## Views
 
-A view is a custom element extending `PageView` (`js/views/page-view.js`): light DOM, so
+A view is a custom element extending `PageView` (`js/views/page-view.ts`): light DOM, so
 the stylesheet and ids apply; class `view`, so it lays out as a child of `.app-container`.
 
 - The router sets `route` on the view, before it is attached and when the route changes
@@ -70,7 +71,7 @@ something is playing (`active` attribute, `isActive`). Leaving a setlist sends
 Collapsed, it is a translucent pill of three buttons: play (the song in view), stop, and expand.
 
 The player is optional: setlist navigation is the core, and the player may be off on an older
-device. `js/media-player-loader.js` loads its code only if the device has Web Audio and the
+device. `js/media-player-loader.ts` loads its code only if the device has Web Audio and the
 player is on in Preferences (and when it is switched on later); a player that fails to load is
 a warning, not an error; and Drive pads are only preloaded when the player and pads are on.
 Don't let the setlists depend on it.
@@ -86,5 +87,5 @@ is a bug: use `goTo()`.
 ## Adding a view
 
 1. A `PageView` subclass in `js/views/`, registered with `customElements.define`.
-2. An entry in `js/views/registry.js`, and the route in `js/router.js` if it is new.
+2. An entry in `js/views/registry.ts`, and the route in `js/router.ts` if it is new.
 3. Teardown for anything it does outside its own elements.

@@ -59,7 +59,7 @@ export interface ParsedChart {
 /**
  * What a section hides: nothing, its chords (lyrics only) or its lyrics (chords only); or the
  * whole section is collapsed or hidden. 'melody' shows an instrumental section as a line of music in
- * place of its chords (docs/MELODY.md, "In the chart"); only a section with notes in the lead sheet has it.
+ * place of its chords (docs/LEAD_SHEETS.md, "In the chart"); only a section with notes in the lead sheet has it.
  */
 export type HideMode = 'none' | 'chords' | 'lyrics' | 'melody' | 'collapse' | 'hide'
 
@@ -140,7 +140,7 @@ export interface PendingDeletion {
 }
 
 /**
- * The melody of a song (docs/MELODY.md): the notes of its lead sheet, kept beside its chart. One a
+ * The melody of a song (docs/LEAD_SHEETS.md): the notes of its lead sheet, kept beside its chart. One a
  * song (a variant has its own), keyed by the song's uuid. In Drive it is a MusicXML file in the
  * space's `songs` folder, linked to the chart by its properties (an `.mxl`: the same MusicXML,
  * zipped); here it is the MusicXML text, parsed when it is wanted (`readMusicXml`), as that is a few

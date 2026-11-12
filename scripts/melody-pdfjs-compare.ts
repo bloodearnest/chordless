@@ -1,5 +1,5 @@
 /**
- * Spike for docs/MELODY.md: the melody read with pdf.js (what the app will use) against the one read
+ * Spike for docs/LEAD_SHEETS.md: the melody read with pdf.js (what the app will use) against the one read
  * from mutool's output, for every lead sheet PDF in a folder. They should be the same.
  *
  *   node scripts/melody-pdfjs-compare.ts export/

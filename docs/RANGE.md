@@ -1,11 +1,11 @@
-# Melody range
+# Lead sheet range
 
-Which keys can the band sing a song in? Each song can carry the **range of its melody**: the lowest
+Which keys can the band sing a song in? Each song can carry the **range of its lead sheet**: the lowest
 and highest note. The key picker uses it to colour the keys, so a leader changing key (in edit mode
-or live, a late change is when it matters most) sees at once where the melody goes too high or too
+or live, a late change is when it matters most) sees at once where the lead sheet's notes go too high or too
 low.
 
-ChordPro has no melody. The range comes from a SongSelect lead sheet, or is typed in.
+ChordPro has no notes. The range comes from a SongSelect lead sheet, or is typed in.
 
 ## The range
 
@@ -23,7 +23,7 @@ them (F#5 in G, Eb5 in Bb), and read as MIDI numbers (60 is middle C) for the ch
 Because it is in the chart, it travels with the file: Drive, an export, a share link, a backup, a
 copy in another ChordPro program. It is per chart, so an arrangement (a variant) can have its own.
 
-- **Written pitch.** The melody is written for the higher voices, and men sing it an octave down.
+- **Written pitch.** The lead sheet is written for the higher voices, and men sing it an octave down.
   So every limit below is about the written note: the written low note is what a man reaches
   first, and the written high note is what a woman does.
 - **Editable, always.** A range read from a lead sheet can be wrong (a harmony line, a cue
@@ -60,7 +60,7 @@ words). A song with no range, or no key to measure it from, shows the picker as 
   them in the key's label ("A +2, too high", "E -3, in range"). The icon is dark on the solid
   colour, which reads the same on the popup's navy and on the lighter row of the key in use
   (coloured text on that row fails the contrast check).
-- **The notes, to say what the colour means.** Each key's row also says the melody's lowest and
+- **The notes, to say what the colour means.** Each key's row also says the lead sheet's lowest and
   highest note in that key ("E4–F#5", spelled as the key spells them), with the one that is out of
   range in bold: A is red because the top is F#5. The screen-reader label has the same text, as it
   must contain what is shown ("A +2, E4–F#5, too high"). The notes are in the full text colour: a
@@ -91,25 +91,123 @@ Width is counted in the scale tones the range covers (D4 to E5 is nine, a 9th), 
 in the key, so it does not change with the key. It is what a leader asks (how many notes does this
 ask of a singer?), where semitones, which are kept for being exact, are not how singers think, and
 octaves are too coarse (nearly every song is an octave to an octave and a half). The notes are
-written pitch: men sing the melody an octave down.
+written pitch: men sing the lead sheet an octave down.
 
-**How long the song sits there.** When the song has a melody (`docs/MELODY.md`), a line under the width says
+**How long the song sits there.** When the song has a lead sheet (`docs/LEAD_SHEETS.md`), a line under the width says
 how many beats (quarter notes) the song spends on its highest and its lowest note, over the whole song as played:
 repeats and endings followed, a tie's notes added, cue notes left out ("Highest E5: 3½ beats; lowest D4: 1 beat").
 A high note held for a long time tires a singer more than one touched once. This is worked out from the stored score
 each time (`src/js/melody-analysis.ts`; the parse is cached by the score's hash), and is not written to the chart.
-The song cards' key pickers (a setlist's edit mode) look the melody up when the card is in edit mode, and not for a list as it is shown, so no score is parsed for a song whose picker is not on screen.
+The song cards' key pickers (a setlist's edit mode) look the lead sheet up when the card is in edit mode, and not for a list as it is shown, so no score is parsed for a song whose picker is not on screen.
 The range itself is the chart's `x_chordless_range` if it has one (the person's, or what an import wrote), else the
-melody's own; the dialog and the key picker both use it.
+lead sheet's own; the dialog and the key picker both use it.
 
-## Giving a whole library its ranges
+## Re-importing a whole library from SongSelect
 
-A library imported before lead sheets were read can be brought up to date in one pass, without
-opening each song: docs/REIMPORT.md.
+To put every chart of a library in SongSelect's own key, and give each song its range
+(above) from its lead sheet, without opening each song by hand. A library imported before
+lead sheets were read, or in keys other than SongSelect's, can be brought up to date in one pass.
+
+It is three steps: a script fetches the charts and lead sheets from SongSelect into a folder, the
+import page takes the whole folder at once, and one choice updates every song that is there. It
+opens no tabs and asks for nothing per song.
+
+#### 1. Make the script
+
+The script is `scripts/songselect-backfill.js` with the library's CCLI numbers after it. Export the
+space (Account and Teams, the space, Export), then:
+
+    node scripts/make-songselect-backfill.ts chordless-export-Church-2026-10-23.zip --out backfill.js
+
+It says how many songs go in, which have no CCLI number (made by hand: they are left out) and how
+old the export is: a song added since is not in it, so export again for those.
+
+#### 2. Run it on SongSelect
+
+Sign in to https://songselect.ccli.com in Chrome or Edge. Open the DevTools console (F12), paste the
+whole of `backfill.js` (Chrome asks you to type `allow pasting` the first time) and press Enter.
+It asks for a folder to save in: make one, and choose it.
+
+For each song it asks SongSelect for the ChordPro (with no key asked for, so SongSelect gives the
+song's own) and for the lead sheet in that key, and saves `<number>-<title>.cho` and
+`<number>-lead-<key>.pdf` in the folder. It says what it is doing, and about how long it will take:
+**twenty minutes or so for 140 songs**, as it goes slowly on purpose.
+
+- **It does not trip SongSelect's limits.** One request at a time, with a pause before each of four
+  to seven seconds (it varies); when SongSelect says to slow down (429, or a 5xx) it waits as long as
+  it is told, or 30 seconds and then twice that, and tries again; and when five songs fail one after
+  another it stops, and says to wait.
+- **It can be stopped and started.** `stopSongSelectBackfill()` in the console stops it after the
+  song it is on. A manifest in the folder (`backfill-manifest.json`) remembers what is done, so
+  running the script again carries on, and tries again those that failed.
+- **Signed out** (or no access) is noticed, and it stops at once rather than asking again.
+- A song SongSelect has **no ChordPro for** is left out, and listed at the end. SongSelect answers
+  such a song with a sentence ("no chordPro for this song") as if it were the chart; the script
+  checks that what came is ChordPro (a directive like `{title: …}`, or a chord like `[G]`) and does
+  not save the sentence. It is not counted as a failure (it is not SongSelect limiting the
+  requests), and is not asked for again when the script is run again.
+- A song with no lead sheet (SongSelect has none, or the account cannot get it) is still saved,
+  with no range. A chart with no key in it cannot be asked for a lead sheet in its key.
+- SongSelect counts a lead sheet fetched this way as a download (`activityType=downloaded`, as its
+  own button sends), so about as many downloads as songs are recorded on the account.
+
+#### 3. Import the folder
+
+In Chordless, Import, "Import ChordPro Files": choose every file in the folder (the manifest in it,
+`backfill-manifest.json`, is a JSON file, and the import page passes over any: "a JSON file, not a
+ChordPro chart"). Each lead sheet is
+paired with its ChordPro by CCLI number (below, "Getting a range from a lead sheet"), and the page reads them all.
+
+**The same song is updated with no question.** A song the library has, whose new chart has the same
+words and chords as the library's (whatever else differs: the copyright, the tempo, even the key),
+is updated at once: there is nothing to decide. The page says "updated: the same song as in your
+library", and says how far it has got when there are several ("Importing 37 of 141…"). More than
+eight songs are folded behind a count of what came of them ("141 updated: the same song as in your
+library") with "Show the 141 songs" to open the list, so the choices that follow (add them to a
+setlist, or save to the library only) are on the first screen and not thirteen screens down.
+When there is nothing to save (every song is the same as the library's) the page still has a way
+on: "Go to the Library", beside adding them to a setlist or making one. What is
+listed for you to decide is only what differs: other words or other chords (they may be
+arrangements), which can be imported as a variant, replace the library's, or not be imported. When
+several are listed, a bar "For all of them" makes one choice for all: **Update all N**, or **Do not
+import any**; then "Import all with these choices".
+
+The one exception is a library chart from SongSelect, with a chart that is not from SongSelect (it
+has none of SongSelect's CCLI material): that is not replaced without asking, though it is the same
+song.
+
+**Where the songs are recorded as from.** A chart that carries SongSelect's CCLI material (its
+`CCLI Song #` line and the terms-of-use footer: `hasCcliBumph`) is recorded as from SongSelect even
+when it arrives as a file or as pasted text, as a download from SongSelect is. A chart without it
+stays a file, or pasted text. A library song that was imported as a file before, and comes again as
+the same chart, has its source set to SongSelect: a folder imported earlier can be imported again to
+correct it, and nothing else changes ("Its source is now recorded as SongSelect"). The library
+repair (`planSources`, docs/ACCOUNT.md) does the same for a whole library.
+
+**What an update does** (`replaceSong`): the song keeps its identity and its place in every setlist;
+its chart is replaced; and **the new chart's key and tempo become the song's own** (the key it is in
+by default, and the original that the key picker marks and a reset goes back to). A setlist entry
+with no key or tempo of its own shows the song's, so moving the song would move every such setlist,
+old services included: **the entries that would change are given the key and tempo they showed**
+(`keepShown`, as merging two songs already does), and only those are written. A setlist that has
+none of the song, an entry with its own key, and a song whose key does not move are not touched.
+So no setlist changes; new setlists have the song in its new key. No migration is needed first: it
+is done for each song as it is updated.
+
+**Variants are left alone.** The import finds the song's default variant by its CCLI number and
+updates only that: another variant of the same song (an arrangement with its own label) is not
+touched, and keeps hanging from it.
+
+#### What it cannot know
+
+- **SongSelect's own key** is what SongSelect gives when no key is asked for. It is the song's key as
+  SongSelect has it, which should be the recording's; the lead sheet says "original key: X" in its
+  heading, so a few can be checked by eye.
+- **A song with no CCLI number** (made by hand) is not fetched.
 
 ## Getting a range from a lead sheet
 
-The lead sheet's whole melody is read once (`src/js/score-pdfjs.ts`, docs/MELODY.md), and the range
+The whole lead sheet is read once (`src/js/score-pdfjs.ts`, docs/LEAD_SHEETS.md), and the range
 is its lowest and highest sung note (`readOfMelody` in `src/js/lead-sheet.ts`). Two signs say a note
 is not sung, and either leaves it out (`sungNotes` in `src/js/score-transpose.ts`): it is drawn
 small (an instrumental line: an intro, a turnaround), or its measure has no lyric under it (a
@@ -143,7 +241,7 @@ range from the lead sheet is suggested as "Update current song" (keeping the lib
 it), and one that is the same as the library's says so.
 
 **Checking the import.** The import page says what it found: the range and its key, or why there is
-none (no lead sheet came, it had no melody, it could not be read). Under it, "How the lead sheet was
+none (no lead sheet came, it had no notes, it could not be read). Under it, "How the lead sheet was
 read" gives the bars, the sung notes read and what was left out (small instrumental
 notes, and notes with no lyric), the key
 signature, and the bar the lowest and the highest notes are in (as the sheet numbers them), so
@@ -170,7 +268,7 @@ The song info's "Melody Range" item has **Add a range** (when there is none) or 
 pickers, "Lowest note" and "Highest note", offer the notes from A2 to C6 (wider if the range is),
 named as the chart's key names them; **Save**, **Cancel**, and **Remove** (when there is one). A
 new range starts at D4 to D5. A lowest note above the highest is not saved, and says so. The notes
-are in the chart's own key, as written: men sing the melody an octave down.
+are in the chart's own key, as written: men sing the lead sheet an octave down.
 
 The import page offers the same two pickers, under "Set the range yourself", for a single song that
 has no range (no lead sheet came, or it could not be read), once the song is in the library as it is
@@ -195,5 +293,5 @@ already.
 
 ## Not decided
 
-- Limits as a preference (a group of altos, a younger group). Reading the whole melody, not just
-  its range, would let the picker rate keys per voice: see `docs/MELODY.md`.
+- Limits as a preference (a group of altos, a younger group). Reading the whole lead sheet, not just
+  its range, would let the picker rate keys per voice: see `docs/LEAD_SHEETS.md`.

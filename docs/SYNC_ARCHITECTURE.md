@@ -38,7 +38,7 @@ document and SETLIST_DELETION.md.
 
   That is a personal space. A team space's folder is `<Team name> Chordless/` in the parent its owner
   picked (docs/SPACES.md), with the same four folders inside. Drive is the shared copy; each device
-  syncs its local database with it. A song's melody (docs/MELODY.md) is
+  syncs its local database with it. A song's lead sheet (docs/LEAD_SHEETS.md) is
   a third kind of file in `songs/`, an `.mxl` (zipped MusicXML) `<title>[-<ccli>].lead-sheet.mxl` beside its chart (plain
   `.lead-sheet.musicxml` in a space that holds text only; `.melody.mxl` before the rename).
 
@@ -121,10 +121,10 @@ changed, pushed when it has no file or its score hashes to something other than 
 MusicXML, not of the file, so another deflate never causes an upload), Drive wins a
 conflict, and one a read-only user changed here is held back (`heldBack`). The pull reads the `songs/` listing once for
 both (`pullSongs`, then `pullScores`). What differs from a chart: it is derived data, so a file Chordless cannot read
-as MusicXML is left and tried again, and a melody whose file was deleted elsewhere and not made again here is simply
-deleted. Deleting a song deletes its melody and notes its file for the trash (also when the song went because its chart
-was deleted in Drive); a full sync that has read every file also deletes the melodies of songs that are not here, and
-trashes their files. A melody made here and not sent counts among the unsynced changes a reset would lose.
+as MusicXML is left and tried again, and a lead sheet whose file was deleted elsewhere and not made again here is simply
+deleted. Deleting a song deletes its lead sheet and notes its file for the trash (also when the song went because its chart
+was deleted in Drive); a full sync that has read every file also deletes the lead sheets of songs that are not here, and
+trashes their files. A lead sheet made here and not sent counts among the unsynced changes a reset would lose.
 
 **The rename.** Files written before it have `type: 'melody'`, `melodyFormat` and the name `.melody.mxl`. Every pull reads
 both types, for good (a reader of a Drive folder cannot rewrite them). A pull that reads an old file marks the record
@@ -196,7 +196,7 @@ Every upload and update goes through it.
   what pull needs that the chart text doesn't contain.
 - **Score** `appProperties`: `type: 'score'` (`'melody'` before the rename, which is still read), `songUuid` and `songId` (the link to its chart), `spaceId`, `key` (the
   key it is written in), `scoreFormat` (`melodyFormat` before the rename; the shape of the file: `2` is an `.mxl`, `application/vnd.recordare.musicxml`; `1` is plain MusicXML,
-  `application/vnd.recordare.musicxml+xml`, which a text-only space keeps) and `appVersion`. Clients from before melodies skip a file in `songs/` whose `type`
+  `application/vnd.recordare.musicxml+xml`, which a text-only space keeps) and `appVersion`. Clients from before lead sheets skip a file in `songs/` whose `type`
   is not `chordpro`, so they ignore it.
 - Updates send name and `appProperties` with the content in one multipart request,
   so file names follow edits; retired properties from older versions are removed.
@@ -298,8 +298,8 @@ if any local record has changes not in Drive. Per-setlist device state is kept.
 
 A space's linked folder can stop being there to find: deleted, in the Drive trash, or never
 visible to the Google account or app now signed in. Drive answers 404 for all of them, and under
-the `drive.file` scope a different Google app (a new OAuth client, as in
-[CLOUD_MIGRATION.md](CLOUD_MIGRATION.md)) cannot see what the first one made. `resolveDriveFolder`
+the `drive.file` scope a different Google app (a new OAuth client, as when the app moved to
+its current Google project) cannot see what the first one made. `resolveDriveFolder`
 throws `DriveFolderGoneError` (reason `missing` or `trashed`), changing nothing.
 
 It is told early, not at the first sync: `refreshSpaceAccess` (app start and sign-in) asks
@@ -393,7 +393,7 @@ view says why (`deleteBlocked`).
 
 **Built (2026-11-12):** a setlist that is in Drive is deleted too. `ChordlessDB.removeSetlist` takes
 the record out and, if it has a file, notes it as a pending deletion (`kind: 'setlist'`, the same store
-the songs' and melodies' use); the next sync's `trashPendingDeletions` puts the file in the Drive trash,
+the songs' and lead sheets' use); the next sync's `trashPendingDeletions` puts the file in the Drive trash,
 the pull skips a file that is noted so it does not come back meanwhile, and another device's sync drops
 its unchanged copy (`removeSetlistsDeletedInDrive`) or, if it has edited it, keeps it and sends it back.
 **Undo** (a toast for fifteen seconds) is `restoreSetlist`: while the file is not in the trash yet

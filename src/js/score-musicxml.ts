@@ -1,6 +1,6 @@
 /**
  * A melody written as MusicXML 4.0 (partwise): the interchange format every notation program and
- * web renderer reads (`docs/MELODY.md`, "The format"). Chord symbols are `<harmony>`, written from
+ * web renderer reads (`docs/LEAD_SHEETS.md`, "The format"). Chord symbols are `<harmony>`, written from
  * our own text so the app's spelling stays the app's; sections are rehearsal marks.
  */
 

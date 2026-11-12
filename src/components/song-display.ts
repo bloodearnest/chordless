@@ -31,7 +31,7 @@ export class SongDisplay extends LitElement {
     capo: { type: Number },
     /** The song's annotations, placed on its sections (docs/ANNOTATIONS.md) */
     annotations: { attribute: false },
-    /** The notes of the song's lead sheet that its sections show (docs/MELODY.md, "In the chart") */
+    /** The notes of the song's lead sheet that its sections show (docs/LEAD_SHEETS.md, "In the chart") */
     cues: { attribute: false },
   }
 

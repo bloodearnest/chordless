@@ -48,7 +48,7 @@ when nobody does, drop the steps and the tests of the versions below it. It also
    (`SCHEMAS`, in `tests/old-database.ts`): the test fails without it, and checks that the upgrade gives the
    stores and indexes a new database has. Add a test of what the step does to the records, from a
    database built with `oldDatabase()`.
-2. **Derived data is cleared, not converted**, where it can be made again (v14 did this for the melody).
+2. **Derived data is cleared, not converted**, where it can be made again (v14 did this for the lead sheet).
 3. **Destructive changes take two releases.** Copy in one, drop in the next: a store that is dropped in the
    release that copies it cannot be had back. (v15 dropped `melodies` at once, as scores are derived and in Drive.)
 4. **Roll forward, never back.** A device that has been upgraded fails to open its database under an older build
@@ -85,7 +85,7 @@ long as they might be there. Older clients skip what they do not know: a file in
 
 ## The register of teams (D1)
 
-The register of teams (`docs/SPACES.md`, "SongSelect's terms") is a D1 database in Cloudflare, whose
+The register of teams (`docs/SPACES.md`, "The register of teams") is a D1 database in Cloudflare, whose
 tables are the files in `migrations/`, numbered (`0001_...sql`), applied in order by the deploy
 (`wrangler d1 migrations apply`, after `wrangler deploy`) and for development by `just db-local`.
 Roll forward only, as everywhere: a change is a new file, never an edit of one that has been applied. It

@@ -6,7 +6,7 @@ Worker's team service serves the same calls to team-space members (docs/SPACES.m
 them in memory for tests. A second real backend (Dropbox, OneDrive, WebDAV) is not planned yet; the
 interface is shaped so that it would not mean touching the engine.
 
-**Status (2026-10-20):** built. The interface, the Drive adapter (`src/js/storage/drive-storage.ts`)
+**Status (checked 2026-11-12):** built. The interface, the Drive adapter (`src/js/storage/drive-storage.ts`)
 and the in-memory backend (`tests/memory-storage.ts`) pass one conformance suite
 (`tests/storage-conformance.ts`). The sync engine (`sync-manager.ts`, `sync/*`) and the share links
 (`share-manager.ts`) work through the interface, and so do the pad sets (`pad-set-service.ts`); the engine and pad service tests run on the memory backend. Left:
@@ -15,7 +15,7 @@ see "Still on drive-api.ts".
 ## The shape
 
 A **backend** finds, makes and opens **roots**; a **space storage** (`backend.space(rootRef)`) holds
-one space's files in three **collections**, `songs` (charts, and a song's melody beside its chart, told apart by the file's `type` prop), `setlists` and `people` (the space's list of
+one space's files in three **collections**, `songs` (charts, and a song's lead sheet beside its chart, told apart by the file's `type` prop), `setlists` and `people` (the space's list of
 people who lead setlists, one JSON file each: `docs/IDENTITIES.md`), and the `shares` folder.
 
 | Call | What it is for |
@@ -30,7 +30,7 @@ people who lead setlists, one JSON file each: `docs/IDENTITIES.md`), and the `sh
 | `inventory()` | the refs of every live file in the space (finding records whose file has gone) |
 | `status(ref)` | a file wherever it is: `{trashed}`, or null if it does not exist |
 | `readText(ref)`, `readMany(refs)` | a file's text; many files' texts, one entry each in order, null for one that could not be read |
-| `bytes`, `readBytes(ref)`, `readManyBytes(refs)` | whether the space holds bytes as well as text (`create` and `update` take a `Uint8Array`; a team space, text-only for now, refuses one); a file's bytes, one entry each in order, null for one that could not be read. The melody's `.mxl` is the first file that is not text |
+| `bytes`, `readBytes(ref)`, `readManyBytes(refs)` | whether the space holds bytes as well as text (`create` and `update` take a `Uint8Array`; a team space, text-only for now, refuses one); a file's bytes, one entry each in order, null for one that could not be read. The lead sheet's `.mxl` is the first file that is not text |
 | `changes` | the feed of what changed, or null for a backend with none: `start()` gives a position, `since(position)` the files now live in `songs` or `setlists` that changed after it, the refs that are gone (in the bin, deleted, or not in this space), and the next position. A position the backend has forgotten throws `ChangeTokenLost`: the sync then lists everything once. Drive's is `changes.list`; the team service passes it on to members (`/changes/start`, `/changes`), saying only of the space's own files that they are gone (docs/SYNC_ARCHITECTURE.md, "Incremental sync") |
 | `create`, `createMany`, `update`, `updateMany` | write; each says whether the backend stored exactly what was sent (`intact`). The `Many` forms give one entry per item in order, null for one that failed. An update may carry `ifRev`, the rev the caller last saw the file with: the team service answers 409 (a batch: null for that file) and writes nothing if it has moved on; Drive cannot check and ignores it |
 
@@ -92,75 +92,41 @@ suite, and a way to keep `props` (see above).
 The Worker's team service (docs/SPACES.md) serves this API over HTTP to team members, so roles and scope
 are enforced per collection and ref, and not by walking Drive parents.
 
-## The team backend (built end to end for an owner-token space, in the Worker; no page for it yet, and no service account)
+## The team backend
 
 Team-space members get a second implementation of the same interface, `TeamStorage`
-(`src/js/storage/team-storage.ts`): HTTP calls to `/api/space/<id>/...` carrying the Worker's
-ID token (docs/SPACES.md). The engine, share manager and pad service are unchanged; which
-backend a space is given depends on its kind and on whether this person is its owner (the owner
-keeps `DriveStorage`, direct). `TeamStorage` has to pass `tests/storage-conformance.ts` against
-the Worker running over `fake-drive.ts`.
+(`src/js/storage/team-storage.ts`): HTTP calls to `/api/space/<id>/...` carrying Google's ID token
+(docs/SPACES.md, "Sign-in model"). The engine, share manager and pad service are unchanged. Which backend a
+space is given depends on its kind and on whether this person owns it: the owner of an owner-token space keeps
+`DriveStorage` and goes direct (`storageFor(space)`, `storage/space-storage.ts`); everyone else uses `TeamStorage`,
+with the team's id as `rootRef`. It passes the same conformance suite, through the Worker's handler over
+`fake-drive.ts`.
 
-**Built (2026-10-20):** `TeamStorage` and the API it calls, `worker/src/team-api.ts`
-(`handleTeamRequest`; the routes are listed at the top of that file). The API is a function of
-the request, the asker's role (settled first, in `team-routes.ts`) and a `TeamContext`: the space's
-`SpaceStorage` (`space`), its root (`root`) and whether files are in its tree (`owns`, `ownedAmong`). Tests
-give it the in-memory storage; the real context is the team's state in D1 and the owner's token or
-service account, and the route is not in `router.ts` yet. Roles are enforced in the handler
-(reader reads, writer writes and bins, `canWrite` in the root), a file outside the space is
-404 (null in a batch), bodies are text only but for pad audio (below). Share links work (2026-10-22): `publicLink` is
-accepted for the `shares` collection only and `unpublish` is passed through, and because a team
-space's refs are Drive file ids, the Worker's `/api/share/<id>` serves a share from a team space
-unchanged (ciphertext only, as ever). The space-level conformance suite (`describeSpaceStorage`, split from the
-backend suite) runs over `TeamStorage` through the handler, and `team-api.node.test.ts` covers
-the roles, the refusals and the scoping. `owns` is the part that needs care in the real context:
-it must include binned files, and be cheap (D1 keeping the refs, not a walk of
-Drive per call): `TeamSpaceState.addRefs` and `owns` (`worker/src/team-state.ts`) keep them, and
-a ref stays noted when its file is binned.
-`notingRefs` (`worker/src/team-refs.ts`) fills it: it wraps the space's storage and notes the refs a
-listing, an inventory or a create shows. The owner syncs straight to Drive, so the Worker never
-sees their files made, but a member lists before reading and a listing is scoped to the space's
-root. A ref no listing has shown is unknown (a 404) until the next one; there is no fallback
-that walks a file's parents. A team space's root ref is the space id. The client's `token` option is `getIdentityToken()` (`google-auth.ts`), Google's ID token, which the Worker checks (`worker/src/identity.ts`; docs/SPACES.md, "Sign-in model").
+**On the Worker** (`worker/src/team-api.ts`, with `team-routes.ts`, `team-context.ts`, `team-drive.ts`) each call
+is: check the ID token, look up the member's role in the team's state (D1), check it against the collection and
+ref, make the Drive call with the team's credential (the owner's token, or Chordless's service account: docs/SPACES.md,
+"Credentials") and stream the answer back. Nothing is stored. The Worker reuses `createDriveStorage` with another
+token source, so there is one Drive implementation.
 
-On the Worker each call is: check the ID token, look up the member's role in the space's
-state (D1), check it against the collection and ref, make the Drive call with the owner's token
-(later the service account's) and stream the answer back. Nothing is stored. The Worker reuses
-`createDriveStorage` with another token source (`worker/src/team-drive.ts`, built 2026-10-21), so there
-stays one Drive implementation: `ownerAccessToken` opens the owner's blob from the space's Durable
-Object, checks it is the owner's (`owner_sub`), refreshes an access token for it (kept in the
-isolate's memory for its hour, made once for a whole batch) and says "sharing is not set up" (no
-blob) or "the owner needs to reconnect Google Drive" (`invalid_grant`, or a blob it can no longer
-decrypt) as a 409. A service account
-would be another source. Wired into the route (`worker/src/router.ts`, `team-context.ts`, 2026-10-21): the ID token is checked first, then the role from D1, then Drive with the owner's token, with the refs each listing shows noted. Spaces are made and joined through `team-admin.ts` (docs/SPACES.md), not through this API.
-
-**On the device (built 2026-10-21):** a space shared with a team has `team: {id, role}` on its
-record (`Space.team`). `storageFor(space)` (`storage/space-storage.ts`) gives the backend: Drive for
-a space of one's own and for the owner of a team space, `TeamStorage` for anyone else, whose
-`rootRef` is the team space id. `createSyncManager`, `isSyncAvailable` and the folder check
-(`space-access.ts`) use it, so a member's sync, availability and read-only state (the role's
-`canWrite`) come from the Worker. `team-client.ts` is the page's end of the Worker's routes
-(`teamApi`), and `team-spaces.ts` has `shareSpace` (the owner: the space keeps its folder and files
-and gets an id) and `joinSpace` (a member: a space named as the team calls it, rooted at the team
-id). A member's local rename is theirs: `TeamStorage.renameRoot` does nothing. No page uses these
-yet.
-
-How each call maps:
-- `list`, `inventory`, `status`, `readText`, `create`, `createMany`, `update`: straight through;
-  writes need writer or above.
-- `members()`: from D1, not Drive permissions.
-- `inspectRoot`: answers with the member's role as `canWrite`, which replaces `writeRefusals()`
-  and the Drive-capabilities guess (the "role from the Worker" to-do in SPACES.md).
-- `findRootByName`, `ensureRoot`, `renameRoot`: first-sync-on-a-device calls that do not apply to
-  a member, whose space is issued an id and `rootRef`. Open question: a small "join an issued
-  space" call in the interface, so a team backend is not left with stubs. Rename is admin-only.
-- Pads (built 2026-11-10): `/api/space/<id>/pads…` (`team-pads.ts`) streams a file's audio out as
-  Drive sends it; an upload (MP3, up to 20 MB a file) is held in the Worker's memory while it is
-  sent on, never stored. Any member uploads, but below an admin an upload only adds (a set or a
-  key that is there is refused with 409); admin and up bins a set's files to replace them.
-- Share links: `/api/share/<id>` is Drive-specific. Team spaces work today because their refs are
-  Drive file ids; a backend with other refs (a service account on another store) would need it
-  generalised.
+- **Roles** are enforced in the handler: a reader reads, a writer writes and bins, with the finer rules for pads and
+  for deleting a setlist (docs/SPACES.md, "Roles").
+- **Scoping.** A file is reachable only if the team's tree holds it. The D1 table `team_refs`
+  (`worker/src/team-state.ts`, `team-refs.ts`) keeps the refs, and a ref stays noted when its file is binned. A listing,
+  an inventory or a create notes the refs it shows, so a ref no listing has shown is unknown (404) until the next one;
+  there is no fallback that walks a file's parents. The owner syncs straight to Drive, so the Worker never sees the
+  files they make, but a member lists before reading.
+- **Bodies** are text only, but for pad audio, so `TeamStorage.bytes` is false.
+- **Share links** work for a team space unchanged, because its refs are Drive file ids: `publicLink` is accepted for
+  the `shares` collection only and `unpublish` is passed through; the Worker's `/api/share/<id>` serves ciphertext only.
+- **Pads** (`team-pads.ts`): `/api/space/<id>/pads…` streams a file's audio out as Drive sends it. An upload (MP3, up to
+  20 MB a file) is held in the Worker's memory while it is sent on, never stored. Any member uploads, but below an admin
+  an upload only adds (a set or a key that is there is refused with 409); admin and up bins a set's files to replace them.
+- **What does not apply to a member:** `findRootByName`, `ensureRoot` and `renameRoot` are first-sync calls for a space
+  that is found or made; a member's space is issued an id. A member's local rename is theirs (`renameRoot` does
+  nothing). `inspectRoot` answers with the member's role as `canWrite`, and `members()` comes from D1, not from Drive
+  permissions.
+- **On the device** a space shared with a team has `team: {id, role}` on its record (`Space.team`). `team-client.ts`
+  is the page's end of the Worker's routes, and `team-spaces.ts` has `shareSpace` and `joinSpace`.
 
 **Request volume and batching.** Each storage call is one Worker request plus one Drive
 subrequest. A steady-state sync is a few list calls plus one read or write per changed file, so

@@ -31,8 +31,8 @@ cloudflare
   becomes FAIL in .zap/rules.tsv
 
 google
-- the Team storage service account should move to a Google Cloud project of its own:
-  docs/CLOUD_MIGRATION.md, step 6
+- (decided 2026-11-10: the Team storage service account stays in `chordless-app`. Revisit if one leaked
+  key reaching every connected team's drive becomes the concern)
 
 github
 - agents with a GitHub identity of their own, so a pull request can need an approval (infra/github's

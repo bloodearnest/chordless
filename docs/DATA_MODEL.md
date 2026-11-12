@@ -4,18 +4,19 @@ The Chordless data model is somewhat complex, primarily for one reason: Chordles
 cannot store the song data, as that is copyrighted. The users must store it, on
 their devices or on their own google drive.
 
-There are 3 core models stored per space (called "organisation" before 2026-10-20; some stored names still are). Each space has an IndexedDB
-database named exactly after its `spaceId` containing these object stores:
+Each space (called "organisation" before 2026-10-20; some stored names still are) has an IndexedDB
+database named exactly after its `spaceId`, with seven object stores:
 
 1. `songs` – flattened song variants (metadata only)
 2. `chordpro` – raw chordpro text + hashes
 3. `setlists` – setlist documents
 4. `setlist_local` – local-only per-user state (not synced)
 5. `people` – who leads the setlists (`docs/IDENTITIES.md`; since database version 10)
-6. `scores` – the MusicXML of a song's lead sheet, one a song (`docs/MELODY.md`; `melodies` from database version 13, holding the score since 14, renamed `scores` in 15)
+6. `scores` – the MusicXML of a song's lead sheet, one a song (`docs/LEAD_SHEETS.md`; `melodies` from database version 13, holding the score since 14, renamed `scores` in 15)
+7. `pending_deletions` – Drive files to put in the trash at the next sync (`docs/SYNC_ARCHITECTURE.md`, "Deleting songs")
 
 Drive sync stores JSON/ChordPro files inside the space’s Google Drive folder
-and tracks Drive metadata (`fileRef`, `fileModified`, `lastSyncedAt`, `_lastSyncHash`, etc.)
+and tracks Drive metadata (`fileRef`, `fileModified`, `lastSyncedAt`, `syncedContentHash` (`_lastSyncHash` on older records), etc.)
 on each record.
 
 ## Song
@@ -55,7 +56,7 @@ The `scores` object store (`ScoreRecord`) keeps the lead sheet of a song, keyed 
 variant has its own). Derived data: it can be read again from a lead sheet PDF or a MusicXML file.
 
 - `xml`: the MusicXML score, parsed when it is wanted (`readMusicXml`, a few milliseconds) into a `Score` (`src/js/score.ts`): measures, notes, lyrics, chord symbols, directions. Version 13 kept the parse; the upgrade to 14 clears those records
-- `key`: the key the melody is written in, as the chart names it (the MusicXML has a key signature, not a name)
+- `key`: the key the lead sheet is written in, as the chart names it (the MusicXML has a key signature, not a name)
 - `contentHash`: hash of `xml`, so a change made here is found by comparing it with `syncedContentHash`
 - `createdDate`, `modifiedDate`
 - Sync metadata as the chart's: `fileRef`, `fileRev`, `fileModified`, `lastSyncedAt`, `syncedContentHash`
@@ -68,15 +69,15 @@ Version 15 renamed the `melodies` store to `scores` (the records are copied, and
 
 ### Song Versioning
 
-A chart can be fixed in place (`overwriteSong`, `docs/CHART_EDITOR.md`: a typo, a wrong chord), and the
+A chart can be fixed in place (`overwriteSong`; the editor for it is planned: `docs/VARIANTS.md`, "Editing a chart"), and the
 fix reaches other devices by sync. An arrangement is a new variant with a new UUID. Variants provide:
 
-- Each variant links back to the song it was copied from via `variant_of`
+- Each variant links back to the song it was copied from via `variantOf`
 - Multiple variants of the same song (same deterministic id) can exist within a space
-- One variant is marked as the default (`is_default: true`) which is shown first when browsing
+- One variant is marked as the default (`isDefault`) which is shown first when browsing
 - "Official fixes" are just variants that are marked as the new default
 - When two users edit different versions offline and sync, both variants are preserved; last updated wins for which is default
-- A future tool will allow merging/removing variants
+- Variants can be merged, renamed, made the default and deleted (`docs/VARIANTS.md`, "Versions and merging")
 
 The goal is that every song the space has ever seen is available in
 a single maintained per-space index of songs (stored in IndexedDB). If a song is imported that is already
@@ -110,7 +111,7 @@ Each song in the setlist has metadata specific to this setlist:
   `docs/ANNOTATIONS.md`). The user's own are kept on the device, not here
 
 Setlists also store sync metadata: `fileRef`, `fileModified`, `lastSyncedAt`,
-`_lastSyncHash`. These fields are updated whenever a setlist is uploaded/downloaded from Drive.
+`syncedContentHash` (`_lastSyncHash` on older records). These fields are updated whenever a setlist is uploaded/downloaded from Drive.
 
 Notes:
 
@@ -129,6 +130,8 @@ There is companion local state that is only stored for the current user locally 
 - clickEnabled: boolean (metronome)
 - sectionVisibility: per-song section visibility states (which sections are shown/hidden)
 - lastUsedDate: when this setlist was last viewed
+
+The capo, the sections shown and private annotations are kept by song in localStorage instead (`setlist/local-state.ts`, `docs/STATE.md`).
 
 This state is stored in a separate object store `setlist_local` (not synced to Drive) as it represents personal preferences for this device/user, not shared setlist data.
 

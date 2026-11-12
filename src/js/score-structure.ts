@@ -1,5 +1,5 @@
 /**
- * The structure of a song as its lead sheet plays it: `docs/MELODY.md`, "Structure". The sheet
+ * The structure of a song as its lead sheet plays it: `docs/LEAD_SHEETS.md`, "Structure". The sheet
  * writes each section once, with repeat signs, numbered endings and jumps (D.S., D.C., coda, Fine);
  * `playOrder` follows them to give the measures in the order they are played, `playSteps` groups
  * those into the sections they come from, and `matchChart` finds the chart's section for each step

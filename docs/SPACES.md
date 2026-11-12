@@ -31,85 +31,43 @@ links are the one exception: the Worker caches ciphertext it cannot read.)
 Churches using Chordless are expected to hold a CCLI licence, which covers sharing charts with the
 members of their church. Each space is self-contained, so copyright compliance is per space.
 
-### SongSelect's terms (read 2026-11-11, terms updated 2026-10-30)
+### The register of teams
 
-What the SongSelect Terms of Use say that matters here (a summary, not legal advice; the terms can
-change without notice):
+A team space's state is in **D1**
+(`migrations/0001_team_register.sql`, `0002_team_state.sql`, `worker/src/team-state.ts`), not in a
+Durable Object, so it can be asked across teams and outlives them. `teams` has a row per team:
+its id, name, owner (account and email), its Drive folder, which credential it uses, its licence
+number, when it was made, and when sharing ended (the row stays). `team_members` (account, email,
+role, since), `team_invites` (the hash of the code, never the code), `team_refs` (the Drive file
+ids in its tree) and `team_credentials` (the owner's encrypted token, a table of its own so a
+query about teams never selects it; a team on the service account has no row) are deleted when
+sharing ends, so the register that outlives a team names no member. `team_events` is added to and
+never changed: `created`, `licence` (from, to, and who) and `ended`. Nothing in D1 is song,
+setlist or pad content, and an email other than the owner's is kept only while its member is in
+(CLAUDE.md; `src/privacy.html` says so).
+- **The Durable Object keeps only the live sockets** (`TeamRoom`, binding `TEAM_ROOM`,
+  `worker/src/team-room.ts`), which a hibernating WebSocket needs, and no storage. A socket's
+  attachment is its account and space (no email); when a message arrives the room asks D1 for the
+  sender's role, and when someone's role changes or they go, the Worker tells the room to close
+  their sockets. This replaced `TeamSpace`, whose objects held the state: the migration `v3` in
+  `wrangler.toml` deleted that class with everything in it (one team existed, defunct), so nothing
+  was copied across.
+- **D1 is a dependency of every team call**, as the object was. A Worker with no database says team
+  spaces are not available (503); with the database down a team call fails, and devices carry on
+  from their own copy (offline first). Nothing about a team is best effort now: the audit trail
+  is written in the same batch as the change it records.
+- **Setting it up.** `wrangler.toml` has a `[[d1_databases]]` binding `DB` with no `database_id`:
+  wrangler makes the database, named `chordless-teams`, on the first deploy, and the deploy then
+  applies `migrations/`. The Cloudflare token the deploy uses needs **D1: Edit**. In development
+  it is a local database; `just db-local` makes its tables. Tests run the migration files against
+  SQLite (`tests/d1-db.ts`; in the browser, through Web Test Runner, `tests/d1-browser.ts`).
+- **Asking it.** There is no route that reads the register: the operator asks with wrangler, for
+  example `npx wrangler d1 execute chordless-teams --remote --command "SELECT name, owner_email FROM teams WHERE ccli_licence = '471102'"`,
+  or how many people a team has: `SELECT t.name, COUNT(m.identity) + 1 AS people FROM teams t LEFT JOIN team_members m USING (space_id) WHERE t.ended_at IS NULL GROUP BY t.space_id`,
+  or the teams a person is in: `SELECT t.name FROM team_members m JOIN teams t USING (space_id) WHERE m.email = 'x@example.com'`.
+- **Not covered.** A team's renaming is not noted (a team cannot be renamed yet).
 
-- **The subscriber is a church, not a person**, and there is no price per user: a church has
-  unlimited users, each with their own CCLI Profile linked to the church's account. A chart
-  downloaded is a "Digital Fixation", for that church's own non-commercial ministry. It may be used
-  by its "staff or volunteers" only; the service is "exclusive to your church" and "confidential".
-- **Charts do not move between churches.** The Church Copyright Licence covers the *words* of a
-  song for any church; a SongSelect chart (chords, lead sheet) is the subscribing church's. A
-  chart in one church's space is not covered by another church's licence by having a CCLI number.
-- **200 songs a year.** The Advanced and Premium tiers let a church print or download the charts
-  of 200 songs per annual term (counted from the purchase date); more costs extra. The
-  bookmarklet's downloads count, as do any made on SongSelect directly, so Chordless can only
-  know a lower bound.
-- **No passwords to outsiders.** The bookmarklet runs in the person's own signed-in tab. A
-  SongSelect login, cookie or token must never reach the Worker or any server of ours.
-- The terms say nothing about bookmarklets or automation, but the endpoints it calls are not
-  documented and may change.
-- The service lasts only while the church's licence does; Chordless cannot see that.
-
-What Chordless does about it: each space can hold its church's **CCLI licence number**, for
-records. It is never checked and never a gate: a team made before anyone has the number to hand
-must work, as must a church outside the countries CCLI serves.
-
-- **Where it is kept.** A Team's number is kept **by the Worker, in D1**, on the team's row
-  (`teams.ccli_licence`), with who set, changed or cleared it, and when, in `team_events`
-  (`LicenceChange`). It is the team's record, not a user's: CCLI may ask who a licence is used by,
-  and a record of the teams using Chordless is wanted for compliance and perhaps for charging. It
-  is not song content, so it is within what the Worker may hold (CLAUDE.md). The device keeps a
-  copy to show (`Space.ccliLicence`). A personal space's number is kept on the device alone.
-- **Who sets it.** Anyone who can write sets it where there is none; changing or clearing it takes
-  an admin (the owner included), who also sees the log. A reader sees the number only.
-  `GET`/`PUT /api/space/<id>/licence`; it can also be given when the space is made.
-- **How it gets there.** A chart downloaded from SongSelect carries it (the `{ccli_license}`
-  directive or the trailer's "CCLI License # N"), so **the first SongSelect import into a space
-  with none sets it**, silently (`licenceOfChart`, `noteLicence`). For a Team the Worker is asked
-  on the first SongSelect chart of each import: a number already there is copied to the device and
-  never written over; one kept only on the device (the Worker was out of reach) is sent. It can be
-  typed when a team is made, and changed in the Team's "Users" window (`team-licence-panel.ts`).
-- **The register of teams is the team.** A team space's state is in **D1**
-  (`migrations/0001_team_register.sql`, `0002_team_state.sql`, `worker/src/team-state.ts`), not in a
-  Durable Object, so it can be asked across teams and outlives them. `teams` has a row per team:
-  its id, name, owner (account and email), its Drive folder, which credential it uses, its licence
-  number, when it was made, and when sharing ended (the row stays). `team_members` (account, email,
-  role, since), `team_invites` (the hash of the code, never the code), `team_refs` (the Drive file
-  ids in its tree) and `team_credentials` (the owner's encrypted token, a table of its own so a
-  query about teams never selects it; a team on the service account has no row) are deleted when
-  sharing ends, so the register that outlives a team names no member. `team_events` is added to and
-  never changed: `created`, `licence` (from, to, and who) and `ended`. Nothing in D1 is song,
-  setlist or pad content, and an email other than the owner's is kept only while its member is in
-  (CLAUDE.md; `src/privacy.html` says so).
-  - **The Durable Object keeps only the live sockets** (`TeamRoom`, binding `TEAM_ROOM`,
-    `worker/src/team-room.ts`), which a hibernating WebSocket needs, and no storage. A socket's
-    attachment is its account and space (no email); when a message arrives the room asks D1 for the
-    sender's role, and when someone's role changes or they go, the Worker tells the room to close
-    their sockets. This replaced `TeamSpace`, whose objects held the state: the migration `v3` in
-    `wrangler.toml` deleted that class with everything in it (one team existed, defunct), so nothing
-    was copied across.
-  - **D1 is a dependency of every team call**, as the object was. A Worker with no database says team
-    spaces are not available (503); with the database down a team call fails, and devices carry on
-    from their own copy (offline first). Nothing about a team is best effort now: the audit trail
-    is written in the same batch as the change it records.
-  - **Setting it up.** `wrangler.toml` has a `[[d1_databases]]` binding `DB` with no `database_id`:
-    wrangler makes the database, named `chordless-teams`, on the first deploy, and the deploy then
-    applies `migrations/`. The Cloudflare token the deploy uses needs **D1: Edit**. In development
-    it is a local database; `just db-local` makes its tables. Tests run the migration files against
-    SQLite (`tests/d1-db.ts`; in the browser, through Web Test Runner, `tests/d1-browser.ts`).
-  - **Asking it.** There is no route that reads the register: the operator asks with wrangler, for
-    example `npx wrangler d1 execute chordless-teams --remote --command "SELECT name, owner_email FROM teams WHERE ccli_licence = '471102'"`,
-    or how many people a team has: `SELECT t.name, COUNT(m.identity) + 1 AS people FROM teams t LEFT JOIN team_members m USING (space_id) WHERE t.ended_at IS NULL GROUP BY t.space_id`,
-    or the teams a person is in: `SELECT t.name FROM team_members m JOIN teams t USING (space_id) WHERE m.email = 'x@example.com'`.
-  - **Not covered.** A team's renaming is not noted (a team cannot be renamed yet).
-
-Who imported a song, when and from where is already kept on it (`importUser`, `importDate`,
-`importSource`). Planned, not built: the licence a song came in under; asking before a copy of
-a SongSelect chart goes to a space with a different licence number (a confirmation, not a block);
-and a count of the songs imported this term against 200.
+The CCLI licence number and SongSelect's terms are in [CCLI.md](CCLI.md).
 
 ## Naming
 
@@ -468,7 +426,7 @@ members is `<name>@<project-id>.iam.gserviceaccount.com`, and a project id canno
 account has a tidy project id. It is in the app's
 own project, the one that holds the OAuth client and the verified brand, for the time being;
 ideally the key that can reach every connected team's drive sits apart from the sign-in project, in
-a project of its own (docs/CLOUD_MIGRATION.md, step 6). Revisit with many teams or if the spike
+a project of its own (decided 2026-11-10 not to, for now). Revisit with many teams or if the spike
 shows rate limits bite. Also not built: bring-your-own
 service account (the team uploads its own key; isolation, but real setup friction for a church).
 
@@ -839,7 +797,7 @@ carry, and the menu already has "Import Songs" and "Import a Setlist", which are
   an ordinary edit of the same file (no second file, no "start over"), and other devices take it like
   any edit. A record only in the file is added with its uuid. A record only here is **kept**, and
   counted: nothing is deleted, as deleting a file in Drive is a separate decision (and a setlist in
-  Drive cannot be deleted yet). Before it does anything it shows the plan (what is replaced, added and
+  Drive is deleted by "Deleting setlists" in SYNC_ARCHITECTURE.md, not by this). Before it does anything it shows the plan (what is replaced, added and
   the same, and which charts were changed here *after* the file was made, which the reset undoes),
   offers an export of the space as a backup, and asks. A setlist deleted here that the file has comes
   back. Limit: a space with two default variants of a song (one only here, one from the file) is not
@@ -883,36 +841,10 @@ removal destroys data; the key needs distributing (invite link fragment) and rot
 revoke; pad audio and `md5Checksum` conflict checks get more awkward. Low value, high cost. Revisit
 only if a concrete threat appears. (Share links use a per-share key because they are public.)
 
-## Spike first: can the planned design work?
-
-Throwaway Worker route plus two real Google accounts (FakeDrive can't prove `drive.file`
-behaviour). Pass/fail, in order:
-1. Owner's token via a Worker route: a second user's request lists and reads files in the owner's
-   app-created folder.
-2. Owner picks a **shared-drive folder** in the Picker, the app creates `<team>/` inside it with
-   `supportsAllDrives`; create, list, read, update, delete files and subfolders there with the
-   owner's token (Workspace admin policy permitting).
-3. Same from a **My Drive** parent.
-4. Stream a ~20 MB pad file up and down through the Worker without buffering; note limits.
-5. Stored token blob: refresh works from the Worker with no user present (consent screen "In
-   production"; 7-day refresh expiry in Testing).
-6. Confirm a *different* member of the shared drive, using their own `drive.file` token, cannot see
-   the owner's files (confirms the team service is required) and a new owner token cannot adopt the
-   folder (confirms succession = copy).
-7. **Service account:** in a shared drive, a Chordless service account added as Content manager can
-   create, list, read, update and delete files and folders (`supportsAllDrives`); the Worker can
-   mint its access token (RS256 JWT signed with WebCrypto, exchanged at Google's token endpoint)
-   with no user present; it can reach nothing that wasn't shared with it; and an external service
-   account can be added at all under a typical Workspace sharing policy. Also confirm shared drives
-   are available on the nonprofit Workspace tier, and that a free Gmail user cannot create one (so
-   owner-token stays the default path).
-
-If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My Drive).
-
-### Spike results (2026-10-19 and 20): the design works
+## What the spike established (2026-10-19 and 20)
 
 Run on a real Workspace shared drive with a Workspace account (the owner), a Gmail account (the
-member), a throwaway dev Worker and a service account. Detail of each run is below.
+member), a throwaway dev Worker and a service account. The throwaway spike pages and the step-by-step notes are in git history.
 
 | # | Question | Result |
 |---|---|---|
@@ -936,7 +868,7 @@ member), a throwaway dev Worker and a service account. Detail of each run is bel
 **What it changes**
 - No One Tap. The page sends Google's ID token, renewed with the access token (design above).
 - The service account is `team-storage@chordless-app.iam.gserviceaccount.com`, in the app project
-  for now (docs/CLOUD_MIGRATION.md, step 6 is a project of its own).
+  (a project of its own was considered and declined, 2026-11-10).
 
 **Still open**
 - The Cloudflare limits on a deployed Worker (request length, body size): only a deployment shows them.
@@ -946,131 +878,12 @@ member), a throwaway dev Worker and a service account. Detail of each run is bel
 - Clock-time costs: Drive calls took 1 s or more each through the Worker, and `changes.list` runs
   3 to 6 s behind a change. Pulls by a timer are fine; anything wanting faster has the live channel (a WebSocket in the space's room, a Durable Object with no storage, that makes the others sync now: LIVE_SYNC.md).
 
-The throwaway code (`worker/src/spike-broker.ts`, `spike-service-account.ts`, `src/dev/broker-spike.*`,
-`src/dev/shared-drive-probe.*`, `src/dev/picker.js`, and their tests) was deleted on 2026-10-20 when the
-spike was done. It is in git history (`git log --diff-filter=D -- worker/src/spike-broker.ts`); the
-service account's JWT signing in `spike-service-account.ts` is the part the real team service will want. The
-"Ready to run" notes below describe the pages and routes as they were.
-
-**Ready to run, item 1 (2026-10-19):** `/dev/broker-spike.html` and a throwaway Worker route
-(`worker/src/spike-broker.ts`, `POST /dev/spike/enable` and `/dev/spike/drive`; 404 unless
-`DEV_PAGES`, so dev only; the owner's token is kept in the dev server's memory and nowhere else).
-- *Owner* (browser profile signed in as account A): optionally pick a parent folder (Picker), list
-  the people allowed (an email and `reader` or `writer` per line), press "Make a team folder and
-  enable sharing". It makes a folder with a file, a subfolder with a file, and a file outside it,
-  hands the Worker the owner's blob and folder, and gives a member code to copy.
-- *Member* (another browser profile signed in as account B, on the same dev server): paste the code,
-  say what role B should have, press "Run the member checks". It lists the folder, reads a file in it
-  and one in a folder inside it (timed), asks for the file outside (must be refused), and tries to
-  write (a writer may, a reader must be refused). Running it as account A, who is not in the list,
-  with "not a member" should be refused everywhere.
-- The member's calls carry only their own Google ID token (`getIdToken`, a Google sign-in prompt, which
-  has not been used this way before: if the browser suppresses it, that is the first thing to report).
-  The Worker checks the token, the member's role, and that the file is inside the team folder
-  (walking up its parents), then calls Drive with the owner's access token and streams the answer.
-- **Reader result (2026-10-19): passed** for a second account through the Worker, on a team folder in
-  the shared drive: list, read a file, read one in a folder inside it (about 1.1 to 1.4 s each on the
-  dev server), the file outside the folder refused, and the write refused. **Writer: passed** (the
-  write is accepted, the outside file still refused). **Not a member: passed** (a stranger who knows
-  the space id and the file ids gets 403 on everything). One run of "not a member" first showed
-  200s: the wrong account was behind the Google popup, a listed one. The Worker now stamps each answer
-  `X-Spike-Member: <email> (<role or not a member>)` and the page shows it first, so a mix-up of
-  accounts is visible. **Item 1 is done** for the owner's token, on a shared-drive folder, with a
-  Content manager.
-- **Do not build the real team service on One Tap.** The member's ID token here comes from
-  `google.accounts.id.prompt()`, which Chrome shows as a native FedCM popup ("Sign in as …"), not an
-  OAuth window. Other browsers show Google's own card in the page or nothing, Google is retiring that
-  fallback and the moment notifications `getIdToken` relies on, a few dismissals silence it for a
-  while, and an old iPad is the target. It was only the quickest way to make the spike run. The
-  design: the normal sign-in popup (`initCodeClient`, which works everywhere) already gives the
-  Worker a verified ID token, and a refresh (`/session/refresh`, which has the encrypted blob as proof
-  of identity) returns a new ID token with every new access token (checked on a real refresh,
-  2026-10-21), so the page sends that to the team service. No prompt, any browser, no per-call
-  popup, and no Worker signing key. (Current dates for Google's retirement not checked.)
-- **Item 4, a big file:** `POST /dev/spike/upload?space=…&name=…` takes the file as the raw body with
-  `X-Id-Token` and `Content-Length`, for a writer only. It opens a resumable upload to Drive with the
-  owner's token and passes the body on as it arrives, through a `FixedLengthStream` of exactly that
-  length where Workers has one, never holding it. The page makes random bytes of a chosen size (up to
-  140 MB), sends them, reads them back with the existing streamed `read`, and compares SHA-256, with
-  timings (when the answer starts, when it ends, MB/s). What this shows is that streaming works end to
-  end, not the production limits: the dev server does not enforce the plan's limits. From the
-  Cloudflare documentation as I remember it, and not checked today: a request body up to 100 MB on the
-  Free and Pro plans (more on Business and Enterprise), no limit on a response body, and CPU time
-  counts compute, not time spent waiting on a stream. A pad set is 12 files of a few MB each, well
-  inside that. Whether a request that long is cut off at the edge on a real deployment is the thing
-  only a deployed Worker can say.
-- **Item 4 result (2026-10-19): passed, 20 MB.** Up through the Worker to the shared drive: 200, 9.7 s,
-  2.1 MB/s, Drive reports exactly 20,971,520 bytes. Back down through the Worker: the answer started
-  after 1.2 s and ended after 1.9 s (10.3 MB/s), 20,971,520 bytes, SHA-256 identical to what was
-  sent. So streaming works end to end with nothing kept in the Worker. The speeds are those of the
-  dev machine's own connection (the dev Worker runs there), not of a deployed Worker, so they are a
-  pessimistic guide; the plan's production limits are still unchecked on a real deployment. A pad
-  set (12 files of a few MB) would take tens of seconds to upload on a slow link, once.
-- **Item 7 result (2026-10-20): passed.** The Worker signed an RS256 JWT with WebCrypto and Google
-  gave a token with the `drive` scope, no user present. As a Content manager of the shared drive the
-  service account read the team folder (`canAddChildren` and `canTrash` true, `canDelete` false),
-  listed it **including files the owner's Chordless client had made** (which `drive.file` hides from
-  any other client), created a file, read it back, replaced its content and trashed it. The permanent
-  delete of the trashed file answered 404, not the expected 403: it does not say whether a Content
-  manager may delete for good, and does not matter, as the app only trashes. Still unchecked: that an
-  external service account can be added under a stricter sharing policy than this one, and the
-  nonprofit tier.
-- **Item 6, no Worker** (run as the *other* account, a member of the shared drive, with the member
-  code from the owner part; the code now includes the team folder's id):
-  - **6a** "try my own token on the team's files": this account's own Chordless sign-in lists the team
-    folder and reads the folder, a file in it, and a file in a subfolder. All must be refused or empty.
-    A pass confirms `drive.file` is per app and per user on a shared drive too, so the team service is
-    needed (a "seen" would mean members could sync a shared drive directly, a much simpler design).
-  - **6b** "pick the team folder, and see what I get": the Picker (the API key in the owner part)
-    picks the team folder with this account. The pick grants the folder, but listing it must still
-    show nothing and the old owner's files must stay refused, which is why there is one live owner
-    per team space and succession is a copy.
-  - **Item 6 result (2026-10-20): passed.** Run as the Gmail account, a member of the shared drive.
-    6a: nothing listed, and the folder, a file in it and a file in a subfolder all refused (404), so
-    `drive.file` is per user and per client on a shared drive too, and the team service is needed. 6b: the
-    pick granted the folder it was given and nothing under it (listing showed nothing; the old
-    owner's song stayed refused), so a new owner cannot adopt the folder's contents and succession is
-    a copy. The page marked one row "fail" only because the account picked the parent folder
-    ("Chordless") and not the spike's own subfolder, which the pick made no difference to.
-- It uses the lowest roles that work: a Content manager of the shared drive (or any editor), not a
-  Manager, since the app only ever trashes.
-
-**Run 2026-10-19 on a real My Drive (empty parent):** every file call passed with the flags (create,
-list, get, update, download, permissions, batch delete, trash), and `/about` accepted the flag too.
-`changes.list` saw nothing at once but did after 5.7 s on a retry: it works under `drive.file`, and
-trails a change by a few seconds. Making a file public and removing that (the share-link calls) also
-passed. A shared-drive folder is still untested.
-
-**Ready to run:** `/dev/shared-drive-probe.html` (served by `just serve`, signed in on the Storage
-page) makes a folder, then creates, lists, gets, updates, downloads, reads permissions, batch
-deletes and trashes with the app's own `drive-api.ts` calls, and also tries `/about` with the flag.
-Empty parent: your My Drive (checks the flags do no harm to everyone's sync).
-
-**Picking a shared-drive folder (spike item 2):** under `drive.file` the token only sees a folder the
-app made or the user picked, so the page has a "Pick a folder…" button (Google Picker, with shared
-drives on). Picking fills in the parent; the probe then reads it, lists what the app can see in it
-(expected: nothing it did not make), and creates `chordless-probe-…` inside it, as the team folder
-would be. It needs, in the Google Cloud console, the Picker API enabled and a browser API key allowed
-for it (restrict it to the Picker API and to the page's address); the key is typed on the page and
-kept in that browser only (the Worker's `GOOGLE_API_KEY` is a different key and never reaches a
-browser). The app id is the project number, `818185619377` (`chordless-app`). The production CSP is not changed yet:
-it needs `apis.google.com`, `docs.google.com` and `www.gstatic.com` when the Picker goes in the app.
-Needs one account; items 1, 5 and 6 still need two.
-
-**Run 2026-10-19 on a picked shared-drive folder (spike item 2, owner's token): passed.** The Picker
-folder reads as a shared-drive folder the app may add to, shows 0 items (`drive.file`), and a folder
-made inside it takes create, list, get, update, download, subfolders, reading the permissions (3
-people: the shared drive's members), making a file public and removing that, and `changes.list` (about
-6 s behind). One failure found something real: a permanent delete does nothing for a Content manager,
-so the one place the app deleted permanently (replacing a pad set's files) now trashes them
-(`trashFilesInFolder`).
-
 ## Order of work and status
 
 Checked against the code 2026-11-12.
 
 1. [x] Principle in CLAUDE.md and this doc.
-2. [x] Spike (above): passed, see "Spike results".
+2. [x] Spike: passed, see "What the spike established".
 3. [x] Space abstraction: space id and `rootRef`, the folder Picker, the shared-drive flags,
    per-space transport through `StorageBackend` (docs/STORAGE_API.md). Left: the space's kind is
    not a field of its own (a team space has `team` set, personal does not).
@@ -1117,7 +930,7 @@ Built 2026-11-12 (`space-deletion.ts`, `space-delete-everywhere.ts`, the Worker'
     Worker enforces it; a writer or reader is told it is for admins). A Team's folder is the owner's, or
     on a shared drive the service account's, so the Worker trashes it, with the space's own credential
     (`AdminContext.trashRoot`), and then ends sharing (`destroy`), so the members, invites and token go and
-    only the team's register row and events stay, marked ended (see "SongSelect's terms").
+    only the team's register row and events stay, marked ended (see "The register of teams").
   - **Three things asked before it does.** A **backup** the page makes itself and hands to the browser
     (`downloadBackup`, the same export as the export panel: songs and setlists as they are on this device,
     no audio pads; a sync first if others changed it), the space's **name typed**, and a press of a button

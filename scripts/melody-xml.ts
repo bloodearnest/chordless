@@ -1,6 +1,6 @@
 /**
  * Reading the SVG of a `GetSongLeadPreview` response: the oracle the PDF reader is developed against
- * (docs/MELODY.md). Nothing in `src/` uses it: the app reads the PDF alone.
+ * (docs/LEAD_SHEETS.md). Nothing in `src/` uses it: the app reads the PDF alone.
  */
 import type { Score } from '../src/js/score.ts'
 import { type ReadStats, readScoreTrees } from '../src/js/score-read.ts'

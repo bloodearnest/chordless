@@ -75,7 +75,7 @@ sign-in backup (download, import).
 - **A card's lines:** how much the space holds (estimated: IndexedDB reports usage for the whole
   origin only, so a space's size is its records, setlist JSON and chart text, as the team wizard's
   "Bring across" step counts them), a Team's **CCLI licence number** if it has one
-  (docs/SPACES.md, "SongSelect's terms"), and how the sync stands: when it last ran, its progress
+  (docs/CCLI.md), and how the sync stands: when it last ran, its progress
   while it runs, or what stands in the way ("Sign in to sync", "Sign-in expired: reconnect to sync",
   "Connect Google Drive to sync").
 - **Sync** is on the card, and the card runs the sync itself (`space-sync.ts`). It is shown for any
@@ -154,7 +154,7 @@ closes (`SpaceGoneEvent`) and the list is read again; closing it any other way r
   owner can **stop sharing**, and any other member can **leave**. A role acts only on those below it (the
   Worker's rule, docs/SPACES.md, "Roles"; the controls shown follow it).
 - **CCLI licence number** (`team-licence-panel.ts`): anyone sees it, a writer sets it where there is
-  none, an admin changes or clears it and sees the log of changes (docs/SPACES.md, "SongSelect's terms").
+  none, an admin changes or clears it and sees the log of changes (docs/CCLI.md).
 - **Team storage** (`team-storage-panel.ts`, the owner only): how the Team's folder is reached, the
   owner's own Google sign-in or Chordless's service account on a shared drive, with the address to
   add and **Check and switch** (docs/SPACES.md, "Credentials").

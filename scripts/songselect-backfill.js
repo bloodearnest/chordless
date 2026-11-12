@@ -1,6 +1,6 @@
 /**
  * Fetch every chart of a library from SongSelect again, to put the charts in SongSelect's own key
- * and give each song its melody range from its lead sheet (docs/REIMPORT.md).
+ * and give each song its melody range from its lead sheet (docs/RANGE.md, "Re-importing a whole library").
  *
  * It runs in the Chrome DevTools console on https://songselect.ccli.com, signed in, as the script
  * that scripts/make-songselect-backfill.ts makes: this, with the library's CCLI numbers after it.

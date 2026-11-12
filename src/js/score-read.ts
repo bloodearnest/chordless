@@ -1,5 +1,5 @@
 /**
- * Reads the melody out of the tree of a SongSelect lead sheet as Verovio engraves it (`docs/MELODY.md`). The
+ * Reads the melody out of the tree of a SongSelect lead sheet as Verovio engraves it (`docs/LEAD_SHEETS.md`). The
  * tree comes from the PDF (`score-pdf.ts` rebuilds it from the drawing) and, in development, from the SVG of
  * `GetSongLeadPreview` (`scripts/melody-xml.ts`), which is the oracle the PDF's reading is checked against.
  *

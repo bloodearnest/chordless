@@ -1,5 +1,5 @@
 /**
- * The melody of a lead sheet as music: what `docs/MELODY.md` calls the `Score`. Plain data, small
+ * The melody of a lead sheet as music: what `docs/LEAD_SHEETS.md` calls the `Score`. Plain data, small
  * as JSON, and no XML: MusicXML is written from it and read into it at the edges
  * (`score-musicxml.ts`).
  *
@@ -110,6 +110,6 @@ export interface ScoreMeasure {
 export interface Score {
   title: string | null
   measures: ScoreMeasure[]
-  /** The text under the music that has to travel with it: copyright, CCLI numbers (docs/MELODY.md, "The terms") */
+  /** The text under the music that has to travel with it: copyright, CCLI numbers (docs/LEAD_SHEETS.md, "The terms") */
   notice: string[]
 }

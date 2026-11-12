@@ -4,12 +4,11 @@ editing
   tests/emails-private.node.test.ts (real emails, newest 5 by default) is no longer the only test of it
 - A received share (readOnly page option) should allow local edits too, kept on the device apart from the
   set (a key change there is lost when the set updates): see docs/SPACES.md, "Read-only"
-- song notes/stickies
 
 song data
-- chart editor (fix a typo in place): plan in docs/CHART_EDITOR.md, not built
-- the import page's "Create New Setlist" offers the people of the space the app is in, not the one being
-  imported into (getSpacePeople reads the current space)
+- chart editor (fix a typo in place): plan in docs/VARIANTS.md, "Editing a chart", not built
+- the import page's "Create New Setlist" may offer the people of the space the app is in, not the one being
+  imported into: getSpacePeople now takes the database, but still reads the current space too; check
 - at import, when the chart's CCLI number finds a song and a song with no CCLI number has the same title,
   offer to link that one as a variant too (the library repair and "Merge another song into this one" do
   it afterwards: docs/VARIANTS.md, "Versions and merging")
@@ -25,7 +24,6 @@ song data
   differs (the key, say) or ask
 - a free-form source (who wrote a chart) can be supplied nowhere: add an optional field to the import
   and to the song's info
-- the Worker does not check who may delete songs in a Team (admin and up): see docs/SPACES.md, "Roles"
 - feature idea: song structure.  Have an translucent overlay on the top right
   that shows intended structure vertically e.g. "v1 c1 v2 c2 x2 b1 x4 c1". We
   could fill in a default by guessing based on source chordpro, but users
@@ -50,6 +48,11 @@ spaces (personal and team): the plan, the order of work and the status list are 
 preferences
 - Date format: the copied song list ("Songs for Sunday 18th October") is UK style for now; let the
   date format be chosen in preferences, and use it for the other dates too
+- revisit the configuration panels (Preferences, Storage, media player settings): too much variety in layout and
+  controls. Settings rows, switches vs checkboxes, toggle buttons vs radios, button sizes all differ; headings repeat
+  ("Appearance" twice, "Media Player Settings" twice). Settle on one settings row pattern in shared-styles.js.
+  Decided: on/off settings use checkboxes, not pill-shaped toggle switches (pills are poor UX), sized for touch (a
+  large box and a big tap target on the whole row)
 
 song edit UI
 - the click sound: choose it (a later change; the downbeat emphasis and the double click are done)
@@ -80,37 +83,14 @@ bugs
   "See His Love" show Em D C for Gm (Sunday 18 Oct). Reimport them in the Gateway Church space: Adonai,
   All Hail King Jesus, Here Is Love, Holy Holy Holy, More Precious Than Silver, Our God He Reigns,
   See His Love, Washed, What A Friend.
-browser support
-- Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120 (raised to Safari/iOS 17.4 on 2026-10-27, for `scrollend`), set in .browserslistrc
-  and TARGET in vite.config.ts (keep them the same). Reasoning: support devices up to about five
-  years old; asking people to update their OS is fine, excluding a device that cannot update is
-  not, and every iPhone/iPad from 2021 on can run iOS 17 and later (a survey of the worship team:
-  all on 26+, lowest 26.5), but some people dislike updating, so the floor is what the code
-  needs with margin, not the newest. An audit (grep for version-gated features) found nothing
-  between 26.2 and 16.2 that costs anything: the first thing below that is color-mix() (42 uses).
-  View transitions are feature-detected. The 2017 iPad (16.7), the Air 2 and the 2019-2020 models
-  stuck on iOS 18 or lower are mostly outside the window on purpose. The floor is a claim
-  from reading the code, not tested on an old device: do that (Playwright's WebKit is current)
-- A user reported iPadOS 15.8.8 (2026-10-11): so an iPad Air 2 (2014) or iPad mini 4 (2015), the
-  last models on iPadOS 15, which cannot update. Outside the window on purpose, so nothing is
-  done for now. If it is revisited: lower TARGET and .browserslistrc to Safari 15.4, give the 42
-  color-mix() uses fallback colours (Safari 16.2), test on a real device (a module using class
-  static blocks or regex lookbehind, Safari 16.4, would not even parse: unknown). The "update
-  your device" page below is the cheap part either way
+browser support (the reasoning and the floor are in docs/BUILD.md, "The browser floor")
+- the floor is a claim from reading the code, not tested on an old device (Playwright's WebKit is current): try one.
+  iPadOS 15 (Air 2, mini 4) is outside the window on purpose; if it is revisited, the plan is in docs/BUILD.md
 - No fallbacks or polyfills for what 17 has (nesting, dialog, :has, view transitions as an
   enhancement). Look through the code for workarounds the floor makes unnecessary
 - Below the floor the page says "Please update your device" (public/floor.js, with a "Try it anyway"
   that is remembered). Not seen on a real old device: find out what one shows when the app's module
   scripts cannot even parse (an iPhone on 18.0.1 was reported, which is above the floor: check it works)
-- Core is setlist navigation (reading and moving through the setlist, offline). The media player
-  is optional and may be off on a device without Web Audio: it is not loaded when the device has
-  none or it is switched off in Preferences (media-player-loader.ts), and a player that fails to
-  load is a warning, not an error. Don't make the core depend on it
-- Usage pattern to design for: a dedicated iPad opened every 3 to 4 weeks, often on poor wifi.
-  So: the app must open offline from its cache (done: the build precaches everything,
-  tests/built.playwright.ts), data must survive the weeks between (the install nag, below), and
-  a signed-in session and the Drive link must still work after weeks (test an expired token with
-  no network: local setlists must still show)
 
 navigation
 - When the supported browsers all have the Navigation API (Safari/iOS 26.2, Chrome 102; the floor
@@ -138,14 +118,6 @@ styles
   Remove them, checking each against the light DOM pages and the two light-DOM
   components (chord-display, setlist-overview)
 
-preferences
-  - custom section visibility defaults
-  - revisit the configuration panels (Preferences, Storage, media player settings): too
-    much variety in layout and controls. Settings rows, switches vs checkboxes, toggle
-    buttons vs radios, button sizes all differ; headings repeat ("Appearance" twice,
-    "Media Player Settings" twice). Settle on one settings row pattern in shared-styles.js
-    Decided: on/off settings use checkboxes, not pill-shaped toggle switches (pills are
-    poor UX), sized for touch (a large box and a big tap target on the whole row).
 
 offline
 - an update shows as a dot on the menu button and a first item in the menu, and on the About
@@ -166,14 +138,10 @@ storage/sync
   poll for the live setlist: the live channel, a WebSocket relay, is the fast way: docs/LIVE_SYNC.md); team members get the feed through the
   Worker too. The Worker role replaces the Drive-capabilities
   trigger later (docs/SPACES.md)
-- a song's melody range, for picking a key a singer can sing: `readMelodyRange` (src/js/melody-range.ts) reads the
-  lowest and highest sung note from a SongSelect lead sheet PDF (ChordPro has no melody, the lead sheet does; the
-  notes are drawn shapes, not text; instrumental lines, drawn small, are left out). Built and tested
-  (tests/melody-range.node.test.ts, on lead sheets drawn by tests/melody-pdf.ts: the real ones are CCLI's, so none are
-  kept here). Built since: the bookmarklet and the file picker bring a lead sheet in, the range is kept in the chart
-  (`{x_chordless_range: D4-E5}`), the key picker marks each key by it, the song info shows it, and it can be set by hand
-  there (docs/RANGE.md). Not built: the limits as a preference. Not read: an accidental on a single note, a bass clef, a
-  semibreve (checked on no real sheet, it is drawn as a wider ring)
+- a song's lead sheet range (docs/RANGE.md, docs/LEAD_SHEETS.md) is built end to end: read from a SongSelect lead
+  sheet, kept in the chart as `{x_chordless_range}`, marked on the key picker, shown in the song info and settable
+  by hand. Not built: the limits (`RANGE_LIMITS`) as a preference, so a group of altos or a younger group can have
+  their own
 - variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the space's default, a chart editor for fixes and arrangements; the picker's cards and the versions list are built)
 - conflict resolution (currently Drive wins when edited on two devices, and the local edit is
   silently dropped). Idea: keep the losing edit as a conflict copy of the setlist instead.
@@ -189,9 +157,6 @@ storage/sync
   role later. Open: open to all in the space by default, or only those. The layer must
   show, simply: one indicator that something differs from the official version, and a way to view
   what (see the doc). The Worker's team service later enforces it and detects conflicts
-- delete setlists (owner only, trashed in Drive on sync, removed on other devices):
-  designed in docs/SYNC_ARCHITECTURE.md, not built
-- a durable offline write queue (the immediate push is built: a local save starts a sync after 2s, see docs/SYNC_ARCHITECTURE.md; a change made offline waits for the next sync once online)
 - a change made just before the app is closed may still not reach Drive (found 2026-10-28; the person
   prepares a setlist on the desktop, closes it, opens the tablet at church, and the desktop never
   synced). Built: a page that is hidden (`visibilitychange`: a tab switch, a minimised window, an app
@@ -217,23 +182,14 @@ storage/sync
   8: the feed's no-op, the repeated inventory, the serial listings, the pull's listings and the folder
   lookups are fixed: docs/OBSERVABILITY.md). Left: an incremental sync that finds changes asks for the
   access before it knows it will write: it could wait for a write that needs it
+- privacy-preserving analytics (cookieless, with song popularity by CCLI number): the plan and its constraints are in
+  docs/ANALYTICS.md
+- tighten the Content-Security-Policy (drop `style-src-attr 'unsafe-inline'`, Trusted Types, `upgrade-insecure-requests`,
+  a `report-to`) and check the service worker's own fetches and Safari: docs/BUILD.md, "Tightening the Content-Security-Policy"
 - richer PWA install UI (Chrome's devtools manifest tab warns): add "screenshots" to
   public/manifest.webmanifest, at least one with form_factor "wide" (desktop) and one without it
   or "narrow" (mobile). Generate them with Playwright from seeded data, using a public-domain
   hymn (no copyrighted lyrics), and keep them out of the precache if they are large
-- privacy-preserving analytics (cookieless, like Plausible; GoatCounter, Umami and Cloudflare Web
-  Analytics are the alternatives). Proxy the script and its event endpoint through the worker so
-  the CSP stays 'self' and ad blockers don't drop it. Constraints: events are lost while the
-  device is offline (the iPad often is), so counts undercount; never send song titles, lyrics,
-  setlist names or the ids in /setlist/<id> and /songs/<id> (count the page type only); never send
-  Google sign-in data (email, name, id): the OAuth verification is for Limited Use; no events in
-  dev or the Playwright tests; update public/privacy.html (it says no analytics) in the same
-  change.
-  Song popularity: one event when a song is added to a setlist, with its CCLI song number as a
-  property (a public catalogue id, not user data), only when it is all digits (4 to 9 long), so
-  free text can never leak. Never fall back to the title (it may be a private song). Songs with no
-  CCLI number are not counted. The chart's number is in song.metadata.ccliSongNumber or .ccli (getSongWithContent). Plausible custom props: check which plan; GoatCounter can use an event
-  name like song-added/<number>; Cloudflare Web Analytics has no events. Say it in the policy too
 - proofread the sample charts (public/samples): the words were written from memory and the chords
   and the time and tempo are my guesses. Check the words against a source before real use
 - check on a real iPhone/iPad (Safari): the first visit with no reload (public/boot.js waits two
@@ -243,21 +199,6 @@ storage/sync
   with the entry (about 15 KB gzipped more for every route). Measure on the live site first
 - Lighthouse leftovers: pinch zoom is off on purpose (accessibility flags it); the llms.txt and
   ai-catalog audits are ignored
-- the Content-Security-Policy is enforced (public/_headers). Not yet checked: the service worker's
-  own fetches (its violations are not in the page console: chrome://serviceworker-internals or the
-  worker's DevTools), and Safari
-  Tightening it further (raised 2026-11-07, after the Verovio worker took `'wasm-unsafe-eval'` off the page):
-  - drop `style-src-attr 'unsafe-inline'`, the loosest directive left: it is only for the 26 `style="..."`
-    attributes in 14 files (grep `style="` in src/). Static ones become classes. A style set through the DOM
-    (`element.style`, or Lit's `styleMap`) is not blocked, so the dynamic ones (the media player's rotate and
-    translate) move to that; a `style="...${x}"` binding sets an attribute and is blocked. Check that
-    Google's sign-in button works without it
-  - Trusted Types: `require-trusted-types-for 'script'`, so a string cannot reach `innerHTML` and the like.
-    The app has one `innerHTML = ''` (song-view-manager.ts) and Lit has its own policy (`lit-html`); the risk is
-    Google's sign-in and Picker scripts, which may need policies of their own. Try it as
-    `Content-Security-Policy-Report-Only` first and see what is reported
-  - `upgrade-insecure-requests` (nothing is http: it costs nothing), and a `report-to` so a violation on a
-    device is heard of (it would go through the Worker's telemetry route; the privacy policy would need a line)
 - test song import on real devices, on the live site: file import and paste on Android and iPad,
   the bookmarklet on Android Chrome, and whether the phone/tablet tip shows on the bookmarklet page
 - user-facing Drive health check / cleanup (idea): turn src/dev/drive-audit.html into an
@@ -273,16 +214,13 @@ ci/cd (docs/CI.md; the infrastructure and deploy tasks are in infra/TODO)
   and the Picker, whose windows and frames COEP can break; responses with no Content-Type (10019, which
   ones: the report in the DAST run's artifact); its caching warnings (10015, 10049), mostly meant
   (the service worker, fresh API answers), to be looked at once and the rules set to match
-- the weekly review routine (docs/agents/weekly-review.md, on the same branch): Sunday 20:00 UTC
 
 live mode
  - loading a setlist at a song (reload, or a link to #song-N) reports the song, then the
    overview, then the song again (the section observer's first callback): the media
    player is told "no song" in between, and for that moment the edit button and arrow
    keys act on the overview. tests/live.playwright.ts opens songs with the arrow instead
- - live sync of team setlists over a WebSocket relay (designed, not built: docs/LIVE_SYNC.md)
  - follow the leader's current song/section in a live session (after live sync; an optional `current` in the live setlist)
- - live sync for share links: faster polling (Step A), then a nudge channel (Step B) (docs/LIVE_SYNC.md, "Share links")
 
 tests
  - tests/songs.playwright.ts "choosing a song opens it at its own URL, and back returns to the
@@ -300,50 +238,10 @@ ccli import
  - try importing in original key, but record the key that it was set to in the songselect page, and add to setlist in that key
   - handle numbers on import (need to get an original key)
  - make it reuse open windows for import (maybe need to get the default app, not opened via import, to have the tag tag?)
- - - we want to be able to forward an email sent by others and import a setlist
-  from it. Expect attached PDFs, download and extract ccli numbers and match
-  against song db.  If the song is missing, ideally create a shell that can be
-  imported over from songselect. Ideally, we can sue "Share To" type
-  interaction to share the email and attachements locally, but maybe we need
-  some kind of email address to process this as an anonymous share and reply with the link to you
-  Built so far: the parser (src/js/email-setlist.ts, tests/email-setlist.node.test.ts), pure text in,
-  setlist out. Decisions: the leader's name and email are kept as owner/ownerId whether or not they
-  are in any space; songs get their order and keys from the list in the body (numbered, or
-  OnSong's bullets), else the attachments' order (orderFromList false: say it is a guess); the same
-  song in two keys is one song, first key, with a note "May also be in E"; a missing date is asked
-  for, defaulting to nearestSunday(); a date whose weekday is wrong ("Sunday 8th Nov" on a
-  Saturday) becomes the nearest right weekday and must be confirmed (dateWarning); the subject is
-  the setlist's name ("Prayer day" is one), and a date in it is not removed.
-  Built: the /import-setlist review page (src/components/setlist-email-import.ts),
-  matching by CCLI number, then title, then close titles to confirm, then, if no title is close, a
-  line of the songs' words (src/js/import-plan.ts: leaders call a song by its chorus, e.g. "Your Grace
-  Is Enough" for "This Is Our God"; never picked for the person).
-  Built too: the email Worker (worker/src/email.ts; docs/EMAIL_IMPORT.md): a forwarded email gets a
-  reply with /import-setlist#<setlist> (src/js/email-link.ts), tried in workerd with wrangler dev.
-  Set up by hand in the Cloudflare dashboard (Email Routing on chordless.app, an address that
-  sends to the Worker); tried with real forwards.
-  Built too: matching songs of the other databases (copied into the library when the setlist is
-  made); updating the setlist that has the date (the same leader's is the default, the changes
-  are shown first); rate limits on the Worker (per sender and overall); createdBy on setlists
-  (recorded, nothing decides by it yet); no .eml file picker (only the Worker reads emails;
-  the app reads a PDF only when one is shared to it, see docs/EMAIL_IMPORT.md). WhatsApp can
-  share neither text messages nor a selection of them, so a setlist cannot come from it: one
-  downloaded PDF at a time can. Other ways in are not built: Share To (email apps
-  do not share an email to a web app) and a pasted link are not worth it, as the reply's link
-  opens the installed app.
-  Still to build: use of createdBy (an imported setlist's owner is the leader, so the importer
-  could not delete it under the owner rule: allow the owner or the creator;
-  docs/SYNC_ARCHITECTURE.md).
-- email import, a rule: the PDFs are never imported as charts. They are read only for their title,
-  key, tempo and CCLI number (src/js/pdf-text.ts). A song that is not in the library (by CCLI
-  number, then by title) has to be imported from SongSelect first, with the bookmarklet: the review
-  page (/import-setlist) links to its SongSelect page (songSelectLink in
-  src/js/songselect-link.ts: /songs/<ccli>, else a search for the title; the search URL could not
-  be checked from here, SongSelect refuses automated requests, so check it by hand), looks again
-  when the person comes back, and won't make the setlist until each song is in the library or left
-  out. No placeholder songs: they would sit in the shared library with no chart, and a title
-  that differs from SongSelect's would never be replaced. The Worker keeps no PDF either: it
-  replies with a link holding only the metadata.
+ - email import is built (docs/EMAIL_IMPORT.md): the parser, the /import-setlist review page, the email Worker
+  with its rate limits, matching by CCLI number, title and words. Other ways in are not worth building: Share To
+  (email apps do not share an email to a web app), a pasted link (the reply's link opens the installed app), and
+  WhatsApp, which shares neither text messages nor a selection of them
 - email import, from surveying 61 real emails (tests/emails-private.node.test.ts): about half the
   charts have no CCLI number. They are old OnSong PDFs from before SongSelect, which people still
   use: a different version of the song, often under another title. So a chart with no CCLI number
@@ -355,9 +253,9 @@ ccli import
   properly: the leader, date and songs from importFromEmail, songs matched to the library by
   CCLI number then title, with shells and SongSelect links for the rest. Many have no date (events
   like "Prayer Day"), so it must ask.
-- notes on a setlist song (SetlistEntry.notes) are not shown anywhere yet: show them in live mode
-  and the overview, and let them be edited. The email import fills them in ("fairly empty to
-  start", "May also be in E").
+- notes on a setlist song (SetlistEntry.notes, the older plain-text note) are not shown or edited anywhere: show
+  them with the annotations (docs/ANNOTATIONS.md, "Not built yet"), or drop the field. The email import fills them in
+  ("fairly empty to start", "May also be in E")
 
 sharing
 - share links: built (docs/SHARING.md): create/update/stop from a share button in the overview header (a modal with the link and QR code),
@@ -370,7 +268,6 @@ sharing
   whole setlist), importing through incoming-songs.ts. It's the sharer's job to hold the
   rights. This breaks the "never mixed into a library" rule in docs/SHARING.md, so update
   that when it's built. Not part of the first version.
-- email media team
 - team spaces for people with no Google account (raised 2026-10-19): members sign in to the Worker with a Google
   ID token, so any Google account (not only Gmail or Workspace) can join, but not a person with none. Idea, later,
   opt-in per team space: a read-only invite link (the Worker keeps a hash of a random token with the reader role and
@@ -378,7 +275,6 @@ sharing
   the reader's device). Needs expiry, revoking one invite, a warning that the link is a bearer credential (it reads
   the whole library, unlike a one-setlist share link), and no per-person identity. Share links and "Shared with me"
   already cover a volunteer who only needs this week's set
-- restrict editing others' setlists, using the setlist's ownerId? (leader's Google email)
 
  - the pad sets are the user's own (Drive): the app ships none, so pads are off until one is
    uploaded (the first upload is chosen)
@@ -387,63 +283,9 @@ sharing
    songs. Pads re-download from Drive. Fall back to the default caches elsewhere.
 
 UI
-- recover when Safari has cleared the storage: the nag is the prevention, this is the cure.
-  The JWE key stays in the worker (JWE_ENCRYPTION_KEY): the worker needs it to decrypt the blob
-  and use the Google refresh token, and the browser must never hold it. What the browser holds
-  is the encrypted blob in IndexedDB (auth-db.ts), and that is what an eviction deletes, along
-  with the spaces and their Drive-folder links (space-db.ts), the songs and
-  setlists (db.ts) and the current-space marker (localStorage). So there is nothing on the device
-  to restore from: recovery needs either the user or the server.
-  - Plan (decided): the server keeps a copy of the blob in a cookie, and the app restores from it.
-    - the worker also sets the blob as an HttpOnly, Secure, SameSite=Lax cookie (Path=/session,
-      long Max-Age) on /oauth/callback, and clears it on /session/revoke. WebKit's tracking
-      prevention (webkit.org/tracking-prevention) caps cookies created in JavaScript, not
-      Set-Cookie ones (except under CNAME cloaking to a third party), so it survives the eviction
-    - POST /session/restore reads the cookie and returns what /oauth/callback does (blob,
-      access_token, user), so the client can store the blob again
-    - detect an eviction: a localStorage marker ("this device has data") that is missing when the
-      app opens, and /session/restore answers yes. Then show "Safari cleared this device's data:
-      restoring your setlists from Google Drive" and run the existing first-sign-in sync
-      (checkFirstTimeAuth renames the Personal space to the Google name, Sync joins the existing
-      same-named Drive folder). No tap needed. If /session/restore says no (no cookie), fall back
-      to asking the user to sign in again: google-auth.ts uses access_type: 'offline' with
-      prompt: 'consent', so that should be issued a new refresh token (verify with a real wipe)
-    - update public/privacy.html in the same change: it says Chordless uses no cookies and the
-      worker stores nothing. Say it sets one sign-in cookie (the encrypted token, HttpOnly, how
-      long it lasts, removed on sign-out and Clear Local Data)
-    - needs the network, so say so plainly at church
-    - it is an auth change: review it with the user before building
-    - security: a same-origin check (Origin / Sec-Fetch-Site) on /session/*; no
-      Access-Control-Allow-Credentials with a reflected origin; restrict the current
-      `Access-Control-Allow-Origin: *` (already on the production list); "Clear Local Data" and
-      sign-out must clear the cookie too, or they would restore what the user wiped; check that
-      chordless.app is not a CNAME to another registrable domain
-    - tests: worker unit tests for set, restore and clear; a Playwright test that wipes
-      IndexedDB and localStorage with the cookie kept and sees the restore
-  - either way, unsynced changes and device settings (theme, pad set) are lost: sync early and
-    often (see the background sync item)
-- autoscaling font
-- install nag ("install to keep your data on this device"). The welcome card (a new user's home
-  page) already has an "Install it" step with the reason and the per-platform instructions
-  (src/js/install.ts has the detection and the Chromium prompt): this is the nag that keeps asking
-  after that, below. this will be important for a dedicated church
-  iPad that is only opened when its owner is on the rota (every 3 to 4 weeks). Safari (iOS, and
-  macOS) deletes a site's script-writable storage (IndexedDB, localStorage, the service worker
-  and its caches) after 7 days of Safari use without the user interacting with the site (days
-  the browser is used, not calendar days: a rarely used iPad is not wiped just by sitting idle,
-  but Safari use on other days counts; WebKit's "Full Third-Party Cookie Blocking and More"
-  post, 2020; not re-checked since) unless the site is added to the Home Screen, which has its
-  own counter. What is lost: the sign-in, the space's Drive folder link, unsynced changes, settings
-  and pads, and at church, with poor wifi, the setlists are gone until signed in and synced.
-  On iOS and iPadOS in a Safari tab (not navigator.standalone) it should INSIST: not a corner
-  banner that "Not now" dismisses for weeks, but a sheet over the home page that explains the
-  risk in one line and walks through Share › Add to Home Screen, back each time the app is
-  opened in Safari until it is installed. Allow "Continue in Safari anyway" for that visit only
-  (people borrow an iPad, or are mid-rota). Never over a setlist (the home page only). Detect
-  iOS with the user agent or, for iPadOS (which reports as a Mac), maxTouchPoints > 1.
-  The platform detection, the Chromium prompt and the instructions already exist in
-  src/js/install.ts and the welcome card: reuse them. Skip when already installed. Installing
-  also lets Chrome grant persistent storage.
+- recover when Safari has cleared the storage (the server keeps the sign-in blob in a cookie), and an install nag that
+  insists on iOS: both are plans in docs/OFFLINE_STORAGE.md, with the usage they are for (an iPad opened every 3 to 4
+  weeks, on poor wifi). The first needs an auth review before it is built
 
 - email replies: a logo where Gmail shows a profile picture needs BIMI, and BIMI needs a VMC or CMC
   certificate (from a CA such as DigiCert or Entrust, a yearly cost; Let's Encrypt cannot issue it).
@@ -454,42 +296,12 @@ UI
   certificate is bought for another reason.
 
 library
+ - lyrics full-text search is built (docs/SEARCH.md). Not built: matchLibrary's "line of the words" step still scans
+   instead of using the index; a stored index if libraries grow; ranking a title that is the word above one that has
+   it; apostrophe contractions and ends of words ("singin'")
  - ccli report nag
- - lyrics full-text search. Built (src/js/utils/song-search.ts, used by `filterSongs`): MiniSearch over
-   the songs the library page and the add-song modal already have, with their charts parsed (title,
-   artist, variant name, lyrics; each word is indexed as written and stemmed with `stemmer`, in lower
-   case without accents or apostrophes, and the very common words are left out). It finds other forms
-   of a word ("praises" finds "praise"), a slip of the fingers (fuzzy, on stems of six letters or more:
-   on shorter ones "praises" would find "raise"), words in any order (all must be there), and a word
-   begun (the last one: as written, or going on from a stem of four letters or more with the start of
-   an ending, `ENDINGS`, and a lost "e": "worshippin" finds "worship", "lovi" finds "love"). The words
-   found are marked in the title, artist and variant name, and the best line is quoted (`wordRanges`,
-   `lyricSnippet`). Songs found by the words alone come after every song the typed letters are in,
-   except that a title that has the word is ranked as a title that has the letters (`wordRank`); a
-   song found only because a word in it has a letter wrong comes last of all; among lyrics-only
-   matches the better score goes first. Checked over many words drawn from the songs, made-up and
-   real (docs/TESTING.md, "The search, over many words"). Made in memory, not stored: it is rebuilt when the
-   list of songs changes (the library page and the modal make it a moment after the list is shown,
-   `warmSearch`), which costs about 0.2 s for 600 songs on a laptop. The list includes songs of the
-   device's other databases, so one index covers "From …" songs too, and there is nothing to keep
-   up to date after a save, a sync, or leaving a space. Not built:
-   - matchLibrary's "line of the song's words" step (src/js/import-plan.ts) still scans; it could use
-     the same index (rejoining SongSelect's split syllables is `SPLIT_WORD` in song-filter.ts)
-   - if libraries grow so that making the index is felt (thousands of songs, an old iPad), store the
-     serialised index (MiniSearch toJSON/loadJSON) in its own IndexedDB store as a derived cache that
-     is safe to drop, one per database, updated per chart on save (db.saveChordPro/deleteChordPro)
-     and by contentHash after a sync pull, with a version to bump when the tokeniser or stemmer changes
-   - rank a title that is the word ("Praise" for "praises") above a title with the word in it
-   - a word with an apostrophe for a letter left out ("ev'ry", "pow'r", "heav'n", "ne'er") is found as
-     the word it is: indexed with each of a, e, i, o, u, v put back (`lettersPutBack`), and marked the
-     same way. Not done: an everyday contraction (Lord's, don't) is left alone, as is an apostrophe at an
-     end of a word ("singin'", "'cause", "'neath"), and a letter left out that is not one of those
-     six or more than one letter ("fount'n" for "fountain"). Add what a real chart needs
-   - a word begun that is only a stem and a short ending ("moti" is "mot" and "i", so "mote") finds
-     the odd unrelated word; fine so far, look again if it is noticed
 
 - Make the settings controls and panels (About: version, install, offline, storage status) more compact; they are all a little large.
 - The info icon is an i-in-a-circle inside a second circle. Want one circle only: either just an `i` inside our current border circle, or the icon without the border.
 - Shared with me (docs/SHARING.md, "Shared with me"): built the database, the home page group, and tidying (expiry, and dropping a setlist once the user has it in a space). Search across all databases (library page and add-song modal, tagged "From …") and "Add to my library" (a copy into the current space) are built. Still to do: deleting received songs by hand; warnings on space delete/Reset from Drive. Links are shorter (128-bit key + 6-character setlist code that sends space members straight to their own setlist).
-- Data migrations with a UI (asked for 2026-10-20). Today's two (the spaces database `organisations` → `spaces`, in `SpaceDB.init`; and the file fields `driveFileId` → `fileRef` etc., in `migrateRecords` in `db.ts`) run by themselves when a database is opened, silently. More will come, so give them a shape: a registry (`src/js/migrations.ts`) of named, ordered, idempotent steps, each with `needed()`, `run(progress)` and a description; a record of what ran and when (and any failure) kept on the device; run the cheap ones at load behind a "Updating your data…" notice that does not stop a live setlist (CLAUDE.md: a toast, never a block); and a Storage page section, "Data updates", listing each step as done / waiting / failed with "Apply" (and "Try again") for the ones not run automatically. IndexedDB version upgrades (`onupgradeneeded`) cannot wait for a button: they stay automatic, but should be recorded in the same list. Decide first which migrations may be left for the user to apply (a big one, such as copying pad sets) and which must not.
 - server-sent invite emails: decided against for now (docs/SPACES.md, "Invites are for an email address"); the share sheet / WhatsApp / Gmail buttons cover it. Revisit if links get lost, after rate limits

@@ -1,7 +1,8 @@
 # Song variants
 
-Status: a plan (nothing here is built yet, except what "Today" says). Decisions are the
-user's, recorded 2026-10-13.
+Status: mostly built. The origin fields on a variant, the import choices (compare, keep both, replace),
+the versions list and merging are built (below); the chart editor is not. Decisions are the user's,
+recorded 2026-10-13.
 
 ## Today
 
@@ -15,7 +16,7 @@ library has); sync sees the changed hash and uploads it.
 
 **A setlist entry plays the version it names** (`versionForEntry`, `songOfEntry` in
 `src/js/song-utils.ts`): the setlist page, a shared setlist's bundle, the key and tempo an update
-writes into the entries (docs/REIMPORT.md) and the library's "last played" all go by it. If the
+writes into the entries (docs/RANGE.md, "Re-importing a whole library") and the library's "last played" all go by it. If the
 version it names is not in the library (or is another song's now) it plays the song's default. Until
 2026-11-05 the setlist page and sharing went by the song's id, so an entry that named a version
 other than the default showed the default's chart. Last played is per version: a card that is one
@@ -89,8 +90,56 @@ copied into the library, so editing it always makes a variant, never a change to
 database. Offline-first: the edit is saved at once and syncs later. Two people fixing one chart
 meet the usual Drive conflict rule (docs/SYNC_ARCHITECTURE.md).
 
-docs/DATA_MODEL.md says "Songs are immutable - any edit creates a new variant". That changes:
-a fix is in place.
+docs/DATA_MODEL.md says "Songs are immutable - any edit creates a new variant". That changed: a fix is in place.
+
+### First slice: fix a typo in place (a plan, nothing built, 2026-10-24)
+
+Arrangements (a new variant) come later; this is **fix only**. Entry point and tests are below.
+
+#### Starting point
+
+- `overwriteSong(uuid, content, db)` in `src/js/song-utils.ts` already does the save: the ChordPro,
+  hash and modified date, the parse cache, the song's metadata. Sync sees the changed hash and
+  uploads it, so other devices follow.
+- Check first: does `db.saveChordPro` / `saveSong` announce the change on the change bus
+  (`data:change`, `src/js/data-changes.ts`, docs/STATE.md)? Auto-sync listens on it.
+- The song info dialog (`src/components/song-info-dialog.ts`, opened by `showSongInfo` in
+  `setlist-page.ts` and from the library) holds the Versions list: the home for an "Edit chart" button.
+
+#### Plan
+
+1. **`src/components/chart-editor.ts`**: a Lit element in an `app-modal` (fullscreen) with a native
+   `<textarea>` of the raw ChordPro, monospace. Save and Cancel. No live preview yet. It fires a
+   `chart-editor:save` event with the new text; the parent saves (as `setlist-info-dialog` does).
+   Cancelling a changed edit asks first.
+2. **`fixChart(uuid, content, db)`** in `song-utils.ts`, wrapping `overwriteSong`: refuse a chart
+   that parses to nothing (an empty textarea must not wipe a song); do nothing if the hash is unchanged.
+3. **Wiring.** An "Edit chart" button in the song info dialog, for the variant shown. Available live
+   too (CLAUDE.md, "permissive in the moment"): the friction is the dialog and the cancel
+   confirmation, not edit mode. A failed save is a `toast()` with "Try again", never `alert()`.
+   Read-only spaces keep local edits (sync just does not write back). Hidden for songs from another
+   database (Shared with me, another space): those need copying first, which is the arrangement path.
+4. **Refresh.** The setlist page (`buildRuntimeSongs`) and the library list show the fix without a
+   reload. Preferred: listen for `data:change` on the song/chart ids, as `setupChangedSetlists` does
+   for setlists; it also shows a fix that arrives by sync. Fallback: the dialog fires an event and the
+   page reloads that one song.
+5. **Tests** (docs/TESTING.md). Node: `fixChart` changes text, metadata and hash; rejects empty input;
+   keeps `uuid` and `variantOf`. Browser unit: the editor's save and cancel events and the
+   confirmation. Playwright: edit a lyric in the dialog, save, see it on the song page and in the library.
+6. **Verify** with `just format lint test`; commit in steps: save function, editor, wiring and
+   refresh, docs.
+
+#### Open questions
+
+- Entry point: the song info dialog only (proposed), or also a pencil on the song page in edit mode?
+- A plain textarea is proposed; anything fancier adds a dependency.
+
+#### Later
+
+- A live preview beside the text.
+- Save as an arrangement (a new variant, label, author, origin).
+- Editing a song from another space or a share (copy first).
+- Chord and section helpers in the editor.
 
 ## Importing a chart the library already has (designed 2026-10-22; built 2026-10-23 except item 5)
 
@@ -144,7 +193,7 @@ each variant with who imported it, when, its source and key; **Make default**, *
 **Delete** (a second tap; setlists that used it use the default, keeping the key and tempo they
 showed). A song's only version is deleted as the song ("Delete song": the confirmation says how many
 setlists have it, and it is taken out of them); a team's admins are meant to be the only ones who may
-delete songs (docs/SPACES.md, "Roles"), which the Worker does not yet check. **Merge another song into this one** folds a song
+delete songs (docs/SPACES.md, "Roles"), which the page checks and the Worker does not, on purpose (docs/SPACES.md, "Roles"). **Merge another song into this one** folds a song
 into this one as a variant (`linkSong`): every variant of it takes this song's id, CCLI number and
 title, and the one that was its default becomes a variant of this default. The library repair does
 the same by itself for a song with no CCLI number whose title is exactly one CCLI song's
