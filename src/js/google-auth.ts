@@ -237,6 +237,10 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
 
           // A new sign-in may be a different account, with different access to the folder
           import('./space-access.ts').then(({ refreshSpaceAccess }) => refreshSpaceAccess())
+          // ...and may be in teams this device has not set up
+          import('./team-memberships.ts').then(({ checkTeamMemberships }) =>
+            checkTeamMemberships({ force: true })
+          )
 
           resolve({ blob, access_token, expires_in, user: normalizedUser || user })
         } catch (error) {

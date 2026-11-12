@@ -33,6 +33,13 @@ export interface TeamCredential {
 const space = (id: string) => `/api/space/${encodeURIComponent(id)}`
 
 export const teamApi = {
+  /** The spaces you are in (owner or member), for a device that has not set them up */
+  list: () =>
+    call<{ spaceId: string; name: string; role: TeamRole; rootRef?: string }[]>(
+      'GET',
+      '/api/spaces'
+    ),
+
   /** Share a folder you own as a team space; `blob` is the page's own sign-in */
   createSpace: (details: { blob: string; rootRef: string; name: string; ccliLicence?: string }) =>
     call<{ spaceId: string; role: TeamRole }>('POST', '/api/spaces', details),

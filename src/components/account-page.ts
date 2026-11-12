@@ -4,6 +4,7 @@ import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { goTo } from '../js/navigation.ts'
 import { getCurrentSpace, listSpaces, switchSpace } from '../js/space.ts'
+import { checkTeamMemberships, TeamSpacesAddedEvent } from '../js/team-memberships.ts'
 import { AccountStateEvent } from './account-card.ts'
 import './account-card.ts'
 import type { AppModal } from './app-modal.ts'
@@ -41,9 +42,14 @@ export class AccountPage extends LitElement {
     _managing: { state: true },
     _users: { state: true },
     _leaders: { state: true },
+    _looking: { state: true },
+    _lookMessage: { state: true },
   }
 
   declare _spaces: Space[]
+  /** Whether it is asking which teams the person is in, and what it found */
+  declare _looking: boolean
+  declare _lookMessage: string
   declare _currentId: string | null
   declare _signIn: SignInState | null
   /** The space being managed, while its modal is open */
@@ -104,6 +110,8 @@ export class AccountPage extends LitElement {
     this._managing = null
     this._users = null
     this._leaders = null
+    this._looking = false
+    this._lookMessage = ''
   }
 
   override connectedCallback(): void {
@@ -116,6 +124,7 @@ export class AccountPage extends LitElement {
     this.addEventListener(SpaceLeadersEvent.type, this._onLeaders)
     this.addEventListener(TeamShareLeftEvent.type, this._onLeft)
     this.addEventListener(SpaceGoneEvent.type, this._onGone)
+    window.addEventListener(TeamSpacesAddedEvent.type, this._onTeamsAdded)
     void this.load()
   }
 
@@ -128,7 +137,31 @@ export class AccountPage extends LitElement {
     this.removeEventListener(SpaceLeadersEvent.type, this._onLeaders)
     this.removeEventListener(TeamShareLeftEvent.type, this._onLeft)
     this.removeEventListener(SpaceGoneEvent.type, this._onGone)
+    window.removeEventListener(TeamSpacesAddedEvent.type, this._onTeamsAdded)
     super.disconnectedCallback()
+  }
+
+  /** Asks which teams the person is in and sets up the ones missing (a test gives its own) */
+  checkTeams: typeof checkTeamMemberships = checkTeamMemberships
+
+  /** Teams were set up on this device (by the check at start-up or the button): list them */
+  _onTeamsAdded = (): void => {
+    void this.load()
+  }
+
+  /** Ask which teams the person is in, including any taken off this device, and set up what is missing */
+  async _lookForTeams(): Promise<void> {
+    this._looking = true
+    this._lookMessage = ''
+    try {
+      const { added } = await this.checkTeams({ force: true, includeDeclined: true })
+      this._lookMessage = added.length
+        ? `Added ${added.map(space => space.name).join(', ')}.`
+        : 'Every team you are in is on this device.'
+    } catch (error) {
+      this._lookMessage = `Could not look for your teams: ${error instanceof Error ? error.message : error}`
+    }
+    this._looking = false
   }
 
   _onAccount = (event: Event): void => {
@@ -236,6 +269,16 @@ export class AccountPage extends LitElement {
         </div>
         <p class="hint">To join a Team, open the invite link its admin sent you.</p>
         <a class="btn" id="create-team" href="/account/new">Create a new Team</a>
+        ${
+          this._signIn === 'signed-in'
+            ? html`<button class="btn" id="look-for-teams" ?disabled=${this._looking} @click=${this._lookForTeams}>
+                ${this._looking ? 'Looking…' : 'Look for my teams'}
+              </button>
+              <p class="hint" id="look-message" role="status">
+                ${this._lookMessage || 'Teams you are in on another device are added by themselves; this looks now, and brings back any you took off this device.'}
+              </p>`
+            : nothing
+        }
         <div class="panel">
           <h3>This device</h3>
           <storage-summary></storage-summary>
