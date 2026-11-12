@@ -232,6 +232,20 @@ describe('the team share panel', () => {
       expect(send.email).to.equal('fay@example.com')
       expect(send.role).to.equal('reader')
       expect(send.url).to.contain(`/join#${TEAM}.`)
+      expect(text()).to.contain('Not a Gmail address')
+    })
+
+    it('does not mention making a Google account for a Gmail address', async () => {
+      routes[`POST /api/space/${TEAM}/invites`] = () =>
+        json({ code: 'CODE1234567890ab', expiresAt: 'later' })
+      await open(await space('owner'))
+      await until(() => text().includes('Invite someone'), 'the form')
+      must(panel.shadowRoot?.querySelector<HTMLInputElement>('input[type="email"]')).value =
+        'fay@gmail.com'
+      button('Make the invite').click()
+      await until(() => panel.shadowRoot?.querySelector('.link-box'), 'the link')
+      expect(text()).to.contain('Link for fay@gmail.com')
+      expect(text()).to.not.contain('Not a Gmail address')
     })
 
     it('copies the link, or selects it when it cannot', async () => {
