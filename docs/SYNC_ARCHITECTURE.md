@@ -260,14 +260,21 @@ admin routes) (SPACES.md, "Why the Worker serves members"). Every member's Drive
 it is the one place that can:
 1. **Enforce roles and ownership.** It already enforces reader or writer; it can reject a write
    to a setlist by someone who is not its owner or an editor, so the rule stops being advice.
-2. **Detect conflicts.** The client sends the checksum it last saw (it records `fileRev`
-   already); if Drive's differs the Worker answers 409 and nothing is overwritten.
-3. **Make that atomic.** Check-then-write is not atomic, so writes would go through one Durable Object
-   per space, which serialises them. **Not built, and neither is the checksum check (2 above)**: the
-   Worker serves a write as the client sends it. The only Durable Object, `TeamRoom`, holds live
-   sockets and no storage, and team state is in D1.
+2. **Detect conflicts.** **Built (2026-11-12).** The client sends the checksum it last saw (the
+   record's `fileRev`, as `ifRev`, on `update` and `updateMany`: `UpdateOptions` in
+   `storage/types.ts`); if Drive's differs the Worker answers 409 and writes nothing (`isAsSeen`,
+   `team-api.ts`). In a batch the file is left alone and has no result. The sync leaves the record
+   changed, and its next sync pulls first and applies the usual rules (Drive wins), so nothing is
+   lost that was not lost before; what it closes is a write over a change made since the pull. A
+   write with no `ifRev` (an older client, a record never synced) is not checked, and Drive itself
+   ignores it (no compare-and-set), so a personal space and an owner's direct sync are as they were.
+3. **Make that atomic.** Check-then-write is not atomic, so two writes a moment apart can both pass
+   the check; writes would go through one Durable Object per space, which serialises them. **Not
+   built:** the only Durable Object, `TeamRoom`, holds live sockets and no storage, and team state is
+   in D1. The check costs the Worker one read of the file's status per file written.
 
-The Worker detects and the client resolves: after a 409 the client fetches the current setlist,
+The Worker detects and the client resolves (the client's part, below, is designed, not built; today
+a 409 leaves the record changed and the next sync takes Drive's version): after a 409 the client fetches the current setlist,
 merges it with its layer by a three-way merge (it keeps the last-synced copy as the base) and
 tries again. The merge is a shared, tested TypeScript module, run on the device because an
 offline device has to merge there anyway (it is where the "your change" marker lives); the Worker

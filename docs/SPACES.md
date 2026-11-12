@@ -11,8 +11,8 @@ SYNC_ARCHITECTURE.md.
 > live channel, deleting a space, deleting and moving a setlist, and a device setting up its own teams
 > are **built**, and have been tried with real accounts (the service-account teams on 2026-11-12).
 > The tests run on fakes. **Not built:** the default space ("Presenting spaces"), bringing pads
-> across spaces, the shared-drive choice in the wizard, the Worker's checks on who may delete a
-> song or a setlist, the checksum precondition on writes, and a few smaller things listed under
+> across spaces, the shared-drive choice in the wizard, serialised writes on the Worker, the Worker's
+> check of who may delete a song, and a few smaller things listed under
 > "Order of work and status". The code and docs call it a space throughout (it was "organisation"
 > until 2026-10-20: see "Naming").
 
@@ -857,9 +857,11 @@ carry, and the menu already has "Import Songs" and "Import a Setlist", which are
   own token; member → `/api/space/<id>/drive/...` with their Google ID token. One engine
   (`sync-manager.ts`, `sync/*`).
 - **Conflicts:** Drive wins and the local edit is dropped, with a console warning, in every space
-  (`sync/pull.ts`). Planned, not built: a conflict copy of dropped local edits; for team spaces the
-  Worker's checksum precondition (409) and serialised writes (SYNC_ARCHITECTURE.md, "Several people
-  editing a setlist").
+  (`sync/pull.ts`). Planned, not built: a conflict copy of dropped local edits, and serialised writes
+  on the Worker (SYNC_ARCHITECTURE.md, "Several people editing a setlist"). **Built for team spaces:**
+  an update carries the rev the device last synced the file with (`ifRev`), and the Worker answers
+  409 and writes nothing if the file has moved on (check-then-write: two writes a moment apart can
+  both pass). The device keeps the record changed, and its next sync pulls first.
 - **Owner goes direct**, so it works if the team service is down.
 - **Worker state:** a team space's rows in D1: members, roles, invites, the refs in its tree, the
   encrypted token blob (and a live room, a Durable Object with no storage). Never content. If the owner revokes the app, members see "owner needs to sign in again".
@@ -1083,7 +1085,7 @@ Checked against the code 2026-11-12.
    bringing pads across (item 4).
 7. [x] Worker team service: the API for members, identity, D1 state, the register, invites, joining,
    roles, licence, deleting a space, the changes feed, the live channel, pads, the Account and Teams
-   page and the join page. Left: the checksum precondition on writes (409), and probing protections (item 11).
+   page and the join page. Left: serialised writes (the 409 check is not atomic), and probing protections (item 11).
 8. [ ] The team space wizard. Built: name, parent folder (Picker), bring songs and setlists, invite,
    result and retry. Not built: the shared-drive choice and the service account in the wizard, and
    pads. The header switcher and Merged/Separate are dropped; the default space ("Presenting

@@ -85,13 +85,31 @@ function asFileInput(value: unknown): FileInput {
 interface Write {
   input: FileInput
   body: string
+  /** The rev the writer last saw the file with, if it said: the write is for that file, not a later one */
+  ifRev?: string
 }
 
 function asWrite(value: unknown): Write {
   if (!isRecord(value) || typeof value.body !== 'string') {
     throw new Refusal(400, 'A file needs a text body')
   }
-  return { input: asFileInput(value.input), body: value.body }
+  const { ifRev } = value
+  if (ifRev !== undefined && ifRev !== null && typeof ifRev !== 'string') {
+    throw new Refusal(400, 'ifRev must be a rev')
+  }
+  return { input: asFileInput(value.input), body: value.body, ifRev: ifRev ?? undefined }
+}
+
+/**
+ * Whether a file is still as the writer last saw it. No condition, or a file that is not there (the
+ * write will say so), is fine. Check-then-write is not atomic: two writes a moment apart can both
+ * pass (docs/SYNC_ARCHITECTURE.md, "Several people editing a setlist"), but the long window, a
+ * change made since this device last pulled, is closed.
+ */
+async function isAsSeen(space: SpaceStorage, ref: string, ifRev?: string): Promise<boolean> {
+  if (ifRev === undefined) return true
+  const now = await space.status(ref)
+  return !now || now.rev === ifRev
 }
 
 function asList(value: unknown, what: string): unknown[] {
@@ -248,10 +266,18 @@ export async function handleTeamRequest(
         return { ref: item.ref, ...asWrite(item) }
       })
       const here = await ownedOf(items.map(item => item.ref))
-      const results = await space.updateMany(items.filter(item => here.has(item.ref)))
+      // (a file changed since the writer saw it is left as it is, as one that is not here is: no result)
+      const current = await Promise.all(
+        items.map(async item => here.has(item.ref) && (await isAsSeen(space, item.ref, item.ifRev)))
+      )
+      const results = await space.updateMany(
+        items
+          .filter((_, index) => current[index])
+          .map(({ ref, input, body }) => ({ ref, input, body }))
+      )
       let next = 0
       return jsonResponse({
-        results: items.map(item => (here.has(item.ref) ? results[next++] : null)),
+        results: items.map((_, index) => (current[index] ? results[next++] : null)),
       })
     }
 
@@ -276,8 +302,11 @@ export async function handleTeamRequest(
       }
       if (method === 'PUT' && action === undefined) {
         write()
-        const { input, body } = asWrite(await readJson(request))
+        const { input, body, ifRev } = asWrite(await readJson(request))
         if (!(await owned(ref))) return jsonResponse({ error: 'No such file' }, 404)
+        if (!(await isAsSeen(space, ref, ifRev))) {
+          throw new Refusal(409, 'The file has changed since you last read it')
+        }
         return jsonResponse(await space.update(ref, input, body))
       }
       if (method === 'POST' && action === '/trash') {

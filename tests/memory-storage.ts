@@ -27,6 +27,7 @@ import {
   type SpaceStorage,
   type StorageBackend,
   type StoredFile,
+  type UpdateOptions,
   type WriteResult,
 } from '../src/js/storage/types.ts'
 import { md5Hex } from '../src/js/utils/md5.ts'
@@ -155,6 +156,13 @@ export class MemoryStorage implements StorageBackend {
 
   roots = new Map<string, MemoryRoot>()
   files = new Map<string, MemoryFile>()
+  /** The rev each update said the file had (`ifRev`), for assertions; `undefined` when it said none */
+  updates: { ref: string; ifRev: string | null | undefined }[] = []
+  /**
+   * Whether an update with an `ifRev` that is no longer the file's rev is refused (409), as the
+   * team service does; a storage that cannot check (Drive's) takes it
+   */
+  checksRev = false
   /** Every call made, for assertions: `op` and the ref or collection it was about */
   calls: { op: StorageOp; on?: string }[] = []
   /** Server clock skew relative to the test's clock, in ms */
@@ -747,9 +755,18 @@ class MemorySpace implements SpaceStorage {
     }
   }
 
-  async update(ref: string, input: FileInput, body: FileBody): Promise<WriteResult> {
+  async update(
+    ref: string,
+    input: FileInput,
+    body: FileBody,
+    { ifRev }: UpdateOptions = {}
+  ): Promise<WriteResult> {
     this.#storage.enter('update', ref)
     const file = this.#storage.files.get(ref)
+    this.#storage.updates.push({ ref, ifRev })
+    if (this.#storage.checksRev && ifRev && file && file.rev !== ifRev) {
+      throw new StorageError('The file has changed since you last read it', 409)
+    }
     return this.#storage.write(
       this.#root,
       file?.collection ?? 'setlists',
@@ -760,13 +777,13 @@ class MemorySpace implements SpaceStorage {
   }
 
   async updateMany(
-    items: { ref: string; input: FileInput; body: string }[]
+    items: ({ ref: string; input: FileInput; body: string } & UpdateOptions)[]
   ): Promise<(WriteResult | null)[]> {
     this.#storage.enter('updateMany')
     const results: (WriteResult | null)[] = []
-    for (const { ref, input, body } of items) {
+    for (const { ref, input, body, ifRev } of items) {
       try {
-        results.push(await this.update(ref, input, body))
+        results.push(await this.update(ref, input, body, { ifRev }))
       } catch (error) {
         console.error('[MemoryStorage] Failed to update a file:', error)
         results.push(null)
