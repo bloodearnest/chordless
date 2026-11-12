@@ -452,6 +452,41 @@ describe('deleting a setlist: POST /files/<ref>/trash', () => {
     assert.equal((await deleted.trash('ann-token')).status, 403)
   })
 
+  test('does not guess when a file cannot be read as a setlist or a person', async () => {
+    const files = [
+      await rigWith({ leaderId: 'ann' }, [ann]),
+      await rigWith({ leaderId: 'ann' }, [ann]),
+    ]
+    // (a setlist file that is not JSON, or not an object)
+    for (const [index, content] of ['{ not json', '[1, 2]'].entries()) {
+      const rig = files[index].rig
+      const file = rig.storage.list(f => f.props.setlistId === 's1')[0]
+      await rig.storage.space(rig.spaces[0].root).update(file.ref, setlistFile, content)
+      assert.equal((await files[index].trash('ann-token')).status, 403)
+    }
+    // (a person file that is not JSON, or not an object)
+    for (const content of ['{ not json', '[1, 2]']) {
+      const { rig, trash } = await rigWith({ leaderId: 'ann' }, [ann])
+      const file = rig.storage.list(f => f.props.personId === 'ann')[0]
+      await rig.storage.space(rig.spaces[0].root).update(file.ref, personFile('ann'), content)
+      assert.equal((await trash('ann-token')).status, 403)
+    }
+  })
+
+  test('does not take a leader with no list of addresses for the caller', async () => {
+    const { trash } = await rigWith({ leaderId: 'ann' }, [{ id: 'ann' }])
+    assert.equal((await trash('ann-token')).status, 403)
+  })
+
+  test('gives up on people who were merged into each other in a circle', async () => {
+    const { trash, trashed } = await rigWith({ leaderId: 'a' }, [
+      { id: 'a', emails: ['ann@example.com'], mergedInto: 'b' },
+      { id: 'b', emails: ['ann@example.com'], mergedInto: 'a' },
+    ])
+    assert.equal((await trash('ann-token')).status, 403)
+    assert.equal(trashed(), false)
+  })
+
   test('knows a leader written as an email, as older setlists have', async () => {
     const { trash, trashed } = await rigWith({ ownerId: 'ANN@example.com' })
     assert.equal((await trash('ann-token')).status, 204)
