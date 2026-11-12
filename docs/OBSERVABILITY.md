@@ -34,7 +34,7 @@ team ids kept in synced data, and the live-update latency.
 - Chordless's own servers store no copyrighted content (CLAUDE.md): the route parses a small body in
   memory and forwards it. Nothing is written to KV, R2, a Durable Object or the cache. (CLAUDE.md's
   headline rule says Chordless never stores copyrighted content: Honeycomb's 60 days of fragments is
-  an exception to it, so the wording there and in `public/privacy.html` needs to say so.)
+  an exception to it, so the wording there and in `src/privacy.html` needs to say so.)
 
 ## Conventions
 
@@ -124,10 +124,10 @@ Anonymous, and re-identifiable only when the user gives the id to us.
 - `chordless.team.pseudo_id`: the same, in the team space's own synced data, made by a worship
   leader's client and regenerable by the leader for that team only.
 - The user sees a **Support ID** (the first 8 characters of `enduser.pseudo.id`, or of `device.id` when
-  signed out), with a copy button, and the contact form (when there is one) includes it. We find
+  signed out), with a copy button, and the Contact page includes it. We find
   their traces with a starts-with query. "Reset Support ID" makes new ones; turning telemetry off
   stops sending them.
-- The privacy text (`public/privacy.html`) says what is sent, that signed-in use can be linked across
+- The privacy text (`src/privacy.html`) says what is sent, that signed-in use can be linked across
   devices, and for how long Honeycomb keeps it (set per dataset in Terraform).
 
 ## The Worker route
@@ -435,7 +435,7 @@ invisible until it ended, and lost with the tab.
 
 The **Support ID** is in Preferences, "Usage reports": the first eight characters of the device
 id, with Copy and Reset (Reset forgets the id; a new one is made at once). It is not shown while
-reports are off. There is no contact form yet to put it in.
+reports are off. The Contact page (`/contact`, `src/js/contact.ts`) puts it in the email it makes.
 
 Not done, on purpose: the import and pad attributes (they would be on a span that encloses them,
 and the setlist spans no longer enclose anything; each becomes a span of its own when the data says it

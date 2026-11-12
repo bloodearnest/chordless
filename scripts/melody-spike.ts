@@ -1,5 +1,5 @@
 /**
- * Spike for docs/MELODY.md: read a SongSelect lead sheet preview (the `GetSongLeadPreview` response,
+ * Spike for docs/LEAD_SHEETS.md: read a SongSelect lead sheet preview (the `GetSongLeadPreview` response,
  * saved as JSON) into a melody, check every measure against its time signature, and score the notes
  * against the preview's own MIDI and time map.
  *

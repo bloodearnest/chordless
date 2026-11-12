@@ -29,19 +29,16 @@ Reads the raw email in memory, answers the sender with the link (or why there is
 nothing. The reply goes only to the envelope sender, threaded on their `Message-ID`. Emails over
 25 MB are ignored. The link's origin is `APP_ORIGIN`, `https://chordless.app` when unset.
 
-### Setting it up (once, in the Cloudflare dashboard)
+### Setting it up
 
-Email Routing is on the domain, not in `wrangler.toml`:
+Email Routing is on the domain, so it is Terraform, not `wrangler.toml`: `infra/cloudflare/main.tf`
+(`cloudflare_email_routing_settings`, the `import` rule that sends `import@chordless.app` to the Worker
+`chordless`, and the catch-all). Deploy the Worker as usual.
 
-1. Cloudflare dashboard › chordless.app › Email › Email Routing: enable it (it adds the MX and
-   SPF records).
-2. Routing rules › Create address: a custom address (for example `import@chordless.app`) with the
-   action **Send to a Worker** › `chordless`.
-3. Deploy the Worker as usual.
-
-The address is public: anyone who knows it can email it and get a reply to the address they
-sent from. The reply is short and only goes to the sender, but abuse (someone forging a sender) is
-possible; if it becomes a problem, rate limit it or reply only to senders with a passing DKIM/SPF.
+The address is public: anyone who knows it can email it and get a reply to the address they sent from.
+The reply is short and goes only to the sender. Two rate limits (`EMAIL_PER_SENDER`, `EMAIL_OVERALL`, in
+`wrangler.toml`) drop an email over either without a reply; forged senders get round the first, hence the
+second. If abuse still happens, reply only to senders with a passing DKIM/SPF.
 
 ### Trying it locally
 
@@ -57,7 +54,7 @@ The `.eml` needs a `Message-ID` header. The reply is written under `dist/chordle
 ## Privacy
 
 The link holds titles, keys, CCLI numbers, the date, and the leader's name and email: never a PDF,
-the body, or the `To:`/`Cc:` lists. `public/privacy.html` says so.
+the body, or the `To:`/`Cc:` lists. `src/privacy.html` says so.
 
 ## A PDF shared to the app
 

@@ -1,5 +1,5 @@
 /**
- * A SongSelect lead sheet, as an import reads it (docs/RANGE.md, docs/MELODY.md): the melody is
+ * A SongSelect lead sheet, as an import reads it (docs/RANGE.md, docs/LEAD_SHEETS.md): the melody is
  * read from the PDF once (`score-pdfjs.ts`), and its range, and how it was found, come from that.
  */
 import { rangeOfChart, withRange } from './chart-range.ts'
@@ -88,7 +88,7 @@ export function readOfMelody(melody: Score): MelodyRead | null {
 
 /**
  * The chart with its melody's range in it, from the song's lead sheet (docs/RANGE.md), and the
- * melody to keep with it (docs/MELODY.md). The lead sheet is never kept, and one that cannot be
+ * melody to keep with it (docs/LEAD_SHEETS.md). The lead sheet is never kept, and one that cannot be
  * read leaves the chart as it came: the song is imported without a range, and can be given one.
  * A chart with a range of its own keeps it, and a sheet in another key gives neither.
  * `read` reads a PDF (it is large, so loaded only when there is one to read).

@@ -85,7 +85,7 @@ export const teamApi = {
     call<TeamCredential>('POST', `${space(id)}/credential/service-account`),
   /**
    * The team's CCLI licence number, which the Worker keeps with the team for its records; an admin
-   * also gets the log of its changes (docs/SPACES.md, "SongSelect's terms")
+   * also gets the log of its changes (docs/CCLI.md)
    */
   licence: (id: string) => call<TeamLicence>('GET', `${space(id)}/licence`),
   /** Set it (empty to clear it): a writer may set it where there is none; changing it takes an admin */

@@ -1,5 +1,5 @@
 /**
- * Spike for docs/MELODY.md: the MusicXML a melody is written as, read back. If the file is to be what
+ * Spike for docs/LEAD_SHEETS.md: the MusicXML a melody is written as, read back. If the file is to be what
  * is kept, `readMusicXml(writeMusicXml(melody))` has to give the melody again, field by field.
  *
  *   node scripts/melody-xml-roundtrip.ts export/             every song, scored

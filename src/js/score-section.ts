@@ -1,5 +1,5 @@
 /**
- * The notes of one chart section, from the song's lead sheet: `docs/MELODY.md`, "In the chart". A part
+ * The notes of one chart section, from the song's lead sheet: `docs/LEAD_SHEETS.md`, "In the chart". A part
  * of the chart with no words (an intro, an instrumental) can be shown as the cue-size notes the sheet
  * has for it, a line of music in place of its chords. `cueMeasures` finds which measures of the sheet
  * are which chart section's, and `sliceMeasures` cuts them out of a melody (that is already in the

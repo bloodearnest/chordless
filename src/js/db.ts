@@ -990,7 +990,7 @@ export class ChordlessDB {
     return count
   }
 
-  // Melodies (docs/MELODY.md)
+  // Melodies (docs/LEAD_SHEETS.md)
 
   async getScore(uuid: string): Promise<ScoreRecord | undefined> {
     const tx = this.#transaction(['scores'], 'readonly')

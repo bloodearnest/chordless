@@ -6,7 +6,7 @@ import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 
 /**
- * A Team's CCLI licence number (docs/SPACES.md, "SongSelect's terms"). The Worker keeps it with
+ * A Team's CCLI licence number (docs/CCLI.md). The Worker keeps it with
  * the team, for the team's records: CCLI may ask who a licence is used by. Anyone in the Team sees
  * it; one who can write sets it where there is none, and an admin changes or clears it, with the
  * log of changes shown to them. It is also filled in by the first SongSelect chart imported.

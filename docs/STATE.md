@@ -62,10 +62,7 @@ The setlist page keeps its parsed songs (they are costly to build), but not the 
 from: it reads the setlist again on a change and applies the difference to what it shows (it
 already does this for a changed setlist, `applyChangedSetlist`), whatever the origin.
 
-## The steps
-
-Each is shippable, and tested on its own. Earlier steps change nothing the user sees except where
-a view used to be stale.
+## What is built
 
 1. **The bus.** `DataChangeEvent`, sent by `ChordlessDB` from every committed write; the origin
    replaces `quiet`. Replaces `LocalChangeEvent`, `SetlistsPulledEvent` and the sync's

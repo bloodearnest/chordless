@@ -8,8 +8,8 @@ so what CI runs can be run, and fixed, locally.
 1. Work on a branch (`<agent>/<topic>`, in a worktree of its own when several agents work at once).
    Commit as you go, one logical step per commit.
 2. Before asking for review: `git fetch && git rebase origin/main`, then `just ci`, then
-   `git push --force-with-lease`. Open the pull request with `gh pr create` (a draft until `just ci`
-   passes), using the template.
+   `git push --force-with-lease`. Open the pull request with `gh pr create`, using the template (ready for
+   review; a draft only for a spike).
 3. The pull request needs `ci-ok` to pass, CodeQL's findings below the ruleset's thresholds, and the
    approvals the ruleset asks for. It need not be up to date with `main` (that would cost another run of
    CI per merge): the checks on `main` after a merge, which the deploy waits for, catch what slips in. It is merged with **Rebase and merge**: no merge commits, no squash. "Enable auto-merge"
@@ -256,4 +256,4 @@ leaves them alone and the job never sees them.
 
 ## Next
 
-Still to come: the `cloudflare` and Google stacks in CI; deploys on every merge.
+Nothing planned here that is not in `infra/TODO` (a rollback drill, a deploy freeze, the Honeycomb stack in CI).

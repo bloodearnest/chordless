@@ -1,5 +1,5 @@
 /**
- * The words around a lead sheet that have to travel with it (docs/MELODY.md, "The terms"), laid out as
+ * The words around a lead sheet that have to travel with it (docs/LEAD_SHEETS.md, "The terms"), laid out as
  * CCLI lays them out: under the title a small italic subtitle, "Words and Music by" and the writers at
  * the right, and at the foot, centred and small, the CCLI song number, the copyright, the terms and
  * the licence. A score keeps these as a plain list of lines, the sheet's own text in reading order, so

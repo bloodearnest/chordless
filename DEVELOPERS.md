@@ -15,13 +15,8 @@ just setup   # npm dependencies, and Chromium for the end-to-end tests
 ```
 
 Sign-in needs Google OAuth credentials and a session key, in a `.dev.vars` file in the
-project root (not committed):
-
-```
-JWE_ENCRYPTION_KEY=<base64 symmetric key>
-GOOGLE_CLIENT_ID=<Google OAuth client id>
-GOOGLE_CLIENT_SECRET=<Google OAuth client secret>
-```
+project root (not committed). `just dev-vars` writes it (the secrets it needs are listed in
+`.dev.vars.example` and explained in [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md)).
 
 Without it the app still runs, but you can't sign in or sync with Drive.
 
@@ -52,11 +47,13 @@ just format lint test
 | `just lint` | Lints with Biome, type-checks with `tsc -b`, and runs knip (unused files, exports and dependencies; see `knip.json`) |
 | `just test` | Runs the three suites below |
 | `just test-node` | Node tests (the worker, event names) |
-| `just test-unit` | Browser unit tests, in Web Test Runner. Takes files: `just test-unit tests/db.test.js` |
-| `just test-browser-headless` | End-to-end tests, in Playwright. Takes files and options: `just test-browser-headless tests/live.playwright.js --repeat-each=5` |
+| `just test-unit` | Browser unit tests, in Web Test Runner. Takes files: `just test-unit tests/db.test.ts` |
+| `just test-browser-headless` | End-to-end tests, in Playwright. Takes files and options: `just test-browser-headless tests/live.playwright.ts --repeat-each=5` |
 | `just test-browser-ui` | Playwright's UI, to step through a test |
 | `just test-browser-headed` | Playwright with a visible browser |
-| `just coverage` | Browser unit test coverage, in `coverage/index.html` |
+| `just coverage` | Node and browser unit test coverage, merged, in `coverage/index.html` |
+| `just ci` | What CI runs, on Linux: run it before opening a pull request ([docs/CI.md](docs/CI.md)) |
+| `just wrap-up` | At the end of a session: fast-forward `main`, list merged branches and worktrees |
 
 [docs/TESTING.md](docs/TESTING.md) covers what each suite is for and how to write tests.
 
@@ -71,8 +68,8 @@ just format lint test
 
 ## Conventions
 
-- Vanilla JavaScript and Lit, with Vite as the only tooling: nothing is transpiled or
-  generated in development. Dependencies are npm packages imported by name.
+- TypeScript (erasable syntax only) and Lit, with Vite as the only tooling: nothing is
+  transpiled or generated in development. Dependencies are npm packages imported by name.
 - Use modern HTML, CSS and JS, within the browsers in `.browserslistrc`, and prefer
   native browser features.
 - Components are [Lit](https://lit.dev/) web components in `src/components/`.
@@ -95,6 +92,6 @@ just format lint test
   it, so they never reach production. Put other local-only settings in `[env.dev]` too.
 - When adding a page, link it from `src/dev/index.html` and use absolute paths
   (`/js/...`, `/components/...`, `/css/style.css`).
-- `tests/dev-pages.playwright.js` loads every page and fails on JS errors, failed
+- `tests/dev-pages.playwright.ts` loads every page and fails on JS errors, failed
   requests or unregistered custom elements, so a broken playground shows up in
   `just test-browser-headless`.

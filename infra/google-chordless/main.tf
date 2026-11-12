@@ -1,4 +1,4 @@
-# Google Cloud config for the `chordless-app` project, the app project (docs/CLOUD_MIGRATION.md).
+# Google Cloud config for the `chordless-app` project, the app project (the app moved here from an older project, 2026-10-21).
 # Created by Terraform, not imported.
 #
 # NOT here: the OAuth consent screen and the web OAuth client (the provider cannot manage them),
@@ -102,7 +102,7 @@ resource "google_apikeys_key" "sharing" {
 }
 
 # Service account for team-managed storage (docs/SPACES.md). No project roles: it works through
-# the shared drive it is added to. (It moves to its own project later: CLOUD_MIGRATION.md, step 6.)
+# the shared drive it is added to. (It stays in this project: decided 2026-11-10.)
 resource "google_service_account" "team_storage" {
   account_id  = "team-storage"
   description = "Chordless account to maintain shared Teams files"

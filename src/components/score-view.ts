@@ -11,7 +11,7 @@ import { withTextAccidentals } from '../js/score-svg-text.ts'
 import { transposeScore } from '../js/score-transpose.ts'
 
 /**
- * A song's melody engraved as sheet music (docs/MELODY.md, "Uses"): the lead sheet in the key the
+ * A song's melody engraved as sheet music (docs/LEAD_SHEETS.md, "Uses"): the lead sheet in the key the
  * song is shown in, as wide as its space with no margin to speak of, and the notice under it.
  *
  * The notes are moved to `songKey` (from `melodyKey`, the key they are written in) by

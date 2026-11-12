@@ -1,7 +1,7 @@
 /**
  * `.mxl`, the compressed form of MusicXML that notation programs (MuseScore, Sibelius, Dorico)
  * write and read: a zip holding `META-INF/container.xml`, which names the score, and the score.
- * This is the file a melody is kept in in Drive (docs/MELODY.md): a 60 KB score is about 3 KB.
+ * This is the file a melody is kept in in Drive (docs/LEAD_SHEETS.md): a 60 KB score is about 3 KB.
  *
  * The zip is read and written by hand, with the browser's own `CompressionStream` for the
  * deflate: a score is one small file, so there is no zip64, no encryption and no multi-disk. A

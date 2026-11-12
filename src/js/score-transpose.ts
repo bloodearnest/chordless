@@ -1,5 +1,5 @@
 /**
- * A melody in another key: docs/MELODY.md, "Transposing". The notes move by the interval and are
+ * A melody in another key: docs/LEAD_SHEETS.md, "Transposing". The notes move by the interval and are
  * respelled for the new key; the chord symbols go through the app's own transposer, so they read
  * as the chart's do. Nothing else about the song changes.
  *

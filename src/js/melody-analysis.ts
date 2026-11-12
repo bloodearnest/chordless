@@ -1,5 +1,5 @@
 /**
- * What a song's melody says about singing it (docs/MELODY.md, "Uses"), worked out from the score
+ * What a song's melody says about singing it (docs/LEAD_SHEETS.md, "Uses"), worked out from the score
  * kept on the device each time it is wanted, not stored in the chart: the score is the source, so
  * the numbers cannot disagree with it. A range typed into the chart (`x_chordless_range`) is the
  * person's, and wins; it is also all there is for a song with no melody.

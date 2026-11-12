@@ -32,7 +32,6 @@ share button in the header of the setlist overview (`setlist-share.ts` is the mo
 download and preview (`worker/src/share.ts`, `share-page.ts`), and opening a link
 (`share-receiver.ts`, `views/share-view.ts`, route `/s/<id>`). Not done:
 
-- Importing a received set's songs into a library (the TODO).
 - Per-device view settings on a received set (a key change there is lost when the set updates).
 - Trying it on a Workspace account, and a real run with several people (see "Still to check").
 
@@ -120,7 +119,7 @@ share. It's written into the link as base64url, without padding (22 characters).
 - Only this file is public. The `shares` folder and the space folder stay
   private.
 - Its `appProperties` are `setlistId`, `spaceId`, `expires` and `appVersion`,
-  generated in `drive-metadata.js` like all other Drive metadata. They're readable
+  generated in `drive-metadata.ts` like all other Drive metadata. They're readable
   by anyone with the file id, so they must never include the key.
 
 **The key:** on the setlist, as
@@ -255,18 +254,15 @@ not.
   is deleted: they have the real one now, permanently. (Shares made before `setlistId` existed
   get one the next time the sharer's sync updates them.)
 
-**Still to build:** search across the spaces' songs and "Shared with me" (the library
-and add-song modal show one database today), and "Add to my library", which copies a song
-from another database into the current space. A setlist can only point at songs in its
-own space's database, so adding is always a copy: deduplicated by content hash, then
-by the song's deterministic id, as a variant if the song is there in another form. It is up
-to the user to add. A copy of a chart from SongSelect into another church's space is a
-transfer between churches, which SongSelect's terms do not allow (SPACES.md, "SongSelect's
-terms"), so that copy is to ask first, once songs record the licence they came in under.
-Explicit song deletion is separate: a synced song deleted only here would come back at the
-next sync, so it waits for the Drive trash design planned for setlists
-(SYNC_ARCHITECTURE.md). Songs received by link have no Drive copy, so those can be deleted
-locally.
+**Built:** search across the device's databases (the library and the add-song modal tag "From …"), and "Add to my
+library", which copies a song from another database into the current space (`other-songs.ts`). A setlist can only
+point at songs in its own space's database, so adding is always a copy: deduplicated by content hash, then by the
+song's deterministic id, as a variant if the song is there in another form. It is up to the user to add. A copy of a
+chart from SongSelect into another church's space is a transfer between churches, which SongSelect's terms do not
+allow (docs/CCLI.md), so that copy is to ask first, once songs record the licence they came in under.
+**Still to build:** deleting received songs by hand, and warnings on deleting a space or "Reset from Drive". A synced
+song deleted only here would come back at the next sync, so only songs received by link can be deleted locally:
+those have no Drive copy.
 
 ### The download proxy
 
@@ -305,7 +301,7 @@ a CORS error). A room of people on one wifi opening a link looks the same. So
 
 ### Verified against real Drive
 
-Checked with `/dev/share-spike.html` (a personal Google account, a file in My Drive root):
+Checked with a throwaway page, since removed (a personal Google account, a file in My Drive root):
 
 - **Public permissions under `drive.file`:** the app can create `anyone`/`reader` with
   `allowFileDiscovery: false` on a file it created.
@@ -354,14 +350,6 @@ Still to check:
   - a past `expires` deletes the setlist (not its songs) on start
 
 Where the tests are: `share-bundle.node.test.ts`, `share-proxy.node.test.ts`,
-`share-page.node.test.ts`, `share-drive.test.ts`, `share-sync.test.ts`,
+`share-page.node.test.ts`, `tests/drive/` (the real-Drive suite), `share-sync.test.ts`,
 `share-receiver.test.ts`, `setlist-share.test.ts` and `share.playwright.ts` (which stubs the
 worker's download and blocks service workers; the offline path is in `share-receiver.test.ts`).
-
-### Removing the old link sharing
-
-- **Removed now:** `share.html`, `share-setlist.js`, the share button and dialog,
-  and the `/share/<id>` route.
-- **Also removed:** the worker's `POST /api/share` and `GET /api/share/:id`, and the
-  `SETLISTS` KV binding (the old link sharing was never finished). The KV namespace itself
-  is still in the Cloudflare account and can be deleted there.

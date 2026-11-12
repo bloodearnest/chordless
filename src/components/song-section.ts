@@ -131,7 +131,7 @@ export class SongSection extends LitElement {
     capo: { type: Number },
     /** @type {string} Target key after applying capo */
     capoKey: { type: String, attribute: 'capo-key' },
-    /** The song's lead sheet and the key it is written in, and which of its measures are this section's (docs/MELODY.md, "In the chart"); none where it has no notes to show */
+    /** The song's lead sheet and the key it is written in, and which of its measures are this section's (docs/LEAD_SHEETS.md, "In the chart"); none where it has no notes to show */
     melody: { attribute: false },
     melodyKey: { type: String, attribute: false },
     melodyMeasures: { attribute: false },

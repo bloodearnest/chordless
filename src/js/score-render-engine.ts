@@ -1,6 +1,6 @@
 /**
  * Engraves a melody as sheet music, with Verovio: the renderer SongSelect itself uses for its lead
- * sheets (docs/MELODY.md), so a sheet made here looks like theirs. It takes the MusicXML that
+ * sheets (docs/LEAD_SHEETS.md), so a sheet made here looks like theirs. It takes the MusicXML that
  * `writeMusicXml` makes and gives SVG, one string a page.
  *
  * This is the engine, which runs wherever it is called. The app does not call it on the page: the

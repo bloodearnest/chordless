@@ -1,5 +1,5 @@
 /**
- * A space's CCLI licence number (docs/SPACES.md, "SongSelect's terms"). A Team's is kept by the
+ * A space's CCLI licence number (docs/CCLI.md). A Team's is kept by the
  * Worker with the team, with a log of who changed it and when, because CCLI may ask for it and a
  * record of the teams using Chordless is wanted; this device keeps a copy to show. A personal
  * space's is kept here alone.

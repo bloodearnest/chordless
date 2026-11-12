@@ -1,5 +1,5 @@
 /**
- * Spike for docs/MELODY.md: how well the words read from a lead sheet PDF agree with the ChordPro
+ * Spike for docs/LEAD_SHEETS.md: how well the words read from a lead sheet PDF agree with the ChordPro
  * chart of the same song (the chart is the check here, and is not needed to read the PDF).
  *
  *   node scripts/melody-text-check.ts export/

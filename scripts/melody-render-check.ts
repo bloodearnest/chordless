@@ -1,5 +1,5 @@
 /**
- * Spike for docs/MELODY.md: the MusicXML written from a lead sheet PDF, engraved by Verovio (the
+ * Spike for docs/LEAD_SHEETS.md: the MusicXML written from a lead sheet PDF, engraved by Verovio (the
  * renderer SongSelect uses), and read back with the SVG reader. If the MusicXML says what the sheet
  * says, the notes that come back are the notes that went in.
  *

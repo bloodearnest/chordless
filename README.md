@@ -75,8 +75,8 @@ We're all special in our own way.
   song. *Coming soon, use capo for now!*
 - **I know this song backwards!** Even the 3rd verse? Hide the sections you
   don't need to spend screen space on.
-- **Make notes** to remind you of key information. These can be personal, or
-  shared with the team. *Sharing coming soon.*
+- **Make notes** on a chart to remind you of key information ("repeat 4 times").
+  These can be personal, or shared with the team.
 - **Personal sync.** Use multiple devices, and your data and preferences sync
   between them. *Preferences sync coming soon.*
 
@@ -93,7 +93,6 @@ You know, the basics.
   words it found.
 - **Transpose** to your preferred key.
 - **Order songs** as you like.
-- **Add notes** to share with your team. *Coming soon.*
 - **Define song structure.** How many times are we doing the bridge? Or: we're
   only doing the chorus of this song. *Coming soon.*
 - **Setlist metadata.** Date, time, leader, service type.
@@ -167,4 +166,9 @@ components, no framework on top, and native browser features wherever possible.
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md): songs, setlists and spaces
 - [docs/SPACES.md](docs/SPACES.md): personal and team spaces, roles
 - [docs/SYNC_ARCHITECTURE.md](docs/SYNC_ARCHITECTURE.md): Google Drive sync
-- [docs/SHARING.md](docs/SHARING.md): share links and licensing
+- [docs/SHARING.md](docs/SHARING.md): share links
+- [docs/CCLI.md](docs/CCLI.md): what CCLI's and SongSelect's terms mean for the app
+- [docs/LEAD_SHEETS.md](docs/LEAD_SHEETS.md) and [docs/RANGE.md](docs/RANGE.md): lead sheets kept as music, and the range of a song
+- [docs/ANNOTATIONS.md](docs/ANNOTATIONS.md), [docs/VARIANTS.md](docs/VARIANTS.md): notes on a chart, and versions of a song
+- [docs/ROUTING.md](docs/ROUTING.md), [docs/STATE.md](docs/STATE.md), [docs/MIGRATIONS.md](docs/MIGRATIONS.md): navigation, state, and changing stored data
+- [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md), [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md): traces, and dev and prod

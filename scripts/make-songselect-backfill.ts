@@ -1,6 +1,6 @@
 /**
  * Makes the script to run in the Chrome console on SongSelect that fetches a library's charts and
- * lead sheets again (docs/REIMPORT.md): scripts/songselect-backfill.js, with the CCLI numbers of
+ * lead sheets again (docs/RANGE.md, "Re-importing a whole library"): scripts/songselect-backfill.js, with the CCLI numbers of
  * the songs in a Chordless export after it.
  *
  *   node scripts/make-songselect-backfill.ts chordless-export-Church-2026-10-23.zip --out backfill.js

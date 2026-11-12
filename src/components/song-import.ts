@@ -511,7 +511,7 @@ export class SongImport extends LitElement {
 
   /**
    * A chart from SongSelect carries the church's CCLI licence number. A space that has none yet
-   * takes the first one it sees, for its records (docs/SPACES.md, "SongSelect's terms"); one it
+   * takes the first one it sees, for its records (docs/CCLI.md); one it
    * has already is left, whatever a later chart says.
    */
   async _noteLicence(chordproText: string): Promise<void> {
@@ -689,7 +689,7 @@ export class SongImport extends LitElement {
     return html`${text ? html`<p class="range">${text}</p>` : ''}${kept ? html`<p class="range">${kept}</p>` : ''}${text && melody && key ? this._renderHowRead(melody, key) : ''}${settable ? this._renderRangePickers(item, key) : ''}`
   }
 
-  /** What the page says of the lead sheet's whole melody: kept with the song, or why it is not (docs/MELODY.md) */
+  /** What the page says of the lead sheet's whole melody: kept with the song, or why it is not (docs/LEAD_SHEETS.md) */
   _melodyKept(item: ImportItem): string {
     if (item.melodySaved === false) {
       return 'The lead sheet could not be saved, so the song has only its range.'

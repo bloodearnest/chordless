@@ -1,5 +1,5 @@
 /**
- * Spike for docs/MELODY.md, "Structure": the play order a lead sheet gives, matched to the sections of
+ * Spike for docs/LEAD_SHEETS.md, "Structure": the play order a lead sheet gives, matched to the sections of
  * the ChordPro of the same song, by the lyrics.
  *
  *   node scripts/melody-structure-check.ts export/            every song, scored

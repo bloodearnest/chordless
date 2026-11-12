@@ -1,5 +1,5 @@
 /**
- * Making a song's melody record (docs/MELODY.md): the MusicXML score, the key it is in, and the
+ * Making a song's melody record (docs/LEAD_SHEETS.md): the MusicXML score, the key it is in, and the
  * hash of the score, which is how the sync tells that it changed here.
  */
 import type { ScoreRecord } from './data-types.ts'

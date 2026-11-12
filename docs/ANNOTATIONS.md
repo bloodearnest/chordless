@@ -37,7 +37,7 @@ user's browser, their own Drive, a share link), never by Chordless's own servers
 
 ## Following edits to the chart
 
-A chart is **fixed in place** (`overwriteSong`, `CHART_EDITOR.md`), and the fix reaches other devices
+A chart is **fixed in place** (`overwriteSong`, `VARIANTS.md`, "Editing a chart"), and the fix reaches other devices
 by sync, with no record of what it was before; and a song's setlists each have their own annotations,
 some shared and some on other devices. So an annotation cannot be moved by hooking the edit. It finds
 its place again from what it keeps and the chart as it is (`annotations/anchor.ts`):
@@ -106,7 +106,7 @@ segment of the chart's own lyrics, so the anchor is exact.
 ## Handwriting
 
 Words are always typed. Handwriting (finger or pen) is for diagrams: a staff with a few musical notes to
-record a melody line, an underline, a circle, an arrow.
+record a line of music, an underline, a circle, an arrow.
 
 **Ink is never shared.** It is always private to the musician who drew it, so Chordless never has
 to serialise and re-render arbitrary vectors or bitmaps across devices and screen sizes. The types
@@ -135,9 +135,3 @@ scales with the font on that musician's own devices.
 `SetlistEntry.notes`, the older plain-text note of a song in a setlist, is kept and synced but not
 drawn or edited. A line of bars only (drawn as aligned measures) cannot be pressed for an annotation; an annotation
 attached to one is drawn on the line as chords. Ink; exporting private annotations.
-
-## Order of work
-
-All built: 1. This doc. 2. Types and anchors. 3. Persistence and permissions. 4. Rendering. 5. The
-collision pass. 6. The editor and long-press in edit mode, preferences. 7. Sync diff, share bundle,
-help (Setlist Song > Edit mode: annotations).

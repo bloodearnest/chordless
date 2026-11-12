@@ -1,6 +1,6 @@
 /**
  * Reads MusicXML into a `Score`: the other half of `score-musicxml.ts`, which writes it. This is how
- * a melody is kept (a MusicXML file beside the chart, docs/MELODY.md) and how one from another
+ * a melody is kept (a MusicXML file beside the chart, docs/LEAD_SHEETS.md) and how one from another
  * program comes in. It reads partwise scores, the first part, and what a lead sheet has: pitches and
  * lengths, voices (with `<backup>` and `<forward>`), chords, ties, tuplets, lyrics, chord symbols,
  * rehearsal marks, tempo, key and time changes, repeats and endings, and the jump signs.

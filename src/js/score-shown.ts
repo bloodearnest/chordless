@@ -1,5 +1,5 @@
 /**
- * A song's content shown as its lyrics or as its melody sheet (docs/MELODY.md), the same in a
+ * A song's content shown as its lyrics or as its melody sheet (docs/LEAD_SHEETS.md), the same in a
  * setlist and in the library: the `<song-display>` and the `<score-view>` beside it in one
  * `.song-content`, one of them hidden. The sheet's component is loaded the first time one is shown.
  */
@@ -64,7 +64,7 @@ export function shownSheet(content: ParentNode | null | undefined): HTMLElement 
 }
 
 /**
- * Give a song's sections the notes of its lead sheet they have (docs/MELODY.md, "In the chart"), or take them
+ * Give a song's sections the notes of its lead sheet they have (docs/LEAD_SHEETS.md, "In the chart"), or take them
  * away (with no melody). Returns whether any section has some, which is when the song's section states are
  * to be worked out again: a part with no words shows its notes by default.
  */

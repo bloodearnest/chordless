@@ -1,403 +1,78 @@
-# Theme System Documentation
+# Theme system
 
-## Overview
+Colours, type and scale are CSS custom properties. They inherit through shadow DOM, so Lit components use
+them without being told about the theme. `src/css/style.css` declares them (the light values on `:root`);
+`src/js/theme-manager.ts` (`themeManager`, a singleton) holds the theme definitions, sets the variables on
+`<html>`, saves the choice in `localStorage` and follows the system's light/dark preference. A playground
+with every control is at `/dev/theme.html` (`just serve`).
 
-The theme system provides centralized control over colors, typography, and scaling using **CSS Custom Properties (CSS Variables)**. These variables inherit through shadow DOM boundaries, making them perfect for Lit components.
+## Using it
 
-## Features
-
-✅ **Light/Dark mode support** - Pre-configured themes
-✅ **Shadow DOM compatible** - Variables inherit into web components
-✅ **Persistent** - Preferences saved to localStorage
-✅ **Responsive** - Media query support for font scaling
-✅ **Dynamic** - Update styles without re-rendering components
-✅ **System preference detection** - Auto-detect dark mode preference
-✅ **Observable** - Listen for theme changes
-✅ **Type-safe** - Centralized variable definitions
-
-## Quick Start
-
-### 1. Theme Variables Available
-
-All variables are defined in `/css/style.css` and managed by `/js/theme-manager.js`:
-
-#### Colors
+In a component's CSS, use the variables and never a literal colour:
 
 ```css
---bg-color          /* Main background */
---bg-secondary      /* Secondary background */
---bg-tertiary       /* Tertiary background */
---text-color        /* Primary text */
---text-secondary    /* Secondary text */
---text-tertiary     /* Tertiary text */
---text-muted        /* Muted text */
---header-bg         /* Header background */
---header-text       /* Header text */
---button-bg         /* Button background */
---button-hover      /* Button hover state */
---button-text       /* Button text */
---color-primary     /* Primary accent */
---color-success     /* Success state */
---color-warning     /* Warning state */
---color-danger      /* Danger/error state */
---color-info        /* Info state */
---chord-color       /* Chord notation color */
---annotation-private-color /* A private annotation on a chart (pencil) */
---annotation-shared-color  /* An annotation shared with everyone (ink) */
---border-color      /* Border color */
---border-light      /* Light border */
---overlay-bg        /* Modal/overlay background */
---overlay-light     /* Light overlay */
---hover-bg          /* Hover background */
---active-bg         /* Active/pressed background */
---focus-ring        /* Focus ring color */
+.panel { background: var(--bg-secondary); color: var(--text-color); border: 1px solid var(--border-color); }
 ```
 
-#### Typography
+Sizes come from the text size, so they follow the user's setting and the device:
 
 ```css
---font-family-base  /* Base font family */
---font-scale        /* Responsive scaling multiplier */
+.note { font-size: var(--font-ui); padding: calc(var(--font-base) * 0.5); }
 ```
 
-### 2. Using Variables in Components
+The variables (the full list, with both themes' values, is `ThemeManager.themes` and `style.css`):
 
-```javascript
-// components/my-component.js
-import { LitElement, html, css } from 'lit';
+- **Surfaces and text:** `--bg-color`, `--bg-secondary`, `--bg-tertiary`, `--text-color`, `--text-secondary`,
+  `--text-tertiary`, `--text-muted`, `--border-color`, `--border-light`, `--panel-bg`, `--panel-border`.
+- **Header and buttons:** `--header-bg`, `--header-text`, `--button-bg`, `--button-hover`, `--button-text`.
+  The header is the same navy in light and dark on purpose.
+- **State colours:** `--color-primary`, `--color-success`, `--color-warning`, `--color-danger`, `--color-info`.
+- **The chart:** `--chord-color`, `--annotation-private-color` (pencil), `--annotation-shared-color` (ink:
+  docs/ANNOTATIONS.md), `--sheet-background`, `--sheet-text`, `--sheet-notice` (a lead sheet drawn as music:
+  docs/LEAD_SHEETS.md).
+- **Overlays and dialogs:** `--overlay-bg`, `--overlay-light`, `--modal-backdrop`, `--modal-bg`, `--modal-border`,
+  `--modal-shadow`, `--hover-bg`, `--active-bg`, `--focus-ring`.
+- **Tints** (a wash of the current text colour, for rows and borders): `--tint-subtle`, `--tint`, `--tint-strong`,
+  `--tint-border`.
+- **Type:** `--font-family-base`, `--font-family-annotation`, and the sizes below.
 
-export class MyComponent extends LitElement {
-  static styles = css`
-    :host {
-      /* Use theme variables */
-      font-family: var(--font-family-base);
-      color: var(--text-color);
-      background: var(--bg-color);
-    }
+## Text size
 
-    .header {
-      background: var(--header-bg);
-      color: var(--header-text);
-      /* Scale with viewport */
-      font-size: calc(1.5rem * var(--font-scale));
-    }
+`--font-base-auto` is the device's choice: fluid between 16pt on a phone and 24pt on a tablet or desktop frame
+(`clamp(16pt, min(3vw, 0.03 * var(--app-width)), 24pt)`). `--font-scale` is the user's own multiplier
+(Preferences; `setFontScale`, 0.8 to 1.5, saved on the device). `--font-base` is their product, and the
+semantic sizes derive from it: `--font-lyrics`, `--font-chords`, `--font-annotation`, `--font-ui`,
+`--font-ui-small`, `--font-icon`. Spacing that should keep the device's proportions is built on
+`--font-base-auto`, so a larger text setting does not eat the screen.
 
-    .button {
-      background: var(--button-bg);
-      color: var(--button-text);
-      border: 1px solid var(--border-color);
-    }
+## JavaScript
 
-    .button:hover {
-      background: var(--button-hover);
-    }
+```ts
+import { themeManager } from './theme-manager.ts'
 
-    /* Responsive spacing */
-    .content {
-      padding: calc(1rem * var(--font-scale));
-    }
-  `;
-
-  render() {
-    return html`
-      <div class="header">
-        <h1>My Component</h1>
-      </div>
-      <div class="content">
-        <button class="button">Click Me</button>
-      </div>
-    `;
-  }
-}
+themeManager.setTheme('dark')        // 'light', 'dark' or 'system' (follow the system)
+themeManager.toggleTheme()           // Ctrl+Alt+M does the same
+themeManager.getCurrentTheme()
+themeManager.setFontScale(1.2)
+themeManager.setVariable('chord-color', '#c0392b')
+window.addEventListener('theme:change', e => { /* ThemeChangeEvent: theme, actualTheme */ })
 ```
 
-### 3. JavaScript API
+`addObserver(fn)` / `removeObserver(fn)` are the same without an event. A component that draws on a canvas, or
+otherwise cannot use a variable, listens for the change; everything else needs nothing. The theme manager is
+loaded by its own early script in `index.html`, so the first paint is in the right theme.
 
-```javascript
-import { themeManager } from '/js/theme-manager.js';
+## Adding to it
 
-// Set theme
-themeManager.setTheme('dark'); // or 'light' or 'system'
-themeManager.setTheme('system'); // Follow system preference automatically
-themeManager.toggleTheme(); // Toggle between light/dark
-
-// Get current theme
-const currentTheme = themeManager.getCurrentTheme(); // 'light', 'dark', or 'system'
-
-// Detect system preference
-const systemTheme = themeManager.detectSystemPreference(); // 'light' or 'dark'
-
-// Set custom variable
-themeManager.setVariable('my-color', '#ff0000');
-themeManager.setVariable('my-spacing', '2rem');
-
-// Get variable value
-const primaryColor = themeManager.getVariable('color-primary');
-
-// Font scaling
-themeManager.setFontScale(1.2);
-
-// Dynamic responsive scaling based on container width
-themeManager.updateResponsiveFontScale(containerWidth, baseWidth);
-
-// Custom font family
-themeManager.setFontFamily('Georgia, serif');
-
-// Observe theme changes
-themeManager.addObserver(themeName => {
-  console.log('Theme changed to:', themeName);
-});
-
-// Export theme configuration
-const config = themeManager.exportTheme();
-```
-
-## Theme Definitions
-
-### Light Theme
-
-```javascript
-{
-  'bg-color': '#ffffff',
-  'text-color': '#1a1a1a',
-  'header-bg': '#2c3e50',
-  'button-bg': '#3498db',
-  // ... full definition in theme-manager.js
-}
-```
-
-### Dark Theme
-
-```javascript
-{
-  'bg-color': '#1a1a1a',
-  'text-color': '#ecf0f1',
-  'header-bg': '#34495e',
-  'button-bg': '#4da6ff',
-  // ... full definition in theme-manager.js
-}
-```
-
-## Responsive Font Scaling
-
-The `--font-scale` variable automatically adjusts based on viewport size:
-
-```css
-/* In css/style.css */
-:root {
-  --font-scale: 1.125; /* Default (tablet) */
-}
-
-/* Phone */
-@media (max-width: 48rem) {
-  :root {
-    --font-scale: 0.65; /* Smaller for mobile */
-  }
-}
-
-/* Desktop */
-@media (min-width: 64rem) {
-  :root {
-    --font-scale: 1; /* Standard desktop */
-  }
-}
-```
-
-Use it in components:
-
-```css
-.text {
-  font-size: calc(1rem * var(--font-scale));
-  padding: calc(0.5rem * var(--font-scale));
-}
-```
-
-## Adding a Theme Toggle Button
-
-```javascript
-import { themeManager } from '/js/theme-manager.js';
-
-// In your nav menu or settings
-const toggleButton = document.createElement('button');
-toggleButton.textContent = 'Toggle Theme';
-toggleButton.addEventListener('click', () => {
-  themeManager.toggleTheme();
-});
-```
-
-Or in a Lit component:
-
-```javascript
-render() {
-  return html`
-    <button @click=${this._toggleTheme}>
-      ${this._currentTheme === 'dark' ? '☀️' : '🌙'}
-    </button>
-  `;
-}
-
-_toggleTheme() {
-  themeManager.toggleTheme();
-  this._currentTheme = themeManager.getCurrentTheme();
-}
-
-connectedCallback() {
-  super.connectedCallback();
-  this._currentTheme = themeManager.getCurrentTheme();
-
-  // Listen for theme changes from other components
-  this._themeObserver = (theme) => {
-    this._currentTheme = theme;
-    this.requestUpdate();
-  };
-  themeManager.addObserver(this._themeObserver);
-}
-
-disconnectedCallback() {
-  super.disconnectedCallback();
-  themeManager.removeObserver(this._themeObserver);
-}
-```
-
-## Best Practices
-
-### 1. Always use CSS variables for theming
-
-```css
-/* ✅ Good */
-.element {
-  color: var(--text-color);
-  background: var(--bg-color);
-}
-
-/* ❌ Avoid */
-.element {
-  color: #1a1a1a;
-  background: #ffffff;
-}
-```
-
-### 2. Provide fallback values
-
-```css
-.element {
-  color: var(--text-color, #1a1a1a);
-}
-```
-
-### 3. Use calc() for responsive sizing
-
-```css
-.element {
-  font-size: calc(1rem * var(--font-scale));
-  padding: calc(0.5rem * var(--font-scale));
-}
-```
-
-### 4. Listen for theme changes in components that need it
-
-```javascript
-connectedCallback() {
-  super.connectedCallback();
-  themeManager.addObserver(this._handleThemeChange);
-}
-
-disconnectedCallback() {
-  super.disconnectedCallback();
-  themeManager.removeObserver(this._handleThemeChange);
-}
-```
-
-### 5. Initialize theme manager early
-
-Theme manager auto-initializes when imported. Just import it once in your main script:
-
-```javascript
-import '/js/theme-manager.js';
-```
-
-## Demo
-
-Visit `/theme-demo.html` to see the theme system in action with:
-
-- Theme switching controls
-- Color palette display
-- Font scaling controls
-- Usage examples
-- JavaScript API examples
-
-## Files
-
-- `/js/theme-manager.js` - Theme management logic
-- `/css/style.css` - CSS variable definitions
-- `/theme-demo.html` - Interactive demo
-- `THEME_SYSTEM.md` - This documentation
-
-## Extending the System
-
-### Adding New Themes
-
-Edit `/js/theme-manager.js` and add to `ThemeManager.themes`:
-
-```javascript
-static themes = {
-  light: { /* ... */ },
-  dark: { /* ... */ },
-  custom: {
-    'bg-color': '#your-color',
-    'text-color': '#your-color',
-    // ...
-  }
-};
-```
-
-### Adding New Variables
-
-1. Define default in `/css/style.css`:
-
-```css
-:root {
-  --my-custom-var: #default-value;
-}
-```
-
-2. Add to theme definitions in `/js/theme-manager.js`:
-
-```javascript
-light: {
-  'my-custom-var': '#light-value',
-},
-dark: {
-  'my-custom-var': '#dark-value',
-}
-```
-
-3. Use in components:
-
-```css
-.element {
-  border-color: var(--my-custom-var);
-}
-```
+- **A variable:** declare it in `style.css` (light) and in both themes in `ThemeManager.themes`, then use it.
+  Check it in both themes at `/dev/theme.html`.
+- **A theme:** add an entry to `ThemeManager.themes` with every variable, and a button for it in the theme
+  settings (`src/components/theme-settings.ts`).
 
 ## Troubleshooting
 
-### Variables not updating
-
-- Check that theme-manager.js is imported
-- Verify variable name matches (no typos)
-- Check browser console for errors
-
-### Shadow DOM not inheriting variables
-
-CSS variables inherit by default. If not working:
-
-- Ensure `:root` is used (not `body`)
-- Check component is using `var(--name)` syntax
-- Verify component has shadow DOM (`createRenderRoot()` not overridden)
-
-### Theme not persisting
-
-- Check localStorage is available (not in private browsing)
-- Verify no JavaScript errors on page load
-- Check browser console for theme-manager warnings
+- *A variable does not update:* it must be set on `:root`/`<html>`, not on an element inside a shadow root, and
+  the CSS must say `var(--name)`, not a copy of the value.
+- *A shadow root ignores the theme:* an inherited property does not cross a `:host { all: initial }`.
+- *The theme is not remembered:* `localStorage` can be blocked (a private window); the manager falls back to the
+  system preference and logs a warning.
