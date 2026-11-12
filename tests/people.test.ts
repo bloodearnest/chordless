@@ -155,6 +155,28 @@ describe('the signed-in user and the space’s people', () => {
     ])
   })
 
+  it('names the signed-in member by their Google name when only their address was known', async () => {
+    // (an invite typed in by address: the members list has them with no name)
+    await withMembers([{ email: 'ann@example.com' }])
+    signIn({ name: 'Ann Singer', email: 'ann@example.com' })
+
+    const { me, people } = await getSpacePeople(db)
+
+    expect(me?.name).to.equal('Ann Singer')
+    expect(people.map(each => each.name)).to.deep.equal(['Ann Singer'])
+    expect((await db.getAllPeople()).map(each => each.name)).to.deep.equal(['Ann Singer'])
+  })
+
+  it('keeps a name someone gave the signed-in member, over their Google name', async () => {
+    await db.savePeople([person({ id: 'ann', name: 'Annie', emails: ['ann@example.com'] })])
+    await withMembers([{ email: 'ann@example.com' }])
+    signIn({ name: 'Ann Singer', email: 'ann@example.com' })
+
+    const { me } = await getSpacePeople(db)
+
+    expect(me?.name).to.equal('Annie')
+  })
+
   it('does not make them twice, or change the name someone has been given', async () => {
     await withMembers([{ email: 'ben@example.com', name: 'Ben' }])
     signIn({ name: 'Ann Singer', email: 'ann@example.com' })

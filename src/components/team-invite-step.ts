@@ -2,7 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import type { TeamLink } from '../js/data-types.ts'
 import { teamApi } from '../js/team-client.ts'
 import { MEMBER_ROLES, type MemberRole } from '../js/team-roles.ts'
-import { inviteLink, type Leader, roleLabel } from '../js/team-spaces.ts'
+import { googleAccountHelp, inviteLink, type Leader, roleLabel } from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import './invite-send.ts'
 import { buttonStyles } from './shared-styles.ts'
@@ -228,6 +228,11 @@ export class TeamInviteStep extends LitElement {
                       .email=${outcome.email}
                       .url=${outcome.url}
                     ></invite-send>
+                    ${
+                      googleAccountHelp(outcome.email)
+                        ? html`<p class="hint">Not a Gmail address, so the message also tells them how to make a Google account with it.</p>`
+                        : nothing
+                    }
                   </li>`
                   : html`<li class="error" role="alert">${outcome.email}: ${outcome.error}</li>`
               )}
