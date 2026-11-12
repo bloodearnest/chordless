@@ -206,8 +206,7 @@ export class PadSetUpload extends LitElement {
                   class="field"
                   ?disabled=${this._uploading}
                   @change=${(event: Event) => {
-                    const value = (event.target as HTMLSelectElement).value
-                    this._destination = value || null
+                    this._destination = (event.target as HTMLSelectElement).value
                   }}
                 >
                   ${this._destinations.map(

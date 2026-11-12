@@ -120,6 +120,13 @@ describe('pad sets', () => {
       expect(announced.map(s => s?.id)).to.deep.equal([padSet.id])
     })
 
+    it('has none for a choice made when pad sets were the account’s, which named no space', () => {
+      localStorage.setItem('padset-selection', JSON.stringify({ id: 'old', name: 'Old' }))
+      expect(getActivePadSet()).to.equal(null)
+      localStorage.setItem('padset-selection', 'null')
+      expect(getActivePadSet()).to.equal(null)
+    })
+
     it('refuses one that is gone, and keeps the old choice', async () => {
       await listPadSets(true)
       let error: Error | null = null

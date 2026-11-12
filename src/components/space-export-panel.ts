@@ -151,8 +151,8 @@ export class SpaceExportPanel extends LitElement {
   }
 
   /** The space whose pads are this space's: each keeps its own */
-  get _padSpaceId(): string | null {
-    return this.space?.id ?? null
+  get _padSpaceId(): string {
+    return this.space.id
   }
 
   get _padBytes(): number {
