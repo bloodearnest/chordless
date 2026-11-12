@@ -1,8 +1,8 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { mayDeleteSetlist } from '../src/js/team-roles.ts'
-import { must } from './must.ts'
 import { makeLocalState, makeSetlist } from './builders.ts'
+import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window

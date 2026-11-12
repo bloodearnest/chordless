@@ -69,9 +69,9 @@ import { SectionController } from './setlist/section-controller.ts'
 import { SetlistHeader } from './setlist/setlist-header.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
 import { getCurrentSpaceFull, getSpaceById, listSpaces } from './space.ts'
+import { transferSetlists } from './space-transfer.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
-import { transferSetlists } from './space-transfer.ts'
 import { mayDeleteSetlist } from './team-roles.ts'
 import {
   editModeEntered,

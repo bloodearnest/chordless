@@ -6,10 +6,12 @@ import {
 import {
   SetlistInfoDeleteEvent,
   type SetlistInfoDialog,
+  SetlistInfoMoveEvent,
   SetlistInfoSaveEvent,
 } from '../src/components/setlist-info-dialog.ts'
 import type { Setlist } from '../src/js/data-types.ts'
 import { makeSetlist } from './builders.ts'
+import { must } from './must.ts'
 import { settle } from './test-helpers.ts'
 import '../src/components/setlist-info-dialog.ts'
 
@@ -119,7 +121,7 @@ describe('setlist-info-dialog', () => {
     expect(saved).to.equal(0)
   })
 
-  it('offers to delete a setlist that is not in Drive, and says it was asked to', async () => {
+  it('offers to delete a setlist, and says it was asked to', async () => {
     const el = await show()
     await el.edit(setlist())
     await el.updateComplete
@@ -132,18 +134,60 @@ describe('setlist-info-dialog', () => {
     el.close()
   })
 
-  it('says why a setlist in Drive cannot be deleted here, and does not delete it', async () => {
+  it('offers to delete a setlist that is in Drive too', async () => {
     const el = await show()
     await el.edit(setlist({ fileRef: 'drive-1' }))
     await el.updateComplete
+    expect(el.shadowRoot?.querySelector('.delete-setlist button')?.textContent).to.contain(
+      'Delete setlist'
+    )
+    el.close()
+  })
+
+  it('says why a setlist cannot be deleted when the page says so, and does not delete or move it', async () => {
+    const el = await show()
+    el.deleteBlocked = 'Only the leader of a setlist or an admin can delete it.'
+    el.moveTargets = [{ id: 'other', name: 'Events' }]
+    await el.edit(setlist())
+    await el.updateComplete
     expect(el.shadowRoot?.querySelector('.delete-setlist')?.textContent).to.contain(
-      'in Google Drive'
+      'Only the leader'
     )
     expect(el.shadowRoot?.querySelector('.delete-setlist button')).to.equal(null)
-    let deleted = 0
-    el.addEventListener(SetlistInfoDeleteEvent.type, () => deleted++)
+    expect(el.shadowRoot?.querySelector('#move-setlist-space')).to.equal(null)
+    let asked = 0
+    el.addEventListener(SetlistInfoDeleteEvent.type, () => asked++)
+    el.addEventListener(SetlistInfoMoveEvent.type, () => asked++)
     el._delete()
-    expect(deleted).to.equal(0)
+    el._move()
+    expect(asked).to.equal(0)
+    el.close()
+  })
+
+  it('offers to move a setlist to another space, only when there is one, with the one chosen', async () => {
+    const el = await show()
+    await el.edit(setlist())
+    await el.updateComplete
+    expect(el.shadowRoot?.querySelector('#move-setlist-space')).to.equal(null)
+
+    el.moveTargets = [
+      { id: 'one', name: 'Church' },
+      { id: 'two', name: 'Events' },
+    ]
+    await el.updateComplete
+    const select = must(el.shadowRoot?.querySelector<HTMLSelectElement>('#move-setlist-space'))
+    expect([...select.options].map(option => option.textContent?.trim())).to.deep.equal([
+      'Church',
+      'Events',
+    ])
+    select.value = 'two'
+    const seen: string[][] = []
+    el.addEventListener(SetlistInfoMoveEvent.type, event => {
+      const { setlistId, spaceId } = event as SetlistInfoMoveEvent
+      seen.push([setlistId, spaceId])
+    })
+    el.shadowRoot?.querySelector<HTMLButtonElement>('#move-setlist-space ~ button')?.click()
+    expect(seen).to.deep.equal([['sl-1', 'two']])
     el.close()
   })
 

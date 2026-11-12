@@ -359,7 +359,9 @@ test.describe('Song info', () => {
     expect(left).toBeUndefined()
   })
 
-  test('a setlist that is in Drive cannot be deleted', { tag: '@logic' }, async ({ page }) => {
+  test('a setlist that is in Drive is deleted, its file noted for the Drive trash, and Undo brings it back', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSong(page, { setlistId: 'drive-test-setlist' })
     await page.evaluate(async () => {
       const { getCurrentDB } = await import('/js/db.ts')
@@ -373,8 +375,21 @@ test.describe('Song info', () => {
     await page.locator('#app-header').getByRole('button', { name: 'Information' }).click()
     const dialog = page.locator('#setlist-info-dialog')
     await dialog.getByRole('button', { name: 'Edit setlist details' }).click()
-    await expect(dialog).toContainText("in Google Drive, so it can't be deleted here")
-    await expect(dialog.getByRole('button', { name: 'Delete setlist' })).toHaveCount(0)
+    await dialog.getByRole('button', { name: 'Delete setlist' }).click()
+    const confirm = page.locator('#delete-setlist-modal')
+    await expect(confirm).toContainText('Google Drive trash')
+    await confirm.getByRole('button', { name: 'Delete' }).click()
+
+    await expect(page).toHaveURL(/\/$/)
+    expect(await fromDB(page, 'getSetlist', 'drive-test-setlist')).toBeUndefined()
+    const pending = await fromDB(page, 'getPendingDeletions', undefined)
+    expect(pending.map((entry: { ref: string }) => entry.ref)).toEqual(['drive-file-1'])
+
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect
+      .poll(async () => (await fromDB(page, 'getSetlist', 'drive-test-setlist'))?.fileRef)
+      .toBe('drive-file-1')
+    expect(await fromDB(page, 'getPendingDeletions', undefined)).toEqual([])
   })
 
   test('cancelling a setlist details edit changes nothing', { tag: '@logic' }, async ({ page }) => {

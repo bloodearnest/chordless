@@ -5,7 +5,7 @@ the designs for what's next.
 
 - [Part 1: How sync works today](#part-1-how-sync-works-today)
 - [Part 2: Planned work](#part-2-planned-work)
-  - [Deleting setlists](#deleting-setlists) (designed, not built)
+  - [Deleting setlists](#deleting-setlists) (built 2026-11-12, but for the per-leader rule on the server)
   - [Immediate background sync](#immediate-background-sync) (built)
   - [Later](#later)
 
@@ -379,8 +379,22 @@ uploaded, but this device has not yet synced, can be deleted here and will come 
 next sync (nothing in Drive is touched). The rest of this section is the design for setlists
 that are in Drive.
 
-Status of the rest: **designed, not built.** Goal: remove a setlist (e.g. added in error),
-restricted to setlists you own, with the deletion reaching Drive and other devices.
+**Built (2026-11-12):** a setlist that is in Drive is deleted too. `ChordlessDB.removeSetlist` takes
+the record out and, if it has a file, notes it as a pending deletion (`kind: 'setlist'`, the same store
+the songs' and melodies' use); the next sync's `trashPendingDeletions` puts the file in the Drive trash,
+the pull skips a file that is noted so it does not come back meanwhile, and another device's sync drops
+its unchanged copy (`removeSetlistsDeletedInDrive`) or, if it has edited it, keeps it and sends it back.
+**Undo** (a toast for fifteen seconds) is `restoreSetlist`: while the file is not in the trash yet
+it calls the trashing off and the setlist is as it was; after, the setlist is made again without its
+link to the file, so the next sync sends it as a new file (the old one stays in the trash, from where
+Drive can restore it). A dialog button, **Move to this space**, is delete plus `transferSetlists`
+(`move`): the setlist is added to the other space first (its charts copied, its leader found there by
+email then name, or made), then removed here. The per-leader rule below is checked by the page
+(`mayDeleteSetlist`); the Worker does **not** yet check it on the server: a worship leader's token can
+trash any file of the space (`POST /files/<ref>/trash`), as before. What follows is the design, with
+that left to do.
+
+Goal: remove a setlist (e.g. added in error), with the deletion reaching Drive and other devices.
 
 **Why it needs sync changes:** a deletion made here is undone by the next sync, because a
 setlist in Drive but missing locally is downloaded (`pullSetlists`). (A setlist removed in

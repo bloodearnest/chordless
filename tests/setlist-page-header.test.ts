@@ -18,6 +18,7 @@ import { SetlistRevertedEvent } from '../src/components/setlist-differs.ts'
 import {
   SetlistInfoDeleteEvent,
   type SetlistInfoDialog,
+  SetlistInfoMoveEvent,
   SetlistInfoSaveEvent,
 } from '../src/components/setlist-info-dialog.ts'
 import {
@@ -31,17 +32,24 @@ import { SetlistShareChangeEvent } from '../src/components/setlist-share.ts'
 import { type SongInfoDialog, SongRangeChangedEvent } from '../src/components/song-info-dialog.ts'
 import { SongChangeEvent } from '../src/js/app-events.ts'
 import type { Person, Setlist } from '../src/js/data-types.ts'
+import { ChordlessDB } from '../src/js/db.ts'
 import { setCapoPreference } from '../src/js/preferences.ts'
 import { writeMusicXml } from '../src/js/score-musicxml.ts'
 import { scoreRecord } from '../src/js/score-record.ts'
-import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
+import {
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  setSpaceReadOnly,
+  updateSpace,
+} from '../src/js/space.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { measure, melodyOf } from './score-build.ts'
 import { sampleRecord } from './score-sample.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
 import { nextTimestamp, nothingFor, shownToast } from './test-helpers.ts'
 
-const { describe, it, afterEach } = window
+const { describe, it, beforeEach, afterEach } = window
 
 describe('the setlist page: header, menu and keys', () => {
   const rig = useSetlistPage()
@@ -1111,14 +1119,173 @@ describe('the setlist page: header, menu and keys', () => {
       expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
     })
 
-    it('says why it cannot, when the setlist is in Drive', async () => {
+    it('says in the question that a setlist in Drive goes to the Drive trash', async () => {
       const { setlist } = await ready()
       must(rig.page.currentSetlist).fileRef = 'in-drive'
-      await rig.db.saveSetlist({ ...setlist, fileRef: 'in-drive' })
+      let seen = ''
+      must($<AppModal>('#delete-setlist-modal')).ask = async () => {
+        seen = $('#delete-setlist-text')?.textContent ?? ''
+        return false
+      }
+      await rig.page.deleteSetlist()
+      expect(seen).to.contain('Google Drive trash')
+      expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
+    })
+
+    it('notes the file of one in Drive for the trash, and a toast offers Undo that puts it back as it was', async () => {
+      const { setlist } = await ready()
+      const inDrive = { ...setlist, fileRef: 'in-drive', name: 'Kept' }
+      await rig.db.saveSetlist(inDrive)
+      rig.page.currentSetlist = inDrive
       must($<AppModal>('#delete-setlist-modal')).ask = async () => true
       await rig.page.deleteSetlist()
-      expect(shownToast()?.message).to.contain("Couldn't delete the setlist")
+
+      expect(await rig.db.getSetlist(setlist.id)).to.equal(undefined)
+      expect((await rig.db.getPendingDeletions()).map(entry => entry.ref)).to.deep.equal([
+        'in-drive',
+      ])
+      const toast = must(shownToast())
+      expect(toast.message).to.contain('Deleted')
+      expect(toast.action?.label).to.equal('Undo')
+
+      toast.action?.run()
+      await waitUntil(
+        async () => (await rig.db.getSetlist(setlist.id)) !== undefined,
+        'the setlist to come back'
+      )
+      const back = must(await rig.db.getSetlist(setlist.id))
+      expect([back.name, back.fileRef]).to.deep.equal(['Kept', 'in-drive'])
+      expect(await rig.db.getPendingDeletions()).to.deep.equal([])
+    })
+
+    it('says who may not delete it: a worship leader of a team, for a setlist they do not lead', async () => {
+      const { setlist, dialog } = await ready()
+      const space = getCurrentSpace().id as string
+      try {
+        await updateSpace(space, { team: { id: 'team-1', role: 'writer' } })
+        await rig.page.showSetlistInfo()
+        expect(dialog.deleteBlocked).to.contain('only the leader')
+
+        await updateSpace(space, { team: { id: 'team-1', role: 'admin' } })
+        await rig.page.showSetlistInfo()
+        expect(dialog.deleteBlocked).to.equal(null)
+      } finally {
+        await updateSpace(space, { team: undefined })
+      }
       expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
+    })
+
+    it('offers the other spaces on this device to move it to, but not a team it cannot write to', async () => {
+      const { dialog } = await ready()
+      const open = await createSpace(`Events ${crypto.randomUUID().slice(0, 8)}`)
+      const readOnly = await createSpace(`Members ${crypto.randomUUID().slice(0, 8)}`)
+      try {
+        await updateSpace(readOnly.id, { team: { id: 'team-2', role: 'reader' } })
+        await rig.page.showSetlistInfo()
+        const targets = dialog.moveTargets.map(target => target.id)
+        expect(targets).to.include(open.id)
+        expect(targets).to.not.include(readOnly.id)
+        expect(targets).to.not.include(getCurrentSpace().id)
+      } finally {
+        await deleteSpace(open.id)
+        await deleteSpace(readOnly.id)
+      }
+    })
+
+    describe('moving it to another space', () => {
+      let target: Awaited<ReturnType<typeof createSpace>>
+      let destination: ChordlessDB
+
+      beforeEach(async () => {
+        target = await createSpace(`Events ${crypto.randomUUID().slice(0, 8)}`)
+        destination = new ChordlessDB(target.id)
+        await destination.init()
+      })
+
+      afterEach(async () => {
+        destination.db?.close()
+        await deleteSpace(target.id)
+      })
+
+      it('asks, adds it there with its leader and charts, removes it here, notes its file, and goes home', async () => {
+        const person = { id: 'ann', name: 'Ann Singer', emails: ['ann@example.com'] }
+        await rig.db.savePeople([{ ...person, modifiedDate: new Date().toISOString() } as Person])
+        const { setlist } = await ready()
+        const inDrive = { ...setlist, fileRef: 'in-drive', leaderId: 'ann' }
+        await rig.db.saveSetlist(inDrive)
+        rig.page.currentSetlist = inDrive
+        let seen = ''
+        must($<AppModal>('#move-setlist-modal')).ask = async () => {
+          seen = $('#move-setlist-text')?.textContent ?? ''
+          return true
+        }
+
+        await rig.page.moveSetlist(target.id)
+
+        expect(seen).to.contain(target.name)
+        expect(seen).to.contain('Google Drive trash')
+        expect(await rig.db.getSetlist(setlist.id)).to.equal(undefined)
+        expect((await rig.db.getPendingDeletions()).map(entry => entry.ref)).to.deep.equal([
+          'in-drive',
+        ])
+        const there = must(await destination.getSetlist(setlist.id))
+        expect(there.fileRef).to.equal(undefined)
+        expect((await destination.getAllSongs()).length).to.equal(setlist.songs.length)
+        const leader = (await destination.getAllPeople()).find(each => each.id === there.leaderId)
+        expect(leader?.name).to.equal('Ann Singer')
+        expect(shownToast()?.message).to.contain(`Moved`)
+        expect(urls().at(-1)).to.equal('/')
+      })
+
+      it('changes nothing when it is not confirmed', async () => {
+        const { setlist } = await ready()
+        must($<AppModal>('#move-setlist-modal')).ask = async () => false
+        await rig.page.moveSetlist(target.id)
+        expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
+        expect(await destination.getAllSetlists()).to.deep.equal([])
+      })
+
+      it('leaves it here, and says so, when the other space already has it', async () => {
+        const { setlist } = await ready()
+        await destination.saveSetlist(setlist)
+        must($<AppModal>('#move-setlist-modal')).ask = async () => true
+        await rig.page.moveSetlist(target.id)
+        expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
+        expect(shownToast()?.message).to.contain('already in')
+      })
+
+      it('is asked for by the info dialog', async () => {
+        const { setlist, dialog } = await ready()
+        must($<AppModal>('#move-setlist-modal')).ask = async () => true
+        dialog.dispatchEvent(new SetlistInfoMoveEvent(setlist.id, target.id))
+        await waitUntil(
+          async () => (await destination.getSetlist(setlist.id)) !== undefined,
+          'the setlist to be moved'
+        )
+      })
+
+      it('says what went wrong, and keeps it here, when the other space cannot be written', async () => {
+        const { setlist } = await ready()
+        must($<AppModal>('#move-setlist-modal')).ask = async () => true
+        const real = Object.getPrototypeOf(destination).saveSetlist
+        Object.getPrototypeOf(destination).saveSetlist = () =>
+          Promise.reject(new Error('disk full'))
+        try {
+          await rig.page.moveSetlist(target.id)
+        } finally {
+          Object.getPrototypeOf(destination).saveSetlist = real
+        }
+        expect(shownToast()).to.include({ kind: 'error', details: 'disk full' })
+        expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
+      })
+
+      it('does nothing for a space that is not there, or with no setlist', async () => {
+        const { setlist } = await ready()
+        await rig.page.moveSetlist('no-such-space')
+        rig.page.currentSetlist = undefined
+        await rig.page.moveSetlist(target.id)
+        expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
+      })
     })
 
     it('puts up with storage being unavailable', async () => {
