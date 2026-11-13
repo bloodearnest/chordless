@@ -120,54 +120,18 @@ export async function copySongs(
  * source song is. A song that has a lead sheet already keeps it: nothing is replaced. They are the
  * destination's own records, not in its Drive until it syncs (a Team's as plain MusicXML, a text-only space).
  */
-export async function copyScores(
+async function copyScores(
   source: TransferSource,
   destination: ChordlessDB,
   songs: SongMap,
-  report: TransferReport = emptyReport()
+  report: TransferReport
 ): Promise<void> {
-  for (const { record, to } of await scoresToCopy(source, destination, songs)) {
+  for (const record of (await source.getAllScores?.()) ?? []) {
+    const to = songs.get(record.uuid)
+    if (!to || (await destination.getScore(to))) continue
     await destination.saveScore(scoreRecord(to, record.xml, record.key))
     report.scoresAdded++
   }
-}
-
-/** The source's lead sheets that the destination lacks, each with the uuid of the destination song it is for */
-export async function scoresToCopy(
-  source: TransferSource,
-  destination: ChordlessDB,
-  songs: SongMap,
-  taken: Set<string> = new Set()
-): Promise<{ record: ScoreRecord; to: string }[]> {
-  const found: { record: ScoreRecord; to: string }[] = []
-  for (const record of (await source.getAllScores?.()) ?? []) {
-    const to = songs.get(record.uuid)
-    // (`taken`: a song two sources both have a sheet for gets the first's)
-    if (!to || taken.has(to) || (await destination.getScore(to))) continue
-    taken.add(to)
-    found.push({ record, to })
-  }
-  return found
-}
-
-/**
- * Which of the destination's songs is each of the source's, for a source whose songs were copied
- * before their lead sheets went with them: the same chart (by content hash), or else the same song
- * (its id, as `ccli-7226112`) in its default form. A source song that is not there is left out.
- */
-export async function matchSongs(
-  source: TransferSource,
-  destination: ChordlessDB
-): Promise<SongMap> {
-  const here = await destination.getAllSongs()
-  const byHash = new Map(here.map(song => [song.contentHash, song.uuid]))
-  const byId = new Map(here.filter(song => song.isDefault).map(song => [song.id, song.uuid]))
-  const map: SongMap = new Map()
-  for (const song of await source.getAllSongs()) {
-    const uuid = byHash.get(song.contentHash) ?? byId.get(song.id)
-    if (uuid) map.set(song.uuid, uuid)
-  }
-  return map
 }
 
 /** The setlist as the destination gets it: its content, with nothing of the source's Drive */

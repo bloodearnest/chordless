@@ -5,10 +5,8 @@ import { addChart } from '../src/js/song-utils.ts'
 import {
   bringAcross,
   contentsOf,
-  copyScores,
   copySongs,
   emptyReport,
-  matchSongs,
   transferSetlists,
   transferSpace,
 } from '../src/js/space-transfer.ts'
@@ -188,52 +186,6 @@ describe('Copying and moving between spaces', () => {
         getAllPeople: () => db.getAllPeople(),
       }
     }
-
-    describe('found by matching songs that were copied before the sheets went with them', () => {
-      it('matches the same chart by its content, whatever the uuid', async () => {
-        const alpha = await addChart(source, ALPHA, ADD)
-        const there = await addChart(destination, ALPHA, ADD)
-        expect(alpha.uuid).to.not.equal(there.uuid)
-        expect([...(await matchSongs(source, destination))]).to.deep.equal([
-          [alpha.uuid, there.uuid],
-        ])
-      })
-
-      it('else matches the same song (its id) in its default form, as the chart was edited since', async () => {
-        const alpha = await addChart(source, '{title: Alpha}\n{ccli: 7226112}\n[G]Line', ADD)
-        const there = await addChart(
-          destination,
-          '{title: Alpha}\n{ccli: 7226112}\n[G]Line, edited',
-          ADD
-        )
-        expect(alpha.id).to.equal('ccli-7226112')
-        expect(must(alpha.contentHash)).to.not.equal(there.contentHash)
-        expect((await matchSongs(source, destination)).get(alpha.uuid)).to.equal(there.uuid)
-      })
-
-      it('leaves out a song the destination does not have', async () => {
-        await addChart(source, ALPHA, ADD)
-        await addChart(destination, BETA, ADD)
-        expect((await matchSongs(source, destination)).size).to.equal(0)
-      })
-
-      it('puts the sheet on the match, and keeps the one that is there', async () => {
-        const alpha = await addChart(source, ALPHA, ADD)
-        const beta = await addChart(source, BETA, ADD)
-        await source.saveScore(scoreRecord(alpha.uuid, SHEET, 'G'))
-        await source.saveScore(scoreRecord(beta.uuid, SHEET, 'D'))
-        const there = await addChart(destination, ALPHA, ADD)
-        const bethere = await addChart(destination, BETA, ADD)
-        await destination.saveScore(scoreRecord(bethere.uuid, OTHER_SHEET, 'D'))
-
-        const report = emptyReport()
-        await copyScores(source, destination, await matchSongs(source, destination), report)
-
-        expect(report.scoresAdded).to.equal(1)
-        expect(must(await destination.getScore(there.uuid)).xml).to.equal(SHEET)
-        expect(must(await destination.getScore(bethere.uuid)).xml).to.equal(OTHER_SHEET)
-      })
-    })
   })
 
   it('copies songs, and a chart the destination has is not added twice', async () => {

@@ -194,10 +194,6 @@ as the chord transposer spells them. The range is of the sung notes: cue notes a
     and `scores.json` (the song's uuid in the file, and the key it is written in). An export from before has neither,
     and imports as it did. A **reset from an export** puts its sheets on the songs that have none, and keeps those that
     are there (a sheet is derived data: a reset is about what people wrote).
-  - **For a space made before that** the space's Data modal offers "Copy lead sheets" when another space on the device
-    has a sheet for a song here that has none (`lead-sheets-elsewhere.ts`): the same chart is found by its content,
-    else by its song's id (`ccli-7226112`), the Personal space's first. It is the device's own copies, with no Drive
-    access to the source, and sync sends them to the space's Drive (a Team's as the plain `.musicxml`).
 
 ## The terms
 
