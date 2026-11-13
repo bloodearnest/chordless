@@ -1,17 +1,20 @@
 import { expect } from '@open-wc/testing'
+import { trace } from '@opentelemetry/api'
+import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace'
 import type { ScoreRecord } from '../src/js/data-types.ts'
 import { readMxl, readScoreFile } from '../src/js/mxl.ts'
 import type { Score } from '../src/js/score.ts'
 import { writeMusicXml } from '../src/js/score-musicxml.ts'
 import { readMusicXml } from '../src/js/score-musicxml-read.ts'
 import { scoreRecord } from '../src/js/score-record.ts'
+import { resetTelemetryState, traced } from '../src/js/telemetry/telemetry.ts'
 import { addSong, useSyncRig } from './drive-harness.ts'
 import type { MemoryFile } from './memory-storage.ts'
 import { must } from './must.ts'
 import { measure } from './score-build.ts'
 import { nextTimestamp, suppressConsoleLogs } from './test-helpers.ts'
 
-const { describe, it } = window
+const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
@@ -216,6 +219,76 @@ describe('Drive sync: melodies', () => {
     await syncDevice(tablet)
     expect(await tablet.db.getScore('song-1')).to.equal(undefined)
     expect(await tablet.db.getSong('song-1')).to.not.equal(undefined)
+  })
+
+  describe('what the sync span says of them (docs/OBSERVABILITY.md)', () => {
+    const exporter = new InMemorySpanExporter()
+    /** The attributes of the sync spans so far, the newest last */
+    const syncs = () =>
+      exporter
+        .getFinishedSpans()
+        .filter(span => span.name === 'chordless.sync.run')
+        .map(span => span.attributes)
+
+    /** A device's sync as the orchestrator makes it: one span, which the counts go on */
+    const syncReported = (device: Parameters<typeof syncDevice>[0]) =>
+      traced('chordless.sync.run', {}, () => syncDevice(device), { trackCalls: true })
+
+    beforeEach(() => {
+      localStorage.clear()
+      trace.disable()
+      exporter.reset()
+      resetTelemetryState()
+      trace.setGlobalTracerProvider(
+        new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] })
+      )
+    })
+    afterEach(() => {
+      trace.disable()
+      localStorage.clear()
+    })
+
+    it('counts the lead sheets sent, the ones Drive has, and those pulled', async () => {
+      const phone = await deviceWithScore()
+      await syncReported(phone)
+      const tablet = await makeDevice('tablet')
+      await syncReported(tablet)
+
+      const [pushed, pulled] = syncs()
+      expect(pushed['chordless.sync.scores_pushed']).to.equal(1)
+      expect(pulled['chordless.sync.scores_in_drive']).to.equal(1)
+      expect(pulled['chordless.sync.scores_pulled']).to.equal(1)
+      expect(pulled['chordless.sync.scores_unreadable']).to.equal(undefined)
+      expect(pulled['chordless.sync.scores_failed']).to.equal(0)
+    })
+
+    it('counts a file it could not read, which is otherwise skipped without a trace', async () => {
+      const phone = await deviceWithScore()
+      await syncReported(phone)
+      rig.storage.edit(must(scoreFiles()[0]).ref, 'this is not music')
+      exporter.reset()
+
+      const tablet = await makeDevice('tablet')
+      await syncReported(tablet)
+
+      const [sync] = syncs()
+      expect(sync['chordless.sync.scores_in_drive']).to.equal(1)
+      expect(sync['chordless.sync.scores_unreadable']).to.equal(1)
+      expect(sync['chordless.sync.scores_pulled']).to.equal(undefined)
+    })
+
+    it('counts a file that is XML but not a score it can read', async () => {
+      const phone = await deviceWithScore()
+      await syncReported(phone)
+      const [file] = scoreFiles()
+      rig.storage.edit(file.ref, '<score-partwise><part-list/></score-partwise>')
+      exporter.reset()
+
+      const tablet = await makeDevice('tablet')
+      await syncReported(tablet)
+
+      expect(syncs()[0]['chordless.sync.scores_unreadable']).to.equal(1)
+    })
   })
 
   it('removes the melody of a song the chart of which was deleted in Drive, and trashes its file', async () => {

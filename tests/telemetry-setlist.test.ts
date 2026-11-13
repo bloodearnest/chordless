@@ -80,6 +80,14 @@ describe('opening a setlist', () => {
     expect(attributes).to.not.have.property('chordless.setlist.id')
   })
 
+  it('says how many of its songs have a lead sheet, when that is known', () => {
+    startSetlistSession(opened({ scores: 0 }))
+    startSetlistSession(opened())
+    const [known, unknown] = named('chordless.setlist.open')
+    expect(known.attributes['chordless.setlist.scores']).to.equal(0)
+    expect(unknown.attributes).to.not.have.property('chordless.setlist.scores')
+  })
+
   it('is a new session each time, and says so of one received by link', () => {
     startSetlistSession(opened({ source: 'share' }))
     const first = baselineAttributes()['session.id']

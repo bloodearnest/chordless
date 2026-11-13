@@ -255,7 +255,7 @@ export class SetlistPage {
     await this.renderSetlist(this._setlistId, this._initialSongIndex)
     this._starting = false
     if (this._disposed) return
-    this._startSession()
+    await this._startSession()
 
     this.setupKeyboardNavigation()
     const header = this.root.querySelector<AppHeader>('#app-header')
@@ -280,17 +280,35 @@ export class SetlistPage {
     window.addEventListener(LiveSyncStatusEvent.type, this._onLiveChange, { signal })
   }
 
+  /** How many of the setlist's songs have a lead sheet in this space (what a song with none shows is a greyed-out button), for the report of it opening */
+  async _scoresIn(setlist: Setlist): Promise<number | undefined> {
+    try {
+      const database = this._database()
+      const found = await Promise.all(setlist.songs.map(entry => database.getScore(entry.songUuid)))
+      return found.filter(Boolean).length
+      /* v8 ignore start -- a database that cannot be read: the report goes without the count */
+    } catch {
+      return undefined
+    }
+    /* v8 ignore stop */
+  }
+
   /** The setlist is shown: its session begins (docs/OBSERVABILITY.md) */
-  _startSession() {
+  async _startSession() {
     const setlist = this.currentSetlist
     if (!setlist) return
+    // (taken before looking for the lead sheets, which is not part of how long the setlist took to show)
+    const openMs = performance.now() - this._createdAt
+    const scores = await this._scoresIn(setlist)
+    if (this._disposed) return
     startSetlistSession({
       setlistId: setlist.id,
       date: setlist.date,
       songs: this.songs.length,
+      scores,
       ccli: this.songs.flatMap(song => song._canonicalSong?.ccliNumber ?? []),
       source: this._readOnly ? 'share' : 'library',
-      openMs: performance.now() - this._createdAt,
+      openMs,
       hasUnsent: hasUnsentChanges,
     })
     // (the page may already show a song: it was made with the route)

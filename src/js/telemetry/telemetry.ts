@@ -33,6 +33,8 @@ interface CallStats {
   ms: Record<CallKind, number>
   slowest: Record<CallKind, number>
   errors: number
+  /** What the sync counted itself (`tally`), by attribute name */
+  counts: Record<string, number>
 }
 
 const newStats = (): CallStats => ({
@@ -40,6 +42,7 @@ const newStats = (): CallStats => ({
   ms: { drive: 0, worker: 0 },
   slowest: { drive: 0, worker: 0 },
   errors: 0,
+  counts: {},
 })
 
 /** At most this many calls of one sync are spans of their own: a first sync can make hundreds, and they are still counted on the sync's span */
@@ -91,8 +94,9 @@ export async function traced<T>(
     throw error
   } finally {
     if (mine) {
-      const { calls, ms, slowest, errors } = mine.stats
+      const { calls, ms, slowest, errors, counts } = mine.stats
       span.setAttributes({
+        ...counts,
         'chordless.sync.drive_calls': calls.drive,
         'chordless.sync.drive_ms_total': Math.round(ms.drive),
         'chordless.sync.drive_ms_max': Math.round(slowest.drive),
@@ -157,6 +161,15 @@ export function countCall(kind: CallKind, ms: number, status: number): void {
   stats.ms[kind] += ms
   stats.slowest[kind] = Math.max(stats.slowest[kind], ms)
   if (failed(status)) stats.errors++
+}
+
+/**
+ * Count something the sync running now did (files pulled, files it could not read) as an attribute on
+ * its span, added up over the sync. Does nothing outside a sync, or when reports are off.
+ */
+export function tally(attribute: string, count = 1): void {
+  if (!tracked) return
+  tracked.stats.counts[attribute] = (tracked.stats.counts[attribute] ?? 0) + count
 }
 
 /** A call that did not work: no answer, or a refusal (a 404 is Drive's way of saying there is no such file) */
