@@ -4,6 +4,7 @@
  * only the places that exist.
  */
 import type { Space } from './data-types.ts'
+import { bySpaceAge, defaultSpaceOf } from './default-space.ts'
 import { withSource } from './other-songs.ts'
 import { databaseExists, SHARED_DB_ID } from './share-receiver.ts'
 import { getCurrentSpace, listSpaces } from './space.ts'
@@ -21,6 +22,8 @@ export interface SpaceTab {
   name: string
   /** "Team" or "Personal", beside the name; none for Shared, or a Personal space named so */
   kind: string | null
+  /** The default space (docs/SPACES.md, "Presenting spaces"): the leftmost tab, and always shown */
+  isDefault?: boolean
 }
 
 /** The ids of the places last used, most recent first */
@@ -51,8 +54,9 @@ async function hasShared(): Promise<boolean> {
 }
 
 /**
- * The tabs there are, in their fixed order: Teams, Personal, Shared. A Personal space with nothing
- * in it is left out unless it is the current one; Shared is there only when something was shared.
+ * The tabs there are, in their fixed order: Teams, Personal, Shared, with the default space first.
+ * A Personal space with nothing in it is left out unless it is the current one; Shared is there
+ * only when something was shared.
  * Fewer than two is no choice to make: none (the rule under "Presenting spaces").
  */
 export async function loadSpaceTabs(
@@ -72,17 +76,22 @@ export async function visibleSpaces(currentId: string | null, given?: Space[]): 
 }
 
 async function allPlaces(currentId: string | null, given?: Space[]): Promise<SpaceTab[]> {
-  const spaces = given ?? (await listSpaces())
+  // (in the order they were made: the database lists them by id, which is no order at all)
+  const spaces = [...(given ?? (await listSpaces()))].sort(bySpaceAge)
   const teams = spaces.filter(space => space.team)
   const personal: typeof spaces = []
   for (const space of spaces.filter(space => !space.team)) {
     if (space.id === currentId || (await hasContents(space.id))) personal.push(space)
   }
+  const preferred = defaultSpaceOf(spaces)?.id
   const tabs: SpaceTab[] = [...teams, ...personal].map(space => ({
     id: space.id,
     name: space.name,
     kind: spaceKind(space),
+    ...(space.id === preferred ? { isDefault: true } : {}),
   }))
+  const first = tabs.findIndex(tab => tab.isDefault)
+  if (first > 0) tabs.unshift(...tabs.splice(first, 1))
   if (await hasShared()) tabs.push({ id: SHARED_DB_ID, name: 'Shared', kind: null })
   return tabs
 }
@@ -94,8 +103,8 @@ async function hasContents(spaceId: string): Promise<boolean> {
 }
 
 /**
- * Which tabs are shown and which go under "More", both in the fixed order. The current tab and
- * the most recently used stay shown.
+ * Which tabs are shown and which go under "More", both in the fixed order. The current tab, the
+ * default and the most recently used stay shown.
  */
 export function splitTabs(
   tabs: SpaceTab[],
@@ -105,7 +114,8 @@ export function splitTabs(
 ): { shown: SpaceTab[]; more: SpaceTab[] } {
   if (tabs.length <= max) return { shown: tabs, more: [] }
   const rank = (tab: SpaceTab) => {
-    if (tab.id === currentId) return -1
+    if (tab.id === currentId) return -2
+    if (tab.isDefault) return -1
     const at = recent.indexOf(tab.id)
     return at === -1 ? recent.length : at
   }

@@ -8,9 +8,9 @@ SYNC_ARCHITECTURE.md.
 > **Status (checked against the code 2026-11-12):** the personal space, the team space for both
 > credentials (the owner's token, and team-managed storage on Chordless's service account), roles,
 > invites, joining, the Account and Teams page, the tabs, pads per space, a team's changes feed and
-> live channel, deleting a space, deleting and moving a setlist, and a device setting up its own teams
+> live channel, deleting a space, deleting and moving a setlist, a default space, and a device setting up its own teams
 > are **built**, and have been tried with real accounts (the service-account teams on 2026-11-12).
-> The tests run on fakes. **Not built:** the default space ("Presenting spaces"), bringing pads
+> The tests run on fakes. **Not built:** bringing pads
 > across spaces, the shared-drive choice in the wizard, serialised writes on the Worker, the Worker's
 > check of who may delete a song, and a few smaller things listed under
 > "Order of work and status". The code and docs call it a space throughout (it was "organisation"
@@ -146,7 +146,7 @@ a re-pointing of the folder.
   folder).
 - localStorage caches the current space's id (`current-space-id`) and name
   (`current-space-name`) for synchronous rendering.
-- On first load a default space named "Personal" is created and made current. On a first Google
+- On first load a space named "Personal" is created and made current. On a first Google
   sign-in, a space still called "Personal" is renamed to the user's name (metadata only).
 - **Deleting a space:** from this device only, or everywhere (the Drive folder to the trash):
   see "Deleting a space", below.
@@ -593,16 +593,25 @@ plus the kind label when you have more than one space). A wrong choice is fixed 
 space" in the setlist's info dialog, in edit mode (keeps the setlist id: SYNC_ARCHITECTURE.md,
 "Deleting setlists").
 
-**A default space (proposed 2026-11-12, not built, to be confirmed).** One space on a device is
-marked "default" ("Set as default", on a space's card and in a tab's menu):
-- it is the leftmost tab, the others keeping their fixed order;
-- it is where new things go: the "Save to" of the upload form, Add Song, imports and a new setlist
-  are pre-filled with it (a pre-fill, never a lock). If the default is one the person cannot write
-  to, the next space they can write to is used and the form says so;
-- with no choice made it is the first team joined or made, else Personal; leaving or deleting it
-  falls back the same way;
-- kept per device, in this browser; it does not decide which tab the app opens on (to be
-  confirmed: the last tab used is the better start in a service).
+**The default space (built 2026-11-13; `default-space.ts`).** One space on a device is the default,
+chosen with **Make default** on its card on Account and Teams (the card says **Default**; with one
+space there is nothing to choose, so neither shows). It is a preference of this device, kept in this
+browser, and it never stops anything:
+- **It is the leftmost tab** on the Setlists, Library and Add Song pages, the others keeping their
+  fixed order, and it stays a tab when there are too many (the current tab and the default are
+  always shown). A default that is a Personal space with nothing in it has no tab, as any such space.
+- **It is where an import from outside the app goes:** what the SongSelect bookmarklet brings, and
+  files or text shared to Chordless. They arrive with no tab in front of the person, so they go to
+  the default, with "Import into" saying so and open to change; once the person picks another,
+  the default does not override it. If the default is one the person can only read (a team member,
+  not a worship leader), the first Team they can write to, else any space they can, is used
+  (`importTargetOf`).
+- **Where the person is working is still the tab in view.** Add Song from a tab, a new setlist, and
+  the "Save to" of a pad upload start at the space in use, not the default, and the app reopens on
+  the space last used: in a service the last place is the better start (decided 2026-11-13).
+- With none chosen it is the first Team the device has (by when it was made), else the first space,
+  and it falls back the same way when the one chosen is deleted or left.
+- Not synced: a Team's default is nobody else's business.
 
 ## Space tabs, and joining by invite (decided and built 2026-10-23)
 
@@ -902,7 +911,7 @@ Checked against the code 2026-11-12.
 8. [ ] The team space wizard. Built: name, parent folder (Picker), bring songs and setlists, invite,
    result and retry. Not built: the shared-drive choice and the service account in the wizard, and
    pads. The header switcher and Merged/Separate are dropped; the default space ("Presenting
-   spaces") replaces them, proposed.
+   spaces") replaces them, built 2026-11-13.
 9. [x] Space-aware immediate sync for team spaces, with the Worker's feed of changes and the live
    channel.
 10. [x] Team-managed storage: the service-account provider, "Check and switch" and rollback, deleting
@@ -974,6 +983,6 @@ Built 2026-11-12 (`space-deletion.ts`, `space-delete-everywhere.ts`, the Worker'
 `fake-drive.ts` extended with a second user and shared-drive flags. To cover: create a team space
 with a chosen parent; enable sharing; join; reader edits stay local and survive a pull; reader can
 upload but not delete pads; admin can delete; move personal → team keeps setlist ids and moves pads;
-tabs hidden with 1 space and shown with 2; the default space, once built; the Worker never persists bodies.
+tabs hidden with 1 space and shown with 2; the default space first; the Worker never persists bodies.
 Manual two-account run for the spike and the team-service and UI steps. Log real defects in
 `docs/test-catches.jsonl`.

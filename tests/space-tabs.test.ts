@@ -1,7 +1,9 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import '../src/components/space-tabs.ts'
 import { SpaceTabs } from '../src/components/space-tabs.ts'
+import type { Space } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
+import { setDefaultSpaceId } from '../src/js/default-space.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
 import { addChart } from '../src/js/song-utils.ts'
@@ -21,7 +23,7 @@ import {
   visibleSpaces,
 } from '../src/js/space-tabs.ts'
 import { must } from './must.ts'
-import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, nextTimestamp, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -30,6 +32,12 @@ suppressConsoleLogs()
 const tab = (id: string, kind: string | null = null): SpaceTab => ({ id, name: id, kind })
 
 describe('splitTabs', () => {
+  it('keeps the default as a tab, after the current one', () => {
+    const tabs = ['a', 'b', 'c', 'd', 'e', 'f'].map(id => ({ ...tab(id), isDefault: id === 'a' }))
+    const { shown } = splitTabs(tabs, 'f', ['e', 'd', 'c', 'b'])
+    expect(shown.map(each => each.id)).to.deep.equal(['a', 'd', 'e', 'f'])
+  })
+
   it('shows every tab when they fit', () => {
     const tabs = ['a', 'b', 'c'].map(id => tab(id))
     expect(splitTabs(tabs, 'a', []).more).to.deep.equal([])
@@ -109,6 +117,45 @@ describe('the tabs of the spaces on this device', () => {
     expect(tabs[0].kind).to.equal('Team')
     expect(tabs[1].kind).to.equal('Personal')
     expect(tabs[2].kind).to.equal(null)
+  })
+
+  it('puts the default first, whatever kind it is, and the Teams still before Personal after it', async () => {
+    const { updateSpace } = await import('../src/js/space.ts')
+    const personal = await space('Mine', 1)
+    const first = await space('First', 1)
+    await nextTimestamp()
+    const second = await space('Second', 1)
+    await updateSpace(first, { team: { id: 'space-t1', role: 'writer' } })
+    await updateSpace(second, { team: { id: 'space-t2', role: 'writer' } })
+    try {
+      // (none chosen: the first Team made)
+      setDefaultSpaceId(null)
+      const spaces = await mine()
+      expect((await loadSpaceTabs(personal, spaces)).map(each => each.id)).to.deep.equal([
+        first,
+        second,
+        personal,
+      ])
+      // (a Team chosen goes first; so does Personal)
+      setDefaultSpaceId(second)
+      let tabs = await loadSpaceTabs(personal, spaces)
+      expect(tabs.map(each => each.id)).to.deep.equal([second, first, personal])
+      expect(tabs.map(each => Boolean(each.isDefault))).to.deep.equal([true, false, false])
+      setDefaultSpaceId(personal)
+      tabs = await loadSpaceTabs(personal, spaces)
+      expect(tabs.map(each => each.id)).to.deep.equal([personal, first, second])
+    } finally {
+      setDefaultSpaceId(null)
+    }
+  })
+
+  it('draws nothing, and the page works, when the spaces cannot be read', async () => {
+    const tabs = await fixture<SpaceTabs>(
+      html`<space-tabs .spaces=${{} as unknown as Space[]}></space-tabs>`
+    )
+    await tabs.load()
+    await tabs.updateComplete
+    expect(tabs.shadowRoot?.querySelector('[role=tablist]')).to.equal(null)
   })
 
   it('draws a tablist of them, marks the current one, and switches when one is chosen', async () => {
