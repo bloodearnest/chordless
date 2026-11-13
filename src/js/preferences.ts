@@ -78,6 +78,13 @@ export class TelemetryPreferenceEvent extends Event {
     this.enabled = enabled
   }
 }
+/** The chord highlight or a font choice changed (sent on window); see appearance.ts */
+export class AppearancePreferenceEvent extends Event {
+  static readonly type = 'preferences:appearance-changed'
+  constructor() {
+    super(AppearancePreferenceEvent.type)
+  }
+}
 /** The longest the screen is kept awake with no touch changed (sent on window) */
 export class KeepAwakeLimitEvent extends Event {
   static readonly type = 'preferences:keep-awake-limit-changed'
@@ -230,6 +237,20 @@ const keepAwakeMinutes = definePreference<number>({
   changed: minutes => new KeepAwakeLimitEvent(minutes),
 })
 
+// How the chart reads (appearance.ts checks the values: a preset's id, a #rrggbb, a font's id)
+const textPreference = (key: string, none: string) =>
+  definePreference<string>({
+    keys: [key],
+    read: ([stored]) => stored ?? none,
+    write: value => value,
+    blocked: none,
+    changed: () => new AppearancePreferenceEvent(),
+  })
+const chordTint = textPreference('chord_tint', '')
+const fontUi = textPreference('font_ui', 'default')
+const fontLyrics = textPreference('font_lyrics', 'default')
+const fontChords = textPreference('font_chords', 'default')
+
 const setupDone = definePreference<boolean>({
   keys: ['setup-done'],
   read: ([stored]) => stored === '1',
@@ -238,6 +259,16 @@ const setupDone = definePreference<boolean>({
   blocked: true,
   remember: false,
 })
+
+/** The tint behind chords: a preset's id, a #rrggbb colour, or '' for none */
+export const getChordTint = (): string => chordTint.get()
+export const setChordTint = (value: string) => chordTint.set(value)
+
+/** The font for the UI, the lyrics or the chords: an id from fonts.ts */
+export const getFontChoice = (area: 'ui' | 'lyrics' | 'chords'): string =>
+  ({ ui: fontUi, lyrics: fontLyrics, chords: fontChords })[area].get()
+export const setFontChoice = (area: 'ui' | 'lyrics' | 'chords', id: string) =>
+  ({ ui: fontUi, lyrics: fontLyrics, chords: fontChords })[area].set(id)
 
 export const getUseNashvilleNumbers = (): boolean => nashville.get()
 export const setUseNashvilleNumbers = (value: boolean) => nashville.set(!!value)

@@ -64,7 +64,7 @@ app-modal:not(:defined) {
   --color-warning: #f39c12;
   --color-danger: #e74c3c;
   --color-info: #2980b9;
-  --chord-color: #2980b9;
+  --chord-color: #1d6a9c;
   --annotation-private-color: #4f5b66;
   --annotation-shared-color: #b8431f;
   --sheet-background: #ffffff;
@@ -102,6 +102,10 @@ app-modal:not(:defined) {
 
   /* Typography */
   --font-family-base: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* The lyrics and the chords each have a font of their own to choose (Preferences, appearance.ts):
+     the lyrics follow the app's unless one is, the chords have a stack of their own */
+  --font-family-lyrics: var(--font-family-base);
+  --font-family-chords: 'Source Sans Pro', 'Segoe UI', sans-serif;
 
   /* Base font size: fluid between 16pt on a phone and 24pt on a tablet or desktop frame. This is
      what the device picks. Spacing that should keep the proportions of the device (the song margin,
@@ -972,7 +976,8 @@ body.edit-mode .key-selector:focus {
 }
 
 .song-content .chord {
-  color: var(--chord-color);
+  color: var(--chord-tint-ink, var(--chord-color));
+  font-family: var(--font-family-chords);
   font-weight: bold;
   font-size: var(--font-chords);
   min-height: 1.1em;
@@ -992,6 +997,7 @@ body.edit-mode .key-selector:focus {
 }
 
 .song-content .lyrics {
+  font-family: var(--font-family-lyrics);
   line-height: 1.4em;
   padding: 0;
   margin: 0;

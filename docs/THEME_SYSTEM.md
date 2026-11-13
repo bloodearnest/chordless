@@ -34,7 +34,8 @@ The variables (the full list, with both themes' values, is `ThemeManager.themes`
   `--modal-shadow`, `--hover-bg`, `--active-bg`, `--focus-ring`.
 - **Tints** (a wash of the current text colour, for rows and borders): `--tint-subtle`, `--tint`, `--tint-strong`,
   `--tint-border`.
-- **Type:** `--font-family-base`, `--font-family-annotation`, and the sizes below.
+- **Type:** `--font-family-base`, `--font-family-lyrics`, `--font-family-chords`, `--font-family-annotation`, and the sizes below.
+- **Chord highlight:** `--chord-tint-bg` and `--chord-tint-ink`, set only while a tint is chosen (below).
 
 ## Text size
 
@@ -44,6 +45,26 @@ The variables (the full list, with both themes' values, is `ThemeManager.themes`
 semantic sizes derive from it: `--font-lyrics`, `--font-chords`, `--font-annotation`, `--font-ui`,
 `--font-ui-small`, `--font-icon`. Spacing that should keep the device's proportions is built on
 `--font-base-auto`, so a larger text setting does not eat the screen.
+
+## Chord highlight and fonts
+
+Preferences ("Chord Highlight and Fonts", `readability-settings.ts`) lets people put a tint behind the
+chords (never the lyrics) and choose a typeface for the app, the lyrics and the chords separately. The
+choices are stored on the device (`chord_tint`, `font_ui`, `font_lyrics`, `font_chords`:
+`preferences.ts`) and `applyAppearance()` (`appearance.ts`) puts them on `<html>` as the variables above,
+at once and without a reload. The theme manager calls it whenever it sets a theme, because a preset has a
+pale colour for the light theme and a deep one for the dark (a colour of the reader's own is used in
+both).
+
+- `chord-tint.ts` has the presets and the contrast rule: the chord text keeps the theme's chord colour if
+  it has 4.5:1 on the tint (WCAG AA), otherwise it is a dark or light ink that does.
+- `fonts.ts` has the choices: stacks of fonts a device already has, never downloaded, so they work offline.
+  (A bundled face such as Atkinson Hyperlegible would be a dependency added to `package.json`.)
+- Chord styles read `var(--chord-tint-ink, var(--chord-color))` and put the tint on the `chord-display`
+  inside `.chord`, so a chord that spills over the words after it is tinted too. A bar line and an invalid
+  chord are not tinted.
+- The settings panel draws a sample verse in the light and the dark theme side by side, from
+  `ThemeManager.themes`, whichever theme is on.
 
 ## JavaScript
 

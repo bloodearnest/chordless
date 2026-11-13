@@ -127,8 +127,12 @@ Use it for home practice, team rehearsal, or live.
 - **Older hardware is a goal, not an afterthought.** Churches don't replace their iPads every
   two years. Chordless runs on devices up to about five years old (iOS and iPadOS 17,
   Chrome and Edge 120), which can all update to that for free.
-- **Colour highlights.** Highlight chord background/text colours to help with
-  visual impairment or dyslexia. *Coming soon.*
+- **Chord highlight.** A coloured background behind the chords (not the lyrics), to help with
+  dyslexia or visual stress: pale and deep presets for the light and dark themes, or your own
+  colour. Preferences draws a verse in both themes so you can choose; the chord text changes
+  colour where it would be hard to read on your choice.
+- **Fonts.** A typeface for the app, the lyrics and the chords, each on its own (fonts your
+  device already has, so they work offline).
 
 ### Your songs stay yours
 
