@@ -1,6 +1,7 @@
 import { expect } from '@open-wc/testing'
 import type { Space } from '../src/js/data-types.ts'
 import {
+  bySpaceAge,
   defaultSpaceOf,
   getDefaultSpaceId,
   importTargetOf,
@@ -21,6 +22,16 @@ const team = (id: string, extra: Partial<Space> = {}) =>
 
 describe('the default space', () => {
   afterEach(() => setDefaultSpaceId(null))
+
+  it('orders spaces by when they were made, and two made in the same moment by their ids', () => {
+    const at = '2026-01-01T00:00:00.000Z'
+    const made = [
+      { ...space('b'), createdDate: at },
+      { ...space('a'), createdDate: at },
+      { ...space('c'), createdDate: '2025-12-31T00:00:00.000Z' },
+    ]
+    expect(made.sort(bySpaceAge).map(each => each.id)).to.deep.equal(['c', 'a', 'b'])
+  })
 
   it('is kept in this browser, and forgotten', () => {
     expect(getDefaultSpaceId()).to.equal(null)
