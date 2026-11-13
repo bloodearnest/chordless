@@ -255,7 +255,8 @@ export class SetlistPage {
     await this.renderSetlist(this._setlistId, this._initialSongIndex)
     this._starting = false
     if (this._disposed) return
-    await this._startSession()
+    // (not waited for: looking for the lead sheets must not hold up the page's controls)
+    void this._startSession()
 
     this.setupKeyboardNavigation()
     const header = this.root.querySelector<AppHeader>('#app-header')
