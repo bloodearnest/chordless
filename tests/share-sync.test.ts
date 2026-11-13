@@ -306,27 +306,18 @@ describe('Share links: sync', () => {
     expect(rig.storage.publicDownload(share.fileId).status).to.equal(404)
   })
 
-  it('shares a song the library has lost by the chart edited into the setlist, and leaves out one with none', async () => {
+  it('leaves out a song the library has lost', async () => {
     const { phone, setlist } = await sharedSetlist()
-    const lost = (songId: string, order: number, chordproEdits?: string) =>
-      makeEntry({ order, songId, songUuid: songId, key: 'G', notes: '', chordproEdits })
+    const lost = (songId: string, order: number) =>
+      makeEntry({ order, songId, songUuid: songId, key: 'G', notes: '' })
     const changed = {
       ...setlist,
-      songs: [
-        ...setlist.songs,
-        lost('title-lost-with-edits', 3, '{title: Lost}\n[G]Edited here'),
-        lost('title-lost-without', 4),
-      ],
+      songs: [...setlist.songs, lost('title-lost', 3)],
     }
     const share = await createShare(changed, ctx(phone))
 
     const bundle = await openShare(share.fileId, share.key)
-    expect(bundle.setlist.songs.map(song => song.title)).to.deep.equal([
-      'Alpha',
-      'Beta',
-      'title-lost-with-edits',
-    ])
-    expect(bundle.setlist.songs[2].chordpro).to.contain('Edited here')
+    expect(bundle.setlist.songs.map(song => song.title)).to.deep.equal(['Alpha', 'Beta'])
   })
 
   it('leaves a share file that will not end, and ends it the next time', async () => {

@@ -101,7 +101,7 @@ export function buildShareBundle(
       key: entry.key ?? songKey,
       tempo: entry.tempo ?? songTempo ?? null,
       notes: entry.notes ?? '',
-      chordpro: entry.chordproEdits ?? chordpro,
+      chordpro,
       // (left out when there are none, so a share of a setlist without annotations keeps its hash)
       ...(entry.annotations?.length && { annotations: entry.annotations }),
     }))

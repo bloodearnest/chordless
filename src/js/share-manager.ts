@@ -70,16 +70,7 @@ async function loadShareSources(setlist: Setlist, db: ChordlessDB): Promise<Shar
         chordpro: song.chordpro,
       })
     } catch (error) {
-      if (entry.chordproEdits) {
-        sources.push({
-          entry,
-          title: entry.songId,
-          songKey: null,
-          chordpro: entry.chordproEdits,
-        })
-      } else {
-        console.warn('[Share] Song not in the library, left out:', entry.songId, error)
-      }
+      console.warn('[Share] Song not in the library, left out:', entry.songId, error)
     }
   }
   return sources

@@ -27,8 +27,8 @@ function editedSongStandIn(runtimeSong: RuntimeSong, setlistEntry: SetlistEntry)
  *
  * @param runtimeSong - Runtime song object from this.songs[]
  * @param setlistEntry - Entry from setlist.songs[]
- * @param canonicalSong - Full canonical song with parsed content; null for a song with its own
- *   edits (chordproEdits), which has none: the model then gets one made from the runtime song
+ * @param canonicalSong - Full canonical song with parsed content; null if there is none, and the
+ *   model then gets one made from the runtime song
  * @param setlistId - Setlist ID
  * @param db - Database instance
  * @param spaceId - Space ID

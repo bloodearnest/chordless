@@ -41,7 +41,6 @@ export interface RuntimeSong {
   /** Which version of the song this is: the stored song's label */
   variantLabel: string | null
   sourceText: string
-  hasLocalEdits: boolean
   /** Kept to make the song's model */
   _setlistEntry: SetlistEntry
   _canonicalSong: SongWithContent | null
@@ -92,21 +91,15 @@ export async function buildRuntimeSongs(
   const songs: RuntimeSong[] = []
 
   for (const songEntry of setlist.songs) {
-    // Get source text (local edits or from Songs collection)
-    let sourceText: string
-    let canonicalSong: SongWithContent | null = null
-    if (songEntry.chordproEdits) {
-      sourceText = songEntry.chordproEdits
-    } else {
-      // Get song with content using deterministic ID
-      try {
-        canonicalSong = await songOfEntry(songEntry, db)
-        sourceText = canonicalSong.chordpro
-      } catch (error) {
-        console.error('[ERROR] Song not found in DB:', songEntry.songId, error)
-        continue
-      }
+    // Get the song with its content, by the entry's deterministic ID
+    let canonicalSong: SongWithContent
+    try {
+      canonicalSong = await songOfEntry(songEntry, db)
+    } catch (error) {
+      console.error('[ERROR] Song not found in DB:', songEntry.songId, error)
+      continue
     }
+    const sourceText = canonicalSong.chordpro
 
     // Parse the chordpro
     const parsed = parser.parse(sourceText)
@@ -116,7 +109,7 @@ export async function buildRuntimeSongs(
 
     // Get target key from setlist (explicit snapshot); an old setlist with none uses the
     // library song's key
-    const targetKey = songEntry.key ?? canonicalSong?.key ?? null
+    const targetKey = songEntry.key ?? canonicalSong.key ?? null
 
     // Apply transposition if requested and we have a reference key
     if (targetKey && originalKey && targetKey !== originalKey) {
@@ -177,9 +170,8 @@ export async function buildRuntimeSongs(
       currentBPM: currentBPM,
       currentCapo: 0, // Capo is loaded from localStorage in loadState()
       songId: songEntry.songId,
-      variantLabel: canonicalSong?.variantLabel ?? null,
+      variantLabel: canonicalSong.variantLabel ?? null,
       sourceText: sourceText,
-      hasLocalEdits: Boolean(songEntry.chordproEdits),
       // Store references needed for model creation
       _setlistEntry: songEntry,
       _canonicalSong: canonicalSong,

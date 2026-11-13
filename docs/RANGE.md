@@ -289,7 +289,7 @@ already.
   `song-info-dialog:range-changed` and each page gives the picker the new one), and the info shows
   the song as it was saved.
 - It is the song's chart (the default variant the info shows), so every setlist that uses the song
-  sees it. A setlist's own edits of a chart (`chordproEdits`) are not written anywhere yet.
+  sees it. A setlist keeps no edits of a chart of its own.
 
 ## Not decided
 
