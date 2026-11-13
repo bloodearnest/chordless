@@ -107,6 +107,16 @@ describe('chord text on a tint', () => {
     assert.ok(contrastRatio(ink, '#fff4a3') >= MIN_CONTRAST)
   })
 
+  it('does not trust a chord colour that is not a #rrggbb', () => {
+    const ink = inkOn('#ffffff', 'var(--chord-color)')
+    assert.ok(contrastRatio(ink, '#ffffff') >= MIN_CONTRAST)
+  })
+
+  it('falls back to white or black where neither ink reads', () => {
+    assert.equal(inkOn('#717171', 'var(--chord-color)'), '#ffffff')
+    assert.equal(inkOn('#808080', 'var(--chord-color)'), '#000000')
+  })
+
   it('has no colours for no tint', () => {
     assert.equal(chordColours('', 'light', LIGHT_CHORD), null)
     assert.equal(chordColours('nonsense', 'dark', DARK_CHORD), null)
