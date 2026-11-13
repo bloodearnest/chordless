@@ -130,7 +130,7 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
 
 - **A trigger, not the setlist.** The first design relayed a projection of the leader's setlist and
   stored the latest one in the Durable Object for late joiners. Checking it against the code found
-  holes: `setlistContentHash` includes `share` and `chordproEdits`, so a projection never hashes as
+  holes: `setlistContentHash` includes `share`, so a projection never hashes as
   the local record; replacing a record needs merging device-only fields; the push decides by that
   hash, so a replaced setlist would be pushed to Drive by every follower, colliding with the leader's;
   `syncsBack` is per space, not per setlist; a leader needed one-device-at-a-time rules. All of it
@@ -143,9 +143,8 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
 - **Per space, not per setlist.** A sync reads everything that changed anyway.
 - **Not a preference.** The channel opens only while the device is live on a setlist that has one,
   and it only makes a sync happen sooner. A preference can be added if people want it.
-- **`chordproEdits`** (a per-entry override of a chart's text, still read by the setlist and the share
-  bundle but written by nothing) is no longer in the way. If it comes back, as a formal variant
-  edited in the setlist's UI, it is a song and syncs as one.
+- **A setlist keeps no edits of a chart of its own.** A typo fixed, or a variant made, is the song's
+  and syncs as one. (`chordproEdits`, which nothing wrote, was removed.)
 
 ## Tests
 

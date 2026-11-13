@@ -89,7 +89,6 @@ describe('buildRuntimeSongs', () => {
     expect(song.songId).to.equal(songId)
     expect(song.songIndex).to.equal(0)
     expect(song.currentCapo).to.equal(0)
-    expect(song.hasLocalEdits).to.equal(false)
   })
 
   it('plays the version the entry names, though it is not the default, and the default if it is not there', async () => {
@@ -159,18 +158,6 @@ describe('buildRuntimeSongs', () => {
     expect(song.currentBPM).to.equal(100)
   })
 
-  it("uses the setlist's own edited chart, without looking the song up", async () => {
-    const edited = '{title: Edited}\n{key: D}\n\n[D]Edited words'
-    const [song] = await build([
-      { songId: 'title-not-in-the-library', chordproEdits: edited, order: 2 },
-    ])
-    expect(song.title).to.equal('Edited')
-    expect(song.sourceText).to.equal(edited)
-    expect(song.hasLocalEdits).to.equal(true)
-    expect(song.originalKey).to.equal('D')
-    expect(song.songIndex).to.equal(2)
-  })
-
   it('leaves out a song that is not in the library, and goes on with the rest', async () => {
     const songId = await addSong(chart())
     const songs = await build([
@@ -182,9 +169,8 @@ describe('buildRuntimeSongs', () => {
   })
 
   it('names a song with no title after its place in the setlist', async () => {
-    const [song] = await build([
-      { songId: 'title-x', chordproEdits: '{key: C}\n\n[C]Words', order: 3 },
-    ])
+    const songId = await addSong('{key: C}\n\n[C]Words')
+    const [song] = await build([{ songId, order: 3 }])
     expect(song.title).to.equal('Song 4')
   })
 

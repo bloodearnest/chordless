@@ -71,18 +71,18 @@ test('a share ends two weeks after the setlist, or after it was shared if that i
   assert.equal(isExpired('2026-10-25', '2026-10-26'), true)
 })
 
-test('the bundle has the songs in order, each with the setlist key, notes and edits', () => {
+test('the bundle has the songs in order, each with the setlist key and notes', () => {
   const bundle = bundleOf([
     source(2, { key: 'A', notes: 'repeat 4x', tempo: 72 }, '{title: Two}'),
     source(1, {}, '{title: One}'),
-    source(3, { chordproEdits: '{title: Three, fixed}' }, '{title: Three}'),
+    source(3, {}, '{title: Three}'),
   ])
   assert.deepEqual(
     bundle.setlist.songs.map(s => [s.title, s.key, s.tempo, s.notes, s.chordpro]),
     [
       ['Song 1', 'G', null, '', '{title: One}'],
       ['Song 2', 'A', 72, 'repeat 4x', '{title: Two}'],
-      ['Song 3', 'G', null, '', '{title: Three, fixed}'],
+      ['Song 3', 'G', null, '', '{title: Three}'],
     ]
   )
   assert.equal(bundle.format, 'chordless-share')

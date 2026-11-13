@@ -99,7 +99,6 @@ describe('SetlistSong', () => {
       key: 'G', // Explicit snapshot from canonical song
       tempo: 90,
       notes: '',
-      chordproEdits: null,
     })
 
     await db.saveSetlist(setlist)

@@ -272,8 +272,6 @@ export interface SetlistEntry {
   notes: string
   /** Annotations on the chart that everyone with the setlist sees (docs/ANNOTATIONS.md) */
   annotations?: SharedChartAnnotation[]
-  /** This setlist's own edited ChordPro text for the song, if it has one */
-  chordproEdits?: string
 }
 
 /**
