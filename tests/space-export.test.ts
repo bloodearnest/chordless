@@ -2,6 +2,7 @@ import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import { listPadSets, padSetSize, setPadSources, uploadPadSet } from '../src/js/pad-set-service.ts'
+import { scoreRecord } from '../src/js/score-record.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import {
   createExport,
@@ -111,7 +112,7 @@ describe('Exporting a space, and importing one', () => {
       version: 1,
       space: 'Grace Church',
       created: '2026-10-19T21:00:00.000Z',
-      counts: { songs: 3, setlists: 1, padSets: 0 },
+      counts: { songs: 3, setlists: 1, padSets: 0, scores: 0 },
     })
   })
 
@@ -183,6 +184,83 @@ describe('Exporting a space, and importing one', () => {
     const report = await importIntoSpace(damaged, destination)
     expect(report.songsAdded).to.equal(0)
     expect(await destination.getAllSongs()).to.have.length(0)
+  })
+
+  describe('with lead sheets', () => {
+    const SHEET = '<score-partwise>alpha</score-partwise>'
+
+    /** A song with a sheet, one without, and a sheet whose song is gone */
+    async function sheets() {
+      const alpha = await addChart(source, ALPHA, ADD)
+      await addChart(source, BETA, ADD)
+      await source.saveScore(scoreRecord(alpha.uuid, SHEET, 'G'))
+      await source.saveScore(scoreRecord('a-song-that-was-deleted', SHEET, 'G'))
+      return alpha
+    }
+
+    it("puts each song's sheet in as plain MusicXML beside the charts, and says how many", async () => {
+      await sheets()
+      const blob = await createExport(source, 'Grace Church')
+      const zip = await readZip(blob)
+      const names = zip.entries.map(entry => entry.fileName)
+      expect(names).to.include('scores.json')
+      expect(names.filter(name => name.endsWith('.lead-sheet.musicxml'))).to.have.length(1)
+      expect((await readExport(blob)).manifest.counts.scores).to.equal(1)
+    })
+
+    it('imports them onto the songs, which are new in the space, in the key they were written in', async () => {
+      const alpha = await sheets()
+      const exported = await readExport(await createExport(source, 'Grace Church'))
+      expect(exported.scores.map(score => score.uuid)).to.deep.equal([alpha.uuid])
+
+      const report = await importIntoSpace(exported, destination)
+
+      expect(report.scoresAdded).to.equal(1)
+      const [song] = (await destination.getAllSongs()).filter(each => each.title === 'Alpha')
+      const there = must(await destination.getScore(must(song).uuid))
+      expect(there.xml).to.equal(SHEET)
+      expect(there.key).to.equal('G')
+      expect(await destination.getAllScores()).to.have.length(1)
+    })
+
+    it('adds none the second time, and replaces none the space has', async () => {
+      await sheets()
+      const exported = await readExport(await createExport(source, 'Grace Church'))
+      await importIntoSpace(exported, destination)
+      const [song] = (await destination.getAllSongs()).filter(each => each.title === 'Alpha')
+      await destination.saveScore(
+        scoreRecord(must(song).uuid, '<score-partwise>mine</score-partwise>', 'A')
+      )
+
+      const again = await importIntoSpace(exported, destination)
+
+      expect(again.scoresAdded).to.equal(0)
+      expect(must(await destination.getScore(must(song).uuid)).xml).to.contain('mine')
+    })
+
+    it('reads an export from before there were any, and one whose list names a file that is not there', async () => {
+      await sheets()
+      const blob = await createExport(source, 'Grace Church')
+      const zip = await readZip(blob)
+      const files = await Promise.all(
+        zip.entries.map(async entry => ({ name: entry.fileName, data: await zip.read(entry) }))
+      )
+
+      const old = await readExport(
+        await writeZip(
+          files.filter(
+            file => file.name !== 'scores.json' && !file.name.endsWith('.lead-sheet.musicxml')
+          )
+        )
+      )
+      expect(old.scores).to.deep.equal([])
+      expect((await importIntoSpace(old, destination)).songsAdded).to.equal(2)
+
+      const damaged = await readExport(
+        await writeZip(files.filter(file => !file.name.endsWith('.lead-sheet.musicxml')))
+      )
+      expect(damaged.scores).to.deep.equal([])
+    })
   })
 
   it('names the file by the space and the day', () => {

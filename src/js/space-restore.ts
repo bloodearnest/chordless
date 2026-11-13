@@ -12,6 +12,8 @@
  * - **Only in the file:** added, with the uuid it has there, so the setlists that name it find it.
  * - **Only here:** kept, and counted. A deletion of a file in Drive is a decision this does not
  *   take; the plan says how many there are.
+ * - **Lead sheets:** put on the songs that have none here; a song's sheet that is here is kept, as
+ *   a sheet is derived data (docs/LEAD_SHEETS.md) and a reset is about what people wrote.
  *
  * What it replaces is first counted (`planReset`), with the records that are newer here than in
  * the file, so the user is told what a reset undoes before it is done.
@@ -85,6 +87,8 @@ export type ResetReport = Pick<
   songsAdded: number
   setlistsReplaced: number
   setlistsAdded: number
+  /** Lead sheets the file had for songs that had none */
+  scoresAdded: number
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
@@ -208,6 +212,14 @@ export async function resetToExport(exported: SpaceExport, db: ChordlessDB): Pro
     })
   }
 
+  // (after the songs: a sheet is of a song that is here by now)
+  let scoresAdded = 0
+  for (const score of exported.scores) {
+    if (!(await db.getSong(score.uuid)) || (await db.getScore(score.uuid))) continue
+    await db.saveScore(score)
+    scoresAdded++
+  }
+
   // (the people first: a setlist whose leader is not stored shows none)
   await db.addPeople(exported.people)
   const replacingSetlists = new Set(plan.setlistsReplaced.map(item => item.id))
@@ -240,5 +252,6 @@ export async function resetToExport(exported: SpaceExport, db: ChordlessDB): Pro
     setlistsAdded: plan.setlistsAdded.length,
     setlistsSame: plan.setlistsSame,
     setlistsOnlyHere: plan.setlistsOnlyHere,
+    scoresAdded,
   }
 }
