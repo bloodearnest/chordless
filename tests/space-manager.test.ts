@@ -12,6 +12,7 @@ import '../src/components/space-manager.ts'
 import type { Space } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import { forgetSync } from '../src/js/last-sync.ts'
+import { scoreRecord } from '../src/js/score-record.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import {
   createSpace,
@@ -96,6 +97,46 @@ describe('space-manager', () => {
     ).click()
     return modal
   }
+
+  describe('lead sheets another space holds', () => {
+    /** Two spaces with the same song (as a Team made from an export has it), a lead sheet in the first only */
+    async function withSheetInOne() {
+      const mine = await space('Mine')
+      const team = await space('Team')
+      const db = new ChordlessDB(mine.id)
+      await db.init()
+      const [song] = await db.getAllSongs()
+      await db.saveScore(scoreRecord(must(song).uuid, '<score-partwise>a</score-partwise>', 'G'))
+      db.db?.close()
+      return { mine, team }
+    }
+
+    it('offers to copy them into a space whose songs lack them, and does', async () => {
+      const { team } = await withSheetInOne()
+      const el = await page(team.id)
+      await waitUntil(() => el.shadowRoot?.querySelector('#copy-sheets'), undefined, {
+        timeout: 2000,
+      })
+      expect(el.shadowRoot?.textContent).to.contain('1 song here has no')
+
+      must(el.shadowRoot?.querySelector<HTMLButtonElement>('#copy-sheets')).click()
+      await waitUntil(() => !el.shadowRoot?.querySelector('#copy-sheets'), undefined, {
+        timeout: 2000,
+      })
+
+      const db = new ChordlessDB(team.id)
+      await db.init()
+      expect(await db.getAllScores()).to.have.length(1)
+      db.db?.close()
+    })
+
+    it('offers nothing to the space the lead sheets are in', async () => {
+      const { mine } = await withSheetInOne()
+      const el = await page(mine.id)
+      await nothingFor(100)
+      expect(el.shadowRoot?.querySelector('#copy-sheets')).to.equal(null)
+    })
+  })
 
   it('says there is no such space for an id this device does not have', async () => {
     const el = await page('no-such-space')

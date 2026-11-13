@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
+import { copySheetsInto, sheetsToCopyInto } from '../js/lead-sheets-elsewhere.ts'
 import { loadMediaSettings } from '../js/media-settings.ts'
 import { getCurrentSpace, getSpaceById } from '../js/space.ts'
 import { removeSpaceFromDevice } from '../js/space-deletion.ts'
@@ -13,6 +14,7 @@ import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './drive-sync-panel.ts'
+import { toast } from '../js/toast.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 import './space-delete-everywhere.ts'
 import type { SpaceDeletedEvent } from './space-delete-everywhere.ts'
@@ -45,6 +47,8 @@ export class SpaceManager extends LitElement {
     spaceId: { type: String },
     _space: { state: true },
     _summary: { state: true },
+    _sheets: { state: true },
+    _copying: { state: true },
     _signIn: { state: true },
     _missing: { state: true },
     _error: { state: true },
@@ -54,6 +58,9 @@ export class SpaceManager extends LitElement {
   declare spaceId: string
   declare _space: Space | null
   declare _summary: SpaceSummary | null
+  /** How many songs here lack a lead sheet that another space of the device has */
+  declare _sheets: number
+  declare _copying: boolean
   declare _signIn: SignInState | null
   declare _missing: boolean
   declare _error: string
@@ -99,6 +106,8 @@ export class SpaceManager extends LitElement {
     this.spaceId = ''
     this._space = null
     this._summary = null
+    this._sheets = 0
+    this._copying = false
     this._signIn = null
     this._missing = false
     this._error = ''
@@ -120,6 +129,32 @@ export class SpaceManager extends LitElement {
     this._missing = !space
     this._space = space ?? null
     this._summary = space ? await summaryOf(space.id) : null
+    this._sheets = space ? await this._countSheets(space.id) : 0
+  }
+
+  /** (the offer is a convenience: failing to work it out only leaves it out) */
+  async _countSheets(spaceId: string): Promise<number> {
+    try {
+      return await sheetsToCopyInto(spaceId)
+    } catch (error) {
+      console.error('[SpaceManager] Could not look for lead sheets in other spaces:', error)
+      return 0
+    }
+  }
+
+  async _copySheets(): Promise<void> {
+    if (this._copying) return
+    this._copying = true
+    try {
+      const copied = await copySheetsInto(this.spaceId)
+      toast(`Copied ${copied} lead sheet${copied === 1 ? '' : 's'}.`)
+      this._sheets = await this._countSheets(this.spaceId)
+    } catch (error) {
+      console.error('[SpaceManager] Failed to copy lead sheets:', error)
+      toast("Couldn't copy the lead sheets.", { kind: 'error', details: errorMessage(error) })
+    } finally {
+      this._copying = false
+    }
   }
 
   get _current(): boolean {
@@ -213,6 +248,23 @@ export class SpaceManager extends LitElement {
                 : html`<p class="hint">Sign in on the Account and Teams page to sync.</p>`
           }
         </div>
+
+        ${
+          this._sheets > 0
+            ? html`<div class="panel">
+              <h3>Lead sheets</h3>
+              <p>
+                ${this._sheets} song${this._sheets === 1 ? '' : 's'} here ${this._sheets === 1 ? 'has' : 'have'} no
+                lead sheet, but ${this._sheets === 1 ? 'the same song has one' : 'the same songs have them'} in
+                another space on this device. Copy ${this._sheets === 1 ? 'it' : 'them'} here: songs that have one
+                keep it, and nothing is taken from the other space.
+              </p>
+              <button class="btn" id="copy-sheets" ?disabled=${this._copying} @click=${this._copySheets}>
+                Copy lead sheets
+              </button>
+            </div>`
+            : nothing
+        }
 
         <div class="panel">
           <h3>Export and import</h3>

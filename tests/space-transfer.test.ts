@@ -1,10 +1,14 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
+import { scoreRecord } from '../src/js/score-record.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import {
   bringAcross,
   contentsOf,
+  copyScores,
   copySongs,
+  emptyReport,
+  matchSongs,
   transferSetlists,
   transferSpace,
 } from '../src/js/space-transfer.ts'
@@ -102,6 +106,133 @@ describe('Copying and moving between spaces', () => {
       const [made] = await destination.getAllPeople()
       expect(made.name).to.equal('Visiting Vic')
       expect(must((await destination.getAllSetlists())[0]).leaderId).to.equal(made.id)
+    })
+  })
+
+  describe('lead sheets', () => {
+    const SHEET = '<score-partwise>source</score-partwise>'
+    const OTHER_SHEET = '<score-partwise>already here</score-partwise>'
+
+    it("go with the songs copied, onto the destination's own songs, in the key they are written in", async () => {
+      const alpha = await addChart(source, ALPHA, ADD)
+      await source.saveScore(scoreRecord(alpha.uuid, SHEET, 'G'))
+      await addChart(source, BETA, ADD)
+
+      const report = emptyReport()
+      const map = await copySongs(source, destination, null, report)
+
+      const copied = must(await destination.getScore(must(map.get(alpha.uuid))))
+      expect(copied.xml).to.equal(SHEET)
+      expect(copied.key).to.equal('G')
+      expect(copied.fileRef ?? null).to.equal(null)
+      expect(report.scoresAdded).to.equal(1)
+      expect(await destination.getAllScores()).to.have.length(1)
+    })
+
+    it('go to a song the destination already had, but never replace one it has', async () => {
+      const alpha = await addChart(source, ALPHA, ADD)
+      const beta = await addChart(source, BETA, ADD)
+      await source.saveScore(scoreRecord(alpha.uuid, SHEET, 'G'))
+      await source.saveScore(scoreRecord(beta.uuid, SHEET, 'D'))
+      const there = await addChart(destination, ALPHA, ADD)
+      const bethere = await addChart(destination, BETA, ADD)
+      await destination.saveScore(scoreRecord(bethere.uuid, OTHER_SHEET, 'D'))
+
+      const report = emptyReport()
+      await copySongs(source, destination, null, report)
+
+      expect(must(await destination.getScore(there.uuid)).xml).to.equal(SHEET)
+      expect(must(await destination.getScore(bethere.uuid)).xml).to.equal(OTHER_SHEET)
+      expect(report.scoresAdded).to.equal(1)
+    })
+
+    it('come with a transferred space, once, and a second run adds none', async () => {
+      const alpha = await addChart(source, ALPHA, ADD)
+      await source.saveScore(scoreRecord(alpha.uuid, SHEET, 'G'))
+      await setlistWith('s1', alpha)
+
+      const first = await transferSpace(source, destination, 'copy')
+      const second = await transferSpace(source, destination, 'copy')
+
+      expect(first.scoresAdded).to.equal(1)
+      expect(second.scoresAdded).to.equal(0)
+      expect(await destination.getAllScores()).to.have.length(1)
+    })
+
+    it('are only those of the songs a setlist uses, when only setlists are brought', async () => {
+      const alpha = await addChart(source, ALPHA, ADD)
+      const beta = await addChart(source, BETA, ADD)
+      await source.saveScore(scoreRecord(alpha.uuid, SHEET, 'G'))
+      await source.saveScore(scoreRecord(beta.uuid, SHEET, 'D'))
+      await setlistWith('s1', alpha)
+
+      const report = await transferSetlists(source, destination, null, 'copy')
+
+      expect(report.scoresAdded).to.equal(1)
+      expect(await destination.getAllScores()).to.have.length(1)
+    })
+
+    it('are left out when the source has none to give (an export from before there were any)', async () => {
+      await addChart(source, ALPHA, ADD)
+      const report = emptyReport()
+      await copySongs({ ...bareSource(source) }, destination, null, report)
+      expect(report.scoresAdded).to.equal(0)
+    })
+
+    /** A source that does not offer lead sheets, as an export file from before had none */
+    function bareSource(db: ChordlessDB) {
+      return {
+        getAllSongs: () => db.getAllSongs(),
+        getChordPro: (id: string) => db.getChordPro(id),
+        getAllSetlists: () => db.getAllSetlists(),
+        getAllPeople: () => db.getAllPeople(),
+      }
+    }
+
+    describe('found by matching songs that were copied before the sheets went with them', () => {
+      it('matches the same chart by its content, whatever the uuid', async () => {
+        const alpha = await addChart(source, ALPHA, ADD)
+        const there = await addChart(destination, ALPHA, ADD)
+        expect(alpha.uuid).to.not.equal(there.uuid)
+        expect([...(await matchSongs(source, destination))]).to.deep.equal([
+          [alpha.uuid, there.uuid],
+        ])
+      })
+
+      it('else matches the same song (its id) in its default form, as the chart was edited since', async () => {
+        const alpha = await addChart(source, '{title: Alpha}\n{ccli: 7226112}\n[G]Line', ADD)
+        const there = await addChart(
+          destination,
+          '{title: Alpha}\n{ccli: 7226112}\n[G]Line, edited',
+          ADD
+        )
+        expect(alpha.id).to.equal('ccli-7226112')
+        expect(must(alpha.contentHash)).to.not.equal(there.contentHash)
+        expect((await matchSongs(source, destination)).get(alpha.uuid)).to.equal(there.uuid)
+      })
+
+      it('leaves out a song the destination does not have', async () => {
+        await addChart(source, ALPHA, ADD)
+        await addChart(destination, BETA, ADD)
+        expect((await matchSongs(source, destination)).size).to.equal(0)
+      })
+
+      it('puts the sheet on the match, and keeps the one that is there', async () => {
+        const alpha = await addChart(source, ALPHA, ADD)
+        const beta = await addChart(source, BETA, ADD)
+        await source.saveScore(scoreRecord(alpha.uuid, SHEET, 'G'))
+        await source.saveScore(scoreRecord(beta.uuid, SHEET, 'D'))
+        const there = await addChart(destination, ALPHA, ADD)
+        const bethere = await addChart(destination, BETA, ADD)
+        await destination.saveScore(scoreRecord(bethere.uuid, OTHER_SHEET, 'D'))
+
+        const report = emptyReport()
+        await copyScores(source, destination, await matchSongs(source, destination), report)
+
+        expect(report.scoresAdded).to.equal(1)
+        expect(must(await destination.getScore(there.uuid)).xml).to.equal(SHEET)
+        expect(must(await destination.getScore(bethere.uuid)).xml).to.equal(OTHER_SHEET)
+      })
     })
   })
 
