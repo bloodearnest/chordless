@@ -27,6 +27,7 @@ import {
 } from '../js/preferences.ts'
 import { resetDeviceId, supportId } from '../js/telemetry/ids.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../js/wake-lock.ts'
+import './readability-settings.ts'
 import './theme-settings.ts'
 import { buttonStyles, panelStyles, statusStyles } from './shared-styles.ts'
 import { renderStatus } from './status-view.ts'
@@ -345,6 +346,12 @@ export class AppPreferences extends LitElement {
           <h3>Appearance</h3>
           <p>Customize the look and feel of the app with theme and display settings.</p>
           <theme-settings></theme-settings>
+        </div>
+
+        <div class="panel">
+          <h3>Chord Highlight and Fonts</h3>
+          <p>Make the chart easier to read: a tint behind the chords, and a typeface for each part.</p>
+          <readability-settings></readability-settings>
         </div>
 
         <div class="panel">

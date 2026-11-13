@@ -22,6 +22,10 @@ const KEYS = [
   'keep_awake_minutes',
   'show_shared_annotations',
   'show_my_annotations',
+  'chord_tint',
+  'font_ui',
+  'font_lyrics',
+  'font_chords',
 ]
 
 const fresh = (): Promise<Preferences> => Promise.resolve(preferencesModule)

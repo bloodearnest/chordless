@@ -78,19 +78,32 @@ export class BarGroup extends LitElement {
     }
 
     .chord {
-      color: var(--chord-color, #2980b9);
+      color: var(--chord-tint-ink, var(--chord-color, #1d6a9c));
       font-weight: bold;
       font-size: var(--font-chords);
       line-height: 1.1em;
       padding-right: 0.25em;
-      font-family: 'Source Sans Pro', 'Segoe UI', sans-serif;
+      font-family: var(--font-family-chords, 'Source Sans Pro', 'Segoe UI', sans-serif);
       display: inline-block;
       white-space: nowrap;
+    }
+
+    /* A tint behind the chords (Preferences: Chord highlight); the bleed is a shadow, so no chord
+       moves or measures wider */
+    .chord chord-display {
+      background: var(--chord-tint-bg, transparent);
+      border-radius: 0.2em;
+      box-shadow: 0 0 0 0.15em var(--chord-tint-bg, transparent);
     }
 
     .chord.bar {
       color: var(--text-tertiary, #95a5a6);
       font-weight: normal;
+    }
+
+    .chord.bar chord-display {
+      background: none;
+      box-shadow: none;
     }
 
     .chord sup.chord-extension {

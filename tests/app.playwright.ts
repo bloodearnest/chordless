@@ -154,6 +154,50 @@ test.describe('Display preferences', () => {
   })
 })
 
+test.describe('Chord highlight and fonts', () => {
+  test('tint the chords and not the lyrics, move nothing, and follow the theme', async ({
+    page,
+  }) => {
+    await seedSong(page)
+    await page.goto('/songs/info-test-song')
+    await page.reload()
+    await expect(page.locator('#library-app-header')).toContainText('Info Test Song')
+    const chord = page.locator('#library-song-content song-section chord-display').nth(1)
+    const lyrics = page.locator('#library-song-content song-section .lyrics').first()
+    await expect(chord).toHaveText('C')
+    const look = locator =>
+      locator.evaluate(el => {
+        const style = getComputedStyle(el)
+        return { background: style.backgroundColor, font: style.fontFamily }
+      })
+    const before = must(await chord.boundingBox())
+    const plain = await look(chord)
+
+    const set = (name, ...args) =>
+      page.evaluate(async ({ name, args }) => (await import('/js/preferences.ts'))[name](...args), {
+        name,
+        args,
+      })
+    await set('setChordTint', 'yellow')
+    await expect.poll(async () => (await look(chord)).background).toBe('rgb(255, 244, 163)')
+    expect((await look(lyrics)).background).toBe('rgba(0, 0, 0, 0)')
+    // (the tint is a shadow: no chord moves or gets wider)
+    expect(must(await chord.boundingBox())).toEqual(before)
+
+    await page.evaluate(async () =>
+      (await import('/js/theme-manager.ts')).themeManager.setTheme('dark')
+    )
+    await expect.poll(async () => (await look(chord)).background).toBe('rgb(92, 82, 18)')
+
+    await set('setChordTint', '')
+    await expect.poll(async () => (await look(chord)).background).toBe(plain.background)
+
+    await set('setFontChoice', 'lyrics', 'serif')
+    await expect.poll(async () => (await look(lyrics)).font).toContain('Georgia')
+    expect((await look(chord)).font).toBe(plain.font)
+  })
+})
+
 test.describe('Navigation menu', () => {
   test("choosing a song in a setlist's menu opens it", async ({ page }) => {
     await seedSong(page, { setlistId: 'menu-song-setlist' })

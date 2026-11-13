@@ -1,3 +1,5 @@
+import { applyAppearance } from './appearance.ts'
+
 /** The theme was applied (sent on window): theme is the choice ('system', 'light', 'dark'), actualTheme what's shown */
 export class ThemeChangeEvent extends Event {
   static readonly type = 'theme:change'
@@ -65,7 +67,7 @@ export class ThemeManager {
       'color-warning': '#f39c12',
       'color-danger': '#e74c3c',
       'color-info': '#2980b9',
-      'chord-color': '#2980b9',
+      'chord-color': '#1d6a9c',
       // Annotations on a chart: private in pencil, shared in ink (docs/ANNOTATIONS.md)
       'annotation-private-color': '#4f5b66',
       'annotation-shared-color': '#b8431f',
@@ -203,6 +205,9 @@ export class ThemeManager {
     // So native controls (checkboxes, selects, date pickers, scrollbars) match
     this.root.style.colorScheme = actualTheme
 
+    // The chord highlight depends on the theme (its pale or deep colour, and the chord text on it)
+    applyAppearance()
+
     // Store current theme preference (may be 'system')
     this._currentTheme = themeName
 
@@ -322,6 +327,9 @@ export class ThemeManager {
     } catch (e) {
       console.warn('[ThemeManager] Failed to load font preference:', e)
     }
+
+    // The font choices in Preferences are over the older single font family
+    applyAppearance()
 
     // Load font scale preference
     try {

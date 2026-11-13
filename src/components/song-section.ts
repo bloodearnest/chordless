@@ -225,6 +225,7 @@ export class SongSection extends LitElement {
     .song-section-wrapper details.song-section summary.section-label:active {
       outline: none;
       background: none;
+      box-shadow: none;
     }
 
     .song-section-wrapper .section-title {
@@ -283,7 +284,7 @@ export class SongSection extends LitElement {
 
     .song-section-wrapper.melody-shown .melody-mark {
       opacity: 1;
-      color: var(--chord-color, #2980b9);
+      color: var(--chord-color, #1d6a9c);
     }
 
     .song-section-wrapper .section-collapse-toggle:hover {
@@ -541,14 +542,31 @@ export class SongSection extends LitElement {
     }
 
     .song-section-wrapper .chord {
-      color: var(--chord-color, #2980b9);
+      color: var(--chord-tint-ink, var(--chord-color, #1d6a9c));
       font-weight: bold;
       font-size: var(--font-chords);
       line-height: 1.1em;
       padding-right: 0.25em;
-      font-family: 'Source Sans Pro', 'Segoe UI', sans-serif;
+      font-family: var(--font-family-chords, 'Source Sans Pro', 'Segoe UI', sans-serif);
       display: inline-block;
       white-space: nowrap;
+    }
+
+    /* A tint behind the chords (Preferences: Chord highlight), on the chord's text so it also covers
+       one that spills over the words after it. The bleed is a shadow, so no chord moves or measures wider. */
+    .song-section-wrapper .chord chord-display {
+      background: var(--chord-tint-bg, transparent);
+      border-radius: 0.2em;
+      box-shadow: 0 0 0 0.15em var(--chord-tint-bg, transparent);
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
+    }
+
+    /* (a bar line and a chord that is not one are not tinted) */
+    .song-section-wrapper .chord.bar chord-display,
+    .song-section-wrapper .chord.invalid chord-display {
+      background: none;
+      box-shadow: none;
     }
 
     /* A chord over words that go on under the next chord's room takes no width of its own */
@@ -574,6 +592,7 @@ export class SongSection extends LitElement {
     }
 
     .song-section-wrapper .lyrics {
+      font-family: var(--font-family-lyrics, inherit);
       font-size: var(--font-lyrics);
       line-height: 1.4em;
       padding: 0;
