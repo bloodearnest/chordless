@@ -201,53 +201,22 @@ Every upload and update goes through it.
 - Updates send name and `appProperties` with the content in one multipart request,
   so file names follow edits; retired properties from older versions are removed.
 
-### Several people editing a setlist (design, not built)
+### Several people editing a setlist
 
-Written 2026-10-16. Today a setlist is one JSON file, whoever edits it writes the whole file, and
-a conflict (changed on this device and in Drive) is **Drive wins, the local edit silently
-dropped**. That was fine with one editor. It is a data-loss path for the case that matters most,
-a last-minute change on a band member's tablet that the next sync reverts. The principle behind
-the design is in CLAUDE.md, "be permissive in the moment": nobody is stopped from changing what
-they see; rights only decide **what reaches the shared setlist**.
+**Settled 2026-11-13: docs/PERSONAL_LAYER.md.** Only a setlist's leader (or a team admin or owner, and
+you in a personal space) changes the shared setlist; everyone else adapts it in a personal layer on their
+own device that is never synced. So the shared file has one writer at a time and a conflict is rare. The
+device layer, the field merge and the ownership steps this section used to design (written 2026-10-16:
+a layer promoted into the base for writers, a three-way merge by song id) are not planned: there is
+nothing to merge. A conflict between the leader and someone covering for them stays **Drive wins**, with
+the 409 below to close the window between a pull and a push.
 
-**Shared base plus a device layer.** A setlist the device shows is the *base* (what syncs) with
-the device's own changes applied over it:
-- The *layer* keeps this device's changes as changes (a song's key, BPM or notes, a song added
-  or removed, the order), not a copy of the setlist. It lives next to `setlist_local`, which
-  already holds the device-only capo and section state, so a pull never touches it.
-- A pull updates the base. What the person changed stays as they set it; anything they did not
-  touch follows the leader. Nothing is dropped silently.
-- **It must show, and no more than that.** An indication that something here differs from the
-  official version, and an option to view what. One small indicator on the setlist (nothing on
-  each row, nothing on a song page, nothing over the lyrics); opening it lists the differences
-  (yours, the official value, and whether the official one has changed since) with a way to
-  reset. A conflict is one more line in that list, not another look for the indicator. For
-  someone who is not allowed to write the setlist the indicator stays, because their changes
-  never become official.
-- A writer's layer is **promoted into the base** when it syncs. A reader's, or a non-owner's
-  (below), never is. So the same mechanism serves the read-only TODO (local key change for a
-  reader), unsynced offline edits and conflicts.
-- Merge by field and by song id. Per-song changes merge cleanly. The order is the hard part (two
-  people reordering): start from "base order, plus your additions and removals" and decide the
-  rest when it is built.
-
-**Ownership. First step: block the sync of writes from non-owners.** A setlist has an owner, and
-only the owner's edits to it are uploaded. Everyone else can still edit it on their device (the
-layer above), and nothing of theirs is pushed.
-- **Who may write:** both `createdBy` (who made it in Chordless) and `ownerId` (the leader), when
-  they differ, have edit rights: the leader who did not create the setlist is not shut out.
-  (`createdBy` is only a trace today: "nothing decides by it yet", data-types.ts.) Later an
-  **space admin** role can edit any setlist of the space (roles come with the
-  Worker team service, SPACES.md). The `editors` list below adds named people.
-- It needs the layer first. Without it, a non-owner's edit would be dropped by the next pull, the
-  same reason a reader's edits are blocked now. So until the layer exists a non-owner is treated
-  as a reader of that setlist (no setlist edits).
-- Later, in this order: an optional `editors` list the owner grants (whether everyone in the
-  space may edit by default, or only the people above, is undecided); then **suggestions**, where a non-owner's layer is offered to the owner, who accepts or
-  rejects each change; accepted changes are applied to the base.
-- Drive's permissions are per folder, so an owner or editors rule inside the setlist file is
-  only advice to a client that follows it: anyone who can write the folder can write the file.
-  Real enforcement needs the Worker (below), so the client check comes first and is advisory.
+**Suggestions** (designed, not built, to be decided after the simple version has been used). A writer
+who does not lead a setlist could press "Suggest to the leader", and their changes go to the leader as
+a proposal: a file in a `proposals/` folder of the space's own Drive folder, one per proposer per
+setlist, holding the setlist they started from and the one they propose (nothing the Worker keeps).
+The leader's device lists the changes, one row each, with Accept and Reject, applied onto the current
+setlist; what no longer applies is shown as skipped.
 
 **With immediate sync** (the changed record is pushed at once when online, the expected normal
 case) conflicts get rare: the window shrinks from "since the last sync" to seconds, and edits can
@@ -258,8 +227,9 @@ opened every few weeks on poor wifi is offline when it edits, and Drive has no c
 **The Worker, when it serves space writes** (today it enforces only reader or writer, and the pad and
 admin routes) (SPACES.md, "Why the Worker serves members"). Every member's Drive call goes through it, so for a space
 it is the one place that can:
-1. **Enforce roles and ownership.** It already enforces reader or writer; it can reject a write
-   to a setlist by someone who is not its owner or an editor, so the rule stops being advice.
+1. **Enforce roles and ownership.** It already enforces reader or writer, and who may bin a setlist; it
+   can reject a write to a setlist by someone who does not control it (docs/PERSONAL_LAYER.md), so the
+   rule stops being advice. Not built, and not needed until the client's rule is not enough.
 2. **Detect conflicts.** **Built (2026-11-12).** The client sends the checksum it last saw (the
    record's `fileRev`, as `ifRev`, on `update` and `updateMany`: `UpdateOptions` in
    `storage/types.ts`); if Drive's differs the Worker answers 409 and writes nothing (`isAsSeen`,
@@ -273,19 +243,9 @@ it is the one place that can:
    built:** the only Durable Object, `TeamRoom`, holds live sockets and no storage, and team state is
    in D1. The check costs the Worker one read of the file's status per file written.
 
-The Worker detects and the client resolves (the client's part, below, is designed, not built; today
-a 409 leaves the record changed and the next sync takes Drive's version): after a 409 the client fetches the current setlist,
-merges it with its layer by a three-way merge (it keeps the last-synced copy as the base) and
-tries again. The merge is a shared, tested TypeScript module, run on the device because an
-offline device has to merge there anyway (it is where the "your change" marker lives); the Worker
-could run the same module later. A solo user syncing straight to their own Drive (no Worker) has
-no server check, but the same layer and merge stop their phone and tablet dropping each other's
-edits.
-
-Order of work: (1) never drop a losing local edit silently (a conflict copy is the cheap first
-step, see the TODO); (2) the device layer and merge module; (3) block the sync of non-owners'
-writes, on the client; (4) the Worker's roles and conflict check, with the team service; (5) editors,
-then suggestions.
+After a 409 the record stays changed and the next sync pulls first, so the leader's or the covering
+person's change is not overwritten. The client does not yet say that its change lost; a notice is the
+small thing to add.
 
 ### Reset from Google Drive
 
@@ -678,10 +638,10 @@ backstop.
 - **Full sync in the service worker / periodic sync:** the orchestrator would have to
   broadcast its progress to the pages with `postMessage` (today it calls a callback).
   Periodic Background Sync has the same platform limits.
-- **Conflict resolution:** today Drive wins. At least surface conflicts to the user;
-  ideally merge setlist field changes. Designed above, "Several people editing a setlist".
-- **Restricting edits to a setlist's owner** (`createdBy` and `ownerId` both write; admins later): designed above,
-  first by blocking the sync of non-owners' writes.
+- **Conflict resolution:** Drive wins, and it should say so to the person whose change lost (not built);
+  see "Several people editing a setlist".
+- **Restricting edits to the people who control a setlist:** settled in docs/PERSONAL_LAYER.md (its
+  leader, a team admin or owner, and you in a personal space); not built.
 - **Real Drive integration tests** (see Tests above).
 
 ## People (added 2026-10-29)
