@@ -22,6 +22,7 @@ import {
 import { leaderName } from '../leaders.ts'
 import { writeMxl } from '../mxl.ts'
 import type { UpdateOptions, WriteResult } from '../storage/types.ts'
+import { tally } from '../telemetry/telemetry.ts'
 import { hashText } from '../utils/hash.ts'
 import {
   driveMarkers,
@@ -643,6 +644,7 @@ export async function pushScores(
       saved.push(upload.record)
     })
     if (saved.length > 0) await run.db.saveScoresSent(saved)
+    tally('chordless.sync.scores_pushed', saved.length)
     return saved.length
   }
   const write = (upload: ScoreUpload) =>
@@ -657,6 +659,7 @@ export async function pushScores(
   const uploadOne = async (upload: ScoreUpload) => {
     recordScoreUpload(upload, await write(upload))
     await run.db.saveScoresSent([upload.record])
+    tally('chordless.sync.scores_pushed')
   }
   // (a space that holds bytes has no batch call for them: one request a file, together, and one that
   // failed is null, as in a batch)

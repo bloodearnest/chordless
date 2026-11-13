@@ -17,6 +17,8 @@ export interface SetlistOpened {
   /** YYYY-MM-DD */
   date: string
   songs: number
+  /** How many of the songs have a lead sheet in the space (docs/LEAD_SHEETS.md); not known if it could not be read */
+  scores?: number
   /** The CCLI numbers of the songs that have one */
   ccli: string[]
   /** From the library, or received by a share link */
@@ -72,6 +74,7 @@ export function startSetlistSession(opened: SetlistOpened): void {
     'chordless.setlist.id': opened.setlistId,
     'chordless.setlist.date': opened.date,
     'chordless.setlist.songs': opened.songs,
+    ...(opened.scores === undefined ? {} : { 'chordless.setlist.scores': opened.scores }),
     'chordless.setlist.ccli': opened.ccli.join(','),
     'chordless.setlist.source': opened.source,
     'chordless.setlist.open_ms': Math.round(opened.openMs),

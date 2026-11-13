@@ -28,6 +28,7 @@ import {
   reportError,
   resetTelemetryState,
   TICK_SAMPLE,
+  tally,
   timedFetch as timedFetchNow,
   traced as tracedNow,
 } from '../src/js/telemetry/telemetry.ts'
@@ -285,6 +286,25 @@ describe('the calls made during a sync', () => {
     countCall('drive', 10, 200)
     await traced('chordless.other', {}, () => countCall('drive', 10, 200))
     expect(finished()[0].attributes).to.not.have.property('chordless.sync.drive_calls')
+  })
+
+  it('are joined by what the sync counts itself, added up, and none outside a sync', async () => {
+    tally('chordless.sync.scores_pulled', 5)
+    await traced(
+      'chordless.sync.run',
+      {},
+      () => {
+        tally('chordless.sync.scores_pulled', 2)
+        tally('chordless.sync.scores_pulled')
+        tally('chordless.sync.scores_unreadable')
+      },
+      { trackCalls: true }
+    )
+    await traced('chordless.sync.run', {}, () => {}, { trackCalls: true })
+    const [first, second] = finished()
+    expect(first.attributes['chordless.sync.scores_pulled']).to.equal(3)
+    expect(first.attributes['chordless.sync.scores_unreadable']).to.equal(1)
+    expect(second.attributes).to.not.have.property('chordless.sync.scores_pulled')
   })
 
   it('end with the sync: the next one starts from nothing', async () => {

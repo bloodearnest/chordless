@@ -1,10 +1,13 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
+import { trace } from '@opentelemetry/api'
+import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace'
 import { type ScoreView, ScoreViewErrorEvent } from '../src/components/score-view.ts'
 import '../src/components/score-view.ts'
 import { setUseUnicodeAccidentals } from '../src/js/preferences.ts'
+import { resetTelemetryState } from '../src/js/telemetry/telemetry.ts'
 import { sampleScore } from './score-sample.ts'
 
-const { describe, it } = window
+const { describe, it, beforeEach, afterEach } = window
 
 describe('score-view', () => {
   const shown = async (set: Partial<ScoreView>) => {
@@ -255,5 +258,74 @@ describe('score-view', () => {
     const viewBox = (sheet: ScoreView) =>
       Number(sheet.shadowRoot?.querySelector('svg')?.getAttribute('viewBox')?.split(' ')[2])
     expect(viewBox(narrow)).to.be.lessThan(viewBox(unknown))
+  })
+
+  describe('its reports (docs/OBSERVABILITY.md)', () => {
+    const exporter = new InMemorySpanExporter()
+    const finished = (name: string) =>
+      exporter.getFinishedSpans().filter(span => span.name === name)
+
+    beforeEach(() => {
+      localStorage.clear()
+      trace.disable()
+      exporter.reset()
+      resetTelemetryState()
+      trace.setGlobalTracerProvider(
+        new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] })
+      )
+    })
+    afterEach(() => {
+      trace.disable()
+      localStorage.clear()
+    })
+
+    it('is a span for a whole sheet: how long, how many pages and measures, and how it ended', async () => {
+      await shown({ melody: sampleScore, melodyKey: 'C', songKey: 'C' })
+      const [span] = finished('chordless.score.engrave')
+      expect(span.attributes['chordless.score.pages']).to.equal(1)
+      expect(span.attributes['chordless.score.measures']).to.equal(sampleScore.measures.length)
+      expect(span.attributes['chordless.score.narrow']).to.equal(false)
+      expect(span.attributes['chordless.score.first']).to.be.a('boolean')
+      expect(span.attributes['chordless.score.ms']).to.be.a('number')
+      expect(span.attributes['chordless.outcome']).to.equal('ok')
+    })
+
+    it('says that the space was narrow', async () => {
+      const first = await fixture<ScoreView>(html`<score-view style="width: 360px"></score-view>`)
+      Object.assign(first, { melody: sampleScore, melodyKey: 'C', songKey: 'C' })
+      await waitUntil(() => finished('chordless.score.engrave').length === 1, undefined, {
+        timeout: 5000,
+      })
+      expect(finished('chordless.score.engrave')[0].attributes['chordless.score.narrow']).to.equal(
+        true
+      )
+    })
+
+    it('records a sheet that could not be engraved, with the error, on its span', async () => {
+      const broken = { ...sampleScore, measures: null as never }
+      const sheet = await fixture<ScoreView>(html`<score-view></score-view>`)
+      Object.assign(sheet, { melody: broken, melodyKey: 'C', songKey: 'C' })
+      await waitUntil(() => sheet._failed, undefined, { timeout: 5000 })
+      const [span] = finished('chordless.score.engrave')
+      expect(span.attributes['chordless.outcome']).to.equal('error')
+      expect(span.events.map(event => event.name)).to.include('exception')
+    })
+
+    it('makes no span for a line of an instrumental part, and reports one that fails as an error', async () => {
+      await shown({ melody: sampleScore, melodyKey: 'C', songKey: 'C', measures: [0] })
+      expect(finished('chordless.score.engrave')).to.have.length(0)
+
+      const sheet = await fixture<ScoreView>(html`<score-view></score-view>`)
+      Object.assign(sheet, {
+        melody: { ...sampleScore, measures: null as never },
+        melodyKey: 'C',
+        songKey: 'C',
+        measures: [0],
+      })
+      await waitUntil(() => sheet._failed, undefined, { timeout: 5000 })
+      const [error] = finished('chordless.error')
+      expect(error.attributes['chordless.score.kind']).to.equal('cue')
+      expect(finished('chordless.score.engrave')).to.have.length(0)
+    })
   })
 })

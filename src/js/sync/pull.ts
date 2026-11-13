@@ -15,6 +15,7 @@ import { readMusicXml } from '../score-musicxml-read.ts'
 import { songSource } from '../song-source.ts'
 import { chartFields, chartIdentity } from '../song-utils.ts'
 import type { StoredFile } from '../storage/types.ts'
+import { tally } from '../telemetry/telemetry.ts'
 import { hashText } from '../utils/hash.ts'
 import {
   driveMarkers,
@@ -465,6 +466,7 @@ export async function pullSongs(
     results => {
       const succeeded = results.filter(result => result.status === 'fulfilled').length
       downloaded += succeeded
+      tally('chordless.sync.scores_failed', results.length - succeeded)
       if (succeeded > 0) {
         progressCallback?.({
           stage: 'pulling',
@@ -620,6 +622,8 @@ export async function pullScores(
     latestByUuid.set(uuid, { file, props: file.props })
   }
   run.liveScoreUuids = new Set(latestByUuid.keys())
+  // (what Drive has, to set against what this device has once it is pulled)
+  tally('chordless.sync.scores_in_drive', latestByUuid.size)
 
   const downloads: ScoreDownload[] = []
   for (const [uuid, { file, props }] of latestByUuid) {
@@ -677,6 +681,7 @@ async function downloadScore(
   const xml = await readScoreFile(bytes)
   if (xml === null) {
     console.warn(`[DriveSync] ${file.name} is not MusicXML Chordless can read: left as it is`)
+    tally('chordless.sync.scores_unreadable')
     return
   }
   const hash = hashText(xml)
@@ -694,8 +699,10 @@ async function downloadScore(
   // (parsed once to know it can be, and not kept: it is parsed when it is wanted)
   if (!readMusicXml(xml)) {
     console.warn(`[DriveSync] ${file.name} is not MusicXML Chordless can read: left as it is`)
+    tally('chordless.sync.scores_unreadable')
     return
   }
+  tally('chordless.sync.scores_pulled')
   await run.db.saveScore({
     uuid,
     xml,

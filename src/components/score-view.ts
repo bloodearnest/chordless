@@ -1,4 +1,5 @@
 import { ContextConsumer } from '@lit/context'
+import type { Span } from '@opentelemetry/api'
 import { css, html, LitElement, nothing, type PropertyValues } from 'lit'
 import { unsafeSVG } from 'lit/directives/unsafe-svg.js'
 import { displayPreferencesContext } from '../js/display-preferences.ts'
@@ -9,6 +10,10 @@ import { renderScore } from '../js/score-render.ts'
 import { sliceMeasures } from '../js/score-section.ts'
 import { withTextAccidentals } from '../js/score-svg-text.ts'
 import { transposeScore } from '../js/score-transpose.ts'
+import { reportError, traced } from '../js/telemetry/telemetry.ts'
+
+/** Whether a sheet was engraved already on this page, so the first, which starts the engraver, can be told from the rest */
+let engravedBefore = false
 
 /**
  * A song's melody engraved as sheet music (docs/LEAD_SHEETS.md, "Uses"): the lead sheet in the key the
@@ -281,7 +286,12 @@ export class ScoreView extends LitElement {
       return
     }
     const asked = ++this._asked
-    try {
+    const narrow = this.clientWidth > 0 && this.clientWidth < NARROW_BELOW
+    const wholeSheet = !this.measures
+    const first = !engravedBefore
+    engravedBefore = true
+    const started = performance.now()
+    const engrave = async (span?: Span) => {
       // (a key that is not known leaves the notes as they were written)
       const whole =
         this.melodyKey && this.songKey
@@ -289,21 +299,39 @@ export class ScoreView extends LitElement {
           : melody
       // (cut after the notes are moved, so a few measures sit in the octave the whole sheet chose)
       const moved = this.measures ? sliceMeasures(whole, this.measures) : whole
-      const narrow = this.clientWidth > 0 && this.clientWidth < NARROW_BELOW
-      const result = await renderScore(writeMusicXml(moved), {
+      span?.setAttribute('chordless.score.measures', moved.measures.length)
+      const rendered = await renderScore(writeMusicXml(moved), {
         pageWidth: narrow ? NARROW_PAGE : WIDE_PAGE,
         // (each section starts a line, as on SongSelect's sheet)
         sections: writeSectionsMusicXml(moved),
       })
-      if (asked !== this._asked) return
       /* v8 ignore next -- Verovio only gives null for MusicXML it cannot read, which writeMusicXml does not write */
-      if (!result) throw new Error('The lead sheet could not be read')
+      if (!rendered) throw new Error('The lead sheet could not be read')
+      span?.setAttributes({
+        'chordless.score.ms': Math.round(performance.now() - started),
+        'chordless.score.pages': rendered.pages.length,
+      })
+      return rendered
+    }
+    try {
+      // (a song's whole sheet is a span of its own, how long it took and how it ended; each of the
+      // lines of an instrumental part is not, as a song has many: only its failure is reported)
+      const result = wholeSheet
+        ? await traced(
+            'chordless.score.engrave',
+            { 'chordless.score.narrow': narrow, 'chordless.score.first': first },
+            engrave
+          )
+        : await engrave()
+      if (asked !== this._asked) return
       this._pages = result.pages
       this._failed = false
     } catch (error) {
       /* v8 ignore next -- an older engraving that fails after a newer one was asked for */
       if (asked !== this._asked) return
       console.error('[ScoreView] Could not engrave the melody:', error)
+      // (a whole sheet's failure is on its span: a line of an instrumental part has none)
+      if (!wholeSheet) reportError(error, { 'chordless.score.kind': 'cue' })
       this._failed = true
       this.dispatchEvent(new ScoreViewErrorEvent())
     }
