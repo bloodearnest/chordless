@@ -2,6 +2,7 @@ import { expect } from '@open-wc/testing'
 import { SongImportedEvent } from '../src/components/song-import.ts'
 import type { SongRecord } from '../src/js/data-types.ts'
 import { createSetlist, getCurrentDB, openSpace } from '../src/js/db.ts'
+import { setDefaultSpaceId } from '../src/js/default-space.ts'
 import { addChart, createSong } from '../src/js/song-utils.ts'
 import {
   createSpace,
@@ -783,6 +784,45 @@ describe('song-import', () => {
         expect(element._spaceId).to.equal(current)
         expect($(element, '.space').value).to.equal(current)
         await expect(element).to.be.accessible(A11Y)
+      })
+    })
+
+    it('sends what the SongSelect bookmarklet brings to the default space, unless one was chosen', async () => {
+      await withOtherSpace(async (other, current) => {
+        try {
+          setDefaultSpaceId(other.id)
+          const send = (title: string) =>
+            window.dispatchEvent(
+              new MessageEvent('message', {
+                origin: 'https://songselect.ccli.com',
+                data: {
+                  type: 'CHORDLESS_IMPORT',
+                  data: { chordproText: chart(title), metadata: { title }, source: 'songselect' },
+                },
+              })
+            )
+          // (nothing chosen: it goes to the default, not the space in use)
+          const element: any = await importer()
+          await waitFor(() => element._spaces.length > 1)
+          const first = unique('Bookmarklet')
+          send(first)
+          await waitFor(() => element._state === 'choices')
+          expect(element._spaceId).to.equal(other.id)
+          expect(await titlesIn(other.id)).to.include(first)
+          expect(await titlesIn(current)).to.not.include(first)
+
+          // (the person chose the space in use: the default does not override that)
+          const chosen: any = await importer()
+          await waitFor(() => chosen._spaces.length > 1)
+          await chosen._chooseSpace(current)
+          const second = unique('Chosen')
+          send(second)
+          await waitFor(() => chosen._state === 'choices')
+          expect(chosen._spaceId).to.equal(current)
+          expect(await titlesIn(current)).to.include(second)
+        } finally {
+          setDefaultSpaceId(null)
+        }
       })
     })
 

@@ -31,6 +31,16 @@ export class SpaceSwitchEvent extends Event {
   }
 }
 
+/** A person asked to make this space the default (docs/SPACES.md, "Presenting spaces"): the page keeps it */
+export class SpaceDefaultEvent extends Event {
+  static readonly type = 'space-card:default'
+  readonly spaceId: string
+  constructor(spaceId: string) {
+    super(SpaceDefaultEvent.type, { bubbles: true, composed: true })
+    this.spaceId = spaceId
+  }
+}
+
 /** A person asked to manage this space: the page shows everything to do with it in a modal */
 export class SpaceManageEvent extends Event {
   static readonly type = 'space-card:manage'
@@ -72,6 +82,8 @@ export class SpaceCard extends LitElement {
   static override properties = {
     space: { attribute: false },
     current: { type: Boolean },
+    isDefault: { type: Boolean },
+    several: { type: Boolean },
     signIn: { attribute: false },
     _summary: { state: true },
     _syncing: { state: true },
@@ -83,6 +95,10 @@ export class SpaceCard extends LitElement {
   declare space: Space
   /** Whether this is the space in use */
   declare current: boolean
+  /** Whether this is the default space, which is the first tab and where imports from outside go */
+  declare isDefault: boolean
+  /** Whether the device has more than one space: with one there is no default to choose */
+  declare several: boolean
   /** How the person is signed in, or null while that is not known yet */
   declare signIn: SignInState | null
   declare _summary: SpaceSummary | null
@@ -223,6 +239,7 @@ export class SpaceCard extends LitElement {
           <span class="title">${space.name}</span>
           ${kind ? html`<span class="chip">${kind}</span>` : nothing}
           ${role ? html`<span class="chip">${role}</span>` : nothing}
+          ${this.several && this.isDefault ? html`<span class="chip default">Default</span>` : nothing}
           ${this.current ? html`<span class="badge">Current</span>` : nothing}
         </div>
         <p class="line">
@@ -258,6 +275,13 @@ export class SpaceCard extends LitElement {
             space.team
               ? html`<button class="btn" id="users" @click=${() => this.dispatchEvent(new SpaceUsersEvent(space.id))}>
                 Users
+              </button>`
+              : nothing
+          }
+          ${
+            this.several && !this.isDefault
+              ? html`<button class="btn" id="make-default" @click=${() => this.dispatchEvent(new SpaceDefaultEvent(space.id))}>
+                Make default
               </button>`
               : nothing
           }

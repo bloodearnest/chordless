@@ -55,6 +55,7 @@ import type {
   SetlistDetailsSaveEvent,
 } from './setlist-details-form.ts'
 import './setlist-details-form.ts'
+import { importTargetOf } from '../js/default-space.ts'
 import {
   chartWithLeadSheet,
   type KeptMelody,
@@ -66,7 +67,7 @@ import { goTo, loadPage } from '../js/navigation.ts'
 import { describeSignature, noteName } from '../js/pitch.ts'
 import type { Score } from '../js/score.ts'
 import { SONGSELECT } from '../js/song-source.ts'
-import { ensureCurrentSpace, getSpaceById, setCurrentSpace } from '../js/space.ts'
+import { ensureCurrentSpace, getSpaceById, listSpaces, setCurrentSpace } from '../js/space.ts'
 import { noteLicence } from '../js/space-licence.ts'
 import { visibleSpaces } from '../js/space-tabs.ts'
 import { songImportStyles } from './song-import-styles.ts'
@@ -181,6 +182,10 @@ export class SongImport extends LitElement {
   declare _spaceId: string
   /** The space the app is in, which may not be the one importing into */
   _currentSpaceId = ''
+  /** Whether the person chose where the songs go (the default does not override that) */
+  _spaceChosen = false
+  /** Once the spaces are known */
+  _spacesLoaded: Promise<void> = Promise.resolve()
   /** The batch being imported has already told its space the licence number its charts carry */
   _licenceNoted = false
   /** What was last read, to read again if the space it goes to is changed */
@@ -239,7 +244,7 @@ export class SongImport extends LitElement {
     window.addEventListener('message', this._onMessage)
     window.addEventListener(IncomingSongsEvent.type, this._onIncoming)
     this._signalReady()
-    void this._loadSpaces()
+    this._spacesLoaded = this._loadSpaces()
     // Files the system opened with Chordless, or something another app shared to it
     void this._takeIncoming()
   }
@@ -261,6 +266,18 @@ export class SongImport extends LitElement {
     this._spaces = await visibleSpaces(this._currentSpaceId)
   }
 
+  /**
+   * Songs that arrive from outside the app, from the bookmarklet or shared to it, have no tab in
+   * front of the person, so they go to the default space (docs/SPACES.md, "Presenting spaces"),
+   * unless the person already chose another or it is the only one that can be written to
+   */
+  async _useDefaultSpace(): Promise<void> {
+    await this._spacesLoaded
+    if (this._spaceChosen || this._state === 'choices') return
+    const target = importTargetOf(await listSpaces())
+    if (target && this._spaces.some(space => space.id === target.id)) this._spaceId = target.id
+  }
+
   /** The database of the space being imported into */
   async _targetDB(): Promise<ChordlessDB> {
     if (!this._spaceId) this._spaceId = (await ensureCurrentSpace()).id
@@ -272,6 +289,7 @@ export class SongImport extends LitElement {
    * and read again in the new one, so long as nothing has been decided about them.
    */
   async _chooseSpace(spaceId: string): Promise<void> {
+    this._spaceChosen = true
     if (spaceId === this._spaceId) return
     const incoming = this._incoming
     if (this._state === 'choices') {
@@ -287,6 +305,7 @@ export class SongImport extends LitElement {
   async _takeIncoming(): Promise<void> {
     const incoming = await takeIncoming()
     if (!incoming) return
+    await this._useDefaultSpace()
     const pdfs = incoming.files.filter(isPdf)
     this._startReading(pdfs)
     try {
@@ -428,7 +447,7 @@ export class SongImport extends LitElement {
     if (event.origin !== SONGSELECT_ORIGIN) return
     if (event.data?.type === 'CHORDLESS_IMPORT') {
       this._progress = 'Reading the song…'
-      this.receive(event.data.data)
+      void this._useDefaultSpace().then(() => this.receive(event.data.data))
     } else if (event.data?.type === 'CHORDLESS_IMPORT_FAILED') {
       this._showError(`Import from SongSelect failed: ${event.data.data?.message}`)
     }

@@ -6,6 +6,7 @@ import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import {
   type SpaceCard,
+  SpaceDefaultEvent,
   SpaceLeadersEvent,
   SpaceManageEvent,
   SpaceSwitchEvent,
@@ -128,6 +129,34 @@ describe('space-card', () => {
     const plain = await make('Personal')
     const el = await card('signed-out', { space: plain })
     expect(labels(el)).to.deep.equal([])
+  })
+
+  it('says which space is the default, and offers the others to be made so, when there is a choice', async () => {
+    const handle = async (props: { isDefault?: boolean; several?: boolean }) => {
+      const el = await fixture<SpaceCard>(
+        html`<space-card .space=${space} .signIn=${'signed-out'} ?isDefault=${props.isDefault} ?several=${props.several}></space-card>`
+      )
+      await waitUntil(() => el._summary)
+      await el.updateComplete
+      return el
+    }
+    // (with one space there is nothing to choose)
+    const alone = await handle({ isDefault: true })
+    expect(labels(alone)).to.deep.equal(['Personal'])
+    expect(button(alone, 'make-default')).to.equal(null)
+
+    const chosen = await handle({ isDefault: true, several: true })
+    expect(labels(chosen)).to.deep.equal(['Personal', 'Default'])
+    expect(button(chosen, 'make-default')).to.equal(null)
+
+    const other = await handle({ several: true })
+    expect(labels(other)).to.deep.equal(['Personal'])
+    let asked = ''
+    other.addEventListener(SpaceDefaultEvent.type, event => {
+      asked = (event as SpaceDefaultEvent).spaceId
+    })
+    must(button(other, 'make-default')).click()
+    expect(asked).to.equal(space.id)
   })
 
   it('asks the page to show it when told to manage it', async () => {

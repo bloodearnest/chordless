@@ -1,6 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
+import { defaultSpaceOf, setDefaultSpaceId } from '../js/default-space.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { goTo } from '../js/navigation.ts'
 import { getCurrentSpace, listSpaces, switchSpace } from '../js/space.ts'
@@ -11,6 +12,7 @@ import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 import {
+  SpaceDefaultEvent,
   SpaceLeadersEvent,
   SpaceManageEvent,
   SpaceSwitchEvent,
@@ -38,6 +40,7 @@ export class AccountPage extends LitElement {
   static override properties = {
     _spaces: { state: true },
     _currentId: { state: true },
+    _defaultId: { state: true },
     _signIn: { state: true },
     _managing: { state: true },
     _users: { state: true },
@@ -51,6 +54,8 @@ export class AccountPage extends LitElement {
   declare _looking: boolean
   declare _lookMessage: string
   declare _currentId: string | null
+  /** The default space (docs/SPACES.md, "Presenting spaces") */
+  declare _defaultId: string | null
   declare _signIn: SignInState | null
   /** The space being managed, while its modal is open */
   declare _managing: Space | null
@@ -106,6 +111,7 @@ export class AccountPage extends LitElement {
     super()
     this._spaces = []
     this._currentId = null
+    this._defaultId = null
     this._signIn = null
     this._managing = null
     this._users = null
@@ -119,6 +125,7 @@ export class AccountPage extends LitElement {
     this.addEventListener(AccountStateEvent.type, this._onAccount)
     this.addEventListener(SpaceSyncedEvent.type, this._onSynced)
     this.addEventListener(SpaceSwitchEvent.type, this._onSwitch)
+    this.addEventListener(SpaceDefaultEvent.type, this._onDefault)
     this.addEventListener(SpaceManageEvent.type, this._onManage)
     this.addEventListener(SpaceUsersEvent.type, this._onUsers)
     this.addEventListener(SpaceLeadersEvent.type, this._onLeaders)
@@ -132,6 +139,7 @@ export class AccountPage extends LitElement {
     this.removeEventListener(AccountStateEvent.type, this._onAccount)
     this.removeEventListener(SpaceSyncedEvent.type, this._onSynced)
     this.removeEventListener(SpaceSwitchEvent.type, this._onSwitch)
+    this.removeEventListener(SpaceDefaultEvent.type, this._onDefault)
     this.removeEventListener(SpaceManageEvent.type, this._onManage)
     this.removeEventListener(SpaceUsersEvent.type, this._onUsers)
     this.removeEventListener(SpaceLeadersEvent.type, this._onLeaders)
@@ -171,6 +179,12 @@ export class AccountPage extends LitElement {
   /** A sync can rename a personal space (after its owner), so read the list again */
   _onSynced = (): void => {
     void this.load()
+  }
+
+  _onDefault = (event: Event): void => {
+    const id = (event as SpaceDefaultEvent).spaceId
+    setDefaultSpaceId(id)
+    this._defaultId = id
   }
 
   _onSwitch = (event: Event): void => {
@@ -250,6 +264,7 @@ export class AccountPage extends LitElement {
     const spaces = await listSpaces()
     spaces.sort((a, b) => a.createdDate.localeCompare(b.createdDate) || a.id.localeCompare(b.id))
     this._currentId = getCurrentSpace().id
+    this._defaultId = defaultSpaceOf(spaces)?.id ?? null
     this._spaces = spaces
   }
 
@@ -264,6 +279,8 @@ export class AccountPage extends LitElement {
               .space=${space}
               .signIn=${this._signIn}
               ?current=${space.id === this._currentId}
+              ?isDefault=${space.id === this._defaultId}
+              ?several=${this._spaces.length > 1}
             ></space-card>`
           )}
         </div>

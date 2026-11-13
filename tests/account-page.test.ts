@@ -9,6 +9,7 @@ import { type AppModal, ModalCloseEvent } from '../src/components/app-modal.ts'
 import '../src/components/account-page.ts'
 import type { SpaceCard } from '../src/components/space-card.ts'
 import {
+  SpaceDefaultEvent,
   SpaceLeadersEvent,
   SpaceManageEvent,
   SpaceSwitchEvent,
@@ -17,6 +18,7 @@ import {
 } from '../src/components/space-card.ts'
 import { SpaceGoneEvent } from '../src/components/space-manager.ts'
 import { TeamShareLeftEvent } from '../src/components/team-share-panel.ts'
+import { getDefaultSpaceId, setDefaultSpaceId } from '../src/js/default-space.ts'
 import type { SignInState } from '../src/js/google-auth.ts'
 import {
   createSpace,
@@ -132,6 +134,32 @@ describe('account-page', () => {
     await waitUntil(() => shown !== 0)
     expect(shown).to.equal(1)
     expect(getCurrentSpace().id).to.equal(second.id)
+  })
+
+  it('keeps the space asked for as the default, and marks only that one', async () => {
+    const first = await space('First')
+    await nextTimestamp()
+    const second = await space('Second')
+    const el = await page()
+    const isDefault = () =>
+      cards(el)
+        .filter(card => card.isDefault)
+        .map(card => card.space.id)
+    try {
+      setDefaultSpaceId(first.id)
+      await el.load()
+      await el.updateComplete
+      expect(isDefault()).to.deep.equal([first.id])
+      expect(cards(el).every(card => card.several)).to.equal(true)
+
+      const card = must(cards(el).find(each => each.space.id === second.id))
+      card.dispatchEvent(new SpaceDefaultEvent(second.id))
+      await el.updateComplete
+      expect(getDefaultSpaceId()).to.equal(second.id)
+      expect(isDefault()).to.deep.equal([second.id])
+    } finally {
+      setDefaultSpaceId(null)
+    }
   })
 
   it('reads the spaces again when a sync may have renamed one', async () => {
