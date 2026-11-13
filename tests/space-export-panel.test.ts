@@ -7,6 +7,7 @@ import {
 import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import { setPadSources, uploadPadSet } from '../src/js/pad-set-service.ts'
+import { scoreRecord } from '../src/js/score-record.ts'
 import { addChart, hashText } from '../src/js/song-utils.ts'
 import {
   createSpace,
@@ -79,7 +80,7 @@ describe('the export panel', () => {
     must(el.shadowRoot?.querySelector<HTMLButtonElement>(`#${id}`))
 
   /** A space's export file, from a database made for it */
-  async function exportOf(name: string, fill = true) {
+  async function exportOf(name: string, fill = true, sheet = '') {
     const id = `source-${crypto.randomUUID()}`
     const db = new ChordlessDB(id)
     await db.init()
@@ -92,6 +93,7 @@ describe('the export panel', () => {
             songs: [makeEntry({ songId: song.id, songUuid: song.uuid, key: 'A' })],
           })
         )
+        if (sheet) await db.saveScore(scoreRecord(song.uuid, sheet, 'G'))
       }
       return new File([await createExport(db, name)], 'export.zip')
     } finally {
@@ -175,6 +177,16 @@ describe('the export panel', () => {
     expect(text(el)).to.contain('1 charts and 1 setlists were already there')
   })
 
+  it('says how many lead sheets an import added, in the singular or the plural', async () => {
+    const el = await mount()
+    await choose(el, await exportOf('Elsewhere', true, '<score-partwise>a</score-partwise>'))
+    await waitUntil(() => text(el).includes('Import this export'), 'the question')
+    button(el, 'import').click()
+    await waitUntil(() => text(el).includes('Imported into Export'), 'the import')
+    expect(text(el)).to.contain('; 1 lead sheet added')
+    expect(await (await getCurrentDB()).getAllScores()).to.have.length(1)
+  })
+
   describe('reset from an export', () => {
     const FIXED = '{title: Alpha}\n{key: G}\n[G]Alpha fixed line'
 
@@ -215,6 +227,27 @@ describe('the export panel', () => {
       expect(must(await db.getSong(song.uuid)).chordproFileId).to.equal(song.chordproFileId)
       expect(imported).to.equal(1)
       expect(text(el)).to.not.contain('to this export')
+    })
+
+    it('says how many lead sheets the file gave to songs that had none', async () => {
+      const { el, db, song } = await repairedFile()
+      const chart = (content: string) =>
+        db.saveChordPro({ id: song.chordproFileId, content, contentHash: hashText(content) })
+      await chart(FIXED)
+      await db.saveScore(scoreRecord(song.uuid, '<score-partwise>a</score-partwise>', 'G'))
+      const file = new File([await createExport(db, 'Repaired')], 'repaired.zip')
+      await chart(ALPHA)
+      await db.deleteScore(song.uuid, { remember: false })
+
+      await choose(el, file)
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+      button(el, 'reset-start').click()
+      await waitUntil(() => text(el).includes('to this export'), 'the plan')
+      button(el, 'reset-confirm').click()
+      await waitUntil(() => text(el).includes('from the export:'), 'the reset')
+
+      expect(text(el)).to.contain('; 1 lead sheet added')
+      expect(must(await db.getScore(song.uuid)).xml).to.contain('>a<')
     })
 
     it('offers a backup of the space first, and can be cancelled without changing anything', async () => {

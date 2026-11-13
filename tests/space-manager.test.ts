@@ -27,7 +27,7 @@ import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
+import { clearToasts, nothingFor, shownToast, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -48,6 +48,7 @@ describe('space-manager', () => {
   })
 
   afterEach(async () => {
+    clearToasts()
     drive.uninstall()
     uninstallWorker()
     for (const id of made.splice(0)) {
@@ -128,6 +129,35 @@ describe('space-manager', () => {
       await db.init()
       expect(await db.getAllScores()).to.have.length(1)
       db.db?.close()
+    })
+
+    it('says so in the plural for several songs, and says how many it copied', async () => {
+      const { mine, team } = await withSheetInOne()
+      for (const id of [mine.id, team.id]) {
+        const db = new ChordlessDB(id)
+        await db.init()
+        const beta = await addChart(db, '{title: Beta}\n{key: D}\n[D]Beta line', {
+          variantLabel: 'Test',
+          importSource: 'test',
+          makeDefault: 'first',
+        })
+        if (id === mine.id) {
+          await db.saveScore(scoreRecord(beta.uuid, '<score-partwise>b</score-partwise>', 'D'))
+        }
+        db.db?.close()
+      }
+      const el = await page(team.id)
+      await waitUntil(() => el.shadowRoot?.querySelector('#copy-sheets'), undefined, {
+        timeout: 2000,
+      })
+      expect(el.shadowRoot?.textContent?.replace(/\s+/g, ' ')).to.contain(
+        '2 songs here have no lead sheet, but the same songs have them'
+      )
+
+      must(el.shadowRoot?.querySelector<HTMLButtonElement>('#copy-sheets')).click()
+      await waitUntil(() => shownToast()?.message === 'Copied 2 lead sheets.', undefined, {
+        timeout: 2000,
+      })
     })
 
     it('offers nothing to the space the lead sheets are in', async () => {
