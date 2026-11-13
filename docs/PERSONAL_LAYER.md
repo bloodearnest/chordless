@@ -68,6 +68,13 @@ Never synced, never exported. All of it is the person's own and nobody else's bu
 
   The key shown is the shared key plus the offset. Only offsets are covered: drop D and other tunings
   that change the shapes and not the key are not.
+
+  **Built (2026-11-13), the device default:** Preferences, "My instrument", a choice of 0 to 11
+  semitones with the instruments and tunings each suits named (`instrument.ts`). It is in the display
+  preferences, so the chords move wherever a song is drawn; the capo is applied after it, as the
+  one capo that does the same (`shapesFor`), so nothing downstream changed. The song's header says
+  "Chords up: N". **Not built:** the override for one setlist, and the lead sheet's notes (a horn
+  player reads the melody at their pitch too).
 - **Capo**, per song, as now. It changes the shapes shown, not the key.
 - **Songs added locally.** Anyone may add a song to a setlist for themselves, which is the congregation
   member starting a song a cappella, offline. It is kept in the layer, shown after the song it was added
@@ -130,8 +137,9 @@ What is built and will change:
 
 ## Order of work
 
-1. This document; the other docs point here.
-2. **My instrument**: the device default and the setlist override, in the personal layer.
+1. This document; the other docs point here. (Done.)
+2. **My instrument**: the device default (done), then the setlist override, in the personal layer,
+   then the lead sheet's notes.
 3. **Who controls a setlist**: the controls for key, tempo, order, removal and "Everyone" annotations
    offered only to them.
 4. **Songs added locally.**

@@ -20,6 +20,7 @@ import { getLive, isLiveSetlist } from '../live.ts'
 import { getLiveSyncStatus } from '../live-sync-status.ts'
 import { wantsMediaPlayer } from '../media-player-loader.ts'
 import { listPadSets } from '../pad-set-service.ts'
+import { getInstrumentPreference } from '../preferences.ts'
 import { buildUrl, type Route } from '../router.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
 import { syncsBack } from '../space.ts'
@@ -182,6 +183,7 @@ export class SetlistHeader {
       if (musicalMetadata) {
         musicalMetadata.keyValue = song.currentKey || ''
         musicalMetadata.capoValue = capoEnabled ? (song.currentCapo ?? 0) : 0
+        musicalMetadata.instrument = getInstrumentPreference()
         musicalMetadata.bpm = song.currentBPM || null
         musicalMetadata.timeSignature = song.metadata?.time || song.metadata?.timeSignature || ''
         musicalMetadata.style.display = ''
@@ -213,9 +215,16 @@ export class SetlistHeader {
   }
 
   /** Show new values in the song's metadata display (after a change to its key, capo or tempo) */
-  showMetadata(shown: Partial<Pick<MusicalMetadataDisplay, 'keyValue' | 'capoValue' | 'bpm'>>) {
+  showMetadata(
+    shown: Partial<Pick<MusicalMetadataDisplay, 'keyValue' | 'capoValue' | 'bpm' | 'instrument'>>
+  ) {
     const musicalMetadata = this.#find<MusicalMetadataDisplay>('#musical-metadata')
     if (musicalMetadata) Object.assign(musicalMetadata, shown)
+  }
+
+  /** My instrument changed: the song's metadata says how far up the chords are moved */
+  showInstrument() {
+    this.showMetadata({ instrument: getInstrumentPreference() })
   }
 
   /** The share, differs and live buttons: on the overview only. Share is lit while the setlist is shared */

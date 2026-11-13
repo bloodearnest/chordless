@@ -1,3 +1,5 @@
+import { normalizeInstrument } from './instrument.ts'
+
 const MUSICIAN_TYPES = ['general', 'singer', 'drummer', 'guitarist'] as const
 export type MusicianType = (typeof MUSICIAN_TYPES)[number]
 
@@ -47,6 +49,15 @@ export class CapoPreferenceEvent extends Event {
   constructor(enabled: boolean) {
     super(CapoPreferenceEvent.type)
     this.enabled = enabled
+  }
+}
+/** My instrument changed (sent on window): docs/PERSONAL_LAYER.md */
+export class InstrumentPreferenceEvent extends Event {
+  static readonly type = 'preferences:instrument-changed'
+  readonly semitones: number
+  constructor(semitones: number) {
+    super(InstrumentPreferenceEvent.type)
+    this.semitones = semitones
   }
 }
 /** Which annotations on a chart to show changed (sent on window) */
@@ -183,6 +194,15 @@ const capo = definePreference<boolean>({
   changed: on => new CapoPreferenceEvent(on),
 })
 
+// My instrument (docs/PERSONAL_LAYER.md): the device's default, in semitones up from the key
+const instrument = definePreference<number>({
+  keys: ['instrument-offset'],
+  read: ([stored]) => normalizeInstrument(stored),
+  write: semitones => String(semitones),
+  blocked: 0,
+  changed: semitones => new InstrumentPreferenceEvent(semitones),
+})
+
 // Annotations on a chart (docs/ANNOTATIONS.md): both kinds shown unless turned off
 const showSharedAnnotations = definePreference<boolean>({
   keys: ['show_shared_annotations'],
@@ -296,6 +316,11 @@ export const getSectionDefaults = (): SectionDefaults => sectionDefaults.get()
 export const getCapoPreference = (): boolean => capo.get()
 export const setCapoPreference = (value: boolean) => capo.set(!!value)
 
+/** My instrument: how far up the chords shown are moved from the setlist's key, on this device */
+export const getInstrumentPreference = (): number => instrument.get()
+export const setInstrumentPreference = (value: unknown) =>
+  instrument.set(normalizeInstrument(value))
+
 /** Which annotations on a chart are shown: those shared with everyone, and the user's own */
 export const getAnnotationsPreference = (): { shared: boolean; mine: boolean } => ({
   shared: showSharedAnnotations.get(),
@@ -338,6 +363,7 @@ declare global {
     [AccidentalsPreferenceEvent.type]: AccidentalsPreferenceEvent
     [SectionDefaultsEvent.type]: SectionDefaultsEvent
     [CapoPreferenceEvent.type]: CapoPreferenceEvent
+    [InstrumentPreferenceEvent.type]: InstrumentPreferenceEvent
     [AnnotationsPreferenceEvent.type]: AnnotationsPreferenceEvent
   }
 }

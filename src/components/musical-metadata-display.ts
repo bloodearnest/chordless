@@ -29,6 +29,7 @@ export class MusicalMetadataDisplay extends LitElement {
   static override properties = {
     keyValue: { type: String, attribute: 'key-value' },
     capoValue: { type: Number, attribute: 'capo-value' },
+    instrument: { type: Number },
     bpm: { type: Number },
     timeSignature: { type: String, attribute: 'time-signature' },
     editMode: { type: Boolean, attribute: 'edit-mode', reflect: true },
@@ -36,6 +37,8 @@ export class MusicalMetadataDisplay extends LitElement {
 
   declare keyValue: string
   declare capoValue: number
+  /** My instrument: how far up the chords are moved (0: not at all), docs/PERSONAL_LAYER.md */
+  declare instrument: number
   declare bpm: number | null
   declare timeSignature: string
   declare editMode: boolean
@@ -113,6 +116,7 @@ export class MusicalMetadataDisplay extends LitElement {
     super()
     this.keyValue = ''
     this.capoValue = 0
+    this.instrument = 0
     this.bpm = null
     this.timeSignature = ''
     this.editMode = false
@@ -157,6 +161,16 @@ export class MusicalMetadataDisplay extends LitElement {
               <div class="meta-item">
                 <span class="meta-label">Capo:</span>
                 <span class="meta-value">${this.capoValue}</span>
+              </div>
+            `
+            : ''
+        }
+        ${
+          this.instrument > 0
+            ? html`
+              <div class="meta-item">
+                <span class="meta-label">Chords up:</span>
+                <span class="meta-value">${this.instrument}</span>
               </div>
             `
             : ''

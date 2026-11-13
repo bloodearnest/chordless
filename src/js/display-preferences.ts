@@ -1,13 +1,15 @@
 import { ContextProvider, createContext } from '@lit/context'
 import {
   AccidentalsPreferenceEvent,
+  getInstrumentPreference,
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
+  InstrumentPreferenceEvent,
   NashvillePreferenceEvent,
 } from './preferences.ts'
 
 /**
- * How chords are shown, as a Lit context: {nashville, unicodeAccidentals}.
+ * How chords are shown, as a Lit context: {nashville, unicodeAccidentals, instrument}.
  *
  * Provided for the whole page from <html> as soon as this module loads, and
  * kept current as the preferences change. Consume it with
@@ -20,6 +22,8 @@ import {
 export interface DisplayPreferences {
   nashville: boolean
   unicodeAccidentals: boolean
+  /** My instrument: how far up the chords are moved from the song's key (docs/PERSONAL_LAYER.md) */
+  instrument: number
 }
 
 export const displayPreferencesContext = createContext<DisplayPreferences>(
@@ -27,7 +31,11 @@ export const displayPreferencesContext = createContext<DisplayPreferences>(
 )
 
 function current(): DisplayPreferences {
-  return { nashville: getUseNashvilleNumbers(), unicodeAccidentals: getUseUnicodeAccidentals() }
+  return {
+    nashville: getUseNashvilleNumbers(),
+    unicodeAccidentals: getUseUnicodeAccidentals(),
+    instrument: getInstrumentPreference(),
+  }
 }
 
 const provider = new ContextProvider(document.documentElement, {
@@ -35,6 +43,10 @@ const provider = new ContextProvider(document.documentElement, {
   initialValue: current(),
 })
 
-for (const type of [NashvillePreferenceEvent.type, AccidentalsPreferenceEvent.type]) {
+for (const type of [
+  NashvillePreferenceEvent.type,
+  AccidentalsPreferenceEvent.type,
+  InstrumentPreferenceEvent.type,
+]) {
   window.addEventListener(type, () => provider.setValue(current()))
 }

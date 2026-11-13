@@ -20,6 +20,7 @@ const KEYS = [
   'section_defaults',
   'enable_capo',
   'enabled_capo',
+  'instrument-offset',
   'keep_screen_awake',
   'scroll_to_top_on_swipe',
   'keep_awake_minutes',
@@ -89,6 +90,22 @@ describe('app-preferences', () => {
         control<HTMLInputElement>(el, id).click()
         expect(localStorage.getItem(key), id).to.equal(value)
       }
+    })
+
+    it('keeps My instrument, with each offset named for what it suits', async () => {
+      const el = await show()
+      const select = control<HTMLSelectElement>(el, '#instrument')
+      expect(select.value).to.equal('0')
+      expect([...select.options].map(option => option.textContent?.trim())).to.include.members([
+        'Concert pitch',
+        '+9 (E♭ instrument)',
+      ])
+      select.value = '9'
+      select.dispatchEvent(new Event('change'))
+      expect(localStorage.getItem('instrument-offset')).to.equal('9')
+      expect(el.instrument).to.equal(9)
+      // (and it is there next time)
+      expect(control<HTMLSelectElement>(await show(), '#instrument').value).to.equal('9')
     })
 
     it('keeps the limit chosen', async () => {

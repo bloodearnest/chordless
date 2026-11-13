@@ -28,6 +28,17 @@ describe('musical-metadata-display', () => {
     expect(items(display)).to.deep.equal(['Key: G', 'Capo: 2', 'BPM: 90', 'Time: 3/4'])
   })
 
+  it('says how far up My instrument moves the chords, and nothing for concert pitch', async () => {
+    expect(items(await show({ keyValue: 'G', instrument: 9 }))).to.deep.equal([
+      'Key: G',
+      'Chords up: 9',
+    ])
+    expect(
+      items(await show({ keyValue: 'G', capoValue: 2, instrument: 2, bpm: 80 }))
+    ).to.deep.equal(['Key: G', 'Capo: 2', 'Chords up: 2', 'BPM: 80'])
+    expect(items(await show({ keyValue: 'G', instrument: 0 }))).to.deep.equal(['Key: G'])
+  })
+
   it('leaves out what is not known, and the capo when there is none', async () => {
     expect(items(await show())).to.deep.equal([])
     expect(items(await show({ keyValue: 'D', capoValue: 0 }))).to.deep.equal(['Key: D'])

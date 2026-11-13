@@ -4,6 +4,7 @@ import { ContextConsumer } from '@lit/context'
 import { attachAnnotations, type ChartAnnotations } from '../js/annotations/shown.ts'
 import type { ChartSection, ParsedChart } from '../js/data-types.ts'
 import { displayPreferencesContext } from '../js/display-preferences.ts'
+import { shapesFor } from '../js/instrument.ts'
 import type { SongCues } from '../js/score-section.ts'
 import { isEditMode } from '../js/setlist/edit-mode-ui.ts'
 import { transposeKeyName } from '../js/transpose.ts'
@@ -11,7 +12,7 @@ import { annotationStyles, renderAnnotations } from './chart-annotation.ts'
 import { AnnotationRequestEvent } from './song-section.ts'
 
 /** How chords are shown before the page has said */
-const NO_DISPLAY_PREFERENCES = { nashville: false, unicodeAccidentals: false }
+const NO_DISPLAY_PREFERENCES = { nashville: false, unicodeAccidentals: false, instrument: 0 }
 
 /**
  * Song Display Component
@@ -147,13 +148,17 @@ export class SongDisplay extends LitElement {
   }
 
   _renderSection(section: ChartSection, index: number) {
-    /* v8 ignore next -- the page provides these as soon as display-preferences loads */
-    const { nashville, unicodeAccidentals } = this._display.value ?? NO_DISPLAY_PREFERENCES
+    /* v8 ignore next 2 -- the page provides these as soon as display-preferences loads */
+    const { nashville, unicodeAccidentals, instrument } =
+      this._display.value ?? NO_DISPLAY_PREFERENCES
     const displayKey = this.parsed?.metadata?.key || ''
     const capoValue = Number.isFinite(this.capo)
       ? Math.min(Math.max(Math.round(this.capo), 0), 11)
       : 0
-    const capoKey = capoValue > 0 && displayKey ? transposeKeyName(displayKey, -capoValue) : ''
+    // (the chords are moved by My instrument and then down by the capo: the same as one capo)
+    const shapes = shapesFor(instrument, capoValue, semitones =>
+      displayKey ? transposeKeyName(displayKey, semitones) : ''
+    )
     return html`
       <song-section
         .lines=${attachAnnotations(section.lines, this.annotations?.sections[index]?.lines ?? [])}
@@ -165,8 +170,8 @@ export class SongDisplay extends LitElement {
         .displayAsNashville=${nashville}
         .unicodeAccidentals=${unicodeAccidentals}
         .displayKey=${displayKey}
-        .capo=${capoValue}
-        .capoKey=${capoKey}
+        .capo=${shapes.capo}
+        .capoKey=${shapes.key}
         .melody=${this.cues?.measures[index] ? this.cues.melody : null}
         .melodyKey=${this.cues?.key ?? ''}
         .melodyMeasures=${this.cues?.measures[index] ?? null}

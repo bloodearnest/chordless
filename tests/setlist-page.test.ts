@@ -9,6 +9,7 @@
 
 import { expect, waitUntil } from '@open-wc/testing'
 import { render } from 'lit'
+import type { MusicalMetadataDisplay } from '../src/components/musical-metadata-display.ts'
 import type { SongDisplay } from '../src/components/song-display.ts'
 import '../src/components/song-display.ts'
 import '../src/components/song-section.ts'
@@ -17,7 +18,12 @@ import { SongChangeEvent } from '../src/js/app-events.ts'
 import type { Setlist, SongWithContent } from '../src/js/data-types.ts'
 import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
-import { CapoPreferenceEvent, setCapoPreference } from '../src/js/preferences.ts'
+import {
+  CapoPreferenceEvent,
+  InstrumentPreferenceEvent,
+  setCapoPreference,
+  setInstrumentPreference,
+} from '../src/js/preferences.ts'
 import { loadSetlistLocalState, saveSetlistLocalState } from '../src/js/setlist/local-state.ts'
 import { SetlistPage } from '../src/js/setlist-page.ts'
 import { getSongUserPrefs } from '../src/js/song-user-prefs.ts'
@@ -689,6 +695,24 @@ describe('the setlist page', () => {
 
       expect([capoOf(0), capoOf(1)]).to.deep.equal([0, 0])
       expect(selector.style.display).to.equal('none')
+    })
+
+    it('says in the song’s metadata how far My instrument moves the chords, and follows a change', async () => {
+      await open()
+      const metadata = must(root.querySelector<MusicalMetadataDisplay>('#musical-metadata'))
+      try {
+        setInstrumentPreference(9)
+        await settle()
+        // (opening a song shows it; changing the preference while one is shown updates it)
+        page.header.showInstrument()
+        expect(metadata.instrument).to.equal(9)
+        setInstrumentPreference(2)
+        window.dispatchEvent(new InstrumentPreferenceEvent(2))
+        await settle()
+        expect(metadata.instrument).to.equal(2)
+      } finally {
+        setInstrumentPreference(0)
+      }
     })
 
     describe('with the preference on when the setlist is opened', () => {

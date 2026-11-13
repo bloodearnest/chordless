@@ -1,8 +1,10 @@
 import { css, html, LitElement } from 'lit'
 import type { IconName } from '../js/icons.ts'
+import { INSTRUMENT_OPTIONS, instrumentLabel } from '../js/instrument.ts'
 import {
   getAnnotationsPreference,
   getCapoPreference,
+  getInstrumentPreference,
   getKeepAwakeMinutes,
   getKeepAwakePreference,
   getMusicianType,
@@ -16,6 +18,7 @@ import {
   type MusicianType,
   setAnnotationsPreference,
   setCapoPreference,
+  setInstrumentPreference,
   setKeepAwakeMinutes,
   setKeepAwakePreference,
   setMusicianType,
@@ -46,6 +49,7 @@ export class AppPreferences extends LitElement {
     useUnicodeAccidentals: { type: Boolean, attribute: false },
     musicianType: { type: String, attribute: false },
     capoEnabled: { type: Boolean, attribute: false },
+    instrument: { type: Number, attribute: false },
     scrollToTop: { type: Boolean, attribute: false },
     sharedAnnotations: { type: Boolean, attribute: false },
     myAnnotations: { type: Boolean, attribute: false },
@@ -59,6 +63,8 @@ export class AppPreferences extends LitElement {
   declare useUnicodeAccidentals: boolean
   declare musicianType: MusicianType
   declare capoEnabled: boolean
+  /** My instrument: how far up the chords are moved from the key (docs/PERSONAL_LAYER.md) */
+  declare instrument: number
   declare scrollToTop: boolean
   declare sharedAnnotations: boolean
   declare myAnnotations: boolean
@@ -167,6 +173,7 @@ export class AppPreferences extends LitElement {
     this.useUnicodeAccidentals = getUseUnicodeAccidentals()
     this.musicianType = getMusicianType()
     this.capoEnabled = getCapoPreference()
+    this.instrument = getInstrumentPreference()
     this.scrollToTop = getScrollToTopOnSwipe()
     this.sharedAnnotations = getAnnotationsPreference().shared
     this.myAnnotations = getAnnotationsPreference().mine
@@ -406,6 +413,27 @@ export class AppPreferences extends LitElement {
         </div>
 
         <div class="panel">
+          <h3>My instrument</h3>
+          <p>
+            Move the chords to suit your instrument, or how it is tuned: an E♭ or B♭ horn, or a
+            guitar tuned down. Only you see this. A setlist's key does not change.
+          </p>
+          <label class="field" for="instrument">
+            <span>Chords shown</span>
+            <select id="instrument" name="instrument" @change=${this._onInstrumentChange}>
+              ${INSTRUMENT_OPTIONS.map(
+                option => html`<option
+                  value=${option.semitones}
+                  ?selected=${option.semitones === this.instrument}
+                >
+                  ${instrumentLabel(option.semitones)}
+                </option>`
+              )}
+            </select>
+          </label>
+        </div>
+
+        <div class="panel">
           <h3>Moving between songs</h3>
           <p>
             Start each song at its top when you swipe to it. Turn this off to find a song where you
@@ -610,6 +638,11 @@ export class AppPreferences extends LitElement {
     const value = (event.currentTarget as HTMLInputElement).checked
     this.scrollToTop = value
     setScrollToTopOnSwipe(value)
+  }
+
+  _onInstrumentChange(event: Event): void {
+    this.instrument = Number((event.currentTarget as HTMLSelectElement).value)
+    setInstrumentPreference(this.instrument)
   }
 
   _onCapoToggle(event: Event): void {

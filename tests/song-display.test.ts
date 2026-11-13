@@ -53,6 +53,36 @@ describe('song-display', () => {
     expect(sections(display)[0].capoKey).to.equal('')
   })
 
+  it('moves the chords for My instrument and then the capo, as one capo would', async () => {
+    const { displayPreferencesContext } = await import('../src/js/display-preferences.ts')
+    const host = document.createElement('div')
+    const provider = new ContextProvider(host, {
+      context: displayPreferencesContext,
+      initialValue: { nashville: false, unicodeAccidentals: false, instrument: 2 },
+    })
+    document.body.append(host)
+    const display = document.createElement('song-display')
+    display.parsed = parse(CHART)
+    host.append(display)
+    await display.updateComplete
+    // (a B♭ instrument reads a G chart up a whole step, in A: the same as a capo at 10)
+    expect(sections(display)[0].capo).to.equal(10)
+    expect(sections(display)[0].capoKey).to.equal('A')
+
+    // (a capo 2 on top of that is the chart as it is)
+    display.capo = 2
+    await display.updateComplete
+    expect(sections(display)[0].capo).to.equal(0)
+    expect(sections(display)[0].capoKey).to.equal('')
+
+    // (and a different instrument follows the preference, with no song key to spell by)
+    provider.setValue({ nashville: false, unicodeAccidentals: false, instrument: 9 })
+    display.capo = 0
+    await display.updateComplete
+    expect(sections(display)[0].capo).to.equal(3)
+    host.remove()
+  })
+
   it('gives no capo key for a song with no key', async () => {
     const display = await show({ parsed: parse('{title: A}\n\n[G]One'), capo: 2 })
     expect(sections(display)[0].capoKey).to.equal('')
@@ -64,7 +94,7 @@ describe('song-display', () => {
     const host = document.createElement('div')
     const provider = new ContextProvider(host, {
       context: displayPreferencesContext,
-      initialValue: { nashville: true, unicodeAccidentals: false },
+      initialValue: { nashville: true, unicodeAccidentals: false, instrument: 0 },
     })
     document.body.append(host)
     const display = document.createElement('song-display')
@@ -74,7 +104,7 @@ describe('song-display', () => {
     expect(sections(display)[0].displayAsNashville).to.equal(true)
     expect(sections(display)[0].unicodeAccidentals).to.equal(false)
 
-    provider.setValue({ nashville: false, unicodeAccidentals: true })
+    provider.setValue({ nashville: false, unicodeAccidentals: true, instrument: 0 })
     await display.updateComplete
     expect(sections(display)[0].displayAsNashville).to.equal(false)
     expect(sections(display)[0].unicodeAccidentals).to.equal(true)

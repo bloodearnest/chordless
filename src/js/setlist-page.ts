@@ -46,6 +46,7 @@ import {
   CapoPreferenceEvent,
   getCapoPreference,
   getScrollToTopOnSwipe,
+  InstrumentPreferenceEvent,
   SectionDefaultsEvent,
 } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
@@ -277,6 +278,9 @@ export class SetlistPage {
     window.addEventListener(SectionDefaultsEvent.type, this._onSectionDefaultsChanged, { signal })
     window.addEventListener('storage', this._onCapoPreferenceChange, { signal })
     window.addEventListener(CapoPreferenceEvent.type, this._onCapoPreferenceChange, { signal })
+    window.addEventListener(InstrumentPreferenceEvent.type, () => this.header.showInstrument(), {
+      signal,
+    })
     window.addEventListener(LiveChangeEvent.type, this._onLiveChange, { signal })
     window.addEventListener(LiveSyncStatusEvent.type, this._onLiveChange, { signal })
   }

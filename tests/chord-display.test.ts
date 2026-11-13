@@ -46,6 +46,14 @@ describe('chord-display', () => {
       expect(text(await show({ chord: 'G', capo: 2 }))).to.equal('F')
     })
 
+    it('shows the chords as My instrument moves them, which a capo of 12 less does', async () => {
+      // (a B♭ instrument reads up a whole step: the key is moved to A, and the chords with it)
+      expect(text(await show({ chord: 'G', capo: 10, capoKey: 'A' }))).to.equal('A')
+      expect(text(await show({ chord: 'D/F#', capo: 10, capoKey: 'A' }))).to.equal('E/G#')
+      // (an E♭ instrument reads up a sixth, in the sharps or flats of the key it is moved to)
+      expect(text(await show({ chord: 'G', capo: 3, capoKey: 'E' }))).to.equal('E')
+    })
+
     it('shows the chord as it is with no capo, or one that is not a number', async () => {
       expect(text(await show({ chord: 'G', capo: 0 }))).to.equal('G')
       expect(text(await show({ chord: 'G', capo: Number.NaN }))).to.equal('G')

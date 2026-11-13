@@ -16,6 +16,7 @@ const KEYS = [
   'section_defaults',
   'enable_capo',
   'enabled_capo',
+  'instrument-offset',
   'setup-done',
   'keep_screen_awake',
   'scroll_to_top_on_swipe',
@@ -157,6 +158,24 @@ describe('preferences', () => {
     })
   })
 
+  describe('My instrument', () => {
+    it('is concert pitch until one is chosen, kept as whole semitones from 0 to 11, and said on window', async () => {
+      const preferences = await fresh()
+      expect(preferences.getInstrumentPreference()).to.equal(0)
+      const events = heard<InstanceType<Preferences['InstrumentPreferenceEvent']>>(
+        'preferences:instrument-changed',
+        () => preferences.setInstrumentPreference(9)
+      )
+      expect(events.map(event => event.semitones)).to.deep.equal([9])
+      expect(localStorage.getItem('instrument-offset')).to.equal('9')
+      expect(preferences.getInstrumentPreference()).to.equal(9)
+      preferences.setInstrumentPreference(14)
+      expect(preferences.getInstrumentPreference()).to.equal(2)
+      localStorage.setItem('instrument-offset', 'nonsense')
+      expect(preferences.getInstrumentPreference()).to.equal(0)
+    })
+  })
+
   describe('the section defaults', () => {
     it('are what the user chose, or everything when nothing is stored', async () => {
       const preferences = await fresh()
@@ -246,6 +265,12 @@ describe('preferences', () => {
       expect(preferences.getKeepAwakeMinutes()).to.equal(30)
       expect(() => preferences.setKeepAwakePreference(false)).to.not.throw()
       expect(() => preferences.setKeepAwakeMinutes(30)).to.not.throw()
+    })
+
+    it('has concert pitch when it cannot ask what the instrument is', async () => {
+      const preferences = await fresh()
+      block()
+      expect(preferences.getInstrumentPreference()).to.equal(0)
     })
 
     it('has no capo when it cannot ask whether it is on', async () => {
