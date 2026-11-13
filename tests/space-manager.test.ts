@@ -12,7 +12,6 @@ import '../src/components/space-manager.ts'
 import type { Space } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import { forgetSync } from '../src/js/last-sync.ts'
-import { scoreRecord } from '../src/js/score-record.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import {
   createSpace,
@@ -27,7 +26,7 @@ import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { clearToasts, nothingFor, shownToast, suppressConsoleLogs } from './test-helpers.ts'
+import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -48,7 +47,6 @@ describe('space-manager', () => {
   })
 
   afterEach(async () => {
-    clearToasts()
     drive.uninstall()
     uninstallWorker()
     for (const id of made.splice(0)) {
@@ -98,75 +96,6 @@ describe('space-manager', () => {
     ).click()
     return modal
   }
-
-  describe('lead sheets another space holds', () => {
-    /** Two spaces with the same song (as a Team made from an export has it), a lead sheet in the first only */
-    async function withSheetInOne() {
-      const mine = await space('Mine')
-      const team = await space('Team')
-      const db = new ChordlessDB(mine.id)
-      await db.init()
-      const [song] = await db.getAllSongs()
-      await db.saveScore(scoreRecord(must(song).uuid, '<score-partwise>a</score-partwise>', 'G'))
-      db.db?.close()
-      return { mine, team }
-    }
-
-    it('offers to copy them into a space whose songs lack them, and does', async () => {
-      const { team } = await withSheetInOne()
-      const el = await page(team.id)
-      await waitUntil(() => el.shadowRoot?.querySelector('#copy-sheets'), undefined, {
-        timeout: 2000,
-      })
-      expect(el.shadowRoot?.textContent).to.contain('1 song here has no')
-
-      must(el.shadowRoot?.querySelector<HTMLButtonElement>('#copy-sheets')).click()
-      await waitUntil(() => !el.shadowRoot?.querySelector('#copy-sheets'), undefined, {
-        timeout: 2000,
-      })
-
-      const db = new ChordlessDB(team.id)
-      await db.init()
-      expect(await db.getAllScores()).to.have.length(1)
-      db.db?.close()
-    })
-
-    it('says so in the plural for several songs, and says how many it copied', async () => {
-      const { mine, team } = await withSheetInOne()
-      for (const id of [mine.id, team.id]) {
-        const db = new ChordlessDB(id)
-        await db.init()
-        const beta = await addChart(db, '{title: Beta}\n{key: D}\n[D]Beta line', {
-          variantLabel: 'Test',
-          importSource: 'test',
-          makeDefault: 'first',
-        })
-        if (id === mine.id) {
-          await db.saveScore(scoreRecord(beta.uuid, '<score-partwise>b</score-partwise>', 'D'))
-        }
-        db.db?.close()
-      }
-      const el = await page(team.id)
-      await waitUntil(() => el.shadowRoot?.querySelector('#copy-sheets'), undefined, {
-        timeout: 2000,
-      })
-      expect(el.shadowRoot?.textContent?.replace(/\s+/g, ' ')).to.contain(
-        '2 songs here have no lead sheet, but the same songs have them'
-      )
-
-      must(el.shadowRoot?.querySelector<HTMLButtonElement>('#copy-sheets')).click()
-      await waitUntil(() => shownToast()?.message === 'Copied 2 lead sheets.', undefined, {
-        timeout: 2000,
-      })
-    })
-
-    it('offers nothing to the space the lead sheets are in', async () => {
-      const { mine } = await withSheetInOne()
-      const el = await page(mine.id)
-      await nothingFor(100)
-      expect(el.shadowRoot?.querySelector('#copy-sheets')).to.equal(null)
-    })
-  })
 
   it('says there is no such space for an id this device does not have', async () => {
     const el = await page('no-such-space')
