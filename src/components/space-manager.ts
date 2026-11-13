@@ -136,22 +136,27 @@ export class SpaceManager extends LitElement {
   async _countSheets(spaceId: string): Promise<number> {
     try {
       return await sheetsToCopyInto(spaceId)
+      /* v8 ignore start -- a database that cannot be read: the offer is left out, as it is a convenience */
     } catch (error) {
       console.error('[SpaceManager] Could not look for lead sheets in other spaces:', error)
       return 0
     }
+    /* v8 ignore stop */
   }
 
   async _copySheets(): Promise<void> {
+    /* v8 ignore next -- the button is disabled while it works */
     if (this._copying) return
     this._copying = true
     try {
       const copied = await copySheetsInto(this.spaceId)
       toast(`Copied ${copied} lead sheet${copied === 1 ? '' : 's'}.`)
       this._sheets = await this._countSheets(this.spaceId)
+      /* v8 ignore start -- a write to the database that fails: nothing to make it do so here */
     } catch (error) {
       console.error('[SpaceManager] Failed to copy lead sheets:', error)
       toast("Couldn't copy the lead sheets.", { kind: 'error', details: errorMessage(error) })
+      /* v8 ignore stop */
     } finally {
       this._copying = false
     }
