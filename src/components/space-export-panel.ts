@@ -26,6 +26,8 @@ interface PendingImport {
   pads: boolean
 }
 
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
+
 /** An import was added to the space: whoever shows what it holds can look again */
 export class SpaceImportedEvent extends Event {
   static readonly type = 'space-export-panel:imported'
@@ -219,6 +221,7 @@ export class SpaceExportPanel extends LitElement {
         text:
           `Imported into ${where}: ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +
           `, ${report.songsSkipped} charts and ${report.setlistsSkipped} setlists were already there` +
+          (report.scoresAdded > 0 ? `; ${plural(report.scoresAdded, 'lead sheet')} added` : '') +
           (pads.length > 0 ? `; ${pads.length} pad sets uploaded to Drive` : '') +
           '.',
         kind: 'info',
@@ -264,6 +267,7 @@ export class SpaceExportPanel extends LitElement {
           (report.songsOnlyHere + report.setlistsOnlyHere > 0
             ? `; ${report.songsOnlyHere} charts and ${report.setlistsOnlyHere} setlists that are not in the file were kept`
             : '') +
+          (report.scoresAdded > 0 ? `; ${plural(report.scoresAdded, 'lead sheet')} added` : '') +
           '. Sync sends the changes to Drive.',
         kind: 'info',
       }

@@ -330,7 +330,8 @@ Steps, each on the one page:
    first that does; a dropdown if more than one does), as separate checkboxes, each with its count
    and size ("Songs (212, 640 KB), copied"). Built 2026-10-22, except pads.
    - **Songs are always copied, never moved**: a song deleted from a synced library would come back
-     (SYNC_ARCHITECTURE.md), so the source keeps its songs. Ticking only the setlists still brings the
+     (SYNC_ARCHITECTURE.md), so the source keeps its songs. Their lead sheets are copied with them
+     (docs/LEAD_SHEETS.md). Ticking only the setlists still brings the
      songs they use.
    - **Setlists: move** (default) or **keep a copy**. An upgrade means the team's setlists should
      leave the personal space, so move is the default and the wording says so ("they leave your
@@ -784,7 +785,9 @@ between two Google accounts. (It is called export and import, not backup and res
 carry, and the menu already has "Import Songs" and "Import a Setlist", which are other things.)
 - **Contents:** `manifest.json` (format `chordless-export`, version, date, the space's name, counts),
   `songs.json` (each chart's record: id, variant, label, key, tempo, origin), `songs/<title>-<id>.cho`
-  (the charts as ChordPro text, readable on their own), `setlists/<date>-<name>-<id>.json`. Nothing of
+  (the charts as ChordPro text, readable on their own), `scores.json` and `scores/<title>-<id>.lead-sheet.musicxml`
+  (each song's lead sheet as plain MusicXML, docs/LEAD_SHEETS.md; an export from before has none),
+  `setlists/<date>-<name>-<id>.json`. Nothing of
   Drive is in it (no file ids or checksums), no share links, no received shares, no deleted setlists.
   A device's own state (the capo, the sections shown) is not in it.
 - **Pads are optional**, off by default, with the size shown beside the choice (`padSetSize`): they are

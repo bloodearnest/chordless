@@ -7,6 +7,8 @@
  *   manifest.json                what and when, and how much
  *   songs.json                   each chart's record (its identity, variant, key, tempo)
  *   songs/<title>-<id>.cho       each chart's text
+ *   scores.json                  each lead sheet's song, and the key it is written in (docs/LEAD_SHEETS.md)
+ *   scores/<title>-<id>.lead-sheet.musicxml   each lead sheet's MusicXML, as any notation program reads it
  *   people.json                  who leads the setlists (docs/IDENTITIES.md)
  *   setlists/<date>-<name>-<id>.json
  *   pads/<set>/<KEY>.mp3
@@ -14,11 +16,12 @@
  * An import adds what the space lacks and skips what it has (charts by content, setlists by id),
  * so running it twice adds nothing; it deletes nothing.
  */
-import type { Person, Setlist, SongRecord } from './data-types.ts'
+import type { Person, ScoreRecord, Setlist, SongRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { adoptLegacyLeader } from './leaders.ts'
 import { PAD_FILE_KEYS } from './pad-keys.ts'
 import { type PadSet, readPadSetAudio, uploadPadSet } from './pad-set-service.ts'
+import { scoreRecord } from './score-record.ts'
 import { type TransferReport, type TransferSource, transferSpace } from './space-transfer.ts'
 import { personContent } from './sync/person-hash.ts'
 import { setlistContent } from './sync/setlist-hash.ts'
@@ -36,7 +39,8 @@ export interface ExportManifest {
   created: string
   /** The name of the space it was exported from */
   space: string
-  counts: { songs: number; setlists: number; padSets: number }
+  /** (`scores` is not in an export made before lead sheets were) */
+  counts: { songs: number; setlists: number; padSets: number; scores?: number }
   /** The pad sets in the file, by name (their files are under `pads/<dir>/`) */
   padSets: { name: string; dir: string }[]
 }
@@ -66,11 +70,20 @@ type ExportSong = Pick<
   | 'modifiedDate'
 > & { file: string }
 
+/** A lead sheet in an export: the song it is of (by the song's uuid in the file), its key, and its file */
+interface ExportScore {
+  uuid: string
+  key: string | null
+  file: string
+}
+
 /** An export file read into memory */
 export interface SpaceExport {
   manifest: ExportManifest
   songs: SongRecord[]
   chordpro: Map<string, string>
+  /** The lead sheets, by the uuid of the song each is of in `songs` (none in an export from before there were) */
+  scores: ScoreRecord[]
   setlists: Setlist[]
   /** The people who lead them (made from the setlists of an export from before there were people) */
   people: Person[]
@@ -148,6 +161,17 @@ export async function createExport(
     })
   }
 
+  // (the lead sheets of the songs above: one of a song that has no chart is no use alone)
+  const scores: ExportScore[] = []
+  const exportedSongs = new Map(songs.map(song => [song.uuid, song]))
+  for (const record of await db.getAllScores()) {
+    const song = exportedSongs.get(record.uuid)
+    if (!song) continue
+    const file = `scores/${slug(song.title)}-${shortId(record.uuid)}.lead-sheet.musicxml`
+    files.push({ name: file, data: record.xml })
+    scores.push({ uuid: record.uuid, key: record.key, file })
+  }
+
   let setlistCount = 0
   for (const setlist of await db.getAllSetlists()) {
     // (a received share is someone else's, kept apart; a deleted setlist is gone)
@@ -178,13 +202,19 @@ export async function createExport(
     version: EXPORT_VERSION,
     created: now.toISOString(),
     space: spaceName,
-    counts: { songs: songs.length, setlists: setlistCount, padSets: padEntries.length },
+    counts: {
+      songs: songs.length,
+      setlists: setlistCount,
+      padSets: padEntries.length,
+      scores: scores.length,
+    },
     padSets: padEntries,
   }
   return writeZip(
     [
       { name: 'manifest.json', data: JSON.stringify(manifest, null, 2) },
       { name: 'songs.json', data: JSON.stringify(songs, null, 2) },
+      { name: 'scores.json', data: JSON.stringify(scores, null, 2) },
       {
         name: 'people.json',
         data: JSON.stringify((await db.getAllPeople()).map(personContent), null, 2),
@@ -243,6 +273,15 @@ export async function readExport(file: Blob): Promise<SpaceExport> {
     })
   }
 
+  // (a file that lists a sheet whose file is not there is read without it: the charts are what matter)
+  const scores: ScoreRecord[] = []
+  if (byName.has('scores.json')) {
+    for (const score of JSON.parse(await text('scores.json')) as ExportScore[]) {
+      if (!byName.has(score.file)) continue
+      scores.push(scoreRecord(score.uuid, await text(score.file), score.key))
+    }
+  }
+
   const setlists: Setlist[] = []
   for (const entry of zip.entries) {
     if (entry.fileName.startsWith('setlists/') && entry.fileName.endsWith('.json')) {
@@ -261,6 +300,7 @@ export async function readExport(file: Blob): Promise<SpaceExport> {
     manifest,
     songs,
     chordpro,
+    scores,
     setlists: adopted,
     people,
     async padAudio(dir) {
@@ -284,6 +324,7 @@ function sourceOf(exported: SpaceExport): TransferSource {
     },
     getAllSetlists: async () => exported.setlists,
     getAllPeople: async () => exported.people,
+    getAllScores: async () => exported.scores,
   }
 }
 

@@ -1,4 +1,5 @@
 import { expect } from '@open-wc/testing'
+import { scoreRecord } from '../src/js/score-record.ts'
 import { generateShareKey } from '../src/js/share-crypto.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import { createExport, readExport, type SpaceExport } from '../src/js/space-export.ts'
@@ -187,6 +188,23 @@ describe('Reset from import (resetToExport)', () => {
     must(file.songs.find(s => s.uuid === 'alpha')).modifiedDate = '2999-01-01T00:00:00.000Z'
     const later = await planReset(file, phone.db)
     expect(later.songsReplaced[0].newerHere).to.equal(false)
+  })
+
+  it("puts the file's lead sheets on songs that have none, and keeps one that is there", async () => {
+    const { phone } = await library()
+    await phone.db.saveScore(scoreRecord('alpha', '<score-partwise>a</score-partwise>', 'G'))
+    await phone.db.saveScore(scoreRecord('beta', '<score-partwise>b</score-partwise>', 'D'))
+    const exported = await fileOf(phone)
+    expect(exported.scores).to.have.length(2)
+    // here: Alpha's sheet lost (as in a space made from an export before sheets were in it), Beta's changed
+    await phone.db.deleteScore('alpha', { remember: false })
+    await phone.db.saveScore(scoreRecord('beta', '<score-partwise>mine</score-partwise>', 'D'))
+
+    const report = await resetToExport(exported, phone.db)
+
+    expect(report.scoresAdded).to.equal(1)
+    expect(must(await phone.db.getScore('alpha')).xml).to.contain('>a<')
+    expect(must(await phone.db.getScore('beta')).xml).to.contain('mine')
   })
 
   it('does nothing twice: a second reset to the same file finds it all the same', async () => {

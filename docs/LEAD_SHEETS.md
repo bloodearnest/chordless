@@ -185,7 +185,19 @@ as the chord transposer spells them. The range is of the sung notes: cue notes a
   only in the user's browser and Drive, never on the Worker, never in a share link, never in
   telemetry. A share carries the setlist; the receiver imports their own.
 - It is derived data: it can be thrown away and read again from a PDF or a MusicXML file, so it is
-  safe to lose, and need not be in exports (the MusicXML file is itself an export).
+  safe to lose. A lead sheet belongs to **a song of one space**, as the song's uuid is the space's own, so what
+  makes a Team from a Personal space's songs has to bring the sheets too, or the Team's songs show none (a Team
+  made from an export did exactly that, once: the charts came and no sheets). Both carry them now:
+  - **Copy and move** between spaces (`copySongs`, `docs/SPACES.md`) and **import** of an export copy a song's sheet with
+    it, also onto a song the destination already had, and never replace one it has (`copyScores`).
+  - **An export** holds each sheet as plain `scores/<title>-<id>.lead-sheet.musicxml`, which any notation program opens,
+    and `scores.json` (the song's uuid in the file, and the key it is written in). An export from before has neither,
+    and imports as it did. A **reset from an export** puts its sheets on the songs that have none, and keeps those that
+    are there (a sheet is derived data: a reset is about what people wrote).
+  - **For a space made before that** the space's Data modal offers "Copy lead sheets" when another space on the device
+    has a sheet for a song here that has none (`lead-sheets-elsewhere.ts`): the same chart is found by its content,
+    else by its song's id (`ccli-7226112`), the Personal space's first. It is the device's own copies, with no Drive
+    access to the source, and sync sends them to the space's Drive (a Team's as the plain `.musicxml`).
 
 ## The terms
 
