@@ -534,8 +534,11 @@ owner (implicitly admin) > admin > writer > reader. Worker enforcement:
   mistakes, not a determined writer.
 - Invite, remove, change roles, enable/disable sharing: admin and up (owner for disable/transfer).
 
-Undecided: whether writers may edit others' setlists (see "Several people editing a setlist" in
-SYNC_ARCHITECTURE.md), and an admin's finer powers.
+**Who changes a setlist** (decided 2026-11-13, not built: docs/PERSONAL_LAYER.md): its leader, a team
+admin or owner, and in a personal space you, always. A writer who is not its leader, and a reader, have
+only the personal layer: their own instrument and capo, annotations and songs added for themselves,
+none of it synced. Undecided: whether other writers may ever change the core properties, and an admin's
+finer powers.
 
 ## Pads in team spaces
 
@@ -767,9 +770,9 @@ only what needs Drive: sharing by link (the song list to paste stays).
   mid-service, since the app syncs by itself (SYNC_ARCHITECTURE.md, "Immediate background sync"):
   the open setlist is updated in place (`applyChangedSetlist`), keeping the current song by its song
   id, saying what changed with the same summary, and keeping Undo.
-- The marker does not yet list *what* differs (their value, the official one, whether the official
-  one changed since). That, and a per-field merge, are the device layer in SYNC_ARCHITECTURE.md,
-  "Several people editing a setlist".
+- The marker does not yet list *what* differs. It goes with the rest of this path when the personal
+  layer is built (docs/PERSONAL_LAYER.md): a person who does not control a setlist will have no shared
+  edits to replace.
 
 **To do:** the Drive-capabilities trigger and the refusal counting can go for team spaces, whose
 role is known. Anyone (a writer too) could choose "keep
@@ -926,7 +929,7 @@ Checked against the code 2026-11-12.
     a space, deleting and moving a setlist.
 
 Items carried over from the TODO (space section): a media-team email config option; restrict
-editing others' setlists by `ownerId` (SYNC_ARCHITECTURE.md, "Several people editing a setlist").
+editing others' setlists (decided: docs/PERSONAL_LAYER.md).
 
 ## Deleting a space
 

@@ -126,9 +126,10 @@ scales with the font on that musician's own devices.
   the rest. Private annotations and drawings never leave the device.
 - The export zip carries shared annotations (they are in the setlist JSON); private annotations are not
   exported, like section visibility.
-- A setlist is one file and a conflict is "Drive wins" (`SYNC_ARCHITECTURE.md`), so two writers
-  editing annotations at once can lose one. Every annotation has an id and a `modified` stamp so the planned
-  three-way merge can merge by annotation id.
+- A setlist is one file and a conflict is "Drive wins" (`SYNC_ARCHITECTURE.md`). Only the people who
+  control a setlist change it (docs/PERSONAL_LAYER.md), so two people editing shared annotations at once
+  is rare. Every annotation keeps an id and a `modified` stamp. Private annotations are never in the
+  file, so a conflict cannot touch them.
 
 ## Not built yet
 
