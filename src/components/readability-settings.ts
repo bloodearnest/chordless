@@ -331,7 +331,7 @@ export class ReadabilitySettings extends LitElement {
 
   _renderPreview(theme: (typeof THEMES)[number]) {
     const colours = ThemeManager.themes[theme] as Record<string, string>
-    const chord = colours['chord-color'] ?? '#1d6a9c'
+    const chord = colours['chord-color'] as string
     const tinted = chordColours(this._tint, theme, chord)
     const ratio = tinted ? contrastRatio(tinted.ink, tinted.background) : null
     return html`

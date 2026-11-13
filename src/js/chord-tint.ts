@@ -60,8 +60,8 @@ export function tintBackground(tint: string, theme: 'light' | 'dark'): string | 
   const value = normaliseTint(tint)
   if (!value) return null
   if (value.startsWith('#')) return value
-  const preset = TINT_PRESETS.find(candidate => candidate.id === value)
-  return preset ? preset[theme] : null
+  // (normaliseTint left only a preset's id)
+  return (TINT_PRESETS.find(candidate => candidate.id === value) as TintPreset)[theme]
 }
 
 const DARK_INK = '#0a2a43'
