@@ -163,16 +163,45 @@ What is built and will change:
 - Shared annotations, the delete rule (a writer deletes a setlist they lead, an admin any) and the
   Worker's check of it, the 409 on a stale write, and the default space are built.
 
-## Order of work
+## Implementation plan
 
-1. This document; the other docs point here.
-2. **"What do you play?"**: the switches and presets (and Custom) in the first-use setup and Preferences,
-   replacing the lyrics-only and capo choices; existing settings carried over.
-3. **Guitarist**: tuning (device default, and per setlist on the overview), the capo added to it, the
-   header's total.
-4. **Transposing instrument**: the pitch (device default, per setlist, per song), through the display
-   code #191 changed; then the lead sheet's notes.
-5. **Who controls a setlist**: the controls for key, tempo, order, removal and "Everyone" annotations
+What is kept, and where (all on the device; the types are presets over the switches, so the switches are
+the truth):
+
+| What | Kept as | Notes |
+|---|---|---|
+| Start with lyrics only | `section_defaults` (as now) | the switch; `setMusicianType` sets it today |
+| Capo and tuning controls on | `enable_capo` (as now) | the switch; renamed in the UI |
+| Instrument pitch controls on | `enable_pitch` (new) | the switch |
+| The type | `musician_type`: `singer`, `guitarist`, `transposing`, `general` (shown as Other), `custom` | `drummer` is read as `singer`; changing a switch by hand makes it `custom` (or the preset it now matches) |
+| Tuning, device default | `tuning` (semitones the shapes go up: 0, 1, 2) | |
+| Tuning, this setlist | `setlist/local-state.ts`: `tuning`, null for the device's | |
+| Capo, a song | as now: per setlist, per song | added to the tuning |
+| Pitch, device default | `pitch` (`concert`, `bb`, `eb`, `f`) | stored as the choice; the offset is derived |
+| Pitch, this setlist | `local-state.ts`: `pitch`, null for the device's | |
+| Pitch, a song | `local-state.ts`: by song, replaces the others | |
+
+For a song the chords move by **tuning (setlist's, else the device's) + pitch offset (song's, else the
+setlist's, else the device's) − capo**, each only if its switch is on. The page works this out and
+gives the song display one number; a view with no setlist (the library) uses the device defaults. The
+chord display is not changed: the number is given to it as the one capo that does the same (`shapesFor`
+in the open #191), and Nashville numbers ignore it.
+
+Pull requests, in order, each building on `main` as it is:
+
+1. **"What do you play?"**: the switches, the presets, Custom; the first-use setup and Preferences
+   (replacing the lyrics-only radios and the capo toggle); existing settings carried over; no change to
+   what is drawn. Header controls show or hide by the switches (the capo already does).
+2. **Guitarist**: tuning (Preferences, and the setlist overview's row, editable in edit mode); the
+   capo added to it; the header's total ("Capo 2, tuned down: capo 1"). Reworks #191's display change:
+   its offset becomes tuning plus pitch resolved per song, and the 12-option list goes.
+3. **Transposing instrument**: pitch (Preferences, overview row, a picker in the song's header), the
+   display as above; then **the lead sheet's notes**, which need a look at how the melody is
+   transposed first.
+4. **Who controls a setlist**: the controls for key, tempo, order, removal and "Everyone" annotations
    offered only to them.
-6. **Songs added locally.**
-7. Remove the read-only reset path.
+5. **Songs added locally.**
+6. Remove the read-only reset path.
+
+Tests, as for any preference: the arithmetic in node, each control's setting and its being kept, storage
+blocked, the carry-over, and the setlist page following a change.
