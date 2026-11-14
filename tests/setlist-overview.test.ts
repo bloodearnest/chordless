@@ -1,6 +1,8 @@
 import { expect, fixture, html } from '@open-wc/testing'
+import { PitchChangeEvent, type PitchSelector } from '../src/components/pitch-selector.ts'
 import {
   OverviewAddSongEvent,
+  OverviewPitchChangeEvent,
   OverviewSongBpmChangeEvent,
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
@@ -76,6 +78,52 @@ describe('setlist-overview', () => {
     cardAt(overview, 1).dispatchEvent(new SongCardKeyChangeEvent('E'))
     cardAt(overview, 0).dispatchEvent(new SongCardBpmChangeEvent(88))
     expect(seen).to.deep.equal(['click 1', 'delete 0', 'key 1 E', 'bpm 0 88'])
+  })
+
+  describe('the instrument pitch for the setlist', () => {
+    const row = (overview: SetlistOverview) =>
+      overview.querySelector<PitchSelector>('pitch-selector')
+
+    it('has a row for it when the pitch controls are on and it is edit mode, and none otherwise', async () => {
+      const overview = await show(true)
+      expect(row(overview)).to.equal(null)
+      overview.showPitch = true
+      await overview.updateComplete
+      expect(row(overview)).to.not.equal(null)
+    })
+
+    it('shows it out of edit mode only when it is not concert pitch, the setlist’s own or the device’s', async () => {
+      const overview = await show()
+      overview.showPitch = true
+      await overview.updateComplete
+      expect(row(overview)).to.equal(null)
+      overview.devicePitch = 'eb'
+      await overview.updateComplete
+      expect(row(overview)?._displayValue()).to.equal('E♭')
+      overview.pitch = 'concert'
+      await overview.updateComplete
+      expect(row(overview)).to.equal(null)
+      overview.pitch = 'bb'
+      await overview.updateComplete
+      expect(row(overview)?._displayValue()).to.equal('B♭')
+      expect(row(overview)?.editMode).to.equal(false)
+      overview.editMode = true
+      await overview.updateComplete
+      expect(row(overview)?.editMode).to.equal(true)
+    })
+
+    it('says which pitch was chosen, once, and null for the device’s', async () => {
+      const overview = await show(true)
+      overview.showPitch = true
+      await overview.updateComplete
+      const seen: (string | null)[] = []
+      overview.addEventListener(OverviewPitchChangeEvent.type, event =>
+        seen.push((event as OverviewPitchChangeEvent).pitch)
+      )
+      row(overview)?.dispatchEvent(new PitchChangeEvent('f'))
+      row(overview)?.dispatchEvent(new PitchChangeEvent(null))
+      expect(seen).to.deep.equal(['f', null])
+    })
   })
 
   describe('the tuning of the guitar for the setlist', () => {

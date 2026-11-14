@@ -46,3 +46,17 @@ describe('tuning', () => {
     assert.deepEqual(shapesFor(1, 0.4, key), { capo: 11, key: key(1) })
   })
 })
+
+describe('shapes for any number of semitones up', () => {
+  test('moves the chords by whatever made the shift, as one capo', () => {
+    const key = (semitones: number) => transposeKeyName('G', semitones)
+    // (an E♭ instrument reads up 9, which is down 3)
+    assert.deepEqual(shapesFor(9, 0, key), { capo: 3, key: key(9) })
+    // (a B♭ instrument and a guitar tuned a whole step down, together: up 4)
+    assert.deepEqual(shapesFor(4, 0, key), { capo: 8, key: key(4) })
+    // (and a capo takes from it)
+    assert.deepEqual(shapesFor(9, 3, key), { capo: 6, key: key(6) })
+    // (up a whole octave is none)
+    assert.deepEqual(shapesFor(12, 0, key), { capo: 0, key: '' })
+  })
+})

@@ -28,14 +28,14 @@ describe('first-use-setup', () => {
   it('opens a modal with the choices', async () => {
     await setUp()
     expect(root().querySelector('app-modal').open).to.equal(true)
-    // (singer, guitarist, another instrument: Custom is for Preferences)
-    expect(root().querySelectorAll('input[type="radio"]').length).to.equal(3)
+    // (singer, guitarist, a transposing instrument, another instrument: Custom is for Preferences)
+    expect(root().querySelectorAll('input[type="radio"]').length).to.equal(4)
     expect(root().querySelector('legend').textContent).to.equal('What do you play?')
   })
 
   it('saves the choice as it is made, with the switches it stands for', async () => {
     await setUp()
-    const [singer, guitarist, other] = root().querySelectorAll('input[type="radio"]')
+    const [singer, guitarist, transposing, other] = root().querySelectorAll('input[type="radio"]')
     singer.click()
     expect(localStorage.getItem('musician_type')).to.equal('singer')
     expect(JSON.parse(localStorage.getItem('section_defaults') ?? '')).to.deep.equal({
@@ -45,9 +45,14 @@ describe('first-use-setup', () => {
     expect(localStorage.getItem('musician_type')).to.equal('guitarist')
     expect(localStorage.getItem('enable_capo')).to.equal('true')
     expect(JSON.parse(localStorage.getItem('section_defaults') ?? '')).to.deep.equal({ all: 'all' })
+    transposing.click()
+    expect(localStorage.getItem('musician_type')).to.equal('transposing')
+    expect(localStorage.getItem('enable_capo')).to.equal('false')
+    expect(localStorage.getItem('enable_pitch')).to.equal('true')
     other.click()
     expect(localStorage.getItem('musician_type')).to.equal('general')
     expect(localStorage.getItem('enable_capo')).to.equal('false')
+    expect(localStorage.getItem('enable_pitch')).to.equal('false')
   })
 
   it('shows what is already chosen', async () => {

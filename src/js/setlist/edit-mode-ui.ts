@@ -7,6 +7,7 @@ import type { AppHeader } from '../../components/app-header.ts'
 import type { CapoSelector } from '../../components/capo-selector.ts'
 import type { KeySelector } from '../../components/key-selector.ts'
 import type { MusicalMetadataDisplay } from '../../components/musical-metadata-display.ts'
+import type { PitchSelector } from '../../components/pitch-selector.ts'
 
 /** How long the controls take to fade, as the CSS has it */
 const FADE_MS = 250
@@ -28,7 +29,7 @@ const all = (root: ParentNode, selector: string) => root.querySelectorAll<HTMLEl
 export function enterEditMode(
   root: ParentNode,
   appHeader: AppHeader,
-  { capoEnabled }: { capoEnabled: boolean }
+  { capoEnabled, pitchEnabled = false }: { capoEnabled: boolean; pitchEnabled?: boolean }
 ) {
   setBodyEditMode(true)
   appHeader.editMode = true
@@ -39,6 +40,8 @@ export function enterEditMode(
   if (keySelector) keySelector.editMode = true
   const capoSelector = root.querySelector<CapoSelector>('#capo-selector')
   if (capoSelector && capoEnabled) capoSelector.editMode = true
+  const pitchSelector = root.querySelector<PitchSelector>('#pitch-selector')
+  if (pitchSelector && pitchEnabled) pitchSelector.editMode = true
 
   // Clear inline display:none if it was set during previous exit
   for (const control of all(root, '.edit-mode-control')) control.style.display = ''
@@ -63,6 +66,8 @@ export function leaveEditMode(root: ParentNode, appHeader: AppHeader, whenFaded:
   if (keySelector) keySelector.editMode = false
   const capoSelector = root.querySelector<CapoSelector>('#capo-selector')
   if (capoSelector) capoSelector.editMode = false
+  const pitchSelector = root.querySelector<PitchSelector>('#pitch-selector')
+  if (pitchSelector) pitchSelector.editMode = false
 
   for (const control of all(root, '.edit-mode-control')) control.classList.remove('fade-in')
   for (const control of all(root, '.normal-mode-control')) control.classList.remove('fade-complete')

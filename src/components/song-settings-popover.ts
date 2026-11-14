@@ -287,6 +287,8 @@ export class SongSettingsPopover extends LitElement {
           <!-- Row 1: Key selector and Capo selector -->
           <slot name="key-selector"></slot>
           <slot name="capo-selector"></slot>
+          <!-- (and the instrument's pitch, for a song that has its own, where the pitch controls are on) -->
+          <slot name="pitch-selector"></slot>
 
           <!-- Row 2: BPM controls -->
           <label class="meta-label bpm-label">BPM:</label>

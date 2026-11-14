@@ -3,11 +3,15 @@ import {
   clearSetlistLocalState,
   loadSetlistAnnotations,
   loadSetlistLocalState,
+  loadSetlistPitch,
   loadSetlistTuning,
   loadSongCapo,
+  loadSongPitches,
   saveSetlistAnnotations,
   saveSetlistLocalState,
+  saveSetlistPitch,
   saveSetlistTuning,
+  saveSongPitch,
 } from '../src/js/setlist/local-state.ts'
 
 const songs = [
@@ -107,6 +111,68 @@ describe('what a setlist keeps on this device', () => {
     saveSetlistLocalState('s1', { sectionState: {}, capoValues: { 0: 1 } }, songs)
     clearSetlistLocalState('s1')
     expect(localStorage.getItem('state-s1')).to.equal(null)
+  })
+
+  describe('the instrument pitch', () => {
+    it('is none until one is kept for the setlist, then kept, and none again for the device’s', () => {
+      expect(loadSetlistPitch('s1')).to.equal(null)
+      saveSetlistPitch('s1', 'bb', songs)
+      expect(loadSetlistPitch('s1')).to.equal('bb')
+      saveSetlistPitch('s1', 'concert', songs)
+      expect(loadSetlistPitch('s1')).to.equal('concert')
+      saveSetlistPitch('s1', null, songs)
+      expect(loadSetlistPitch('s1')).to.equal(null)
+    })
+
+    it('is kept for a song, by song, and goes with it when the setlist is moved about', () => {
+      expect(loadSongPitches('s1', songs)).to.deep.equal({})
+      saveSongPitch('s1', songs[2], 'eb', songs)
+      expect(loadSongPitches('s1', songs)).to.deep.equal({ 2: 'eb' })
+      // (reordered: the song is where it is now)
+      expect(loadSongPitches('s1', [songs[2], songs[0], songs[1]])).to.deep.equal({ 0: 'eb' })
+      saveSongPitch('s1', songs[0], 'f', songs)
+      expect(loadSongPitches('s1', songs)).to.deep.equal({ 0: 'f', 2: 'eb' })
+      saveSongPitch('s1', songs[2], null, songs)
+      saveSongPitch('s1', songs[0], null, songs)
+      expect(loadSongPitches('s1', songs)).to.deep.equal({})
+      expect('pitches' in JSON.parse(localStorage.getItem('state-s1') ?? '{}')).to.equal(false)
+    })
+
+    it('leaves the sections, capos and tuning alone, and they leave it', () => {
+      saveSetlistTuning('s1', 1, songs)
+      saveSetlistPitch('s1', 'bb', songs)
+      saveSongPitch('s1', songs[1], 'f', songs)
+      saveSetlistLocalState('s1', { sectionState: {}, capoValues: { 0: 3 } }, songs)
+      expect(loadSetlistTuning('s1')).to.equal(1)
+      expect(loadSetlistPitch('s1')).to.equal('bb')
+      expect(loadSongPitches('s1', songs)).to.deep.equal({ 1: 'f' })
+      expect(loadSetlistLocalState('s1', songs).capoValues).to.deep.equal({ 0: 3 })
+    })
+
+    it('is read as concert pitch when what is kept is not a pitch, and none for state kept by place', () => {
+      localStorage.setItem(
+        'state-s1',
+        JSON.stringify({ v: 2, sections: {}, capos: {}, pitch: 'x', pitches: { ua: 'y' } })
+      )
+      expect(loadSetlistPitch('s1')).to.equal('concert')
+      expect(loadSongPitches('s1', songs)).to.deep.equal({ 0: 'concert' })
+      localStorage.setItem('state-s1', JSON.stringify({ capo: { 0: 2 } }))
+      expect(loadSetlistPitch('s1')).to.equal(null)
+      expect(loadSongPitches('s1', songs)).to.deep.equal({})
+    })
+
+    it('carries on when it cannot be kept, as when storage is full', () => {
+      const real = Storage.prototype.setItem
+      Storage.prototype.setItem = () => {
+        throw new Error('full')
+      }
+      try {
+        expect(() => saveSetlistPitch('s1', 'bb', songs)).to.not.throw()
+        expect(() => saveSongPitch('s1', songs[0], 'bb', songs)).to.not.throw()
+      } finally {
+        Storage.prototype.setItem = real
+      }
+    })
   })
 
   describe('the tuning', () => {

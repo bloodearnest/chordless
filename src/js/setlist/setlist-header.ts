@@ -10,11 +10,13 @@ import type { AppHeader } from '../../components/app-header.ts'
 import type { CapoSelector } from '../../components/capo-selector.ts'
 import type { KeySelector } from '../../components/key-selector.ts'
 import type { MusicalMetadataDisplay } from '../../components/musical-metadata-display.ts'
+import type { PitchSelector } from '../../components/pitch-selector.ts'
 import type { SetlistDiffers } from '../../components/setlist-differs.ts'
 import type { SetlistShare } from '../../components/setlist-share.ts'
 import type { SongSettingsPopover } from '../../components/song-settings-popover.ts'
 import type { Setlist } from '../data-types.ts'
 import { type ChordlessDB, SETLIST_TYPES } from '../db.ts'
+import { type PitchId, pitchShort } from '../instrument-pitch.ts'
 import { leaderName } from '../leaders.ts'
 import { getLive, isLiveSetlist } from '../live.ts'
 import { getLiveSyncStatus } from '../live-sync-status.ts'
@@ -42,6 +44,10 @@ export interface HeaderHost {
   readonly _capoEnabled: boolean
   /** How the guitar is tuned now: the setlist's, or the device's (docs/PERSONAL_LAYER.md) */
   effectiveTuning(): Tuning
+  /** The instrument pitch controls are on (docs/PERSONAL_LAYER.md) */
+  readonly _pitchEnabled: boolean
+  /** The pitch a song has, and the one it follows when it has none (the setlist's, or the device's) */
+  pitchOf(song: RuntimeSong | null): { own: PitchId | null; followed: PitchId; shown: PitchId }
   _database(): ChordlessDB
   /** The song's melody and its key, or null when it has none */
   melodyOf(song: RuntimeSong): Promise<unknown>
@@ -181,11 +187,13 @@ export class SetlistHeader {
         keySelector.keys = []
       }
       if (capoSelector && capoEnabled) this.showCapo(song.currentCapo, song.currentKey)
+      this.showPitch()
       this.showSongSettings()
       if (musicalMetadata) {
         musicalMetadata.keyValue = song.currentKey || ''
         musicalMetadata.capoValue = capoEnabled ? (song.currentCapo ?? 0) : 0
         musicalMetadata.tuning = this.host.effectiveTuning()
+        musicalMetadata.instrument = this.instrumentSaid(song)
         musicalMetadata.bpm = song.currentBPM || null
         musicalMetadata.timeSignature = song.metadata?.time || song.metadata?.timeSignature || ''
         musicalMetadata.style.display = ''
@@ -218,10 +226,33 @@ export class SetlistHeader {
 
   /** Show new values in the song's metadata display (after a change to its key, capo or tempo) */
   showMetadata(
-    shown: Partial<Pick<MusicalMetadataDisplay, 'keyValue' | 'capoValue' | 'bpm' | 'tuning'>>
+    shown: Partial<
+      Pick<MusicalMetadataDisplay, 'keyValue' | 'capoValue' | 'bpm' | 'tuning' | 'instrument'>
+    >
   ) {
     const musicalMetadata = this.#find<MusicalMetadataDisplay>('#musical-metadata')
     if (musicalMetadata) Object.assign(musicalMetadata, shown)
+  }
+
+  /** The instrument pitch as the metadata says it: "B♭", or nothing for concert pitch */
+  instrumentSaid(song: RuntimeSong | null): string {
+    const { shown } = this.host.pitchOf(song)
+    return this.host._pitchEnabled && shown !== 'concert' ? pitchShort(shown) : ''
+  }
+
+  /** The instrument pitch changed: the picker for the song, and what the metadata says */
+  showPitch() {
+    const song = this.#song
+    this.showMetadata({ instrument: this.instrumentSaid(song) })
+    const selector = this.#find<PitchSelector>('#pitch-selector')
+    if (!selector) return
+    selector.style.display = this.host._pitchEnabled ? '' : 'none'
+    if (!this.host._pitchEnabled || !song) return
+    const { own, followed } = this.host.pitchOf(song)
+    selector.value = own ?? ''
+    selector.followed = followed
+    selector.follows = 'the setlist'
+    selector.editMode = isEditMode()
   }
 
   /** The tuning changed: the song's metadata says so, and the capo picker shows the keys from it */
@@ -373,5 +404,7 @@ export class SetlistHeader {
     if (keySelector) keySelector.editMode = false
     const capoSelector = this.#find<CapoSelector>('#capo-selector')
     if (capoSelector) capoSelector.editMode = false
+    const pitchSelector = this.#find<PitchSelector>('#pitch-selector')
+    if (pitchSelector) pitchSelector.editMode = false
   }
 }

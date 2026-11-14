@@ -12,6 +12,7 @@ import {
   SongSettingsClickEvent,
 } from '../components/musical-metadata-display.ts'
 import { MenuOverviewClickEvent, MenuSongClickEvent, type NavMenu } from '../components/nav-menu.ts'
+import { PitchChangeEvent, type PitchSelector } from '../components/pitch-selector.ts'
 import { SetlistDetailsIdentifyEvent } from '../components/setlist-details-form.ts'
 import { type SetlistDiffers, SetlistRevertedEvent } from '../components/setlist-differs.ts'
 import {
@@ -35,6 +36,7 @@ import { hasUnsentChanges } from './auto-sync.ts'
 import { DataChangeEvent, touches } from './data-changes.ts'
 import type { Setlist, SetlistEntry, SharedChartAnnotation, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB, NO_CHANGE, openSpace, type RemovedSetlist } from './db.ts'
+import type { PitchId } from './instrument-pitch.ts'
 import { leaderName, resolvePerson } from './leaders.ts'
 import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
 import { LiveSyncStatusEvent } from './live-sync-status.ts'
@@ -45,8 +47,12 @@ import { getSpacePeople, identifyMe, settleLeader } from './people.ts'
 import {
   CapoPreferenceEvent,
   getCapoPreference,
+  getPitchControlsPreference,
+  getPitchPreference,
   getScrollToTopOnSwipe,
   getTuningPreference,
+  PitchControlsEvent,
+  PitchPreferenceEvent,
   SectionDefaultsEvent,
   TuningPreferenceEvent,
 } from './preferences.ts'
@@ -62,10 +68,14 @@ import {
   afterMove,
   clearSetlistLocalState,
   loadSetlistLocalState,
+  loadSetlistPitch,
   loadSetlistTuning,
+  loadSongPitches,
   renumberSongs,
   saveSetlistLocalState,
+  saveSetlistPitch,
   saveSetlistTuning,
+  saveSongPitch,
 } from './setlist/local-state.ts'
 import { OverviewController } from './setlist/overview-controller.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
@@ -161,6 +171,10 @@ export class SetlistPage {
   _capoEnabled: boolean
   /** How the guitar is tuned for this setlist, or null for the device's (docs/PERSONAL_LAYER.md) */
   _tuning: Tuning | null = null
+  /** Whether the instrument pitch controls are on (docs/PERSONAL_LAYER.md) */
+  _pitchEnabled: boolean = getPitchControlsPreference()
+  /** The instrument pitch for this setlist, or null for the device's */
+  _pitch: PitchId | null = null
   _setlistDetailsSaveHandler?: (event: SetlistInfoSaveEvent) => void
   _rangeChangedHandler?: (event: SongRangeChangedEvent) => void
   _setlistDeleteHandler?: (event: SetlistInfoDeleteEvent) => void
@@ -285,6 +299,10 @@ export class SetlistPage {
     window.addEventListener('storage', this._onCapoPreferenceChange, { signal })
     window.addEventListener(CapoPreferenceEvent.type, this._onCapoPreferenceChange, { signal })
     window.addEventListener(TuningPreferenceEvent.type, () => this._applyTuning(), { signal })
+    window.addEventListener(PitchControlsEvent.type, () => this._handlePitchControlsChange(), {
+      signal,
+    })
+    window.addEventListener(PitchPreferenceEvent.type, () => this._applyPitch(), { signal })
     window.addEventListener(LiveChangeEvent.type, this._onLiveChange, { signal })
     window.addEventListener(LiveSyncStatusEvent.type, this._onLiveChange, { signal })
   }
@@ -594,6 +612,7 @@ export class SetlistPage {
 
     songContentWrapper.appendChild(this.overview.create(songs))
     this._showTuningInOverview()
+    this._showPitchInOverview()
     overview.appendChild(songContentWrapper)
     fragment.appendChild(overview)
 
@@ -608,6 +627,7 @@ export class SetlistPage {
         songDisplay.songIndex = song.songIndex
         songDisplay.capo = this._capoEnabled ? song.currentCapo || 0 : 0
         songDisplay.tuning = this._tuningForDisplay()
+        songDisplay.pitch = this._pitchForDisplay(song)
         songDisplay.annotations = this.annotations.chartAnnotations(index)
         const songContent = document.createElement('div')
         songContent.className = 'song-content'
@@ -767,6 +787,11 @@ export class SetlistPage {
     $<CapoSelector>('#capo-selector')?.addEventListener(
       CapoChangeEvent.type,
       event => void this.handleCapoChange(event.value),
+      { signal }
+    )
+    $<PitchSelector>('#pitch-selector')?.addEventListener(
+      PitchChangeEvent.type,
+      event => this.handlePitchChange(event.pitch),
       { signal }
     )
   }
@@ -1121,6 +1146,14 @@ export class SetlistPage {
     )
     this.sections.states = sectionState
     this._tuning = loadSetlistTuning(this.currentSetlistId)
+    this._pitch = loadSetlistPitch(this.currentSetlistId)
+    const pitches = loadSongPitches(
+      this.currentSetlistId,
+      this.songs.map(song => song._setlistEntry)
+    )
+    this.songs.forEach((song, index) => {
+      song.currentPitch = pitches[index] ?? null
+    })
     if (this._capoEnabled) {
       for (const [songIndex, capo] of Object.entries(capoValues)) {
         const song = this.songs[Number(songIndex)]
@@ -1184,6 +1217,68 @@ export class SetlistPage {
       display.tuning = this._tuningForDisplay()
     }
     this.header.showTuning()
+  }
+
+  /** The instrument pitch a song has now, and the one it follows (the setlist's, or the device's), as the header shows them */
+  pitchOf(song: RuntimeSong | null): { own: PitchId | null; followed: PitchId; shown: PitchId } {
+    const followed = this._pitch ?? getPitchPreference()
+    const own = song?.currentPitch ?? null
+    return { own, followed, shown: own ?? followed }
+  }
+
+  /** What a song's chords are given for the instrument pitch: the song's or the setlist's, nothing for the device's, concert pitch with the controls off */
+  _pitchForDisplay(song: RuntimeSong | undefined): PitchId | null {
+    return this._pitchEnabled ? (song?.currentPitch ?? this._pitch) : 'concert'
+  }
+
+  /** An instrument pitch was chosen for this setlist (null: the device's again): kept on this device */
+  changeSetlistPitch(pitch: PitchId | null) {
+    this._pitch = pitch
+    saveSetlistPitch(
+      this.currentSetlistId,
+      pitch,
+      this.songs.map(song => song._setlistEntry)
+    )
+    this._applyPitch()
+  }
+
+  /** An instrument pitch was chosen for the song being viewed (null: its setlist's again): kept on this device */
+  handlePitchChange(pitch: PitchId | null) {
+    if (!this._pitchEnabled || this.currentSongIndex < 0) return
+    const song = this.songs[this.currentSongIndex]
+    if (!song || song.currentPitch === pitch) return
+    song.currentPitch = pitch
+    saveSongPitch(
+      this.currentSetlistId,
+      song._setlistEntry,
+      pitch,
+      this.songs.map(each => each._setlistEntry)
+    )
+    this._applyPitch()
+  }
+
+  /** The pitch controls were turned on or off */
+  _handlePitchControlsChange() {
+    this._pitchEnabled = getPitchControlsPreference()
+    this._applyPitch()
+  }
+
+  /** Show the instrument pitch: in the overview's row, in each song's chords, and in the song's header */
+  _applyPitch() {
+    this._showPitchInOverview()
+    for (const display of this.root.querySelectorAll<SongDisplay>('song-display')) {
+      display.pitch = this._pitchForDisplay(this.songs[display.songIndex])
+    }
+    this.header.showPitch()
+  }
+
+  /** The overview's row for the instrument pitch: there when the pitch controls are on */
+  _showPitchInOverview() {
+    const overview = this.overview.component
+    if (!overview) return
+    overview.showPitch = this._pitchEnabled
+    overview.pitch = this._pitch
+    overview.devicePitch = getPitchPreference()
   }
 
   /** The overview's row for the tuning: there when the capo and tuning controls are on */
@@ -1261,6 +1356,7 @@ export class SetlistPage {
           editModeEntered()
           enterEditMode(this.root, appHeader, {
             capoEnabled: this._capoEnabled,
+            pitchEnabled: this._pitchEnabled,
           })
           // Update all sections based on edit mode
           this.sections.applyAll()
@@ -1609,6 +1705,7 @@ export class SetlistPage {
         songDisplay.songIndex = song.songIndex
         songDisplay.capo = this._capoEnabled ? song.currentCapo || 0 : 0
         songDisplay.tuning = this._tuningForDisplay()
+        songDisplay.pitch = this._pitchForDisplay(song)
         songDisplay.annotations = this.annotations.chartAnnotations(songIndex)
         songContent.appendChild(songDisplay)
         if (sheet) keepSheet(songContent, songDisplay, sheet)

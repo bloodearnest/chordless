@@ -7,6 +7,7 @@
 import type { AppHeader } from '../../components/app-header.ts'
 import {
   OverviewAddSongEvent,
+  OverviewPitchChangeEvent,
   OverviewSongBpmChangeEvent,
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
@@ -14,6 +15,7 @@ import {
   OverviewTuningChangeEvent,
   type SetlistOverview,
 } from '../../components/setlist-overview.ts'
+import type { PitchId } from '../instrument-pitch.ts'
 import type { Tuning } from '../tuning.ts'
 import { OverviewReorder } from './overview-reorder.ts'
 import type { RuntimeSong } from './runtime-songs.ts'
@@ -33,6 +35,8 @@ export interface OverviewHost {
   changeSongBpmInSetlist(index: number, bpm: number): Promise<void>
   /** A tuning was chosen for the setlist (null: the device's again) */
   changeSetlistTuning(tuning: Tuning | null): void
+  /** An instrument pitch was chosen for the setlist (null: the device's again) */
+  changeSetlistPitch(pitch: PitchId | null): void
   moveSong(from: number, to: number): Promise<void>
 }
 
@@ -96,6 +100,11 @@ export class OverviewController {
       ({ index, key }) => {
         if (typeof index === 'number' && key) void host.changeSongKeyInSetlist(index, key)
       },
+      { signal }
+    )
+    component.addEventListener(
+      OverviewPitchChangeEvent.type,
+      ({ pitch }) => host.changeSetlistPitch(pitch),
       { signal }
     )
     component.addEventListener(

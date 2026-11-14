@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import type { IconName } from '../js/icons.ts'
+import { PITCHES, type PitchId } from '../js/instrument-pitch.ts'
 import {
   getAnnotationsPreference,
   getCapoPreference,
@@ -7,6 +8,8 @@ import {
   getKeepAwakePreference,
   getLyricsOnlyPreference,
   getMusicianType,
+  getPitchControlsPreference,
+  getPitchPreference,
   getScrollToTopOnSwipe,
   getTelemetryPreference,
   getTuningPreference,
@@ -22,6 +25,8 @@ import {
   setKeepAwakePreference,
   setLyricsOnlyPreference,
   setMusicianType,
+  setPitchControlsPreference,
+  setPitchPreference,
   setScrollToTopOnSwipe,
   setTelemetryPreference,
   setTuningPreference,
@@ -54,6 +59,8 @@ export class AppPreferences extends LitElement {
     capoEnabled: { type: Boolean, attribute: false },
     lyricsOnly: { type: Boolean, attribute: false },
     tuning: { type: Number, attribute: false },
+    pitchControls: { type: Boolean, attribute: false },
+    pitch: { attribute: false },
     scrollToTop: { type: Boolean, attribute: false },
     sharedAnnotations: { type: Boolean, attribute: false },
     myAnnotations: { type: Boolean, attribute: false },
@@ -70,6 +77,9 @@ export class AppPreferences extends LitElement {
   declare lyricsOnly: boolean
   /** The device's default tuning for a guitar (docs/PERSONAL_LAYER.md) */
   declare tuning: Tuning
+  /** Whether the instrument pitch controls are on, and the device's default pitch (docs/PERSONAL_LAYER.md) */
+  declare pitchControls: boolean
+  declare pitch: PitchId
   declare scrollToTop: boolean
   declare sharedAnnotations: boolean
   declare myAnnotations: boolean
@@ -189,6 +199,8 @@ export class AppPreferences extends LitElement {
     this.capoEnabled = getCapoPreference()
     this.lyricsOnly = getLyricsOnlyPreference()
     this.tuning = getTuningPreference()
+    this.pitchControls = getPitchControlsPreference()
+    this.pitch = getPitchPreference()
     this.scrollToTop = getScrollToTopOnSwipe()
     this.sharedAnnotations = getAnnotationsPreference().shared
     this.myAnnotations = getAnnotationsPreference().mine
@@ -425,7 +437,34 @@ export class AppPreferences extends LitElement {
                   />
                   <span>Show the capo and tuning controls</span>
                 </label>
+                <label class="toggle" for="toggle-pitch">
+                  <input
+                    type="checkbox"
+                    id="toggle-pitch"
+                    name="enable-pitch"
+                    ?checked=${this.pitchControls}
+                    @change=${this._onPitchControlsToggle}
+                  />
+                  <span>Show the instrument pitch controls</span>
+                </label>
                 </div>
+              `
+              : ''
+          }
+          ${
+            this.pitchControls
+              ? html`
+                <label class="field" for="pitch">
+                  <span>My instrument</span>
+                  <select id="pitch" name="pitch" @change=${this._onPitchChange}>
+                    ${PITCHES.map(
+                      option => html`<option value=${option.id} ?selected=${option.id === this.pitch}>
+                        ${option.label}
+                      </option>`
+                    )}
+                  </select>
+                </label>
+                <p>Each setlist, and each song, can have its own: choose it there, in edit mode.</p>
               `
               : ''
           }
@@ -611,6 +650,17 @@ export class AppPreferences extends LitElement {
     this.musicianType = getMusicianType()
     this.lyricsOnly = getLyricsOnlyPreference()
     this.capoEnabled = getCapoPreference()
+    this.pitchControls = getPitchControlsPreference()
+  }
+
+  _onPitchChange(event: Event): void {
+    this.pitch = (event.currentTarget as HTMLSelectElement).value as PitchId
+    setPitchPreference(this.pitch)
+  }
+
+  _onPitchControlsToggle(event: Event): void {
+    this.pitchControls = (event.currentTarget as HTMLInputElement).checked
+    setPitchControlsPreference(this.pitchControls)
   }
 
   _onTuningChange(event: Event): void {

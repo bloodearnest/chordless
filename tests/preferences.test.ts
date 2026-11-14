@@ -17,6 +17,8 @@ const KEYS = [
   'enable_capo',
   'enabled_capo',
   'tuning',
+  'enable_pitch',
+  'pitch',
   'setup-done',
   'keep_screen_awake',
   'scroll_to_top_on_swipe',
@@ -122,6 +124,7 @@ describe('preferences', () => {
         ['general', 'all', false, 'general'],
         ['singer', 'lyrics', false, 'singer'],
         ['guitarist', 'all', true, 'guitarist'],
+        ['transposing', 'all', false, 'transposing'],
         ['drummer', 'lyrics', false, 'singer'],
         ['nonsense', 'all', false, 'general'],
       ]
@@ -137,6 +140,7 @@ describe('preferences', () => {
         })
         expect(preferences.getCapoPreference(), type).to.equal(capo)
         expect(preferences.getLyricsOnlyPreference(), type).to.equal(shown === 'lyrics')
+        expect(preferences.getPitchControlsPreference(), type).to.equal(then === 'transposing')
         expect(preferences.getMusicianType(), type).to.equal(then)
       }
     })
@@ -153,6 +157,15 @@ describe('preferences', () => {
       preferences.setLyricsOnlyPreference(true)
       expect(preferences.getLyricsOnlyPreference()).to.equal(true)
       expect(preferences.getMusicianType()).to.equal('custom')
+    })
+
+    it('is a mixture the types do not make, when the capo and the pitch controls are both on', async () => {
+      const preferences = await fresh()
+      preferences.setMusicianType('guitarist')
+      preferences.setPitchControlsPreference(true)
+      expect(preferences.getMusicianType()).to.equal('custom')
+      preferences.setCapoPreference(false)
+      expect(preferences.getMusicianType()).to.equal('transposing')
     })
 
     it('is what the switches make when they were changed since a type was chosen', async () => {
@@ -192,6 +205,34 @@ describe('preferences', () => {
       expect(preferences.getCapoPreference()).to.equal(true)
       preferences.setCapoPreference(false)
       expect(localStorage.getItem('enable_capo')).to.equal('false')
+    })
+  })
+
+  describe('the instrument pitch', () => {
+    it('has controls that are off until turned on, said on window', async () => {
+      const preferences = await fresh()
+      expect(preferences.getPitchControlsPreference()).to.equal(false)
+      const events = heard<InstanceType<Preferences['PitchControlsEvent']>>(
+        'preferences:pitch-controls-changed',
+        () => preferences.setPitchControlsPreference(true)
+      )
+      expect(events.map(event => event.enabled)).to.deep.equal([true])
+      expect(localStorage.getItem('enable_pitch')).to.equal('true')
+      expect(preferences.getPitchControlsPreference()).to.equal(true)
+    })
+
+    it('is concert pitch until one is chosen, kept as its id, said on window', async () => {
+      const preferences = await fresh()
+      expect(preferences.getPitchPreference()).to.equal('concert')
+      const events = heard<InstanceType<Preferences['PitchPreferenceEvent']>>(
+        'preferences:pitch-changed',
+        () => preferences.setPitchPreference('eb')
+      )
+      expect(events.map(event => event.pitch)).to.deep.equal(['eb'])
+      expect(localStorage.getItem('pitch')).to.equal('eb')
+      expect(preferences.getPitchPreference()).to.equal('eb')
+      preferences.setPitchPreference('nonsense')
+      expect(preferences.getPitchPreference()).to.equal('concert')
     })
   })
 
@@ -302,6 +343,13 @@ describe('preferences', () => {
       expect(preferences.getKeepAwakeMinutes()).to.equal(30)
       expect(() => preferences.setKeepAwakePreference(false)).to.not.throw()
       expect(() => preferences.setKeepAwakeMinutes(30)).to.not.throw()
+    })
+
+    it('has no pitch controls, and concert pitch, when it cannot ask', async () => {
+      const preferences = await fresh()
+      block()
+      expect(preferences.getPitchControlsPreference()).to.equal(false)
+      expect(preferences.getPitchPreference()).to.equal('concert')
     })
 
     it('has standard tuning when it cannot ask what it is', async () => {

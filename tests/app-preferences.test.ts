@@ -21,6 +21,8 @@ const KEYS = [
   'enable_capo',
   'enabled_capo',
   'tuning',
+  'enable_pitch',
+  'pitch',
   'keep_screen_awake',
   'scroll_to_top_on_swipe',
   'keep_awake_minutes',
@@ -61,8 +63,8 @@ describe('app-preferences', () => {
 
     it('asks what the person plays, and sets the switches the answer stands for', async () => {
       const el = await show()
-      const [singer, guitarist, other] = radios(el)
-      expect(radios(el).length).to.equal(4)
+      const [singer, guitarist, transposing, other] = radios(el)
+      expect(radios(el).length).to.equal(5)
       singer.click()
       expect(localStorage.getItem('musician_type')).to.equal('singer')
       expect(el.musicianType).to.equal('singer')
@@ -72,7 +74,12 @@ describe('app-preferences', () => {
       guitarist.click()
       expect(localStorage.getItem('enable_capo')).to.equal('true')
       expect(el.capoEnabled).to.equal(true)
+      transposing.click()
+      expect(localStorage.getItem('enable_pitch')).to.equal('true')
+      expect(el.pitchControls).to.equal(true)
+      expect(localStorage.getItem('enable_capo')).to.equal('false')
       other.click()
+      expect(localStorage.getItem('enable_pitch')).to.equal('false')
       expect(localStorage.getItem('musician_type')).to.equal('general')
       expect(localStorage.getItem('enable_capo')).to.equal('false')
       expect(el.capoEnabled).to.equal(false)
@@ -82,7 +89,7 @@ describe('app-preferences', () => {
       const el = await show()
       expect(control(el, '#toggle-lyrics-only')).to.equal(null)
       expect(control(el, '#toggle-capo')).to.equal(null)
-      radios(el)[3].click()
+      radios(el)[4].click()
       await el.updateComplete
       expect(el.musicianType).to.equal('custom')
       control<HTMLInputElement>(el, '#toggle-lyrics-only').click()
@@ -98,6 +105,36 @@ describe('app-preferences', () => {
       await el.updateComplete
       expect(el.capoEnabled).to.equal(false)
       expect(el.lyricsOnly).to.equal(true)
+    })
+
+    it('has the instrument pitch only when its controls are on, and keeps the choice', async () => {
+      const el = await show()
+      expect(control(el, '#pitch')).to.equal(null)
+      radios(el)[2].click()
+      await el.updateComplete
+      const select = control<HTMLSelectElement>(el, '#pitch')
+      expect(select.value).to.equal('concert')
+      expect([...select.options].map(option => option.value)).to.deep.equal([
+        'concert',
+        'bb',
+        'eb',
+        'f',
+      ])
+      select.value = 'eb'
+      select.dispatchEvent(new Event('change'))
+      expect(localStorage.getItem('pitch')).to.equal('eb')
+      expect(el.pitch).to.equal('eb')
+      // (and it goes with the controls: a guitarist has no horn; Custom can have both)
+      radios(el)[1].click()
+      await el.updateComplete
+      expect(control(el, '#pitch')).to.equal(null)
+      expect(localStorage.getItem('pitch')).to.equal('eb')
+      radios(el)[4].click()
+      await el.updateComplete
+      control<HTMLInputElement>(el, '#toggle-pitch').click()
+      await el.updateComplete
+      expect(control(el, '#pitch')).to.not.equal(null)
+      expect(control(el, '#tuning')).to.not.equal(null)
     })
 
     it('has the guitar’s tuning only when the capo and tuning controls are on, and keeps the choice', async () => {

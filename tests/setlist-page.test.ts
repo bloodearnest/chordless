@@ -13,7 +13,10 @@ import type { MusicalMetadataDisplay } from '../src/components/musical-metadata-
 import type { SongDisplay } from '../src/components/song-display.ts'
 import '../src/components/song-display.ts'
 import '../src/components/song-section.ts'
+import { EditModeToggleEvent } from '../src/components/app-header.ts'
 import { CapoChangeEvent } from '../src/components/capo-selector.ts'
+import { PitchChangeEvent, type PitchSelector } from '../src/components/pitch-selector.ts'
+import { OverviewPitchChangeEvent } from '../src/components/setlist-overview.ts'
 import { TuningChangeEvent } from '../src/components/tuning-selector.ts'
 import { SongChangeEvent } from '../src/js/app-events.ts'
 import type { Setlist, SongWithContent } from '../src/js/data-types.ts'
@@ -21,7 +24,11 @@ import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import {
   CapoPreferenceEvent,
+  PitchControlsEvent,
+  PitchPreferenceEvent,
   setCapoPreference,
+  setPitchControlsPreference,
+  setPitchPreference,
   setTuningPreference,
   TuningPreferenceEvent,
 } from '../src/js/preferences.ts'
@@ -856,6 +863,163 @@ describe('the setlist page', () => {
         expect(untuned).to.not.equal('')
         page.changeSetlistTuning(2)
         expect(selector.referenceKey).to.not.equal(untuned)
+      })
+    })
+  })
+
+  describe('the instrument pitch', () => {
+    const pitchOfDisplay = (index: number) =>
+      must(
+        root.querySelector<HTMLElement & { pitch: string | null }>(`#song-${index} song-display`)
+      ).pitch
+    const row = () =>
+      root.querySelector<HTMLElement & { value: string; followed: string }>(
+        'setlist-overview pitch-selector'
+      )
+    const stored = () => JSON.parse(localStorage.getItem(`state-${page.currentSetlistId}`) ?? '{}')
+
+    afterEach(() => {
+      setPitchControlsPreference(false)
+      setPitchPreference('concert')
+      localStorage.removeItem('enable_pitch')
+      localStorage.removeItem('pitch')
+    })
+
+    it('has no row on the overview and concert pitch on the songs while the pitch controls are off', async () => {
+      setPitchPreference('eb')
+      await open()
+      page.overview.setEditMode(true)
+      await settle()
+      expect(row()).to.equal(null)
+      expect([pitchOfDisplay(0), pitchOfDisplay(1)]).to.deep.equal(['concert', 'concert'])
+      page.overview.setEditMode(false)
+    })
+
+    describe('with the controls on when the setlist is opened', () => {
+      beforeEach(() => setPitchControlsPreference(true))
+
+      it('gives the songs none of their own while neither the setlist nor they have one', async () => {
+        setPitchPreference('eb')
+        await open()
+        expect([pitchOfDisplay(0), pitchOfDisplay(1)]).to.deep.equal([null, null])
+        expect(page.pitchOf(page.songs[0])).to.deep.equal({
+          own: null,
+          followed: 'eb',
+          shown: 'eb',
+        })
+      })
+
+      it('keeps a pitch chosen for the setlist, on the device, and gives it to every song, then the device’s again', async () => {
+        setPitchPreference('eb')
+        await open()
+        page.overview.setEditMode(true)
+        page.changeSetlistPitch('bb')
+        await settle()
+        expect(stored().pitch).to.equal('bb')
+        expect(row()?.value).to.equal('bb')
+        expect([pitchOfDisplay(0), pitchOfDisplay(1)]).to.deep.equal(['bb', 'bb'])
+        page.changeSetlistPitch(null)
+        await settle()
+        expect('pitch' in stored()).to.equal(false)
+        expect(row()?.value).to.equal('')
+        expect(row()?.followed).to.equal('eb')
+        expect([pitchOfDisplay(0), pitchOfDisplay(1)]).to.deep.equal([null, null])
+        page.overview.setEditMode(false)
+      })
+
+      it('keeps a pitch chosen for a song, which is that song’s alone and wins over the setlist’s', async () => {
+        await open()
+        page.sectionObserver?.disconnect()
+        page.currentSongIndex = 1
+        page.changeSetlistPitch('bb')
+        page.handlePitchChange('f')
+        await settle()
+        expect(page.songs[1].currentPitch).to.equal('f')
+        expect(pitchOfDisplay(1)).to.equal('f')
+        expect(pitchOfDisplay(0)).to.equal('bb')
+        expect(Object.values(stored().pitches)).to.deep.equal(['f'])
+        expect(page.pitchOf(page.songs[1])).to.deep.equal({ own: 'f', followed: 'bb', shown: 'f' })
+        // (the same again changes nothing; none follows the setlist's again)
+        page.handlePitchChange('f')
+        page.handlePitchChange(null)
+        expect(pitchOfDisplay(1)).to.equal('bb')
+        expect('pitches' in stored()).to.equal(false)
+      })
+
+      it('does nothing for a song on the overview, where none is shown', async () => {
+        await open()
+        page.currentSongIndex = -1
+        page.handlePitchChange('bb')
+        expect(page.songs.every(song => song.currentPitch === null)).to.equal(true)
+      })
+
+      it('says the instrument in the song’s header, and follows the device’s pitch when it is changed', async () => {
+        await open()
+        page.sectionObserver?.disconnect()
+        page.currentSongIndex = 0
+        const metadata = must(root.querySelector<MusicalMetadataDisplay>('#musical-metadata'))
+        page.header.showPitch()
+        expect(metadata.instrument).to.equal('')
+        setPitchPreference('eb')
+        window.dispatchEvent(new PitchPreferenceEvent('eb'))
+        await settle()
+        expect(metadata.instrument).to.equal('E♭')
+        const selector = must(
+          root.querySelector<HTMLElement & { value: string; followed: string }>('#pitch-selector')
+        )
+        expect(selector.value).to.equal('')
+        expect(selector.followed).to.equal('eb')
+        page.handlePitchChange('concert')
+        expect(metadata.instrument).to.equal('')
+        expect(selector.value).to.equal('concert')
+      })
+
+      it('shows the song’s picker only while the controls are on', async () => {
+        await open()
+        page.sectionObserver?.disconnect()
+        page.currentSongIndex = 0
+        const selector = must(root.querySelector<HTMLElement>('#pitch-selector'))
+        page.header.showPitch()
+        expect(selector.style.display).to.equal('')
+        setPitchControlsPreference(false)
+        window.dispatchEvent(new PitchControlsEvent(false))
+        await settle()
+        expect(selector.style.display).to.equal('none')
+        expect([pitchOfDisplay(0), pitchOfDisplay(1)]).to.deep.equal(['concert', 'concert'])
+      })
+
+      it('takes a pitch chosen in the overview’s row', async () => {
+        await open()
+        must(page.overview.component).dispatchEvent(new OverviewPitchChangeEvent('f'))
+        expect(page.pitchOf(page.songs[0]).shown).to.equal('f')
+        expect(stored().pitch).to.equal('f')
+      })
+
+      it('takes a pitch chosen in the song’s picker, and lets it be chosen in edit mode', async () => {
+        await open()
+        page.sectionObserver?.disconnect()
+        page.currentSongIndex = 0
+        const selector = must(root.querySelector<PitchSelector>('#pitch-selector'))
+        selector.dispatchEvent(new PitchChangeEvent('eb'))
+        expect(page.songs[0].currentPitch).to.equal('eb')
+        // (edit mode on a song makes the picker a button; leaving it makes it text again)
+        must(root.querySelector<HTMLElement>('#app-header')).dispatchEvent(
+          new EditModeToggleEvent()
+        )
+        await settle()
+        expect(selector.editMode).to.equal(true)
+        must(root.querySelector<HTMLElement>('#app-header')).dispatchEvent(
+          new EditModeToggleEvent()
+        )
+        await settle()
+        expect(selector.editMode).to.equal(false)
+      })
+
+      it('carries on when there is no overview to show it in', async () => {
+        await open()
+        page.overview.attach(null)
+        expect(() => page.changeSetlistPitch('bb')).to.not.throw()
+        expect(page.pitchOf(page.songs[0]).shown).to.equal('bb')
       })
     })
   })

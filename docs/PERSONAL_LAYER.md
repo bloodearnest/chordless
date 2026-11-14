@@ -156,7 +156,7 @@ What is built and will change:
   are replaced when the leader changes the setlist (docs/SPACES.md, "Read-only").
 - Capo (per song, 0 to 11), the guitar tuning (device default, and per setlist), section display and
   private annotations are in the personal layer. The first-use setup and Preferences ask "What do you
-  play?" (#193). The transposing instrument's pitch is not built.
+  play?" (#193). The transposing instrument's pitch moves the chords (not yet the lead sheet's notes).
 - Any writer can make an annotation "Everyone" on any setlist they can open (`canShareAnnotations`); this
   would narrow to the people who control the setlist.
 - Shared annotations, the delete rule (a writer deletes a setlist they lead, an admin any) and the
@@ -201,9 +201,16 @@ Pull requests, in order, each building on `main` as it is:
    the keys the shapes are played in, from the tuning. A setlist's tuning is in its local state
    (`setlist/local-state.ts`), the device's in the `tuning` preference; with the capo and tuning
    controls off there is no tuning at all. It replaces #191's single offset.
-3. **Transposing instrument**: pitch (Preferences, overview row, a picker in the song's header), the
-   display as above; then **the lead sheet's notes**, which need a look at how the melody is
-   transposed first.
+3. **Transposing instrument** (the chords built; the lead sheet's notes not): the pitch (Concert, B♭,
+   E♭, F) as a device default in Preferences (when the pitch controls are on), one per setlist in a row on
+   the overview (editable in edit mode; shown out of it only when not concert pitch), and one per song
+   in a picker in the song's settings (replacing the other two). The chords move up by the pitch
+   (`instrument-pitch.ts`), with the tuning, and down by the capo, as the one capo that does the same
+   (`shapesFor`). The song's header says "Instrument: ..." when it is not concert pitch. The setlist's
+   pitch and each song's are in the setlist's local state, the device's in the `pitch` preference, the
+   switch in `enable_pitch`; the first-use setup and Preferences have the type "I play a B♭, E♭ or F
+   instrument". **Then the lead sheet's notes**, which need a look at how the melody and the notes in
+   the chart are transposed: a horn player reads them at their pitch too.
 4. **Who controls a setlist**: the controls for key, tempo, order, removal and "Everyone" annotations
    offered only to them.
 5. **Songs added locally.**
