@@ -783,7 +783,9 @@ carry, and the menu already has "Import Songs" and "Import a Setlist", which are
   (each song's lead sheet as plain MusicXML, docs/LEAD_SHEETS.md; an export from before has none),
   `setlists/<date>-<name>-<id>.json`. Nothing of
   Drive is in it (no file ids or checksums), no share links, no received shares, no deleted setlists.
-  A device's own state (the capo, the sections shown) is not in it.
+  A device's own state (the capo, the sections shown) is not in it unless the person ticks "Include my
+  own settings and annotations" (on by default; `personal.json`, `personal-layer.ts`: docs/PERSONAL_LAYER.md,
+  "Export"), and an import puts it back only where the device keeps nothing, and only if its box is ticked.
 - **Pads are optional**, off by default, with the size shown beside the choice (`padSetSize`): they are
   large, and they live in the signed-in account's Drive, so they need the user signed in and online.
   They go in as `pads/<set>/<KEY>.mp3`, stored not compressed.

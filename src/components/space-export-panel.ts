@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import type { Space } from '../js/data-types.ts'
 import { withSource } from '../js/other-songs.ts'
 import { listPadSets, type PadSet, padSetSize } from '../js/pad-set-service.ts'
+import { restorePersonalLayer } from '../js/personal-layer.ts'
 import { downloadBackup } from '../js/space-backup.ts'
 import {
   importIntoSpace,
@@ -24,6 +25,8 @@ interface PadSetChoice {
 interface PendingImport {
   exported: SpaceExport
   pads: boolean
+  /** Whether to put back what the file holds of the person's own settings and annotations */
+  personal: boolean
 }
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
@@ -53,6 +56,7 @@ export class SpaceExportPanel extends LitElement {
     showPads: { type: Boolean, attribute: 'show-pads' },
     _padSets: { state: true },
     _includePads: { state: true },
+    _includePersonal: { state: true },
     _busy: { state: true },
     _message: { state: true },
     _pending: { state: true },
@@ -104,6 +108,7 @@ export class SpaceExportPanel extends LitElement {
   declare showPads: boolean
   declare _padSets: PadSetChoice[]
   declare _includePads: boolean
+  declare _includePersonal: boolean
   declare _busy: boolean
   declare _message: { text: string; kind: 'info' | 'error' } | null
   declare _pending: PendingImport | null
@@ -116,6 +121,7 @@ export class SpaceExportPanel extends LitElement {
     this.showPads = false
     this._padSets = []
     this._includePads = false
+    this._includePersonal = true
     this._busy = false
     this._message = null
     this._pending = null
@@ -169,7 +175,11 @@ export class SpaceExportPanel extends LitElement {
       const pads = this._includePads
         ? await readPadSetsForExport(this._padSets.map(set => set.padSet))
         : []
-      const { fileName, bytes } = await downloadBackup({ id: this.space.id, name }, pads)
+      const { fileName, bytes } = await downloadBackup(
+        { id: this.space.id, name },
+        pads,
+        this._includePersonal
+      )
       this._message = {
         text: `Exported as ${fileName} (${megabytes(bytes)}).`,
         kind: 'info',
@@ -189,7 +199,7 @@ export class SpaceExportPanel extends LitElement {
     this._message = null
     try {
       const exported = await readExport(file)
-      this._pending = { exported, pads: false }
+      this._pending = { exported, pads: false, personal: true }
       this._reset = null
     } catch (error) {
       this._pending = null
@@ -205,7 +215,14 @@ export class SpaceExportPanel extends LitElement {
     try {
       const { exported } = pending
       const where = this.space.name
-      const report = await withSource(this.space.id, db => importIntoSpace(exported, db))
+      const { report, restored } = await withSource(this.space.id, async db => {
+        const report = await importIntoSpace(exported, db)
+        const restored =
+          pending.personal && exported.personal
+            ? await restorePersonalLayer(exported.personal, db)
+            : null
+        return { report, restored }
+      })
       const pads =
         pending.pads && this.signedIn
           ? await importPadSets(
@@ -222,6 +239,9 @@ export class SpaceExportPanel extends LitElement {
           `Imported into ${where}: ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +
           `, ${report.songsSkipped} charts and ${report.setlistsSkipped} setlists were already there` +
           (report.scoresAdded > 0 ? `; ${plural(report.scoresAdded, 'lead sheet')} added` : '') +
+          (restored && restored.setlists + restored.preferences > 0
+            ? `; your own settings and annotations put back for ${plural(restored.setlists, 'setlist')}`
+            : '') +
           (pads.length > 0 ? `; ${pads.length} pad sets uploaded to Drive` : '') +
           '.',
         kind: 'info',
@@ -349,6 +369,25 @@ export class SpaceExportPanel extends LitElement {
         </p>
         <div class="row">
           ${
+            pending.exported.personal
+              ? html`<label>
+                <input
+                  type="checkbox"
+                  id="import-personal"
+                  .checked=${pending.personal}
+                  @change=${(event: Event) => {
+                    this._pending = {
+                      ...pending,
+                      personal: (event.target as HTMLInputElement).checked,
+                    }
+                  }}
+                />
+                Also put back the file's own settings and annotations (capo, tuning, sections shown, private
+                annotations, songs added for the person alone). What this device already keeps is left as it is.
+              </label>`
+              : nothing
+          }
+          ${
             padSets > 0
               ? html`<label>
                 <input
@@ -403,6 +442,18 @@ export class SpaceExportPanel extends LitElement {
             </label>`
             : nothing
         }
+        <label>
+          <input
+            type="checkbox"
+            id="include-personal"
+            .checked=${this._includePersonal}
+            @change=${(event: Event) => {
+              this._includePersonal = (event.target as HTMLInputElement).checked
+            }}
+          />
+          Include my own settings and annotations (capo, tuning, sections shown, private annotations). They
+          are private: leave this off for a file you will share.
+        </label>
         <div>
           <button class="btn primary" id="export-space" ?disabled=${this._busy} @click=${() => this._download()}>
             ${this._busy && !this._pending ? 'Exporting…' : '📦 Export this space'}

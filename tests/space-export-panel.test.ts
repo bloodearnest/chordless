@@ -80,7 +80,7 @@ describe('the export panel', () => {
     must(el.shadowRoot?.querySelector<HTMLButtonElement>(`#${id}`))
 
   /** A space's export file, from a database made for it */
-  async function exportOf(name: string, fill = true, sheet = '') {
+  async function exportOf(name: string, fill = true, sheet = '', personal = false) {
     const id = `source-${crypto.randomUUID()}`
     const db = new ChordlessDB(id)
     await db.init()
@@ -95,7 +95,7 @@ describe('the export panel', () => {
         )
         if (sheet) await db.saveScore(scoreRecord(song.uuid, sheet, 'G'))
       }
-      return new File([await createExport(db, name)], 'export.zip')
+      return new File([await createExport(db, name, [], new Date(), personal)], 'export.zip')
     } finally {
       db.db?.close()
       await deleteDatabase(id)
@@ -175,6 +175,46 @@ describe('the export panel', () => {
     button(el, 'import').click()
     await waitUntil(() => text(el).includes('0 charts and 0 setlists added'), 'the second import')
     expect(text(el)).to.contain('1 charts and 1 setlists were already there')
+  })
+
+  it('puts a person’s own settings and annotations in an export unless that is unticked, and back from one if they choose', async () => {
+    localStorage.setItem('state-set-9', JSON.stringify({ v: 2, sections: {}, capos: { a: 2 } }))
+    try {
+      const el = await mount()
+      expect(el.shadowRoot?.querySelector<HTMLInputElement>('#include-personal')?.checked).to.equal(
+        true
+      )
+      el.shadowRoot?.querySelector<HTMLInputElement>('#include-personal')?.click()
+      button(el, 'export-space').click()
+      await waitUntil(() => downloads.length === 1, 'the download')
+
+      const file = await exportOf('Elsewhere', true, '', true)
+      localStorage.removeItem('state-set-9')
+      await choose(el, file)
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+      const tick = el.shadowRoot?.querySelector<HTMLInputElement>('#import-personal')
+      expect(tick?.checked).to.equal(true)
+      tick?.click()
+      await el.updateComplete
+      expect(el.shadowRoot?.querySelector<HTMLInputElement>('#import-personal')?.checked).to.equal(
+        false
+      )
+      el.shadowRoot?.querySelector<HTMLInputElement>('#import-personal')?.click()
+      await el.updateComplete
+      button(el, 'import').click()
+      await waitUntil(() => text(el).includes('Imported into Export'), 'the import')
+      expect(text(el)).to.contain('put back for 1 setlist')
+      expect(localStorage.getItem('state-set-9')).to.contain('"a":2')
+    } finally {
+      localStorage.removeItem('state-set-9')
+    }
+  })
+
+  it('offers nothing of the kind for a file that holds none', async () => {
+    const el = await mount()
+    await choose(el, await exportOf('Elsewhere'))
+    await waitUntil(() => text(el).includes('Import this export'), 'the question')
+    expect(el.shadowRoot?.querySelector('#import-personal')).to.equal(null)
   })
 
   it('says how many lead sheets an import added, in the singular or the plural', async () => {

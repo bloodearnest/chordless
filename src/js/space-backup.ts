@@ -18,9 +18,12 @@ export interface BackupFile {
  */
 export async function downloadBackup(
   space: Pick<Space, 'id' | 'name'>,
-  pads: ExportPadSet[] = []
+  pads: ExportPadSet[] = [],
+  includePersonal = false
 ): Promise<BackupFile> {
-  const blob = await withSource(space.id, db => createExport(db, space.name, pads))
+  const blob = await withSource(space.id, db =>
+    createExport(db, space.name, pads, new Date(), includePersonal)
+  )
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
   link.download = exportFileName(space.name)

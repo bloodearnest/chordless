@@ -57,7 +57,7 @@ A last-minute change must still be possible for the leader, and for the person w
 
 ## What is personal
 
-Never synced, never exported. All of it is the person's own and nobody else's business.
+Never synced, and exported only into the person's own export file, when they ask (see "Export"). All of it is the person's own and nobody else's business.
 
 - **How I play it** (below): the tuning or pitch of my instrument, and a capo, so the chords shown fit
   how I play. Not the setlist's key, which is the leader's.
@@ -69,6 +69,21 @@ Never synced, never exported. All of it is the person's own and nobody else's bu
   setlist can make one "Everyone".
 - **Section display**, as now: which sections show chords or lyrics, which are hidden or collapsed.
 - **The device's own preferences**: pads, the click, the theme.
+
+## Export
+
+The personal layer is not synced, so the way to carry it to another device (or back after losing one) is
+the space's export (docs/SPACES.md, "Export and import"). The export zip holds a `personal.json` when the
+person leaves "Include my own settings and annotations" ticked: for each exported setlist what the device
+keeps (capo, sections shown, tuning, pitch, private annotations) and the songs added for the person alone,
+the per-song settings of the space, and the settings that describe the person and not the device (what they
+play, the chart's tint and fonts: `PERSONAL_PREFERENCE_KEYS`). The theme, text size, screen and media settings
+and the choice of spaces are the device's, and stay out. It is private: leave it off for a file to share.
+Importing puts it back **only where this device keeps nothing** (it never overwrites), setlist by setlist
+for those the space has, and the songs a person added are added again if the setlist lacks them.
+
+Syncing the layer between devices was considered and left: the value is mostly the annotations, and an
+export covers a move to a new device at a fraction of the machinery.
 
 ## Editing songs
 
