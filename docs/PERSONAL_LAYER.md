@@ -194,7 +194,8 @@ Pull requests, in order, each building on `main` as it is:
    It has the types that have something to give, singer or drummer, guitarist, other and Custom; the
    transposing instrument, and its switch, come with its pitch controls in step 3.
 2. **Guitarist** (built): tuning, the device default in Preferences and one per setlist in a row on the
-   overview, editable in edit mode, with the capo added to it. The chords move up by the tuning and down
+   overview, editable in edit mode (and shown out of it only when it is not standard), with the capo
+   added to it. The chords move up by the tuning and down
    by the capo, given to the existing chord display as the one capo that does the same (`tuning.ts`:
    `shapesFor`). The song's header says "Tuning: ..." when it is not standard, and the capo picker shows
    the keys the shapes are played in, from the tuning. A setlist's tuning is in its local state

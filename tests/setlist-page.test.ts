@@ -815,6 +815,7 @@ describe('the setlist page', () => {
       it('follows a chosen tuning in the overview’s row, in edit mode', async () => {
         await open()
         page.overview.setEditMode(true)
+        await settle()
         row()?.dispatchEvent(new TuningChangeEvent(1))
         await settle()
         expect(page.effectiveTuning()).to.equal(1)
@@ -836,9 +837,11 @@ describe('the setlist page', () => {
         page.changeSetlistTuning(0)
         setTuningPreference(1)
         window.dispatchEvent(new TuningPreferenceEvent(1))
+        page.overview.setEditMode(true)
         await settle()
         expect(page.effectiveTuning()).to.equal(0)
         expect(row()?.deviceTuning).to.equal(1)
+        page.overview.setEditMode(false)
       })
 
       it('starts the capo picker’s keys from the tuning, as the shapes are played in it', async () => {
