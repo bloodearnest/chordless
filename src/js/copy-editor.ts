@@ -1,3 +1,4 @@
+/* v8 ignore start -- dev only: the dev server puts it on the page (vite-plugins/copy-editor.ts), a unit test cannot load that; tests/text.node.test.ts covers what it writes */
 /**
  * Dev only: change what the app says, in the app (docs/COPY.md). The dev server puts this script
  * on every page (vite-plugins/copy-editor.ts); a built app has no trace of it.
