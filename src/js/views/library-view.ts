@@ -47,6 +47,7 @@ import {
   withSongsFromElsewhere,
   withSpaceName,
 } from '../other-songs.ts'
+import { getDevicePitchUp, PitchControlsEvent, PitchPreferenceEvent } from '../preferences.ts'
 import { buildUrl, type Route } from '../router.ts'
 import { attachCues, scoreWithKey, shownSheet, showScore } from '../score-shown.ts'
 import { isEditMode, setBodyEditMode } from '../setlist/edit-mode-ui.ts'
@@ -55,7 +56,7 @@ import { setSongUserPref } from '../song-user-prefs.ts'
 import { getLibrarySongs } from '../song-utils.ts'
 import * as SongViewManager from '../song-view-manager.ts'
 import { getCurrentSpace, listSpaces } from '../space.ts'
-import { getAvailableKeys, transposeSong } from '../transpose.ts'
+import { getAvailableKeys, transposeKeyName, transposeSong } from '../transpose.ts'
 import { filterSongs, warmSearch } from '../utils/song-filter.ts'
 import { PageView, type ViewState } from './page-view.ts'
 
@@ -184,14 +185,30 @@ export class LibraryView extends PageView {
     if (!found) this.#melodyOn = false
     header.melodyMode = this.#melodyOn
     if (!content) return
+    // (a horn player reads the notes at their pitch: the device's, docs/PERSONAL_LAYER.md)
     await showScore(
       content,
-      this.#melodyOn && found ? { ...found, songKey: this.#key || found.key } : null
+      this.#melodyOn && found
+        ? { ...found, songKey: transposeKeyName(this.#key || found.key, getDevicePitchUp()) }
+        : null
     )
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback()
+    // The device's instrument pitch changed: a lead sheet that is shown is engraved again at it
+    window.addEventListener(PitchPreferenceEvent.type, this.#onPitch)
+    window.addEventListener(PitchControlsEvent.type, this.#onPitch)
+  }
+
+  #onPitch = (): void => {
+    if (this.#melodyOn) void this.#applyMelody()
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback()
+    window.removeEventListener(PitchPreferenceEvent.type, this.#onPitch)
+    window.removeEventListener(PitchControlsEvent.type, this.#onPitch)
     clearTimeout(this.#searchTimeout)
     this.#syncing++
     // Edit mode is on <body>, which outlives this view

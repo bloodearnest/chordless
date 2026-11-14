@@ -1,4 +1,4 @@
-import { normalizePitch, type PitchId } from './instrument-pitch.ts'
+import { normalizePitch, type PitchId, pitchSemitones } from './instrument-pitch.ts'
 import { normalizeTuning, type Tuning } from './tuning.ts'
 
 /**
@@ -405,6 +405,10 @@ export const setCapoPreference = (value: boolean) => capo.set(!!value)
 /** Whether the instrument pitch controls are on (a switch of what is played) */
 export const getPitchControlsPreference = (): boolean => pitchControls.get()
 export const setPitchControlsPreference = (value: boolean) => pitchControls.set(!!value)
+
+/** How far up the device's instrument pitch moves the notes a lead sheet shows (none with the pitch controls off) */
+export const getDevicePitchUp = (): number =>
+  pitchControls.get() ? pitchSemitones(pitch.get()) : 0
 
 /** The device's default instrument pitch */
 export const getPitchPreference = (): PitchId => pitch.get()

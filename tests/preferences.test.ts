@@ -221,6 +221,17 @@ describe('preferences', () => {
       expect(preferences.getPitchControlsPreference()).to.equal(true)
     })
 
+    it('moves the notes of a lead sheet by the device’s pitch, and not at all with the controls off', async () => {
+      const preferences = await fresh()
+      expect(preferences.getDevicePitchUp()).to.equal(0)
+      preferences.setPitchPreference('eb')
+      expect(preferences.getDevicePitchUp()).to.equal(0)
+      preferences.setPitchControlsPreference(true)
+      expect(preferences.getDevicePitchUp()).to.equal(9)
+      preferences.setPitchPreference('bb')
+      expect(preferences.getDevicePitchUp()).to.equal(2)
+    })
+
     it('is concert pitch until one is chosen, kept as its id, said on window', async () => {
       const preferences = await fresh()
       expect(preferences.getPitchPreference()).to.equal('concert')

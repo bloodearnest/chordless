@@ -17,6 +17,7 @@ import {
 } from '../src/components/song-section.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
+import { setPitchControlsPreference, setPitchPreference } from '../src/js/preferences.ts'
 import { getSongUserPrefs } from '../src/js/song-user-prefs.ts'
 import { sampleRecord } from './score-sample.ts'
 import '../src/js/views/library-view.ts'
@@ -304,6 +305,29 @@ describe('the library view, with a song open', () => {
         control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('A'))
         await until(() => sheet()?.songKey === 'A', 'the sheet in A')
         expect(lyrics()?.style.display).to.equal('none')
+      })
+
+      it('is shown at the instrument pitch, and engraved again when the device’s is changed', async () => {
+        await open()
+        await until(() => enabled(), 'the melody button')
+        toggle()?.click()
+        await until(() => sheet(), 'the melody sheet')
+        expect(sheet()?.songKey).to.equal('G')
+        try {
+          // (a B♭ instrument reads up a whole step: G is A)
+          setPitchControlsPreference(true)
+          setPitchPreference('bb')
+          await until(() => sheet()?.songKey === 'A', 'the sheet in A')
+          // (and a key change moves it from there)
+          control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('C'))
+          await until(() => sheet()?.songKey === 'D', 'the sheet in D')
+          // (with the controls off it is as the song is)
+          setPitchControlsPreference(false)
+          await until(() => sheet()?.songKey === 'C', 'the sheet in C')
+        } finally {
+          setPitchControlsPreference(false)
+          setPitchPreference('concert')
+        }
       })
 
       it('keeps the sheet, and never shows the lyrics, while the song is drawn again for a new key', async () => {
