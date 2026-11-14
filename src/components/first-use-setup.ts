@@ -71,6 +71,20 @@ export class FirstUseSetup extends LitElement {
         cursor: pointer;
       }
 
+      .text {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+      }
+
+      .name {
+        font-weight: 600;
+      }
+
+      .description {
+        opacity: 0.8;
+      }
+
       .choice input {
         width: 1.5rem;
         height: 1.5rem;
@@ -126,7 +140,10 @@ export class FirstUseSetup extends LitElement {
                   .checked=${this._type === option.type}
                   @change=${() => this._choose(option.type)}
                 />
-                <span>${option.label}: ${option.description}</span>
+                <span class="text">
+                  <span class="name">${option.label}</span>
+                  <span class="description">${option.description}</span>
+                </span>
               </label>
             `
           )}
