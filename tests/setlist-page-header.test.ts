@@ -468,6 +468,21 @@ describe('the setlist page: header, menu and keys', () => {
       }
     })
 
+    it('says the pitch in the metadata, and carries on, when the header has no picker', async () => {
+      setPitchControlsPreference(true)
+      setPitchPreference('eb')
+      try {
+        await rig.open()
+        $('#pitch-selector')?.remove()
+        const metadata = $('#musical-metadata') as unknown as { instrument: string }
+        rig.page.header.showPitch()
+        expect(metadata.instrument).to.equal('E♭')
+      } finally {
+        setPitchControlsPreference(false)
+        setPitchPreference('concert')
+      }
+    })
+
     it('shows the instrument pitch only while its controls are on, and says it only when it is not concert pitch', async () => {
       setPitchControlsPreference(true)
       setPitchPreference('eb')
