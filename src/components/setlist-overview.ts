@@ -84,7 +84,10 @@ export class SetlistOverview extends LitElement {
 
   declare songs: unknown[] /* TYPE */
   declare editMode: boolean
-  /** Whether to show how the guitar is tuned for this setlist (the capo and tuning controls are on) */
+  /**
+   * Whether the guitar's tuning for this setlist can be shown (the capo and tuning controls are on):
+   * it is, always in edit mode, and out of it only when it is not standard
+   */
   declare showTuning: boolean
   /** The setlist's own tuning, or null for the device's */
   declare tuning: Tuning | null
@@ -108,7 +111,7 @@ export class SetlistOverview extends LitElement {
     return html`
       <div class="setlist-overview">
         ${
-          this.showTuning
+          this.showTuning && (this.editMode || (this.tuning ?? this.deviceTuning) !== 0)
             ? html`<div class="overview-tuning">
                 <tuning-selector
                   .value=${this.tuning === null ? '' : String(this.tuning)}

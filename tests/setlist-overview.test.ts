@@ -83,11 +83,34 @@ describe('setlist-overview', () => {
       overview.querySelector<TuningSelector>('tuning-selector')
 
     it('has a row for it when the capo and tuning controls are on, and none otherwise', async () => {
-      const overview = await show()
+      const overview = await show(true)
       expect(row(overview)).to.equal(null)
       overview.showTuning = true
       await overview.updateComplete
       expect(row(overview)).to.not.equal(null)
+    })
+
+    it('shows it always in edit mode, and out of it only when it is not standard', async () => {
+      const overview = await show()
+      overview.showTuning = true
+      await overview.updateComplete
+      // (standard, the setlist's own or the device's: nothing to say)
+      expect(row(overview)).to.equal(null)
+      overview.deviceTuning = 1
+      await overview.updateComplete
+      expect(row(overview)?._displayValue()).to.equal('Half step down')
+      // (a setlist standard in itself, over a device that is not: standard, so nothing to say)
+      overview.tuning = 0
+      await overview.updateComplete
+      expect(row(overview)).to.equal(null)
+      overview.tuning = 2
+      await overview.updateComplete
+      expect(row(overview)?._displayValue()).to.equal('Whole step down')
+      // (and in edit mode it is there to be changed, whatever it is)
+      overview.tuning = 0
+      overview.editMode = true
+      await overview.updateComplete
+      expect(row(overview)?._displayValue()).to.equal('Standard')
     })
 
     it('shows the setlist’s own tuning, or the device’s when it has none, and can be changed in edit mode', async () => {
