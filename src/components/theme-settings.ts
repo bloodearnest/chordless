@@ -91,17 +91,6 @@ export class ThemeSettings extends LitElement {
       border-color: var(--button-hover, #1f6a9a);
     }
 
-    .theme-icon {
-      font-size: var(--font-ui-small);
-    }
-
-    /* The words are enough where the three buttons are tight */
-    @media (max-width: 24rem) {
-      .theme-icon {
-        display: none;
-      }
-    }
-
     .font-scale-controls {
       display: flex;
       align-items: center;
@@ -251,7 +240,6 @@ export class ThemeSettings extends LitElement {
             aria-label="Use system preference"
             title="Follow your system's theme preference automatically"
           >
-            <span class="theme-icon">💻</span>
             <span>System</span>
           </button>
           <button
@@ -259,7 +247,6 @@ export class ThemeSettings extends LitElement {
             @click=${() => this._setTheme('light')}
             aria-label="Light theme"
           >
-            <span class="theme-icon">☀️</span>
             <span>Light</span>
           </button>
           <button
@@ -267,7 +254,6 @@ export class ThemeSettings extends LitElement {
             @click=${() => this._setTheme('dark')}
             aria-label="Dark theme"
           >
-            <span class="theme-icon">🌙</span>
             <span>Dark</span>
           </button>
         </div>
