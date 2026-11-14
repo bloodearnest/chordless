@@ -1,10 +1,6 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import type { AppPreferences } from '../src/components/app-preferences.ts'
-import {
-  KeepAwakeLimitEvent,
-  KeepAwakePreferenceEvent,
-  TelemetryPreferenceEvent,
-} from '../src/js/preferences.ts'
+import { KeepAwakeLimitEvent, KeepAwakePreferenceEvent } from '../src/js/preferences.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../src/js/wake-lock.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import '../src/components/app-preferences.ts'
@@ -26,10 +22,6 @@ const KEYS = [
   'keep_screen_awake',
   'scroll_to_top_on_swipe',
   'keep_awake_minutes',
-  'show_shared_annotations',
-  'show_my_annotations',
-  'telemetry',
-  'telemetry-device-id',
 ]
 
 describe('app-preferences', () => {
@@ -55,6 +47,24 @@ describe('app-preferences', () => {
   const show = () => fixture<AppPreferences>(html`<app-preferences></app-preferences>`)
   const control = <T extends HTMLElement>(el: AppPreferences, selector: string) =>
     el.shadowRoot?.querySelector(selector) as T
+
+  describe('the layout', () => {
+    it('has three panels: Appearance, Behaviour and options, and Accessibility last', async () => {
+      const el = await show()
+      const headings = [...(el.shadowRoot?.querySelectorAll('.panel > h3') ?? [])].map(
+        h => h.textContent
+      )
+      expect(headings).to.deep.equal(['Appearance', 'Behaviour and options', 'Accessibility'])
+      const panels = el.shadowRoot?.querySelectorAll('.panel')
+      expect(panels?.[2]?.querySelector('readability-settings')).to.not.equal(null)
+    })
+
+    it('has neither the annotations nor the usage reports', async () => {
+      const el = await show()
+      expect(el.shadowRoot?.querySelector('#toggle-my-annotations')).to.equal(null)
+      expect(el.shadowRoot?.querySelector('#toggle-telemetry')).to.equal(null)
+    })
+  })
 
   describe('the choices', () => {
     const radios = (el: AppPreferences) => [
@@ -172,11 +182,8 @@ describe('app-preferences', () => {
       for (const [id, key, value] of [
         ['#toggle-use-nashville', 'use-nashville', '1'],
         ['#toggle-unicode-accidentals', 'use-unicode-accidentals', '1'],
-        ['#toggle-shared-annotations', 'show_shared_annotations', 'false'],
-        ['#toggle-my-annotations', 'show_my_annotations', 'false'],
         ['#toggle-keep-awake', 'keep_screen_awake', 'false'],
         ['#toggle-scroll-to-top', 'scroll_to_top_on_swipe', 'false'],
-        ['#toggle-telemetry', 'telemetry', 'false'],
       ] as const) {
         control<HTMLInputElement>(el, id).click()
         expect(localStorage.getItem(key), id).to.equal(value)
@@ -204,62 +211,6 @@ describe('app-preferences', () => {
       el.remove()
       window.dispatchEvent(new KeepAwakePreferenceEvent(true))
       expect(el.keepAwake).to.equal(false)
-    })
-
-    it('shows the usage reports as on until turned off, and follows a change made elsewhere', async () => {
-      const el = await show()
-      expect(control<HTMLInputElement>(el, '#toggle-telemetry').checked).to.equal(true)
-      window.dispatchEvent(new TelemetryPreferenceEvent(false))
-      await el.updateComplete
-      expect(control<HTMLInputElement>(el, '#toggle-telemetry').checked).to.equal(false)
-      el.remove()
-      window.dispatchEvent(new TelemetryPreferenceEvent(true))
-      expect(el.telemetry).to.equal(false)
-    })
-
-    it('shows the start of this device’s report id, which Reset replaces, and not while reports are off', async () => {
-      const el = await show()
-      const id = el.shadowRoot?.querySelector('#support-id')?.textContent ?? ''
-      expect(id).to.match(/^[0-9a-f]{8}$/)
-      expect(localStorage.getItem('telemetry-device-id')?.startsWith(id)).to.equal(true)
-
-      control<HTMLButtonElement>(el, '#reset-support-id').click()
-      await el.updateComplete
-      const after = el.shadowRoot?.querySelector('#support-id')?.textContent ?? ''
-      expect(after).to.match(/^[0-9a-f]{8}$/)
-      expect(after).to.not.equal(id)
-
-      control<HTMLInputElement>(el, '#toggle-telemetry').click()
-      await el.updateComplete
-      expect(el.shadowRoot?.querySelector('#support-id')).to.equal(null)
-    })
-
-    it('copies the id, and carries on if the browser will not', async () => {
-      const el = await show()
-      const written: string[] = []
-      const real = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: { writeText: async (text: string) => void written.push(text) },
-      })
-      try {
-        control<HTMLButtonElement>(el, '#copy-support-id').click()
-        await el.updateComplete
-        expect(written).to.deep.equal([el.supportId])
-        Object.defineProperty(navigator, 'clipboard', {
-          configurable: true,
-          value: {
-            writeText: async () => {
-              throw new Error('refused')
-            },
-          },
-        })
-        control<HTMLButtonElement>(el, '#copy-support-id').click()
-        await el.updateComplete
-      } finally {
-        if (real) Object.defineProperty(navigator, 'clipboard', real)
-        else delete (navigator as unknown as Record<string, unknown>).clipboard
-      }
     })
 
     it('draws again when the wake lock changes', async () => {

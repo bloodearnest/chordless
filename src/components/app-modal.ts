@@ -155,7 +155,7 @@ export class AppModal extends LitElement {
 
     .modal-title {
       flex: 1;
-      font-size: var(--font-ui);
+      font-size: calc(var(--font-base) * 0.95);
       font-weight: 600;
       color: inherit;
       margin: 0;

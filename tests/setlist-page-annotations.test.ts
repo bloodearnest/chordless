@@ -8,7 +8,6 @@ import type { AnnotationEditor } from '../src/components/annotation-editor.ts'
 import type { SongDisplay } from '../src/components/song-display.ts'
 import { AnnotationRequestEvent, type SongSection } from '../src/components/song-section.ts'
 import type { ChartAnnotation, SharedChartAnnotation } from '../src/js/data-types.ts'
-import { setAnnotationsPreference } from '../src/js/preferences.ts'
 import { loadSetlistAnnotations, saveSetlistAnnotations } from '../src/js/setlist/local-state.ts'
 import { makeEntry } from './builders.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
@@ -20,8 +19,6 @@ describe('the setlist page: annotations', () => {
   const rig = useSetlistPage()
   afterEach(async () => {
     clearToasts()
-    setAnnotationsPreference('shared', true)
-    setAnnotationsPreference('mine', true)
   })
 
   const display = (index = 0) => must(rig.$<SongDisplay>(`#song-${index} song-display`))
@@ -306,22 +303,10 @@ describe('the setlist page: annotations', () => {
     expect(await heading({ place: 'text', line: 9, offset: 0 })).to.contain('this line')
   })
 
-  it('draws the annotations the preferences choose, and all of them while editing', async () => {
+  it('draws every annotation, shared and the user’s own', async () => {
     await rig.open(1)
     await make({ place: 'title' }, 'team', root => choose(root, 'Everyone'))
     await make(word, 'mine')
-    expect(shown().map(annotation => annotation.text)).to.have.members(['team', 'mine'])
-
-    setAnnotationsPreference('shared', false)
-    await rig.flush()
-    expect(shown().map(annotation => annotation.text)).to.deep.equal(['mine'])
-    setAnnotationsPreference('mine', false)
-    await rig.flush()
-    expect(shown()).to.deep.equal([])
-
-    document.body.classList.add('edit-mode')
-    rig.page.annotations.refreshAll()
-    await rig.flush()
     expect(shown().map(annotation => annotation.text)).to.have.members(['team', 'mine'])
   })
 
@@ -407,6 +392,20 @@ describe('the setlist page: annotations', () => {
       expect(await stored()).to.include({ line: 0 })
       await rig.page.annotations.healShared()
       expect(await stored()).to.include({ line: 1, offset: 8 })
+    })
+
+    it('leaves a song that has not been read yet, and writes nothing', async () => {
+      const setlist = await rig.open(1)
+      await make(word, 'band drops', root => choose(root, 'Everyone'))
+      const song = rig.page.songs[0]
+      const parsed = song.parsed
+      delete (song as { parsed?: unknown }).parsed
+      try {
+        await rig.page.annotations.healShared()
+      } finally {
+        song.parsed = parsed
+      }
+      expect(must(await rig.db.getSetlist(setlist.id)).songs[0].annotations).to.have.length(1)
     })
 
     it('says nothing, and carries on, when where an annotation is cannot be kept', async () => {

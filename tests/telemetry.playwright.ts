@@ -92,6 +92,20 @@ test('turning the reports off in Preferences forgets this device’s id', { tag:
     .toBeNull()
 })
 
+test('the privacy page has the switch for the reports, and it forgets the id', {
+  tag: '@logic',
+}, async ({ page }) => {
+  await page.route('**/api/otlp/v1/traces', route => route.fulfill({ status: 204 }))
+  await page.goto('/privacy.html')
+  const toggle = page.getByLabel('Send anonymous usage reports from this device')
+  await expect(toggle).toBeChecked()
+  await expect(page.locator('usage-reports-setting #support-id')).toHaveText(/^[0-9a-f]{8}$/)
+  await toggle.uncheck()
+  await expect(page.locator('usage-reports-setting #support-id')).toHaveCount(0)
+  expect(await page.evaluate(() => localStorage.getItem('telemetry'))).toBe('false')
+  expect(await page.evaluate(() => localStorage.getItem('telemetry-device-id'))).toBeNull()
+})
+
 test('a setlist session: opened, then left, with the same session id on both and what happened between', async ({
   page,
 }) => {

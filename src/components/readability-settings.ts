@@ -39,7 +39,7 @@ const SAMPLE: readonly (readonly [string, string])[][] = [
 const THEMES = ['light', 'dark'] as const
 
 /**
- * Chord highlight and fonts (Preferences): a tint behind the chords (not the words) to help
+ * Accessibility: chord highlight and fonts (Preferences): a tint behind the chords (not the words) to help
  * readers with dyslexia or visual stress, and a typeface for the app, the lyrics and the chords
  * each. A verse is drawn in the light theme and the dark, whichever is on, so a choice can be
  * seen in both before it is made. Changes apply at once, with no reload.
@@ -61,7 +61,7 @@ export class ReadabilitySettings extends LitElement {
       }
 
       .group {
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
       }
 
       .group:last-child {
@@ -70,17 +70,16 @@ export class ReadabilitySettings extends LitElement {
 
       .label {
         display: block;
-        font-size: var(--font-ui);
+        font-size: var(--font-ui-small);
         font-weight: 600;
-        margin-bottom: 0.5rem;
-        opacity: 0.9;
+        margin-bottom: 0.25rem;
       }
 
       .description {
         font-size: var(--font-ui-small);
         opacity: 0.7;
         margin-bottom: 0.75rem;
-        line-height: 1.4;
+        line-height: 1.3;
       }
 
       .swatches {
@@ -221,24 +220,30 @@ export class ReadabilitySettings extends LitElement {
         opacity: 0.7;
       }
 
+      /* Each menu under a one-line name, so the menus line up whatever the names say */
       .fonts {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+        gap: 0.75rem 1rem;
       }
 
       .fonts label {
         display: flex;
         flex-direction: column;
         gap: 0.25rem;
+        min-width: 0;
         font-size: var(--font-ui-small);
       }
 
       .fonts .area {
         font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .fonts .hint {
+        font-weight: 400;
         opacity: 0.7;
       }
     `,
@@ -378,8 +383,7 @@ export class ReadabilitySettings extends LitElement {
     const { label, description } = AREA_LABELS[area]
     return html`
       <label>
-        <span class="area">${label}</span>
-        <span class="hint">${description}</span>
+        <span class="area">${label} <span class="hint">${description}</span></span>
         <select
           class="field"
           aria-label="${label} font"
@@ -388,13 +392,16 @@ export class ReadabilitySettings extends LitElement {
         >
           ${FONT_CHOICES.map(
             choice => html`
-              <option value=${choice.id} ?selected=${this._fonts[area] === choice.id}>
+              <option
+                value=${choice.id}
+                title=${choice.note}
+                ?selected=${this._fonts[area] === choice.id}
+              >
                 ${choice.label}
               </option>
             `
           )}
         </select>
-        <span class="hint">${FONT_CHOICES.find(choice => choice.id === this._fonts[area])?.note}</span>
       </label>
     `
   }
@@ -404,11 +411,8 @@ export class ReadabilitySettings extends LitElement {
       <div class="group">
         <span class="label">Chord highlight</span>
         <div class="description">
-          A coloured background behind the chords, not the words, which some readers with dyslexia
-          or visual stress find easier to read. Pick whichever suits you: the effect differs from
-          person to person. Each colour has a pale form in the light theme and a deep one in the
-          dark; "Your own" is used as it is in both. The chord text changes colour if it would
-          otherwise be hard to read.
+          A coloured background behind the chords, not the words: some readers with dyslexia or
+          visual stress find it easier. Pick whichever suits you.
         </div>
         ${this._renderSwatches()}
         <div class="previews">${THEMES.map(theme => this._renderPreview(theme))}</div>
@@ -417,8 +421,7 @@ export class ReadabilitySettings extends LitElement {
       <div class="group">
         <span class="label">Fonts</span>
         <div class="description">
-          A typeface for each part on its own. They are fonts your device already has, so they work
-          offline; the verse above shows the lyrics and chords ones. Saved on this device only.
+          A typeface for each part, from the fonts your device has. Saved on this device only.
         </div>
         <div class="fonts">${FONT_AREAS.map(area => this._renderFontPicker(area))}</div>
       </div>

@@ -96,8 +96,8 @@ second; mouse: long-press or right-click; keyboard: Enter or the context-menu ke
 target) on a section title, a word or a chord opens the annotation editor: text, who sees it
 (Just me or Everyone), delete. Changing who sees it keeps the annotation's id. Outside edit mode annotations are shown,
 not edited. Deleting shows a toast with Undo. An annotation for the whole song is made with "+ Annotation on the
-whole song", shown with the annotations whose place is gone, above the sections. Preferences can hide the
-the annotations shared with everyone, or the user's own (shown in edit mode whatever they say).
+whole song", shown with the annotations whose place is gone, above the sections. They are always shown:
+there is no preference to hide them.
 
 Where in a line a press lands is worked out from the lyrics as they are drawn, which with chords
 hidden are tidied (hyphens, spaces); `snapOffset` moves it to the nearest start of a word or

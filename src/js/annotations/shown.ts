@@ -7,7 +7,7 @@ import type { ChartLine, ChartSection, ChartSegment, ShownAnnotation } from '../
 import { type PlacedAnnotation, placeAnnotations } from './anchor.ts'
 import { type AnnotationSources, allAnnotations } from './store.ts'
 
-/** Which annotations to draw (a preference: both are drawn when editing) */
+/** Which annotations to draw: both kinds, unless a caller says otherwise */
 export interface AnnotationVisibility {
   shared: boolean
   mine: boolean

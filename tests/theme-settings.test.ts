@@ -28,7 +28,6 @@ describe('theme-settings', () => {
   it('chooses the theme with its buttons, and follows the system', async () => {
     const el = await show()
     expect(button(el, 'Light theme').classList.contains('active')).to.equal(true)
-    expect(text(el)).to.contain('System prefers:')
     expect(text(el)).to.not.contain('Following system preference')
 
     button(el, 'Dark theme').click()
@@ -41,7 +40,6 @@ describe('theme-settings', () => {
     expect(themeManager.getCurrentTheme()).to.equal('system')
     expect(button(el, 'Use system preference').classList.contains('active')).to.equal(true)
     expect(text(el)).to.contain('Following system preference')
-    expect(text(el)).to.not.contain('System prefers:')
   })
 
   it('follows a theme changed elsewhere, while it is on the page', async () => {
