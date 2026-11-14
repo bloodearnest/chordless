@@ -22,9 +22,11 @@ let tap: TextTap | null = null
 function bundleOf(source: string): FluentBundle {
   // (no marks around the values: they would be in the text a test, or a person selecting it, sees)
   const bundle = new FluentBundle('en', { useIsolating: false })
+  /* v8 ignore start -- tests/text.node.test.ts fails on a catalogue that is not valid, so none gets here */
   for (const error of bundle.addResource(new FluentResource(source))) {
     console.error('[text] A message in the catalogue is not valid:', error)
   }
+  /* v8 ignore stop */
   return bundle
 }
 
