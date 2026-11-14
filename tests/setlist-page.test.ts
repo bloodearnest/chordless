@@ -9,15 +9,22 @@
 
 import { expect, waitUntil } from '@open-wc/testing'
 import { render } from 'lit'
+import type { MusicalMetadataDisplay } from '../src/components/musical-metadata-display.ts'
 import type { SongDisplay } from '../src/components/song-display.ts'
 import '../src/components/song-display.ts'
 import '../src/components/song-section.ts'
 import { CapoChangeEvent } from '../src/components/capo-selector.ts'
+import { TuningChangeEvent } from '../src/components/tuning-selector.ts'
 import { SongChangeEvent } from '../src/js/app-events.ts'
 import type { Setlist, SongWithContent } from '../src/js/data-types.ts'
 import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
-import { CapoPreferenceEvent, setCapoPreference } from '../src/js/preferences.ts'
+import {
+  CapoPreferenceEvent,
+  setCapoPreference,
+  setTuningPreference,
+  TuningPreferenceEvent,
+} from '../src/js/preferences.ts'
 import { loadSetlistLocalState, saveSetlistLocalState } from '../src/js/setlist/local-state.ts'
 import { SetlistPage } from '../src/js/setlist-page.ts'
 import { getSongUserPrefs } from '../src/js/song-user-prefs.ts'
@@ -746,6 +753,107 @@ describe('the setlist page', () => {
       await settle()
 
       expect(capoOf(0)).to.equal(0)
+    })
+  })
+
+  describe('the guitar tuning', () => {
+    const tuningOf = (index: number) =>
+      must(
+        root.querySelector<HTMLElement & { tuning: number | null }>(`#song-${index} song-display`)
+      ).tuning
+    const row = () =>
+      root.querySelector<HTMLElement & { value: string; deviceTuning: number }>('tuning-selector')
+    const stored = () => JSON.parse(localStorage.getItem(`state-${page.currentSetlistId}`) ?? '{}')
+
+    afterEach(() => {
+      setTuningPreference(0)
+      localStorage.removeItem('tuning')
+    })
+
+    it('has no row on the overview and no tuning on the songs while the capo and tuning controls are off', async () => {
+      setTuningPreference(1)
+      await open()
+      expect(row()).to.equal(null)
+      expect(page.effectiveTuning()).to.equal(0)
+      expect([tuningOf(0), tuningOf(1)]).to.deep.equal([0, 0])
+    })
+
+    describe('with the controls on when the setlist is opened', () => {
+      beforeEach(() => setCapoPreference(true))
+
+      it('shows the device’s tuning on the overview’s row, and gives the songs none of their own', async () => {
+        setTuningPreference(1)
+        await open()
+        expect(row()?.value).to.equal('')
+        expect(row()?.deviceTuning).to.equal(1)
+        expect(page.effectiveTuning()).to.equal(1)
+        expect([tuningOf(0), tuningOf(1)]).to.deep.equal([null, null])
+      })
+
+      it('keeps a tuning chosen for the setlist, on the device, and gives it to every song and the header', async () => {
+        setTuningPreference(1)
+        await open()
+        const metadata = must(root.querySelector<MusicalMetadataDisplay>('#musical-metadata'))
+        page.changeSetlistTuning(2)
+        await settle()
+        expect(stored().tuning).to.equal(2)
+        expect(page.effectiveTuning()).to.equal(2)
+        expect(row()?.value).to.equal('2')
+        expect([tuningOf(0), tuningOf(1)]).to.deep.equal([2, 2])
+        expect(metadata.tuning).to.equal(2)
+
+        // (and the device's again, when asked for)
+        page.changeSetlistTuning(null)
+        await settle()
+        expect('tuning' in stored()).to.equal(false)
+        expect(page.effectiveTuning()).to.equal(1)
+        expect(row()?.value).to.equal('')
+        expect([tuningOf(0), tuningOf(1)]).to.deep.equal([null, null])
+        expect(metadata.tuning).to.equal(1)
+      })
+
+      it('follows a chosen tuning in the overview’s row, in edit mode', async () => {
+        await open()
+        page.overview.setEditMode(true)
+        row()?.dispatchEvent(new TuningChangeEvent(1))
+        await settle()
+        expect(page.effectiveTuning()).to.equal(1)
+        page.overview.setEditMode(false)
+      })
+
+      it('carries on when there is no overview to show it in', async () => {
+        await open()
+        page.overview.attach(null)
+        expect(() => page.changeSetlistTuning(1)).to.not.throw()
+        expect(page.effectiveTuning()).to.equal(1)
+      })
+
+      it('follows the device’s tuning when it is changed, unless the setlist has its own', async () => {
+        await open()
+        setTuningPreference(2)
+        await settle()
+        expect(page.effectiveTuning()).to.equal(2)
+        page.changeSetlistTuning(0)
+        setTuningPreference(1)
+        window.dispatchEvent(new TuningPreferenceEvent(1))
+        await settle()
+        expect(page.effectiveTuning()).to.equal(0)
+        expect(row()?.deviceTuning).to.equal(1)
+      })
+
+      it('starts the capo picker’s keys from the tuning, as the shapes are played in it', async () => {
+        await open()
+        page.sectionObserver?.disconnect()
+        page.currentSongIndex = 0
+        page.header.showCurrentCapo()
+        const selector = must(
+          root.querySelector<HTMLElement & { referenceKey: string }>('#capo-selector')
+        )
+        const untuned = selector.referenceKey
+        expect(untuned).to.not.equal('')
+        page.changeSetlistTuning(2)
+        expect(selector.referenceKey).to.not.equal(untuned)
+      })
     })
   })
 

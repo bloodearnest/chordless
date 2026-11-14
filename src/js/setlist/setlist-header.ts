@@ -24,7 +24,8 @@ import { buildUrl, type Route } from '../router.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
 import { syncsBack } from '../space.ts'
 import { differsFromOfficial } from '../sync/revert.ts'
-import { getAvailableKeys } from '../transpose.ts'
+import { getAvailableKeys, transposeKeyName } from '../transpose.ts'
+import type { Tuning } from '../tuning.ts'
 import { normalizeCapo } from '../utils/capo.ts'
 import { formatSetlistDate, setlistTitle } from '../utils/date-utils.ts'
 import { sleep } from '../utils/sleep.ts'
@@ -39,6 +40,8 @@ export interface HeaderHost {
   readonly currentSongIndex: number
   readonly currentSetlist: Setlist | undefined
   readonly _capoEnabled: boolean
+  /** How the guitar is tuned now: the setlist's, or the device's (docs/PERSONAL_LAYER.md) */
+  effectiveTuning(): Tuning
   _database(): ChordlessDB
   /** The song's melody and its key, or null when it has none */
   melodyOf(song: RuntimeSong): Promise<unknown>
@@ -182,6 +185,7 @@ export class SetlistHeader {
       if (musicalMetadata) {
         musicalMetadata.keyValue = song.currentKey || ''
         musicalMetadata.capoValue = capoEnabled ? (song.currentCapo ?? 0) : 0
+        musicalMetadata.tuning = this.host.effectiveTuning()
         musicalMetadata.bpm = song.currentBPM || null
         musicalMetadata.timeSignature = song.metadata?.time || song.metadata?.timeSignature || ''
         musicalMetadata.style.display = ''
@@ -213,9 +217,17 @@ export class SetlistHeader {
   }
 
   /** Show new values in the song's metadata display (after a change to its key, capo or tempo) */
-  showMetadata(shown: Partial<Pick<MusicalMetadataDisplay, 'keyValue' | 'capoValue' | 'bpm'>>) {
+  showMetadata(
+    shown: Partial<Pick<MusicalMetadataDisplay, 'keyValue' | 'capoValue' | 'bpm' | 'tuning'>>
+  ) {
     const musicalMetadata = this.#find<MusicalMetadataDisplay>('#musical-metadata')
     if (musicalMetadata) Object.assign(musicalMetadata, shown)
+  }
+
+  /** The tuning changed: the song's metadata says so, and the capo picker shows the keys from it */
+  showTuning() {
+    this.showMetadata({ tuning: this.host.effectiveTuning() })
+    this.showCurrentCapo()
   }
 
   /** The share, differs and live buttons: on the overview only. Share is lit while the setlist is shared */
@@ -304,7 +316,10 @@ export class SetlistHeader {
     const capoSelector = this.#find<CapoSelector>('#capo-selector')
     if (!capoSelector) return
     capoSelector.value = normalizeCapo(value)
-    capoSelector.referenceKey = key || this.#capoKey || ''
+    // (the key the shapes are in at each capo starts from the tuning: a guitar tuned down plays higher)
+    const tuning = this.host.effectiveTuning()
+    capoSelector.referenceKey =
+      (key && tuning ? transposeKeyName(key, tuning) : key) || this.#capoKey || ''
     this.#capoKey = capoSelector.referenceKey
     capoSelector.editMode = isEditMode()
   }

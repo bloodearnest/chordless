@@ -3,9 +3,11 @@ import {
   clearSetlistLocalState,
   loadSetlistAnnotations,
   loadSetlistLocalState,
+  loadSetlistTuning,
   loadSongCapo,
   saveSetlistAnnotations,
   saveSetlistLocalState,
+  saveSetlistTuning,
 } from '../src/js/setlist/local-state.ts'
 
 const songs = [
@@ -105,6 +107,52 @@ describe('what a setlist keeps on this device', () => {
     saveSetlistLocalState('s1', { sectionState: {}, capoValues: { 0: 1 } }, songs)
     clearSetlistLocalState('s1')
     expect(localStorage.getItem('state-s1')).to.equal(null)
+  })
+
+  describe('the tuning', () => {
+    it('is none until one is kept, then kept, and none again when the device’s is asked for', () => {
+      expect(loadSetlistTuning('s1')).to.equal(null)
+      saveSetlistTuning('s1', 1, songs)
+      expect(loadSetlistTuning('s1')).to.equal(1)
+      saveSetlistTuning('s1', 0, songs)
+      expect(loadSetlistTuning('s1')).to.equal(0)
+      saveSetlistTuning('s1', null, songs)
+      expect(loadSetlistTuning('s1')).to.equal(null)
+    })
+
+    it('leaves the sections and capos alone, and they leave it', () => {
+      saveSetlistLocalState(
+        's1',
+        { sectionState: { 0: { 1: hidden } }, capoValues: { 2: 4 } },
+        songs
+      )
+      saveSetlistTuning('s1', 2, songs)
+      expect(loadSetlistLocalState('s1', songs)).to.deep.equal({
+        sectionState: { 0: { 1: hidden } },
+        capoValues: { 2: 4 },
+      })
+      saveSetlistLocalState('s1', { sectionState: {}, capoValues: { 0: 3 } }, songs)
+      expect(loadSetlistTuning('s1')).to.equal(2)
+    })
+
+    it('is read as standard when what is kept is not a tuning, and none for state kept by place', () => {
+      localStorage.setItem('state-s1', JSON.stringify({ v: 2, sections: {}, capos: {}, tuning: 7 }))
+      expect(loadSetlistTuning('s1')).to.equal(0)
+      localStorage.setItem('state-s1', JSON.stringify({ capo: { 0: 2 } }))
+      expect(loadSetlistTuning('s1')).to.equal(null)
+    })
+
+    it('carries on when it cannot be kept, as when storage is full', () => {
+      const real = Storage.prototype.setItem
+      Storage.prototype.setItem = () => {
+        throw new Error('full')
+      }
+      try {
+        expect(() => saveSetlistTuning('s1', 1, songs)).to.not.throw()
+      } finally {
+        Storage.prototype.setItem = real
+      }
+    })
   })
 
   describe('private annotations', () => {

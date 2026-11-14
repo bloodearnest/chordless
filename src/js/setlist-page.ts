@@ -46,7 +46,9 @@ import {
   CapoPreferenceEvent,
   getCapoPreference,
   getScrollToTopOnSwipe,
+  getTuningPreference,
   SectionDefaultsEvent,
+  TuningPreferenceEvent,
 } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import type { Score } from './score.ts'
@@ -60,8 +62,10 @@ import {
   afterMove,
   clearSetlistLocalState,
   loadSetlistLocalState,
+  loadSetlistTuning,
   renumberSongs,
   saveSetlistLocalState,
+  saveSetlistTuning,
 } from './setlist/local-state.ts'
 import { OverviewController } from './setlist/overview-controller.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
@@ -82,6 +86,7 @@ import {
 } from './telemetry/setlist-session.ts'
 import { toast } from './toast.ts'
 import { transposeSong } from './transpose.ts'
+import type { Tuning } from './tuning.ts'
 import { normalizeCapo } from './utils/capo.ts'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.ts'
 import { errorMessage } from './utils/errors.ts'
@@ -154,6 +159,8 @@ export class SetlistPage {
   /** The overview, and its edit mode */
   overview: OverviewController
   _capoEnabled: boolean
+  /** How the guitar is tuned for this setlist, or null for the device's (docs/PERSONAL_LAYER.md) */
+  _tuning: Tuning | null = null
   _setlistDetailsSaveHandler?: (event: SetlistInfoSaveEvent) => void
   _rangeChangedHandler?: (event: SongRangeChangedEvent) => void
   _setlistDeleteHandler?: (event: SetlistInfoDeleteEvent) => void
@@ -277,6 +284,7 @@ export class SetlistPage {
     window.addEventListener(SectionDefaultsEvent.type, this._onSectionDefaultsChanged, { signal })
     window.addEventListener('storage', this._onCapoPreferenceChange, { signal })
     window.addEventListener(CapoPreferenceEvent.type, this._onCapoPreferenceChange, { signal })
+    window.addEventListener(TuningPreferenceEvent.type, () => this._applyTuning(), { signal })
     window.addEventListener(LiveChangeEvent.type, this._onLiveChange, { signal })
     window.addEventListener(LiveSyncStatusEvent.type, this._onLiveChange, { signal })
   }
@@ -585,6 +593,7 @@ export class SetlistPage {
     songContentWrapper.className = 'song-content'
 
     songContentWrapper.appendChild(this.overview.create(songs))
+    this._showTuningInOverview()
     overview.appendChild(songContentWrapper)
     fragment.appendChild(overview)
 
@@ -598,6 +607,7 @@ export class SetlistPage {
         songDisplay.parsed = song.parsed
         songDisplay.songIndex = song.songIndex
         songDisplay.capo = this._capoEnabled ? song.currentCapo || 0 : 0
+        songDisplay.tuning = this._tuningForDisplay()
         songDisplay.annotations = this.annotations.chartAnnotations(index)
         const songContent = document.createElement('div')
         songContent.className = 'song-content'
@@ -1110,6 +1120,7 @@ export class SetlistPage {
       this.songs.map(song => song._setlistEntry)
     )
     this.sections.states = sectionState
+    this._tuning = loadSetlistTuning(this.currentSetlistId)
     if (this._capoEnabled) {
       for (const [songIndex, capo] of Object.entries(capoValues)) {
         const song = this.songs[Number(songIndex)]
@@ -1148,6 +1159,45 @@ export class SetlistPage {
         song.currentCapo = normalizeCapo(songUserPrefs.capo)
       }
     })
+  }
+
+  /** How the guitar is tuned now: the setlist's, or the device's, when the capo and tuning controls are on */
+  effectiveTuning(): Tuning {
+    return this._capoEnabled ? (this._tuning ?? getTuningPreference()) : 0
+  }
+
+  /** A tuning was chosen for this setlist (null: the device's again): kept on this device */
+  changeSetlistTuning(tuning: Tuning | null) {
+    this._tuning = tuning
+    saveSetlistTuning(
+      this.currentSetlistId,
+      tuning,
+      this.songs.map(song => song._setlistEntry)
+    )
+    this._applyTuning()
+  }
+
+  /** Show the tuning: in the overview's row, in each song's chords, and in the song's header */
+  _applyTuning() {
+    this._showTuningInOverview()
+    for (const display of this.root.querySelectorAll<SongDisplay>('song-display')) {
+      display.tuning = this._tuningForDisplay()
+    }
+    this.header.showTuning()
+  }
+
+  /** The overview's row for the tuning: there when the capo and tuning controls are on */
+  _showTuningInOverview() {
+    const overview = this.overview.component
+    if (!overview) return
+    overview.showTuning = this._capoEnabled
+    overview.tuning = this._tuning
+    overview.deviceTuning = getTuningPreference()
+  }
+
+  /** What a song's chords are given for the tuning: the setlist's, nothing for the device's, standard with no guitar controls */
+  _tuningForDisplay(): Tuning | null {
+    return this._capoEnabled ? this._tuning : 0
   }
 
   /** Keep the section states and capos on this device (see loadState) */
@@ -1558,6 +1608,7 @@ export class SetlistPage {
         songDisplay.parsed = song.parsed
         songDisplay.songIndex = song.songIndex
         songDisplay.capo = this._capoEnabled ? song.currentCapo || 0 : 0
+        songDisplay.tuning = this._tuningForDisplay()
         songDisplay.annotations = this.annotations.chartAnnotations(songIndex)
         songContent.appendChild(songDisplay)
         if (sheet) keepSheet(songContent, songDisplay, sheet)
@@ -1949,6 +2000,7 @@ export class SetlistPage {
         display.capo = 0
       }
     })
+    this._applyTuning()
   }
 }
 

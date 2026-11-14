@@ -19,7 +19,7 @@ export const PLAYS: readonly PlayOption[] = [
   {
     type: 'guitarist',
     label: 'I play guitar',
-    description: 'Chords and lyrics, with a capo control for each song',
+    description: 'Chords and lyrics, with capo and tuning controls',
   },
   {
     type: 'general',

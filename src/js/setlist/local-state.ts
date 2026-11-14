@@ -6,6 +6,7 @@
  * the setlist twice shares them.) The page works on them by place, as the songs are on the page.
  */
 import type { ChartAnnotation, SectionState } from '../data-types.ts'
+import { normalizeTuning, type Tuning } from '../tuning.ts'
 
 /** Per song index, then per section index */
 export type SectionStates = Record<number, Record<number, SectionState>>
@@ -34,6 +35,8 @@ interface StoredState {
   annotations?: Record<string, ChartAnnotation[]>
   /** What `annotations` was called until 2026-11-06: read, and moved to `annotations` when saved */
   notes?: Record<string, ChartAnnotation[]>
+  /** How the guitar is tuned for this setlist (docs/PERSONAL_LAYER.md); none: the device's */
+  tuning?: number
 }
 
 const keyFor = (setlistId: string | null) => `state-${setlistId}`
@@ -102,6 +105,30 @@ export function loadSongCapo(setlistId: string | null, song: SongRef, index: num
   return saved.v === 2
     ? (saved as unknown as StoredState).capos?.[songKey(song)]
     : byPlace(saved).capoValues[index]
+}
+
+/** The tuning kept for this setlist, or null for the device's */
+export function loadSetlistTuning(setlistId: string | null): Tuning | null {
+  const saved = readSaved(setlistId)
+  return saved.v === 2 && (saved as unknown as StoredState).tuning !== undefined
+    ? normalizeTuning((saved as unknown as StoredState).tuning)
+    : null
+}
+
+/** Keep a tuning for this setlist (null: the device's). `songs` are the setlist's, for state still kept by place. */
+export function saveSetlistTuning(
+  setlistId: string | null,
+  tuning: Tuning | null,
+  songs: SongRef[]
+) {
+  try {
+    const stored = bySong(readSaved(setlistId), songs)
+    if (tuning === null) delete stored.tuning
+    else stored.tuning = tuning
+    localStorage.setItem(keyFor(setlistId), JSON.stringify(stored))
+  } catch (error) {
+    console.error('Failed to save the setlist tuning:', error)
+  }
 }
 
 /** The private annotations kept for one song in this setlist (by song, so a reordered setlist keeps them) */

@@ -1,3 +1,5 @@
+import { normalizeTuning, type Tuning } from './tuning.ts'
+
 /**
  * What the person plays (docs/PERSONAL_LAYER.md, "How I play it"): a preset over the switches below
  * (lyrics only to start, the capo control), or `custom` when they set the switches one by one.
@@ -61,6 +63,15 @@ export class CapoPreferenceEvent extends Event {
   constructor(enabled: boolean) {
     super(CapoPreferenceEvent.type)
     this.enabled = enabled
+  }
+}
+/** The device's default tuning changed (sent on window): docs/PERSONAL_LAYER.md */
+export class TuningPreferenceEvent extends Event {
+  static readonly type = 'preferences:tuning-changed'
+  readonly tuning: Tuning
+  constructor(tuning: Tuning) {
+    super(TuningPreferenceEvent.type)
+    this.tuning = tuning
   }
 }
 /** Which annotations on a chart to show changed (sent on window) */
@@ -195,6 +206,15 @@ const capo = definePreference<boolean>({
   write: on => (on ? 'true' : 'false'),
   blocked: false,
   changed: on => new CapoPreferenceEvent(on),
+})
+
+// The tuning of a guitar, the device's default (docs/PERSONAL_LAYER.md): standard until chosen
+const tuning = definePreference<Tuning>({
+  keys: ['tuning'],
+  read: ([stored]) => normalizeTuning(stored),
+  write: semitones => String(semitones),
+  blocked: 0,
+  changed: semitones => new TuningPreferenceEvent(semitones),
 })
 
 // Annotations on a chart (docs/ANNOTATIONS.md): both kinds shown unless turned off
@@ -333,6 +353,10 @@ export const getSectionDefaults = (): SectionDefaults => sectionDefaults.get()
 export const getCapoPreference = (): boolean => capo.get()
 export const setCapoPreference = (value: boolean) => capo.set(!!value)
 
+/** The device's default tuning: the capo and tuning controls' default for a guitar */
+export const getTuningPreference = (): Tuning => tuning.get()
+export const setTuningPreference = (value: unknown) => tuning.set(normalizeTuning(value))
+
 /** Which annotations on a chart are shown: those shared with everyone, and the user's own */
 export const getAnnotationsPreference = (): { shared: boolean; mine: boolean } => ({
   shared: showSharedAnnotations.get(),
@@ -375,6 +399,7 @@ declare global {
     [AccidentalsPreferenceEvent.type]: AccidentalsPreferenceEvent
     [SectionDefaultsEvent.type]: SectionDefaultsEvent
     [CapoPreferenceEvent.type]: CapoPreferenceEvent
+    [TuningPreferenceEvent.type]: TuningPreferenceEvent
     [AnnotationsPreferenceEvent.type]: AnnotationsPreferenceEvent
   }
 }

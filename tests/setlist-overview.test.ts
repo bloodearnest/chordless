@@ -5,6 +5,7 @@ import {
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
   OverviewSongKeyChangeEvent,
+  OverviewTuningChangeEvent,
   type SetlistOverview,
 } from '../src/components/setlist-overview.ts'
 import {
@@ -14,6 +15,7 @@ import {
   SongCardKeyChangeEvent,
   type SongCardSong,
 } from '../src/components/song-card.ts'
+import { TuningChangeEvent, type TuningSelector } from '../src/components/tuning-selector.ts'
 import '../src/components/setlist-overview.ts'
 
 const { describe, it } = window
@@ -74,6 +76,47 @@ describe('setlist-overview', () => {
     cardAt(overview, 1).dispatchEvent(new SongCardKeyChangeEvent('E'))
     cardAt(overview, 0).dispatchEvent(new SongCardBpmChangeEvent(88))
     expect(seen).to.deep.equal(['click 1', 'delete 0', 'key 1 E', 'bpm 0 88'])
+  })
+
+  describe('the tuning of the guitar for the setlist', () => {
+    const row = (overview: SetlistOverview) =>
+      overview.querySelector<TuningSelector>('tuning-selector')
+
+    it('has a row for it when the capo and tuning controls are on, and none otherwise', async () => {
+      const overview = await show()
+      expect(row(overview)).to.equal(null)
+      overview.showTuning = true
+      await overview.updateComplete
+      expect(row(overview)).to.not.equal(null)
+    })
+
+    it('shows the setlist’s own tuning, or the device’s when it has none, and can be changed in edit mode', async () => {
+      const overview = await show()
+      overview.showTuning = true
+      overview.deviceTuning = 1
+      await overview.updateComplete
+      expect(row(overview)?._displayValue()).to.equal('Half step down')
+      overview.tuning = 2
+      await overview.updateComplete
+      expect(row(overview)?._displayValue()).to.equal('Whole step down')
+      expect(row(overview)?.editMode).to.equal(false)
+      overview.editMode = true
+      await overview.updateComplete
+      expect(row(overview)?.editMode).to.equal(true)
+    })
+
+    it('says which tuning was chosen, once, and null for the device’s', async () => {
+      const overview = await show(true)
+      overview.showTuning = true
+      await overview.updateComplete
+      const seen: (number | null)[] = []
+      overview.addEventListener(OverviewTuningChangeEvent.type, event =>
+        seen.push((event as OverviewTuningChangeEvent).tuning)
+      )
+      row(overview)?.dispatchEvent(new TuningChangeEvent(1))
+      row(overview)?.dispatchEvent(new TuningChangeEvent(null))
+      expect(seen).to.deep.equal([1, null])
+    })
   })
 
   it('says when Add Song is pressed', async () => {
