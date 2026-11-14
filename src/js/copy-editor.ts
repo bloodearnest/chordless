@@ -11,7 +11,14 @@
  * It finds the message by what each `t()` said: the text, and the name it was said for (it cannot
  * tell two messages that say the same words apart, and offers both).
  */
-import { setTextTap, TEXT_CHANGED, type TextArgs, t } from './text.ts'
+import { setCatalogue, setTextTap, TEXT_CHANGED, type TextArgs, t } from './text.ts'
+
+// The dev server says when src/text/en.ts is written (by this editor, or by hand in another one), with
+// the Fluent in it: the page takes it, and everything on it is drawn again
+import.meta.hot?.on('chordless:copy', ({ source }) => {
+  setCatalogue(source)
+  renderAgain()
+})
 
 const ENDPOINT = '/__copy'
 const HEADERS = { 'x-chordless-copy': '1', 'Content-Type': 'application/json' }

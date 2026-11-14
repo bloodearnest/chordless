@@ -17,9 +17,9 @@ interface ImportMetaEnv {
 }
 interface ImportMeta {
   readonly env?: ImportMetaEnv
-  /** Vite's hot reload: only in the dev server (js/text.ts takes a rewritten catalogue with it) */
+  /** Vite's hot reload: only in the dev server (js/copy-editor.ts takes a rewritten catalogue with it) */
   readonly hot?: {
-    accept(dependency: string, callback: (module?: { default: string }) => void): void
+    on(event: string, callback: (data: { source: string }) => void): void
   }
 }
 

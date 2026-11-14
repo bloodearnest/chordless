@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import type { IncomingMessage } from 'node:http'
 import { join } from 'node:path'
 import type { Plugin } from 'vite'
-import { listMessages, replaceMessage } from './copy-catalogue.ts'
+import { fluentOf, listMessages, replaceMessage } from './copy-catalogue.ts'
 
 /** The header the editor's requests carry: a page on another origin cannot send it without being asked first */
 const HEADER = 'x-chordless-copy'
@@ -31,6 +31,18 @@ export function copyEditor(): Plugin {
         injectTo: 'head-prepend',
       },
     ],
+    // The catalogue is not a module for Vite to hot reload (that would have the app's own modules
+    // import Vite's client, which the dev service worker does not have cached when offline): the
+    // pages are sent what it says, and take it themselves
+    async hotUpdate({ file, read, server }) {
+      if (file !== join(server.config.root, 'text', 'en.ts')) return
+      server.ws.send({
+        type: 'custom',
+        event: 'chordless:copy',
+        data: { source: fluentOf(await read()) },
+      })
+      return []
+    },
     configureServer(server) {
       const file = join(server.config.root, 'text', 'en.ts')
 

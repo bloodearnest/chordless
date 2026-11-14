@@ -3,10 +3,14 @@
  * is none of, and the dev editor's tap on what is said.
  */
 import { expect } from '@open-wc/testing'
-import { setTextTap, t } from '../src/js/text.ts'
+import { setCatalogue, setTextTap, TEXT_CHANGED, t } from '../src/js/text.ts'
+import catalogue from '../src/text/en.ts'
 
 describe('t', () => {
-  afterEach(() => setTextTap(null))
+  afterEach(() => {
+    setTextTap(null)
+    setCatalogue(catalogue)
+  })
 
   it('puts the values in the message', () => {
     expect(t('toast-setlist-moved', { title: 'Sunday', space: 'Church' })).to.equal(
@@ -46,5 +50,18 @@ describe('t', () => {
     })
     expect(t('toast-setlist-deleted', { title: 'A' })).to.equal('[Deleted A.]')
     expect(seen).to.deep.equal(['toast-setlist-deleted:{"title":"A"}'])
+  })
+
+  it('takes a new catalogue, and says so', () => {
+    let told = 0
+    const count = () => told++
+    window.addEventListener(TEXT_CHANGED, count)
+    try {
+      setCatalogue('action-undo = Take it back')
+      expect(t('action-undo')).to.equal('Take it back')
+      expect(told).to.equal(1)
+    } finally {
+      window.removeEventListener(TEXT_CHANGED, count)
+    }
   })
 })

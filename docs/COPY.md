@@ -42,10 +42,14 @@ By hand in the file, or in the running app (`just serve`, dev only):
 - **Alt + right click** on a message, or on a tooltip, label or placeholder it is in, opens it with its
   comment and the values it has. Save rewrites `src/text/en.ts` (that message only: the diff is its
   lines) and the page takes the new words without reloading, so a toast or a dialog stays where it is.
-  Two messages that say the same words are both offered.
+  Two messages that say the same words are both offered. The dev server also sends a rewrite of the
+  file made by hand, so a page that is open takes that too.
 - **`/dev/copy.html`** lists every message to change, including the ones that are hard to cause (a
   failure of a save).
 - **`?copy=keys`** on any address shows the name of each message in place of its words.
+
+Nothing of the app's own modules is Vite's (no `import.meta.hot`): the dev service worker has
+nothing cached ahead, and would fail to start the app offline on the Vite client it would need.
 
 The editor is a Vite plugin (`vite-plugins/copy-editor.ts`) and `js/copy-editor.ts`, put on the pages
 by the dev server and in no built file. It writes a file of the repository, so it answers only to a
