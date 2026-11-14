@@ -101,6 +101,15 @@ export class AppPreferences extends LitElement {
       height: 1.25rem;
     }
 
+    /* The settings Custom opens: under its text, set in from the radio buttons, with room between */
+    .custom-switches {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+      margin: 0.75rem 0 0 2.25rem;
+    }
+
     .field {
       display: flex;
       align-items: center;
@@ -388,6 +397,7 @@ export class AppPreferences extends LitElement {
           ${
             this.musicianType === 'custom'
               ? html`
+                <div class="custom-switches">
                 <label class="toggle" for="toggle-lyrics-only">
                   <input
                     type="checkbox"
@@ -408,6 +418,7 @@ export class AppPreferences extends LitElement {
                   />
                   <span>Show a capo control for each song</span>
                 </label>
+                </div>
               `
               : ''
           }
