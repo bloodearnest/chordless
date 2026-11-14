@@ -20,6 +20,7 @@ const KEYS = [
   'section_defaults',
   'enable_capo',
   'enabled_capo',
+  'tuning',
   'keep_screen_awake',
   'scroll_to_top_on_swipe',
   'keep_awake_minutes',
@@ -97,6 +98,29 @@ describe('app-preferences', () => {
       await el.updateComplete
       expect(el.capoEnabled).to.equal(false)
       expect(el.lyricsOnly).to.equal(true)
+    })
+
+    it('has the guitar’s tuning only when the capo and tuning controls are on, and keeps the choice', async () => {
+      const el = await show()
+      expect(control(el, '#tuning')).to.equal(null)
+      radios(el)[1].click()
+      await el.updateComplete
+      const select = control<HTMLSelectElement>(el, '#tuning')
+      expect(select.value).to.equal('0')
+      expect([...select.options].map(option => option.textContent?.trim())).to.deep.equal([
+        'Standard',
+        'Half step down',
+        'Whole step down',
+      ])
+      select.value = '1'
+      select.dispatchEvent(new Event('change'))
+      expect(localStorage.getItem('tuning')).to.equal('1')
+      expect(el.tuning).to.equal(1)
+      // (and it goes with the controls: a singer has no guitar)
+      radios(el)[0].click()
+      await el.updateComplete
+      expect(control(el, '#tuning')).to.equal(null)
+      expect(localStorage.getItem('tuning')).to.equal('1')
     })
 
     it('shows the type the switches make when it is opened', async () => {

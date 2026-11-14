@@ -9,6 +9,7 @@ import {
   getMusicianType,
   getScrollToTopOnSwipe,
   getTelemetryPreference,
+  getTuningPreference,
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
   KEEP_AWAKE_LIMITS,
@@ -23,11 +24,13 @@ import {
   setMusicianType,
   setScrollToTopOnSwipe,
   setTelemetryPreference,
+  setTuningPreference,
   setUseNashvilleNumbers,
   setUseUnicodeAccidentals,
   TelemetryPreferenceEvent,
 } from '../js/preferences.ts'
 import { resetDeviceId, supportId } from '../js/telemetry/ids.ts'
+import { TUNINGS, type Tuning } from '../js/tuning.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../js/wake-lock.ts'
 import { PLAYS } from '../js/what-do-you-play.ts'
 import './readability-settings.ts'
@@ -50,6 +53,7 @@ export class AppPreferences extends LitElement {
     musicianType: { type: String, attribute: false },
     capoEnabled: { type: Boolean, attribute: false },
     lyricsOnly: { type: Boolean, attribute: false },
+    tuning: { type: Number, attribute: false },
     scrollToTop: { type: Boolean, attribute: false },
     sharedAnnotations: { type: Boolean, attribute: false },
     myAnnotations: { type: Boolean, attribute: false },
@@ -64,6 +68,8 @@ export class AppPreferences extends LitElement {
   declare musicianType: MusicianType
   declare capoEnabled: boolean
   declare lyricsOnly: boolean
+  /** The device's default tuning for a guitar (docs/PERSONAL_LAYER.md) */
+  declare tuning: Tuning
   declare scrollToTop: boolean
   declare sharedAnnotations: boolean
   declare myAnnotations: boolean
@@ -182,6 +188,7 @@ export class AppPreferences extends LitElement {
     this.musicianType = getMusicianType()
     this.capoEnabled = getCapoPreference()
     this.lyricsOnly = getLyricsOnlyPreference()
+    this.tuning = getTuningPreference()
     this.scrollToTop = getScrollToTopOnSwipe()
     this.sharedAnnotations = getAnnotationsPreference().shared
     this.myAnnotations = getAnnotationsPreference().mine
@@ -416,9 +423,31 @@ export class AppPreferences extends LitElement {
                     ?checked=${this.capoEnabled}
                     @change=${this._onCapoToggle}
                   />
-                  <span>Show a capo control for each song</span>
+                  <span>Show the capo and tuning controls</span>
                 </label>
                 </div>
+              `
+              : ''
+          }
+          ${
+            this.capoEnabled
+              ? html`
+                <label class="field" for="tuning">
+                  <span>My guitar is tuned</span>
+                  <select id="tuning" name="tuning" @change=${this._onTuningChange}>
+                    ${TUNINGS.map(
+                      option => html`<option
+                        value=${option.semitones}
+                        ?selected=${option.semitones === this.tuning}
+                      >
+                        ${option.label}
+                      </option>`
+                    )}
+                  </select>
+                </label>
+                <p>
+                  Each setlist can have its own tuning: choose it on the setlist, in edit mode.
+                </p>
               `
               : ''
           }
@@ -582,6 +611,11 @@ export class AppPreferences extends LitElement {
     this.musicianType = getMusicianType()
     this.lyricsOnly = getLyricsOnlyPreference()
     this.capoEnabled = getCapoPreference()
+  }
+
+  _onTuningChange(event: Event): void {
+    this.tuning = Number((event.currentTarget as HTMLSelectElement).value) as Tuning
+    setTuningPreference(this.tuning)
   }
 
   _onLyricsOnlyToggle(event: Event): void {

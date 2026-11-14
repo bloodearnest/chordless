@@ -1,6 +1,9 @@
 import { html, LitElement } from 'lit'
+import type { Tuning } from '../js/tuning.ts'
 import './icon.ts'
 import type { SongCardBpmChangeEvent, SongCardKeyChangeEvent } from './song-card.ts'
+import type { TuningChangeEvent } from './tuning-selector.ts'
+import './tuning-selector.ts'
 
 /** A song's card was clicked; index is its place in the setlist */
 export class OverviewSongClickEvent extends Event {
@@ -46,6 +49,16 @@ export class OverviewSongBpmChangeEvent extends Event {
   }
 }
 
+/** A tuning was chosen for the setlist (null: the device's again) */
+export class OverviewTuningChangeEvent extends Event {
+  static readonly type = 'setlist-overview:tuning-change'
+  readonly tuning: Tuning | null
+  constructor(tuning: Tuning | null) {
+    super(OverviewTuningChangeEvent.type, { bubbles: true, composed: true })
+    this.tuning = tuning
+  }
+}
+
 /** Add Song was pressed */
 export class OverviewAddSongEvent extends Event {
   static readonly type = 'setlist-overview:add-song'
@@ -64,15 +77,26 @@ export class SetlistOverview extends LitElement {
   static override properties = {
     songs: { type: Array, attribute: false },
     editMode: { type: Boolean, attribute: 'edit-mode' },
+    showTuning: { type: Boolean, attribute: 'show-tuning' },
+    tuning: { attribute: false },
+    deviceTuning: { type: Number, attribute: 'device-tuning' },
   }
 
   declare songs: unknown[] /* TYPE */
   declare editMode: boolean
+  /** Whether to show how the guitar is tuned for this setlist (the capo and tuning controls are on) */
+  declare showTuning: boolean
+  /** The setlist's own tuning, or null for the device's */
+  declare tuning: Tuning | null
+  declare deviceTuning: number
 
   constructor() {
     super()
     this.songs = []
     this.editMode = false
+    this.showTuning = false
+    this.tuning = null
+    this.deviceTuning = 0
   }
 
   // Render into light DOM so existing CSS/selectors keep working
@@ -83,6 +107,21 @@ export class SetlistOverview extends LitElement {
   override render() {
     return html`
       <div class="setlist-overview">
+        ${
+          this.showTuning
+            ? html`<div class="overview-tuning">
+                <tuning-selector
+                  .value=${this.tuning === null ? '' : String(this.tuning)}
+                  .deviceTuning=${this.deviceTuning}
+                  .editMode=${this.editMode}
+                  @tuning-selector:change=${(event: TuningChangeEvent) => {
+                    event.stopPropagation()
+                    this.dispatchEvent(new OverviewTuningChangeEvent(event.tuning))
+                  }}
+                ></tuning-selector>
+              </div>`
+            : ''
+        }
         <div class="overview-songs">
           ${this.songs.map(
             (song, index) => html`
@@ -154,5 +193,6 @@ declare global {
     [OverviewSongKeyChangeEvent.type]: OverviewSongKeyChangeEvent
     [OverviewSongBpmChangeEvent.type]: OverviewSongBpmChangeEvent
     [OverviewAddSongEvent.type]: OverviewAddSongEvent
+    [OverviewTuningChangeEvent.type]: OverviewTuningChangeEvent
   }
 }
