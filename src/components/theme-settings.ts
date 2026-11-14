@@ -30,7 +30,7 @@ export class ThemeSettings extends LitElement {
     }
 
     .settings-group {
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
     }
 
     .settings-group:last-child {
@@ -39,10 +39,9 @@ export class ThemeSettings extends LitElement {
 
     .settings-label {
       display: block;
-      font-size: var(--font-ui);
+      font-size: var(--font-ui-small);
       font-weight: 600;
-      margin-bottom: 0.5rem;
-      opacity: 0.9;
+      margin-bottom: 0.25rem;
     }
 
     .settings-description {
@@ -60,7 +59,7 @@ export class ThemeSettings extends LitElement {
 
     .theme-button {
       flex: 1;
-      min-width: 120px;
+      min-width: 6rem;
       padding: 0.75rem 1.25rem;
       border: 2px solid var(--tint-border);
       border-radius: 6px;
@@ -165,32 +164,6 @@ export class ThemeSettings extends LitElement {
       background: var(--tint-strong);
     }
 
-    .current-theme-info {
-      margin-top: 1rem;
-      padding: 0.75rem;
-      background: var(--tint-subtle);
-      border-radius: 4px;
-      font-size: var(--font-ui-small);
-    }
-
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 0.25rem;
-    }
-
-    .info-row:last-child {
-      margin-bottom: 0;
-    }
-
-    .info-label {
-      opacity: 0.7;
-    }
-
-    .info-value {
-      font-weight: 600;
-    }
-
     .system-preference {
       margin-top: 0.5rem;
       padding: 0.5rem;
@@ -263,10 +236,7 @@ export class ThemeSettings extends LitElement {
 
     return html`
       <div class="settings-group">
-        <label class="settings-label">Appearance</label>
-        <div class="settings-description">
-          Choose between light and dark mode. Your preference is saved automatically.
-        </div>
+        <span class="settings-label">Theme</span>
         <div class="theme-buttons">
           <button
             class="theme-button ${this._currentTheme === 'system' ? 'active' : ''}"
@@ -306,9 +276,9 @@ export class ThemeSettings extends LitElement {
       </div>
 
       <div class="settings-group">
-        <label class="settings-label">Font Scale</label>
+        <span class="settings-label">Font size</span>
         <div class="settings-description">
-          Make all text in the app, lyrics included, smaller or larger than this device would pick. Saved on this device only.
+          All text in the app, lyrics included. Saved on this device only.
         </div>
         <div class="font-scale-controls">
           <input
@@ -339,28 +309,6 @@ export class ThemeSettings extends LitElement {
         </div>
       </div>
 
-      <div class="current-theme-info">
-        <div class="info-row">
-          <span class="info-label">Theme preference:</span>
-          <span class="info-value"
-            >${this._currentTheme}${usingSystemMode ? ` (${systemPreference})` : ''}</span
-          >
-        </div>
-        <div class="info-row">
-          <span class="info-label">Font scale:</span>
-          <span class="info-value">${Math.round(this._fontScale * 100)}%</span>
-        </div>
-        ${
-          !usingSystemMode
-            ? html`
-              <div class="info-row">
-                <span class="info-label">System prefers:</span>
-                <span class="info-value">${systemPreference}</span>
-              </div>
-            `
-            : ''
-        }
-      </div>
     `
   }
 }

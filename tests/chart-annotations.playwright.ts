@@ -127,27 +127,6 @@ test.describe('Annotations on a chart', () => {
     await expect(shownAnnotations(page)).toHaveText(['very softly'])
   })
 
-  test('the preferences can hide a kind of annotation without a reload', async ({ page }) => {
-    await openSong(page)
-    await enterEditMode(page)
-    await hold(page, 'grace')
-    await writeAnnotation(page, 'softly')
-    await editor(page).getByRole('button', { name: 'Done' }).click()
-    await page.locator('#app-header').getByRole('button', { name: 'Toggle edit mode' }).click()
-    await expect(shownAnnotations(page)).toHaveText(['softly'])
-
-    await page.evaluate(async () => {
-      const { setAnnotationsPreference } = await import('/js/preferences.ts')
-      setAnnotationsPreference('mine', false)
-    })
-    await expect(shownAnnotations(page)).toHaveCount(0)
-    await page.evaluate(async () => {
-      const { setAnnotationsPreference } = await import('/js/preferences.ts')
-      setAnnotationsPreference('mine', true)
-    })
-    await expect(shownAnnotations(page)).toHaveText(['softly'])
-  })
-
   for (const width of [320, 360, 390]) {
     test(`the editor fits a ${width}px wide phone, with Delete showing`, async ({ page }) => {
       await page.setViewportSize({ width, height: 640 })

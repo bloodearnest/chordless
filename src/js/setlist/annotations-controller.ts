@@ -19,10 +19,8 @@ import {
   removeAnnotation,
 } from '../annotations/store.ts'
 import type { ChartAnnotation, Setlist, SharedChartAnnotation } from '../data-types.ts'
-import { AnnotationsPreferenceEvent, getAnnotationsPreference } from '../preferences.ts'
 import { toast } from '../toast.ts'
 import { errorMessage } from '../utils/errors.ts'
-import { isEditMode } from './edit-mode-ui.ts'
 import { loadSetlistAnnotations, type SongRef, saveSetlistAnnotations } from './local-state.ts'
 import type { RuntimeSong } from './runtime-songs.ts'
 
@@ -111,19 +109,15 @@ export class AnnotationsController {
     }
   }
 
-  /** The annotations to draw on a song: all of them when editing, else those the user's preferences choose */
+  /** The annotations to draw on a song: all of them */
   chartAnnotations(index: number): ChartAnnotations | null {
     const song = this.#host.songs[index]
     const sources = this.#sources[index]
     if (!song?.parsed || !sources) return null
-    return annotationsBySection(
-      song.parsed.sections,
-      sources,
-      isEditMode() ? { shared: true, mine: true } : getAnnotationsPreference()
-    )
+    return annotationsBySection(song.parsed.sections, sources)
   }
 
-  /** Give every song's display its annotations again (after editing starts or ends, or a preference changes) */
+  /** Give every song's display its annotations again (after editing starts or ends) */
   refreshAll(): void {
     this.#host.songs.forEach((_, index) => {
       this.#refresh(index)
@@ -135,14 +129,13 @@ export class AnnotationsController {
     if (display) display.annotations = this.chartAnnotations(index)
   }
 
-  /** Listen for the editor to be asked for, and for the annotations shown to change */
+  /** Listen for the editor to be asked for */
   listen(signal: AbortSignal): void {
     this.#host.root.addEventListener(
       AnnotationRequestEvent.type,
       event => void this.#edit(event as AnnotationRequestEvent),
       { signal }
     )
-    window.addEventListener(AnnotationsPreferenceEvent.type, () => this.refreshAll(), { signal })
   }
 
   async #edit(event: AnnotationRequestEvent) {

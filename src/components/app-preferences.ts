@@ -2,7 +2,6 @@ import { css, html, LitElement } from 'lit'
 import type { IconName } from '../js/icons.ts'
 import { PITCHES, type PitchId } from '../js/instrument-pitch.ts'
 import {
-  getAnnotationsPreference,
   getCapoPreference,
   getKeepAwakeMinutes,
   getKeepAwakePreference,
@@ -11,7 +10,6 @@ import {
   getPitchControlsPreference,
   getPitchPreference,
   getScrollToTopOnSwipe,
-  getTelemetryPreference,
   getTuningPreference,
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
@@ -19,7 +17,6 @@ import {
   KeepAwakeLimitEvent,
   KeepAwakePreferenceEvent,
   type MusicianType,
-  setAnnotationsPreference,
   setCapoPreference,
   setKeepAwakeMinutes,
   setKeepAwakePreference,
@@ -28,13 +25,10 @@ import {
   setPitchControlsPreference,
   setPitchPreference,
   setScrollToTopOnSwipe,
-  setTelemetryPreference,
   setTuningPreference,
   setUseNashvilleNumbers,
   setUseUnicodeAccidentals,
-  TelemetryPreferenceEvent,
 } from '../js/preferences.ts'
-import { resetDeviceId, supportId } from '../js/telemetry/ids.ts'
 import { TUNINGS, type Tuning } from '../js/tuning.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../js/wake-lock.ts'
 import { PLAYS } from '../js/what-do-you-play.ts'
@@ -62,12 +56,8 @@ export class AppPreferences extends LitElement {
     pitchControls: { type: Boolean, attribute: false },
     pitch: { attribute: false },
     scrollToTop: { type: Boolean, attribute: false },
-    sharedAnnotations: { type: Boolean, attribute: false },
-    myAnnotations: { type: Boolean, attribute: false },
     keepAwake: { type: Boolean, attribute: false },
     keepAwakeMinutes: { type: Number, attribute: false },
-    telemetry: { type: Boolean, attribute: false },
-    supportId: { type: String, attribute: false },
   }
 
   declare useNashville: boolean
@@ -81,13 +71,8 @@ export class AppPreferences extends LitElement {
   declare pitchControls: boolean
   declare pitch: PitchId
   declare scrollToTop: boolean
-  declare sharedAnnotations: boolean
-  declare myAnnotations: boolean
   declare keepAwake: boolean
   declare keepAwakeMinutes: number
-  declare telemetry: boolean
-  /** The start of this device's id for the usage reports, to read out to whoever is helping; '' when they are off */
-  declare supportId: string
 
   static override styles = [
     panelStyles,
@@ -102,19 +87,48 @@ export class AppPreferences extends LitElement {
       padding: 1rem;
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
+      gap: 1rem;
+    }
+
+    /* Smaller than the dialog's title, and bigger than the headings inside a panel */
+    .panel {
+      padding: 1rem;
+    }
+
+    .panel h3 {
+      font-size: var(--font-ui);
+      margin: 0 0 0.75rem;
+    }
+
+    .group + .group {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--tint-border);
+    }
+
+    .group h4 {
+      font-size: var(--font-ui-small);
+      font-weight: 600;
+      margin: 0 0 0.25rem;
+    }
+
+    .group p {
+      margin: 0 0 0.5rem;
     }
 
     .toggle {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 0.75rem;
+      margin: 0.5rem 0;
+      font-size: var(--font-ui-small);
       font-weight: 600;
     }
 
     .toggle input[type='checkbox'] {
       width: 1.25rem;
       height: 1.25rem;
+      flex-shrink: 0;
     }
 
     /* The settings Custom opens: under its text, set in from the radio buttons, with room between */
@@ -130,7 +144,7 @@ export class AppPreferences extends LitElement {
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      margin: 0.75rem 0;
+      margin: 0.5rem 0;
       font-size: var(--font-ui-small);
     }
 
@@ -179,7 +193,7 @@ export class AppPreferences extends LitElement {
 
     .radio-option-label {
       font-weight: 600;
-      font-size: var(--font-ui);
+      font-size: var(--font-ui-small);
     }
 
     .radio-option-description {
@@ -202,12 +216,8 @@ export class AppPreferences extends LitElement {
     this.pitchControls = getPitchControlsPreference()
     this.pitch = getPitchPreference()
     this.scrollToTop = getScrollToTopOnSwipe()
-    this.sharedAnnotations = getAnnotationsPreference().shared
-    this.myAnnotations = getAnnotationsPreference().mine
     this.keepAwake = getKeepAwakePreference()
     this.keepAwakeMinutes = getKeepAwakeMinutes()
-    this.telemetry = getTelemetryPreference()
-    this.supportId = this._supportIdNow()
   }
 
   override connectedCallback() {
@@ -216,18 +226,14 @@ export class AppPreferences extends LitElement {
     // The menu's modal outlives each visit, and the setting can change elsewhere meanwhile
     window.addEventListener(KeepAwakePreferenceEvent.type, this._onKeepAwakeChanged)
     window.addEventListener(KeepAwakeLimitEvent.type, this._onKeepAwakeLimitChanged)
-    window.addEventListener(TelemetryPreferenceEvent.type, this._onTelemetryChanged)
     this.keepAwake = getKeepAwakePreference()
     this.keepAwakeMinutes = getKeepAwakeMinutes()
-    this.telemetry = getTelemetryPreference()
-    this.supportId = this._supportIdNow()
   }
 
   override disconnectedCallback() {
     window.removeEventListener(WakeLockStateEvent.type, this._onWakeLockState)
     window.removeEventListener(KeepAwakePreferenceEvent.type, this._onKeepAwakeChanged)
     window.removeEventListener(KeepAwakeLimitEvent.type, this._onKeepAwakeLimitChanged)
-    window.removeEventListener(TelemetryPreferenceEvent.type, this._onTelemetryChanged)
     super.disconnectedCallback()
   }
 
@@ -239,29 +245,6 @@ export class AppPreferences extends LitElement {
 
   _onKeepAwakeLimitChanged = (event: KeepAwakeLimitEvent): void => {
     this.keepAwakeMinutes = event.minutes
-  }
-
-  _onTelemetryChanged = (event: TelemetryPreferenceEvent): void => {
-    this.telemetry = event.enabled
-    this.supportId = this._supportIdNow()
-  }
-
-  _supportIdNow(): string {
-    return supportId()
-  }
-
-  async _copySupportId(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(this.supportId)
-    } catch {
-      // (the id is on screen to read out: copying is a convenience)
-    }
-  }
-
-  /** A new id, which nothing links to the old one */
-  _resetSupportId(): void {
-    resetDeviceId()
-    this.supportId = this._supportIdNow()
   }
 
   /** A limit in words: "15 minutes", "1 hour", "2 hours" */
@@ -378,22 +361,15 @@ export class AppPreferences extends LitElement {
       <div class="preferences-content">
         <div class="panel">
           <h3>Appearance</h3>
-          <p>Customize the look and feel of the app with theme and display settings.</p>
           <theme-settings></theme-settings>
         </div>
 
         <div class="panel">
-          <h3>Chord Highlight and Fonts</h3>
-          <p>Make the chart easier to read: a tint behind the chords, and a typeface for each part.</p>
-          <readability-settings></readability-settings>
-        </div>
+          <h3>Behaviour and options</h3>
 
-        <div class="panel">
-          <h3>What do you play?</h3>
-          <p>
-            This sets what each song shows when you open it, and which controls you get. Only you see
-            it.
-          </p>
+          <section class="group">
+            <h4>What do you play?</h4>
+            <p>What each song shows when you open it, and which controls you get. Only you see it.</p>
           <div class="radio-group">
             ${PLAYS.map(
               option => html`
@@ -490,94 +466,52 @@ export class AppPreferences extends LitElement {
               `
               : ''
           }
-        </div>
+          </section>
 
-        <div class="panel">
-          <h3>Moving between songs</h3>
-          <p>
-            Start each song at its top when you swipe to it. Turn this off to find a song where you
-            left it.
-          </p>
-          <label class="toggle" for="toggle-scroll-to-top">
-            <input
-              type="checkbox"
-              id="toggle-scroll-to-top"
-              name="scroll-to-top-on-swipe"
-              ?checked=${this.scrollToTop}
-              @change=${this._onScrollToTopToggle}
-            />
-            <span>Start songs at the top</span>
-          </label>
-        </div>
+          <section class="group">
+            <h4>Chords</h4>
+            <label class="toggle" for="toggle-use-nashville">
+              <input
+                type="checkbox"
+                id="toggle-use-nashville"
+                name="use-nashville-numbers"
+                ?checked=${this.useNashville}
+                @change=${this._onNashvilleToggle}
+              />
+              <span>Nashville numbers instead of letter names</span>
+            </label>
+            <label class="toggle" for="toggle-unicode-accidentals">
+              <input
+                type="checkbox"
+                id="toggle-unicode-accidentals"
+                name="use-unicode-accidentals"
+                ?checked=${this.useUnicodeAccidentals}
+                @change=${this._onAccidentalToggle}
+              />
+              <span>Unicode accidentals (♯/♭)</span>
+            </label>
+          </section>
 
-        <div class="panel">
-          <h3>Annotations</h3>
-          <p>Show the handwritten annotations on a chart. Annotations are made in edit mode.</p>
-          <label class="toggle" for="toggle-shared-annotations">
-            <input
-              type="checkbox"
-              id="toggle-shared-annotations"
-              name="show-shared-annotations"
-              ?checked=${this.sharedAnnotations}
-              @change=${this._onSharedAnnotationsToggle}
-            />
-            <span>Show annotations shared with everyone</span>
-          </label>
-          <label class="toggle" for="toggle-my-annotations">
-            <input
-              type="checkbox"
-              id="toggle-my-annotations"
-              name="show-my-annotations"
-              ?checked=${this.myAnnotations}
-              @change=${this._onMyAnnotationsToggle}
-            />
-            <span>Show my own annotations</span>
-          </label>
-        </div>
+          <section class="group">
+            <h4>Moving between songs</h4>
+            <label class="toggle" for="toggle-scroll-to-top">
+              <input
+                type="checkbox"
+                id="toggle-scroll-to-top"
+                name="scroll-to-top-on-swipe"
+                ?checked=${this.scrollToTop}
+                @change=${this._onScrollToTopToggle}
+              />
+              <span>Start each song at its top (off: find it where you left it)</span>
+            </label>
+          </section>
 
-        <div class="panel">
-          <h3>Usage reports</h3>
-          <p>
-            Chordless sends anonymous reports of how it runs (how long a sync took, what failed) so
-            problems can be found and fixed. They carry a random id for this device, never your
-            name or email, and are kept for 60 days.
-            <a href="/privacy.html#reports" rel="external">What is sent</a>
-          </p>
-          <label class="toggle" for="toggle-telemetry">
-            <input
-              type="checkbox"
-              id="toggle-telemetry"
-              name="usage-reports"
-              ?checked=${this.telemetry}
-              @change=${this._onTelemetryToggle}
-            />
-            <span>Send anonymous usage reports</span>
-          </label>
-          ${
-            this.supportId
-              ? html`<p class="support-id">
-                  Support ID: <code id="support-id">${this.supportId}</code>
-                  <button type="button" id="copy-support-id" @click=${this._copySupportId}>
-                    Copy
-                  </button>
-                  <button type="button" id="reset-support-id" @click=${this._resetSupportId}>
-                    Reset
-                  </button>
-                </p>
-                <p>
-                  If you ask for help, this is how your reports are found. Reset makes a new one.
-                  <a href="/contact">Contact us</a> adds it for you.
-                </p>`
-              : ''
-          }
-        </div>
-
-        <div class="panel">
-          <h3>Screen and live mode</h3>
-          <p>
-            Keep the screen from turning off while a setlist is open, and on any page while you
-            are live (Go live is on a setlist's overview), so you needn't touch it.
-          </p>
+          <section class="group">
+            <h4>Screen and live mode</h4>
+            <p>
+              Keep the screen on while a setlist is open, and on any page while you are live (Go
+              live is on a setlist's overview).
+            </p>
           <label class="toggle" for="toggle-keep-awake">
             <input
               type="checkbox"
@@ -612,32 +546,12 @@ export class AppPreferences extends LitElement {
             ${this._powerStatus()}
           </p>
           ${this._renderWakeLockAction()}
+          </section>
         </div>
 
         <div class="panel">
-          <h3>Chords</h3>
-          <p>Display chord charts using relative Nashville numbers instead of letter names.</p>
-          <label class="toggle" for="toggle-use-nashville">
-            <input
-              type="checkbox"
-              id="toggle-use-nashville"
-              name="use-nashville-numbers"
-              ?checked=${this.useNashville}
-              @change=${this._onNashvilleToggle}
-            />
-            <span>Use Nashville numbers</span>
-          </label>
-          <p>Choose how accidentals are rendered.</p>
-          <label class="toggle" for="toggle-unicode-accidentals">
-            <input
-              type="checkbox"
-              id="toggle-unicode-accidentals"
-              name="use-unicode-accidentals"
-              ?checked=${this.useUnicodeAccidentals}
-              @change=${this._onAccidentalToggle}
-            />
-            <span>Use unicode accidentals (♯/♭)</span>
-          </label>
+          <h3>Accessibility</h3>
+          <readability-settings></readability-settings>
         </div>
       </div>
     `
@@ -686,12 +600,6 @@ export class AppPreferences extends LitElement {
     setUseUnicodeAccidentals(value)
   }
 
-  _onTelemetryToggle(event: Event): void {
-    const value = (event.currentTarget as HTMLInputElement).checked
-    this.telemetry = value
-    setTelemetryPreference(value)
-  }
-
   _onKeepAwakeToggle(event: Event): void {
     const value = (event.currentTarget as HTMLInputElement).checked
     this.keepAwake = value
@@ -702,16 +610,6 @@ export class AppPreferences extends LitElement {
     const minutes = Number((event.currentTarget as HTMLSelectElement).value)
     this.keepAwakeMinutes = minutes
     setKeepAwakeMinutes(minutes)
-  }
-
-  _onSharedAnnotationsToggle(event: Event): void {
-    this.sharedAnnotations = (event.currentTarget as HTMLInputElement).checked
-    setAnnotationsPreference('shared', this.sharedAnnotations)
-  }
-
-  _onMyAnnotationsToggle(event: Event): void {
-    this.myAnnotations = (event.currentTarget as HTMLInputElement).checked
-    setAnnotationsPreference('mine', this.myAnnotations)
   }
 
   _onScrollToTopToggle(event: Event): void {

@@ -99,17 +99,6 @@ export class TuningPreferenceEvent extends Event {
     this.tuning = tuning
   }
 }
-/** Which annotations on a chart to show changed (sent on window) */
-export class AnnotationsPreferenceEvent extends Event {
-  static readonly type = 'preferences:annotations-changed'
-  readonly shared: boolean
-  readonly mine: boolean
-  constructor(shared: boolean, mine: boolean) {
-    super(AnnotationsPreferenceEvent.type)
-    this.shared = shared
-    this.mine = mine
-  }
-}
 /** The keep-the-screen-awake preference changed (sent on window) */
 export class KeepAwakePreferenceEvent extends Event {
   static readonly type = 'preferences:keep-awake-changed'
@@ -258,20 +247,6 @@ const tuning = definePreference<Tuning>({
   changed: semitones => new TuningPreferenceEvent(semitones),
 })
 
-// Annotations on a chart (docs/ANNOTATIONS.md): both kinds shown unless turned off
-const showSharedAnnotations = definePreference<boolean>({
-  keys: ['show_shared_annotations'],
-  read: ([stored]) => stored !== 'false',
-  write: on => (on ? 'true' : 'false'),
-  blocked: true,
-})
-const showMyAnnotations = definePreference<boolean>({
-  keys: ['show_my_annotations'],
-  read: ([stored]) => stored !== 'false',
-  write: on => (on ? 'true' : 'false'),
-  blocked: true,
-})
-
 // A song starts at its top when swiped to (on unless turned off): the one left is put back
 // to its top once it is out of sight
 const scrollToTopOnSwipe = definePreference<boolean>({
@@ -418,17 +393,6 @@ export const setPitchPreference = (value: unknown) => pitch.set(normalizePitch(v
 export const getTuningPreference = (): Tuning => tuning.get()
 export const setTuningPreference = (value: unknown) => tuning.set(normalizeTuning(value))
 
-/** Which annotations on a chart are shown: those shared with everyone, and the user's own */
-export const getAnnotationsPreference = (): { shared: boolean; mine: boolean } => ({
-  shared: showSharedAnnotations.get(),
-  mine: showMyAnnotations.get(),
-})
-export function setAnnotationsPreference(which: 'shared' | 'mine', on: boolean) {
-  ;(which === 'shared' ? showSharedAnnotations : showMyAnnotations).set(on)
-  const { shared, mine } = getAnnotationsPreference()
-  window.dispatchEvent(new AnnotationsPreferenceEvent(shared, mine))
-}
-
 /** Whether a song is put back to its top once swiped away from: on unless the user turned it off */
 export const getScrollToTopOnSwipe = (): boolean => scrollToTopOnSwipe.get()
 export const setScrollToTopOnSwipe = (value: boolean) => scrollToTopOnSwipe.set(!!value)
@@ -463,7 +427,6 @@ declare global {
     [TuningPreferenceEvent.type]: TuningPreferenceEvent
     [PitchControlsEvent.type]: PitchControlsEvent
     [PitchPreferenceEvent.type]: PitchPreferenceEvent
-    [AnnotationsPreferenceEvent.type]: AnnotationsPreferenceEvent
   }
 }
 

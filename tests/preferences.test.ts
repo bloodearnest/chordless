@@ -68,30 +68,6 @@ describe('preferences', () => {
     for (const key of KEYS) localStorage.removeItem(key)
   })
 
-  describe('annotations on a chart', () => {
-    it('are shown unless turned off, each kind on its own, and said on window', async () => {
-      const preferences = await fresh()
-      expect(preferences.getAnnotationsPreference()).to.deep.equal({ shared: true, mine: true })
-      const heardOf = heard<InstanceType<Preferences['AnnotationsPreferenceEvent']>>(
-        'preferences:annotations-changed',
-        () => {
-          preferences.setAnnotationsPreference('shared', false)
-          preferences.setAnnotationsPreference('mine', false)
-          preferences.setAnnotationsPreference('shared', true)
-        }
-      )
-      expect(heardOf.map(event => [event.shared, event.mine])).to.deep.equal([
-        [false, true],
-        [false, false],
-        [true, false],
-      ])
-      expect(preferences.getAnnotationsPreference()).to.deep.equal({ shared: true, mine: false })
-      expect(localStorage.getItem('show_my_annotations')).to.equal('false')
-      preferences.setAnnotationsPreference('mine', true)
-      expect(localStorage.getItem('show_my_annotations')).to.equal('true')
-    })
-  })
-
   describe('Nashville numbers and accidentals', () => {
     it('are kept, and said on window', async () => {
       const preferences = await fresh()

@@ -263,10 +263,6 @@ const SONG: HelpPage = {
           label: 'An annotation for the whole song',
           text: 'Use “+ Annotation on the whole song” above the first section.',
         },
-        {
-          label: 'Hide annotations',
-          text: 'Turn off the ones shared with everyone, or your own, in [Preferences](/preferences).',
-        },
       ],
     },
   ],

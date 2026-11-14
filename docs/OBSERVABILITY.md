@@ -404,7 +404,7 @@ idle, only if reports are on, and again when they are turned on.
   worker's), `deployment.environment.name`, `user_agent.original`.
 - Batches go every five seconds, and when the page is hidden or left, through `GatedExporter`, which
   drops a batch while offline or when reports are off (nothing is queued across page loads).
-- Preference `telemetry` (Preferences, "Usage reports"; on unless `false`; off where storage cannot be
+- Preference `telemetry` (the privacy page, `<usage-reports-setting>`; on unless `false`; off where storage cannot be
   read). Turning it off deletes the device id.
 - To see spans without Honeycomb: `localStorage.setItem('telemetry-console', '1')` and reload.
 - Deferred: the space kind and the team and account ids (the sync span has no
@@ -434,7 +434,7 @@ The song in view is only counted, for those totals: no span carries it. The `pag
 Both spans are made and ended at once: a span held open for the length of a setlist would be
 invisible until it ended, and lost with the tab.
 
-The **Support ID** is in Preferences, "Usage reports": the first eight characters of the device
+The **Support ID** is on the privacy page, by the usage reports switch: the first eight characters of the device
 id, with Copy and Reset (Reset forgets the id; a new one is made at once). It is not shown while
 reports are off. The Contact page (`/contact`, `src/js/contact.ts`) puts it in the email it makes.
 
