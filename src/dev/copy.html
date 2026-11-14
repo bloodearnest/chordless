@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Messages - Chordless</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      body {
+        overflow: auto;
+        padding: 2rem;
+      }
+      main {
+        max-width: 50rem;
+        margin: 0 auto;
+      }
+      #filter {
+        width: 100%;
+        padding: 0.5rem;
+        margin-block: 1rem;
+        font: inherit;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+      }
+      li {
+        margin-block: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border-color, #8884);
+        border-radius: 6px;
+      }
+      li button {
+        all: unset;
+        display: block;
+        width: 100%;
+        cursor: pointer;
+      }
+      .id {
+        font: 0.8rem ui-monospace, monospace;
+        opacity: 0.7;
+      }
+      .source {
+        white-space: pre-wrap;
+      }
+      .comment {
+        font-size: 0.85rem;
+        font-style: italic;
+        opacity: 0.8;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Messages</h1>
+      <p>
+        Everything the app says (<code>src/text/en.ts</code>, docs/COPY.md). Click one to change it.
+        In the app itself, Alt + right click on a message does the same. Served by
+        <code>just serve</code> only, never in production.
+      </p>
+      <input id="filter" type="search" placeholder="Filter by name, words or comment" aria-label="Filter" />
+      <ul id="messages"></ul>
+    </main>
+    <script type="module" src="/dev/copy.js"></script>
+  </body>
+</html>
