@@ -73,7 +73,7 @@ test.describe('A setlist shared by link', () => {
   test.describe('on the first visit', () => {
     test.use({ firstUse: true })
 
-    test('a visitor is asked how they read, then sees the setlist', async ({ context, page }) => {
+    test('a visitor is asked what they play, then sees the setlist', async ({ context, page }) => {
       const key = generateShareKey()
       await serveShare(context, key)
 
@@ -81,7 +81,7 @@ test.describe('A setlist shared by link', () => {
       const modal = page.getByRole('dialog', { name: 'Welcome to Chordless' })
       await expect(modal).toBeVisible()
       const setup = page.locator('first-use-setup')
-      await setup.getByRole('radio', { name: /^Lyrics only/ }).check()
+      await setup.getByRole('radio', { name: /^I sing/ }).check()
       await setup.getByRole('button', { name: 'Continue' }).click()
 
       await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
