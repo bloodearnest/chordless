@@ -2,6 +2,7 @@ import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import { listPadSets, padSetSize, setPadSources, uploadPadSet } from '../src/js/pad-set-service.ts'
+import { collectPersonalLayer, restorePersonalLayer } from '../src/js/personal-layer.ts'
 import { scoreRecord } from '../src/js/score-record.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import {
@@ -260,6 +261,128 @@ describe('Exporting a space, and importing one', () => {
         await writeZip(files.filter(file => !file.name.endsWith('.lead-sheet.musicxml')))
       )
       expect(damaged.scores).to.deep.equal([])
+    })
+  })
+
+  describe('with what the person keeps for themselves', () => {
+    const keys = ['state-set-1', `song-prefs-${sourceId}`, 'tuning', 'font_ui', 'theme']
+    const clear = () => {
+      for (const key of keys) localStorage.removeItem(key)
+    }
+    beforeEach(clear)
+    afterEach(clear)
+
+    /** Set up what a person keeps, and the songs they added, beside `fill()` */
+    async function keep() {
+      const { alpha } = await fill()
+      localStorage.setItem(
+        'state-set-1',
+        JSON.stringify({ v: 2, sections: { x: {} }, capos: { y: 2 } })
+      )
+      localStorage.setItem(`song-prefs-${sourceId}`, JSON.stringify({ [alpha.id]: { capo: 3 } }))
+      localStorage.setItem('tuning', '-1')
+      localStorage.setItem('font_ui', 'serif')
+      localStorage.setItem('theme', 'dark')
+      const setlist = must(await source.getSetlist('set-1'))
+      await source.saveSetlist({
+        ...setlist,
+        songs: [
+          ...setlist.songs,
+          makeEntry({ order: 2, songId: 'mine', songUuid: 'mine-uuid', local: true }),
+        ],
+      })
+    }
+
+    it('is left out unless asked for, and so are the songs added for the person alone', async () => {
+      await keep()
+      const none = await readExport(await createExport(source, 'Grace Church'))
+      expect(none.personal).to.equal(null)
+      expect(none.manifest.personal).to.equal(undefined)
+      const asked = await readExport(
+        await createExport(source, 'Grace Church', [], new Date(), true)
+      )
+      expect(asked.manifest.personal).to.equal(true)
+      expect(asked.setlists[0].songs.map(entry => entry.songId)).to.not.include('mine')
+      // (and the device's own settings stay out)
+      expect(Object.keys(must(asked.personal).preferences).sort()).to.deep.equal([
+        'font_ui',
+        'tuning',
+      ])
+    })
+
+    it('is put back where nothing is kept, and never over what is', async () => {
+      await keep()
+      const exported = await readExport(
+        await createExport(source, 'Grace Church', [], new Date(), true)
+      )
+      await importIntoSpace(exported, destination)
+      clear()
+      localStorage.setItem('tuning', '0')
+
+      const report = await restorePersonalLayer(must(exported.personal), destination)
+
+      expect(report).to.deep.equal({ setlists: 1, songs: 1, preferences: 1 })
+      expect(JSON.parse(localStorage.getItem('state-set-1') ?? '').capos).to.deep.equal({ y: 2 })
+      expect(localStorage.getItem('tuning')).to.equal('0')
+      expect(localStorage.getItem('font_ui')).to.equal('serif')
+      expect(localStorage.getItem('theme')).to.equal(null)
+      expect(JSON.parse(localStorage.getItem(`song-prefs-${destinationId}`) ?? '')).to.deep.equal({
+        'title-alpha': { capo: 3 },
+      })
+      const there = must(await destination.getSetlist('set-1'))
+      expect(there.songs.map(entry => [entry.songId, Boolean(entry.local)])).to.deep.equal([
+        [there.songs[0].songId, false],
+        [there.songs[1].songId, false],
+        ['mine', true],
+      ])
+
+      // again: nothing new
+      localStorage.setItem('state-set-1', 'kept')
+      const again = await restorePersonalLayer(must(exported.personal), destination)
+      expect(again).to.deep.equal({ setlists: 0, songs: 0, preferences: 0 })
+      expect(localStorage.getItem('state-set-1')).to.equal('kept')
+      localStorage.removeItem(`song-prefs-${destinationId}`)
+    })
+
+    it('skips a setlist the space does not have, and a setting that is not the person’s', async () => {
+      const report = await restorePersonalLayer(
+        {
+          setlists: { nowhere: { state: { v: 2 } } },
+          songPrefs: {},
+          preferences: { theme: 'dark', tuning: '2' },
+        },
+        destination
+      )
+      expect(report).to.deep.equal({ setlists: 0, songs: 0, preferences: 1 })
+      expect(localStorage.getItem('state-nowhere')).to.equal(null)
+      expect(localStorage.getItem('theme')).to.equal(null)
+    })
+
+    it('keeps the songs a person added even with no state, and skips unreadable state and a setlist that is gone', async () => {
+      await keep()
+      localStorage.removeItem('state-set-1')
+      localStorage.setItem('state-broken', '{not json')
+      try {
+        const layer = must(await collectPersonalLayer(source, ['set-1', 'broken', 'gone']))
+        expect(Object.keys(layer.setlists)).to.deep.equal(['set-1'])
+        expect(layer.setlists['set-1']).to.not.have.property('state')
+        expect(must(layer.setlists['set-1'].local).map(entry => entry.songId)).to.deep.equal([
+          'mine',
+        ])
+      } finally {
+        localStorage.removeItem('state-broken')
+      }
+    })
+
+    it('has nothing to keep for a person who has set nothing, and reads a file whose list is broken', async () => {
+      await fill()
+      expect(await collectPersonalLayer(source, ['set-1'])).to.equal(null)
+      const zip = await readZip(await createExport(source, 'Grace Church'))
+      const files = await Promise.all(
+        zip.entries.map(async entry => ({ name: entry.fileName, data: await zip.read(entry) }))
+      )
+      const broken = await writeZip([...files, { name: 'personal.json', data: 'not json' }])
+      expect((await readExport(broken)).personal).to.equal(null)
     })
   })
 

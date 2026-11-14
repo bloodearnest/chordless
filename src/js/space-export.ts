@@ -10,6 +10,7 @@
  *   scores.json                  each lead sheet's song, and the key it is written in (docs/LEAD_SHEETS.md)
  *   scores/<title>-<id>.lead-sheet.musicxml   each lead sheet's MusicXML, as any notation program reads it
  *   people.json                  who leads the setlists (docs/IDENTITIES.md)
+ *   personal.json                what the person keeps for themselves, if asked (src/js/personal-layer.ts)
  *   setlists/<date>-<name>-<id>.json
  *   pads/<set>/<KEY>.mp3
  *
@@ -21,6 +22,7 @@ import type { ChordlessDB } from './db.ts'
 import { adoptLegacyLeader } from './leaders.ts'
 import { PAD_FILE_KEYS } from './pad-keys.ts'
 import { type PadSet, readPadSetAudio, uploadPadSet } from './pad-set-service.ts'
+import { collectPersonalLayer, type PersonalLayer } from './personal-layer.ts'
 import { scoreRecord } from './score-record.ts'
 import { type TransferReport, type TransferSource, transferSpace } from './space-transfer.ts'
 import { personContent } from './sync/person-hash.ts'
@@ -41,6 +43,8 @@ export interface ExportManifest {
   space: string
   /** (`scores` is not in an export made before lead sheets were) */
   counts: { songs: number; setlists: number; padSets: number; scores?: number }
+  /** Whether the file holds the person's own settings and annotations (`personal.json`) */
+  personal?: boolean
   /** The pad sets in the file, by name (their files are under `pads/<dir>/`) */
   padSets: { name: string; dir: string }[]
 }
@@ -87,6 +91,8 @@ export interface SpaceExport {
   setlists: Setlist[]
   /** The people who lead them (made from the setlists of an export from before there were people) */
   people: Person[]
+  /** What the person kept for themselves, when the file holds it */
+  personal: PersonalLayer | null
   /** The pad sets' audio, read from the zip when asked (they are large) */
   padAudio(dir: string): Promise<Map<string, Uint8Array<ArrayBuffer>>>
 }
@@ -126,7 +132,8 @@ export async function createExport(
   db: ChordlessDB,
   spaceName: string,
   padSets: ExportPadSet[] = [],
-  now = new Date()
+  now = new Date(),
+  includePersonal = false
 ): Promise<Blob> {
   const files: ZipFile[] = []
 
@@ -173,6 +180,7 @@ export async function createExport(
   }
 
   let setlistCount = 0
+  const exportedSetlistIds: string[] = []
   for (const setlist of await db.getAllSetlists()) {
     // (a received share is someone else's, kept apart; a deleted setlist is gone)
     if (setlist.deletedAt || setlist.received) continue
@@ -180,6 +188,7 @@ export async function createExport(
     const name = `setlists/${setlist.date}-${slug(setlist.name || setlist.type)}-${shortId(setlist.id)}.json`
     files.push({ name, data: JSON.stringify(content, null, 2) })
     setlistCount++
+    exportedSetlistIds.push(setlist.id)
   }
 
   const padEntries: ExportManifest['padSets'] = []
@@ -197,6 +206,7 @@ export async function createExport(
     }
   }
 
+  const personal = includePersonal ? await collectPersonalLayer(db, exportedSetlistIds) : null
   const manifest: ExportManifest = {
     format: EXPORT_FORMAT,
     version: EXPORT_VERSION,
@@ -208,6 +218,7 @@ export async function createExport(
       padSets: padEntries.length,
       scores: scores.length,
     },
+    ...(personal ? { personal: true } : {}),
     padSets: padEntries,
   }
   return writeZip(
@@ -219,6 +230,7 @@ export async function createExport(
         name: 'people.json',
         data: JSON.stringify((await db.getAllPeople()).map(personContent), null, 2),
       },
+      ...(personal ? [{ name: 'personal.json', data: JSON.stringify(personal, null, 2) }] : []),
       ...files,
     ],
     now
@@ -296,8 +308,19 @@ export async function readExport(file: Blob): Promise<SpaceExport> {
   const adopted = setlists.map(setlist => adoptLegacyLeader(setlist, leaders))
   people.push(...leaders.added)
 
+  // (what the person kept for themselves: a file that lists it but cannot be read is read without it)
+  let personal: PersonalLayer | null = null
+  if (byName.has('personal.json')) {
+    try {
+      personal = JSON.parse(await text('personal.json'))
+    } catch {
+      personal = null
+    }
+  }
+
   return {
     manifest,
+    personal,
     songs,
     chordpro,
     scores,
