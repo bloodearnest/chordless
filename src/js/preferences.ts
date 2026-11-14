@@ -1,8 +1,22 @@
-const MUSICIAN_TYPES = ['general', 'singer', 'drummer', 'guitarist'] as const
+/**
+ * What the person plays (docs/PERSONAL_LAYER.md, "How I play it"): a preset over the switches below
+ * (lyrics only to start, the capo control), or `custom` when they set the switches one by one.
+ * `general` is "Other": chords at concert pitch, no extra controls.
+ */
+const MUSICIAN_TYPES = ['general', 'singer', 'guitarist', 'custom'] as const
 export type MusicianType = (typeof MUSICIAN_TYPES)[number]
 
-function isMusicianType(value: unknown): value is MusicianType {
-  return MUSICIAN_TYPES.includes(value as MusicianType)
+/** What each type switches on: starting with lyrics only, and the capo control */
+const PRESETS: Record<Exclude<MusicianType, 'custom'>, { lyricsOnly: boolean; capo: boolean }> = {
+  singer: { lyricsOnly: true, capo: false },
+  guitarist: { lyricsOnly: false, capo: true },
+  general: { lyricsOnly: false, capo: false },
+}
+
+/** A type as it is stored: one of ours, or the `drummer` an earlier version had, which is a singer */
+function readMusicianType(value: unknown): MusicianType | null {
+  if (value === 'drummer') return 'singer'
+  return MUSICIAN_TYPES.includes(value as MusicianType) ? (value as MusicianType) : null
 }
 
 /** What each part of a song shows by default, as stored: { all: 'all' | 'lyrics' | ... } */
@@ -158,7 +172,7 @@ const accidentals = flag('use-unicode-accidentals', on => new AccidentalsPrefere
 const MUSICIAN_TYPE_KEY = 'musician_type'
 const musicianType = definePreference<MusicianType>({
   keys: [MUSICIAN_TYPE_KEY],
-  read: ([stored]) => (isMusicianType(stored) ? stored : 'general'),
+  read: ([stored]) => readMusicianType(stored) ?? 'general',
   write: type => type,
   blocked: 'general',
 })
@@ -276,16 +290,39 @@ export const setUseNashvilleNumbers = (value: boolean) => nashville.set(!!value)
 export const getUseUnicodeAccidentals = (): boolean => accidentals.get()
 export const setUseUnicodeAccidentals = (value: boolean) => accidentals.set(!!value)
 
-export const getMusicianType = (): MusicianType => musicianType.get()
+/**
+ * What the person plays: the type they chose, unless that is a preset and the switches have been
+ * changed since (the capo control turned on elsewhere, say), when it is the preset the switches
+ * now make, or `custom` if they make none. A person who set them one by one chose `custom`.
+ */
+export function getMusicianType(): MusicianType {
+  const chosen = musicianType.get()
+  if (chosen === 'custom') return chosen
+  const switches = { lyricsOnly: getLyricsOnlyPreference(), capo: getCapoPreference() }
+  const matching = (Object.keys(PRESETS) as Exclude<MusicianType, 'custom'>[]).find(
+    type => PRESETS[type].lyricsOnly === switches.lyricsOnly && PRESETS[type].capo === switches.capo
+  )
+  return matching ?? 'custom'
+}
 
-/** Choose a musician type, which sets what each part of a song shows by default */
+/**
+ * Choose what the person plays, which sets the switches it stands for (a type of `custom` leaves them
+ * as they are, to be set one by one)
+ */
 export function setMusicianType(value: string) {
-  const type = isMusicianType(value) ? value : 'general'
+  const type = readMusicianType(value) ?? 'general'
   musicianType.set(type)
-  // The singer and the drummer read the words, the others have everything
-  const defaults: SectionDefaults = {
-    all: type === 'singer' || type === 'drummer' ? 'lyrics' : 'all',
-  }
+  if (type === 'custom') return
+  setCapoPreference(PRESETS[type].capo)
+  keepLyricsOnly(PRESETS[type].lyricsOnly, type)
+}
+
+/** Whether a song's sections start with only the lyrics shown, a switch of what is played */
+export const getLyricsOnlyPreference = (): boolean => sectionDefaults.get().all === 'lyrics'
+export const setLyricsOnlyPreference = (on: boolean) => keepLyricsOnly(on, getMusicianType())
+
+function keepLyricsOnly(on: boolean, type: MusicianType) {
+  const defaults: SectionDefaults = { all: on ? 'lyrics' : 'all' }
   sectionDefaults.set(defaults)
   window.dispatchEvent(new SectionDefaultsEvent(type, defaults))
 }

@@ -5,6 +5,7 @@ import {
   getCapoPreference,
   getKeepAwakeMinutes,
   getKeepAwakePreference,
+  getLyricsOnlyPreference,
   getMusicianType,
   getScrollToTopOnSwipe,
   getTelemetryPreference,
@@ -18,6 +19,7 @@ import {
   setCapoPreference,
   setKeepAwakeMinutes,
   setKeepAwakePreference,
+  setLyricsOnlyPreference,
   setMusicianType,
   setScrollToTopOnSwipe,
   setTelemetryPreference,
@@ -27,6 +29,7 @@ import {
 } from '../js/preferences.ts'
 import { resetDeviceId, supportId } from '../js/telemetry/ids.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../js/wake-lock.ts'
+import { PLAYS } from '../js/what-do-you-play.ts'
 import './readability-settings.ts'
 import './theme-settings.ts'
 import { buttonStyles, panelStyles, statusStyles } from './shared-styles.ts'
@@ -46,6 +49,7 @@ export class AppPreferences extends LitElement {
     useUnicodeAccidentals: { type: Boolean, attribute: false },
     musicianType: { type: String, attribute: false },
     capoEnabled: { type: Boolean, attribute: false },
+    lyricsOnly: { type: Boolean, attribute: false },
     scrollToTop: { type: Boolean, attribute: false },
     sharedAnnotations: { type: Boolean, attribute: false },
     myAnnotations: { type: Boolean, attribute: false },
@@ -59,6 +63,7 @@ export class AppPreferences extends LitElement {
   declare useUnicodeAccidentals: boolean
   declare musicianType: MusicianType
   declare capoEnabled: boolean
+  declare lyricsOnly: boolean
   declare scrollToTop: boolean
   declare sharedAnnotations: boolean
   declare myAnnotations: boolean
@@ -167,6 +172,7 @@ export class AppPreferences extends LitElement {
     this.useUnicodeAccidentals = getUseUnicodeAccidentals()
     this.musicianType = getMusicianType()
     this.capoEnabled = getCapoPreference()
+    this.lyricsOnly = getLyricsOnlyPreference()
     this.scrollToTop = getScrollToTopOnSwipe()
     this.sharedAnnotations = getAnnotationsPreference().shared
     this.myAnnotations = getAnnotationsPreference().mine
@@ -355,54 +361,56 @@ export class AppPreferences extends LitElement {
         </div>
 
         <div class="panel">
-          <h3>Display Defaults</h3>
-          <p>Choose how each section appears when you open a setlist.</p>
+          <h3>What do you play?</h3>
+          <p>
+            This sets what each song shows when you open it, and which controls you get. Only you see
+            it.
+          </p>
           <div class="radio-group">
-            <label class="radio-option">
-              <input
-                type="radio"
-                name="musician-type"
-                value="general"
-                ?checked=${this.musicianType === 'general'}
-                @change=${this._onMusicianTypeChange}
-              />
-              <div class="radio-option-content">
-                <span class="radio-option-label">Show chords and lyrics</span>
-                <span class="radio-option-description">General musician</span>
-              </div>
-            </label>
-
-            <label class="radio-option">
-              <input
-                type="radio"
-                name="musician-type"
-                value="singer"
-                ?checked=${this._isLyricsOnlySelection()}
-                @change=${this._onMusicianTypeChange}
-              />
-              <div class="radio-option-content">
-                <span class="radio-option-label">Show only lyrics</span>
-                <span class="radio-option-description">
-                  Great for singers and drummers who don't need chords
-                </span>
-              </div>
-            </label>
+            ${PLAYS.map(
+              option => html`
+                <label class="radio-option">
+                  <input
+                    type="radio"
+                    name="musician-type"
+                    value=${option.type}
+                    ?checked=${this.musicianType === option.type}
+                    @change=${this._onMusicianTypeChange}
+                  />
+                  <div class="radio-option-content">
+                    <span class="radio-option-label">${option.label}</span>
+                    <span class="radio-option-description">${option.description}</span>
+                  </div>
+                </label>
+              `
+            )}
           </div>
-        </div>
-
-        <div class="panel">
-          <h3>Capo</h3>
-          <p>Show a capo control so guitarists can view transposed chords without changing pads.</p>
-          <label class="toggle" for="toggle-capo">
-            <input
-              type="checkbox"
-              id="toggle-capo"
-              name="enable-capo"
-              ?checked=${this.capoEnabled}
-              @change=${this._onCapoToggle}
-            />
-            <span>Enable capo adjustments</span>
-          </label>
+          ${
+            this.musicianType === 'custom'
+              ? html`
+                <label class="toggle" for="toggle-lyrics-only">
+                  <input
+                    type="checkbox"
+                    id="toggle-lyrics-only"
+                    name="lyrics-only"
+                    ?checked=${this.lyricsOnly}
+                    @change=${this._onLyricsOnlyToggle}
+                  />
+                  <span>Start each song with only the lyrics</span>
+                </label>
+                <label class="toggle" for="toggle-capo">
+                  <input
+                    type="checkbox"
+                    id="toggle-capo"
+                    name="enable-capo"
+                    ?checked=${this.capoEnabled}
+                    @change=${this._onCapoToggle}
+                  />
+                  <span>Show a capo control for each song</span>
+                </label>
+              `
+              : ''
+          }
         </div>
 
         <div class="panel">
@@ -556,14 +564,19 @@ export class AppPreferences extends LitElement {
     `
   }
 
-  _isLyricsOnlySelection(): boolean {
-    return this.musicianType === 'singer' || this.musicianType === 'drummer'
-  }
-
   _onMusicianTypeChange(event: Event): void {
     const value = (event.currentTarget as HTMLInputElement).value as MusicianType
-    this.musicianType = value
     setMusicianType(value)
+    // (the type is what the switches now make, and they are what the type was chosen to set)
+    this.musicianType = getMusicianType()
+    this.lyricsOnly = getLyricsOnlyPreference()
+    this.capoEnabled = getCapoPreference()
+  }
+
+  _onLyricsOnlyToggle(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).checked
+    this.lyricsOnly = value
+    setLyricsOnlyPreference(value)
   }
 
   _onNashvilleToggle(event: Event): void {

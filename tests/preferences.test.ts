@@ -57,7 +57,8 @@ describe('preferences', () => {
     const preferences = await fresh()
     expect(preferences.getUseNashvilleNumbers()).to.equal(true)
     expect(preferences.getUseUnicodeAccidentals()).to.equal(true)
-    expect(preferences.getMusicianType()).to.equal('drummer')
+    // (the switches are what count: a stored type that they do not agree with is the type they make)
+    expect(preferences.getMusicianType()).to.equal('guitarist')
     expect(preferences.getCapoPreference()).to.equal(true)
   })
   afterEach(() => {
@@ -112,27 +113,63 @@ describe('preferences', () => {
     })
   })
 
-  describe('the musician type', () => {
-    it('sets what each part of a song shows by default, and says so', async () => {
+  describe('what the person plays', () => {
+    it('sets the switches the type stands for, and says so', async () => {
       const preferences = await fresh()
-      const expected: Record<string, string> = {
-        general: 'all',
-        singer: 'lyrics',
-        drummer: 'lyrics',
-        guitarist: 'all',
-        nonsense: 'all',
-      }
-      for (const [type, shown] of Object.entries(expected)) {
+      // [type chosen, what each part shows to start, whether the capo control is on, the type then]
+      const expected: [string, string, boolean, string][] = [
+        ['general', 'all', false, 'general'],
+        ['singer', 'lyrics', false, 'singer'],
+        ['guitarist', 'all', true, 'guitarist'],
+        ['drummer', 'lyrics', false, 'singer'],
+        ['nonsense', 'all', false, 'general'],
+      ]
+      for (const [type, shown, capo, then] of expected) {
         const events = heard<InstanceType<Preferences['SectionDefaultsEvent']>>(
           'preferences:section-defaults-changed',
           () => preferences.setMusicianType(type)
         )
         expect(events[0].defaults, type).to.deep.equal({ all: shown })
+        expect(events.at(-1)?.musicianType, type).to.equal(then)
         expect(JSON.parse(localStorage.getItem('section_defaults') ?? ''), type).to.deep.equal({
           all: shown,
         })
-        expect(preferences.getMusicianType()).to.equal(type === 'nonsense' ? 'general' : type)
+        expect(preferences.getCapoPreference(), type).to.equal(capo)
+        expect(preferences.getLyricsOnlyPreference(), type).to.equal(shown === 'lyrics')
+        expect(preferences.getMusicianType(), type).to.equal(then)
       }
+    })
+
+    it('leaves the switches as they are for Custom, to be set one by one', async () => {
+      const preferences = await fresh()
+      preferences.setMusicianType('guitarist')
+      preferences.setMusicianType('custom')
+      expect(preferences.getCapoPreference()).to.equal(true)
+      expect(preferences.getMusicianType()).to.equal('custom')
+      // (and it stays Custom, though the switches now make a type)
+      preferences.setCapoPreference(false)
+      expect(preferences.getMusicianType()).to.equal('custom')
+      preferences.setLyricsOnlyPreference(true)
+      expect(preferences.getLyricsOnlyPreference()).to.equal(true)
+      expect(preferences.getMusicianType()).to.equal('custom')
+    })
+
+    it('is what the switches make when they were changed since a type was chosen', async () => {
+      const preferences = await fresh()
+      preferences.setMusicianType('general')
+      // (the capo control turned on, as it could be before there was one question)
+      preferences.setCapoPreference(true)
+      expect(preferences.getMusicianType()).to.equal('guitarist')
+      // (a mixture no type makes)
+      preferences.setLyricsOnlyPreference(true)
+      expect(preferences.getMusicianType()).to.equal('custom')
+    })
+
+    it('reads a drummer, as an earlier version stored it, as a singer', async () => {
+      const preferences = await fresh()
+      localStorage.setItem('musician_type', 'drummer')
+      localStorage.setItem('section_defaults', JSON.stringify({ all: 'lyrics' }))
+      expect(preferences.getMusicianType()).to.equal('singer')
     })
   })
 

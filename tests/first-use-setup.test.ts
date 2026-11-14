@@ -28,28 +28,33 @@ describe('first-use-setup', () => {
   it('opens a modal with the choices', async () => {
     await setUp()
     expect(root().querySelector('app-modal').open).to.equal(true)
-    expect(root().querySelectorAll('input[type="radio"]').length).to.equal(2)
-    expect(root().querySelector('input[type="checkbox"]')).to.not.equal(null)
+    // (singer, guitarist, another instrument: Custom is for Preferences)
+    expect(root().querySelectorAll('input[type="radio"]').length).to.equal(3)
+    expect(root().querySelector('legend').textContent).to.equal('What do you play?')
   })
 
-  it('saves the choices as they are made', async () => {
+  it('saves the choice as it is made, with the switches it stands for', async () => {
     await setUp()
-    const lyrics = root().querySelectorAll('input[type="radio"]')[1]
-    lyrics.click()
+    const [singer, guitarist, other] = root().querySelectorAll('input[type="radio"]')
+    singer.click()
     expect(localStorage.getItem('musician_type')).to.equal('singer')
-    root().querySelector('input[type="checkbox"]').click()
+    expect(JSON.parse(localStorage.getItem('section_defaults') ?? '')).to.deep.equal({
+      all: 'lyrics',
+    })
+    guitarist.click()
+    expect(localStorage.getItem('musician_type')).to.equal('guitarist')
     expect(localStorage.getItem('enable_capo')).to.equal('true')
+    expect(JSON.parse(localStorage.getItem('section_defaults') ?? '')).to.deep.equal({ all: 'all' })
+    other.click()
+    expect(localStorage.getItem('musician_type')).to.equal('general')
+    expect(localStorage.getItem('enable_capo')).to.equal('false')
   })
 
-  it('can be set back to chords and lyrics after choosing lyrics only', async () => {
+  it('shows what is already chosen', async () => {
+    localStorage.setItem('enable_capo', 'true')
     await setUp()
-    const [both, lyrics] = root().querySelectorAll('input[type="radio"]')
-    // (a choice made in an earlier test is remembered, and a radio already chosen does not change)
-    lyrics.click()
-    both.click()
-    expect(localStorage.getItem('musician_type')).to.equal('general')
-    lyrics.click()
-    expect(localStorage.getItem('musician_type')).to.equal('singer')
+    const [, guitarist] = root().querySelectorAll('input[type="radio"]')
+    expect(guitarist.checked).to.equal(true)
   })
 
   it('marks the setup done and goes away when closed', async () => {

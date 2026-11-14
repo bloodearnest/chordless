@@ -54,30 +54,61 @@ describe('app-preferences', () => {
     el.shadowRoot?.querySelector(selector) as T
 
   describe('the choices', () => {
-    it('sets the musician type with the radio buttons', async () => {
+    const radios = (el: AppPreferences) => [
+      ...(el.shadowRoot?.querySelectorAll<HTMLInputElement>('input[name="musician-type"]') ?? []),
+    ]
+
+    it('asks what the person plays, and sets the switches the answer stands for', async () => {
       const el = await show()
-      const [both, lyrics] = [
-        ...(el.shadowRoot?.querySelectorAll<HTMLInputElement>('input[name="musician-type"]') ?? []),
-      ]
-      lyrics.click()
+      const [singer, guitarist, other] = radios(el)
+      expect(radios(el).length).to.equal(4)
+      singer.click()
       expect(localStorage.getItem('musician_type')).to.equal('singer')
       expect(el.musicianType).to.equal('singer')
-      expect(el._isLyricsOnlySelection()).to.equal(true)
-      both.click()
+      expect(JSON.parse(localStorage.getItem('section_defaults') ?? '')).to.deep.equal({
+        all: 'lyrics',
+      })
+      guitarist.click()
+      expect(localStorage.getItem('enable_capo')).to.equal('true')
+      expect(el.capoEnabled).to.equal(true)
+      other.click()
       expect(localStorage.getItem('musician_type')).to.equal('general')
-      expect(el._isLyricsOnlySelection()).to.equal(false)
+      expect(localStorage.getItem('enable_capo')).to.equal('false')
+      expect(el.capoEnabled).to.equal(false)
     })
 
-    it('has lyrics only chosen for a drummer, too', async () => {
+    it('shows the switches for Custom only, each kept as it is changed', async () => {
       const el = await show()
-      el.musicianType = 'drummer'
-      expect(el._isLyricsOnlySelection()).to.equal(true)
+      expect(control(el, '#toggle-lyrics-only')).to.equal(null)
+      expect(control(el, '#toggle-capo')).to.equal(null)
+      radios(el)[3].click()
+      await el.updateComplete
+      expect(el.musicianType).to.equal('custom')
+      control<HTMLInputElement>(el, '#toggle-lyrics-only').click()
+      control<HTMLInputElement>(el, '#toggle-capo').click()
+      expect(JSON.parse(localStorage.getItem('section_defaults') ?? '')).to.deep.equal({
+        all: 'lyrics',
+      })
+      expect(localStorage.getItem('enable_capo')).to.equal('true')
+      // (it stays Custom, though these two make no type)
+      expect(el.musicianType).to.equal('custom')
+      // (and a type chosen after is shown by its radio button, with the switches it set)
+      radios(el)[0].click()
+      await el.updateComplete
+      expect(el.capoEnabled).to.equal(false)
+      expect(el.lyricsOnly).to.equal(true)
+    })
+
+    it('shows the type the switches make when it is opened', async () => {
+      localStorage.setItem('enable_capo', 'true')
+      const el = await show()
+      expect(el.musicianType).to.equal('guitarist')
+      expect(radios(el)[1].checked).to.equal(true)
     })
 
     it('keeps the toggles', async () => {
       const el = await show()
       for (const [id, key, value] of [
-        ['#toggle-capo', 'enable_capo', 'true'],
         ['#toggle-use-nashville', 'use-nashville', '1'],
         ['#toggle-unicode-accidentals', 'use-unicode-accidentals', '1'],
         ['#toggle-shared-annotations', 'show_shared_annotations', 'false'],

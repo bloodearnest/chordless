@@ -222,7 +222,7 @@ const SONG: HelpPage = {
         },
         {
           label: 'Capo',
-          text: 'Choose where the capo goes, with the key the chords are played in at each fret. You can change it once you have turned on capo adjustments in [Preferences](/preferences).',
+          text: 'Choose where the capo goes, with the key the chords are played in at each fret. You can change it once you have said you play guitar in [Preferences](/preferences), or turned on the capo there.',
         },
         {
           label: 'Tempo (BPM)',
