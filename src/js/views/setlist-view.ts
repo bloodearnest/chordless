@@ -3,6 +3,7 @@ import '../../components/app-header.ts'
 import '../../components/app-modal.ts'
 import '../../components/capo-selector.ts'
 import '../../components/key-selector.ts'
+import '../../components/pitch-selector.ts'
 import '../../components/musical-metadata-display.ts'
 import '../../components/setlist-info-dialog.ts'
 import '../../components/setlist-overview.ts'
@@ -88,6 +89,7 @@ export function setlistTemplate({
           <song-settings-popover id="song-settings-popover">
             <key-selector id="key-selector" slot="key-selector"></key-selector>
             <capo-selector id="capo-selector" slot="capo-selector"></capo-selector>
+            <pitch-selector id="pitch-selector" slot="pitch-selector"></pitch-selector>
           </song-settings-popover>
         </div>
       </app-header>

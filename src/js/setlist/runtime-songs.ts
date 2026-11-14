@@ -12,6 +12,7 @@ import type {
   TempoInput,
 } from '../data-types.ts'
 import type { ChordlessDB } from '../db.ts'
+import type { PitchId } from '../instrument-pitch.ts'
 import { songOfEntry } from '../song-utils.ts'
 import { transposeSong } from '../transpose.ts'
 
@@ -37,6 +38,8 @@ export interface RuntimeSong {
   currentKey: string | undefined
   currentBPM: number | null
   currentCapo: number
+  /** The instrument pitch this song has of its own (docs/PERSONAL_LAYER.md), or null: its setlist's, or the device's */
+  currentPitch: PitchId | null
   songId: string
   /** Which version of the song this is: the stored song's label */
   variantLabel: string | null
@@ -169,6 +172,7 @@ export async function buildRuntimeSongs(
       currentKey: parsed.metadata.key,
       currentBPM: currentBPM,
       currentCapo: 0, // Capo is loaded from localStorage in loadState()
+      currentPitch: null, // and so is the song's own pitch
       songId: songEntry.songId,
       variantLabel: canonicalSong.variantLabel ?? null,
       sourceText: sourceText,

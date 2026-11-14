@@ -29,16 +29,17 @@ export const tuningLabel = (value: unknown): string => TUNINGS[normalizeTuning(v
 
 /**
  * How the chords of a song are moved for display, as the capo-shaped pair the chord display takes:
- * the shapes are the song's key moved up by the tuning and then down by the capo. `capo` is the
+ * the shapes are the song's key moved up (by the guitar's tuning, and the instrument's pitch) and then
+ * down by the capo. `up` is the semitones up, whatever made them. `capo` is the
  * fret of the one capo that does the same (the chords are the same wherever the shift is made, an
  * octave apart), and `key` the key the shapes are in (to spell the chords by), or '' for none.
  */
 export function shapesFor(
-  tuning: Tuning,
+  up: number,
   capo: number,
   keyAfter: (semitones: number) => string
 ): { capo: number; key: string } {
-  const shift = normalizeTuning(tuning) - Math.max(0, Math.round(capo))
+  const shift = (Math.round(up) % 12) - Math.max(0, Math.round(capo))
   if (shift === 0) return { capo: 0, key: '' }
-  return { capo: (((-shift % 12) + 12) % 12) as number, key: keyAfter(shift) }
+  return { capo: ((-shift % 12) + 12) % 12, key: keyAfter(shift) }
 }

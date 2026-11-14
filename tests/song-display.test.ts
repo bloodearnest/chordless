@@ -58,7 +58,7 @@ describe('song-display', () => {
     const host = document.createElement('div')
     const provider = new ContextProvider(host, {
       context: displayPreferencesContext,
-      initialValue: { nashville: false, unicodeAccidentals: false, tuning: 1 },
+      initialValue: { nashville: false, unicodeAccidentals: false, tuning: 1, pitch: 'concert' },
     })
     document.body.append(host)
     const display = document.createElement('song-display')
@@ -88,10 +88,48 @@ describe('song-display', () => {
 
     // (and with none of its own it follows the device's again)
     display.tuning = null
-    provider.setValue({ nashville: false, unicodeAccidentals: false, tuning: 0 })
+    provider.setValue({ nashville: false, unicodeAccidentals: false, tuning: 0, pitch: 'concert' })
     await display.updateComplete
     expect(sections(display)[0].capo).to.equal(0)
     host.remove()
+  })
+
+  it('moves the chords up by the instrument pitch, the song’s or the setlist’s over the device’s', async () => {
+    const { displayPreferencesContext } = await import('../src/js/display-preferences.ts')
+    const host = document.createElement('div')
+    const provider = new ContextProvider(host, {
+      context: displayPreferencesContext,
+      initialValue: { nashville: false, unicodeAccidentals: false, tuning: 0, pitch: 'bb' },
+    })
+    document.body.append(host)
+    const display = document.createElement('song-display')
+    display.parsed = parse(CHART)
+    host.append(display)
+    await display.updateComplete
+    // (a B♭ instrument reads a G chart in A: the same as a capo at 10)
+    expect(sections(display)[0].capo).to.equal(10)
+    expect(sections(display)[0].capoKey).to.equal('A')
+
+    // (an E♭ instrument up 9 is down 3: a capo at 3, in E)
+    display.pitch = 'eb'
+    await display.updateComplete
+    expect(sections(display)[0].capo).to.equal(3)
+    expect(sections(display)[0].capoKey).to.equal('E')
+
+    // (concert pitch of its own, over the device's)
+    display.pitch = 'concert'
+    await display.updateComplete
+    expect(sections(display)[0].capo).to.equal(0)
+
+    // (and with none of its own, it follows the device's again; the tuning and the capo join it)
+    display.pitch = null
+    display.tuning = 1
+    display.capo = 2
+    await display.updateComplete
+    // (up 2 and 1, down 2: up 1)
+    expect(sections(display)[0].capo).to.equal(11)
+    host.remove()
+    provider.setValue({ nashville: false, unicodeAccidentals: false, tuning: 0, pitch: 'concert' })
   })
 
   it('gives no capo key for a song with no key', async () => {
@@ -105,7 +143,7 @@ describe('song-display', () => {
     const host = document.createElement('div')
     const provider = new ContextProvider(host, {
       context: displayPreferencesContext,
-      initialValue: { nashville: true, unicodeAccidentals: false, tuning: 0 },
+      initialValue: { nashville: true, unicodeAccidentals: false, tuning: 0, pitch: 'concert' },
     })
     document.body.append(host)
     const display = document.createElement('song-display')
@@ -115,7 +153,7 @@ describe('song-display', () => {
     expect(sections(display)[0].displayAsNashville).to.equal(true)
     expect(sections(display)[0].unicodeAccidentals).to.equal(false)
 
-    provider.setValue({ nashville: false, unicodeAccidentals: true, tuning: 0 })
+    provider.setValue({ nashville: false, unicodeAccidentals: true, tuning: 0, pitch: 'concert' })
     await display.updateComplete
     expect(sections(display)[0].displayAsNashville).to.equal(false)
     expect(sections(display)[0].unicodeAccidentals).to.equal(true)

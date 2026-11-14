@@ -4,6 +4,7 @@ import { ContextConsumer } from '@lit/context'
 import { attachAnnotations, type ChartAnnotations } from '../js/annotations/shown.ts'
 import type { ChartSection, ParsedChart } from '../js/data-types.ts'
 import { displayPreferencesContext } from '../js/display-preferences.ts'
+import { type PitchId, pitchSemitones } from '../js/instrument-pitch.ts'
 import type { SongCues } from '../js/score-section.ts'
 import { isEditMode } from '../js/setlist/edit-mode-ui.ts'
 import { transposeKeyName } from '../js/transpose.ts'
@@ -12,7 +13,12 @@ import { annotationStyles, renderAnnotations } from './chart-annotation.ts'
 import { AnnotationRequestEvent } from './song-section.ts'
 
 /** How chords are shown before the page has said */
-const NO_DISPLAY_PREFERENCES = { nashville: false, unicodeAccidentals: false, tuning: 0 as Tuning }
+const NO_DISPLAY_PREFERENCES = {
+  nashville: false,
+  unicodeAccidentals: false,
+  tuning: 0 as Tuning,
+  pitch: 'concert' as PitchId,
+}
 
 /**
  * Song Display Component
@@ -32,6 +38,8 @@ export class SongDisplay extends LitElement {
     capo: { type: Number },
     /** The tuning this setlist has for the guitar, or null for the device's (docs/PERSONAL_LAYER.md) */
     tuning: { attribute: false },
+    /** The instrument pitch this song has, or its setlist: null for the device's (docs/PERSONAL_LAYER.md) */
+    pitch: { attribute: false },
     /** The song's annotations, placed on its sections (docs/ANNOTATIONS.md) */
     annotations: { attribute: false },
     /** The notes of the song's lead sheet that its sections show (docs/LEAD_SHEETS.md, "In the chart") */
@@ -42,6 +50,7 @@ export class SongDisplay extends LitElement {
   declare songIndex: number
   declare capo: number
   declare tuning: Tuning | null
+  declare pitch: PitchId | null
   declare annotations: ChartAnnotations | null
   declare cues: SongCues | null
 
@@ -90,6 +99,7 @@ export class SongDisplay extends LitElement {
     this.songIndex = 0
     this.capo = 0
     this.tuning = null
+    this.pitch = null
     this.annotations = null
     this.cues = null
     // How chords are shown (Nashville numbers, unicode accidentals), passed
@@ -152,15 +162,17 @@ export class SongDisplay extends LitElement {
   }
 
   _renderSection(section: ChartSection, index: number) {
-    /* v8 ignore next -- the page provides these as soon as display-preferences loads */
-    const { nashville, unicodeAccidentals, tuning } = this._display.value ?? NO_DISPLAY_PREFERENCES
+    /* v8 ignore next 2 -- the page provides these as soon as display-preferences loads */
+    const { nashville, unicodeAccidentals, tuning, pitch } =
+      this._display.value ?? NO_DISPLAY_PREFERENCES
     const displayKey = this.parsed?.metadata?.key || ''
     const capoValue = Number.isFinite(this.capo)
       ? Math.min(Math.max(Math.round(this.capo), 0), 11)
       : 0
-    // (the chords are moved up by the tuning (the setlist's, if it has one) and down by the capo: the
-    // same as one capo)
-    const shapes = shapesFor(this.tuning ?? tuning, capoValue, semitones =>
+    // (the chords are moved up by the tuning and the instrument's pitch (the setlist's or the song's,
+    // if it has one) and down by the capo: the same as one capo)
+    const up = (this.tuning ?? tuning) + pitchSemitones(this.pitch ?? pitch)
+    const shapes = shapesFor(up, capoValue, semitones =>
       displayKey ? transposeKeyName(displayKey, semitones) : ''
     )
     return html`

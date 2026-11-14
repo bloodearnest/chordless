@@ -6,6 +6,7 @@
  * the setlist twice shares them.) The page works on them by place, as the songs are on the page.
  */
 import type { ChartAnnotation, SectionState } from '../data-types.ts'
+import { normalizePitch, type PitchId } from '../instrument-pitch.ts'
 import { normalizeTuning, type Tuning } from '../tuning.ts'
 
 /** Per song index, then per section index */
@@ -37,6 +38,10 @@ interface StoredState {
   notes?: Record<string, ChartAnnotation[]>
   /** How the guitar is tuned for this setlist (docs/PERSONAL_LAYER.md); none: the device's */
   tuning?: number
+  /** The instrument pitch for this setlist; none: the device's */
+  pitch?: string
+  /** The instrument pitch for each song that has its own, by song: it wins over the setlist's */
+  pitches?: Record<string, string>
 }
 
 const keyFor = (setlistId: string | null) => `state-${setlistId}`
@@ -128,6 +133,63 @@ export function saveSetlistTuning(
     localStorage.setItem(keyFor(setlistId), JSON.stringify(stored))
   } catch (error) {
     console.error('Failed to save the setlist tuning:', error)
+  }
+}
+
+/** The instrument pitch kept for this setlist, or null for the device's */
+export function loadSetlistPitch(setlistId: string | null): PitchId | null {
+  const saved = readSaved(setlistId)
+  const pitch = saved.v === 2 ? (saved as unknown as StoredState).pitch : undefined
+  return pitch === undefined ? null : normalizePitch(pitch)
+}
+
+/** Keep an instrument pitch for this setlist (null: the device's) */
+export function saveSetlistPitch(
+  setlistId: string | null,
+  pitch: PitchId | null,
+  songs: SongRef[]
+) {
+  try {
+    const stored = bySong(readSaved(setlistId), songs)
+    if (pitch === null) delete stored.pitch
+    else stored.pitch = pitch
+    localStorage.setItem(keyFor(setlistId), JSON.stringify(stored))
+  } catch (error) {
+    console.error('Failed to save the setlist pitch:', error)
+  }
+}
+
+/** The instrument pitch each song has of its own, by place in the setlist */
+export function loadSongPitches(
+  setlistId: string | null,
+  songs: SongRef[]
+): Record<number, PitchId> {
+  const saved = readSaved(setlistId)
+  const kept = saved.v === 2 ? (saved as unknown as StoredState).pitches : undefined
+  const pitches: Record<number, PitchId> = {}
+  songs.forEach((song, index) => {
+    const pitch = kept?.[songKey(song)]
+    if (pitch !== undefined) pitches[index] = normalizePitch(pitch)
+  })
+  return pitches
+}
+
+/** Keep an instrument pitch for one song of this setlist (null: it follows the setlist's again) */
+export function saveSongPitch(
+  setlistId: string | null,
+  song: SongRef,
+  pitch: PitchId | null,
+  songs: SongRef[]
+) {
+  try {
+    const stored = bySong(readSaved(setlistId), songs)
+    stored.pitches ??= {}
+    if (pitch === null) delete stored.pitches[songKey(song)]
+    else stored.pitches[songKey(song)] = pitch
+    if (Object.keys(stored.pitches).length === 0) delete stored.pitches
+    localStorage.setItem(keyFor(setlistId), JSON.stringify(stored))
+  } catch (error) {
+    console.error('Failed to save the song pitch:', error)
   }
 }
 

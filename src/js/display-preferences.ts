@@ -1,12 +1,17 @@
 import { ContextProvider, createContext } from '@lit/context'
+import type { PitchId } from './instrument-pitch.ts'
 import {
   AccidentalsPreferenceEvent,
   CapoPreferenceEvent,
   getCapoPreference,
+  getPitchControlsPreference,
+  getPitchPreference,
   getTuningPreference,
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
   NashvillePreferenceEvent,
+  PitchControlsEvent,
+  PitchPreferenceEvent,
   TuningPreferenceEvent,
 } from './preferences.ts'
 import type { Tuning } from './tuning.ts'
@@ -27,6 +32,8 @@ export interface DisplayPreferences {
   unicodeAccidentals: boolean
   /** The device's tuning, when the capo and tuning controls are on (else standard): docs/PERSONAL_LAYER.md */
   tuning: Tuning
+  /** The device's instrument pitch, when the pitch controls are on (else concert pitch) */
+  pitch: PitchId
 }
 
 export const displayPreferencesContext = createContext<DisplayPreferences>(
@@ -38,6 +45,7 @@ function current(): DisplayPreferences {
     nashville: getUseNashvilleNumbers(),
     unicodeAccidentals: getUseUnicodeAccidentals(),
     tuning: getCapoPreference() ? getTuningPreference() : 0,
+    pitch: getPitchControlsPreference() ? getPitchPreference() : 'concert',
   }
 }
 
@@ -51,6 +59,8 @@ for (const type of [
   AccidentalsPreferenceEvent.type,
   TuningPreferenceEvent.type,
   CapoPreferenceEvent.type,
+  PitchControlsEvent.type,
+  PitchPreferenceEvent.type,
 ]) {
   window.addEventListener(type, () => provider.setValue(current()))
 }

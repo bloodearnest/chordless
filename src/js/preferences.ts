@@ -1,18 +1,23 @@
+import { normalizePitch, type PitchId } from './instrument-pitch.ts'
 import { normalizeTuning, type Tuning } from './tuning.ts'
 
 /**
  * What the person plays (docs/PERSONAL_LAYER.md, "How I play it"): a preset over the switches below
- * (lyrics only to start, the capo control), or `custom` when they set the switches one by one.
- * `general` is "Other": chords at concert pitch, no extra controls.
+ * (lyrics only to start, the capo and tuning controls, the instrument pitch controls), or `custom` when
+ * they set the switches one by one. `general` is "Other": chords at concert pitch, no extra controls.
  */
-const MUSICIAN_TYPES = ['general', 'singer', 'guitarist', 'custom'] as const
+const MUSICIAN_TYPES = ['general', 'singer', 'guitarist', 'transposing', 'custom'] as const
 export type MusicianType = (typeof MUSICIAN_TYPES)[number]
 
-/** What each type switches on: starting with lyrics only, and the capo control */
-const PRESETS: Record<Exclude<MusicianType, 'custom'>, { lyricsOnly: boolean; capo: boolean }> = {
-  singer: { lyricsOnly: true, capo: false },
-  guitarist: { lyricsOnly: false, capo: true },
-  general: { lyricsOnly: false, capo: false },
+/** What each type switches on: starting with lyrics only, the capo and tuning controls, the pitch controls */
+const PRESETS: Record<
+  Exclude<MusicianType, 'custom'>,
+  { lyricsOnly: boolean; capo: boolean; pitch: boolean }
+> = {
+  singer: { lyricsOnly: true, capo: false, pitch: false },
+  guitarist: { lyricsOnly: false, capo: true, pitch: false },
+  transposing: { lyricsOnly: false, capo: false, pitch: true },
+  general: { lyricsOnly: false, capo: false, pitch: false },
 }
 
 /** A type as it is stored: one of ours, or the `drummer` an earlier version had, which is a singer */
@@ -65,6 +70,26 @@ export class CapoPreferenceEvent extends Event {
     this.enabled = enabled
   }
 }
+/** The instrument pitch controls were turned on or off (sent on window): docs/PERSONAL_LAYER.md */
+export class PitchControlsEvent extends Event {
+  static readonly type = 'preferences:pitch-controls-changed'
+  readonly enabled: boolean
+  constructor(enabled: boolean) {
+    super(PitchControlsEvent.type)
+    this.enabled = enabled
+  }
+}
+
+/** The device's default instrument pitch changed (sent on window) */
+export class PitchPreferenceEvent extends Event {
+  static readonly type = 'preferences:pitch-changed'
+  readonly pitch: PitchId
+  constructor(pitch: PitchId) {
+    super(PitchPreferenceEvent.type)
+    this.pitch = pitch
+  }
+}
+
 /** The device's default tuning changed (sent on window): docs/PERSONAL_LAYER.md */
 export class TuningPreferenceEvent extends Event {
   static readonly type = 'preferences:tuning-changed'
@@ -208,6 +233,22 @@ const capo = definePreference<boolean>({
   changed: on => new CapoPreferenceEvent(on),
 })
 
+// The instrument pitch controls (a switch), and the device's default pitch (docs/PERSONAL_LAYER.md)
+const pitchControls = definePreference<boolean>({
+  keys: ['enable_pitch'],
+  read: ([stored]) => stored === 'true' || stored === '1',
+  write: on => (on ? 'true' : 'false'),
+  blocked: false,
+  changed: on => new PitchControlsEvent(on),
+})
+const pitch = definePreference<PitchId>({
+  keys: ['pitch'],
+  read: ([stored]) => normalizePitch(stored),
+  write: id => id,
+  blocked: 'concert',
+  changed: id => new PitchPreferenceEvent(id),
+})
+
 // The tuning of a guitar, the device's default (docs/PERSONAL_LAYER.md): standard until chosen
 const tuning = definePreference<Tuning>({
   keys: ['tuning'],
@@ -318,9 +359,16 @@ export const setUseUnicodeAccidentals = (value: boolean) => accidentals.set(!!va
 export function getMusicianType(): MusicianType {
   const chosen = musicianType.get()
   if (chosen === 'custom') return chosen
-  const switches = { lyricsOnly: getLyricsOnlyPreference(), capo: getCapoPreference() }
+  const switches = {
+    lyricsOnly: getLyricsOnlyPreference(),
+    capo: getCapoPreference(),
+    pitch: getPitchControlsPreference(),
+  }
   const matching = (Object.keys(PRESETS) as Exclude<MusicianType, 'custom'>[]).find(
-    type => PRESETS[type].lyricsOnly === switches.lyricsOnly && PRESETS[type].capo === switches.capo
+    type =>
+      PRESETS[type].lyricsOnly === switches.lyricsOnly &&
+      PRESETS[type].capo === switches.capo &&
+      PRESETS[type].pitch === switches.pitch
   )
   return matching ?? 'custom'
 }
@@ -334,6 +382,7 @@ export function setMusicianType(value: string) {
   musicianType.set(type)
   if (type === 'custom') return
   setCapoPreference(PRESETS[type].capo)
+  setPitchControlsPreference(PRESETS[type].pitch)
   keepLyricsOnly(PRESETS[type].lyricsOnly, type)
 }
 
@@ -352,6 +401,14 @@ export const getSectionDefaults = (): SectionDefaults => sectionDefaults.get()
 
 export const getCapoPreference = (): boolean => capo.get()
 export const setCapoPreference = (value: boolean) => capo.set(!!value)
+
+/** Whether the instrument pitch controls are on (a switch of what is played) */
+export const getPitchControlsPreference = (): boolean => pitchControls.get()
+export const setPitchControlsPreference = (value: boolean) => pitchControls.set(!!value)
+
+/** The device's default instrument pitch */
+export const getPitchPreference = (): PitchId => pitch.get()
+export const setPitchPreference = (value: unknown) => pitch.set(normalizePitch(value))
 
 /** The device's default tuning: the capo and tuning controls' default for a guitar */
 export const getTuningPreference = (): Tuning => tuning.get()
@@ -400,6 +457,8 @@ declare global {
     [SectionDefaultsEvent.type]: SectionDefaultsEvent
     [CapoPreferenceEvent.type]: CapoPreferenceEvent
     [TuningPreferenceEvent.type]: TuningPreferenceEvent
+    [PitchControlsEvent.type]: PitchControlsEvent
+    [PitchPreferenceEvent.type]: PitchPreferenceEvent
     [AnnotationsPreferenceEvent.type]: AnnotationsPreferenceEvent
   }
 }

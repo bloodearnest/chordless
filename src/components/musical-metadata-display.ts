@@ -31,6 +31,7 @@ export class MusicalMetadataDisplay extends LitElement {
     keyValue: { type: String, attribute: 'key-value' },
     capoValue: { type: Number, attribute: 'capo-value' },
     tuning: { type: Number },
+    instrument: { type: String },
     bpm: { type: Number },
     timeSignature: { type: String, attribute: 'time-signature' },
     editMode: { type: Boolean, attribute: 'edit-mode', reflect: true },
@@ -40,6 +41,8 @@ export class MusicalMetadataDisplay extends LitElement {
   declare capoValue: number
   /** How far down the guitar is tuned (0: standard), docs/PERSONAL_LAYER.md */
   declare tuning: number
+  /** The instrument pitch, in words ("B♭"), or '' for concert pitch (docs/PERSONAL_LAYER.md) */
+  declare instrument: string
   declare bpm: number | null
   declare timeSignature: string
   declare editMode: boolean
@@ -118,6 +121,7 @@ export class MusicalMetadataDisplay extends LitElement {
     this.keyValue = ''
     this.capoValue = 0
     this.tuning = 0
+    this.instrument = ''
     this.bpm = null
     this.timeSignature = ''
     this.editMode = false
@@ -162,6 +166,16 @@ export class MusicalMetadataDisplay extends LitElement {
               <div class="meta-item">
                 <span class="meta-label">Capo:</span>
                 <span class="meta-value">${this.capoValue}</span>
+              </div>
+            `
+            : ''
+        }
+        ${
+          this.instrument
+            ? html`
+              <div class="meta-item">
+                <span class="meta-label">Instrument:</span>
+                <span class="meta-value">${this.instrument}</span>
               </div>
             `
             : ''

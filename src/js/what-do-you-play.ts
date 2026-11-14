@@ -22,6 +22,11 @@ export const PLAYS: readonly PlayOption[] = [
     description: 'Chords and lyrics, with capo and tuning controls',
   },
   {
+    type: 'transposing',
+    label: 'I play a B♭, E♭ or F instrument',
+    description: 'Chords and lyrics, with an instrument pitch control',
+  },
+  {
     type: 'general',
     label: 'Another instrument',
     description: 'Chords and lyrics, as they are written',

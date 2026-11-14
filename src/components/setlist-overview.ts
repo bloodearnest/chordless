@@ -1,7 +1,10 @@
 import { html, LitElement } from 'lit'
+import type { PitchId } from '../js/instrument-pitch.ts'
 import type { Tuning } from '../js/tuning.ts'
 import './icon.ts'
+import type { PitchChangeEvent } from './pitch-selector.ts'
 import type { SongCardBpmChangeEvent, SongCardKeyChangeEvent } from './song-card.ts'
+import './pitch-selector.ts'
 import type { TuningChangeEvent } from './tuning-selector.ts'
 import './tuning-selector.ts'
 
@@ -59,6 +62,16 @@ export class OverviewTuningChangeEvent extends Event {
   }
 }
 
+/** An instrument pitch was chosen for the setlist (null: the device's again) */
+export class OverviewPitchChangeEvent extends Event {
+  static readonly type = 'setlist-overview:pitch-change'
+  readonly pitch: PitchId | null
+  constructor(pitch: PitchId | null) {
+    super(OverviewPitchChangeEvent.type, { bubbles: true, composed: true })
+    this.pitch = pitch
+  }
+}
+
 /** Add Song was pressed */
 export class OverviewAddSongEvent extends Event {
   static readonly type = 'setlist-overview:add-song'
@@ -80,6 +93,9 @@ export class SetlistOverview extends LitElement {
     showTuning: { type: Boolean, attribute: 'show-tuning' },
     tuning: { attribute: false },
     deviceTuning: { type: Number, attribute: 'device-tuning' },
+    showPitch: { type: Boolean, attribute: 'show-pitch' },
+    pitch: { attribute: false },
+    devicePitch: { attribute: false },
   }
 
   declare songs: unknown[] /* TYPE */
@@ -92,6 +108,11 @@ export class SetlistOverview extends LitElement {
   /** The setlist's own tuning, or null for the device's */
   declare tuning: Tuning | null
   declare deviceTuning: number
+  /** Whether the instrument pitch for this setlist can be shown (the pitch controls are on): in edit mode, or when it is not concert pitch */
+  declare showPitch: boolean
+  /** The setlist's own instrument pitch, or null for the device's */
+  declare pitch: PitchId | null
+  declare devicePitch: PitchId
 
   constructor() {
     super()
@@ -100,6 +121,9 @@ export class SetlistOverview extends LitElement {
     this.showTuning = false
     this.tuning = null
     this.deviceTuning = 0
+    this.showPitch = false
+    this.pitch = null
+    this.devicePitch = 'concert'
   }
 
   // Render into light DOM so existing CSS/selectors keep working
@@ -122,6 +146,22 @@ export class SetlistOverview extends LitElement {
                     this.dispatchEvent(new OverviewTuningChangeEvent(event.tuning))
                   }}
                 ></tuning-selector>
+              </div>`
+            : ''
+        }
+        ${
+          this.showPitch && (this.editMode || (this.pitch ?? this.devicePitch) !== 'concert')
+            ? html`<div class="overview-tuning">
+                <pitch-selector
+                  .value=${this.pitch ?? ''}
+                  .followed=${this.devicePitch}
+                  follows="my device"
+                  .editMode=${this.editMode}
+                  @pitch-selector:change=${(event: PitchChangeEvent) => {
+                    event.stopPropagation()
+                    this.dispatchEvent(new OverviewPitchChangeEvent(event.pitch))
+                  }}
+                ></pitch-selector>
               </div>`
             : ''
         }
@@ -197,5 +237,6 @@ declare global {
     [OverviewSongBpmChangeEvent.type]: OverviewSongBpmChangeEvent
     [OverviewAddSongEvent.type]: OverviewAddSongEvent
     [OverviewTuningChangeEvent.type]: OverviewTuningChangeEvent
+    [OverviewPitchChangeEvent.type]: OverviewPitchChangeEvent
   }
 }

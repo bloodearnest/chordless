@@ -28,6 +28,14 @@ describe('musical-metadata-display', () => {
     expect(items(display)).to.deep.equal(['Key: G', 'Capo: 2', 'BPM: 90', 'Time: 3/4'])
   })
 
+  it('says the instrument pitch when it is not concert pitch', async () => {
+    expect(items(await show({ keyValue: 'G', instrument: 'E♭' }))).to.deep.equal([
+      'Key: G',
+      'Instrument: E♭',
+    ])
+    expect(items(await show({ keyValue: 'G', instrument: '' }))).to.deep.equal(['Key: G'])
+  })
+
   it('says how the guitar is tuned when it is not standard', async () => {
     expect(items(await show({ keyValue: 'G', capoValue: 2, tuning: 1 }))).to.deep.equal([
       'Key: G',
