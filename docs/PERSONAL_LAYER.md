@@ -189,9 +189,11 @@ in the open #191), and Nashville numbers ignore it.
 
 Pull requests, in order, each building on `main` as it is:
 
-1. **"What do you play?"**: the switches, the presets, Custom; the first-use setup and Preferences
-   (replacing the lyrics-only radios and the capo toggle); existing settings carried over; no change to
-   what is drawn. Header controls show or hide by the switches (the capo already does).
+1. **"What do you play?"** (#193): the switches, the presets, Custom; the first-use setup and
+   Preferences (replacing the lyrics-only radios and the capo toggle); existing settings carried over;
+   no change to what is drawn. Header controls show or hide by the switches (the capo already does).
+   It has the types that have something to give, singer or drummer, guitarist, other and Custom; the
+   transposing instrument, and its switch, come with its pitch controls in step 3.
 2. **Guitarist**: tuning (Preferences, and the setlist overview's row, editable in edit mode); the
    capo added to it; the header's total ("Capo 2, tuned down: capo 1"). Reworks #191's display change:
    its offset becomes tuning plus pitch resolved per song, and the 12-option list goes.
