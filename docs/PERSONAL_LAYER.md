@@ -59,16 +59,8 @@ A last-minute change must still be possible for the leader, and for the person w
 
 Never synced, never exported. All of it is the person's own and nobody else's business.
 
-- **My instrument**: a transposition, in semitones, so the chords shown fit the instrument or the
-  tuning: Bb, Eb or F, a guitar tuned a half or a whole step down, or a number of semitones typed in. Not a key
-  per song: an Eb horn is Eb for every song. It has two levels:
-  - a **default for the device** ("I play alto sax"), and
-  - an **override for one setlist**, always possible ("Bb this week", "tuned down for this one"). A setlist
-    that has none uses the device's.
-
-  The key shown is the shared key plus the offset. Only offsets are covered: drop D and other tunings
-  that change the shapes and not the key are not.
-- **Capo**, per song, as now. It changes the shapes shown, not the key.
+- **How I play it** (below): the tuning or pitch of my instrument, and a capo, so the chords shown fit
+  how I play. Not the setlist's key, which is the leader's.
 - **Songs added locally.** Anyone may add a song to a setlist for themselves, which is the congregation
   member starting a song a cappella, offline. It is kept in the layer, shown after the song it was added
   after, and never sent. Its key and tempo are the person's own. They can remove it, and only
@@ -91,10 +83,51 @@ Who may: **writers and up** in a team, in their own space anyone. A reader canno
 stays on the device and is held back from sync. A version and edit history, to see and undo what changed,
 belongs to the design of editing charts, which is not written.
 
+## How I play it
+
+One question, asked at first use and in Preferences, **"What do you play?"**, decides which of a few
+independent controls are on. It is a set of presets over switches, so that a person can also set each
+switch themselves (**Custom**). Everything here is on the device and never synced.
+
+| Type | Lyrics only to start | Capo and tuning | Instrument pitch |
+|---|---|---|---|
+| Singer or drummer | yes | no | no |
+| Guitarist | no | yes | no |
+| Transposing instrument | no | no | yes |
+| Other (keys, bass, anything at concert pitch) | no | no | no |
+| **Custom** | the person's choice | the person's choice | the person's choice |
+
+Choosing a type sets the switches; Custom shows them to change one by one. (They are already separate
+settings today: the musician type, the sections' defaults, and whether the capo control shows. A type is a
+preset that sets them, not a fact kept beside them.) A person with the capo on becomes a guitarist, one
+who chose lyrics only a singer, anyone else "Other".
+
+**Guitarist.** Two things move the shapes, and they add:
+- **Tuning**, for a guitar tuned down: standard, half step down, whole step down. A device default
+  ("I always tune down"), and one for **this setlist** ("tuned down tonight") that wins over it.
+- **Capo**, per song, 0 to 11, as now. It is added to the tuning, and the song's header shows the total, so
+  it is clear what is being applied: tuned a half step down with a capo 2 plays as a capo 1.
+
+**Transposing instrument.** The **instrument pitch**: Concert, B♭, E♭ or F (for the chords: a B♭ horn
+reads up a whole step, an E♭ up a sixth, an F up a fifth). A device default ("I play alto sax"), one for
+**this setlist** ("B♭ sax this week") that wins over it, and one for **a song** that replaces both for
+that song (the song where the horn is swapped). The key shown is the shared key plus the offset.
+
+**Singer, and Other:** none of this, and nothing in the header for it.
+
+**Where each is set.** The type, the switches and the device defaults are in **Preferences**. The setlist's
+tuning or pitch is a row on the **setlist overview**, shown to people who have that control and editable
+in edit mode, as the rest of the setlist's settings are. A song's capo or pitch is in the song's header,
+as the capo is now.
+
+**Not covered:** only offsets, so drop D and other tunings that change the shapes and not the key are not;
+and the lead sheet's notes, which a horn player reads at their pitch too: separate, later. Working names:
+"Tuning", "Instrument", "Capo" and "Pitch"; "My key" was considered and is a letter, not an offset.
+
 ## What goes away, and what changes
 
 - **A writer's change of key or tempo on someone else's setlist** is no longer offered. Today any writer
-  can. The person's way to a different key is My instrument.
+  can. The person's way to a different key is how they play it (above).
 - **The read-only reset path** (a reader's changes replaced by the leader's, the "differs from official"
   button, the revert) has nothing to do once non-owners have no shared edits: a person's changes are in
   the layer, and nothing is replaced. It is removed with the layer.
@@ -114,7 +147,6 @@ belongs to the design of editing charts, which is not written.
   has been used by several people.
 - **Hiding a shared song for oneself** (skipping one that does not apply to them). Not designed.
 - **A personal variant** of a chart.
-- **Naming.** "My instrument" is the working name; "My key" was considered and is a letter, not an offset.
 
 ## Today
 
@@ -122,7 +154,10 @@ What is built and will change:
 
 - A writer's key, tempo, order and removal edit the shared setlist; a reader's stay on the device and
   are replaced when the leader changes the setlist (docs/SPACES.md, "Read-only").
-- Capo, section display and private annotations are in the personal layer already.
+- Capo (per song, 0 to 11, shown if a preference is on), section display and private annotations are in
+  the personal layer already. The musician type exists, with the first-use setup asking two things:
+  lyrics only, and whether to show a capo control. A device default for the instrument offset is open as
+  a pull request (#191) and will be reworked into what this document now says.
 - Any writer can make an annotation "Everyone" on any setlist they can open (`canShareAnnotations`); this
   would narrow to the people who control the setlist.
 - Shared annotations, the delete rule (a writer deletes a setlist they lead, an admin any) and the
@@ -131,8 +166,13 @@ What is built and will change:
 ## Order of work
 
 1. This document; the other docs point here.
-2. **My instrument**: the device default and the setlist override, in the personal layer.
-3. **Who controls a setlist**: the controls for key, tempo, order, removal and "Everyone" annotations
+2. **"What do you play?"**: the switches and presets (and Custom) in the first-use setup and Preferences,
+   replacing the lyrics-only and capo choices; existing settings carried over.
+3. **Guitarist**: tuning (device default, and per setlist on the overview), the capo added to it, the
+   header's total.
+4. **Transposing instrument**: the pitch (device default, per setlist, per song), through the display
+   code #191 changed; then the lead sheet's notes.
+5. **Who controls a setlist**: the controls for key, tempo, order, removal and "Everyone" annotations
    offered only to them.
-4. **Songs added locally.**
-5. Remove the read-only reset path.
+6. **Songs added locally.**
+7. Remove the read-only reset path.
