@@ -231,6 +231,9 @@ CCLI's terms for keeping and transposing a lead sheet are in [CCLI.md](CCLI.md),
 
 ## In the chart: the notes of an instrumental part
 
+(For a player of a transposing instrument, every note shown here and in the whole sheet is moved by
+their instrument pitch, a B♭ horn up a whole step and so on: `docs/PERSONAL_LAYER.md`.)
+
 Most of a band plays from the chart in a set, and uses the lead sheet to check a tune or a rhythm in
 rehearsal. What they want in the chart itself is the small notes of an instrumental line (an intro, a
 turnaround). So a part of the chart can be shown as that line of music, in place of its chords: a fifth

@@ -188,6 +188,7 @@ export class SongDisplay extends LitElement {
         .displayKey=${displayKey}
         .capo=${shapes.capo}
         .capoKey=${shapes.key}
+        .pitchUp=${pitchSemitones(this.pitch ?? pitch)}
         .melody=${this.cues?.measures[index] ? this.cues.melody : null}
         .melodyKey=${this.cues?.key ?? ''}
         .melodyMeasures=${this.cues?.measures[index] ?? null}

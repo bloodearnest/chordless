@@ -182,6 +182,21 @@ describe('song-section', () => {
       expect(sheet.songKey).to.equal('C')
     })
 
+    it('moves the notes up by the instrument pitch, from the key the song is shown in', async () => {
+      await withMelody({ hideMode: 'melody' })
+      section.pitchUp = 2
+      await section.updateComplete
+      // (the chart is in C, and a B♭ instrument reads it in D)
+      expect(section.shadowRoot.querySelector('score-view').songKey).to.equal('D')
+      // (and from the key the notes were written in when the song has none shown)
+      section.displayKey = ''
+      await section.updateComplete
+      expect(section.shadowRoot.querySelector('score-view').songKey).to.equal('D')
+      section.pitchUp = 0
+      await section.updateComplete
+      expect(section.shadowRoot.querySelector('score-view').songKey).to.equal('C')
+    })
+
     it('engraves in the key the notes were written in when the song has none shown', async () => {
       await withMelody({ hideMode: 'melody' })
       section.displayKey = ''

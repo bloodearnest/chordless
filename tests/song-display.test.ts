@@ -128,6 +128,11 @@ describe('song-display', () => {
     await display.updateComplete
     // (up 2 and 1, down 2: up 1)
     expect(sections(display)[0].capo).to.equal(11)
+    // (the notes of a lead sheet move by the pitch alone, which the tuning and the capo do not touch)
+    expect(sections(display)[0].pitchUp).to.equal(2)
+    display.pitch = 'eb'
+    await display.updateComplete
+    expect(sections(display)[0].pitchUp).to.equal(9)
     host.remove()
     provider.setValue({ nashville: false, unicodeAccidentals: false, tuning: 0, pitch: 'concert' })
   })

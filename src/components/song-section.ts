@@ -5,6 +5,7 @@ import { listenForLongPress } from '../js/annotations/long-press.ts'
 import { nudgeLine } from '../js/annotations/nudge.ts'
 import type { ChartLine, ChartSegment, HideMode, ShownAnnotation } from '../js/data-types.ts'
 import type { Score } from '../js/score.ts'
+import { transposeKeyName } from '../js/transpose.ts'
 import { chordFitsOverWords, groupSegmentsIntoUnits } from '../js/utils/chart-line-units.ts'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
 import {
@@ -134,6 +135,8 @@ export class SongSection extends LitElement {
     /** The song's lead sheet and the key it is written in, and which of its measures are this section's (docs/LEAD_SHEETS.md, "In the chart"); none where it has no notes to show */
     melody: { attribute: false },
     melodyKey: { type: String, attribute: false },
+    /** How far up the instrument pitch moves the notes of the lead sheet (docs/PERSONAL_LAYER.md) */
+    pitchUp: { type: Number, attribute: false },
     melodyMeasures: { attribute: false },
   }
 
@@ -153,6 +156,7 @@ export class SongSection extends LitElement {
   declare capoKey: string
   declare melody: Score | null
   declare melodyKey: string
+  declare pitchUp: number
   declare melodyMeasures: number[] | null
 
   _wrapper: Ref<HTMLElement>
@@ -641,6 +645,7 @@ export class SongSection extends LitElement {
     this.capoKey = ''
     this.melody = null
     this.melodyKey = ''
+    this.pitchUp = 0
     this.melodyMeasures = null
   }
 
@@ -984,7 +989,7 @@ export class SongSection extends LitElement {
       return html`<score-view
         .melody=${this.melody}
         .melodyKey=${this.melodyKey}
-        .songKey=${this.displayKey || this.melodyKey}
+        .songKey=${transposeKeyName(this.displayKey || this.melodyKey, this.pitchUp)}
         .measures=${this.melodyMeasures}
       ></score-view>`
     }

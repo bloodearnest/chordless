@@ -36,7 +36,7 @@ import { hasUnsentChanges } from './auto-sync.ts'
 import { DataChangeEvent, touches } from './data-changes.ts'
 import type { Setlist, SetlistEntry, SharedChartAnnotation, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB, NO_CHANGE, openSpace, type RemovedSetlist } from './db.ts'
-import type { PitchId } from './instrument-pitch.ts'
+import { type PitchId, pitchSemitones } from './instrument-pitch.ts'
 import { leaderName, resolvePerson } from './leaders.ts'
 import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
 import { LiveSyncStatusEvent } from './live-sync-status.ts'
@@ -95,7 +95,7 @@ import {
   startSetlistSession,
 } from './telemetry/setlist-session.ts'
 import { toast } from './toast.ts'
-import { transposeSong } from './transpose.ts'
+import { transposeKeyName, transposeSong } from './transpose.ts'
 import type { Tuning } from './tuning.ts'
 import { normalizeCapo } from './utils/capo.ts'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.ts'
@@ -1270,6 +1270,8 @@ export class SetlistPage {
       display.pitch = this._pitchForDisplay(this.songs[display.songIndex])
     }
     this.header.showPitch()
+    // (a song shown as its lead sheet is engraved again at the new pitch)
+    for (const index of this._melodyOn) void this.applyMelodyMode(index)
   }
 
   /** The overview's row for the instrument pitch: there when the pitch controls are on */
@@ -1786,7 +1788,19 @@ export class SetlistPage {
     const found = this._melodyOn.has(index) ? melody : null
     // (a song with no melody stays in its lyrics)
     if (!found) this._melodyOn.delete(index)
-    await showScore(content, found && { ...found, songKey: song.currentKey ?? found.key })
+    // (a horn player reads the notes at their pitch too: docs/PERSONAL_LAYER.md)
+    await showScore(
+      content,
+      found && {
+        ...found,
+        songKey: transposeKeyName(song.currentKey ?? found.key, this._pitchUpFor(song)),
+      }
+    )
+  }
+
+  /** How far up the instrument pitch moves the notes of a song's lead sheet: the song's, the setlist's or the device's, none with the controls off */
+  _pitchUpFor(song: RuntimeSong): number {
+    return this._pitchEnabled ? pitchSemitones(this.pitchOf(song).shown) : 0
   }
 
   _updateSongDisplayCapo(songIndex: number, capoValue: unknown) {

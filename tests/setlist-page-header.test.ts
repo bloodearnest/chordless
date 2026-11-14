@@ -847,6 +847,52 @@ describe('the setlist page: header, menu and keys', () => {
         await rig.db.deleteScore(rig.songs[0].uuid, { remember: false })
       })
 
+      it('shows the sheet at the instrument pitch, and engraves it again when the pitch is changed', async () => {
+        await rig.db.saveScore(sampleRecord(rig.songs[0].uuid, 'G'))
+        setPitchControlsPreference(true)
+        try {
+          await rig.open()
+          rig.page.showSong(0, true)
+          await rig.page.header.show(rig.page.songs[0], true)
+          rig.page.currentSongIndex = 0
+          await until(() => enabled())
+          toggle()?.click()
+          await until(() => sheetOf(0) && pressed() === 'true')
+          const key = () => (sheetOf(0) as unknown as { songKey: string } | null)?.songKey
+          expect(key()).to.equal('G')
+          // (a B♭ instrument reads up a whole step, an E♭ up a sixth, the song's own over the setlist's)
+          rig.page.changeSetlistPitch('bb')
+          await until(() => key() === 'A')
+          rig.page.changeSetlistPitch('eb')
+          await until(() => key() === 'E')
+          rig.page.handlePitchChange('f')
+          await until(() => key() === 'D')
+          rig.page.handlePitchChange(null)
+          rig.page.changeSetlistPitch(null)
+          await until(() => key() === 'G')
+        } finally {
+          setPitchControlsPreference(false)
+          await rig.db.deleteScore(rig.songs[0].uuid, { remember: false })
+        }
+      })
+
+      it('shows the sheet in the key it was written in for a song the setlist gives no key', async () => {
+        await rig.db.saveScore(sampleRecord(rig.songs[0].uuid, 'G'))
+        try {
+          await rig.open()
+          rig.page.songs[0].currentKey = undefined
+          rig.page.showSong(0, true)
+          await rig.page.header.show(rig.page.songs[0], true)
+          rig.page.currentSongIndex = 0
+          await until(() => enabled())
+          toggle()?.click()
+          await until(() => sheetOf(0) && pressed() === 'true')
+          expect((sheetOf(0) as unknown as { songKey: string }).songKey).to.equal('G')
+        } finally {
+          await rig.db.deleteScore(rig.songs[0].uuid, { remember: false })
+        }
+      })
+
       it('shows the melody sheet in place of the lyrics, for this song alone, and follows the route', async () => {
         await rig.db.saveScore(sampleRecord(rig.songs[0].uuid, 'G'))
         await rig.db.saveScore(sampleRecord(rig.songs[1].uuid, 'G'))
