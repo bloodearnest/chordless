@@ -16,6 +16,7 @@ import { getLive } from './live.ts'
 import { getCurrentSpace, getCurrentSpaceFull } from './space.ts'
 import { isTeamMember, storageFor } from './storage/space-storage.ts'
 import { createSyncOrchestrator, type SyncTrigger } from './sync-orchestrator.ts'
+import { t } from './text.ts'
 
 /** How often the app syncs while it is on screen, in a team space, where a member has no other way to see a change */
 export const TICK_MS = 60_000
@@ -303,16 +304,18 @@ async function notifySignInExpired(): Promise<void> {
     import('./google-auth.ts'),
     import('./utils/errors.ts'),
   ])
-  toast('Your Google sign-in has expired, so your changes are not syncing.', {
+  toast(t('toast-signin-expired'), {
     kind: 'error',
-    details: `Reconnect with Google to carry on. Changes made here are kept on this device and will be sent then.${last ? ` Last synced ${new Date(last).toLocaleString()}.` : ''}`,
+    details: last
+      ? t('toast-signin-expired-details-last', { when: new Date(last).toLocaleString() })
+      : t('toast-signin-expired-details'),
     action: {
-      label: 'Reconnect',
+      label: t('action-reconnect'),
       run: () =>
         void authorizeWithGoogle()
           .then(() => syncSoon())
           .catch(error =>
-            toast("Couldn't reconnect with Google.", {
+            toast(t('toast-reconnect-failed'), {
               kind: 'error',
               details: errorMessage(error),
             })

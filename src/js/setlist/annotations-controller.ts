@@ -19,6 +19,7 @@ import {
   removeAnnotation,
 } from '../annotations/store.ts'
 import type { ChartAnnotation, Setlist, SharedChartAnnotation } from '../data-types.ts'
+import { t } from '../text.ts'
 import { toast } from '../toast.ts'
 import { errorMessage } from '../utils/errors.ts'
 import { loadSetlistAnnotations, type SongRef, saveSetlistAnnotations } from './local-state.ts'
@@ -172,7 +173,7 @@ export class AnnotationsController {
         await this.#apply(
           index,
           removeAnnotation(sources, annotation.id),
-          'Annotation deleted',
+          t('toast-annotation-deleted'),
           sources
         )
       return
@@ -237,14 +238,16 @@ export class AnnotationsController {
     } catch (error) {
       this.#sources[index] = previous
       this.#refresh(index)
-      toast("Couldn't save the annotation. It is as it was.", {
+      toast(t('toast-annotation-save-failed'), {
         kind: 'error',
         details: errorMessage(error),
       })
       return
     }
     if (deleted && before) {
-      toast(deleted, { action: { label: 'Undo', run: () => void this.#apply(index, before) } })
+      toast(deleted, {
+        action: { label: t('action-undo'), run: () => void this.#apply(index, before) },
+      })
     }
   }
 }

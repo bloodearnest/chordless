@@ -23,6 +23,7 @@ import { personContentHash } from '../js/sync/person-hash.ts'
 import { teamApi } from '../js/team-client.ts'
 import { atLeast, type TeamRole } from '../js/team-roles.ts'
 import { roleLabel } from '../js/team-spaces.ts'
+import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -243,7 +244,7 @@ export class SpacePeople extends LitElement {
 
   /** Change the people in the space's database, then read them again; a failure is said in a toast */
   async _change(
-    what: string,
+    failure: string,
     work: (db: Awaited<ReturnType<typeof openSpace>>) => Promise<unknown>
   ) {
     try {
@@ -254,8 +255,8 @@ export class SpacePeople extends LitElement {
         db.db?.close()
       }
     } catch (error) {
-      console.error(`[People] Could not ${what}:`, error)
-      toast(`Couldn't ${what}.`, { kind: 'error', details: errorMessage(error) })
+      console.error(`[People] ${failure}:`, error)
+      toast(t(failure), { kind: 'error', details: errorMessage(error) })
     }
     await this.load()
   }
@@ -273,7 +274,7 @@ export class SpacePeople extends LitElement {
       void this._nameSelf(team.id, person, changed.name)
       return
     }
-    void this._change('rename them', db => db.savePeople([changed]))
+    void this._change('toast-people-rename-failed', db => db.savePeople([changed]))
   }
 
   /**
@@ -281,7 +282,7 @@ export class SpacePeople extends LitElement {
    * what it answers with is kept here as already sent, so nothing is left to send
    */
   async _nameSelf(teamId: string, person: Person, name: string): Promise<void> {
-    await this._change('change your name', async db => {
+    await this._change('toast-people-name-self-failed', async db => {
       const { file, person: stored } = await teamApi.nameSelf(teamId, person.id, name)
       await db.savePeople([
         {
@@ -308,11 +309,13 @@ export class SpacePeople extends LitElement {
     }
     const address = input.value
     input.value = ''
-    void this._change('add the address', db => db.savePeople([withEmail(person, address, true)]))
+    void this._change('toast-people-add-address-failed', db =>
+      db.savePeople([withEmail(person, address, true)])
+    )
   }
 
   _removeEmail(person: Person, address: string): void {
-    void this._change('remove the address', db =>
+    void this._change('toast-people-remove-address-failed', db =>
       db.savePeople([withEmail(person, address, false)])
     )
   }
@@ -330,7 +333,7 @@ export class SpacePeople extends LitElement {
       `and ${into.name} gains their email addresses.` +
       ` ${person.name} is no longer listed.`
     if (!(await modal.ask())) return
-    await this._change('merge them', db => mergePersonInto(db, person.id, into.id))
+    await this._change('toast-people-merge-failed', db => mergePersonInto(db, person.id, into.id))
   }
 
   async _delete(person: Person): Promise<void> {
@@ -339,7 +342,7 @@ export class SpacePeople extends LitElement {
     modal.confirmLabel = 'Delete'
     modal.message = `Delete ${person.name}? They lead no setlists. They are removed from the Leader menu.`
     if (!(await modal.ask())) return
-    await this._change('delete them', db => deletePerson(db, person.id))
+    await this._change('toast-people-delete-failed', db => deletePerson(db, person.id))
   }
 
   _renderPerson(person: Person) {

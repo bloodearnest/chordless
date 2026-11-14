@@ -33,6 +33,7 @@ import {
   setSongRange,
 } from '../js/song-utils.ts'
 import { songSelectLink } from '../js/songselect-link.ts'
+import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
@@ -770,10 +771,10 @@ export class SongImport extends LitElement {
       await setSongRange(item.song.uuid, range, this._database())
     } catch (error) {
       console.error('[Import] Could not save the range:', error)
-      toast("Couldn't save the melody range.", {
+      toast(t('toast-range-save-failed'), {
         kind: 'error',
         details: errorMessage(error),
-        action: { label: 'Try again', run: () => void this._setRange(item, key) },
+        action: { label: t('action-try-again'), run: () => void this._setRange(item, key) },
       })
       return
     }
