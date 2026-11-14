@@ -528,13 +528,13 @@ owner (implicitly admin) > admin > writer > reader. Worker enforcement:
   setlist's file is refused (403) to a writer unless the setlist's leader (`leaderId`, followed
   through a merged person; an older setlist's `ownerId` email) has the writer's verified email among
   their addresses. The Worker reads the setlist and the person's file through to decide and keeps
-  nothing; a setlist with no findable leader is for an admin. **The song rule is the page's alone**
+  nothing; a setlist with no findable leader is its creator's (`createdBy`) and an admin's. **The song rule is the page's alone**
   (`mayDeleteSong`, above): a writer's token can still bin a song's file. Until restrictions on editing others' setlists exist
   (SYNC_ARCHITECTURE.md), a writer can make themselves the leader first, so the rule guards against
   mistakes, not a determined writer.
 - Invite, remove, change roles, enable/disable sharing: admin and up (owner for disable/transfer).
 
-**Who changes a setlist** (decided 2026-11-13, not built: docs/PERSONAL_LAYER.md): its leader, a team
+**Who changes a setlist** (decided 2026-11-13, built: docs/PERSONAL_LAYER.md): its leader, a team
 admin or owner, and in a personal space you, always. A writer who is not its leader, and a reader, have
 only the personal layer: their own instrument and capo, annotations and songs added for themselves,
 none of it synced. Undecided: whether other writers may ever change the core properties, and an admin's

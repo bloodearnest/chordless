@@ -3,7 +3,7 @@
  * (a writer) may put in the bin a setlist they lead, an admin or the owner any. The setlist's file
  * names its leader (`leaderId`, a person of the space: docs/IDENTITIES.md), and the person's file
  * lists their addresses, so the leader is the caller when the caller's verified email is among
- * them. Both files are read through and nothing of them is kept. A writer can make themselves the
+ * them; where the setlist has no leader that can be found, the creator (`createdBy`) is. Both files are read through and nothing of them is kept. A writer can make themselves the
  * leader first, so this guards against mistakes and not against a determined writer.
  */
 
@@ -44,11 +44,13 @@ export async function leadsSetlist(
   if (is(setlist.ownerId)) return true
 
   let personId = typeof setlist.leaderId === 'string' ? setlist.leaderId : ''
-  if (!personId) return false
+  // (a setlist whose leader cannot be found is its creator's)
+  const madeIt = is(setlist.createdBy)
+  if (!personId) return madeIt
   const people = await space.list('people')
   for (let hops = 0; hops <= MAX_MERGES; hops++) {
     const file = people.find(each => each.props.personId === personId)
-    if (!file) return false
+    if (!file) return madeIt
     let person: unknown
     try {
       person = JSON.parse(await space.readText(file.ref))

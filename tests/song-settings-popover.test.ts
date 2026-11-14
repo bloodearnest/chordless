@@ -29,6 +29,16 @@ describe('song-settings-popover', () => {
       expect(el.shadowRoot?.querySelector('.bpm-value')?.textContent).to.equal('100')
     })
 
+    it('cannot be stepped when it is the setlist’s and not this person’s to change', async () => {
+      const el = await show()
+      el.bpmValue = 100
+      el.bpmLocked = true
+      await el.updateComplete
+      expect(button(el, 'Decrease BPM').disabled).to.equal(true)
+      expect(button(el, 'Increase BPM').disabled).to.equal(true)
+      expect(el.shadowRoot?.querySelector('.bpm-value')?.textContent).to.equal('100')
+    })
+
     it('stops at its limits', async () => {
       const el = await show()
       const seen: number[] = []

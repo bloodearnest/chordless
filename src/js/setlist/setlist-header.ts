@@ -42,6 +42,8 @@ export interface HeaderHost {
   readonly currentSongIndex: number
   readonly currentSetlist: Setlist | undefined
   readonly _capoEnabled: boolean
+  /** Whether the person using the device may change this song for everyone (key, tempo): they control the setlist, or added it for themselves */
+  mayChangeSong(song: RuntimeSong | null | undefined): boolean
   /** How the guitar is tuned now: the setlist's, or the device's (docs/PERSONAL_LAYER.md) */
   effectiveTuning(): Tuning
   /** The instrument pitch controls are on (docs/PERSONAL_LAYER.md) */
@@ -332,7 +334,7 @@ export class SetlistHeader {
     keySelector.showRangeOf(song?.parsed.metadata, song?.originalKey ?? '', async () =>
       song ? this.host._database().getScore(song._setlistEntry.songUuid) : undefined
     )
-    keySelector.editMode = isEditMode()
+    keySelector.editMode = isEditMode() && this.host.mayChangeSong(song)
   }
 
   /** Show the song being viewed's key in the key picker */
@@ -382,6 +384,7 @@ export class SetlistHeader {
     if (!popover || !song) return
 
     popover.bpmValue = song.currentBPM || DEFAULT_BPM
+    popover.bpmLocked = !this.host.mayChangeSong(song)
     // This user's media choices for the song (theirs alone: not in the setlist, so a user who
     // can only read it can make them too). Shown only where the media player is
     popover.mediaAvailable = wantsMediaPlayer()

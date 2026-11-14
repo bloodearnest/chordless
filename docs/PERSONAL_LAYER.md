@@ -152,13 +152,15 @@ Working names:
 
 What is built and will change:
 
-- A writer's key, tempo, order and removal edit the shared setlist; a reader's stay on the device and
-  are replaced when the leader changes the setlist (docs/SPACES.md, "Read-only").
+- Who controls a setlist is built (`src/js/setlist-control.ts`): key, tempo, order, removal and the
+  setlist's details are offered only to them, and non-owners' Add Song makes a local addition (`local`
+  on the entry: never in Drive, a share or an export, and put back after a pull). A setlist whose leader
+  cannot be found is its creator's (`createdBy`), here and in the Worker's delete rule. A reader's
+  earlier changes stay until the read-only reset is removed (step 6).
 - Capo (per song, 0 to 11), the guitar tuning (device default, and per setlist), section display and
   private annotations are in the personal layer. The first-use setup and Preferences ask "What do you
   play?" (#193). The transposing instrument's pitch moves the chords and the lead sheet's notes.
-- Any writer can make an annotation "Everyone" on any setlist they can open (`canShareAnnotations`); this
-  would narrow to the people who control the setlist.
+- "Everyone" annotations are for those who control the setlist; the rest have "Just me".
 - Shared annotations, the delete rule (a writer deletes a setlist they lead, an admin any) and the
   Worker's check of it, the 409 on a stale write, and the default space are built.
 
@@ -213,9 +215,13 @@ Pull requests, in order, each building on `main` as it is:
    tuning or the capo, which are about shapes): the whole sheet, in the setlist (`applyMelodyMode`) and in
    the library (the device's pitch), and the notes shown in the chart's instrumental parts
    (`song-section`'s `pitchUp`). A shown sheet is engraved again when the pitch changes.
-4. **Who controls a setlist**: the controls for key, tempo, order, removal and "Everyone" annotations
-   offered only to them.
-5. **Songs added locally.**
+4. **Who controls a setlist** (built): the controls for key, tempo, order, removal and "Everyone"
+   annotations offered only to them. The page decides it once per setlist (`_controls`); the overview
+   shows plain text, no drag handles or delete buttons; the song's key picker and BPM steppers are
+   locked; the info dialog says who can change it. The Worker stays advisory.
+5. **Songs added locally** (built, with 4): someone who does not control the setlist adds a song as an
+   entry flagged `local` in their own copy; it is marked "Just me" in the overview and can be removed
+   and changed by them alone.
 6. Remove the read-only reset path.
 
 Tests, as for any preference: the arithmetic in node, each control's setting and its being kept, storage

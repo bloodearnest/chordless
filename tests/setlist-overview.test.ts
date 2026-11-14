@@ -56,6 +56,26 @@ describe('setlist-overview', () => {
     )
   })
 
+  it('has no editors or delete buttons for someone who does not control the setlist, except on the songs they added', async () => {
+    const overview = await show(true)
+    overview.controls = false
+    overview.songs = [
+      songs[0],
+      { ...songs[1], _setlistEntry: { songUuid: 'u', local: true } } as SongCardSong,
+    ]
+    await overview.updateComplete
+    const [shared, mine] = Array.from(overview.querySelectorAll('song-card'))
+    await Promise.all([shared.updateComplete, mine.updateComplete])
+    expect(shared.editMode).to.equal(false)
+    expect(shared.local).to.equal(false)
+    expect(mine.editMode).to.equal(true)
+    expect(mine.local).to.equal(true)
+    expect(mine.shadowRoot?.querySelector('.local-mark')?.textContent).to.equal('Just me')
+    overview.controls = true
+    await overview.updateComplete
+    expect(shared.editMode).to.equal(true)
+  })
+
   it('says which song was clicked, deleted or given another key, by its place', async () => {
     const overview = await show(true)
     const seen: string[] = []

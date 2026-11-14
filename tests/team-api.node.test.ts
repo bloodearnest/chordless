@@ -487,6 +487,19 @@ describe('deleting a setlist: POST /files/<ref>/trash', () => {
     assert.equal(trashed(), false)
   })
 
+  test('lets the creator bin a setlist whose leader cannot be found, and not one that has a leader', async () => {
+    for (const lost of [{}, { leaderId: 'nobody' }]) {
+      const { trash, trashed } = await rigWith({ ...lost, createdBy: 'Ann@example.com' })
+      assert.equal((await trash('ann-token')).status, 204)
+      assert.equal(trashed(), true)
+    }
+    const led = await rigWith({ leaderId: 'bob', createdBy: 'ann@example.com' }, [
+      { id: 'bob', emails: ['bob@example.com'] },
+    ])
+    assert.equal((await led.trash('ann-token')).status, 403)
+    assert.equal(led.trashed(), false)
+  })
+
   test('knows a leader written as an email, as older setlists have', async () => {
     const { trash, trashed } = await rigWith({ ownerId: 'ANN@example.com' })
     assert.equal((await trash('ann-token')).status, 204)

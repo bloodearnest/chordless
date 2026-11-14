@@ -93,6 +93,25 @@ describe('Share links: sync', () => {
     expect(share.expires).to.equal(addDays(nextWeek, SHARE_DAYS_AFTER))
   })
 
+  it('leaves out a song added for this device alone', async () => {
+    const phone = await makeDevice('phone')
+    for (const [uuid, title] of [
+      ['a', 'Alpha'],
+      ['b', 'Beta'],
+    ]) {
+      await addSong(phone, {
+        uuid,
+        title,
+        content: `{title: ${title}}\n{key: G}\n[G]${title} line`,
+      })
+    }
+    const setlist = await addSetlist(phone, ['title-alpha', 'title-beta'])
+    setlist.songs[1].local = true
+    const share = await createShare(setlist, ctx(phone))
+    const bundle = await openShare(share.fileId, share.key)
+    expect(bundle.setlist.songs.map(s => s.title)).to.deep.equal(['Alpha'])
+  })
+
   it('records the share on the setlist, so the space has it', async () => {
     const { phone, share } = await sharedSetlist()
     await phone.sync.sync()

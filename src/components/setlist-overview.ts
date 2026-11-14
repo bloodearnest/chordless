@@ -90,6 +90,7 @@ export class SetlistOverview extends LitElement {
   static override properties = {
     songs: { type: Array, attribute: false },
     editMode: { type: Boolean, attribute: 'edit-mode' },
+    controls: { type: Boolean },
     showTuning: { type: Boolean, attribute: 'show-tuning' },
     tuning: { attribute: false },
     deviceTuning: { type: Number, attribute: 'device-tuning' },
@@ -100,6 +101,8 @@ export class SetlistOverview extends LitElement {
 
   declare songs: unknown[] /* TYPE */
   declare editMode: boolean
+  /** Whether the person using the device controls the setlist: others can change only the songs they added for themselves */
+  declare controls: boolean
   /**
    * Whether the guitar's tuning for this setlist can be shown (the capo and tuning controls are on):
    * it is, always in edit mode, and out of it only when it is not standard
@@ -118,6 +121,7 @@ export class SetlistOverview extends LitElement {
     super()
     this.songs = []
     this.editMode = false
+    this.controls = true
     this.showTuning = false
     this.tuning = null
     this.deviceTuning = 0
@@ -166,21 +170,23 @@ export class SetlistOverview extends LitElement {
             : ''
         }
         <div class="overview-songs">
-          ${this.songs.map(
-            (song, index) => html`
+          ${this.songs.map((song, index) => {
+            const local = (song as { _setlistEntry?: { local?: boolean } })._setlistEntry?.local
+            return html`
               <song-card
                 class="overview-song-card"
                 data-song-index=${index}
                 .song=${song}
                 variant="setlist"
-                .editMode=${this.editMode}
+                .editMode=${this.editMode && (this.controls || Boolean(local))}
+                .local=${Boolean(local)}
                 @song-card:click=${() => this._handleSongClick(index)}
                 @song-card:delete=${() => this._handleSongDelete(index)}
                 @song-card:key-change=${(e: SongCardKeyChangeEvent) => this._handleSongKeyChange(index, e.key)}
                 @song-card:bpm-change=${(e: SongCardBpmChangeEvent) => this._handleSongBpmChange(index, e.bpm)}
               ></song-card>
             `
-          )}
+          })}
 
           <button
             class="song-card add-song-button"

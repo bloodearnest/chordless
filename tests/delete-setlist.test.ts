@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
-import { mayDeleteSetlist, mayDeleteSong } from '../src/js/team-roles.ts'
+import { mayChangeSetlist, mayDeleteSong } from '../src/js/team-roles.ts'
 import { makeLocalState, makeSetlist } from './builders.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -105,23 +105,23 @@ describe('ChordlessDB.removeSetlist', () => {
   })
 })
 
-describe('mayDeleteSetlist', () => {
+describe('mayChangeSetlist', () => {
   it('lets anyone in a personal space', () => {
-    expect(mayDeleteSetlist(null, false)).to.equal(true)
+    expect(mayChangeSetlist(null, false)).to.equal(true)
   })
 
   it('lets an admin or the owner delete any setlist of a team', () => {
-    expect(mayDeleteSetlist('admin', false)).to.equal(true)
-    expect(mayDeleteSetlist('owner', false)).to.equal(true)
+    expect(mayChangeSetlist('admin', false)).to.equal(true)
+    expect(mayChangeSetlist('owner', false)).to.equal(true)
   })
 
   it('lets a worship leader delete only the setlists they lead', () => {
-    expect(mayDeleteSetlist('writer', true)).to.equal(true)
-    expect(mayDeleteSetlist('writer', false)).to.equal(false)
+    expect(mayChangeSetlist('writer', true)).to.equal(true)
+    expect(mayChangeSetlist('writer', false)).to.equal(false)
   })
 
   it('does not let a team member delete any', () => {
-    expect(mayDeleteSetlist('reader', true)).to.equal(false)
+    expect(mayChangeSetlist('reader', true)).to.equal(false)
   })
 })
 
