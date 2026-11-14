@@ -53,6 +53,47 @@ describe('song-display', () => {
     expect(sections(display)[0].capoKey).to.equal('')
   })
 
+  it('moves the chords up by the tuning and down by the capo, as one capo would', async () => {
+    const { displayPreferencesContext } = await import('../src/js/display-preferences.ts')
+    const host = document.createElement('div')
+    const provider = new ContextProvider(host, {
+      context: displayPreferencesContext,
+      initialValue: { nashville: false, unicodeAccidentals: false, tuning: 1 },
+    })
+    document.body.append(host)
+    const display = document.createElement('song-display')
+    display.parsed = parse(CHART)
+    host.append(display)
+    await display.updateComplete
+    // (a guitar tuned a half step down plays a G chart in Ab: the same as a capo at 11)
+    expect(sections(display)[0].capo).to.equal(11)
+    expect(sections(display)[0].capoKey).to.equal('Ab')
+
+    // (a capo 3 on top: down 2 from the key)
+    display.capo = 3
+    await display.updateComplete
+    expect(sections(display)[0].capo).to.equal(2)
+    expect(sections(display)[0].capoKey).to.equal('F')
+
+    // (the setlist's own tuning wins over the device's, and standard needs no shift)
+    display.capo = 0
+    display.tuning = 0
+    await display.updateComplete
+    expect(sections(display)[0].capo).to.equal(0)
+    expect(sections(display)[0].capoKey).to.equal('')
+    display.tuning = 2
+    await display.updateComplete
+    expect(sections(display)[0].capo).to.equal(10)
+    expect(sections(display)[0].capoKey).to.equal('A')
+
+    // (and with none of its own it follows the device's again)
+    display.tuning = null
+    provider.setValue({ nashville: false, unicodeAccidentals: false, tuning: 0 })
+    await display.updateComplete
+    expect(sections(display)[0].capo).to.equal(0)
+    host.remove()
+  })
+
   it('gives no capo key for a song with no key', async () => {
     const display = await show({ parsed: parse('{title: A}\n\n[G]One'), capo: 2 })
     expect(sections(display)[0].capoKey).to.equal('')
@@ -64,7 +105,7 @@ describe('song-display', () => {
     const host = document.createElement('div')
     const provider = new ContextProvider(host, {
       context: displayPreferencesContext,
-      initialValue: { nashville: true, unicodeAccidentals: false },
+      initialValue: { nashville: true, unicodeAccidentals: false, tuning: 0 },
     })
     document.body.append(host)
     const display = document.createElement('song-display')
@@ -74,7 +115,7 @@ describe('song-display', () => {
     expect(sections(display)[0].displayAsNashville).to.equal(true)
     expect(sections(display)[0].unicodeAccidentals).to.equal(false)
 
-    provider.setValue({ nashville: false, unicodeAccidentals: true })
+    provider.setValue({ nashville: false, unicodeAccidentals: true, tuning: 0 })
     await display.updateComplete
     expect(sections(display)[0].displayAsNashville).to.equal(false)
     expect(sections(display)[0].unicodeAccidentals).to.equal(true)

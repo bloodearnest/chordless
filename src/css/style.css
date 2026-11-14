@@ -1020,6 +1020,17 @@ body.edit-mode .key-selector:focus {
   padding: 1.5rem 0;
 }
 
+/* How the guitar is tuned for this setlist: above the songs, in the text colour (the picker is made for the header) */
+.overview-tuning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  --header-text: var(--text-color, #1a1a1a);
+  --header-bg: var(--bg-tertiary, #ecf0f1);
+}
+
 .overview-songs {
   display: flex;
   flex-direction: column;

@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { tuningLabel } from '../js/tuning.ts'
 
 /** The key/BPM box was pressed in edit mode, to open the song settings */
 export class SongSettingsClickEvent extends Event {
@@ -29,6 +30,7 @@ export class MusicalMetadataDisplay extends LitElement {
   static override properties = {
     keyValue: { type: String, attribute: 'key-value' },
     capoValue: { type: Number, attribute: 'capo-value' },
+    tuning: { type: Number },
     bpm: { type: Number },
     timeSignature: { type: String, attribute: 'time-signature' },
     editMode: { type: Boolean, attribute: 'edit-mode', reflect: true },
@@ -36,6 +38,8 @@ export class MusicalMetadataDisplay extends LitElement {
 
   declare keyValue: string
   declare capoValue: number
+  /** How far down the guitar is tuned (0: standard), docs/PERSONAL_LAYER.md */
+  declare tuning: number
   declare bpm: number | null
   declare timeSignature: string
   declare editMode: boolean
@@ -113,6 +117,7 @@ export class MusicalMetadataDisplay extends LitElement {
     super()
     this.keyValue = ''
     this.capoValue = 0
+    this.tuning = 0
     this.bpm = null
     this.timeSignature = ''
     this.editMode = false
@@ -157,6 +162,16 @@ export class MusicalMetadataDisplay extends LitElement {
               <div class="meta-item">
                 <span class="meta-label">Capo:</span>
                 <span class="meta-value">${this.capoValue}</span>
+              </div>
+            `
+            : ''
+        }
+        ${
+          this.tuning > 0
+            ? html`
+              <div class="meta-item">
+                <span class="meta-label">Tuning:</span>
+                <span class="meta-value">${tuningLabel(this.tuning)}</span>
               </div>
             `
             : ''

@@ -154,10 +154,9 @@ What is built and will change:
 
 - A writer's key, tempo, order and removal edit the shared setlist; a reader's stay on the device and
   are replaced when the leader changes the setlist (docs/SPACES.md, "Read-only").
-- Capo (per song, 0 to 11, shown if a preference is on), section display and private annotations are in
-  the personal layer already. The musician type exists, with the first-use setup asking two things:
-  lyrics only, and whether to show a capo control. A device default for the instrument offset is open as
-  a pull request (#191) and will be reworked into what this document now says.
+- Capo (per song, 0 to 11), the guitar tuning (device default, and per setlist), section display and
+  private annotations are in the personal layer. The first-use setup and Preferences ask "What do you
+  play?" (#193). The transposing instrument's pitch is not built.
 - Any writer can make an annotation "Everyone" on any setlist they can open (`canShareAnnotations`); this
   would narrow to the people who control the setlist.
 - Shared annotations, the delete rule (a writer deletes a setlist they lead, an admin any) and the
@@ -194,9 +193,13 @@ Pull requests, in order, each building on `main` as it is:
    no change to what is drawn. Header controls show or hide by the switches (the capo already does).
    It has the types that have something to give, singer or drummer, guitarist, other and Custom; the
    transposing instrument, and its switch, come with its pitch controls in step 3.
-2. **Guitarist**: tuning (Preferences, and the setlist overview's row, editable in edit mode); the
-   capo added to it; the header's total ("Capo 2, tuned down: capo 1"). Reworks #191's display change:
-   its offset becomes tuning plus pitch resolved per song, and the 12-option list goes.
+2. **Guitarist** (built): tuning, the device default in Preferences and one per setlist in a row on the
+   overview, editable in edit mode, with the capo added to it. The chords move up by the tuning and down
+   by the capo, given to the existing chord display as the one capo that does the same (`tuning.ts`:
+   `shapesFor`). The song's header says "Tuning: ..." when it is not standard, and the capo picker shows
+   the keys the shapes are played in, from the tuning. A setlist's tuning is in its local state
+   (`setlist/local-state.ts`), the device's in the `tuning` preference; with the capo and tuning
+   controls off there is no tuning at all. It replaces #191's single offset.
 3. **Transposing instrument**: pitch (Preferences, overview row, a picker in the song's header), the
    display as above; then **the lead sheet's notes**, which need a look at how the melody is
    transposed first.
