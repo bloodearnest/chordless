@@ -119,6 +119,7 @@ export class SongCard extends LitElement {
     song: { type: Object, attribute: false },
     variant: { type: String, reflect: true },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
+    local: { type: Boolean },
     search: { type: String },
     _melody: { state: true },
   }
@@ -126,6 +127,8 @@ export class SongCard extends LitElement {
   declare song: SongCardSong | null
   declare variant: string
   declare editMode: boolean
+  /** A song this device added to the setlist for itself alone: marked as such */
+  declare local: boolean
   /** The library search the song matched: its matches are marked, and a lyrics match is quoted */
   declare search: string
   /** The range of the song's melody, worked out when the key picker is shown (edit mode in a setlist) */
@@ -208,7 +211,8 @@ export class SongCard extends LitElement {
       min-width: 0;
     }
 
-    .variant-label {
+    .variant-label,
+    .local-mark {
       align-self: center;
       max-width: 50%;
       padding: 0.05rem 0.5rem;
@@ -412,6 +416,7 @@ export class SongCard extends LitElement {
     this.song = null
     this.variant = 'library'
     this.editMode = false
+    this.local = false
     this.search = ''
     this._melody = null
   }
@@ -450,6 +455,7 @@ export class SongCard extends LitElement {
             <div class="line1">
               <div class="title" part="title">${this._mark(this.song.title)}</div>
               ${this._renderVariantLabel()}
+              ${this.local ? html`<span class="local-mark" title="Added on this device only">Just me</span>` : ''}
               ${
                 this.variant !== 'setlist' && this.song.artist
                   ? html`

@@ -81,6 +81,18 @@ describe('setlist-info-dialog', () => {
     el.close()
   })
 
+  it('says why it cannot be changed, when it is the leader’s to change', async () => {
+    const el = await show()
+    el.readonly = true
+    el.readonlyReason = 'Only Ann or an admin can change this setlist.'
+    await el.show(setlist())
+    await el.updateComplete
+    expect(el.shadowRoot?.querySelector('.readonly-reason')?.textContent).to.equal(
+      'Only Ann or an admin can change this setlist.'
+    )
+    el.close()
+  })
+
   it('stops editing when it is closed', async () => {
     const el = await show()
     await el.edit(setlist())

@@ -1,4 +1,4 @@
-import type { Setlist } from '../data-types.ts'
+import type { Setlist, SetlistEntry } from '../data-types.ts'
 import { hashText } from '../utils/hash.ts'
 
 /**
@@ -24,12 +24,43 @@ type SyncField = (typeof SETLIST_SYNC_FIELDS)[number]
 // someone's older version wrote, may still carry them
 const LEGACY_SYNC_FIELDS = ['driveFileId', 'driveModifiedTime', 'driveChecksum']
 
-/** A setlist without this device's sync state: what gets stored in Drive */
+/**
+ * A setlist without this device's sync state, and without the songs added for this device alone
+ * (`SetlistEntry.local`): what gets stored in Drive. The songs left are numbered from 0 again only
+ * if some were taken out, so a setlist with none of its own hashes as it always did.
+ */
 export function setlistContent(setlist: Setlist): Omit<Setlist, SyncField> {
   const content: Partial<Setlist> = { ...setlist }
   for (const field of SETLIST_SYNC_FIELDS) delete content[field]
   for (const field of LEGACY_SYNC_FIELDS) delete (content as Record<string, unknown>)[field]
+  if (setlist.songs?.some(entry => entry.local)) {
+    content.songs = setlist.songs
+      .filter(entry => !entry.local)
+      .map((entry, order) => ({ ...entry, order }))
+  }
   return content as Omit<Setlist, SyncField>
+}
+
+/**
+ * Drive's songs with the ones added for this device alone put back, each after the song it followed
+ * here, or last when that song is not there; one the setlist now has itself (the leader added it
+ * too) is left out. Numbered from 0.
+ */
+export function withLocalSongs(
+  remote: SetlistEntry[],
+  local: SetlistEntry[] | undefined
+): SetlistEntry[] {
+  const mine = (local ?? []).filter(entry => entry.local)
+  if (mine.length === 0) return remote
+  const merged = [...remote]
+  local?.forEach((entry, index) => {
+    if (!entry.local || merged.some(each => !each.local && each.songId === entry.songId)) return
+    const before = local[index - 1]
+    const at = before ? merged.findIndex(each => each.songId === before.songId) : -1
+    if (at >= 0) merged.splice(at + 1, 0, entry)
+    else merged.push(entry)
+  })
+  return merged.map((entry, order) => ({ ...entry, order }))
 }
 
 /** JSON with object keys sorted, so equal content always hashes the same */

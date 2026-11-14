@@ -75,6 +75,8 @@ export class SetlistInfoDialog extends LitElement {
     askWho: { type: Boolean },
     /** A setlist received by link: no editing or deleting */
     readonly: { type: Boolean },
+    /** Why it cannot be changed here, when it cannot: said under what the setlist is */
+    readonlyReason: { attribute: false },
     /** Why this setlist cannot be deleted (or moved, which deletes it from here), if it cannot */
     deleteBlocked: { attribute: false },
     /** The other spaces on this device the setlist could be moved to */
@@ -110,6 +112,7 @@ export class SetlistInfoDialog extends LitElement {
   declare meId: string | null
   declare askWho: boolean
   declare readonly: boolean
+  declare readonlyReason: string
   declare deleteBlocked: string | null
   declare moveTargets: { id: string; name: string }[]
   declare _setlist: Setlist | null
@@ -124,6 +127,7 @@ export class SetlistInfoDialog extends LitElement {
     this.meId = null
     this.askWho = false
     this.readonly = false
+    this.readonlyReason = ''
     this.deleteBlocked = null
     this.moveTargets = []
     this._setlist = null
@@ -249,6 +253,7 @@ export class SetlistInfoDialog extends LitElement {
                 .setlist=${this._setlist}
                 .leader=${leaderName(this.people, this._setlist?.leaderId)}
               ></setlist-info>
+              ${this.readonlyReason ? html`<p class="readonly-reason">${this.readonlyReason}</p>` : ''}
             `
         }
       </app-modal>

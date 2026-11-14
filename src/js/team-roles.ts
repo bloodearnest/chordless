@@ -48,14 +48,17 @@ export function asMemberRole(value: unknown): MemberRole | null {
 }
 
 /**
- * Whether someone may delete a setlist (docs/SYNC_ARCHITECTURE.md, "Who can delete"): in a
- * personal space (`role` null) its owner, anything; in a team space a worship leader (`writer`)
- * the setlists they lead, an admin or the owner any, a team member (`reader`) none.
+ * Whether someone controls a setlist, which is what may change it for everyone and delete it
+ * (docs/PERSONAL_LAYER.md, "Who controls a setlist"): in a personal space (`role` null) its owner,
+ * anything; in a team space an admin or the owner, any; a worship leader (`writer`) the setlists they
+ * lead, and those nobody can be found to lead that they made (`madeIt`); a team member (`reader`) none.
  */
-export function mayDeleteSetlist(role: TeamRole | null, leadsIt: boolean): boolean {
+export function mayChangeSetlist(role: TeamRole | null, leadsIt: boolean, madeIt = false): boolean {
   if (role === null || atLeast(role, 'admin')) return true
-  return role === 'writer' && leadsIt
+  return role === 'writer' && (leadsIt || madeIt)
 }
+
+/** Whether someone may delete a setlist: those who control it (docs/SYNC_ARCHITECTURE.md, "Who can delete") */
 
 /**
  * Whether someone may delete a song, not just one of its versions (docs/SPACES.md, "Roles"): in a

@@ -29,7 +29,11 @@ const all = (root: ParentNode, selector: string) => root.querySelectorAll<HTMLEl
 export function enterEditMode(
   root: ParentNode,
   appHeader: AppHeader,
-  { capoEnabled, pitchEnabled = false }: { capoEnabled: boolean; pitchEnabled?: boolean }
+  {
+    capoEnabled,
+    pitchEnabled = false,
+    keyEditable = true,
+  }: { capoEnabled: boolean; pitchEnabled?: boolean; keyEditable?: boolean }
 ) {
   setBodyEditMode(true)
   appHeader.editMode = true
@@ -37,7 +41,7 @@ export function enterEditMode(
   const musicalMetadata = root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
   if (musicalMetadata) musicalMetadata.editMode = true
   const keySelector = root.querySelector<KeySelector>('#key-selector')
-  if (keySelector) keySelector.editMode = true
+  if (keySelector) keySelector.editMode = keyEditable
   const capoSelector = root.querySelector<CapoSelector>('#capo-selector')
   if (capoSelector && capoEnabled) capoSelector.editMode = true
   const pitchSelector = root.querySelector<PitchSelector>('#pitch-selector')

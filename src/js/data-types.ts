@@ -272,6 +272,11 @@ export interface SetlistEntry {
   notes: string
   /** Annotations on the chart that everyone with the setlist sees (docs/ANNOTATIONS.md) */
   annotations?: SharedChartAnnotation[]
+  /**
+   * Added for this device by someone who does not control the setlist (docs/PERSONAL_LAYER.md): in the
+   * local copy only, never in Drive, in a share, or in an export
+   */
+  local?: true
 }
 
 /**

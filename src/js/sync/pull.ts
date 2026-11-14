@@ -26,7 +26,7 @@ import {
 } from './changes.ts'
 import { personContent, personContentHash, personHasLocalChanges } from './person-hash.ts'
 import { inBatches, inBatchesOfBytes, type ProgressCallback, type SyncRun } from './session.ts'
-import { setlistContent, setlistContentHash } from './setlist-hash.ts'
+import { setlistContent, setlistContentHash, withLocalSongs } from './setlist-hash.ts'
 import { metadataOfProps, remoteMetadataChanges } from './song-metadata.ts'
 
 /** A chord chart in Drive that a pull has decided to download */
@@ -103,6 +103,8 @@ async function downloadSetlist(
 
   return {
     ...setlistContent(remote),
+    // (what was added for this device alone is put back)
+    songs: withLocalSongs(remote.songs, localSetlist?.songs),
     id: remote.id || setlistId,
     fileRef: driveFile.ref,
     fileModified: driveFile.modified,

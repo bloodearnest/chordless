@@ -60,6 +60,8 @@ const todayOf = ({ today, now }: ShareContext) => today ?? toLocalDateString(now
 async function loadShareSources(setlist: Setlist, db: ChordlessDB): Promise<ShareSource[]> {
   const sources: ShareSource[] = []
   for (const entry of setlist.songs) {
+    // (what is added for this device alone is not shared)
+    if (entry.local) continue
     try {
       const song = await songOfEntry(entry, db)
       sources.push({

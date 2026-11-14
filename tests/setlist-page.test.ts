@@ -275,6 +275,47 @@ describe('the setlist page', () => {
     })
   })
 
+  describe('someone who does not control the setlist', () => {
+    const saved = async (id: string) => must(await db.getSetlist(id)).songs
+
+    it('adds a song for themselves alone, marked local, and may then change and remove it', async () => {
+      const setlist = await open(2)
+      page._controls = false
+      page._decideControls = async () => false
+
+      await page.addSongToSetlist(asLibrarySong(songs[3], 'D'))
+
+      expect((await saved(setlist.id)).map(entry => Boolean(entry.local))).to.deep.equal([
+        false,
+        false,
+        true,
+      ])
+      expect(page.mayChangeSong(page.songs[2])).to.equal(true)
+      expect(page.mayChangeSong(page.songs[0])).to.equal(false)
+      await page.deleteSongFromSetlist(2)
+      expect(await savedTitles(setlist.id)).to.deep.equal(['Alpha', 'Bravo'])
+    })
+
+    it('cannot reorder, remove or re-key the songs everyone has', async () => {
+      const setlist = await open(3)
+      page._controls = false
+      const before = await saved(setlist.id)
+
+      await page.moveSong(0, 2)
+      await page.deleteSongFromSetlist(1)
+      await page.changeSongKeyInSetlist(0, 'F')
+
+      expect(await saved(setlist.id)).to.deep.equal(before)
+    })
+
+    it('is a controller again when the page says so', async () => {
+      const setlist = await open(2)
+      page._controls = true
+      await page.moveSong(0, 1)
+      expect(await savedTitles(setlist.id)).to.deep.equal(['Bravo', 'Alpha'])
+    })
+  })
+
   describe('adding a song', () => {
     it('adds it at the end with the key and tempo it has now, and shows it', async () => {
       const setlist = await open(2)
@@ -944,6 +985,16 @@ describe('the setlist page', () => {
         page.handlePitchChange(null)
         expect(pitchOfDisplay(1)).to.equal('bb')
         expect('pitches' in stored()).to.equal(false)
+      })
+
+      it('goes back to the setlist’s when the song is reset', async () => {
+        await open()
+        page.sectionObserver?.disconnect()
+        page.currentSongIndex = 1
+        page.handlePitchChange('f')
+        expect(page.songs[1].currentPitch).to.equal('f')
+        await page.resetCurrentSong()
+        expect(page.songs[1].currentPitch).to.equal(null)
       })
 
       it('does nothing for a song on the overview, where none is shown', async () => {

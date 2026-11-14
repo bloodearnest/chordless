@@ -37,13 +37,13 @@ import { DataChangeEvent, touches } from './data-changes.ts'
 import type { Setlist, SetlistEntry, SharedChartAnnotation, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB, NO_CHANGE, openSpace, type RemovedSetlist } from './db.ts'
 import { type PitchId, pitchSemitones } from './instrument-pitch.ts'
-import { leaderName, resolvePerson } from './leaders.ts'
+import { leaderName, normalizeEmail, resolvePerson } from './leaders.ts'
 import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
 import { LiveSyncStatusEvent } from './live-sync-status.ts'
 import { goTo, setPageTitle } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
-import { getSpacePeople, identifyMe, settleLeader } from './people.ts'
+import { chosenMeId, getSignedInUser, getSpacePeople, identifyMe, settleLeader } from './people.ts'
 import {
   CapoPreferenceEvent,
   getCapoPreference,
@@ -81,12 +81,13 @@ import { OverviewController } from './setlist/overview-controller.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
 import { SectionController } from './setlist/section-controller.ts'
 import { SetlistHeader } from './setlist/setlist-header.ts'
+import { controlsSetlist } from './setlist-control.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
 import { getCurrentSpaceFull, getSpaceById, listSpaces } from './space.ts'
 import { transferSetlists } from './space-transfer.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
-import { mayDeleteSetlist } from './team-roles.ts'
+import { mayChangeSetlist } from './team-roles.ts'
 import {
   editModeEntered,
   endSetlistSession,
@@ -171,6 +172,8 @@ export class SetlistPage {
   _capoEnabled: boolean
   /** How the guitar is tuned for this setlist, or null for the device's (docs/PERSONAL_LAYER.md) */
   _tuning: Tuning | null = null
+  /** Whether the person using the device controls this setlist: may change what everyone has (docs/PERSONAL_LAYER.md) */
+  _controls = true
   /** Whether the instrument pitch controls are on (docs/PERSONAL_LAYER.md) */
   _pitchEnabled: boolean = getPitchControlsPreference()
   /** The instrument pitch for this setlist, or null for the device's */
@@ -451,6 +454,8 @@ export class SetlistPage {
         })
         return
       }
+
+      this._controls = await this._decideControls(setlist)
 
       if (setlist.songs.length === 0) {
         console.warn('[WARN] Setlist has no songs')
@@ -853,7 +858,10 @@ export class SetlistPage {
       }
       dialog.addEventListener(SetlistDetailsIdentifyEvent.type, this._identifyHandler)
     }
-    dialog.readonly = this._readOnly
+    // (who leads it, or what role this person has, may have changed since the page was shown)
+    this._controls = await this._decideControls(this.currentSetlist)
+    dialog.readonly = this._readOnly || !this._controls
+    dialog.readonlyReason = !this._readOnly && !this._controls ? await this._whoControlsNote() : ''
     await this._loadDialogPeople(dialog)
     await this._loadDialogActions(dialog, this.currentSetlist)
     await dialog.show(this.currentSetlist)
@@ -888,7 +896,11 @@ export class SetlistPage {
     const role = space.team?.role ?? null
     const leader = resolvePerson(dialog.people, setlist.leaderId)
     const leadsIt = Boolean(leader && dialog.meId && leader.id === dialog.meId)
-    if (!mayDeleteSetlist(role, leadsIt)) {
+    // (a setlist whose leader cannot be found is its creator's)
+    const email = (await getSignedInUser())?.email
+    const madeIt =
+      !leader && Boolean(email) && normalizeEmail(setlist.createdBy) === normalizeEmail(email)
+    if (!mayChangeSetlist(role, leadsIt, madeIt)) {
       dialog.deleteBlocked = `In ${space.name}, only the leader of a setlist or an admin can delete it.`
       return
     }
@@ -1359,6 +1371,7 @@ export class SetlistPage {
           enterEditMode(this.root, appHeader, {
             capoEnabled: this._capoEnabled,
             pitchEnabled: this._pitchEnabled,
+            keyEditable: this.mayChangeSong(this.songs[this.currentSongIndex]),
           })
           // Update all sections based on edit mode
           this.sections.applyAll()
@@ -1473,7 +1486,7 @@ export class SetlistPage {
   async handleBPMChange(newValue: number) {
     if (this.currentSongIndex < 0) return
     const song = this.songs[this.currentSongIndex]
-    if (!song || song.currentBPM === newValue) return
+    if (!song || song.currentBPM === newValue || !this.mayChangeSong(song)) return
 
     song.currentBPM = newValue
     await this._saveSongSetting(song, model => model.setTempo(newValue), { bpm: newValue })
@@ -1499,6 +1512,7 @@ export class SetlistPage {
     if (!newKey || this.currentSongIndex < 0) return
 
     const song = this.songs[this.currentSongIndex]
+    if (!this.mayChangeSong(song)) return
     song.currentKey = newKey
     const index = this.currentSongIndex
     songTransposed()
@@ -1523,8 +1537,8 @@ export class SetlistPage {
 
     const originalKey = song.originalKey
 
-    // Reset BPM to original
-    song.currentBPM = song.metadata.tempo
+    // Reset BPM to original (the setlist's tempo is for those who control it to change)
+    if (this.mayChangeSong(song)) song.currentBPM = song.metadata.tempo
 
     // Reset capo to 0 (using handleCapoChange to update all displays)
     if (this._capoEnabled && song.currentCapo !== 0) {
@@ -1539,12 +1553,16 @@ export class SetlistPage {
     // Reapply section states (all back to default)
     this.sections.applyAll()
 
-    // Reset key last - this will handle re-rendering and updating all displays
-    if (originalKey && song.currentKey !== originalKey) {
+    // The song's own instrument pitch goes too (back to the setlist's)
+    if (song.currentPitch !== null) this.handlePitchChange(null)
+
+    // Reset key last - this will handle re-rendering and updating all displays (the key is for those
+    // who control the setlist to change)
+    if (this.mayChangeSong(song) && originalKey && song.currentKey !== originalKey) {
       await this.handleKeyChange(originalKey)
     } else if (originalKey) {
-      // Key is already correct, just update displays
-      this.header.showMetadata({ keyValue: originalKey })
+      // Key is already correct (or not theirs to put back), just update displays
+      this.header.showMetadata({ keyValue: song.currentKey })
     } else {
       console.warn('[resetCurrentSong] No original key found in metadata!')
     }
@@ -1565,7 +1583,7 @@ export class SetlistPage {
    */
   async moveSong(startIndex: number, newIndex: number) {
     const moving = this.currentSetlist?.songs[startIndex]
-    if (!moving) return
+    if (!moving || !this._controls) return
 
     // Reorder songs in the setlist, as it is stored
     const saved = await this.editSetlist(stored => {
@@ -1842,6 +1860,8 @@ export class SetlistPage {
     const latest = await this._database().getSetlist(id)
     // (the setlist can be gone, and the view with it)
     if (this._disposed || !latest) return
+    // (who leads it may have changed)
+    this._controls = await this._decideControls(latest)
     if (setlistContentHash(latest) === setlistContentHash(before)) {
       // Nothing to show: only what sync keeps of the file changed, which later saves must carry
       this.currentSetlist = latest
@@ -1868,6 +1888,40 @@ export class SetlistPage {
     toast(
       `${setlistTitle(latest, 'short')} was updated${changes.length ? `: ${changes.join(', ')}` : ''}`
     )
+  }
+
+  /**
+   * Whether the person using the device controls the setlist (docs/PERSONAL_LAYER.md, "Who controls a
+   * setlist"): they may change its songs, order, keys, tempos and details for everyone, and share
+   * annotations. Everyone else has what they keep for themselves, and what they added for themselves.
+   * A setlist received by link is nobody's here.
+   */
+  async _decideControls(setlist: Setlist): Promise<boolean> {
+    if (this._readOnly) return false
+    const space = await getCurrentSpaceFull()
+    if (!space.team) return true
+    const db = this._database()
+    const user = await getSignedInUser()
+    /* v8 ignore next -- signed in or not is one expression: the rule's own tests cover both */
+    const email = user ? user.email : null
+    return controlsSetlist(setlist, space, await db.getAllPeople(), {
+      email,
+      chosenPersonId: chosenMeId(db.spaceId),
+    })
+  }
+
+  /** Who can change this setlist, for those who cannot */
+  async _whoControlsNote(): Promise<string> {
+    const leader = resolvePerson(
+      await this._database().getAllPeople(),
+      this.currentSetlist?.leaderId
+    )
+    return `Only ${leader ? leader.name : 'its leader'} or an admin can change this setlist.`
+  }
+
+  /** Whether the person using the device may change this song for everyone: they control the setlist, or the song is one they added for themselves */
+  mayChangeSong(song: RuntimeSong | null | undefined): boolean {
+    return this._controls || Boolean(song?._setlistEntry.local)
   }
 
   /** The media player's speed button remembers the choice for the song being viewed */
@@ -1979,6 +2033,8 @@ export class SetlistPage {
           key: songCurrentKey, // Explicit snapshot of canonical key
           tempo: songCurrentTempo, // Explicit snapshot of canonical tempo
           notes: '',
+          // (someone who does not control the setlist adds for themselves alone)
+          ...(this._controls ? {} : { local: true as const }),
         })
       })
       if (!saved) return
@@ -2032,13 +2088,13 @@ export class SetlistPage {
   /** Whether the user can share an annotation on this setlist with everyone (docs/ANNOTATIONS.md) */
   async canShare(): Promise<boolean> {
     const space = await getSpaceById(this.spaceId())
-    return canShareAnnotations(space, this.currentSetlist)
+    return this._controls && canShareAnnotations(space, this.currentSetlist)
   }
 
   /** Change the song at `index`, in the setlist as it is stored, and show it so */
   async #changeEntry(index: number, change: (entry: SetlistEntry) => void, rerender = true) {
     const shown = this.currentSetlist?.songs?.[index]
-    if (!shown) return
+    if (!shown || !this.mayChangeSong(this.songs[index])) return
     await this.editSetlist(stored => {
       const entry = stored.songs[index]
       if (!entry || !sameEntry(entry, shown)) return NO_CHANGE
@@ -2055,6 +2111,7 @@ export class SetlistPage {
         console.error('No current setlist')
         return
       }
+      if (!this.mayChangeSong(this.songs[index])) return
 
       // Remove the song from the setlist as it is stored
       await this.editSetlist(stored => {

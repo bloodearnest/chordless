@@ -1276,16 +1276,27 @@ describe('the setlist page: header, menu and keys', () => {
       }
     })
 
-    it('says who may not delete it: a worship leader of a team, for a setlist they do not lead', async () => {
+    it('says who may change it: a worship leader of a team, for a setlist they do not lead', async () => {
       const { setlist, dialog } = await ready()
       const space = getCurrentSpace().id as string
       try {
         await updateSpace(space, { team: { id: 'team-1', role: 'writer' } })
         await rig.page.showSetlistInfo()
-        expect(dialog.deleteBlocked).to.contain('only the leader')
+        // (it cannot be changed at all by someone who does not lead it: and says so)
+        expect(dialog.readonly).to.equal(true)
+        expect(dialog.readonlyReason).to.contain('Only its leader or an admin')
+        // (and names the leader, when there is one)
+        await rig.db.savePeople([
+          { id: 'bea', name: 'Bea', emails: [], modifiedDate: '' } as Person,
+        ])
+        must(rig.page.currentSetlist).leaderId = 'bea'
+        await rig.page.showSetlistInfo()
+        expect(dialog.readonlyReason).to.contain('Only Bea or an admin')
 
         await updateSpace(space, { team: { id: 'team-1', role: 'admin' } })
         await rig.page.showSetlistInfo()
+        expect(dialog.readonly).to.equal(false)
+        expect(dialog.readonlyReason).to.equal('')
         expect(dialog.deleteBlocked).to.equal(null)
       } finally {
         await updateSpace(space, { team: undefined })
