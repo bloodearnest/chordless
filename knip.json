@@ -3,6 +3,7 @@
   "entry": [
     "src/service-worker.ts",
     "src/dev/*.js",
+    "src/js/copy-editor.ts",
     "scripts/*.ts",
     "web-test-runner.config.js",
     "web-test-runner.drive.config.js",

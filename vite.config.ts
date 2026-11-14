@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import { defineConfig } from 'vite'
+import { copyEditor } from './vite-plugins/copy-editor.ts'
 import { devManifest } from './vite-plugins/dev-manifest.ts'
 import { preloadHome } from './vite-plugins/preload-home.ts'
 import { serviceWorker } from './vite-plugins/service-worker.ts'
@@ -87,6 +88,7 @@ export default defineConfig(({ command, isPreview }) => {
     },
     plugins: [
       devManifest(),
+      copyEditor(),
       preloadHome(),
       serviceWorker({ target: TARGET }),
       ...(WORKER_URL ? [] : [cloudflare({ configPath: '../wrangler.toml' })]),
