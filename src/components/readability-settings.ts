@@ -181,7 +181,8 @@ export class ReadabilitySettings extends LitElement {
       }
 
       .verse {
-        font-size: var(--font-lyrics);
+        /* The sample is for comparing looks, not the lyrics' size: it should fit a phone */
+        font-size: var(--font-ui);
         font-family: var(--font-family-lyrics);
         line-height: 1.4;
       }
@@ -200,7 +201,7 @@ export class ReadabilitySettings extends LitElement {
 
       .verse .chord {
         font-family: var(--font-family-chords);
-        font-size: var(--font-chords);
+        font-size: 0.9em;
         font-weight: bold;
         line-height: 1.1em;
         min-height: 1.1em;
@@ -237,13 +238,10 @@ export class ReadabilitySettings extends LitElement {
 
       .fonts .area {
         font-weight: 600;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
 
+      /* Under the menu, so that the menus line up whatever the names say */
       .fonts .hint {
-        font-weight: 400;
         opacity: 0.7;
       }
     `,
@@ -383,7 +381,7 @@ export class ReadabilitySettings extends LitElement {
     const { label, description } = AREA_LABELS[area]
     return html`
       <label>
-        <span class="area">${label} <span class="hint">${description}</span></span>
+        <span class="area">${label}</span>
         <select
           class="field"
           aria-label="${label} font"
@@ -402,6 +400,7 @@ export class ReadabilitySettings extends LitElement {
             `
           )}
         </select>
+        <span class="hint">${description}</span>
       </label>
     `
   }

@@ -51,16 +51,16 @@ export class ThemeSettings extends LitElement {
       line-height: 1.4;
     }
 
+    /* Always the three side by side: they are short words */
     .theme-buttons {
       display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
+      gap: 0.5rem;
     }
 
     .theme-button {
-      flex: 1;
-      min-width: 6rem;
-      padding: 0.75rem 1.25rem;
+      flex: 1 1 0;
+      min-width: 0;
+      padding: 0.6rem 0.5rem;
       border: 2px solid var(--tint-border);
       border-radius: 6px;
       background: var(--tint-subtle);
@@ -93,6 +93,13 @@ export class ThemeSettings extends LitElement {
 
     .theme-icon {
       font-size: var(--font-ui-small);
+    }
+
+    /* The words are enough where the three buttons are tight */
+    @media (max-width: 24rem) {
+      .theme-icon {
+        display: none;
+      }
     }
 
     .font-scale-controls {
@@ -143,10 +150,10 @@ export class ThemeSettings extends LitElement {
     }
 
     .preset-buttons {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
       gap: 0.5rem;
       margin-top: 0.5rem;
-      flex-wrap: wrap;
     }
 
     .preset-button {
@@ -295,16 +302,16 @@ export class ThemeSettings extends LitElement {
         </div>
         <div class="preset-buttons">
           <button class="preset-button" @click=${() => this._setPresetScale(0.8)}>
-            Small (80%)
+            Small 80%
           </button>
           <button class="preset-button" @click=${() => this._setPresetScale(1.0)}>
-            Normal (100%)
+            Normal 100%
           </button>
           <button class="preset-button" @click=${() => this._setPresetScale(1.25)}>
-            Large (125%)
+            Large 125%
           </button>
           <button class="preset-button" @click=${() => this._setPresetScale(1.5)}>
-            Largest (150%)
+            Largest 150%
           </button>
         </div>
       </div>
