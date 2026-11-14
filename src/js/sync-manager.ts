@@ -31,6 +31,7 @@ import {
 } from './sync/changes.ts'
 import { pullPeople, pullScores, pullSetlists, pullSongs } from './sync/pull.ts'
 import { pushPeople, pushScores, pushSetlists, pushSongs } from './sync/push.ts'
+import { t } from './text.ts'
 
 export type { ProgressCallback, SyncProgress } from './sync/session.ts'
 
@@ -113,16 +114,8 @@ export class UnsyncedChangesError extends Error {
  * made itself).
  */
 export function folderGoneMessage(folder: { name?: string } | null, otherApp: boolean): string {
-  const safe = 'Your songs and setlists are safe on this device.'
-  if (folder) {
-    return (
-      `This space's Google Drive folder "${folder.name}" is in the Drive trash. ` +
-      `${safe} Restore it from the trash, or start over in Drive to upload them to a new folder.`
-    )
-  }
-  return otherApp
-    ? `This space was synced by an earlier version of Chordless's Google app, which cannot see its Drive folder. ${safe} Start over in Drive to upload them again.`
-    : `This space's Google Drive folder can't be found: it was deleted, or belongs to another Google account than the one you are signed in with. ${safe} Sign in with the right account, or start over in Drive to upload them again.`
+  if (folder) return t('folder-gone-trashed', { name: folder.name ?? '' })
+  return t(otherApp ? 'folder-gone-other-app' : 'folder-gone-missing')
 }
 
 /**

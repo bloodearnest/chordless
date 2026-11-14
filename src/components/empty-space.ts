@@ -2,6 +2,7 @@ import { html, LitElement } from 'lit'
 import type { Space } from '../js/data-types.ts'
 import { emptySpaceKind } from '../js/empty-space-kind.ts'
 import { SyncStatusEvent, syncRunning } from '../js/sync-status.ts'
+import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import './progress-bar.ts'
@@ -54,10 +55,10 @@ export class EmptySpace extends LitElement {
     try {
       await this.fetchSpace(this.space)
     } catch (error) {
-      toast(`Couldn't get ${this.space.name}'s songs and setlists.`, {
+      toast(t('toast-space-fetch-failed', { space: this.space.name }), {
         kind: 'error',
         details: errorMessage(error),
-        action: { label: 'Try again', run: () => void this._fetch() },
+        action: { label: t('action-try-again'), run: () => void this._fetch() },
       })
     }
     this._busy = false

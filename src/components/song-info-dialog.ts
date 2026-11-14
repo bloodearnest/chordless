@@ -5,6 +5,7 @@ import { formatRange } from '../js/chart-range.ts'
 import type { SongWithContent } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
 import type { SongMelody } from '../js/melody-analysis.ts'
+import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -134,10 +135,10 @@ export class SongInfoDialog extends LitElement {
       await setSongRange(event.songUuid, event.range, db)
     } catch (error) {
       console.error('[SongInfoDialog] Could not save the range:', error)
-      toast("Couldn't save the melody range.", {
+      toast(t('toast-range-save-failed'), {
         kind: 'error',
         details: errorMessage(error),
-        action: { label: 'Try again', run: () => void this._saveRange(event) },
+        action: { label: t('action-try-again'), run: () => void this._saveRange(event) },
       })
       return
     }

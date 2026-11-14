@@ -26,6 +26,7 @@ import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../pe
 import { listSharedWithMe } from '../share-receiver.ts'
 import { getCurrentSpaceFull } from '../space.ts'
 import { SyncStatusEvent } from '../sync-status.ts'
+import { t } from '../text.ts'
 import { toast } from '../toast.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
 import { errorMessage } from '../utils/errors.ts'
@@ -205,10 +206,10 @@ export class HomeView extends PageView {
       await goTo(`/setlist/${newSetlist.id}`)
     } catch (error) {
       console.error('Failed to create setlist:', error)
-      toast("Couldn't create the setlist.", {
+      toast(t('toast-setlist-create-failed'), {
         kind: 'error',
         details: errorMessage(error),
-        action: { label: 'Try again', run: () => this.#create(event) },
+        action: { label: t('action-try-again'), run: () => this.#create(event) },
       })
     }
   }

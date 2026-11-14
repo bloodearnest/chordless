@@ -14,6 +14,7 @@ import { SpaceDB } from './space-db.ts'
 import { storageFor } from './storage/space-storage.ts'
 import type { RootInfo, SpaceStorage } from './storage/types.ts'
 import { folderGoneMessage } from './sync-manager.ts'
+import { t } from './text.ts'
 import { toast } from './toast.ts'
 
 /** The space's linked Drive folder is not there to sync with */
@@ -71,7 +72,7 @@ function tellOfProblem(spaceId: string, problem: DriveFolderProblem): void {
   toldOf.add(spaceId)
   toast(problem.message, {
     kind: 'error',
-    action: { label: 'Open Account and Teams', run: () => goTo('/account') },
+    action: { label: t('action-open-account'), run: () => goTo('/account') },
   })
 }
 

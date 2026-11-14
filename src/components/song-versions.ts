@@ -14,6 +14,7 @@ import {
 } from '../js/song-versions.ts'
 import { getCurrentSpaceFull } from '../js/space.ts'
 import { mayDeleteSong } from '../js/team-roles.ts'
+import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
@@ -194,7 +195,7 @@ export class SongVersions extends LitElement {
       await change(await this._database())
     } catch (error) {
       console.error(`[SongVersions] ${failure}:`, error)
-      toast(failure, { kind: 'error', details: errorMessage(error) })
+      toast(t(failure), { kind: 'error', details: errorMessage(error) })
       return
     }
     this._renaming = null
@@ -212,7 +213,7 @@ export class SongVersions extends LitElement {
   _saveName(variant: SongRecord, event: Event): void {
     event.preventDefault()
     const input = (event.target as HTMLFormElement).elements.namedItem('name') as HTMLInputElement
-    void this._change("Couldn't rename the version.", db =>
+    void this._change('toast-version-rename-failed', db =>
       renameVariant(db, variant.uuid, input.value).then(() => undefined)
     )
   }
@@ -222,7 +223,7 @@ export class SongVersions extends LitElement {
     const form = event.target as HTMLFormElement
     const label = (form.elements.namedItem('label') as HTMLInputElement).value
     const fillGaps = (form.elements.namedItem('fill') as HTMLInputElement).checked
-    void this._change("Couldn't merge the songs.", db =>
+    void this._change('toast-version-merge-failed', db =>
       linkSong(db, this._mergeFrom, this.songId, label, { fillGaps })
     )
   }
@@ -262,7 +263,7 @@ export class SongVersions extends LitElement {
                   variant.isDefault
                     ? nothing
                     : html`<button class="btn make-default" @click=${() =>
-                        this._change("Couldn't make it the default.", db =>
+                        this._change('toast-version-default-failed', db =>
                           makeDefault(db, variant.uuid)
                         )}>Make default</button>`
                 }
@@ -298,11 +299,11 @@ export class SongVersions extends LitElement {
                 <div class="actions">
                   <button class="btn primary confirm-delete" @click=${() =>
                     several
-                      ? this._change("Couldn't delete the version.", db =>
+                      ? this._change('toast-version-delete-failed', db =>
                           deleteVariant(db, variant.uuid).then(() => undefined)
                         )
                       : this._change(
-                          "Couldn't delete the song.",
+                          'toast-song-delete-failed',
                           db => deleteOnlyVersion(db, variant.uuid).then(() => undefined),
                           true
                         )}>${several ? 'Delete version' : 'Delete song'}</button>

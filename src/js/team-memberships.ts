@@ -20,6 +20,7 @@ import {
 import { teamApi } from './team-client.ts'
 import type { TeamRole } from './team-roles.ts'
 import { createLocalTeamSpace, syncTeamSpace, withMembershipLock } from './team-spaces.ts'
+import { t } from './text.ts'
 import { toast } from './toast.ts'
 
 const DECLINED_KEY = 'declined-team-spaces'
@@ -175,8 +176,8 @@ export function checkTeamMemberships(
         const names = report.added.map(space => space.name)
         toast(
           names.length === 1
-            ? `Added the team ${names[0]}, which you are in.`
-            : `Added ${names.length} teams you are in: ${names.join(', ')}.`
+            ? t('toast-teams-added-one', { name: names[0] as string })
+            : t('toast-teams-added-many', { count: names.length, names: names.join(', ') })
         )
       }
       return report

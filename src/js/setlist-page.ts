@@ -94,6 +94,7 @@ import {
   songTransposed,
   startSetlistSession,
 } from './telemetry/setlist-session.ts'
+import { t } from './text.ts'
 import { toast } from './toast.ts'
 import { transposeKeyName, transposeSong } from './transpose.ts'
 import type { Tuning } from './tuning.ts'
@@ -908,7 +909,7 @@ export class SetlistPage {
       removed = await database.removeSetlist(setlist.id)
     } catch (error) {
       console.error('[SetlistInfo] Failed to delete the setlist:', error)
-      toast("Couldn't delete the setlist.", { kind: 'error', details: errorMessage(error) })
+      toast(t('toast-setlist-delete-failed'), { kind: 'error', details: errorMessage(error) })
       return
     }
     // The section states and capos this device kept for it
@@ -921,8 +922,8 @@ export class SetlistPage {
     await goTo(buildUrl({ name: 'home' }))
     if (removed) {
       const gone = removed
-      toast(`Deleted ${setlistTitle(setlist, 'short')}.`, {
-        action: { label: 'Undo', run: () => void restoreSetlist(spaceId, gone) },
+      toast(t('toast-setlist-deleted', { title: setlistTitle(setlist, 'short') }), {
+        action: { label: t('action-undo'), run: () => void restoreSetlist(spaceId, gone) },
       })
     }
   }
@@ -950,7 +951,7 @@ export class SetlistPage {
       try {
         const report = await transferSetlists(this._database(), destination, [setlist.id], 'move')
         if (report.setlistsAdded === 0) {
-          toast(`${title} is already in ${target.name}, so it was left here.`)
+          toast(t('toast-setlist-move-exists', { title, space: target.name }))
           return
         }
       } finally {
@@ -958,12 +959,12 @@ export class SetlistPage {
       }
     } catch (error) {
       console.error('[SetlistInfo] Failed to move the setlist:', error)
-      toast("Couldn't move the setlist.", { kind: 'error', details: errorMessage(error) })
+      toast(t('toast-setlist-move-failed'), { kind: 'error', details: errorMessage(error) })
       return
     }
     this.root.querySelector<SetlistInfoDialog>('#setlist-info-dialog')?.close()
     await goTo(buildUrl({ name: 'home' }))
-    toast(`Moved ${title} to ${target.name}.`)
+    toast(t('toast-setlist-moved', { title, space: target.name }))
   }
 
   /**
@@ -1001,7 +1002,7 @@ export class SetlistPage {
       })
     } catch (error) {
       console.error('[SetlistInfo] Failed to save setlist details:', error)
-      toast("Couldn't save the setlist details. They are as they were.", {
+      toast(t('toast-setlist-details-failed'), {
         kind: 'error',
         details: errorMessage(error),
       })
@@ -1861,8 +1862,11 @@ export class SetlistPage {
       latest,
       entry => titles.get(entry.songId) ?? entry.songId
     )
+    const title = setlistTitle(latest, 'short')
     toast(
-      `${setlistTitle(latest, 'short')} was updated${changes.length ? `: ${changes.join(', ')}` : ''}`
+      changes.length
+        ? t('toast-setlist-updated-with', { title, changes: changes.join(', ') })
+        : t('toast-setlist-updated', { title })
     )
   }
 
@@ -2024,10 +2028,10 @@ export class SetlistPage {
       await this.renderSetlist(id)
     } catch (error) {
       console.error('Error adding song to setlist:', error)
-      toast("Couldn't add the song to the setlist.", {
+      toast(t('toast-setlist-song-add-failed'), {
         kind: 'error',
         details: errorMessage(error),
-        action: { label: 'Try again', run: () => this.addSongToSetlist(song) },
+        action: { label: t('action-try-again'), run: () => this.addSongToSetlist(song) },
       })
     }
   }
@@ -2111,10 +2115,10 @@ export class SetlistPage {
       await this.renderSetlist(id)
     } catch (error) {
       console.error('Error deleting song from setlist:', error)
-      toast("Couldn't remove the song from the setlist.", {
+      toast(t('toast-setlist-song-remove-failed'), {
         kind: 'error',
         details: errorMessage(error),
-        action: { label: 'Try again', run: () => this.deleteSongFromSetlist(index) },
+        action: { label: t('action-try-again'), run: () => this.deleteSongFromSetlist(index) },
       })
     }
   }
@@ -2160,9 +2164,9 @@ async function restoreSetlist(spaceId: string, removed: RemovedSetlist): Promise
     } finally {
       database.db?.close()
     }
-    toast(`Brought back ${setlistTitle(removed.setlist, 'short')}.`)
+    toast(t('toast-setlist-restored', { title: setlistTitle(removed.setlist, 'short') }))
   } catch (error) {
     console.error('[SetlistInfo] Failed to bring the setlist back:', error)
-    toast("Couldn't bring the setlist back.", { kind: 'error', details: errorMessage(error) })
+    toast(t('toast-setlist-restore-failed'), { kind: 'error', details: errorMessage(error) })
   }
 }

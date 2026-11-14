@@ -14,6 +14,7 @@ import { leaderName } from './leaders.ts'
 import { PERSON_SYNC_FIELDS } from './sync/person-hash.ts'
 import { setAmbient } from './telemetry/context.ts'
 import { recordSpan } from './telemetry/telemetry.ts'
+import { t } from './text.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
 import { requestResult, transactionDone } from './utils/idb.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
@@ -168,17 +169,13 @@ async function tellDatabaseIsTooOld(): Promise<void> {
   if (toldDatabaseIsTooOld) return
   toldDatabaseIsTooOld = true
   const { toast } = await import('./toast.ts')
-  toast('The data on this device is from an old version of Chordless.', {
-    kind: 'error',
-    details:
-      'It is too old to be upgraded here, and has been left as it is. Sign in with Google to bring your songs and setlists back from Drive.',
-  })
+  toast(t('toast-db-too-old'), { kind: 'error', details: t('toast-db-too-old-details') })
 }
 
 /** Say that old data was cleared, and that it is being brought back from Drive */
 async function tellDatabaseWasCleared(): Promise<void> {
   const { toast } = await import('./toast.ts')
-  toast('Chordless is bringing your songs and setlists back from Drive.')
+  toast(t('toast-db-restoring'))
 }
 
 /** Say, once, that the data is newer than the app, and offer to look for a newer app (docs/MIGRATIONS.md) */
@@ -189,10 +186,13 @@ async function tellDatabaseIsNewer(): Promise<void> {
     import('./toast.ts'),
     import('./app-update.ts'),
   ])
-  toast('This device has newer Chordless data than this version can read.', {
+  toast(t('toast-db-too-new'), {
     kind: 'error',
-    details: `The data is newer than version ${DB_VERSION} of its format. Check for a newer version of the app.`,
-    action: { label: 'Check for updates', run: () => void appUpdate.check({ force: true }) },
+    details: t('toast-db-too-new-details', { version: DB_VERSION }),
+    action: {
+      label: t('action-check-for-updates'),
+      run: () => void appUpdate.check({ force: true }),
+    },
   })
 }
 
@@ -202,10 +202,10 @@ async function tellDatabaseWasUpgraded(): Promise<void> {
     import('./toast.ts'),
     import('./app-update.ts'),
   ])
-  toast('Chordless was updated in another window. Reload this one to carry on.', {
+  toast(t('toast-db-updated-elsewhere'), {
     kind: 'error',
     /* v8 ignore next -- reloading the page would end the test run */
-    action: { label: 'Reload', run: () => appUpdate.apply() },
+    action: { label: t('action-reload'), run: () => appUpdate.apply() },
   })
 }
 
@@ -327,7 +327,7 @@ export class ChordlessDB {
       request.onblocked = () => {
         report('blocked')
         void import('./toast.ts').then(({ toast }) =>
-          toast('Close the other Chordless windows to finish updating.', { kind: 'error' })
+          toast(t('toast-db-other-windows'), { kind: 'error' })
         )
       }
       /* v8 ignore stop */

@@ -54,21 +54,6 @@ toast-setlist-song-remove-failed = Couldn't remove the song from the setlist.
 
 toast-setlist-create-failed = Couldn't create the setlist.
 
-# Putting a setlist back to the one the leader made could not be done.
-toast-setlist-official-failed = Couldn't put the setlist back to the official one.
-
-# Where the person has no right to write, a sync replaces what they changed on this device with the
-# leader's version. { $title } is the setlist.
-toast-reset-one = Your changes to { $title } were replaced by the leader's version.
-
-# The same, with a short list of what the leader's has that theirs did not in { $what }.
-toast-reset-one-with = Your changes to { $title } were replaced by the leader's version ({ $what }).
-
-# { $count } is more than one.
-toast-reset-many = Your changes to { $count } setlists were replaced by the leader's versions.
-
-toast-reset-undo-failed = Couldn't put your changes back.
-
 
 ## Songs
 
