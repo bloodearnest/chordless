@@ -11,7 +11,7 @@ const stored = page =>
     done: localStorage.getItem('setup-done'),
   }))
 
-test('a new user is asked how they read, and the answers are saved as they are made', async ({
+test('a new user is asked what they play, and the answer is saved as it is made', async ({
   page,
 }) => {
   await openApp(page, '/')
@@ -20,15 +20,19 @@ test('a new user is asked how they read, and the answers are saved as they are m
   // The choices are slotted into the dialog: they are not inside it as far as locators go
   const setup = page.locator('first-use-setup')
 
-  // Chords and lyrics, and no capo, until they say otherwise
-  await expect(setup.getByRole('radio', { name: /^Chords and lyrics/ })).toBeChecked()
-  await expect(setup.getByRole('checkbox', { name: /guitar/ })).not.toBeChecked()
+  // Chords and lyrics as they are written, and no capo, until they say otherwise
+  await expect(setup.getByRole('radio', { name: /^Another instrument/ })).toBeChecked()
 
-  await setup.getByRole('radio', { name: /^Lyrics only/ }).check()
-  await setup.getByRole('checkbox', { name: /guitar/ }).check()
+  await setup.getByRole('radio', { name: /^I sing/ }).check()
   expect(await stored(page)).toMatchObject({
     type: 'singer',
     defaults: JSON.stringify({ all: 'lyrics' }),
+    capo: 'false',
+  })
+  await setup.getByRole('radio', { name: /^I play guitar/ }).check()
+  expect(await stored(page)).toMatchObject({
+    type: 'guitarist',
+    defaults: JSON.stringify({ all: 'all' }),
     capo: 'true',
   })
 

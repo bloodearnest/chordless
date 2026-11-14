@@ -1,41 +1,42 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import {
-  getCapoPreference,
   getMusicianType,
+  type MusicianType,
   markSetupDone,
-  setCapoPreference,
   setMusicianType,
 } from '../js/preferences.ts'
+import { PLAYS } from '../js/what-do-you-play.ts'
 import './app-modal.ts'
 import type { AppModal } from './app-modal.ts'
 import { buttonStyles } from './shared-styles.ts'
 
+/** The choices at first use: the types, and not Custom, which is for Preferences */
+const FIRST_USE_PLAYS = PLAYS.filter(option => option.type !== 'custom')
+
 /**
  * FirstUseSetup
  *
- * The one-time question of how the user reads a song: chords and lyrics, or lyrics only, and
- * whether to show a capo control. It is shown on the first visit to any page (so also to someone
- * who arrives by a share link), and never again once closed, however it is closed.
+ * The one-time question, "What do you play?", which sets what a song shows to start with and which
+ * controls there are (docs/PERSONAL_LAYER.md, "How I play it"). It is shown on the first visit to any
+ * page (so also to someone who arrives by a share link), and never again once closed, however it is
+ * closed.
  *
- * The choices are the ones in Preferences, saved as soon as they are made.
+ * The choice is the one in Preferences (where each setting can also be set by itself), saved as soon
+ * as it is made.
  */
 export class FirstUseSetup extends LitElement {
   static override properties = {
-    _lyricsOnly: { state: true },
-    _capo: { state: true },
+    _type: { state: true },
   }
 
-  declare _lyricsOnly: boolean
-  declare _capo: boolean
+  declare _type: MusicianType
 
   #modal = createRef<AppModal>()
 
   constructor() {
     super()
-    const musicianType = getMusicianType()
-    this._lyricsOnly = musicianType === 'singer' || musicianType === 'drummer'
-    this._capo = getCapoPreference()
+    this._type = getMusicianType()
   }
 
   static override styles = [
@@ -90,14 +91,9 @@ export class FirstUseSetup extends LitElement {
     this.#modal.value?.show()
   }
 
-  _chooseDisplay(lyricsOnly: boolean): void {
-    this._lyricsOnly = lyricsOnly
-    setMusicianType(lyricsOnly ? 'singer' : 'general')
-  }
-
-  _chooseCapo(event: Event): void {
-    this._capo = (event.currentTarget as HTMLInputElement).checked
-    setCapoPreference(this._capo)
+  _choose(type: MusicianType): void {
+    setMusicianType(type)
+    this._type = getMusicianType()
   }
 
   /** Closed by a button, Esc or a click outside: all mean the question is done with */
@@ -120,31 +116,22 @@ export class FirstUseSetup extends LitElement {
           questions to set up some defaults for you:
         </p>
         <fieldset>
-          <legend>What do you read?</legend>
-          <label class="choice">
-            <input
-              type="radio"
-              name="display"
-              .checked=${!this._lyricsOnly}
-              @change=${() => this._chooseDisplay(false)}
-            />
-            <span>Chords and lyrics: I play an instrument</span>
-          </label>
-          <label class="choice">
-            <input
-              type="radio"
-              name="display"
-              .checked=${this._lyricsOnly}
-              @change=${() => this._chooseDisplay(true)}
-            />
-            <span>Lyrics only: I sing, or don't need chords</span>
-          </label>
+          <legend>What do you play?</legend>
+          ${FIRST_USE_PLAYS.map(
+            option => html`
+              <label class="choice">
+                <input
+                  type="radio"
+                  name="plays"
+                  .checked=${this._type === option.type}
+                  @change=${() => this._choose(option.type)}
+                />
+                <span>${option.label}: ${option.description}</span>
+              </label>
+            `
+          )}
         </fieldset>
-        <label class="choice">
-          <input type="checkbox" .checked=${this._capo} @change=${this._chooseCapo} />
-          <span>I play guitar: show a capo control</span>
-        </label>
-        <p>You can change these later in Preferences.</p>
+        <p>You can change this later in Preferences, where each setting can be set by itself.</p>
         <div class="actions" slot="actions">
           <button class="btn" @click=${() => this.#modal.value?.close()}>Skip</button>
           <button class="btn primary" @click=${() => this.#modal.value?.close()}>Continue</button>
