@@ -14,7 +14,6 @@ import {
   type NavMenu,
 } from '../src/components/nav-menu.ts'
 import { SetlistDetailsIdentifyEvent } from '../src/components/setlist-details-form.ts'
-import { SetlistRevertedEvent } from '../src/components/setlist-differs.ts'
 import {
   SetlistInfoDeleteEvent,
   type SetlistInfoDialog,
@@ -425,13 +424,13 @@ describe('the setlist page: header, menu and keys', () => {
       )
     })
 
-    it('lets a user who can only read change a song’s key too', async () => {
+    it('has a user who can only read see the song’s key as text: the setlist is the leader’s to change', async () => {
       const { id } = getCurrentSpace()
       await setSpaceReadOnly(must(id), true)
       await rig.open()
       rig.page.showSong(0, true)
       header().dispatchEvent(new EditModeToggleEvent())
-      expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(true)
+      expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(false)
       header().dispatchEvent(new EditModeToggleEvent())
       // (left as it was: the controls faded back)
       await waitUntil(() =>
@@ -722,53 +721,6 @@ describe('the setlist page: header, menu and keys', () => {
       }
       must($<HTMLElement>('#share-button')).click()
       expect(shown).to.equal(1)
-    })
-  })
-
-  describe('the differs-from-official button', () => {
-    const changedHere = { fileRef: 'f', syncedContentHash: 'not-this' }
-
-    it('is on the overview of a changed setlist of a user who can only read, and opens its dialog', async () => {
-      const { id } = getCurrentSpace()
-      await setSpaceReadOnly(must(id), true)
-      await rig.open(3, changedHere)
-      const button = must($<HTMLElement>('#differs-button'))
-      expect(button.hidden).to.equal(false)
-      rig.page.showSong(0, true)
-      await rig.page.header.show(rig.page.songs[0], true)
-      expect(button.hidden).to.equal(true)
-
-      const dialog = must($('#setlist-differs')) as unknown as HTMLElement & {
-        show(): void
-        setlist: unknown
-      }
-      let shown = 0
-      dialog.show = () => {
-        shown++
-      }
-      button.click()
-      expect(shown).to.equal(1)
-      expect((dialog.setlist as { id: string }).id).to.equal(rig.page.currentSetlistId)
-
-      const rendered: string[] = []
-      rig.page.renderSetlist = async (setlistId: string) => {
-        rendered.push(setlistId)
-      }
-      dialog.dispatchEvent(new SetlistRevertedEvent())
-      expect(rendered).to.deep.equal([rig.page.currentSetlistId])
-      // (and it is set up once)
-      rig.page.header.refreshDiffers()
-      button.click()
-      expect(shown).to.equal(2)
-    })
-
-    it('is not there for a writer, or for a setlist that is as Drive has it', async () => {
-      await rig.open(3, changedHere)
-      expect(must($<HTMLElement>('#differs-button')).hidden).to.equal(true)
-      const { id } = getCurrentSpace()
-      await setSpaceReadOnly(must(id), true)
-      await rig.open(3, { fileRef: null })
-      expect(must($<HTMLElement>('#differs-button')).hidden).to.equal(true)
     })
   })
 

@@ -7,7 +7,6 @@ import '../../components/pitch-selector.ts'
 import '../../components/musical-metadata-display.ts'
 import '../../components/setlist-info-dialog.ts'
 import '../../components/setlist-overview.ts'
-import '../../components/setlist-differs.ts'
 import '../../components/setlist-share.ts'
 import '../../components/song-card.ts'
 import '../../components/song-display.ts'
@@ -55,16 +54,6 @@ export function setlistTemplate({
           shareable
             ? html`<button
               slot="tools"
-              class="share-button differs-button"
-              id="differs-button"
-              aria-label="Differs from the official setlist"
-              title="Differs from the official setlist"
-              hidden
-            >
-              <app-icon name="warning" size="24"></app-icon>
-            </button>
-            <button
-              slot="tools"
               class="share-button"
               id="share-button"
               aria-label="Share setlist"
@@ -104,7 +93,6 @@ export function setlistTemplate({
       <song-info-dialog id="song-info-dialog"></song-info-dialog>
       <setlist-info-dialog id="setlist-info-dialog"></setlist-info-dialog>
       ${shareable ? html`<setlist-share id="setlist-share"></setlist-share>` : nothing}
-      ${shareable ? html`<setlist-differs id="setlist-differs"></setlist-differs>` : nothing}
 
       <app-modal
         id="reset-confirm-modal"

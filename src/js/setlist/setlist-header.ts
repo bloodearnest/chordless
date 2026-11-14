@@ -11,7 +11,6 @@ import type { CapoSelector } from '../../components/capo-selector.ts'
 import type { KeySelector } from '../../components/key-selector.ts'
 import type { MusicalMetadataDisplay } from '../../components/musical-metadata-display.ts'
 import type { PitchSelector } from '../../components/pitch-selector.ts'
-import type { SetlistDiffers } from '../../components/setlist-differs.ts'
 import type { SetlistShare } from '../../components/setlist-share.ts'
 import type { SongSettingsPopover } from '../../components/song-settings-popover.ts'
 import type { Setlist } from '../data-types.ts'
@@ -25,7 +24,6 @@ import { listPadSets } from '../pad-set-service.ts'
 import { buildUrl, type Route } from '../router.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
 import { syncsBack } from '../space.ts'
-import { differsFromOfficial } from '../sync/revert.ts'
 import { getAvailableKeys, transposeKeyName } from '../transpose.ts'
 import type { Tuning } from '../tuning.ts'
 import { normalizeCapo } from '../utils/capo.ts'
@@ -263,15 +261,11 @@ export class SetlistHeader {
     this.showCurrentCapo()
   }
 
-  /** The share, differs and live buttons: on the overview only. Share is lit while the setlist is shared */
+  /** The share and live buttons: on the overview only. Share is lit while the setlist is shared */
   showButtons(show: boolean) {
     const { currentSetlist } = this.host
     const live = this.#find('#live-button')
     if (live) live.hidden = !show
-    const differs = this.#find('#differs-button')
-    if (differs) {
-      differs.hidden = !(show && currentSetlist && differsFromOfficial(currentSetlist, syncsBack()))
-    }
     const share = this.#find('#share-button')
     if (!share) return
     share.hidden = !show
@@ -300,15 +294,6 @@ export class SetlistHeader {
     const sync = here ? getLiveSyncStatus() : null
     if (sync) button.dataset.sync = sync
     else delete button.dataset.sync
-  }
-
-  /** Hand the "differs from official" dialog the setlist */
-  refreshDiffers() {
-    const dialog = this.#find<SetlistDiffers>('#setlist-differs')
-    const { currentSetlist } = this.host
-    if (!dialog || !currentSetlist) return
-    dialog.setlist = currentSetlist
-    dialog.db = this.host._database()
   }
 
   /** Hand the share dialog the setlist */

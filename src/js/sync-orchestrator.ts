@@ -5,9 +5,6 @@
  * time and the message of any error, and throws the error again.
  */
 
-import type { SetlistEntry } from './data-types.ts'
-import type { ResetSetlist, SyncReport } from './sync/session.ts'
-import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { withSyncLock } from './sync-lock.ts'
 import type { SyncProgress } from './sync-manager.ts'
 import {
@@ -18,8 +15,6 @@ import {
 } from './sync-manager.ts'
 import { trackSync } from './sync-status.ts'
 import { phase, traced } from './telemetry/telemetry.ts'
-import { toast } from './toast.ts'
-import { setlistTitle } from './utils/date-utils.ts'
 import { errorMessage } from './utils/errors.ts'
 
 /** Progress as this layer sends it: with the time, and the error's message on failure */
@@ -29,60 +24,6 @@ export interface SyncBroadcast extends SyncProgress {
 }
 
 export type BroadcastCallback = (progress: SyncBroadcast) => void
-
-/** How much of what changed a toast spells out */
-const SUMMARY_LIMIT = 4
-
-/**
- * A user who can only read never uploads, so the leader's version replaced the setlists they
- * had changed on this device: tell them what the leader's version has that theirs did not, and
- * offer to put theirs back (docs/SPACES.md, "Read-only: local edits are never blocked")
- */
-async function tellOfReset(
-  manager: SyncManager,
-  { resetSetlists: reset }: SyncReport
-): Promise<void> {
-  if (reset.length === 0) return
-  const { db } = manager
-  const titles = new Map<string, string>()
-  for (const { before, after } of reset) {
-    for (const entry of [...before.songs, ...after.songs]) {
-      if (titles.has(entry.songUuid)) continue
-      titles.set(entry.songUuid, (await db.getSong(entry.songUuid))?.title ?? entry.songId)
-    }
-  }
-  const titleOf = (entry: SetlistEntry) => titles.get(entry.songUuid) ?? entry.songId
-
-  const summary = (change: ResetSetlist) => {
-    const changes = describeSetlistChange(change.before, change.after, titleOf)
-    const shown = changes.slice(0, SUMMARY_LIMIT).join(', ')
-    return changes.length > SUMMARY_LIMIT ? `${shown}, …` : shown
-  }
-  const only = reset.length === 1 ? reset[0] : null
-  const what = only ? summary(only) : ''
-  toast(
-    only
-      ? `Your changes to ${setlistTitle(only.before)} were replaced by the leader's version${what ? ` (${what})` : ''}.`
-      : `Your changes to ${reset.length} setlists were replaced by the leader's versions.`,
-    {
-      details: reset.map(change => `${setlistTitle(change.before)}: ${summary(change)}`).join('\n'),
-      action: {
-        label: 'Undo',
-        run: () => {
-          // Back to what this device had; it is still a change here that is never uploaded
-          for (const { before } of reset) {
-            db.saveSetlist(before).catch(error =>
-              toast("Couldn't put your changes back.", {
-                kind: 'error',
-                details: errorMessage(error),
-              })
-            )
-          }
-        },
-      },
-    }
-  )
-}
 
 /** What an operation says as it starts and ends (none for a reset, which has its own progress) */
 interface Messages {
@@ -202,7 +143,7 @@ export class SyncOrchestrator {
       { starting: 'Starting sync...', complete: 'Sync complete!' },
       progressCallback,
       async (manager, progress) => {
-        await tellOfReset(manager, await manager.sync(progress))
+        await manager.sync(progress)
       },
       trigger
     )
@@ -228,7 +169,7 @@ export class SyncOrchestrator {
           {},
           progressCallback,
           async (manager, progress) => {
-            await tellOfReset(manager, await manager.incrementalSync(progress, { push }))
+            await manager.incrementalSync(progress, { push })
           },
           trigger
         ),
@@ -311,7 +252,7 @@ export class SyncOrchestrator {
       { starting: 'Pulling from Drive...', complete: 'Pull complete!' },
       progressCallback,
       async (manager, progress) => {
-        await tellOfReset(manager, await manager.pullFromDrive(progress))
+        await manager.pullFromDrive(progress)
       }
     )
   }
