@@ -57,14 +57,12 @@ export function setTextTap(next: TextTap | null): void {
 /** Told when the catalogue was rewritten while the page is open (dev only: the page is not reloaded) */
 export const TEXT_CHANGED = 'chordless-text-changed'
 
-// In dev the catalogue is rewritten by the editor: take the new one, and say so, rather than reloading
-// the page (and the toast or dialog it was made for)
-/* v8 ignore start -- Vite's hot reload; there is none in a test or a built app */
-if (import.meta.hot) {
-  import.meta.hot.accept('../text/en.ts', next => {
-    if (!next) return
-    bundle = bundleOf(next.default)
-    window.dispatchEvent(new Event(TEXT_CHANGED))
-  })
+/**
+ * Dev only: take a new catalogue (the editor, js/copy-editor.ts, gets it from the dev server when
+ * src/text/en.ts is written, by it or by hand), and say so. Nothing in the app's own modules is
+ * Vite's, so that a service worker with nothing cached ahead (the dev server's) still finds them offline.
+ */
+export function setCatalogue(source: string): void {
+  bundle = bundleOf(source)
+  window.dispatchEvent(new Event(TEXT_CHANGED))
 }
-/* v8 ignore stop */
