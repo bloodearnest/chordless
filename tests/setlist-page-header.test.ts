@@ -33,7 +33,11 @@ import { type SongInfoDialog, SongRangeChangedEvent } from '../src/components/so
 import { SongChangeEvent } from '../src/js/app-events.ts'
 import type { Person, Setlist } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
-import { setCapoPreference } from '../src/js/preferences.ts'
+import {
+  setCapoPreference,
+  setPitchControlsPreference,
+  setPitchPreference,
+} from '../src/js/preferences.ts'
 import { writeMusicXml } from '../src/js/score-musicxml.ts'
 import { scoreRecord } from '../src/js/score-record.ts'
 import {
@@ -446,6 +450,58 @@ describe('the setlist page: header, menu and keys', () => {
       await waitUntil(() =>
         $$('.normal-mode-control').every(el => el.classList.contains('fade-complete'))
       )
+    })
+
+    it('has the pitch selector editable too when the pitch controls are on, and plain text again when edit mode is left', async () => {
+      setPitchControlsPreference(true)
+      try {
+        await rig.open()
+        rig.page.showSong(0, true)
+        const selector = $('#pitch-selector') as unknown as { editMode: boolean }
+        header().dispatchEvent(new EditModeToggleEvent())
+        expect(selector.editMode).to.equal(true)
+        // (the header's own leaving, with no fade, as when the page is left in edit mode)
+        rig.page.header.leaveEditMode()
+        expect(selector.editMode).to.equal(false)
+      } finally {
+        setPitchControlsPreference(false)
+      }
+    })
+
+    it('shows the instrument pitch only while its controls are on, and says it only when it is not concert pitch', async () => {
+      setPitchControlsPreference(true)
+      setPitchPreference('eb')
+      try {
+        await rig.open()
+        const selector = $('#pitch-selector') as unknown as {
+          style: CSSStyleDeclaration
+          value: string
+          followed: string
+        }
+        const metadata = $('#musical-metadata') as unknown as { instrument: string }
+        // (on the overview there is no song: the picker is there, with nothing to say yet)
+        rig.page.currentSongIndex = -1
+        rig.page.header.showPitch()
+        expect(selector.style.display).to.equal('')
+        expect(rig.page.header.instrumentSaid(null)).to.equal('E♭')
+        // (on a song, its own pitch, or the one it follows)
+        rig.page.showSong(0, true)
+        rig.page.header.showPitch()
+        expect(selector.followed).to.equal('eb')
+        expect(metadata.instrument).to.equal('E♭')
+        rig.page.songs[0].currentPitch = 'concert'
+        rig.page.header.showPitch()
+        expect(selector.value).to.equal('concert')
+        expect(metadata.instrument).to.equal('')
+        // (with the controls off it is hidden, and says nothing)
+        setPitchControlsPreference(false)
+        rig.page._handlePitchControlsChange()
+        expect(selector.style.display).to.equal('none')
+        expect(rig.page.header.instrumentSaid(rig.page.songs[0])).to.equal('')
+      } finally {
+        setPitchControlsPreference(false)
+        setPitchPreference('concert')
+      }
     })
 
     it('is left with Escape, and a song’s edits are saved by leaving it', async () => {
