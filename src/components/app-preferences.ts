@@ -95,6 +95,18 @@ export class AppPreferences extends LitElement {
       padding: 1rem;
     }
 
+    /* A phone: the panels use the width, not the margins around them */
+    @media (max-width: 30rem) {
+      .preferences-content {
+        padding: 0.5rem;
+        gap: 0.5rem;
+      }
+
+      .panel {
+        padding: 0.75rem;
+      }
+    }
+
     .panel h3 {
       font-size: var(--font-ui);
       margin: 0 0 0.75rem;
@@ -142,8 +154,9 @@ export class AppPreferences extends LitElement {
 
     .field {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.25rem 0.75rem;
       margin: 0.5rem 0;
       font-size: var(--font-ui-small);
     }
