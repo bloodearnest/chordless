@@ -332,6 +332,10 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       await rig.page.handleKeyChange('B')
       expect(rig.page.songs[0].currentKey).to.not.equal('B')
       expect(must(await rig.db.getSetlist(setlist.id)).songs[0].key).to.not.equal('B')
+      // (out of edit mode it is not editable for anyone)
+      document.body.classList.remove('edit-mode')
+      rig.page.header.showKey('D')
+      expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(false)
       document.body.classList.add('edit-mode')
       rig.page.header.showKey('D')
       expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(false)
@@ -342,6 +346,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       expect(rig.page.songs[0].currentKey).to.equal('B')
       rig.page.header.showKey('D')
       expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(true)
+      document.body.classList.remove('edit-mode')
     })
 
     it('is shown on the selector, editable in edit mode, for a reader too', async () => {
