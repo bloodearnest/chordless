@@ -1,9 +1,9 @@
 /**
  * The pull of a Drive sync: what Drive holds that this device doesn't, or holds newer, comes
- * down to the local database. Drive wins a conflict. A user who can only read never uploads, so
- * the leader's version replaces a setlist they changed here (`resetSetlists` says which, for the
- * app to tell them), while a chart they changed is left as it is (`heldBack` counts it): see
- * docs/SPACES.md, "Read-only: local edits are never blocked".
+ * down to the local database. Drive wins a conflict. A user who can only read never uploads, and
+ * a chart they changed is left as it is (`heldBack` counts it): see docs/SPACES.md, "Read-only:
+ * local edits are never blocked". A setlist is the leader's, and what a person keeps for themselves
+ * is not in it (docs/PERSONAL_LAYER.md), so a pull replaces it without telling anyone.
  */
 
 import type { Person, ScoreRecord, Setlist, SongInput, SongRecord } from '../data-types.ts'
@@ -129,7 +129,6 @@ export async function pullSetlists(
 
   const downloadQueue: SetlistDownload[] = []
   const adopted = new Set<string>()
-  const resetting = new Map<string, Setlist>()
 
   for (const driveFile of driveSetlists) {
     try {
@@ -147,9 +146,6 @@ export async function pullSetlists(
         // Drive's content changed since our last sync if its md5Checksum (computed
         // by Drive) differs from the one we recorded. No clocks involved.
         if (driveFile.rev !== localSetlist.fileRev) {
-          if (run.readOnly && setlistHasLocalChanges(localSetlist)) {
-            resetting.set(setlistId, localSetlist)
-          }
           downloadQueue.push({ driveFile, setlistId, localSetlist })
         }
       } else if (!adopted.has(setlistId) && run.isOrphaned(localSetlist)) {
@@ -215,10 +211,6 @@ export async function pullSetlists(
     // (the people first: a setlist whose leader is not stored shows none)
     await run.db.addPeople(leaders.added)
     await run.db.saveSetlistsBatch(setlistsToSave)
-    for (const after of setlistsToSave) {
-      const before = resetting.get(after.id)
-      if (before) run.resetSetlists.push({ before, after })
-    }
   }
 }
 

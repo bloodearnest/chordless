@@ -14,7 +14,6 @@ import {
 import { MenuOverviewClickEvent, MenuSongClickEvent, type NavMenu } from '../components/nav-menu.ts'
 import { PitchChangeEvent, type PitchSelector } from '../components/pitch-selector.ts'
 import { SetlistDetailsIdentifyEvent } from '../components/setlist-details-form.ts'
-import { type SetlistDiffers, SetlistRevertedEvent } from '../components/setlist-differs.ts'
 import {
   SetlistInfoDeleteEvent,
   type SetlistInfoDialog,
@@ -83,7 +82,7 @@ import { SectionController } from './setlist/section-controller.ts'
 import { SetlistHeader } from './setlist/setlist-header.ts'
 import { controlsSetlist } from './setlist-control.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
-import { getCurrentSpaceFull, getSpaceById, listSpaces } from './space.ts'
+import { getCurrentSpaceFull, getSpaceById, listSpaces, syncsBack } from './space.ts'
 import { transferSetlists } from './space-transfer.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
@@ -465,7 +464,6 @@ export class SetlistPage {
         this.currentSetlistId = setlistId
         this.currentSetlist = setlist
         this.header.refreshShare()
-        this.header.refreshDiffers()
         this.header.refreshLive()
         this.overview.attach(null)
 
@@ -498,7 +496,6 @@ export class SetlistPage {
       this.currentSetlistId = setlistId
       this.currentSetlist = setlist
       this.header.refreshShare()
-      this.header.refreshDiffers()
       this.header.refreshLive()
 
       // Kick off background pad caching for all keys in this setlist
@@ -757,27 +754,6 @@ export class SetlistPage {
       shareDialog.addEventListener(
         SetlistShareChangeEvent.type,
         () => share.classList.toggle('shared', Boolean(shareDialog.setlist?.share)),
-        { signal }
-      )
-    }
-
-    const differs = $('#differs-button')
-    const differsDialog = $<SetlistDiffers>('#setlist-differs')
-    if (differs && differsDialog) {
-      differs.addEventListener(
-        'click',
-        () => {
-          if (!this.currentSetlist) return
-          differsDialog.setlist = this.currentSetlist
-          differsDialog.show()
-        },
-        { signal }
-      )
-      differsDialog.addEventListener(
-        SetlistRevertedEvent.type,
-        () => {
-          if (this.currentSetlistId) void this.renderSetlist(this.currentSetlistId)
-        },
         { signal }
       )
     }
@@ -1894,11 +1870,14 @@ export class SetlistPage {
    * Whether the person using the device controls the setlist (docs/PERSONAL_LAYER.md, "Who controls a
    * setlist"): they may change its songs, order, keys, tempos and details for everyone, and share
    * annotations. Everyone else has what they keep for themselves, and what they added for themselves.
-   * A setlist received by link is nobody's here.
+   * A setlist received by link is nobody's here, and nor is any in a space that does not sync back
+   * (a reader of the Drive folder or a team member who can only read): what they change would
+   * never reach the leader's file.
    */
   async _decideControls(setlist: Setlist): Promise<boolean> {
     if (this._readOnly) return false
     const space = await getCurrentSpaceFull()
+    if (!syncsBack(space)) return false
     if (!space.team) return true
     const db = this._database()
     const user = await getSignedInUser()

@@ -129,8 +129,10 @@ Working names:
 - **A writer's change of key or tempo on someone else's setlist** is no longer offered. Today any writer
   can. The person's way to a different key is how they play it (above).
 - **The read-only reset path** (a reader's changes replaced by the leader's, the "differs from official"
-  button, the revert) has nothing to do once non-owners have no shared edits: a person's changes are in
-  the layer, and nothing is replaced. It is removed with the layer.
+  button, the revert) is gone (step 6): non-owners have no shared edits, a person's changes are in the
+  layer, and nothing is replaced. A reader of the Drive folder, who never syncs back, counts as a
+  non-owner too (`_decideControls`). Changes a device made before stay until the leader next changes
+  the setlist, which replaces them as any pull does, without a notice.
 - **Conflicts become rare**: only the leader and someone covering for them can write the setlist's file.
   Drive wins stays the rule, and the Worker's 409 on a write over a change made since the pull (built)
   guards it. What is missing is telling the person whose change lost; a small notice, later.
@@ -155,8 +157,8 @@ What is built and will change:
 - Who controls a setlist is built (`src/js/setlist-control.ts`): key, tempo, order, removal and the
   setlist's details are offered only to them, and non-owners' Add Song makes a local addition (`local`
   on the entry: never in Drive, a share or an export, and put back after a pull). A setlist whose leader
-  cannot be found is its creator's (`createdBy`), here and in the Worker's delete rule. A reader's
-  earlier changes stay until the read-only reset is removed (step 6).
+  cannot be found is its creator's (`createdBy`), here and in the Worker's delete rule.
+  The read-only reset path (toast, "differs from official" button, revert) is removed.
 - Capo (per song, 0 to 11), the guitar tuning (device default, and per setlist), section display and
   private annotations are in the personal layer. The first-use setup and Preferences ask "What do you
   play?" (#193). The transposing instrument's pitch moves the chords and the lead sheet's notes.
@@ -222,7 +224,8 @@ Pull requests, in order, each building on `main` as it is:
 5. **Songs added locally** (built, with 4): someone who does not control the setlist adds a song as an
    entry flagged `local` in their own copy; it is marked "Just me" in the overview and can be removed
    and changed by them alone.
-6. Remove the read-only reset path.
+6. **Remove the read-only reset path** (built): the toast with Undo, `resetSetlists`, the "differs from
+   official" button and dialog, and `sync/revert.ts`. A Drive-folder reader is a non-owner.
 
 Tests, as for any preference: the arithmetic in node, each control's setting and its being kept, storage
 blocked, the carry-over, and the setlist page following a change.

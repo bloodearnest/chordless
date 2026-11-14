@@ -77,18 +77,10 @@ export function inBatchesOfBytes<T, R>(
   return inBatchesOf(refs => space.readManyBytes(refs), items, refOf, work, onGroup)
 }
 
-/** A setlist a pull replaced: what this device had, and what it has now */
-export interface ResetSetlist {
-  before: Setlist
-  after: Setlist
-}
-
 /** What a sync reports once it has ended */
 export interface SyncReport {
   /** How many charts the pull left alone because they have local changes that can't go back */
   heldBack: number
-  /** The setlists a pull replaced with Drive's although they had local changes (read-only) */
-  resetSetlists: ResetSetlist[]
   /** Whether the user can only read the folder (null: it was not asked) */
   readOnly: boolean | null
   /** Whether a file the pull meant to download could not be */
@@ -125,8 +117,6 @@ export class SyncRun {
   readOnly: boolean | null = null
   /** How many charts the pull left alone because they have local changes that can't go back */
   heldBack = 0
-  /** The setlists a pull replaced with Drive's although they had local changes (read-only) */
-  resetSetlists: ResetSetlist[] = []
   /** Whether the pull of people failed to read some file, so it may not know them all */
   peoplePullIncomplete = false
   /** Whether the pull of setlists failed to read some file, so it may not know them all */
@@ -185,7 +175,6 @@ export class SyncRun {
   report(): SyncReport {
     return {
       heldBack: this.heldBack,
-      resetSetlists: this.resetSetlists,
       readOnly: this.readOnly,
       downloadsFailed: this.downloadsFailed,
     }

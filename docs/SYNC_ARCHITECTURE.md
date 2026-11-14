@@ -610,7 +610,7 @@ moved between folders each have a test of their own.
   saves its whole in-memory copy of the setlist when anything changes, so a copy left as it was
   would overwrite what came in with the next edit. Where this device's unsaved edit and Drive's
   both changed the setlist, Drive's version is what the pull saved and what is shown, as in any
-  pull; a reader's replaced changes keep their Undo (`tellOfReset`). A leader's late song is never
+  pull. A leader's late song is never
   held back, in or out of live mode (CLAUDE.md, "permissive in the moment"). Live pushes feed
   the same step.
 

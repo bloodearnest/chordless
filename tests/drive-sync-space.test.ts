@@ -222,7 +222,6 @@ describe('Drive sync: spaces', () => {
       const report = await member.sync.sync(progress => said.push(progress.message))
 
       expect(must(await member.db.getSetlist(setlist.id)).name).to.equal('Leader change')
-      expect(report.resetSetlists).to.have.length(1)
       expect(report.heldBack).to.equal(0)
       expect(said.at(-1)).to.equal('Sync complete (view-only: your changes stay on this device)')
     })

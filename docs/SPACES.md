@@ -738,41 +738,32 @@ Google accounts.
 
 ## Read-only: local edits are never blocked
 
-**Built (2026-10-19).** A user who can only read the Drive folder edits everything a writer does:
-the `isReadOnlySpace()` gates are gone (setlist page, library, home, imports, nav menu, the
-key and BPM controls). The one boolean left is `syncsBack()` (`space.ts`), and it removes
-only what needs Drive: sharing by link (the song list to paste stays).
+**Built (2026-10-19), narrowed 2026-11-14.** A user who can only read the Drive folder keeps what
+a person keeps for themselves (capo, tuning, pitch, section display, annotations "just me", songs
+added for themselves), but is not the one who controls a setlist, so the key, tempo and order are
+shown and not changed (docs/PERSONAL_LAYER.md, "Who controls a setlist": `_decideControls` is false
+where `syncsBack()` is). The `isReadOnlySpace()` gates stay gone (library, home, imports, nav menu).
+`syncsBack()` (`space.ts`) removes what needs Drive: sharing by link (the song list to paste stays).
 - For a personal space or an owner's, the trigger is Drive's folder `capabilities` or a refused
   upload (`refreshAccess()`, `space-access.ts`), kept as `readOnly` on the space record and in
   localStorage. For a team member it is the role the Worker reports: a reader's space is made
   `readOnly` when the team is joined or found (`team-spaces.ts`, `team-memberships.ts`, which also
   brings a known team's role up to date).
-- Their changes are **never pushed**. They last on this device until a pull finds Drive's copy
-  changed:
-  - a **setlist** they changed is then replaced by the leader's version (the official plan wins; it
-    is the order, keys and tempos that change at the last minute), and a toast tells them
-    ("Your changes to <setlist> were replaced by the leader's version", `tellOfReset` in
-    `sync-orchestrator.ts`; `resetSetlists` in `sync/pull.ts`). A setlist the leader did not change
-    keeps their edits.
+- Their changes are **never pushed**:
+  - a **setlist** is the leader's: a pull replaces it with the leader's version, and nothing is told
+    (there is no toast, "differs from official" button or revert any more: a person's own things are
+    in the personal layer and are not replaced; docs/PERSONAL_LAYER.md, step 6). What they added for
+    themselves is put back after the pull. A change made before this stays until the leader next
+    changes the setlist.
   - a **chart** they changed is left alone (`heldBack` counts it): chart edits are rare and
     deliberate. The sync says "view-only: your changes stay on this device" and how many differ.
-- **Differs from official:** on the overview of a setlist the reader has changed, a small warning
-  button in the header (`#differs-button`) opens `setlist-differs`, which says the change is not
-  uploaded and will be replaced if the leader changes the setlist, and offers "Put it
-  back to the official setlist" (`sync/revert.ts`: Drive's copy replaces the local one, keeping the
-  id and the device state). A held-back chart has no marker yet; "Reset from Google Drive" on the
-  Account and Teams page is its revert.
-- The toast says what the leader's version has that theirs did not (`sync/setlist-diff.ts`: songs
-  added and removed, a different order, a key or tempo, the details) and offers **Undo**, which puts
-  their version back (still never uploaded). Undo lasts as long as the toast (15 seconds).
+    A held-back chart has no marker yet; "Reset from Google Drive" on the Account and Teams page is
+    its revert.
 - **No guard for a setlist that is open or live, on purpose.** A leader's last-minute song must reach
   a live follower: blocking it would go against "permissive in the moment". It can happen
   mid-service, since the app syncs by itself (SYNC_ARCHITECTURE.md, "Immediate background sync"):
   the open setlist is updated in place (`applyChangedSetlist`), keeping the current song by its song
-  id, saying what changed with the same summary, and keeping Undo.
-- The marker does not yet list *what* differs. It goes with the rest of this path when the personal
-  layer is built (docs/PERSONAL_LAYER.md): a person who does not control a setlist will have no shared
-  edits to replace.
+  id and saying what changed (`sync/setlist-diff.ts`).
 
 **To do:** the Drive-capabilities trigger and the refusal counting can go for team spaces, whose
 role is known. Anyone (a writer too) could choose "keep
@@ -908,7 +899,8 @@ Checked against the code 2026-11-12.
    space, and pads (Drive calls).
 5. [x] Read-only rework: gates removed, `syncsBack`, pull skips records with local changes, the
    "differs from official" button with revert (setlists), the role from the Worker for team members.
-   Left: the what-differs list, charts' marker, dropping the capabilities trigger for teams.
+   The button and revert were removed again with the personal layer (docs/PERSONAL_LAYER.md, step 6).
+   Left: charts' marker, dropping the capabilities trigger for teams.
 6. [x] Per-space pads and "Save to" (2026-11-10). Left: the team default pad sound (TODO), and
    bringing pads across (item 4).
 7. [x] Worker team service: the API for members, identity, D1 state, the register, invites, joining,
