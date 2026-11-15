@@ -394,9 +394,11 @@ per device and off by default, that engraves the sheet as a handwritten chart:
   jazz font that ships inside the toolkit: no new file, and it works offline as the rest does.
 - **The words** (chords, lyrics, section names) are lettered in the annotation font (Caveat, already in the
   app), by a rule in `score-view.ts` on `[data-real-book]`.
-- **The chord notation** is the Real Book's: `maj7` is `Δ7`, `m7` is `-7`, `m7b5` is `ø7`, `dim` is `°`, `aug` is
+- **The chord notation** is the Real Book's, for the symbols that nearly every chart agrees on: `m7` is `-7`, `m7b5` is `ø7`, `dim` is `°`, `aug` is
   `+` (`realBookQuality` in `score-svg-text.ts`). It rewrites the text of the SVG's chord symbols only: the MusicXML,
   which is also what is stored, keeps the chart's own words, so turning the style off gives them back.
 
 A change of the preference engraves the sheets again (the view does it, with no page change). Not done: superscripts
-for extensions (`7♭9`), and the style is not offered per setlist.
+for extensions (`7♭9`), and the style is not offered per setlist. Also not done, because charts differ: the major
+seventh (`Δ7`, `M7` or `maj7`) and an explicit major triad (`maj`, `M`) are left as the chart has them. A later choice
+(a "jazz chord symbols" setting apart from the handwritten look) would offer them.

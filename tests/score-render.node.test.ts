@@ -164,10 +164,11 @@ describe('the Real Book style', () => {
 
   it('writes the quality of a chord as a Real Book does', () => {
     const cases: Record<string, string> = {
-      maj7: 'Δ7',
-      Maj7: 'Δ7',
-      M7: 'Δ7',
-      maj9: 'Δ9',
+      // (these vary from chart to chart, so they are as the chart has them)
+      maj7: 'maj7',
+      M7: 'M7',
+      maj: 'maj',
+      M: 'M',
       m: '-',
       m7: '-7',
       min7: '-7',
@@ -205,6 +206,6 @@ describe('the Real Book style', () => {
       [...g[0].matchAll(/<tspan font-size="\d+px"[^>]*>([^<]*)<\/tspan>/g)].map(t => t[1]).join('')
     )
     assert.equal(withRealBookChords(page, false), page)
-    assert.deepEqual(text, ['BbΔ7', 'A-7', 'F#ø7', 'C°', 'G'])
+    assert.deepEqual(text, ['Bbmaj7', 'A-7', 'F#ø7', 'C°', 'G'])
   })
 })
