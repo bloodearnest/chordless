@@ -178,13 +178,6 @@ describe('the Real Book style', () => {
     assert.deepEqual(strokes(after.pages[0] as string), strokes(before.pages[0] as string))
   })
 
-  it('draws chord symbols a little bigger in the Real Book style only', () => {
-    const svg =
-      '<g class="harm"><text font-size="0px"><tspan class="text"><tspan font-size="400px" x="1" y="2">Am7</tspan></tspan></text></g>'
-    assert.match(withRealBookChords(svg), /font-size="460px"[^>]*>A-7</)
-    assert.match(withRealBookChords(svg), /<text font-size="0px">/)
-  })
-
   it('writes the quality of a chord as a Real Book does', () => {
     const cases: Record<string, string> = {
       // (these vary from chart to chart, so they are as the chart has them)

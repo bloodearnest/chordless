@@ -394,13 +394,15 @@ per device and off by default, that engraves the sheet as a handwritten chart:
   jazz font that ships inside the toolkit: no new file, and it works offline as the rest does.
 - **The layout** goes with the font (`REAL_BOOK_OPTIONS` in `score-render-engine.ts`): Verovio's `handwrittenFont`
   setting for Petaluma (a hand drawn staff), heavier staff lines, stems, barlines, ledger lines, ties and slurs, bigger
-  lyrics (Caveat is small for its size), chords lifted (`harmDist`) and 15% bigger (`withRealBookChords`), and a
-  little more room along the line (`spacingLinear`). Found by rendering the same four bars in variants and looking:
+  lyrics, chords lifted (`harmDist`), and a little more room along the line (`spacingLinear`). Found by rendering the same four bars in variants and looking:
   there is no published guidance (Verovio's book says nothing of handwritten fonts, and no one seems to have done a
   Real Book look with it), so these are our choices, to be tuned by eye. The toolkit is kept between sheets, so each
   one starts from `resetOptions()`: the weights must not stay for the next sheet.
-- **The words** (chords, lyrics, section names) are lettered in the annotation font (Caveat, already in the
-  app), by a rule in `score-view.ts` on `[data-real-book]`.
+- **The words** (chords, lyrics, section names) are lettered in **Petaluma Script**, the text font made to go with
+  Petaluma (it has the Δ, ø, ° and + which Caveat does not have, and its chords are upright block capitals like a Real Book's),
+  by a rule in `score-view.ts` on `[data-real-book]`. It is `src/css/fonts/PetalumaScript.woff2` (51 KB, SIL OFL, from
+  `steinbergmedia/petaluma`; the licence is in `public/licences/` and named on `src/licences.html`), so it is bundled and
+  precached like the rest. Caveat is its fallback.
 - **The chord notation** is the Real Book's, for the symbols that nearly every chart agrees on: `m7` is `-7`, `m7b5` is `ø7`, `dim` is `°`, `aug` is
   `+` (`realBookQuality` in `score-svg-text.ts`). It rewrites the text of the SVG's chord symbols only: the MusicXML,
   which is also what is stored, keeps the chart's own words, so turning the style off gives them back.
