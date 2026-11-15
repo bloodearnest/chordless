@@ -204,6 +204,7 @@ describe('the Real Book style', () => {
     const text = [...page.matchAll(/class="harm"[\s\S]*?<\/g>/g)].map(g =>
       [...g[0].matchAll(/<tspan font-size="\d+px"[^>]*>([^<]*)<\/tspan>/g)].map(t => t[1]).join('')
     )
+    assert.equal(withRealBookChords(page, false), page)
     assert.deepEqual(text, ['BbΔ7', 'A-7', 'F#ø7', 'C°', 'G'])
   })
 })

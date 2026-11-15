@@ -48,9 +48,10 @@ export function realBookQuality(quality: string): string {
 /**
  * The chord symbols of the pages in the notation of a Real Book (`realBookQuality`). Only the text of
  * a chord symbol (`g.harm`) is changed: the root is the first letter of the first run, and a run after a
- * flat or sharp is all quality.
+ * flat or sharp is all quality. With `on` false the page is as it was.
  */
-export function withRealBookChords(svg: string): string {
+export function withRealBookChords(svg: string, on = true): string {
+  if (!on) return svg
   return svg.replace(/(class="harm"[\s\S]*?<\/g>)/g, harm =>
     harm.replace(
       /(<tspan font-size="\d+px"[^>]*>)([^<]*)(<\/tspan>)/g,
