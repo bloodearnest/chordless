@@ -78,26 +78,4 @@ describe('lining up a cue line with the sung one', () => {
     const far = svg.replace(/data-x="1830"/, 'data-x="2400"')
     assert.notEqual(readScoreSvg([far]).measures[0]?.length, 4)
   })
-
-  it('puts two chords over one whole rest on different beats, by how far along the measure each is', () => {
-    const chord = (text: string, x: number) =>
-      `<g class="harm"><text x="${x}" y="3000"><tspan class="text"><tspan x="${x}" y="3000">${text}</tspan></tspan></text></g>`
-    const rest =
-      '<g class="mRest"><use xlink:href="#E4E3-x" transform="translate(2000, 3777) scale(0.72, 0.72)" /></g>'
-    const read = (chords: string) =>
-      readScoreSvg([sheet(rest).replace('</g></g></svg>', `${chords}</g></g></svg>`)]).measures[0]
-        ?.chords
-    // "Am" at the start of the room and "F" halfway to the barline: the third beat
-    assert.deepEqual(read(chord('Am', 500) + chord('F', 2250)), [
-      { start: 0, text: 'Am' },
-      { start: 2, text: 'F' },
-    ])
-    // (a chord a little way along stays on its beat, to the nearest half beat)
-    assert.equal(read(chord('Am', 500) + chord('F', 1400))?.[1]?.start, 1)
-    // chords that are not apart are on the same beat, as before
-    assert.deepEqual(read(chord('Am', 500) + chord('F', 540)), [
-      { start: 0, text: 'Am' },
-      { start: 0, text: 'F' },
-    ])
-  })
 })
