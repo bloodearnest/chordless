@@ -203,6 +203,34 @@ describe('the Real Book style', () => {
     }
   })
 
+  it('raises the extension of a chord and brings a bass note back to the line', () => {
+    const run = (text: string, attrs = '') =>
+      withRealBookChords(
+        `<g class="harm"><tspan class="text"><tspan font-size="400px"${attrs}>${text}</tspan></tspan></g>`
+      )
+        .replace(/^.*?<tspan font-size/, '<tspan font-size')
+        .replace(/<\/tspan><\/g>$/, '')
+    // the root and the minor sign on the line, the 7 smaller and above it
+    assert.equal(
+      run('Am7', ' x="1" y="2"'),
+      '<tspan font-size="400px" x="1" y="2">A-</tspan><tspan font-size="280px" dy="-120">7</tspan>'
+    )
+    // a bass note on the line again, as far down as the extension went up
+    assert.equal(
+      run('C7/E'),
+      '<tspan font-size="400px">C</tspan><tspan font-size="280px" dy="-120">7</tspan><tspan font-size="400px" dy="120">/E</tspan>'
+    )
+    // (a bass note with no extension is not moved down, as nothing was moved up)
+    assert.equal(
+      run('C/E'),
+      '<tspan font-size="400px">C</tspan><tspan font-size="400px">/E</tspan>'
+    )
+    // a chord with no extension has one run, a run after a flat has no root, and a flat is not raised
+    assert.equal(run('G'), '<tspan font-size="400px">G</tspan>')
+    assert.equal(run('b'), '<tspan font-size="400px">b</tspan>')
+    assert.equal(run('sus4'), '<tspan font-size="280px" dy="-120">sus4</tspan>')
+  })
+
   it('changes the chord symbols of a sheet and nothing else', async () => {
     const chords = ['Bbmaj7', 'Am7', 'F#m7b5', 'Cdim', 'G']
     const m: Score = {
