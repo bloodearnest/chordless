@@ -70,6 +70,8 @@ const useOf = (g: Glyph) =>
 const num = (n: number) => String(Math.round(n * 10) / 10)
 
 const HEAD_WIDTH: Record<string, number> = { E0A2: 405, E0A3: 314, E0A4: 314, E0A9: 290 }
+/** Heads with no stem this far apart along the staff (the drawing's units: a head is about 210 wide, and X heads in a run are 600 or more apart) are one stack, a chord of whole notes (a second puts a head beside the other, and a cue head is a little off) */
+const STACK_APART = 250
 const HEADS = new Set(['E0A2', 'E0A3', 'E0A4', 'E0A9'])
 const RESTS = new Set(['E4E3', 'E4E4', 'E4E5', 'E4E6', 'E4E7', 'E4E8'])
 const FLAGS = new Set(['E240', 'E241', 'E242', 'E243', 'E244', 'E245'])
@@ -539,20 +541,35 @@ function buildMeasure(
   // heads grouped by the stem they share
   const stemOf = (h: Glyph) => {
     const w = (HEAD_WIDTH[h.code] ?? 314) * h.scale
+    // (an x head's origin is a little below the end of its stem: 80 units in the PDFs seen, which 60 missed)
+    const slack = h.code === 'E0A9' ? 120 : 60
     return stems.find(
       l =>
         (Math.abs(l.x1 - (h.x + w)) <= 40 || Math.abs(l.x1 - h.x) <= 40) &&
-        h.y >= Math.min(l.y1, l.y2) - 60 &&
-        h.y <= Math.max(l.y1, l.y2) + 60
+        h.y >= Math.min(l.y1, l.y2) - slack &&
+        h.y <= Math.max(l.y1, l.y2) + slack
     )
   }
-  const byStem = new Map<(typeof stems)[number] | undefined, Glyph[]>()
+  // (heads that no stem was found for are a chord only if they are stacked, one over another, as a chord of
+  // whole notes is: heads along the staff with no stem found are notes of their own)
+  const byStem = new Map<(typeof stems)[number] | Glyph, Glyph[]>()
+  const bare: Glyph[][] = []
   for (const h of heads.sort((p, q) => p.x - q.x)) {
     const st = stemOf(h)
-    byStem.set(st, [...(byStem.get(st) ?? []), h])
+    if (st) {
+      byStem.set(st, [...(byStem.get(st) ?? []), h])
+      continue
+    }
+    const stack = bare.find(g => Math.abs((g[0] as Glyph).x - h.x) <= STACK_APART)
+    if (stack) stack.push(h)
+    else {
+      bare.push([h])
+      byStem.set(h, bare[bare.length - 1] as Glyph[])
+    }
   }
   const noteEls: { x: number; el: El; cue: boolean }[] = []
-  for (const [st, hs] of byStem) {
+  for (const [key, hs] of byStem) {
+    const st = 'x1' in key ? key : undefined
     const makeNote = (h: Glyph, own: El[]): El => {
       const note = group('note', [group('notehead', [useOf(h)]), ...own])
       noteEls.push({
