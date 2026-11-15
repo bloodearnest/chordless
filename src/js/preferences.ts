@@ -49,6 +49,16 @@ export class AccidentalsPreferenceEvent extends Event {
   }
 }
 
+/** The Real Book lead sheet style preference changed (sent on window) */
+export class RealBookPreferenceEvent extends Event {
+  static readonly type = 'preferences:real-book-changed'
+  readonly enabled: boolean
+  constructor(enabled: boolean) {
+    super(RealBookPreferenceEvent.type)
+    this.enabled = enabled
+  }
+}
+
 /** The section display defaults changed (sent on window) */
 export class SectionDefaultsEvent extends Event {
   static readonly type = 'preferences:section-defaults-changed'
@@ -193,6 +203,7 @@ const flag = (key: string, changed: (on: boolean) => Event) =>
 
 const nashville = flag('use-nashville', on => new NashvillePreferenceEvent(on))
 const accidentals = flag('use-unicode-accidentals', on => new AccidentalsPreferenceEvent(on))
+const realBook = flag('lead-sheet-real-book', on => new RealBookPreferenceEvent(on))
 
 const MUSICIAN_TYPE_KEY = 'musician_type'
 const musicianType = definePreference<MusicianType>({
@@ -326,6 +337,10 @@ export const setUseNashvilleNumbers = (value: boolean) => nashville.set(!!value)
 export const getUseUnicodeAccidentals = (): boolean => accidentals.get()
 export const setUseUnicodeAccidentals = (value: boolean) => accidentals.set(!!value)
 
+/** Whether lead sheets are engraved by hand, in the style of a Real Book (docs/LEAD_SHEETS.md) */
+export const getRealBookPreference = (): boolean => realBook.get()
+export const setRealBookPreference = (value: boolean) => realBook.set(!!value)
+
 /**
  * What the person plays: the type they chose, unless that is a preset and the switches have been
  * changed since (the capo control turned on elsewhere, say), when it is the preset the switches
@@ -422,6 +437,7 @@ declare global {
     [KeepAwakePreferenceEvent.type]: KeepAwakePreferenceEvent
     [NashvillePreferenceEvent.type]: NashvillePreferenceEvent
     [AccidentalsPreferenceEvent.type]: AccidentalsPreferenceEvent
+    [RealBookPreferenceEvent.type]: RealBookPreferenceEvent
     [SectionDefaultsEvent.type]: SectionDefaultsEvent
     [CapoPreferenceEvent.type]: CapoPreferenceEvent
     [TuningPreferenceEvent.type]: TuningPreferenceEvent

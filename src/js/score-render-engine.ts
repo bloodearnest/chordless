@@ -58,6 +58,8 @@ export function withoutStyle(svg: string): string {
 }
 
 export interface RenderOptions {
+  /** The music font: Leipzig (SongSelect's) unless 'Petaluma', the handwritten one of a Real Book */
+  font?: 'Leipzig' | 'Petaluma'
   /** The width of a page, in the toolkit's units (a tenth of a millimetre at scale 100); 2100 is A4 */
   pageWidth?: number
   /** Percent: 100 is the size SongSelect prints at the width above */
@@ -138,6 +140,7 @@ export async function renderScoreHere(
   tk.setOptions({
     // (where the lines break: Verovio's choice, unless the sections are given; see below)
     breaks: 'auto',
+    font: options.font ?? 'Leipzig',
     pageWidth: options.pageWidth ?? 2100,
     scale: options.scale ?? 40,
     // the page is as tall as the music, so a view scrolls it and no page ends mid-song

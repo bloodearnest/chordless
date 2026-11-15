@@ -9,6 +9,7 @@ import {
   getMusicianType,
   getPitchControlsPreference,
   getPitchPreference,
+  getRealBookPreference,
   getScrollToTopOnSwipe,
   getTuningPreference,
   getUseNashvilleNumbers,
@@ -24,6 +25,7 @@ import {
   setMusicianType,
   setPitchControlsPreference,
   setPitchPreference,
+  setRealBookPreference,
   setScrollToTopOnSwipe,
   setTuningPreference,
   setUseNashvilleNumbers,
@@ -49,6 +51,7 @@ export class AppPreferences extends LitElement {
   static override properties = {
     useNashville: { type: Boolean, attribute: false },
     useUnicodeAccidentals: { type: Boolean, attribute: false },
+    realBook: { type: Boolean, attribute: false },
     musicianType: { type: String, attribute: false },
     capoEnabled: { type: Boolean, attribute: false },
     lyricsOnly: { type: Boolean, attribute: false },
@@ -62,6 +65,7 @@ export class AppPreferences extends LitElement {
 
   declare useNashville: boolean
   declare useUnicodeAccidentals: boolean
+  declare realBook: boolean
   declare musicianType: MusicianType
   declare capoEnabled: boolean
   declare lyricsOnly: boolean
@@ -222,6 +226,7 @@ export class AppPreferences extends LitElement {
     super()
     this.useNashville = getUseNashvilleNumbers()
     this.useUnicodeAccidentals = getUseUnicodeAccidentals()
+    this.realBook = getRealBookPreference()
     this.musicianType = getMusicianType()
     this.capoEnabled = getCapoPreference()
     this.lyricsOnly = getLyricsOnlyPreference()
@@ -506,6 +511,20 @@ export class AppPreferences extends LitElement {
           </section>
 
           <section class="group">
+            <h4>Lead sheets</h4>
+            <label class="toggle" for="toggle-real-book">
+              <input
+                type="checkbox"
+                id="toggle-real-book"
+                name="lead-sheet-real-book"
+                ?checked=${this.realBook}
+                @change=${this._onRealBookToggle}
+              />
+              <span>Real Book style: handwritten notation and chords (Δ7, -7, ø7)</span>
+            </label>
+          </section>
+
+          <section class="group">
             <h4>Moving between songs</h4>
             <label class="toggle" for="toggle-scroll-to-top">
               <input
@@ -611,6 +630,12 @@ export class AppPreferences extends LitElement {
     const value = (event.currentTarget as HTMLInputElement).checked
     this.useUnicodeAccidentals = value
     setUseUnicodeAccidentals(value)
+  }
+
+  _onRealBookToggle(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).checked
+    this.realBook = value
+    setRealBookPreference(value)
   }
 
   _onKeepAwakeToggle(event: Event): void {

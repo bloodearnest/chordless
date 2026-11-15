@@ -6,12 +6,14 @@ import {
   getCapoPreference,
   getPitchControlsPreference,
   getPitchPreference,
+  getRealBookPreference,
   getTuningPreference,
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
   NashvillePreferenceEvent,
   PitchControlsEvent,
   PitchPreferenceEvent,
+  RealBookPreferenceEvent,
   TuningPreferenceEvent,
 } from './preferences.ts'
 import type { Tuning } from './tuning.ts'
@@ -34,6 +36,8 @@ export interface DisplayPreferences {
   tuning: Tuning
   /** The device's instrument pitch, when the pitch controls are on (else concert pitch) */
   pitch: PitchId
+  /** Lead sheets engraved by hand, as in a Real Book (docs/LEAD_SHEETS.md) */
+  realBook?: boolean
 }
 
 export const displayPreferencesContext = createContext<DisplayPreferences>(
@@ -46,6 +50,7 @@ function current(): DisplayPreferences {
     unicodeAccidentals: getUseUnicodeAccidentals(),
     tuning: getCapoPreference() ? getTuningPreference() : 0,
     pitch: getPitchControlsPreference() ? getPitchPreference() : 'concert',
+    realBook: getRealBookPreference(),
   }
 }
 
@@ -61,6 +66,7 @@ for (const type of [
   CapoPreferenceEvent.type,
   PitchControlsEvent.type,
   PitchPreferenceEvent.type,
+  RealBookPreferenceEvent.type,
 ]) {
   window.addEventListener(type, () => provider.setValue(current()))
 }
