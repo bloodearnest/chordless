@@ -1,7 +1,17 @@
 /** The accidentals of a chord symbol, which Verovio sets in its own music font (a private-use character of it) */
-const CHORD_ACCIDENTALS: Record<string, string> = { '\uEA64': '♭', '\uEA65': '♮', '\uEA63': '♯' }
+const CHORD_ACCIDENTALS: Record<string, string> = {
+  '\uEA64': '♭',
+  '\uEA65': '♮',
+  '\uEA63': '♯',
+  '\uEA66': '♯',
+}
 /** The same as the letters of a chart ("Bbm7"), which sit close to the letter before them, as the ♭ of a text font does not */
-const CHORD_LETTERS: Record<string, string> = { '\uEA64': 'b', '\uEA65': '♮', '\uEA63': '#' }
+const CHORD_LETTERS: Record<string, string> = {
+  '\uEA64': 'b',
+  '\uEA65': '♮',
+  '\uEA63': '#',
+  '\uEA66': '#',
+}
 
 /**
  * The flats and sharps of chord symbols as ordinary text characters. Verovio writes them as one
@@ -12,11 +22,42 @@ const CHORD_LETTERS: Record<string, string> = { '\uEA64': 'b', '\uEA65': '♮', 
  */
 export function withTextAccidentals(svg: string, unicode = false): string {
   return svg.replace(
-    /(?:<tspan font-size="(\d+)px"[^>]*>[^<]*<\/tspan>\s*)?<tspan font-family="Leipzig"[^>]*>([\uEA63-\uEA65])<\/tspan>/g,
+    /(?:<tspan font-size="(\d+)px"[^>]*>[^<]*<\/tspan>\s*)?<tspan font-family="(?:Leipzig|Petaluma)"[^>]*>([\uEA63-\uEA66])<\/tspan>/g,
     (all, size: string | undefined, glyph: string) => {
-      const before = all.slice(0, all.indexOf('<tspan font-family="Leipzig"'))
+      const before = all.slice(0, all.search(/<tspan font-family="(?:Leipzig|Petaluma)"/))
       // (the text it sits in is 0px: the size is the letter's before it, which it is set at)
       return `${before}<tspan font-size="${size ?? 405}px">${(unicode ? CHORD_ACCIDENTALS : CHORD_LETTERS)[glyph]}</tspan>`
     }
+  )
+}
+
+/**
+ * The quality of a chord ("maj7", "m7b5") as a Real Book writes it: a triangle for major seventh, a
+ * minus for minor, a circle for diminished, a slashed circle for half-diminished, a plus for
+ * augmented. What follows the quality ("sus4", "add9", a bass) is left as it is.
+ */
+export function realBookQuality(quality: string): string {
+  return quality
+    .replace(/^m7b5/, 'ø7')
+    .replace(/^dim/, '°')
+    .replace(/^aug/, '+')
+    .replace(/^(?:maj|Maj|M)(?=\d)/, 'Δ')
+    .replace(/^(?:min|m)(?!aj)/, '-')
+}
+
+/**
+ * The chord symbols of the pages in the notation of a Real Book (`realBookQuality`). Only the text of
+ * a chord symbol (`g.harm`) is changed: the root is the first letter of the first run, and a run after a
+ * flat or sharp is all quality.
+ */
+export function withRealBookChords(svg: string): string {
+  return svg.replace(/(class="harm"[\s\S]*?<\/g>)/g, harm =>
+    harm.replace(
+      /(<tspan font-size="\d+px"[^>]*>)([^<]*)(<\/tspan>)/g,
+      (_all, open: string, text: string, close: string) => {
+        const root = /^[A-G]/.test(text) && !/^[A-G]$/.test(text) ? text.slice(0, 1) : ''
+        return `${open}${root}${realBookQuality(text.slice(root.length))}${close}`
+      }
+    )
   )
 }

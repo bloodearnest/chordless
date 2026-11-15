@@ -3,7 +3,11 @@ import { describe, it } from 'node:test'
 import type { Score } from '../src/js/score.ts'
 import { writeMusicXml, writeSectionsMusicXml } from '../src/js/score-musicxml.ts'
 import { balanceLines, renderScoreHere, withoutStyle } from '../src/js/score-render-engine.ts'
-import { withTextAccidentals } from '../src/js/score-svg-text.ts'
+import {
+  realBookQuality,
+  withRealBookChords,
+  withTextAccidentals,
+} from '../src/js/score-svg-text.ts'
 import { measure } from './score-build.ts'
 
 const melody: Score = {
@@ -144,7 +148,62 @@ describe('engraving a melody with Verovio', () => {
     const out = await renderScoreHere(writeMusicXml(flat))
     assert.ok(out)
     const shown = out.pages.map(page => withTextAccidentals(page, true)).join('')
-    assert.doesNotMatch(shown, /font-family="Leipzig"[^>]*>[\uEA63-\uEA65]/)
+    assert.doesNotMatch(shown, /font-family="Leipzig"[^>]*>[\uEA63-\uEA66]/)
     assert.match(shown, /♭/)
+  })
+})
+
+describe('the Real Book style', () => {
+  it('engraves with the handwritten music font when asked, and with Leipzig otherwise', async () => {
+    const plain = await renderScoreHere(writeMusicXml(melody))
+    const hand = await renderScoreHere(writeMusicXml(melody), { font: 'Petaluma' })
+    assert.ok(plain && hand)
+    assert.notEqual(hand.pages[0], plain.pages[0])
+    assert.equal(hand.log, '')
+  })
+
+  it('writes the quality of a chord as a Real Book does', () => {
+    const cases: Record<string, string> = {
+      maj7: 'Δ7',
+      Maj7: 'Δ7',
+      M7: 'Δ7',
+      maj9: 'Δ9',
+      m: '-',
+      m7: '-7',
+      min7: '-7',
+      m9: '-9',
+      m7b5: 'ø7',
+      dim: '°',
+      dim7: '°7',
+      aug: '+',
+      sus4: 'sus4',
+      '7': '7',
+      add9: 'add9',
+      '': '',
+    }
+    for (const [quality, written] of Object.entries(cases)) {
+      assert.equal(realBookQuality(quality), written, quality)
+    }
+  })
+
+  it('changes the chord symbols of a sheet and nothing else', async () => {
+    const chords = ['Bbmaj7', 'Am7', 'F#m7b5', 'Cdim', 'G']
+    const m: Score = {
+      title: 'T',
+      notice: [],
+      measures: [
+        measure(1, ['C4:1:a', 'D4:1:b', 'E4:1:c', 'F4:1:d', 'G4:1:e'], {
+          chords: chords.map((c, i) => [i, c]) as [number, string][],
+          barline: 'final',
+        }),
+      ],
+    }
+    const out = await renderScoreHere(writeMusicXml(m), { font: 'Petaluma' })
+    assert.ok(out)
+    const page = withRealBookChords(withTextAccidentals(out.pages[0] as string))
+    const text = [...page.matchAll(/class="harm"[\s\S]*?<\/g>/g)].map(g =>
+      [...g[0].matchAll(/<tspan font-size="\d+px"[^>]*>([^<]*)<\/tspan>/g)].map(t => t[1]).join('')
+    )
+    assert.deepEqual(text, ['BbΔ7', 'A-7', 'F#ø7', 'C°', 'G'])
   })
 })

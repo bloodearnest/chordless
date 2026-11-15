@@ -384,3 +384,19 @@ replaces the lead sheet. It is kept only when the sheet is in the chart's key (i
 chart's `{key}`), as the range is; a sheet in another key, or one `readScorePdf` cannot read, leaves the song with its
 chart and no lead sheet. A chart that has a range already keeps it, but the lead sheet is
 still kept. The import page says it under the range: "The lead sheet is kept with the song."; "The lead sheet could not be saved…". It says the same whichever chart is taken. A sheet in another key gives neither, and the page says why.
+
+## Real Book style
+
+A preference (Preferences, "Lead sheets"; `getRealBookPreference`, on `displayPreferencesContext` as `realBook`),
+per device and off by default, that engraves the sheet as a handwritten chart:
+
+- **The music** is set in Verovio's **Petaluma** font (`font: 'Petaluma'` in `RenderOptions`), the handwritten
+  jazz font that ships inside the toolkit: no new file, and it works offline as the rest does.
+- **The words** (chords, lyrics, section names) are lettered in the annotation font (Caveat, already in the
+  app), by a rule in `score-view.ts` on `[data-real-book]`.
+- **The chord notation** is the Real Book's: `maj7` is `Δ7`, `m7` is `-7`, `m7b5` is `ø7`, `dim` is `°`, `aug` is
+  `+` (`realBookQuality` in `score-svg-text.ts`). It rewrites the text of the SVG's chord symbols only: the MusicXML,
+  which is also what is stored, keeps the chart's own words, so turning the style off gives them back.
+
+A change of the preference engraves the sheets again (the view does it, with no page change). Not done: superscripts
+for extensions (`7♭9`), and the style is not offered per setlist.

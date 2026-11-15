@@ -8,7 +8,7 @@ import { writeMusicXml, writeSectionsMusicXml } from '../js/score-musicxml.ts'
 import { layoutNotice } from '../js/score-notice.ts'
 import { renderScore } from '../js/score-render.ts'
 import { sliceMeasures } from '../js/score-section.ts'
-import { withTextAccidentals } from '../js/score-svg-text.ts'
+import { withRealBookChords, withTextAccidentals } from '../js/score-svg-text.ts'
 import { transposeScore } from '../js/score-transpose.ts'
 import { reportError, traced } from '../js/telemetry/telemetry.ts'
 
@@ -123,6 +123,13 @@ export class ScoreView extends LitElement {
     .page g.label {
       font-weight: normal;
     }
+    /* Real Book style: the words are lettered by hand, in the font the annotations use */
+    :host([data-real-book]) .page text {
+      font-family: var(--font-family-annotation, 'Caveat', cursive);
+    }
+    :host([data-real-book]) .page g.harm text {
+      font-weight: 600;
+    }
     .page ellipse,
     .page path,
     .page polygon,
@@ -227,7 +234,16 @@ export class ScoreView extends LitElement {
 
   override updated(changed: PropertyValues): void {
     if (changed.has('_pages')) this._fitToScreen()
+    // (the style is the engraving's, so a change of it is engraved again, a sheet at a time as ever)
+    const realBook = this._realBook()
+    if (realBook !== this._engravedRealBook && this.melody) void this._engrave()
   }
+
+  /** The Real Book style, the preference's (docs/LEAD_SHEETS.md) */
+  _realBook(): boolean {
+    return this._display.value?.realBook ?? false
+  }
+  _engravedRealBook = false
 
   /**
    * A sheet that does not quite fit the screen is drawn a little smaller, so that all of it can be
@@ -286,6 +302,9 @@ export class ScoreView extends LitElement {
       return
     }
     const asked = ++this._asked
+    const realBook = this._realBook()
+    this._engravedRealBook = realBook
+    this.toggleAttribute('data-real-book', realBook)
     const narrow = this.clientWidth > 0 && this.clientWidth < NARROW_BELOW
     const wholeSheet = !this.measures
     const first = !engravedBefore
@@ -301,6 +320,7 @@ export class ScoreView extends LitElement {
       const moved = this.measures ? sliceMeasures(whole, this.measures) : whole
       span?.setAttribute('chordless.score.measures', moved.measures.length)
       const rendered = await renderScore(writeMusicXml(moved), {
+        font: realBook ? 'Petaluma' : 'Leipzig',
         pageWidth: narrow ? NARROW_PAGE : WIDE_PAGE,
         // (each section starts a line, as on SongSelect's sheet)
         sections: writeSectionsMusicXml(moved),
@@ -337,6 +357,12 @@ export class ScoreView extends LitElement {
     }
   }
 
+  /** The words of a page: the accidentals of its chords as text, and in the Real Book style its chord notation */
+  _text(page: string): string {
+    const text = withTextAccidentals(page, this._display.value?.unicodeAccidentals ?? false)
+    return this._engravedRealBook ? withRealBookChords(text) : text
+  }
+
   override render() {
     if (this._failed && !this._pages.length) {
       return html`<p class="failed" role="alert">The lead sheet could not be shown for this song.</p>`
@@ -366,7 +392,7 @@ export class ScoreView extends LitElement {
           </div>`
           : nothing
       }
-      ${this._pages.map(page => html`<div class="page">${unsafeSVG(withTextAccidentals(page, this._display.value?.unicodeAccidentals ?? false))}</div>`)}
+      ${this._pages.map(page => html`<div class="page">${unsafeSVG(this._text(page))}</div>`)}
       ${
         shown && footer.length
           ? html`<div class="notice">${footer.map(line => html`<p>${line}</p>`)}</div>`

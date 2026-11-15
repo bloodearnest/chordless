@@ -3,7 +3,7 @@ import { trace } from '@opentelemetry/api'
 import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace'
 import { type ScoreView, ScoreViewErrorEvent } from '../src/components/score-view.ts'
 import '../src/components/score-view.ts'
-import { setUseUnicodeAccidentals } from '../src/js/preferences.ts'
+import { setRealBookPreference, setUseUnicodeAccidentals } from '../src/js/preferences.ts'
 import { resetTelemetryState } from '../src/js/telemetry/telemetry.ts'
 import { sampleScore } from './score-sample.ts'
 
@@ -65,6 +65,30 @@ describe('score-view', () => {
     } finally {
       setUseUnicodeAccidentals(false)
     }
+  })
+
+  it('engraves it again in the Real Book style when that is the preference, and back when it is not', async () => {
+    const melody = {
+      ...sampleScore,
+      measures: sampleScore.measures.map(m => ({ ...m, chords: [{ start: 0, text: 'Cmaj7' }] })),
+    }
+    const chordText = (sheet: ScoreView) =>
+      [...(sheet.shadowRoot?.querySelectorAll('.page g.harm text') ?? [])]
+        .map(t => t.textContent?.replace(/\s+/g, ''))
+        .join(' ')
+    const sheet = await shown({ melody, melodyKey: 'C', songKey: 'C' })
+    expect(chordText(sheet)).to.equal('Cmaj7')
+    expect(sheet.hasAttribute('data-real-book')).to.equal(false)
+    setRealBookPreference(true)
+    try {
+      await waitUntil(() => chordText(sheet) === 'CΔ7', undefined, { timeout: 3000 })
+      expect(sheet.hasAttribute('data-real-book')).to.equal(true)
+      expect(notes(sheet)).to.equal(3)
+    } finally {
+      setRealBookPreference(false)
+    }
+    await waitUntil(() => chordText(sheet) === 'Cmaj7', undefined, { timeout: 3000 })
+    expect(sheet.hasAttribute('data-real-book')).to.equal(false)
   })
 
   it('has no title line for a sheet that has none', async () => {
