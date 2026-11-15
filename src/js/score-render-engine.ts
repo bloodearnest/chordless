@@ -16,6 +16,7 @@
 /** What the toolkit of `verovio/esm` has that is used here */
 interface Toolkit {
   setOptions(options: Record<string, unknown>): void
+  resetOptions(): void
   loadData(data: string): boolean
   getPageCount(): number
   renderToSVG(page: number): string
@@ -55,6 +56,28 @@ export function withoutStyle(svg: string): string {
     out = out.replace(/<style[\s\S]*?<\/style>/gi, '')
   }
   return out
+}
+
+/**
+ * What goes with the handwritten font to make a sheet look like a Real Book's (docs/LEAD_SHEETS.md,
+ * "Real Book style"): Petaluma's own handling of a hand drawn staff (`handwrittenFont`), heavier staff
+ * lines, stems, barlines, ties and slurs, as a pen draws them, bigger lyrics to go with the lettering
+ * (the page's text is Caveat, which is small for its size), chords lifted a little to leave room for
+ * their bigger size (`withRealBookChords`) and a little more room along the line.
+ * The units are Verovio's MEI units.
+ */
+const REAL_BOOK_OPTIONS = {
+  font: 'Petaluma',
+  handwrittenFont: ['Petaluma'],
+  staffLineWidth: 0.2,
+  stemWidth: 0.28,
+  barLineWidth: 0.4,
+  ledgerLineThickness: 0.35,
+  tieMidpointThickness: 0.8,
+  slurMidpointThickness: 0.9,
+  lyricSize: 5.5,
+  harmDist: 2.5,
+  spacingLinear: 0.3,
 }
 
 export interface RenderOptions {
@@ -137,10 +160,12 @@ export async function renderScoreHere(
   options: RenderOptions = {}
 ): Promise<RenderedScore | null> {
   const tk = await load()
+  // (the toolkit is kept for the next sheet, so what the last one set, the Real Book's weights, is cleared)
+  tk.resetOptions()
   tk.setOptions({
+    ...(options.font === 'Petaluma' ? REAL_BOOK_OPTIONS : {}),
     // (where the lines break: Verovio's choice, unless the sections are given; see below)
     breaks: 'auto',
-    font: options.font ?? 'Leipzig',
     pageWidth: options.pageWidth ?? 2100,
     scale: options.scale ?? 40,
     // the page is as tall as the music, so a view scrolls it and no page ends mid-song
