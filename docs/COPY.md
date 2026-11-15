@@ -69,7 +69,10 @@ that is not there, and when a message is there that nothing uses.
 
 The migration is by area. Done: the toasts (`toast(...)` and the buttons on them), the message
 about a lost Drive folder, and the questions asked before something is changed (the confirmation
-dialogs, and `app-modal`'s own Confirm and Cancel). Still in the code: the other dialogs, empty states, labels, the Help
+dialogs, and `app-modal`'s own Confirm and Cancel), what the pages say while they load, when they have
+nothing to show and when they could not (`status-…`), the signed-out card, and the lead sheet and pad
+messages. Still in the code: the other dialogs and panels, the sync's progress messages
+(`js/sync/`), labels, the Help
 page (`js/help-content.ts`), the text `describeSetlistChange` makes, and the Worker's emails.
 Text with a link or bold in it needs a markup convention that is not built; say so when you reach one
 rather than splitting the sentence.

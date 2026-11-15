@@ -348,7 +348,7 @@ export class TeamSpaceWizard extends LitElement {
   _renderState() {
     switch (this._state) {
       case 'checking':
-        return html`<p class="status" role="status">Checking…</p>`
+        return html`<p class="status" role="status">${t('status-checking')}</p>`
       case 'sign-in':
         return html`
           <h2>New team space</h2>

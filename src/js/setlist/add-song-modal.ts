@@ -4,6 +4,7 @@ import type { SongWithContent } from '../data-types.ts'
 import type { ChordlessDB } from '../db.ts'
 import { addToLibrary, getSongsElsewhere, withSongsFromElsewhere } from '../other-songs.ts'
 import { getLibrarySongs } from '../song-utils.ts'
+import { t } from '../text.ts'
 import { filterSongs, warmSearch } from '../utils/song-filter.ts'
 import { showStatusMessage } from '../utils/status-message.ts'
 
@@ -63,7 +64,7 @@ export class AddSongModal {
     if (!modal || !input || !results) return
 
     try {
-      showStatusMessage(results, { message: 'Loading songs...', state: 'loading' })
+      showStatusMessage(results, { message: t('status-songs-loading'), state: 'loading' })
 
       const db = this.#getDb()
       const songs = withSongsFromElsewhere(
@@ -72,8 +73,8 @@ export class AddSongModal {
       )
       if (songs.length === 0) {
         showStatusMessage(results, {
-          message: 'No songs in library',
-          detail: 'Import songs from the menu to fill the song library.',
+          message: t('status-library-empty-modal'),
+          detail: t('status-library-empty-modal-detail'),
           state: 'empty',
         })
         modal.show()
@@ -133,7 +134,7 @@ export class AddSongModal {
     songList.songs = songs
     songList.search = search
     songList.variant = 'library'
-    songList.emptyMessage = 'No songs match your search.'
+    songList.emptyMessage = t('status-songs-no-match')
     songList.dense = true
     songList.addEventListener(SongSelectEvent.type, event => {
       const { song } = event

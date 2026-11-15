@@ -1,5 +1,6 @@
 import type { PropertyValues } from 'lit'
 import { html, LitElement } from 'lit'
+import { t } from '../js/text.ts'
 import './help-tooltip.ts'
 import './app-modal.ts'
 import './icon.ts'
@@ -959,11 +960,7 @@ export class MediaPlayer extends LitElement {
     const activeKeyDisplay = showPadError
       ? html`
           <help-tooltip
-            message=${
-              this._activePadSet
-                ? 'Could not load pad sound for this key'
-                : 'No pad set yet: upload one in Storage'
-            }
+            message=${this._activePadSet ? t('pad-error-load') : t('pad-error-none')}
           >
             ${this._activeSongKey}!
           </help-tooltip>

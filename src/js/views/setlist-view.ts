@@ -87,7 +87,7 @@ export function setlistTemplate({
 
       <main id="main-content">
         <div class="song-container">
-          <p>Loading setlist...</p>
+          <p>${t('status-setlist-loading')}</p>
         </div>
       </main>
 

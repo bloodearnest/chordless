@@ -3,6 +3,7 @@ import { HIGHEST_OFFERED, LOWEST_OFFERED, rangeOfMetadata, rangeSpan } from '../
 import type { SongWithContent } from '../js/data-types.ts'
 import { formatBeats, type SongMelody } from '../js/melody-analysis.ts'
 import { noteName } from '../js/pitch.ts'
+import { t } from '../js/text.ts'
 import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.ts'
 import { describeRange, type NoteRange, octaveNearGreen, rangeStatus } from '../js/voice-range.ts'
 import { rangeBadge, rangeBadgeStyles } from './range-badge.ts'
@@ -279,11 +280,11 @@ export class SongInfo extends LitElement {
 
   override render() {
     if (this.loading) {
-      return html`<div class="loading">Loading song information...</div>`
+      return html`<div class="loading">${t('status-song-info-loading')}</div>`
     }
 
     if (!this.song) {
-      return html`<div class="empty">No song data available.</div>`
+      return html`<div class="empty">${t('status-song-info-none')}</div>`
     }
 
     const stats = this.calculateAppearanceStats()

@@ -72,11 +72,11 @@ export class EmptySpace extends LitElement {
         return html`
           <status-message
             state="loading"
-            message="Getting ${space.name}'s songs and setlists…"
+            message=${t('status-space-getting', { space: space.name })}
             detail=${progress?.message ?? ''}
           >
             <progress-bar
-              label="Getting ${space.name}'s songs and setlists"
+              label=${t('status-space-getting-label', { space: space.name })}
               .current=${progress?.current}
               .total=${progress?.total}
             ></progress-bar>
@@ -87,11 +87,11 @@ export class EmptySpace extends LitElement {
         return html`
           <status-message
             state="info"
-            message="${space.name}'s songs and setlists have not been fetched yet."
-            detail="They come from Google Drive. You need to be online and signed in."
+            message=${t('status-space-not-fetched', { space: space.name })}
+            detail=${t('status-space-not-fetched-detail')}
           >
             <button class="btn" id="fetch-space" ?disabled=${this._busy} @click=${this._fetch}>
-              ${this._busy ? 'Getting them…' : 'Get them now'}
+              ${this._busy ? t('action-getting-them') : t('action-get-them-now')}
             </button>
           </status-message>
         `
@@ -99,8 +99,8 @@ export class EmptySpace extends LitElement {
         return html`
           <status-message
             state="info"
-            message="${space.name} has no setlists yet."
-            detail="Create the first with the + at the top."
+            message=${t('status-space-no-setlists', { space: space.name })}
+            detail=${t('status-space-no-setlists-detail')}
           ></status-message>
         `
     }

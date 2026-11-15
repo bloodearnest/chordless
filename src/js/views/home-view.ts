@@ -279,13 +279,13 @@ export class HomeView extends PageView {
             pending: () =>
               this.#groups.value
                 ? this.#renderGroups(this.#groups.value)
-                : html`<status-message state="loading" message="Loading setlists..."></status-message>`,
+                : html`<status-message state="loading" message=${t('status-setlists-loading')}></status-message>`,
             complete: groups => this.#renderGroups(groups),
             error: error => {
               console.error('Error loading setlists:', error)
               return html`<status-message
                 state="error"
-                message="Error loading setlists. Please check the console."
+                message=${t('status-setlists-failed')}
               ></status-message>`
             },
           })}
