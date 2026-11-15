@@ -46,20 +46,47 @@ export function realBookQuality(quality: string): string {
     .replace(/^(?:min|m)(?!aj)/, '-')
 }
 
+/** The extension of a chord (the 7 of "Am7") is this much of the size of the chord, and this much of it above the line */
+const SUPERSCRIPT_SIZE = 0.7
+const SUPERSCRIPT_RISE = 0.3
+
 /**
- * The chord symbols of the pages in the notation of a Real Book (`realBookQuality`). Only the text of a
- * chord symbol (`g.harm`) is changed: the root is the first letter of the first run, and a run after a
- * flat or sharp is all quality. With `on` false the page is as it was.
+ * One run of a chord symbol's text set as a Real Book sets it: the root and a minor sign on the line, the
+ * extension ("7", "ø7", "sus4", "maj7#11") smaller and raised, and a bass note ("/E") back on the line.
+ * `open` is the run's own tspan, which keeps the root and the minor sign (and the position it was given).
+ * A run that is only a flat or a sharp, or only a root, is as it was.
+ */
+function realBookRun(size: number, rest: string, text: string): string {
+  if (/^[A-G]?[b#♭♯♮]?$/.test(text)) return `<tspan font-size="${size}px"${rest}>${text}</tspan>`
+  const root = /^[A-G]/.test(text) ? text.slice(0, 1) : ''
+  // (matches any text: every part is optional)
+  const [, minor = '', extension = '', bass = ''] = /^(-?)([^/]*)(\/.*)?$/.exec(
+    realBookQuality(text.slice(root.length))
+  ) as RegExpExecArray
+  const rise = Math.round(size * SUPERSCRIPT_RISE)
+  const up = extension
+    ? `<tspan font-size="${Math.round(size * SUPERSCRIPT_SIZE)}px" dy="${-rise}">${extension}</tspan>`
+    : ''
+  const down = bass
+    ? `<tspan font-size="${size}px"${extension ? ` dy="${rise}"` : ''}>${bass}</tspan>`
+    : ''
+  const line = `${root}${minor}`
+  // (a run that starts with the extension leaves nothing on the line: the position it was given is kept)
+  const base = line || rest ? `<tspan font-size="${size}px"${rest}>${line}</tspan>` : ''
+  return `${base}${up}${down}`
+}
+
+/**
+ * The chord symbols of the pages in the notation of a Real Book (`realBookQuality`, and the extension
+ * raised, `realBookRun`). Only the text of a chord symbol (`g.harm`) is changed. With `on` false the page
+ * is as it was.
  */
 export function withRealBookChords(svg: string, on = true): string {
   if (!on) return svg
   return svg.replace(/(class="harm"[\s\S]*?<\/g>)/g, harm =>
     harm.replace(
-      /(<tspan font-size="\d+px"[^>]*>)([^<]*)(<\/tspan>)/g,
-      (_all, open: string, text: string, close: string) => {
-        const root = /^[A-G]/.test(text) && !/^[A-G]$/.test(text) ? text.slice(0, 1) : ''
-        return `${open}${root}${realBookQuality(text.slice(root.length))}${close}`
-      }
+      /<tspan font-size="(\d+)px"([^>]*)>([^<]*)<\/tspan>/g,
+      (_all, size: string, rest: string, text: string) => realBookRun(Number(size), rest, text)
     )
   )
 }

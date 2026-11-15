@@ -406,8 +406,12 @@ per device and off by default, that engraves the sheet as a handwritten chart:
 - **The chord notation** is the Real Book's, for the symbols that nearly every chart agrees on: `m7` is `-7`, `m7b5` is `ø7`, `dim` is `°`, `aug` is
   `+` (`realBookQuality` in `score-svg-text.ts`). It rewrites the text of the SVG's chord symbols only: the MusicXML,
   which is also what is stored, keeps the chart's own words, so turning the style off gives them back.
+  The **extension** of a chord is set smaller and raised, as a Real Book does it (`Am7` is A-<sup>7</sup>, `G7/B` is G<sup>7</sup>/B:
+  the root and the minor sign on the line, a bass note back on it), by `realBookRun` splitting the run's `<tspan>`; Verovio laid
+  the chord out at its full width, so a raised one is a little narrower than the room it was given. A raised `maj7` can touch
+  the corner of a section's box above it (to tune).
 
-A change of the preference engraves the sheets again (the view does it, with no page change). Not done: superscripts
-for extensions (`7♭9`), and the style is not offered per setlist. Also not done, because charts differ: the major
+A change of the preference engraves the sheets again (the view does it, with no page change). Not done: the style is not
+offered per setlist. Also not done, because charts differ: the major
 seventh (`Δ7`, `M7` or `maj7`) and an explicit major triad (`maj`, `M`) are left as the chart has them. A later choice
 (a "jazz chord symbols" setting apart from the handwritten look) would offer them.
