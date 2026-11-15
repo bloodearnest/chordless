@@ -241,6 +241,7 @@ export class ScoreView extends LitElement {
 
   /** The Real Book style, the preference's (docs/LEAD_SHEETS.md) */
   _realBook(): boolean {
+    /* v8 ignore next -- the page provides the preferences as soon as display-preferences loads */
     return this._display.value?.realBook ?? false
   }
   _engravedRealBook = false
@@ -359,8 +360,9 @@ export class ScoreView extends LitElement {
 
   /** The words of a page: the accidentals of its chords as text, and in the Real Book style its chord notation */
   _text(page: string): string {
+    /* v8 ignore next -- the page provides the preferences as soon as display-preferences loads */
     const text = withTextAccidentals(page, this._display.value?.unicodeAccidentals ?? false)
-    return this._engravedRealBook ? withRealBookChords(text) : text
+    return withRealBookChords(text, this._engravedRealBook)
   }
 
   override render() {

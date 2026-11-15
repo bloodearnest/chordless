@@ -182,6 +182,7 @@ describe('app-preferences', () => {
       for (const [id, key, value] of [
         ['#toggle-use-nashville', 'use-nashville', '1'],
         ['#toggle-unicode-accidentals', 'use-unicode-accidentals', '1'],
+        ['#toggle-real-book', 'lead-sheet-real-book', '1'],
         ['#toggle-keep-awake', 'keep_screen_awake', 'false'],
         ['#toggle-scroll-to-top', 'scroll_to_top_on_swipe', 'false'],
       ] as const) {

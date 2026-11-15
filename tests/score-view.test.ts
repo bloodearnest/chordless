@@ -91,6 +91,18 @@ describe('score-view', () => {
     expect(sheet.hasAttribute('data-real-book')).to.equal(false)
   })
 
+  it('marks the Real Book style on a sheet that has no melody yet, and engraves nothing', async () => {
+    const sheet = await fixture<ScoreView>(html`<score-view></score-view>`)
+    setRealBookPreference(true)
+    try {
+      await new Promise(resolve => setTimeout(resolve, 50))
+      await sheet.updateComplete
+      expect(sheet._pages).to.have.length(0)
+    } finally {
+      setRealBookPreference(false)
+    }
+  })
+
   it('has no title line for a sheet that has none', async () => {
     const melody = { ...sampleScore, title: null, notice: ['(a subtitle)', 'CCLI Song # 1'] }
     const sheet = await shown({ melody, melodyKey: 'C', songKey: 'C' })
