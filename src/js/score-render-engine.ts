@@ -62,8 +62,8 @@ export function withoutStyle(svg: string): string {
  * What goes with the handwritten font to make a sheet look like a Real Book's (docs/LEAD_SHEETS.md,
  * "Real Book style"): Petaluma's own handling of a hand drawn staff (`handwrittenFont`), heavier staff
  * lines, stems, barlines, ties and slurs, as a pen draws them, bigger lyrics to go with the lettering
- * (the page's text is Caveat, which is small for its size), chords lifted a little to leave room for
- * their bigger size (`withRealBookChords`) and a little more room along the line.
+ * (the page's text is Petaluma Script, `score-view.ts`), chords lifted a little and a little more room along
+ * the line.
  * The units are Verovio's MEI units.
  */
 const REAL_BOOK_OPTIONS = {

@@ -2,6 +2,14 @@
 @import '@fontsource/caveat/latin-500.css';
 @import '@fontsource/caveat/latin-ext-500.css';
 
+/* The lettering of a lead sheet in the Real Book style (docs/LEAD_SHEETS.md): Petaluma Script, the handwritten
+   text font that goes with the Petaluma music font, under the SIL Open Font License (src/licences.html) */
+@font-face {
+  font-family: 'Petaluma Script';
+  src: url('./fonts/PetalumaScript.woff2') format('woff2');
+  font-display: swap;
+}
+
 * {
   margin: 0;
   padding: 0;

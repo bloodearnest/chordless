@@ -83,6 +83,9 @@ describe('score-view', () => {
     try {
       await waitUntil(() => chordText(sheet) === 'C-7', undefined, { timeout: 3000 })
       expect(sheet.hasAttribute('data-real-book')).to.equal(true)
+      // (lettered in the text font that goes with the music font)
+      const word = sheet.shadowRoot?.querySelector('.page g.harm text') as Element
+      expect(getComputedStyle(word).fontFamily).to.contain('Petaluma Script')
       expect(notes(sheet)).to.equal(3)
     } finally {
       setRealBookPreference(false)

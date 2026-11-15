@@ -123,12 +123,10 @@ export class ScoreView extends LitElement {
     .page g.label {
       font-weight: normal;
     }
-    /* Real Book style: the words are lettered by hand, in the font the annotations use */
+    /* Real Book style: the words are lettered by hand, in the text font that goes with the music font
+       (Caveat, which the annotations use, if it has not loaded) */
     :host([data-real-book]) .page text {
-      font-family: var(--font-family-annotation, 'Caveat', cursive);
-    }
-    :host([data-real-book]) .page g.harm text {
-      font-weight: 600;
+      font-family: 'Petaluma Script', var(--font-family-annotation, 'Caveat', cursive);
     }
     .page ellipse,
     .page path,
