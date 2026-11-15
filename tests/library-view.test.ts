@@ -595,6 +595,28 @@ describe('the library view, with a song open', () => {
       ).to.equal('G')
     })
 
+    it('shows the song it was last told of, when it was told of another while the first was loading', async () => {
+      view = document.createElement('library-view')
+      view.route = { name: 'songs', songUuid: song.uuid }
+      outlet.append(view)
+      // (the first song is being read from the database: that takes longer than this microtask)
+      await view.updateComplete
+      view.route = { name: 'songs', songUuid: keyless.uuid }
+      await until(
+        () =>
+          view.querySelector('song-display')?.shadowRoot?.querySelectorAll('song-section')
+            .length === 3,
+        'the second song to be shown'
+      )
+      await nothingFor()
+      expect(view.querySelectorAll('song-display')).to.have.length(1)
+      expect(
+        view.querySelector<HTMLElement & { parsed: { metadata: { title: string } } }>(
+          'song-display'
+        )?.parsed.metadata.title
+      ).to.equal('No Key Song')
+    })
+
     it('has nothing to save when edit mode is left with no song open', async () => {
       view = document.createElement('library-view')
       view.route = { name: 'songs' }
