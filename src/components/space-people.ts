@@ -326,21 +326,18 @@ export class SpacePeople extends LitElement {
     select.value = ''
     if (!into) return
     const modal = this._confirm.value as AppModal
-    modal.heading = 'Merge?'
-    modal.confirmLabel = 'Merge'
-    modal.message =
-      `Merge ${person.name} into ${into.name}? The setlists ${person.name} leads are ${into.name}'s, ` +
-      `and ${into.name} gains their email addresses.` +
-      ` ${person.name} is no longer listed.`
+    modal.heading = t('confirm-person-merge-heading')
+    modal.confirmLabel = t('confirm-person-merge-button')
+    modal.message = t('confirm-person-merge-message', { person: person.name, into: into.name })
     if (!(await modal.ask())) return
     await this._change('toast-people-merge-failed', db => mergePersonInto(db, person.id, into.id))
   }
 
   async _delete(person: Person): Promise<void> {
     const modal = this._confirm.value as AppModal
-    modal.heading = 'Delete?'
-    modal.confirmLabel = 'Delete'
-    modal.message = `Delete ${person.name}? They lead no setlists. They are removed from the Leader menu.`
+    modal.heading = t('confirm-person-delete-heading')
+    modal.confirmLabel = t('confirm-person-delete-button')
+    modal.message = t('confirm-person-delete-message', { person: person.name })
     if (!(await modal.ask())) return
     await this._change('toast-people-delete-failed', db => deletePerson(db, person.id))
   }

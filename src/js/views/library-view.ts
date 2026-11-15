@@ -13,6 +13,7 @@ import type { PropertyValues } from 'lit'
 import { html, nothing } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import type { AppHeader } from '../../components/app-header.ts'
+import { t } from '../text.ts'
 import '../../components/app-header.ts'
 import type { AppModal } from '../../components/app-modal.ts'
 import '../../components/app-modal.ts'
@@ -739,10 +740,9 @@ export class LibraryView extends PageView {
       <app-modal
         id="library-reset-confirm-modal"
         type="confirm"
-        heading="Reset Song?"
-        message="This will reset the key and all section states back to defaults. This cannot be undone."
-        confirm-label="Reset"
-        cancel-label="Cancel"
+        heading=${t('confirm-song-reset-heading')}
+        message=${t('confirm-song-reset-message-library')}
+        confirm-label=${t('confirm-song-reset-button')}
         ${ref(this.#resetModal)}
       ></app-modal>
     `

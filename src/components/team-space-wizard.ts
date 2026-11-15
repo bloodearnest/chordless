@@ -29,6 +29,7 @@ import {
   syncTeamSpace,
   type TeamFolders,
 } from '../js/team-spaces.ts'
+import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -293,9 +294,9 @@ export class TeamSpaceWizard extends LitElement {
   async _sureOfMove(): Promise<boolean> {
     const count = (this._contents as Contents).setlists.count
     const modal = this._modal.value as AppModal
-    modal.heading = 'Move the setlists?'
-    modal.message = `${count} setlist${count === 1 ? '' : 's'} will move out of ${this._sourceName} into the team space. They will no longer be in ${this._sourceName}, only in the team's. Those saved to Google Drive go to its Drive trash, where they can be restored from.`
-    modal.confirmLabel = 'Move them'
+    modal.heading = t('confirm-move-setlists-heading')
+    modal.message = t('confirm-move-setlists-message', { count, source: this._sourceName })
+    modal.confirmLabel = t('confirm-move-setlists-button')
     await this.updateComplete
     await modal.updateComplete
     return modal.ask()

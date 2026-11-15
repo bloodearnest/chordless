@@ -1,4 +1,5 @@
 import { html, nothing, type PropertyValues } from 'lit'
+import { t } from '../text.ts'
 import '../../components/app-header.ts'
 import '../../components/app-modal.ts'
 import '../../components/capo-selector.ts'
@@ -97,10 +98,9 @@ export function setlistTemplate({
       <app-modal
         id="reset-confirm-modal"
         type="confirm"
-        heading="Reset Song?"
-        message="This will reset the key, capo, and all section states back to defaults. This cannot be undone."
-        confirm-label="Reset"
-        cancel-label="Cancel"
+        heading=${t('confirm-song-reset-heading')}
+        message=${t('confirm-song-reset-message-setlist')}
+        confirm-label=${t('confirm-song-reset-button')}
       >
       </app-modal>
 
@@ -122,9 +122,8 @@ export function setlistTemplate({
       <app-modal
         id="delete-setlist-modal"
         type="confirm"
-        heading="Delete Setlist?"
-        confirm-label="Delete"
-        cancel-label="Cancel"
+        heading=${t('confirm-setlist-delete-heading')}
+        confirm-label=${t('confirm-setlist-delete-button')}
       >
         <p id="delete-setlist-text"></p>
       </app-modal>
@@ -132,9 +131,8 @@ export function setlistTemplate({
       <app-modal
         id="move-setlist-modal"
         type="confirm"
-        heading="Move Setlist?"
-        confirm-label="Move"
-        cancel-label="Cancel"
+        heading=${t('confirm-setlist-move-heading')}
+        confirm-label=${t('confirm-setlist-move-button')}
       >
         <p id="move-setlist-text"></p>
       </app-modal>
@@ -142,14 +140,10 @@ export function setlistTemplate({
       <app-modal
         id="delete-song-modal"
         type="confirm"
-        heading="Remove Song from Setlist?"
-        confirm-label="Remove"
-        cancel-label="Cancel"
+        heading=${t('confirm-song-remove-heading')}
+        confirm-label=${t('confirm-song-remove-button')}
       >
-        <p>
-          Are you sure you want to remove "<strong id="delete-song-title"></strong>" from this
-          setlist?
-        </p>
+        <p id="delete-song-text"></p>
       </app-modal>
     `
 }

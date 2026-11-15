@@ -8,6 +8,7 @@ import { shareUrl } from '../js/share-crypto.ts'
 import { createShare, refreshShare, stopShare } from '../js/share-manager.ts'
 import { getCurrentSpace } from '../js/space.ts'
 import { createSyncManager, isSyncAvailable } from '../js/sync-manager.ts'
+import { t } from '../js/text.ts'
 import { formatSetlistDate, setlistTitle } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -436,9 +437,9 @@ export class SetlistShare extends LitElement {
         ${ref(this._stopModal)}
         type="confirm"
         size="small"
-        heading="Stop sharing?"
-        confirm-label="Stop sharing"
-        message="Anyone with the link will lose access, and their copy is removed the next time they open it. You can make a new link later."
+        heading=${t('confirm-share-stop-heading')}
+        confirm-label=${t('confirm-share-stop-button')}
+        message=${t('confirm-share-stop-message')}
       ></app-modal>
     `
   }

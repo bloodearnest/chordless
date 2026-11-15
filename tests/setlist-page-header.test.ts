@@ -46,6 +46,7 @@ import {
   setSpaceReadOnly,
   updateSpace,
 } from '../src/js/space.ts'
+import { t } from '../src/js/text.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { measure, melodyOf } from './score-build.ts'
 import { sampleRecord } from './score-sample.ts'
@@ -88,7 +89,9 @@ describe('the setlist page: header, menu and keys', () => {
       overview.dispatchEvent(new OverviewSongDeleteEvent(0))
       await waitUntil(() => asked === 1)
       expect(asked).to.equal(1)
-      expect($('#delete-song-title')?.textContent).to.equal('Alpha')
+      expect($('#delete-song-text')?.textContent).to.equal(
+        t('confirm-song-remove-message', { title: 'Alpha' })
+      )
       overview.dispatchEvent(new OverviewSongDeleteEvent(99))
       expect(asked).to.equal(1)
 
