@@ -520,7 +520,7 @@ export class AppPreferences extends LitElement {
                 ?checked=${this.realBook}
                 @change=${this._onRealBookToggle}
               />
-              <span>Real Book style: handwritten notation and chords (Δ7, -7, ø7)</span>
+              <span>Real Book style: handwritten notation and chords (-7, ø7, °)</span>
             </label>
           </section>
 

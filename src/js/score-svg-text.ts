@@ -32,16 +32,17 @@ export function withTextAccidentals(svg: string, unicode = false): string {
 }
 
 /**
- * The quality of a chord ("maj7", "m7b5") as a Real Book writes it: a triangle for major seventh, a
- * minus for minor, a circle for diminished, a slashed circle for half-diminished, a plus for
- * augmented. What follows the quality ("sus4", "add9", a bass) is left as it is.
+ * The quality of a chord ("m7", "m7b5") as a Real Book writes it, for the symbols that nearly every chart
+ * agrees on: a minus for minor, a circle for diminished, a slashed circle for half-diminished, a plus for
+ * augmented. The ones that vary from chart to chart are left as the chart has them: the major seventh
+ * (`Δ7`, `M7` or `maj7`) and an explicit major triad (`maj`, `M`). So are the words that follow the
+ * quality ("sus4", "add9", a bass).
  */
 export function realBookQuality(quality: string): string {
   return quality
     .replace(/^m7b5/, 'ø7')
     .replace(/^dim/, '°')
     .replace(/^aug/, '+')
-    .replace(/^(?:maj|Maj|M)(?=\d)/, 'Δ')
     .replace(/^(?:min|m)(?!aj)/, '-')
 }
 

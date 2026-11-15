@@ -70,24 +70,24 @@ describe('score-view', () => {
   it('engraves it again in the Real Book style when that is the preference, and back when it is not', async () => {
     const melody = {
       ...sampleScore,
-      measures: sampleScore.measures.map(m => ({ ...m, chords: [{ start: 0, text: 'Cmaj7' }] })),
+      measures: sampleScore.measures.map(m => ({ ...m, chords: [{ start: 0, text: 'Cm7' }] })),
     }
     const chordText = (sheet: ScoreView) =>
       [...(sheet.shadowRoot?.querySelectorAll('.page g.harm text') ?? [])]
         .map(t => t.textContent?.replace(/\s+/g, ''))
         .join(' ')
     const sheet = await shown({ melody, melodyKey: 'C', songKey: 'C' })
-    expect(chordText(sheet)).to.equal('Cmaj7')
+    expect(chordText(sheet)).to.equal('Cm7')
     expect(sheet.hasAttribute('data-real-book')).to.equal(false)
     setRealBookPreference(true)
     try {
-      await waitUntil(() => chordText(sheet) === 'CΔ7', undefined, { timeout: 3000 })
+      await waitUntil(() => chordText(sheet) === 'C-7', undefined, { timeout: 3000 })
       expect(sheet.hasAttribute('data-real-book')).to.equal(true)
       expect(notes(sheet)).to.equal(3)
     } finally {
       setRealBookPreference(false)
     }
-    await waitUntil(() => chordText(sheet) === 'Cmaj7', undefined, { timeout: 3000 })
+    await waitUntil(() => chordText(sheet) === 'Cm7', undefined, { timeout: 3000 })
     expect(sheet.hasAttribute('data-real-book')).to.equal(false)
   })
 
