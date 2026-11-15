@@ -217,7 +217,7 @@ export class SongInfoDialog extends LitElement {
                 error: error => html`
                   <status-message
                     state="error"
-                    message="Couldn't load this song"
+                    message=${t('status-song-load-failed')}
                     .detail=${error instanceof Error ? error.message : ''}
                   ></status-message>
                 `,

@@ -241,4 +241,70 @@ confirm-person-merge-message = Merge { $person } into { $into }? The setlists { 
 confirm-person-delete-heading = Delete?
 confirm-person-delete-button = Delete
 confirm-person-delete-message = Delete { $person }? They lead no setlists. They are removed from the Leader menu.
+
+
+## What a page says while it loads, when it has nothing to show, and when it could not
+
+status-loading = Loading…
+status-checking = Checking…
+
+status-setlists-loading = Loading setlists...
+status-setlists-failed = Error loading setlists. Please check the console.
+status-setlist-loading = Loading setlist...
+status-setlist-info-loading = Loading setlist information...
+status-setlist-info-none = No setlist information available.
+
+status-songs-loading = Loading songs...
+status-songs-failed = Error loading songs. Please check the console.
+status-songs-none = No songs to display.
+status-songs-no-match = No songs match your search.
+status-song-load-failed = Couldn't load this song
+status-song-info-loading = Loading song information...
+status-song-info-none = No song data available.
+status-song-card-none = No song data
+
+# The library page, with nothing in it.
+status-library-empty = No songs in library.
+status-library-empty-detail = Import setlists to populate the song library.
+# The same in the list of songs to add to a setlist.
+status-library-empty-modal = No songs in library
+status-library-empty-modal-detail = Import songs from the menu to fill the song library.
+
+# A space (a Team, say) whose songs and setlists are coming from Drive. { $space } is its name.
+status-space-getting = Getting { $space }'s songs and setlists…
+# What a screen reader says of the progress bar under it.
+status-space-getting-label = Getting { $space }'s songs and setlists
+status-space-not-fetched = { $space }'s songs and setlists have not been fetched yet.
+status-space-not-fetched-detail = They come from Google Drive. You need to be online and signed in.
+status-space-no-setlists = { $space } has no setlists yet.
+status-space-no-setlists-detail = Create the first with the + at the top.
+action-get-them-now = Get them now
+action-getting-them = Getting them…
+
+space-sync-sign-in-hint = Sign in on the Account and Teams page to sync.
+
+
+## Signing in
+
+action-sign-in = Sign in with Google
+account-signed-out-name = Not signed in
+account-signed-out-text = Your songs and setlists stay on this device. Signing in with Google lets you sync them, share setlists, and join a team.
+
+
+## Lead sheets, and the pads that play under a song
+
+# The button over a song that switches between its words and its lead sheet. The first is the label
+# when the song has no lead sheet.
+leadsheet-none = No lead sheet for this song
+leadsheet-show-lyrics = Show the lyrics
+leadsheet-show = Show the lead sheet
+
+pad-error-load = Could not load pad sound for this key
+pad-error-none = No pad set yet: upload one in Storage
+
+
+## About
+
+about-update-none-label = No updates here
+about-update-none-detail = This browser isn't keeping the app's files, so every visit loads the latest.
 `

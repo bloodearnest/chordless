@@ -3,6 +3,7 @@ import { rangeOfMetadata } from '../js/chart-range.ts'
 import type { ParsedChart } from '../js/data-types.ts'
 import { type SongMelody, songMelody } from '../js/melody-analysis.ts'
 import { formatArtistNames } from '../js/song-utils.ts'
+import { t } from '../js/text.ts'
 import { getWeeksAgo } from '../js/utils/date-utils.ts'
 import { lyricSnippet, matchedFields, normalizeTerm } from '../js/utils/song-filter.ts'
 import { type WordRange, wordRanges } from '../js/utils/song-search.ts'
@@ -443,7 +444,7 @@ export class SongCard extends LitElement {
     if (!this.song) {
       return html`
         <div class="card" part="card">
-          <div class="title empty" part="title">No song data</div>
+          <div class="title empty" part="title">${t('status-song-card-none')}</div>
         </div>
       `
     }

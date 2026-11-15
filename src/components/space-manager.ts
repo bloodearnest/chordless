@@ -172,7 +172,7 @@ export class SpaceManager extends LitElement {
       </div>`
     }
     const space = this._space
-    if (!space) return html`<div class="content"><p class="hint">Loading…</p></div>`
+    if (!space) return html`<div class="content"><p class="hint">${t('status-loading')}</p></div>`
     const kind = spaceKind(space)
     const role = spaceRole(space)
     const summary = this._summary
@@ -212,7 +212,7 @@ export class SpaceManager extends LitElement {
                   You are signed in, but Google Drive is not connected, so this space is not syncing.
                   <a href="/account">Connect Google Drive</a> on the Account and Teams page.
                 </p>`
-                : html`<p class="hint">Sign in on the Account and Teams page to sync.</p>`
+                : html`<p class="hint">${t('space-sync-sign-in-hint')}</p>`
           }
         </div>
 

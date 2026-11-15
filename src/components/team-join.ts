@@ -11,6 +11,7 @@ import { setCurrentSpace, switchSpace } from '../js/space.ts'
 import { storageFor } from '../js/storage/space-storage.ts'
 import type { ProgressCallback, SyncProgress } from '../js/sync-manager.ts'
 import { joinSpace, roleWithArticle, syncTeamSpace } from '../js/team-spaces.ts'
+import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { TeamError } from '../js/worker-call.ts'
 import './progress-bar.ts'
@@ -225,7 +226,7 @@ export class TeamJoin extends LitElement {
           </p>
         `
       case 'checking':
-        return html`<p class="status" role="status">Checking…</p>`
+        return html`<p class="status" role="status">${t('status-checking')}</p>`
       case 'sign-in':
         return html`
           <h2>Join a team space</h2>

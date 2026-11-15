@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import type { SongWithContent } from '../js/data-types.ts'
+import { t } from '../js/text.ts'
 import './song-card.ts'
 import './status-message.ts'
 
@@ -46,7 +47,7 @@ export class SongList extends LitElement {
     this.songs = []
     this.variant = 'library'
     this.search = ''
-    this.emptyMessage = 'No songs to display.'
+    this.emptyMessage = t('status-songs-none')
     this.emptyDetail = ''
     this.dense = false
   }

@@ -621,8 +621,8 @@ export class LibraryView extends PageView {
     if (songs.length === 0) {
       return html`<status-message
         state="empty"
-        message="No songs in library."
-        detail="Import setlists to populate the song library."
+        message=${t('status-library-empty')}
+        detail=${t('status-library-empty-detail')}
       ></status-message>`
     }
     const { id, name } = getCurrentSpace()
@@ -634,7 +634,7 @@ export class LibraryView extends PageView {
       ></library-space-filter>
       <song-list
       variant="library"
-      empty-message="No songs match your search."
+      empty-message=${t('status-songs-no-match')}
       .songs=${filterSongs(filterByPlace(songs, this._leftOut, here), this._search)}
       .search=${this._search}
       @song-list:select=${(event: SongSelectEvent) => event.song && this.#openSong(event.song)}
@@ -692,13 +692,13 @@ export class LibraryView extends PageView {
                 pending: () =>
                   this.#songs.value
                     ? this.#renderList(this.#songs.value)
-                    : html`<status-message state="loading" message="Loading songs..."></status-message>`,
+                    : html`<status-message state="loading" message=${t('status-songs-loading')}></status-message>`,
                 complete: songs => this.#renderList(songs),
                 error: error => {
                   console.error('Error loading songs:', error)
                   return html`<status-message
                     state="error"
-                    message="Error loading songs. Please check the console."
+                    message=${t('status-songs-failed')}
                   ></status-message>`
                 },
               })}

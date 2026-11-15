@@ -256,7 +256,7 @@ export class AccountCard extends LitElement {
     return html`
       <div class="panel">
         <h3>Account</h3>
-        ${this._state === null ? html`<p><span class="spinner"></span> Checking…</p>` : this._renderState()}
+        ${this._state === null ? html`<p><span class="spinner"></span> ${t('status-checking')}</p>` : this._renderState()}
         ${
           this._message
             ? html`<p
@@ -333,9 +333,9 @@ export class AccountCard extends LitElement {
   _renderSignedOut() {
     return html`<div class="who">
       <div>
-        <span class="name">Not signed in</span>
+        <span class="name">${t('account-signed-out-name')}</span>
         <span class="status">
-          Your songs and setlists stay on this device. Signing in with Google lets you sync them, share setlists, and join a team.
+          ${t('account-signed-out-text')}
         </span>
       </div>
     </div>`
@@ -368,7 +368,7 @@ export class AccountCard extends LitElement {
 
   _renderMainAction(state: SignInState) {
     if (state === 'signed-out') {
-      return html`<button class="btn primary" id="sign-in" @click=${this._signIn}>Sign in with Google</button>`
+      return html`<button class="btn primary" id="sign-in" @click=${this._signIn}>${t('action-sign-in')}</button>`
     }
     if (state === 'expired') {
       return html`<button class="btn primary" id="reconnect" @click=${this._signIn}>Reconnect with Google</button>`

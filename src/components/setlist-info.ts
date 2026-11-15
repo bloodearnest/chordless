@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import type { Setlist } from '../js/data-types.ts'
+import { t } from '../js/text.ts'
 
 /**
  * SetlistInfo Component
@@ -88,11 +89,11 @@ export class SetlistInfo extends LitElement {
 
   override render() {
     if (this.loading) {
-      return html`<div class="loading">Loading setlist information...</div>`
+      return html`<div class="loading">${t('status-setlist-info-loading')}</div>`
     }
 
     if (!this.setlist) {
-      return html`<div class="empty">No setlist information available.</div>`
+      return html`<div class="empty">${t('status-setlist-info-none')}</div>`
     }
 
     // The date and name are the dialog's heading, so not repeated here

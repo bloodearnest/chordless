@@ -2,6 +2,7 @@ import type { PropertyValues } from 'lit'
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { AppUpdateChangeEvent, appUpdate } from '../js/app-update.ts'
+import { t } from '../js/text.ts'
 import { sleep } from '../js/utils/sleep.ts'
 import './icon.ts'
 
@@ -607,12 +608,12 @@ export class AppHeader extends LitElement {
                     @click=${this._handleMelodyToggle}
                     aria-label=${
                       this.melodyUnavailable
-                        ? 'No lead sheet for this song'
+                        ? t('leadsheet-none')
                         : this.melodyMode
-                          ? 'Show the lyrics'
-                          : 'Show the lead sheet'
+                          ? t('leadsheet-show-lyrics')
+                          : t('leadsheet-show')
                     }
-                    title=${this.melodyUnavailable ? 'No lead sheet for this song' : nothing}
+                    title=${this.melodyUnavailable ? t('leadsheet-none') : nothing}
                     aria-pressed=${this.melodyMode ? 'true' : 'false'}
                     ?disabled=${this.melodyUnavailable}
                   >

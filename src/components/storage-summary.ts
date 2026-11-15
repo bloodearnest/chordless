@@ -1,5 +1,6 @@
 import { Task } from '@lit/task'
 import { css, html, LitElement } from 'lit'
+import { t } from '../js/text.ts'
 
 /**
  * storage-summary
@@ -96,7 +97,7 @@ export class StorageSummary extends LitElement {
   override render() {
     const loading = () => html`
       <div class="stat-card">
-        <span class="stat-label">Loading…</span>
+        <span class="stat-label">${t('status-loading')}</span>
         <span class="stat-value">–</span>
       </div>
     `

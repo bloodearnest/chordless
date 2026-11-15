@@ -6,6 +6,7 @@ import {
   type InstallMode,
   promptInstall,
 } from '../js/install.ts'
+import { t } from '../js/text.ts'
 import { buttonStyles, panelStyles, statusStyles } from './shared-styles.ts'
 import { renderStatus, type StatusShown } from './status-view.ts'
 import './why-install.ts'
@@ -180,8 +181,8 @@ export class AppAbout extends LitElement {
         state: 'none',
         look: 'none',
         icon: 'ban',
-        label: 'No updates here',
-        detail: "This browser isn't keeping the app's files, so every visit loads the latest.",
+        label: t('about-update-none-label'),
+        detail: t('about-update-none-detail'),
       }
     }
     return {
