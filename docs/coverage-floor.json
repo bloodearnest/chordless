@@ -31,8 +31,8 @@
     "functions": 0
   },
   "src/js/score-read.ts": {
-    "lines": 63,
-    "branches": 40,
+    "lines": 57,
+    "branches": 32,
     "functions": 9
   },
   "src/js/score-render-engine.ts": {

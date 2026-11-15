@@ -34,9 +34,6 @@ function all(e: El, test: (c: El) => boolean, out: El[] = []): El[] {
   return out
 }
 
-/** Chord symbols this far apart (the drawing's units: a chord's own text is about 400 wide) are on different beats */
-const CHORD_APART = 100
-
 const byClass = (e: El, cls: string) => all(e, c => is(c, cls))
 const firstByClass = (e: El, cls: string) => byClass(e, cls)[0]
 
@@ -426,9 +423,7 @@ export function readScoreTrees(roots: El[], stats?: ReadStats): Score {
       return [{ x, text, ev: near?.ev ?? null }]
     })
     // The right edge of the measure, from its staff lines: where chords that share a head are told apart
-    const right = Number(
-      /L\s*(-?[\d.]+)/.exec(staff.children.find(c => c.name === 'path')?.attrs.d ?? '')?.[1]
-    )
+    const right = staffRight(staff)
     const chords: ScoreChord[] = placed.map(c => {
       const start = c.ev ? c.ev.start : 0
       // Two chords over the one head (a bar of one rest, "Am" on the first beat and "F" on the third) are
@@ -699,4 +694,17 @@ function alignVoices(voices: ScoreEvent[][], xOf: Map<ScoreEvent, number>): numb
     time = ends.length ? Math.min(...ends) : latest
   }
   return latest
+}
+
+/** Chord symbols this far apart (the drawing's units: a chord's own text is about 400 wide) are on different beats */
+const CHORD_APART = 100
+
+/** Where a staff ends on the page: the end of its first line ("M0 3237 L4000 3237"); not a number if it has none */
+function staffRight(staff: El): number {
+  const line = String(staff.children.find(c => c.name === 'path')?.attrs.d)
+  return Number(
+    String(line.split('L')[1])
+      .trim()
+      .split(/[\s,]+/)[0]
+  )
 }
