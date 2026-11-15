@@ -125,8 +125,28 @@ export class ScoreView extends LitElement {
     }
     /* Real Book style: the words are lettered by hand, in the text font that goes with the music font
        (Caveat, which the annotations use, if it has not loaded) */
-    :host([data-real-book]) .page text {
+    :host([data-real-book]) .page text,
+    :host([data-real-book]) .credits,
+    :host([data-real-book]) .notice {
       font-family: 'Petaluma Script', var(--font-family-annotation, 'Caveat', cursive);
+    }
+    /* (one weight only, so no bold, which the browser would smear; the title is big instead, as on a
+       Real Book's page) */
+    :host([data-real-book]) .title {
+      font-size: 1.8rem;
+      font-weight: normal;
+    }
+    :host([data-real-book]) .credit .names {
+      font-weight: normal;
+      font-size: 1rem;
+    }
+    /* (Petaluma Script is small for its size: the small print is a notch bigger to stay readable) */
+    :host([data-real-book]) .subtitle,
+    :host([data-real-book]) .credit .label {
+      font-size: 0.9rem;
+    }
+    :host([data-real-book]) .notice {
+      font-size: 0.8rem;
     }
     .page ellipse,
     .page path,

@@ -70,6 +70,7 @@ describe('score-view', () => {
   it('engraves it again in the Real Book style when that is the preference, and back when it is not', async () => {
     const melody = {
       ...sampleScore,
+      notice: ['Words and Music by', 'A Writer', 'CCLI Song # 1', '© Somebody'],
       measures: sampleScore.measures.map(m => ({ ...m, chords: [{ start: 0, text: 'Cm7' }] })),
     }
     const chordText = (sheet: ScoreView) =>
@@ -86,6 +87,11 @@ describe('score-view', () => {
       // (lettered in the text font that goes with the music font)
       const word = sheet.shadowRoot?.querySelector('.page g.harm text') as Element
       expect(getComputedStyle(word).fontFamily).to.contain('Petaluma Script')
+      // (and so is the title, the credits and the notice around the music)
+      for (const selector of ['.title', '.credit .names', '.notice p']) {
+        const around = sheet.shadowRoot?.querySelector(selector) as Element
+        expect(getComputedStyle(around).fontFamily, selector).to.contain('Petaluma Script')
+      }
       expect(notes(sheet)).to.equal(3)
     } finally {
       setRealBookPreference(false)
