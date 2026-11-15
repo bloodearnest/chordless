@@ -18,6 +18,7 @@ import {
   roleWithArticle,
   stopSharing,
 } from '../js/team-spaces.ts'
+import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
@@ -169,9 +170,9 @@ export class TeamSharePanel extends LitElement {
   async _stopSharing(): Promise<void> {
     const space = this._current
     const sure = await this._confirm(
-      'Stop sharing this Team?',
-      'Everyone else loses access, and Chordless forgets the sign-in it kept for this Team. The folder and its files stay in your Drive, and on every device that has them.',
-      'Stop sharing'
+      t('confirm-team-stop-heading'),
+      t('confirm-team-stop-message'),
+      t('confirm-team-stop-button')
     )
     if (!sure) return
     await this._run(async () => {
@@ -183,9 +184,9 @@ export class TeamSharePanel extends LitElement {
   async _leave(): Promise<void> {
     const space = this._current
     const sure = await this._confirm(
-      `Leave ${space.name}?`,
-      'You lose access to the Team, and it is removed from this device. The team keeps its songs and setlists, and an admin can invite you again.',
-      'Leave'
+      t('confirm-team-leave-heading', { space: space.name }),
+      t('confirm-team-leave-message'),
+      t('confirm-team-leave-button')
     )
     if (!sure) return
     await this._run(async () => {
@@ -202,9 +203,9 @@ export class TeamSharePanel extends LitElement {
   async _remove(email: string): Promise<void> {
     const team = this._team
     const sure = await this._confirm(
-      `Remove ${email}?`,
-      'They lose access to this Team. What is already on their device stays there, but it no longer syncs.',
-      'Remove'
+      t('confirm-team-remove-heading', { email }),
+      t('confirm-team-remove-message'),
+      t('confirm-team-remove-button')
     )
     if (sure) await this._run(() => teamApi.removeMember(team.id, email))
   }

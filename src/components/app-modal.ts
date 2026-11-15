@@ -1,6 +1,7 @@
 import type { PropertyValues } from 'lit'
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import { t } from '../js/text.ts'
 import './icon.ts'
 import { buttonStyles } from './shared-styles.ts'
 
@@ -265,8 +266,8 @@ export class AppModal extends LitElement {
     this.message = ''
     this.type = 'custom'
     this.size = 'medium'
-    this.confirmLabel = 'Confirm'
-    this.cancelLabel = 'Cancel'
+    this.confirmLabel = t('action-confirm')
+    this.cancelLabel = t('action-cancel')
     this.hideCloseButton = false
   }
 

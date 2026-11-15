@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { StoredBlob } from '../js/auth-db.ts'
 import type { SignInState, UserInfo } from '../js/google-auth.ts'
+import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
@@ -271,17 +272,17 @@ export class AccountCard extends LitElement {
         ${ref(this._logoutModal)}
         type="confirm"
         size="small"
-        heading="Log out of Google?"
-        confirm-label="Log Out"
-        message="This signs you out on this device only. Other devices stay signed in. Your songs and setlists stay on this device and in Drive."
+        heading=${t('confirm-logout-heading')}
+        confirm-label=${t('confirm-logout-button')}
+        message=${t('confirm-logout-message')}
       ></app-modal>
       <app-modal
         ${ref(this._revokeModal)}
         type="confirm"
         size="small"
-        heading="Revoke access at Google?"
-        confirm-label="Revoke Access"
-        message="This signs you out and revokes Chordless's access to your Google Drive at Google (which needs the network). Every other device signed in with this Google account will need to connect again too. Your songs and setlists stay on this device and in Drive."
+        heading=${t('confirm-revoke-heading')}
+        confirm-label=${t('confirm-revoke-button')}
+        message=${t('confirm-revoke-message')}
       ></app-modal>
     `
   }

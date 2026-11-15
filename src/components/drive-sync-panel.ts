@@ -11,6 +11,7 @@ import {
   isSyncAvailable,
   SyncOrchestrator,
 } from '../js/sync-orchestrator.ts'
+import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
@@ -320,9 +321,9 @@ export class DriveSyncPanel extends LitElement {
           ${ref(this._resetModal)}
           type="confirm"
           size="small"
-          heading="Reset from Google Drive?"
-          confirm-label="Reset"
-          message="This replaces this device's setlists and songs with the copy in Google Drive. Anything removed from Drive is removed here too. If this device has changes that aren't in Drive yet, nothing is changed."
+          heading=${t('confirm-drive-reset-heading')}
+          confirm-label=${t('confirm-drive-reset-button')}
+          message=${t('confirm-drive-reset-message')}
         ></app-modal>
 
         ${
@@ -351,9 +352,9 @@ export class DriveSyncPanel extends LitElement {
           ${ref(this._startOverModal)}
           type="confirm"
           size="small"
-          heading="Start over in Google Drive?"
-          confirm-label="Start over"
-          message="Everything on this device is kept, and uploaded again to a new Drive folder. Share links to this space's setlists stop working: make them again. If you can still see the old folder in Drive, it is left alone: delete it by hand when you are sure."
+          heading=${t('confirm-drive-start-over-heading')}
+          confirm-label=${t('confirm-drive-start-over-button')}
+          message=${t('confirm-drive-start-over-message')}
         ></app-modal>
         <button class="btn" ?disabled=${this.syncing} @click=${this._handleReplaceFromFolder}>
           ⤓ Replace with the copy in Drive
@@ -362,9 +363,9 @@ export class DriveSyncPanel extends LitElement {
           ${ref(this._replaceModal)}
           type="confirm"
           size="small"
-          heading="Replace this device's copy?"
-          confirm-label="Replace"
-          message="For when another device has already synced this space with this version of the app. This device's setlists and songs are replaced with the folder of this name in Google Drive, and anything only on this device is lost. If there is no such folder, nothing is changed."
+          heading=${t('confirm-drive-replace-heading')}
+          confirm-label=${t('confirm-drive-replace-button')}
+          message=${t('confirm-drive-replace-message')}
         ></app-modal>
       </div>
     `

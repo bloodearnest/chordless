@@ -32,8 +32,12 @@ songs-count = { $count ->
 - **Write a comment** above a message: when it is shown, and what each `{ $value }` is. The editor
   shows it, and it is what lets someone reword a message without reading the code.
 - **Terms** (`-folder-gone-safe`) are text several messages share.
-- A message the person sees with a value in a different place in a different language is one message
-  with the value in it, not two fragments joined in code.
+- **A message is a whole sentence, or the sentences that go together.** Never a fragment that code
+  joins to another in the middle of a sentence (the order of words differs between languages, and a
+  writer cannot see the whole). Where whole sentences come and go (the question to delete a space has
+  one more sentence when it is the one you are in), one message for each, joined with a space in code;
+  where a clause does (", and its file goes to the Drive trash"), the message in its two forms.
+  A number in a sentence, singular or plural, is a selector in the message.
 
 ## Changing a message
 
@@ -63,8 +67,9 @@ that is not there, and when a message is there that nothing uses.
 
 ## What is not in it yet
 
-The migration is by area. Done: the toasts (`toast(...)` and the buttons on them), and the message
-about a lost Drive folder. Still in the code: dialogs, confirmations, empty states, labels, the Help
+The migration is by area. Done: the toasts (`toast(...)` and the buttons on them), the message
+about a lost Drive folder, and the questions asked before something is changed (the confirmation
+dialogs, and `app-modal`'s own Confirm and Cancel). Still in the code: the other dialogs, empty states, labels, the Help
 page (`js/help-content.ts`), the text `describeSetlistChange` makes, and the Worker's emails.
 Text with a link or bold in it needs a markup convention that is not built; say so when you reach one
 rather than splitting the sentence.

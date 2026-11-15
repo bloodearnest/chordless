@@ -898,8 +898,8 @@ export class SetlistPage {
     if (text) {
       const space = await getCurrentSpaceFull()
       text.textContent = setlist.fileRef
-        ? `This deletes the setlist for everyone in ${space.name}. Its file goes to the Google Drive trash at the next sync, and it can be restored from there.`
-        : 'This deletes the setlist from this device. It was never saved to Google Drive.'
+        ? t('confirm-setlist-delete-shared', { space: space.name })
+        : t('confirm-setlist-delete-local')
     }
     if (!(await modal?.ask())) return
     const database = this._database()
@@ -943,7 +943,10 @@ export class SetlistPage {
     const modal = this.root.querySelector<AppModal>('#move-setlist-modal')
     const text = modal?.querySelector('#move-setlist-text')
     if (text) {
-      text.textContent = `Moves ${title} from ${here.name} to ${target.name}. The charts it uses are copied, and its leader is added to ${target.name} if they are not there already. It is removed from ${here.name}${setlist.fileRef ? ', and its file goes to the Google Drive trash' : ''}.`
+      text.textContent = t(
+        setlist.fileRef ? 'confirm-setlist-move-message-drive' : 'confirm-setlist-move-message',
+        { title, from: here.name, to: target.name }
+      )
     }
     if (!(await modal?.ask())) return
     try {
@@ -2042,8 +2045,8 @@ export class SetlistPage {
   }
 
   async showDeleteSongConfirmation(index: number, song: RuntimeSong) {
-    const title = this.root.querySelector<HTMLElement>('#delete-song-title')
-    if (title) title.textContent = song.title
+    const text = this.root.querySelector<HTMLElement>('#delete-song-text')
+    if (text) text.textContent = t('confirm-song-remove-message', { title: song.title })
     // ask() settles on confirm, cancel or close, leaving no listener behind: a
     // confirm handler left by a cancelled ask would delete a second song later
     if (await this.root.querySelector<AppModal>('#delete-song-modal')?.ask()) {

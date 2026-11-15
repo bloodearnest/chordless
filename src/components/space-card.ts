@@ -7,6 +7,7 @@ import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
 import { syncSpaceNow } from '../js/space-sync.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
+import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -208,7 +209,7 @@ export class SpaceCard extends LitElement {
 
   async _switch(): Promise<void> {
     const modal = this._switchModal.value as AppModal
-    modal.message = `Switch to "${this.space.name}"?`
+    modal.message = t('confirm-space-switch-message', { space: this.space.name })
     if (await modal.ask()) this.dispatchEvent(new SpaceSwitchEvent(this.space.id))
   }
 
@@ -296,8 +297,8 @@ export class SpaceCard extends LitElement {
         ${ref(this._switchModal)}
         type="confirm"
         size="small"
-        heading="Switch?"
-        confirm-label="Switch"
+        heading=${t('confirm-space-switch-heading')}
+        confirm-label=${t('confirm-space-switch-button')}
       ></app-modal>
     `
   }

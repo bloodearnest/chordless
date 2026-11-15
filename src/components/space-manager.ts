@@ -8,6 +8,7 @@ import { removeSpaceFromDevice } from '../js/space-deletion.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
+import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -139,14 +140,15 @@ export class SpaceManager extends LitElement {
   async _delete(): Promise<void> {
     const space = this._space as Space
     const modal = this._deleteModal.value as AppModal
-    modal.message =
-      `Delete "${space.name}" from this device? Its songs and setlists here are deleted, and ` +
-      'anything not yet synced to Google Drive is lost. Its folder in Google Drive is not touched.' +
-      (this._current ? ' It is the one you are in: you will be taken to another.' : '') +
-      (isTeamMember(space)
-        ? ' You stay in the Team: to get it back on this device, ask for a new invite link.'
-        : '') +
-      " This can't be undone."
+    // (a sentence for each thing that is so, and the last one always)
+    modal.message = [
+      t('confirm-space-delete-message', { space: space.name }),
+      this._current ? t('confirm-space-delete-current') : '',
+      isTeamMember(space) ? t('confirm-space-delete-team') : '',
+      t('confirm-space-delete-final'),
+    ]
+      .filter(Boolean)
+      .join(' ')
     if (!(await modal.ask())) return
     this._error = ''
     try {
@@ -258,8 +260,8 @@ export class SpaceManager extends LitElement {
       <app-modal
         ${ref(this._deleteModal)}
         type="confirm"
-        heading="Delete from this device?"
-        confirm-label="Delete"
+        heading=${t('confirm-space-delete-heading')}
+        confirm-label=${t('confirm-space-delete-button')}
       ></app-modal>
     `
   }
