@@ -162,6 +162,29 @@ describe('the Real Book style', () => {
     assert.equal(hand.log, '')
   })
 
+  it('draws the lines and the stems heavier in the Real Book style, and no heavier again after it', async () => {
+    const strokes = (svg: string) =>
+      [...svg.matchAll(/stroke-width="(\d+)"/g)].map(m => Number(m[1]))
+    const before = await renderScoreHere(writeMusicXml(melody))
+    const hand = await renderScoreHere(writeMusicXml(melody), { font: 'Petaluma' })
+    const after = await renderScoreHere(writeMusicXml(melody))
+    assert.ok(before && hand && after)
+    assert.ok(
+      Math.min(...strokes(hand.pages[0] as string)) >
+        Math.min(...strokes(before.pages[0] as string))
+    )
+    // (the toolkit is kept between sheets: what one sets must not stay for the next. The weights are
+    // compared, not the SVG, which has new ids in its element names each time)
+    assert.deepEqual(strokes(after.pages[0] as string), strokes(before.pages[0] as string))
+  })
+
+  it('draws chord symbols a little bigger in the Real Book style only', () => {
+    const svg =
+      '<g class="harm"><text font-size="0px"><tspan class="text"><tspan font-size="400px" x="1" y="2">Am7</tspan></tspan></text></g>'
+    assert.match(withRealBookChords(svg), /font-size="460px"[^>]*>A-7</)
+    assert.match(withRealBookChords(svg), /<text font-size="0px">/)
+  })
+
   it('writes the quality of a chord as a Real Book does', () => {
     const cases: Record<string, string> = {
       // (these vary from chart to chart, so they are as the chart has them)

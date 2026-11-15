@@ -46,19 +46,24 @@ export function realBookQuality(quality: string): string {
     .replace(/^(?:min|m)(?!aj)/, '-')
 }
 
+/** Chord symbols are drawn this much bigger in the Real Book style, where they are bigger than the words under the music */
+const REAL_BOOK_CHORD_SCALE = 1.15
+
 /**
- * The chord symbols of the pages in the notation of a Real Book (`realBookQuality`). Only the text of
- * a chord symbol (`g.harm`) is changed: the root is the first letter of the first run, and a run after a
- * flat or sharp is all quality. With `on` false the page is as it was.
+ * The chord symbols of the pages in the notation of a Real Book (`realBookQuality`), and a little bigger
+ * (`REAL_BOOK_CHORD_SCALE`). Only the text of a chord symbol (`g.harm`) is changed: the root is the first
+ * letter of the first run, and a run after a flat or sharp is all quality. With `on` false the page is as
+ * it was.
  */
 export function withRealBookChords(svg: string, on = true): string {
   if (!on) return svg
   return svg.replace(/(class="harm"[\s\S]*?<\/g>)/g, harm =>
     harm.replace(
-      /(<tspan font-size="\d+px"[^>]*>)([^<]*)(<\/tspan>)/g,
-      (_all, open: string, text: string, close: string) => {
+      /<tspan font-size="(\d+)px"([^>]*)>([^<]*)<\/tspan>/g,
+      (_all, size: string, rest: string, text: string) => {
         const root = /^[A-G]/.test(text) && !/^[A-G]$/.test(text) ? text.slice(0, 1) : ''
-        return `${open}${root}${realBookQuality(text.slice(root.length))}${close}`
+        const bigger = Math.round(Number(size) * REAL_BOOK_CHORD_SCALE)
+        return `<tspan font-size="${bigger}px"${rest}>${root}${realBookQuality(text.slice(root.length))}</tspan>`
       }
     )
   )
