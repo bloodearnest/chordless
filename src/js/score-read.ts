@@ -34,6 +34,9 @@ function all(e: El, test: (c: El) => boolean, out: El[] = []): El[] {
   return out
 }
 
+/** Chord symbols this far apart (the drawing's units: a chord's own text is about 400 wide) are on different beats */
+const CHORD_APART = 100
+
 const byClass = (e: El, cls: string) => all(e, c => is(c, cls))
 const firstByClass = (e: El, cls: string) => byClass(e, cls)[0]
 
@@ -411,7 +414,7 @@ export function readScoreTrees(roots: El[], stats?: ReadStats): Score {
       voiceLengths.every(l => l <= measureLen + 1e-6)
 
     // Chord symbols sit above the beat they belong to: the nearest head along the staff
-    const chords: ScoreChord[] = byClass(m, 'harm').flatMap(h => {
+    const placed = byClass(m, 'harm').flatMap(h => {
       const text = chordText(textOf(h))
       const tx = firstByClass(h, 'text')
       const x = Number(h.children[0]?.attrs.x ?? tx?.attrs.x ?? 0)
@@ -420,7 +423,25 @@ export function readScoreTrees(roots: El[], stats?: ReadStats): Score {
         (b, c) => (!b || Math.abs(c.x - x) < Math.abs(b.x - x) ? c : b),
         null
       )
-      return [{ start: near ? near.ev.start : 0, text }]
+      return [{ x, text, ev: near?.ev ?? null }]
+    })
+    // The right edge of the measure, from its staff lines: where chords that share a head are told apart
+    const right = Number(
+      /L\s*(-?[\d.]+)/.exec(staff.children.find(c => c.name === 'path')?.attrs.d ?? '')?.[1]
+    )
+    const chords: ScoreChord[] = placed.map(c => {
+      const start = c.ev ? c.ev.start : 0
+      // Two chords over the one head (a bar of one rest, "Am" on the first beat and "F" on the third) are
+      // not on the same beat: the later one is as far along the rest of the measure as it is across the room
+      // the first has to the barline, to the nearest half beat
+      const first = placed.find(o => o.ev === c.ev && o.x < c.x - CHORD_APART)
+      const lead = placed.filter(o => o.ev === c.ev).reduce((a, o) => Math.min(a, o.x), c.x)
+      if (!first || !c.ev || !(right > lead)) return { start, text: c.text }
+      const along = ((c.x - lead) / (right - lead)) * (measureLen - start)
+      return {
+        start: start + Math.min(measureLen - start, Math.round(along * 2) / 2),
+        text: c.text,
+      }
     })
 
     const reh = firstByClass(m, 'reh')
