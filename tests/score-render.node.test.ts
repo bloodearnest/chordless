@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { Score } from '../src/js/score.ts'
 import { writeMusicXml, writeSectionsMusicXml } from '../src/js/score-musicxml.ts'
+import { readMusicXml } from '../src/js/score-musicxml-read.ts'
 import { balanceLines, renderScoreHere, withoutStyle } from '../src/js/score-render-engine.ts'
 import {
   realBookQuality,
@@ -150,6 +151,25 @@ describe('engraving a melody with Verovio', () => {
     const shown = out.pages.map(page => withTextAccidentals(page, true)).join('')
     assert.doesNotMatch(shown, /font-family="Leipzig"[^>]*>[\uEA63-\uEA66]/)
     assert.match(shown, /♭/)
+  })
+})
+
+describe('chord symbols that are not chords', () => {
+  it('draws "N.C." as it is, with no root of C before it, and reads it back', async () => {
+    const m: Score = {
+      title: 'T',
+      notice: [],
+      measures: [measure(1, ['C4:4'], { chords: [[0, 'N.C.']], barline: 'final' })],
+    }
+    const xml = writeMusicXml(m)
+    assert.doesNotMatch(xml, /<root-step>C<\/root-step><\/root><kind text="N\.C\."/)
+    const out = await renderScoreHere(xml)
+    assert.ok(out)
+    const text = [...(out.pages[0] as string).matchAll(/class="harm"[\s\S]*?<\/g>/g)].map(g =>
+      [...g[0].matchAll(/>([^<]+)<\/tspan>/g)].map(t => t[1]).join('')
+    )
+    assert.deepEqual(text, ['N.C.'])
+    assert.deepEqual(readMusicXml(xml)?.measures[0]?.chords, [{ start: 0, text: 'N.C.' }])
   })
 })
 

@@ -46,8 +46,10 @@ function typeOf(q: number): { type: string; dots: number } {
 /** "Bb/D" as root, kind text and bass: the app's text is kept as the kind's `text` so nothing is lost on a round trip */
 function harmony(text: string): string {
   const m = /^([A-G])([b#]?)(.*?)(?:\/([A-G])([b#]?))?$/.exec(text)
+  // (a symbol that is no chord of ours, "N.C.", has no root: it is a `<function>`, which MusicXML allows in the root's place
+  // and Verovio shows as its text alone. A root of C would be drawn too, "CN.C.")
   if (!m)
-    return `<harmony><root><root-step>C</root-step></root><kind text="${esc(text)}">other</kind></harmony>`
+    return `<harmony><function>${esc(text)}</function><kind text="${esc(text)}">other</kind></harmony>`
   const alter = (a: string | undefined) => (a === 'b' ? -1 : a === '#' ? 1 : 0)
   const root = `<root><root-step>${m[1]}</root-step>${alter(m[2]) ? `<root-alter>${alter(m[2])}</root-alter>` : ''}</root>`
   const bass = m[4]
