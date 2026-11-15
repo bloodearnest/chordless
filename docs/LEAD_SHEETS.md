@@ -402,7 +402,9 @@ per device and off by default, that engraves the sheet as a handwritten chart:
   Petaluma (it has the Δ, ø, ° and + which Caveat does not have, and its chords are upright block capitals like a Real Book's),
   by a rule in `score-view.ts` on `[data-real-book]`. It is `src/css/fonts/PetalumaScript.woff2` (51 KB, SIL OFL, from
   `steinbergmedia/petaluma`; the licence is in `public/licences/` and named on `src/licences.html`), so it is bundled and
-  precached like the rest. Caveat is its fallback.
+  precached like the rest. Caveat is its fallback. The title, credits and CCLI notice around the music, which are HTML and
+  not the SVG, are lettered in it too, so no part of the page is left in Times; a notch bigger for the small print, and
+  not bold (it has one weight, and a browser's faux bold smears it).
 - **The chord notation** is the Real Book's, for the symbols that nearly every chart agrees on: `m7` is `-7`, `m7b5` is `ø7`, `dim` is `°`, `aug` is
   `+` (`realBookQuality` in `score-svg-text.ts`). It rewrites the text of the SVG's chord symbols only: the MusicXML,
   which is also what is stored, keeps the chart's own words, so turning the style off gives them back.
