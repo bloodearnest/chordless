@@ -1,6 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { type AuthMetadata, deleteBlob, type StoredUser, storeBlob } from '../src/js/auth-db.ts'
 import {
+  type EmailCodeError,
   exportBlobBackup,
   getAccessToken,
   getCurrentUserInfo,
@@ -11,6 +12,8 @@ import {
   logout,
   revokeAccess,
   SignInExpiredError,
+  signInWithEmail,
+  startEmailSignIn,
 } from '../src/js/google-auth.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
@@ -228,6 +231,89 @@ describe('google-auth', () => {
         error = e
       })
       expect((error as Error | null)?.message).to.equal('Sessions are not set up')
+    })
+  })
+
+  describe('signing in with an emailed code', () => {
+    it('asks the Worker to mail the code, and says why when it cannot', async () => {
+      respondTo = () => json({ ok: true })
+      await startEmailSignIn('ann@example.com')
+      expect(fetches).to.deep.equal([
+        { url: '/session/email/start', body: { address: 'ann@example.com' } },
+      ])
+      const why = async (response: Response) => {
+        respondTo = () => response
+        return startEmailSignIn('ann@example.com').catch(e => (e as EmailCodeError).reason)
+      }
+      expect(await why(json({ error: 'invalid_address' }, 400))).to.equal('invalid_address')
+      expect(await why(json({ error: 'too_many' }, 429))).to.equal('too_often')
+      expect(await why(json({ error: 'send_failed' }, 502))).to.equal('failed')
+      expect(await why(new Response('oops', { status: 500 }))).to.equal('failed')
+    })
+
+    it('keeps the session, with no Google blob, and is signed in without Drive', async () => {
+      respondTo = () =>
+        json({
+          access_token: 'a1',
+          refresh_token: 'id.secret',
+          expires_in: 900,
+          email: 'ann@example.com',
+        })
+      await signInWithEmail('ann@example.com', '123456')
+      const stored = must(worker.stored)
+      expect(stored.blob).to.equal('')
+      expect(stored.metadata.session?.refresh_token).to.equal('id.secret')
+      expect(stored.metadata.user?.email).to.equal('ann@example.com')
+      expect(await getSignInState()).to.equal('no-drive')
+      expect(await getIdentityToken()).to.equal('a1')
+      let error: Error | null = null
+      await getAccessToken().catch(e => {
+        error = e
+      })
+      expect((error as Error | null)?.message).to.include('Not signed in with Google')
+    })
+
+    it('says why a code was refused', async () => {
+      const why = async (body: object) => {
+        respondTo = () => json(body, 401)
+        return signInWithEmail('ann@example.com', '1').catch(e => (e as EmailCodeError).reason)
+      }
+      expect(await why({ error: 'invalid_code', reason: 'wrong' })).to.equal('wrong')
+      expect(await why({ error: 'invalid_code', reason: 'expired' })).to.equal('expired')
+      expect(await why({ error: 'invalid_code', reason: 'too_many' })).to.equal('too_many')
+      expect(await why({ error: 'x', reason: 'odd' })).to.equal('failed')
+      expect(worker.stored).to.equal(undefined)
+    })
+
+    it('has to sign in again when the session ends: there is no blob to start from', async () => {
+      worker.stored = {
+        blob: '',
+        metadata: {
+          session: { access_token: 'a', refresh_token: 'r', expires_at: inFromNow(-MINUTE) },
+        },
+        updated_at: new Date().toISOString(),
+      }
+      respondTo = () => json({ error: 'invalid_session' }, 401)
+      let error: unknown
+      await getIdentityToken().catch(e => {
+        error = e
+      })
+      expect(error).to.be.instanceOf(SignInExpiredError)
+    })
+
+    it('ends the session at the Worker at sign-out, with or without Google', async () => {
+      worker.stored = {
+        blob: '',
+        metadata: {
+          session: { access_token: 'a', refresh_token: 'r', expires_at: inFromNow(MINUTE) },
+        },
+        updated_at: new Date().toISOString(),
+      }
+      respondTo = () => json({ success: true })
+      expect(await revokeAccess()).to.deep.equal({ revoked: true })
+      expect(fetches.map(each => each.url)).to.include('/session/logout')
+      expect(fetches.at(-1)?.body).to.deep.equal({ refresh_token: 'r' })
+      expect(worker.stored).to.equal(undefined)
     })
   })
 

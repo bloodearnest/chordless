@@ -823,6 +823,22 @@ describe('signing in with an emailed code', () => {
     )
   })
 
+  test('limits all senders together, and each sender, before anything is sent', async () => {
+    const everyone = world({ EMAIL_LOGIN_OVERALL: { limit: async () => ({ success: false }) } })
+    assert.equal((await everyone.start('ann@example.com')).status, 429)
+    assert.equal(everyone.sent.length, 0)
+    const keys: string[] = []
+    const both = world({
+      EMAIL_LOGIN: { limit: async ({ key }) => (keys.push(key), { success: true }) },
+      EMAIL_LOGIN_OVERALL: { limit: async ({ key }) => (keys.push(key), { success: true }) },
+    })
+    assert.equal(
+      (await both.start('ann@example.com', NOW, { 'CF-Connecting-IP': '9.9.9.9' })).status,
+      200
+    )
+    assert.deepEqual(keys, ['9.9.9.9', 'all'])
+  })
+
   test('says when the mail could not be handed over', async () => {
     const w = world({
       EMAIL: {
@@ -832,6 +848,14 @@ describe('signing in with an emailed code', () => {
       },
     })
     assert.equal((await w.start('ann@example.com')).status, 502)
+    const odd = world({
+      EMAIL: {
+        send: async () => {
+          throw new Error('no code')
+        },
+      },
+    })
+    assert.equal((await odd.start('ann@example.com')).status, 502)
   })
 
   test('signs in with the code, once, as a new account', async () => {

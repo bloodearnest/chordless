@@ -23,6 +23,7 @@ import {
 import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { TeamError } from '../js/worker-call.ts'
+import './email-code-sign-in.ts'
 import './progress-bar.ts'
 import { buttonStyles } from './shared-styles.ts'
 
@@ -32,6 +33,7 @@ type State =
   | 'checking'
   | 'sign-in'
   | 'make-account'
+  | 'email-code'
   | 'ready'
   | 'joining'
   | 'syncing'
@@ -424,6 +426,9 @@ export class TeamJoin extends LitElement {
                 <button class="btn" @click=${() => this._answerHasGoogle('no')}>
                   ${t('join-has-google-no')}
                 </button>
+                <button class="btn" @click=${() => (this._state = 'email-code')}>
+                  ${t('email-code-button')}
+                </button>
               </div>
             `
           : html`
@@ -431,6 +436,9 @@ export class TeamJoin extends LitElement {
               ${this._message ? html`<p class="status error" role="alert">${this._message}</p>` : nothing}
               <div class="actions">
                 <button class="btn primary" @click=${this._signIn}>🔑 ${t('join-sign-in-button')}</button>
+                <button class="btn" @click=${() => (this._state = 'email-code')}>
+                  ${t('email-code-button')}
+                </button>
                 ${
                   known === 'yes'
                     ? html`<button class="btn" @click=${() => this._answerHasGoogle('no')}>
@@ -442,6 +450,25 @@ export class TeamJoin extends LitElement {
             `
       }
     `
+  }
+
+  /** Signing in with an emailed code, which needs no Google account: the invite's address to start from */
+  _renderEmailCode() {
+    return html`
+      <h2>${t('email-code-heading')}</h2>
+      <email-code-sign-in
+        .address=${this._info?.email ?? ''}
+        @email-code:signed-in=${this._emailSignedIn}
+      ></email-code-sign-in>
+      <div class="actions">
+        <button class="btn" @click=${() => (this._state = 'sign-in')}>${t('join-make-back')}</button>
+      </div>
+    `
+  }
+
+  async _emailSignedIn(): Promise<void> {
+    this._trail.note({ 'chordless.join.method': 'email' })
+    await this._check()
   }
 
   /** For someone with no Google account: the easy way, and the way that keeps their own address */
@@ -462,6 +489,9 @@ export class TeamJoin extends LitElement {
           : nothing
       }
       <div class="actions">
+        <button class="btn" @click=${() => (this._state = 'email-code')}>
+          ${t('email-code-button')}
+        </button>
         <button class="btn primary" @click=${() => this._answerHasGoogle('yes')}>
           ${t('join-make-done')}
         </button>
@@ -521,6 +551,8 @@ export class TeamJoin extends LitElement {
         return this._renderSignIn()
       case 'make-account':
         return this._renderMakeAccount()
+      case 'email-code':
+        return this._renderEmailCode()
       case 'ready':
         return this._renderReady()
       case 'joining':

@@ -61,11 +61,19 @@ It works once, for 10 minutes. If you did not ask for it, you can ignore this em
   }
 }
 
+/**
+ * Whether this sender may ask, and the Worker as a whole may send: a sender (by its address) is limited, and
+ * so is everyone together, since a sender that changes address, asking for codes for addresses that do not
+ * exist, would otherwise fill the domain's name with bounces.
+ */
 async function allowed(request: Request, env: Env): Promise<boolean> {
-  if (!env.EMAIL_LOGIN) return true
   try {
     const key = request.headers.get('CF-Connecting-IP') ?? 'unknown'
-    return (await env.EMAIL_LOGIN.limit({ key })).success !== false
+    if (env.EMAIL_LOGIN && (await env.EMAIL_LOGIN.limit({ key })).success === false) return false
+    return (
+      !env.EMAIL_LOGIN_OVERALL ||
+      (await env.EMAIL_LOGIN_OVERALL.limit({ key: 'all' })).success !== false
+    )
   } catch {
     // (a limit that cannot be asked is no reason to refuse)
     return true
