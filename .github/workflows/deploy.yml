@@ -54,6 +54,7 @@ jobs:
     name: CI
     uses: ./.github/workflows/ci.yml
     permissions:
+      actions: write # for ci.yml's watchdog, which cancels a run that is only waiting for a runner
       contents: read
 
   plan:
