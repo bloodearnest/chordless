@@ -197,7 +197,7 @@ describe('the join page', () => {
     )
     expect(text()).to.contain('no access to your Google Drive')
     // an invite to a Hotmail address is not a reason to think a Gmail one is needed
-    expect(text()).to.contain('No Gmail needed')
+    expect(text()).to.contain('You do not need a Gmail address')
     const signUp = page.shadowRoot?.querySelector<HTMLAnchorElement>(
       'a[href^="https://accounts.google.com/signup"]'
     )
@@ -323,7 +323,7 @@ describe('the join page', () => {
     button('Join the team space').click()
     await until(() => text().includes("Couldn't join"), 'the refusal')
     expect(text()).to.contain('sent to a different Google account. Sign in with the address')
-    expect(text()).to.contain('Use my existing email address')
+    expect(text()).to.contain('see the steps on the sign-in page')
   })
 
   it('takes the invite from the path of the link, and another when the route changes', async () => {

@@ -171,7 +171,7 @@ export function isGmailAddress(email: string): boolean {
 /** The part of an invite's message for an address that may not be a Google account yet; empty for Gmail */
 export function googleAccountHelp(email: string): string {
   if (isGmailAddress(email)) return ''
-  return `If ${email} is not a Google account yet, make one first at ${GOOGLE_SIGNUP_URL} and choose "Use my existing email address" (you need no Gmail).`
+  return `If ${email} is not a Google account yet, make one first at ${GOOGLE_SIGNUP_URL}: give your name and birthday, ignore the offer of a new Gmail address and tap "Use your existing email" under it, then enter the code Google emails to ${email} (you need no Gmail). If Google will not accept it, ask for the invite to be sent to a Gmail address instead.`
 }
 
 /** What to say with an invite's link, to the person it is for */

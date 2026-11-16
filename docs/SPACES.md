@@ -470,7 +470,7 @@ Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
   out is the page's, `/join/<space id>/<code>` (built; links sent before 2026-11-16 have them in the fragment, `/join#<space id>.<code>`, which the page still reads, and invites last a week), and is handed on from the
   admin's own account by the share sheet, WhatsApp or Gmail (`invite-send.ts`).
   The message says how to make a Google account with an address that is not Gmail's (a link to
-  Google's sign-up and "Use my existing email address"; `googleAccountHelp`). Whether an address is
+  Google's sign-up and "Use your existing email" (under the offer of a new Gmail address, which is what trips people); `googleAccountHelp`). Whether an address is
   a Google account cannot be known (a Workspace domain or an address made a Google account looks like
   any other, and probing Google's sign-in is not something Chordless does), so only `gmail.com` and
   `googlemail.com` leave the text out, and nothing is ever refused for it. The invite carries no name:

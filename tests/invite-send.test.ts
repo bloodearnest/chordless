@@ -38,7 +38,7 @@ describe('inviteMessage and inviteSendLinks', () => {
   it('tells an address that may not be a Google account how to make one, and leaves it out for Gmail', () => {
     const other = inviteMessage('Grace Church', 'writer', 'fay@church.org')
     expect(other).to.contain('https://accounts.google.com/signup')
-    expect(other).to.contain('Use my existing email address')
+    expect(other).to.contain('Use your existing email')
     expect(googleAccountHelp('fay@church.org')).to.contain(
       'fay@church.org is not a Google account yet'
     )
