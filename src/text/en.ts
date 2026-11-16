@@ -245,15 +245,25 @@ confirm-person-delete-message = Delete { $person }? They lead no setlists. They 
 status-loading = Loading…
 status-checking = Checking…
 
-# On the page an invite's link opens, under "sign in with Google": for someone whose invite was sent
-# to a Hotmail, Outlook, Yahoo or work address, who thinks they need a Gmail one.
-join-no-gmail-needed = No Gmail needed: a Google account can be made with the email address you already have (Hotmail, Outlook, Yahoo or any other). Make it with that same address, then come back to this page and sign in.
+# On the page an invite's link opens, above the steps for making a Google account: for someone whose
+# invite was sent to a Hotmail, Outlook, Yahoo or work address, who thinks they need a Gmail one.
+join-no-gmail-needed = You do not need a Gmail address. A Google account can be made with the email address the invite was sent to (Hotmail, Outlook, Yahoo or any other). If you already have a Google account with that address, just sign in below.
 
-# The link, after join-no-gmail-needed, to Google's page for making that account.
-join-make-google-account = Make a Google account with my existing email address
+# The steps for making one; the quoted names are what Google's sign-up page calls its buttons.
+join-steps-heading = Making a Google account with your own address
+join-step-1 = Open Google's sign-up page (the link below) and give your name and birthday.
+join-step-2 = Google then asks you to choose a new Gmail address. Ignore that, and tap "Use your existing email" under the box instead.
+join-step-3 = Type the address the invite was sent to. Google emails it a six-digit code: enter it.
+join-step-4 = Choose a password (it is for Google, not for Chordless), finish, and come back to this page to sign in.
 
-# The same, shown when the account they signed in with is not the one the invite was sent to.
-join-wrong-account-help = If the invite was sent to an address that is not Gmail's, make a Google account with that address first (choose "Use my existing email address"), then sign in with it.
+# The link, after the steps, to Google's page for making that account.
+join-make-google-account = Open Google's sign-up page
+
+# If Google will not take their address, the way out is another address.
+join-google-refused = If Google will not accept your address, tell whoever invited you: they can invite a Gmail address (or another Google account) instead.
+
+# Shown when the account they signed in with is not the one the invite was sent to.
+join-wrong-account-help = The invite was sent to one particular address, and you need to sign in with that one. If it is not a Gmail address, it must first be made a Google account: see the steps on the sign-in page.
 
 status-setlists-loading = Loading setlists...
 status-setlists-failed = Error loading setlists. Please check the console.
