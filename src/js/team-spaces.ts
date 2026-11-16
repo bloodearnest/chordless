@@ -156,8 +156,14 @@ export function inviteLink(origin: string, teamId: string, code: string): string
   return `${origin}/join/${encodeURIComponent(teamId)}/${encodeURIComponent(code)}`
 }
 
-/** Google's page for making a Google account with an address from somewhere else */
-export const GOOGLE_SIGNUP_URL = 'https://accounts.google.com/signup'
+/**
+ * The page that shows how to make a Google account with an address from somewhere else, step by
+ * step with pictures (src/google-account.html: a static page, no app and no service worker, so that
+ * it opens the same from a message in WhatsApp or Gmail). On the same site as the invite's link.
+ */
+export function googleAccountGuideUrl(inviteUrl: string): string {
+  return new URL('/google-account.html', inviteUrl).href
+}
 
 /**
  * Whether an address is certainly a Google account's: Gmail's. Any other might be one too (a Google
@@ -168,17 +174,21 @@ export function isGmailAddress(email: string): boolean {
   return /@(gmail|googlemail)\.com$/i.test(email.trim())
 }
 
-/** The part of an invite's message for an address that may not be a Google account yet; empty for Gmail */
-export function googleAccountHelp(email: string): string {
-  if (isGmailAddress(email)) return ''
-  return `If ${email} is not a Google account yet, make one first at ${GOOGLE_SIGNUP_URL}: give your name and birthday, ignore the offer of a new Gmail address and tap "Use your existing email" under it, then enter the code Google emails to ${email} (you need no Gmail). If Google will not accept it, ask for the invite to be sent to a Gmail address instead.`
-}
-
-/** What to say with an invite's link, to the person it is for */
-export function inviteMessage(teamName: string, role: TeamRole, email: string): string {
-  const message = `You are invited to join ${teamName} on Chordless as ${roleWithArticle(role)}. Sign in with the Google account ${email}; the link works once, for a week.`
-  const help = googleAccountHelp(email)
-  return help ? `${message} ${help}` : message
+/**
+ * What to say with an invite's link, to the person it is for. For an address that may not be a
+ * Google account yet, the first thing said is to make one *before* opening the link (the page the
+ * link opens asks them to sign in at once), and where to see how.
+ */
+export function inviteMessage(
+  teamName: string,
+  role: TeamRole,
+  email: string,
+  inviteUrl: string
+): string {
+  const intro = `You are invited to join ${teamName} on Chordless as ${roleWithArticle(role)}.`
+  const end = `Sign in with the Google account ${email}; the link works once, for a week.`
+  if (isGmailAddress(email)) return `${intro} ${end}`
+  return `${intro} Before you open the link, ${email} must be a Google account, so if it is not one yet, make it one first (you need no Gmail). The steps, with pictures:\n${googleAccountGuideUrl(inviteUrl)}\n\nThen ${end.charAt(0).toLowerCase()}${end.slice(1)}`
 }
 
 /** The ways to hand an invite on where the browser has no share sheet: WhatsApp, and Gmail's compose window (a mailto: link does nothing on a desktop with no mail app) */
@@ -188,7 +198,7 @@ export function inviteSendLinks(
   email: string,
   url: string
 ): { whatsapp: string; gmail: string } {
-  const message = inviteMessage(teamName, role, email)
+  const message = inviteMessage(teamName, role, email, url)
   const subject = `Join ${teamName} on Chordless`
   return {
     whatsapp: `https://wa.me/?text=${encodeURIComponent(`${message}\n\n${url}`)}`,

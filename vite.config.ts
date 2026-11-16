@@ -56,7 +56,7 @@ export default defineConfig(({ command, isPreview }) => {
         build: {
           rollupOptions: {
             input: Object.fromEntries(
-              ['index', 'privacy', 'terms', 'licences'].map(page => [
+              ['index', 'privacy', 'terms', 'licences', 'google-account'].map(page => [
                 page,
                 fileURLToPath(new URL(`./src/${page}.html`, import.meta.url)),
               ])

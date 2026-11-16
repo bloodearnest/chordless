@@ -469,8 +469,18 @@ Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
   Gmail address with dots or a `+tag` is a different address from the plain one). The link to hand
   out is the page's, `/join/<space id>/<code>` (built; links sent before 2026-11-16 have them in the fragment, `/join#<space id>.<code>`, which the page still reads, and invites last a week), and is handed on from the
   admin's own account by the share sheet, WhatsApp or Gmail (`invite-send.ts`).
-  The message says how to make a Google account with an address that is not Gmail's (a link to
-  Google's sign-up and "Use your existing email" (under the offer of a new Gmail address, which is what trips people); `googleAccountHelp`). Whether an address is
+  The message says, **first**, to make the address a Google account *before* opening the link (the
+  page the link opens asks them to sign in at once, and someone invited at a Hotmail address believed
+  they had to turn it into a Gmail one, 2026-11-16), and links `/google-account.html`
+  (`googleAccountGuideUrl`, on the invite's own site). That page is static, like `privacy.html`: no app and no
+  service worker, so that it opens the same from WhatsApp, Gmail or anywhere. It walks the steps with
+  pictures of Google's own sign-up (`public/google-account/`, kept out of the offline cache): name,
+  birthday and gender, then "Use your existing email" (the small link under an offer of a new Gmail
+  address, which is what trips people), the address, the emailed code, a password. The join page links to it too, and
+  both say what to do if Google will not take the address: ask the admin to invite a Gmail address.
+  The pictures are retaken by hand when Google changes its pages: `just google-account-images`
+  (not in CI; it submits only an invented name and birthday, and types an invented address it never
+  sends; the code and password steps need a real mailbox, so they have none). Whether an address is
   a Google account cannot be known (a Workspace domain or an address made a Google account looks like
   any other, and probing Google's sign-in is not something Chordless does), so only `gmail.com` and
   `googlemail.com` leave the text out, and nothing is ever refused for it. The invite carries no name:
