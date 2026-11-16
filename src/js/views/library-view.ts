@@ -484,6 +484,8 @@ export class LibraryView extends PageView {
       isHidden,
     }))
     await this.#renderInKey(newKey)
+    // (the song may have been closed while it was drawn again: someone changed the key and went back to the list)
+    if (!this.#song) return
     this.#sections().forEach((section, index) => {
       if (states[index]) Object.assign(section, states[index])
     })
