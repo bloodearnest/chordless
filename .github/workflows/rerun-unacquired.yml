@@ -1,0 +1,36 @@
+# Re-run a CI or Deploy run whose only failure is a job GitHub never gave a runner (macOS runners are at
+# times short of capacity): scripts/ci/rerun-unacquired.sh decides, and docs/CI.md ("A job that never
+# gets a runner") says why. It runs on the default branch's copy of this file and checks out nothing
+# from the run it looks at, so a pull request cannot change what it does.
+name: Rerun when no runner was acquired
+
+on:
+  workflow_run:
+    workflows: [CI, Deploy]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  rerun:
+    # (a run cancelled as a whole was replaced by a newer one; a run that passed needs nothing)
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write # re-run the failed jobs
+      checks: read # the annotation that says a runner was not acquired
+      contents: read
+      pull-requests: read # the head of the pull request the run is for
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: scripts/ci/rerun-unacquired.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
