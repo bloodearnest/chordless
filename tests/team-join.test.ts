@@ -622,6 +622,110 @@ describe('the join page', () => {
     expect(text()).to.contain('It may have been used, withdrawn or have run out')
   })
 
+  it('asks nothing of someone whose sign-in has expired: they have a Google account', async () => {
+    worker.stored = {
+      blob: 'blob',
+      metadata: {
+        access_token: 'token',
+        expires_at: new Date(Date.now() - 3600_000).toISOString(),
+        id_token: idToken(-60),
+        scope: 'openid email profile',
+        user,
+      },
+      updated_at: new Date().toISOString(),
+    }
+    routes['POST /session/refresh'] = () =>
+      Response.json({ error: 'invalid_grant' }, { status: 401 })
+    await open(LINK, false)
+    await until(() => text().includes('Sign in with the Google account you use'), 'the sign-in')
+    expect(text()).to.not.contain('Do you already have')
+  })
+
+  it('says an admin invite is for its address before they have signed in, and what to do when the sign-in fails', async () => {
+    inviteFor({ role: 'admin', email: 'boss@example.com' })
+    codeResponse = { error: 'access_denied' }
+    await open(LINK, false)
+    await until(
+      () => text().includes('can only be used with the address it was sent to: boss@example.com'),
+      'the sign-in'
+    )
+    expect(text()).to.not.contain('Do you already have')
+    button('Sign in with Google').click()
+    await until(() => text().includes("Couldn't join"), 'the failure')
+    expect(text()).to.contain('can only be used with the address it was sent to: boss@example.com')
+  })
+
+  it('has nothing to say of the address when the invite could not be looked up: on a phone, in making an account and signed in', async () => {
+    routes['POST /api/spaces/invite'] = () => Response.json({ error: 'busy' }, { status: 429 })
+    await open(LINK, false, device({ os: 'android' }))
+    await until(
+      () => text().includes('Sign in with the Google account you use. Chordless asks'),
+      'the sign-in'
+    )
+    page.remove()
+
+    await open(LINK, false)
+    await say('No, I need one')
+    await until(() => text().includes('Make a Google account'), 'the help')
+    expect(text()).to.not.contain('the address you already have')
+    page.remove()
+
+    await open()
+    await until(() => text().includes('Join the team space'), 'the offer')
+    expect(text()).to.not.contain('This invite was sent to')
+  })
+
+  it('carries on when the device will not keep the answer, and when the link cannot be copied', async () => {
+    const getItem = Storage.prototype.getItem
+    const setItem = Storage.prototype.setItem
+    Storage.prototype.getItem = () => {
+      throw new Error('no storage')
+    }
+    Storage.prototype.setItem = () => {
+      throw new Error('no storage')
+    }
+    try {
+      await open(LINK, false)
+      await say('Yes, sign in')
+      await until(() => text().includes('Sign in with the Google account you use'), 'the sign-in')
+    } finally {
+      Storage.prototype.getItem = getItem
+      Storage.prototype.setItem = setItem
+    }
+
+    page.remove()
+    await open(LINK, false, current => {
+      current.device = { os: 'ios', inAppBrowser: 'Instagram' }
+      current.copyText = async () => {
+        throw new Error('not allowed')
+      }
+    })
+    await until(() => text().includes('Open this page in your browser'), 'the advice')
+    button('Copy link').click()
+    await nothingFor(50)
+    expect(text()).to.contain('Copy link')
+    expect(text()).to.not.contain('Link copied')
+  })
+
+  it('copies the link with the browser’s clipboard unless told otherwise', async () => {
+    const written: string[] = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (text: string) => void written.push(text) },
+    })
+    try {
+      await open(LINK, false, current => {
+        current.device = { os: 'ios', inAppBrowser: 'Facebook' }
+      })
+      await until(() => text().includes('Open this page in your browser'), 'the advice')
+      button('Copy link').click()
+      await until(() => text().includes('Link copied'), 'copied')
+      expect(written).to.deep.equal([window.location.href])
+    } finally {
+      Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
   describe('where it leaves a trace of how it went', () => {
     const exporter = new InMemorySpanExporter()
     beforeEach(() => {

@@ -307,6 +307,7 @@ export class TeamJoin extends LitElement {
       await authorizeWithGoogle({ drive: false })
     } catch (error) {
       this._trail.note({
+        /* v8 ignore next -- authorizeWithGoogle throws Errors; the fallback is for anything else thrown */
         'chordless.join.sign_in_error': error instanceof Error ? error.name : 'unknown',
       })
       this._message = errorMessage(error)
@@ -472,9 +473,9 @@ export class TeamJoin extends LitElement {
 
   /** Signed in: who they are, whether it is the address the invite was sent to, and the choice to join */
   _renderReady() {
-    const info = this._info
-    const mismatch = Boolean(info && this._email && !this._asInvited())
-    const locked = mismatch && info?.role === 'admin'
+    // (the invite, when they are signed in as another address than the one it was sent to)
+    const other = this._info && this._email && !this._asInvited() ? this._info : null
+    const locked = other?.role === 'admin'
     return html`
       <h2>Join a team space</h2>
       <p>
@@ -483,10 +484,10 @@ export class TeamJoin extends LitElement {
         team's.
       </p>
       ${
-        locked
-          ? html`<p class="status error" role="alert">${t('join-admin-exact', { email: info?.email ?? '' })}</p>`
-          : mismatch
-            ? html`<p class="hint">${t('join-as-other', { invited: info?.email ?? '', email: this._email ?? '' })}</p>`
+        other && locked
+          ? html`<p class="status error" role="alert">${t('join-admin-exact', { email: other.email })}</p>`
+          : other
+            ? html`<p class="hint">${t('join-as-other', { invited: other.email, email: this._email as string })}</p>`
             : nothing
       }
       <div class="actions">
