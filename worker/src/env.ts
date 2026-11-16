@@ -6,6 +6,14 @@ import type { ShareEnv } from './share.ts'
 import type { LiveSockets } from './team-state.ts'
 
 /** The worker's bindings, variables and secrets (see wrangler.toml) */
+/** What `EMAIL.send` takes (the part of Cloudflare's builder used here) */
+export interface EmailMessage {
+  to: string
+  from: { email: string; name: string }
+  subject: string
+  text: string
+}
+
 export interface Env extends GoogleEnv, ShareEnv, ServiceAccountEnv {
   /**
    * The live rooms of team spaces, one per space, named by the space's id (team-room.ts): they hold
@@ -37,6 +45,10 @@ export interface Env extends GoogleEnv, ShareEnv, ServiceAccountEnv {
   TELEMETRY?: RateLimit
   /** Limit on looking an invite up before signing in, by sender address (wrangler.toml [[ratelimits]]): unset in tests and dev */
   INVITE_LOOKUP?: RateLimit
+  /** Sends the sign-in code (wrangler.toml `[[send_email]]`: Cloudflare Email Sending, from mail.chordless.app); unset in tests and dev */
+  EMAIL?: { send(message: EmailMessage): Promise<{ messageId: string }> }
+  /** Limit on asking for sign-in codes, by sender address (wrangler.toml [[ratelimits]]): unset in tests and dev */
+  EMAIL_LOGIN?: RateLimit
   /** Where the page's traces go: an OTLP/HTTP traces endpoint (docs/OBSERVABILITY.md); a variable, not a secret */
   OTLP_ENDPOINT?: string
   /** The headers to send with them, `name=value,name=value` (Honeycomb: `x-honeycomb-team=<ingest key>`). Without it, the page's traces are taken and dropped */
