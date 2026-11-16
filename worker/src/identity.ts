@@ -1,13 +1,17 @@
 /**
  * Who is asking the team space API (docs/SPACES.md, "Setting up and joining a team space").
  *
- * A request carries an identity provider's ID token as `Authorization: Bearer`. Each provider
- * says which issuers it answers for and how to verify a token; nothing past `authenticate` knows
- * which provider was used. Google is the only one. The token says who someone is, not what they
- * may do: roles are the space's (kept in D1).
+ * A request carries the Chordless session's access token as `Authorization: Bearer` (session-tokens.ts):
+ * the Worker's own, signed, whichever way the person signed in. Each provider says which issuers it
+ * answers for and how to verify a token; nothing past `authenticate` knows which was used. The token says
+ * who someone is, not what they may do: roles are the space's (kept in D1). A **Google ID token** is no
+ * longer a bearer (it was, before sessions): it is answered `update_required`, which is an app that has not
+ * reloaded since the move (`SESSION_PROVIDER`; the move is forced, with no period of accepting both).
  */
 import * as jose from 'jose'
 import { type GoogleEnv, ISSUERS, verifyIdToken } from './google-auth.ts'
+import { Refusal } from './http.ts'
+import { SESSION_ISSUER, type SessionKey, verifyAccessToken } from './session-tokens.ts'
 
 /** Who a verified token is for */
 export interface Identity {
@@ -26,6 +30,9 @@ export interface IdentityProvider {
   /** Who the token is for; null if it is invalid or expired, or its email is not verified */
   verify(token: string): Promise<Identity | null>
 }
+
+/** The provider of an identity that comes from a session: its `sub` is the account itself, not a login of one */
+export const SESSION_PROVIDER = 'chordless'
 
 /** The key a member is stored under: `sub` is unique only within a provider */
 export function identityKey({ provider, sub }: Pick<Identity, 'provider' | 'sub'>): string {
@@ -50,7 +57,24 @@ export function googleProvider(env: GoogleEnv, keys?: jose.JWTVerifyGetKey): Ide
   }
 }
 
-/** Who is asking, from the request's `Authorization: Bearer` token; null if it names no one */
+/** The Chordless session: an access token the Worker signed, whose subject is an account */
+export function sessionProvider(env: SessionKey): IdentityProvider {
+  return {
+    id: SESSION_PROVIDER,
+    issuers: [SESSION_ISSUER],
+    async verify(token) {
+      const claims = await verifyAccessToken(token, env)
+      return claims
+        ? { provider: SESSION_PROVIDER, sub: claims.accountId, email: claims.email }
+        : null
+    },
+  }
+}
+
+/**
+ * Who is asking, from the request's `Authorization: Bearer` token; null if it names no one. Throws a
+ * `Refusal` (401 `update_required`) for a Google ID token, which an app from before sessions sends.
+ */
 export async function authenticate(
   request: Request,
   providers: IdentityProvider[]
@@ -65,5 +89,6 @@ export async function authenticate(
   }
   // (the issuer picks the provider; the provider then checks everything, the issuer included)
   const provider = providers.find(each => each.issuers.some(name => name === issuer))
+  if (!provider && ISSUERS.some(name => name === issuer)) throw new Refusal(401, 'update_required')
   return provider ? provider.verify(match[1]) : null
 }

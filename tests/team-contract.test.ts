@@ -30,7 +30,7 @@ import type { IdentityProvider } from '../worker/src/identity.ts'
 import { handleRequest } from '../worker/src/router.ts'
 import { makeSetlist } from './builders.ts'
 import { browserD1 } from './d1-browser.ts'
-import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
+import { type FakeAuthWorker, installFakeAuthWorker, sessionFor } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -88,6 +88,7 @@ describe('a team space, end to end', () => {
         access_token: DRIVE_TOKEN,
         expires_at: new Date(Date.now() + 3600_000).toISOString(),
         id_token: idTokenFor(person),
+        session: sessionFor(idTokenFor(person)),
         scope: 'https://www.googleapis.com/auth/drive.file openid email profile',
         user: { ...person, picture: null, given_name: null, family_name: null },
       },

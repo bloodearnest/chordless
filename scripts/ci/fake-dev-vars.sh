@@ -17,7 +17,7 @@ fake_api_key="AIza$(printf 'x%.0s' {1..35})"
 sed -nE 's/^([A-Z_]+)=.*/\1/p' .dev.vars.example | while read -r name; do
   case "$name" in
     GOOGLE_CLIENT_ID) echo "$name=$client_id" ;;
-    JWE_ENCRYPTION_KEY) echo "$name=$key" ;;
+    JWE_ENCRYPTION_KEY | SESSION_SIGNING_KEY) echo "$name=$key" ;;
     GOOGLE_API_KEY | PICKER_API_KEY) echo "$name=$fake_api_key" ;;
     GOOGLE_REDIRECT_URI | OTLP_HEADERS) ;;
     *) echo "$name=ci-made-up-value" ;;

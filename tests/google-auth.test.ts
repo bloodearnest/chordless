@@ -151,7 +151,17 @@ describe('google-auth', () => {
   })
 
   describe('getIdentityToken', () => {
-    const endingIn = (ms: number) => idToken({ exp: Math.floor((Date.now() + ms) / 1000) })
+    const session = (over: object = {}) => ({
+      access_token: 'access-1',
+      refresh_token: 'id.secret-1',
+      expires_at: inFromNow(10 * MINUTE),
+      ...over,
+    })
+    const tokens = (n: number) => ({
+      access_token: `access-${n}`,
+      refresh_token: `id.secret-${n}`,
+      expires_in: 900,
+    })
 
     it('says so when nobody is signed in', async () => {
       let error: Error | null = null
@@ -161,47 +171,63 @@ describe('google-auth', () => {
       expect((error as Error | null)?.message).to.include('Not authenticated')
     })
 
-    it('gives the stored one while it has more than five minutes left, with no request', async () => {
-      const stored = endingIn(30 * MINUTE)
-      signIn({ id_token: stored })
-      expect(await getIdentityToken()).to.equal(stored)
+    it('gives the session’s access token while it has more than five minutes left, with no request', async () => {
+      signIn({ session: session() })
+      expect(await getIdentityToken()).to.equal('access-1')
       expect(fetches).to.have.length(0)
     })
 
-    it('renews it with the access token, and keeps both', async () => {
-      const fresh = endingIn(60 * MINUTE)
-      signIn(
-        { access_token: 'old', expires_at: inFromNow(-MINUTE), id_token: endingIn(2 * MINUTE) },
-        'the-blob'
-      )
-      respondTo = () => json({ access_token: 'fresh', expires_in: 3600, id_token: fresh })
+    it('renews it with the refresh token, and keeps the next one with the sign-in', async () => {
+      signIn({ access_token: 'drive', session: session({ expires_at: inFromNow(MINUTE) }) })
+      respondTo = () => json(tokens(2))
 
-      expect(await getIdentityToken()).to.equal(fresh)
+      expect(await getIdentityToken()).to.equal('access-2')
 
-      expect(must(worker.stored).metadata.id_token).to.equal(fresh)
-      expect(await getAccessToken()).to.equal('fresh')
-      expect(fetches).to.have.length(1)
+      expect(fetches.map(each => each.url)).to.deep.equal(['/session/token'])
+      expect(fetches[0].body).to.deep.equal({ refresh_token: 'id.secret-1' })
+      const stored = must(worker.stored).metadata
+      expect(stored.session?.refresh_token).to.equal('id.secret-2')
+      expect(stored.access_token).to.equal('drive')
     })
 
-    it('renews one it cannot read, or that it never had', async () => {
-      const fresh = endingIn(60 * MINUTE)
-      respondTo = () => json({ access_token: 'fresh', expires_in: 3600, id_token: fresh })
-      signIn({ id_token: 'not-a-token' })
-      expect(await getIdentityToken()).to.equal(fresh)
+    it('gets a session from the blob, silently, for a sign-in made before sessions', async () => {
+      signIn({ access_token: 'drive' }, 'the-blob')
+      respondTo = () => json(tokens(1))
 
+      expect(await getIdentityToken()).to.equal('access-1')
+
+      expect(fetches.map(each => each.url)).to.deep.equal(['/session/upgrade'])
+      expect(fetches[0].body).to.deep.equal({ blob: 'the-blob' })
+      expect(must(worker.stored).metadata.session?.refresh_token).to.equal('id.secret-1')
+    })
+
+    it('falls back to the blob when the session has ended or was revoked', async () => {
+      signIn({ session: session({ expires_at: inFromNow(-MINUTE) }) }, 'the-blob')
+      respondTo = url =>
+        url === '/session/token' ? json({ error: 'invalid_session' }, 401) : json(tokens(3))
+
+      expect(await getIdentityToken()).to.equal('access-3')
+      expect(fetches.map(each => each.url)).to.deep.equal(['/session/token', '/session/upgrade'])
+    })
+
+    it('says the sign-in has expired when the Worker cannot read the blob', async () => {
+      signIn({}, 'old-blob')
+      respondTo = () => json({ error: 'invalid_blob' }, 401)
+      let error: unknown
+      await getIdentityToken().catch(e => {
+        error = e
+      })
+      expect(error).to.be.instanceOf(SignInExpiredError)
+    })
+
+    it('fails with the Worker’s own words for any other refusal', async () => {
       signIn({})
-      expect(await getIdentityToken()).to.equal(fresh)
-    })
-
-    it('says so when Google sent none, and keeps the access token it did send', async () => {
-      signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) })
-      respondTo = () => json({ access_token: 'fresh', expires_in: 3600 })
+      respondTo = () => json({ error: 'Sessions are not set up' }, 503)
       let error: Error | null = null
       await getIdentityToken().catch(e => {
         error = e
       })
-      expect((error as Error | null)?.message).to.include('no ID token')
-      expect(must(worker.stored).metadata.access_token).to.equal('fresh')
+      expect((error as Error | null)?.message).to.equal('Sessions are not set up')
     })
   })
 

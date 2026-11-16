@@ -19,7 +19,7 @@ import {
 } from '../src/js/space.ts'
 import type { ProgressCallback } from '../src/js/sync-manager.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
-import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
+import { type FakeAuthWorker, installFakeAuthWorker, sessionFor } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -87,6 +87,7 @@ describe('team-space-wizard', () => {
           access_token: 'token',
           expires_at: new Date(Date.now() + 3600_000).toISOString(),
           id_token: idToken(),
+          session: sessionFor(idToken()),
           scope,
           user,
         },
@@ -133,6 +134,7 @@ describe('team-space-wizard', () => {
           access_token: 'tok',
           expires_in: 3600,
           id_token: idToken(),
+          session: { access_token: idToken(), refresh_token: 'id.secret', expires_in: 900 },
           scope: `${DRIVE} openid email profile`,
           user,
         })

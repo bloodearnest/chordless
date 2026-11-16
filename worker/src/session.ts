@@ -6,10 +6,34 @@
  */
 
 import { type BlobData, decryptBlob, encryptBlob, UnreadableBlob } from './blob.ts'
+import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
 import { type GoogleApi, realGoogle } from './google-auth.ts'
 import { jsonResponse, message, Refusal, readJson, refusing } from './http.ts'
+import { issueSession, revokeSession, rotateSession, type SessionTokens } from './session-tokens.ts'
+import { accountOf } from './team-state.ts'
 import { annotateRequest } from './trace.ts'
+
+/**
+ * A new Chordless session for a Google login that has just proved who it is (a code exchanged, or a blob that
+ * Google still honours): its account is found or made, and its first tokens issued. Undefined where there is no
+ * database or no signing key (a development Worker without them): the sign-in then works as it did, and the
+ * page has no session to use.
+ */
+async function startSession(
+  env: Env,
+  who: { sub: string; email: string },
+  now: Date
+): Promise<SessionTokens | undefined> {
+  if (!env.DB || !env.SESSION_SIGNING_KEY) return undefined
+  const accountId = (await accountOf(
+    env.DB,
+    { provider: 'google', sub: who.sub, email: who.email },
+    true,
+    now
+  )) as string
+  return issueSession(env.DB, env, { accountId, email: who.email }, now)
+}
 
 /** A text field of a request's body, or undefined if it is missing, empty or not text */
 function textField(body: Record<string, unknown>, name: string): string | undefined {
@@ -54,12 +78,14 @@ async function openBlob(body: Record<string, unknown>, env: Env): Promise<BlobDa
  *   id_token: string,       // Google's ID token (who signed in)
  *   scope: string,          // What was granted: the Drive scope is absent if its box was unticked
  *   user: {...}             // The profile Google gave
+ *   session: {...}          // The Chordless session: { access_token, refresh_token, expires_in }
  * }
  */
 export function handleOAuthCallback(
   request: Request,
   env: Env,
-  google: GoogleApi = realGoogle
+  google: GoogleApi = realGoogle,
+  now: Date = new Date()
 ): Promise<Response> {
   return refusing(async () => {
     const body = await readJson(request)
@@ -120,6 +146,9 @@ export function handleOAuthCallback(
       sub: payload.sub || null,
     }
 
+    const session = await startSession(env, { sub: sub as string, email: email ?? '' }, now)
+    annotateRequest({ 'chordless.auth.session_result': session ? 'issued' : 'unavailable' })
+
     return jsonResponse({
       blob,
       access_token,
@@ -127,6 +156,7 @@ export function handleOAuthCallback(
       id_token,
       scope,
       user,
+      ...(session ? { session } : {}),
     })
   })
 }
@@ -219,6 +249,66 @@ export function handleTokenRefresh(
   })
 }
 
+/** A Worker with no database or signing key cannot keep sessions (a development one without them) */
+function sessionsOf(env: Env): D1Db & { signing: true } {
+  if (!env.DB || !env.SESSION_SIGNING_KEY) throw new Refusal(503, 'Sessions are not set up')
+  return env.DB as D1Db & { signing: true }
+}
+
+/**
+ * POST /session/token
+ *
+ * The next pair of tokens for a refresh token (which is then spent: docs/SECURITY.md). 401 `invalid_session`
+ * if it is not good (unknown, ended, revoked, or already used), and the page signs in again.
+ *
+ * Request body: { refresh_token: string }
+ * Response: { access_token, refresh_token, expires_in }
+ */
+export function handleSessionToken(
+  request: Request,
+  env: Env,
+  now: Date = new Date()
+): Promise<Response> {
+  return refusing(async () => {
+    const body = await readJson(request)
+    const refreshToken = textField(body, 'refresh_token')
+    if (!refreshToken) return jsonResponse({ error: 'Missing refresh_token' }, 400)
+    const db = sessionsOf(env)
+    const result = await rotateSession(db, env, refreshToken, now)
+    annotateRequest({ 'chordless.auth.session_result': result.ok ? 'rotated' : result.why })
+    if (!result.ok) return jsonResponse({ error: 'invalid_session', reason: result.why }, 401)
+    return jsonResponse(result.tokens)
+  })
+}
+
+/**
+ * POST /session/upgrade
+ *
+ * A device that is signed in with Google from before sessions has the blob, which already proves who it
+ * is (as for a refresh): it gets a session for that account with no sign-in. 401 `invalid_blob` if the
+ * blob cannot be read.
+ *
+ * Request body: { blob: string }
+ * Response: { access_token, refresh_token, expires_in }
+ */
+export function handleSessionUpgrade(
+  request: Request,
+  env: Env,
+  now: Date = new Date()
+): Promise<Response> {
+  return refusing(async () => {
+    const blobData = await openBlob(await readJson(request), env)
+    sessionsOf(env)
+    const session = await startSession(
+      env,
+      { sub: blobData.owner_sub as string, email: blobData.owner_email as string },
+      now
+    )
+    annotateRequest({ 'chordless.auth.session_result': 'upgraded' })
+    return jsonResponse(session)
+  })
+}
+
 /**
  * POST /session/logout
  *
@@ -226,7 +316,8 @@ export function handleTokenRefresh(
  * Drive and does not only forget it on this device. The blob proves ownership, as for a refresh.
  * Other devices signed in with the same Google account may need to sign in again.
  *
- * Request body: { blob: string }
+ * Request body: { blob: string, refresh_token?: string }: the session's refresh token, if the device has
+ *   one, is revoked too, so that the session ends here and not only on the device
  * Response: { success: true }, or 502 if Google could not be asked or refused
  */
 export function handleSessionLogout(
@@ -235,7 +326,12 @@ export function handleSessionLogout(
   google: GoogleApi = realGoogle
 ): Promise<Response> {
   return refusing(async () => {
-    const blobData = await openBlob(await readJson(request), env)
+    const body = await readJson(request)
+    const refreshToken = textField(body, 'refresh_token')
+    if (refreshToken && env.DB) await revokeSession(env.DB, refreshToken)
+    // (a device that only ends its session, and keeps Google's access for the others: no blob)
+    if (refreshToken && !textField(body, 'blob')) return jsonResponse({ success: true })
+    const blobData = await openBlob(body, env)
 
     try {
       await google.revokeToken(blobData.refresh_token, env)

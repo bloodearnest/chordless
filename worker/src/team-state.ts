@@ -19,7 +19,7 @@ import type { LicenceChange } from '../../src/js/ccli-licence.ts'
 import type { InviteInfo, MemberRole, TeamMember, TeamRole } from '../../src/js/team-roles.ts'
 import { sha256Hex } from '../../src/js/utils/bytes.ts'
 import type { D1Db, D1Statement } from './d1.ts'
-import { type Identity, identityKey } from './identity.ts'
+import { type Identity, identityKey, SESSION_PROVIDER } from './identity.ts'
 
 export interface SpaceInfo {
   /** Drive's id of the space's folder (or a shared drive's folder) */
@@ -37,8 +37,16 @@ export type SpaceCredential = 'owner' | 'service-account'
 
 /** What the Worker asks of a space: the rules (`TeamSpaceState`) behind the routes */
 export interface TeamSpaceApi {
-  /** Make the space; false (and nothing changed) if it already exists */
-  create(space: { rootRef: string; name: string; owner: Identity }): Promise<boolean>
+  /**
+   * Make the space; false (and nothing changed) if it already exists. `owner` is the login whose Drive sign-in
+   * the space uses; `ownerAccount` is the account that owns it, where the caller already knows it (a session's)
+   */
+  create(space: {
+    rootRef: string
+    name: string
+    owner: Identity
+    ownerAccount?: string
+  }): Promise<boolean>
   info(): Promise<SpaceInfo | null>
   /** This account's role in the space, or null if it is not a member */
   roleOf(identity: Pick<Identity, 'provider' | 'sub'>): Promise<TeamRole | null>
@@ -177,7 +185,8 @@ function newAccountId(): string {
 /**
  * The account a login belongs to. With `create`, one is made (with the login) the first time a team
  * operation sees it (making a space, joining one), never by a bare request; the login's email and
- * `last_seen_at` are refreshed. Without it, null for a login nothing has made an account for.
+ * `last_seen_at` are refreshed. Without it, null for a login nothing has made an account for. An
+ * identity from a Chordless session already is the account (its `sub`): nothing to look up.
  */
 export async function accountOf(
   db: D1Db,
@@ -185,6 +194,7 @@ export async function accountOf(
   create: boolean,
   now: Date = new Date()
 ): Promise<string | null> {
+  if (identity.provider === SESSION_PROVIDER) return identity.sub
   const find = () =>
     db
       .prepare('SELECT account_id FROM account_identities WHERE provider = ? AND sub = ?')
@@ -240,25 +250,26 @@ export async function spacesOf(
   identity: Pick<Identity, 'provider' | 'sub'>
 ): Promise<MySpace[]> {
   const key = identityKey(identity)
-  // (the login's account, if it has one, is owner or member; a row the previous Worker made, with no
-  // account yet, is still found by the login's key)
+  // (the account is the identity's own for a session; for a login it is looked up, if it has one. Either
+  // way it is owner or member; a row the previous Worker made, with no account yet, is found by the key)
+  const direct = identity.provider === SESSION_PROVIDER ? identity.sub : null
   const { results } = await db
     .prepare(
       `SELECT t.space_id, t.name, t.root_ref,
           CASE WHEN t.owner_provider || ':' || t.owner_sub = ?
-                 OR (a.account_id IS NOT NULL AND t.owner_account_id = a.account_id)
+                 OR (acct.id IS NOT NULL AND t.owner_account_id = acct.id)
                THEN 'owner' ELSE m.role END AS role
         FROM teams t
-        LEFT JOIN account_identities a ON a.provider = ? AND a.sub = ?
+        LEFT JOIN (SELECT COALESCE(?, (SELECT account_id FROM account_identities WHERE provider = ? AND sub = ?)) AS id) acct ON 1
         LEFT JOIN team_members m ON m.space_id = t.space_id
-          AND (m.identity = ? OR (a.account_id IS NOT NULL AND m.account_id = a.account_id))
+          AND (m.identity = ? OR (acct.id IS NOT NULL AND m.account_id = acct.id))
         WHERE t.ended_at IS NULL
           AND (t.owner_provider || ':' || t.owner_sub = ?
-               OR (a.account_id IS NOT NULL AND t.owner_account_id = a.account_id)
+               OR (acct.id IS NOT NULL AND t.owner_account_id = acct.id)
                OR m.identity IS NOT NULL)
         ORDER BY t.created_at, t.space_id`
     )
-    .bind(key, identity.provider, identity.sub, key, key)
+    .bind(key, direct, identity.provider, identity.sub, key, key)
     .all<{ space_id: string; name: string; root_ref: string; role: TeamRole }>()
   return results.map(row => ({
     spaceId: row.space_id,
@@ -309,10 +320,15 @@ export class TeamSpaceState implements TeamSpaceApi {
     await this.#sockets?.dropSockets(key)
   }
 
-  async create(space: { rootRef: string; name: string; owner: Identity }): Promise<boolean> {
+  async create(space: {
+    rootRef: string
+    name: string
+    owner: Identity
+    ownerAccount?: string
+  }): Promise<boolean> {
     const at = this.#at()
     const { owner } = space
-    const ownerAccount = await accountOf(this.#db, owner, true, this.#now())
+    const ownerAccount = space.ownerAccount ?? (await accountOf(this.#db, owner, true, this.#now()))
     const made = await this.#db
       .prepare(
         `INSERT OR IGNORE INTO teams
@@ -353,20 +369,21 @@ export class TeamSpaceState implements TeamSpaceApi {
 
   async roleOf(identity: Pick<Identity, 'provider' | 'sub'>): Promise<TeamRole | null> {
     const key = identityKey(identity)
-    // (one round trip: every request asks. The login's account has the role; a row the previous
-    // Worker made, with no account yet, is still found by the login's key)
+    const direct = identity.provider === SESSION_PROVIDER ? identity.sub : null
+    // (one round trip: every request asks. A session's identity is the account itself; a login's account is
+    // looked up. A row the previous Worker made, with no account yet, is still found by the login's key)
     const row = await this.#db
       .prepare(
         `SELECT CASE WHEN t.owner_provider || ':' || t.owner_sub = ?
-                       OR (a.account_id IS NOT NULL AND t.owner_account_id = a.account_id)
+                       OR (acct.id IS NOT NULL AND t.owner_account_id = acct.id)
                      THEN 'owner' ELSE m.role END AS role
           FROM teams t
-          LEFT JOIN account_identities a ON a.provider = ? AND a.sub = ?
+          LEFT JOIN (SELECT COALESCE(?, (SELECT account_id FROM account_identities WHERE provider = ? AND sub = ?)) AS id) acct ON 1
           LEFT JOIN team_members m ON m.space_id = t.space_id
-            AND (m.identity = ? OR (a.account_id IS NOT NULL AND m.account_id = a.account_id))
+            AND (m.identity = ? OR (acct.id IS NOT NULL AND m.account_id = acct.id))
           WHERE t.space_id = ? AND t.ended_at IS NULL`
       )
-      .bind(key, identity.provider, identity.sub, key, this.#id)
+      .bind(key, direct, identity.provider, identity.sub, key, this.#id)
       .first<{ role: TeamRole | null }>()
     return row?.role ?? null
   }
@@ -407,7 +424,8 @@ export class TeamSpaceState implements TeamSpaceApi {
       .prepare("SELECT provider || ':' || sub AS key FROM account_identities WHERE account_id = ?")
       .bind(accountId)
       .all<{ key: string }>()
-    return [...new Set([key, ...results.map(row => row.key)])]
+    // (a device signed in with a session is a socket under the account's own key)
+    return [...new Set([key, `${SESSION_PROVIDER}:${accountId}`, ...results.map(row => row.key)])]
   }
 
   /** Close the live sockets of every login of a member: what they may do has changed */

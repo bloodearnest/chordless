@@ -13,8 +13,12 @@ import type { GoogleApi } from '../worker/src/google-auth.ts'
 import {
   handleOAuthCallback,
   handleSessionLogout,
+  handleSessionToken,
+  handleSessionUpgrade,
   handleTokenRefresh,
 } from '../worker/src/session.ts'
+import { revokeSession, rotateSession, verifyAccessToken } from '../worker/src/session-tokens.ts'
+import { d1Db } from './d1-db.ts'
 
 const randomKey = () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64')
 
@@ -22,6 +26,7 @@ const env = {
   GOOGLE_CLIENT_ID: 'client-id',
   GOOGLE_CLIENT_SECRET: 'client-secret',
   JWE_ENCRYPTION_KEY: randomKey(),
+  SESSION_SIGNING_KEY: randomKey(),
   ASSETS: { fetch: async () => new Response('assets') },
 } satisfies Env
 
@@ -516,5 +521,197 @@ describe('POST /session/logout', () => {
     const body = await bodyOf(response)
     assert.equal(body.error, 'Google did not revoke the access')
     assert.ok(!JSON.stringify(body).includes(REFRESH_TOKEN))
+  })
+})
+
+describe('a Chordless session', () => {
+  const NOW = new Date('2026-11-16T12:00:00.000Z')
+  const later = (ms: number) => new Date(NOW.getTime() + ms)
+  const withDb = () => {
+    const { db, sql } = d1Db()
+    return { sql, env: { ...env, DB: db } satisfies Env }
+  }
+  type Tokens = { access_token: string; refresh_token: string; expires_in: number }
+  const tokenFor = async (e: Env, refresh_token: string, now = NOW) =>
+    handleSessionToken(post('/session/token', { refresh_token }), e, now)
+
+  test('starts with a sign-in with Google, and the access token names the account', async () => {
+    const { env: e, sql } = withDb()
+    const { google } = fakeGoogle()
+    const response = await handleOAuthCallback(
+      post('/oauth/callback', { code: 'c', redirect_uri: 'https://chordless.test' }),
+      e,
+      google,
+      NOW
+    )
+    const session = (await bodyOf(response)).session as Tokens
+    const claims = await verifyAccessToken(session.access_token, e, NOW)
+    const account = sql
+      .prepare(
+        "SELECT account_id FROM account_identities WHERE provider = 'google' AND sub = 'sub-1'"
+      )
+      .get() as { account_id: string }
+    assert.equal(claims?.accountId, account.account_id)
+    assert.equal(session.expires_in, 900)
+    const stored = sql.prepare('SELECT token_hash FROM sessions').all() as { token_hash: string }[]
+    assert.equal(stored.length, 1)
+    assert.ok(!session.refresh_token.includes(stored[0].token_hash))
+  })
+
+  test('is not made by a Worker with no database: the sign-in works without one', async () => {
+    const { google } = fakeGoogle()
+    const response = await handleOAuthCallback(
+      post('/oauth/callback', { code: 'c', redirect_uri: 'https://chordless.test' }),
+      env,
+      google
+    )
+    assert.equal(response.status, 200)
+    assert.equal((await bodyOf(response)).session, undefined)
+  })
+
+  test('gives a silent upgrade to a device with a blob from before, for the same account', async () => {
+    const { env: e } = withDb()
+    const blob = await encryptBlob(blobData(), e)
+    const first = (await bodyOf(
+      await handleSessionUpgrade(post('/session/upgrade', { blob }), e, NOW)
+    )) as Tokens
+    const second = (await bodyOf(
+      await handleSessionUpgrade(post('/session/upgrade', { blob }), e, NOW)
+    )) as Tokens
+    const a = await verifyAccessToken(first.access_token, e, NOW)
+    const b = await verifyAccessToken(second.access_token, e, NOW)
+    assert.equal(a?.accountId, b?.accountId)
+    assert.notEqual(a?.sessionId, b?.sessionId)
+  })
+
+  test('is not given for a blob that cannot be read, or none', async () => {
+    const { env: e } = withDb()
+    assert.equal(
+      (await handleSessionUpgrade(post('/session/upgrade', { blob: 'nope' }), e, NOW)).status,
+      401
+    )
+    assert.equal((await handleSessionUpgrade(post('/session/upgrade', {}), e, NOW)).status, 400)
+  })
+
+  test('is refused with 503 where the Worker has no database', async () => {
+    const blob = await encryptBlob(blobData(), env)
+    assert.equal(
+      (await handleSessionUpgrade(post('/session/upgrade', { blob }), env, NOW)).status,
+      503
+    )
+    assert.equal((await tokenFor(env, 'a.b')).status, 503)
+  })
+
+  test('rotates: each refresh token works once, and gives the next pair', async () => {
+    const { env: e } = withDb()
+    const blob = await encryptBlob(blobData(), e)
+    const start = (await bodyOf(
+      await handleSessionUpgrade(post('/session/upgrade', { blob }), e, NOW)
+    )) as Tokens
+    const next = (await bodyOf(await tokenFor(e, start.refresh_token, later(60_000)))) as Tokens
+    assert.notEqual(next.refresh_token, start.refresh_token)
+    assert.ok(await verifyAccessToken(next.access_token, e, later(60_000)))
+    assert.equal((await tokenFor(e, next.refresh_token, later(120_000))).status, 200)
+  })
+
+  test('answers a retry within the grace, with a new pair', async () => {
+    const { env: e } = withDb()
+    const blob = await encryptBlob(blobData(), e)
+    const start = (await bodyOf(
+      await handleSessionUpgrade(post('/session/upgrade', { blob }), e, NOW)
+    )) as Tokens
+    assert.equal((await tokenFor(e, start.refresh_token, later(1000))).status, 200)
+    // the same request again, a moment later (the answer was lost)
+    assert.equal((await tokenFor(e, start.refresh_token, later(5000))).status, 200)
+  })
+
+  test('revokes the session when a replaced token is used after the grace', async () => {
+    const { env: e, sql } = withDb()
+    const blob = await encryptBlob(blobData(), e)
+    const start = (await bodyOf(
+      await handleSessionUpgrade(post('/session/upgrade', { blob }), e, NOW)
+    )) as Tokens
+    const next = (await bodyOf(await tokenFor(e, start.refresh_token, later(1000)))) as Tokens
+    // the token used long after it was replaced: someone has a copy
+    const thief = await tokenFor(e, start.refresh_token, later(600_000))
+    assert.equal(thief.status, 401)
+    assert.equal((await bodyOf(thief)).reason, 'reused')
+    // and the owner's newest token no longer works either
+    assert.equal((await tokenFor(e, next.refresh_token, later(601_000))).status, 401)
+    const row = sql.prepare('SELECT revoked_at FROM sessions').get() as {
+      revoked_at: string | null
+    }
+    assert.ok(row.revoked_at)
+  })
+
+  test('refuses a token that is made up, changed, or after its 90 days', async () => {
+    const { env: e } = withDb()
+    const blob = await encryptBlob(blobData(), e)
+    const start = (await bodyOf(
+      await handleSessionUpgrade(post('/session/upgrade', { blob }), e, NOW)
+    )) as Tokens
+    const [id] = start.refresh_token.split('.')
+    for (const bad of [
+      '',
+      'garbage',
+      `${id}.${'x'.repeat(43)}`,
+      `${'0'.repeat(32)}.${'x'.repeat(43)}`,
+    ]) {
+      assert.equal((await tokenFor(e, bad)).status, bad === '' ? 400 : 401, bad)
+    }
+    assert.equal((await tokenFor(e, start.refresh_token, later(91 * 86_400_000))).status, 401)
+  })
+
+  test('is ended by its refresh token alone, and only by a good one', async () => {
+    const { env: e, sql } = withDb()
+    const blob = await encryptBlob(blobData(), e)
+    const start = (await bodyOf(
+      await handleSessionUpgrade(post('/session/upgrade', { blob }), e, NOW)
+    )) as Tokens
+    const [id] = start.refresh_token.split('.')
+    assert.equal(await revokeSession(e.DB, 'garbage', NOW), false)
+    assert.equal(await revokeSession(e.DB, `${'0'.repeat(32)}.${'x'.repeat(43)}`, NOW), false)
+    assert.equal(await revokeSession(e.DB, `${id}.${'x'.repeat(43)}`, NOW), false)
+    // (the token a refresh just replaced still ends it: a device that lost the answer signs out)
+    const next = (await bodyOf(await tokenFor(e, start.refresh_token, later(1000)))) as Tokens
+    assert.equal(await revokeSession(e.DB, start.refresh_token, later(2000)), true)
+    assert.equal(await revokeSession(e.DB, next.refresh_token, later(3000)), false, 'already ended')
+    const row = sql.prepare('SELECT revoked_at FROM sessions').get() as { revoked_at: string }
+    assert.equal(row.revoked_at, later(2000).toISOString())
+    const out = await handleSessionLogout(
+      post('/session/logout', { refresh_token: start.refresh_token }),
+      e,
+      fakeGoogle().google
+    )
+    assert.equal(out.status, 200, 'a device with no blob can end its session')
+  })
+
+  test('is made once when two requests use a token at the same moment', async () => {
+    const { env: e } = withDb()
+    const blob = await encryptBlob(blobData(), e)
+    const start = (await bodyOf(
+      await handleSessionUpgrade(post('/session/upgrade', { blob }), e, NOW)
+    )) as Tokens
+    const [a, b] = await Promise.all([
+      rotateSession(e.DB, e, start.refresh_token, later(1000)),
+      rotateSession(e.DB, e, start.refresh_token, later(1000)),
+    ])
+    assert.equal([a, b].filter(each => each.ok).length >= 1, true)
+  })
+
+  test('ends at sign-out, for the device that signed out', async () => {
+    const { env: e } = withDb()
+    const { google } = fakeGoogle()
+    const blob = await encryptBlob(blobData(), e)
+    const start = (await bodyOf(
+      await handleSessionUpgrade(post('/session/upgrade', { blob }), e, NOW)
+    )) as Tokens
+    const out = await handleSessionLogout(
+      post('/session/logout', { blob, refresh_token: start.refresh_token }),
+      e,
+      google
+    )
+    assert.equal(out.status, 200)
+    assert.equal((await tokenFor(e, start.refresh_token, later(1000))).status, 401)
   })
 })

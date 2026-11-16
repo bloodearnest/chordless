@@ -236,11 +236,13 @@ describe('accounts', () => {
     await state.setMember(bob, 'writer')
     addLogin(sql, accountOfLogin(sql, bob) as string, 'microsoft', 'm-2', 'bob@hotmail.example')
     dropped.length = 0
+    // (a device signed in with a session is a socket under the account's own key, as well as the logins')
+    const own = `chordless:${accountOfLogin(sql, bob)}`
     await state.setRoleByEmail('bob@example.com', 'reader')
-    assert.deepEqual([...dropped].sort(), ['google:g-2', 'microsoft:m-2'])
+    assert.deepEqual([...dropped].sort(), [own, 'google:g-2', 'microsoft:m-2'])
     dropped.length = 0
     await state.removeMember(bob)
-    assert.deepEqual([...dropped].sort(), ['google:g-2', 'microsoft:m-2'])
+    assert.deepEqual([...dropped].sort(), [own, 'google:g-2', 'microsoft:m-2'])
     assert.equal(await state.roleOf({ provider: 'microsoft', sub: 'm-2' }), null)
   })
 
@@ -687,14 +689,12 @@ describe('forgetting a space', () => {
     await state.setMember(cat, 'reader')
     await state.removeMember(cat)
     await state.destroy(ann)
-    assert.deepEqual(dropped, [
-      'google:g-2',
-      'google:g-2',
-      'google:g-2',
-      'google:g-3',
-      'google:g-3',
-      undefined,
-    ])
+    // (each change closes the logins' sockets and the account's own, for a device signed in with a session)
+    assert.deepEqual(
+      dropped.filter(key => !key?.startsWith('chordless:')),
+      ['google:g-2', 'google:g-2', 'google:g-2', 'google:g-3', 'google:g-3', undefined]
+    )
+    assert.equal(dropped.filter(key => key?.startsWith('chordless:')).length, 5)
     assert.equal((await state.fetch?.(new Request('https://x.test')))?.status, 200)
   })
 })

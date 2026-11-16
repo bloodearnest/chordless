@@ -38,6 +38,7 @@ function setup(env: Partial<Env> = {}, assets: () => Response = () => new Respon
     GOOGLE_CLIENT_ID: 'client-id',
     GOOGLE_CLIENT_SECRET: 'client-secret',
     JWE_ENCRYPTION_KEY: btoa('k'.repeat(32)),
+    SESSION_SIGNING_KEY: btoa('s'.repeat(32)),
     ASSETS: { fetch: async () => assets() },
     OTLP_ENDPOINT: 'https://api.eu1.honeycomb.test/v1/traces',
     OTLP_HEADERS: 'x-honeycomb-team=hcaik_test',

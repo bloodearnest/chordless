@@ -8,7 +8,7 @@ import '../src/components/team-invite-step.ts'
 import type { TeamInviteStep } from '../src/components/team-invite-step.ts'
 import { leadersOf } from '../src/js/team-spaces.ts'
 import { makeSetlist } from './builders.ts'
-import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
+import { type FakeAuthWorker, installFakeAuthWorker, sessionFor } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -92,7 +92,11 @@ describe('team-invite-step', () => {
     ;({ worker, uninstall: uninstallWorker } = installFakeAuthWorker())
     worker.stored = {
       blob: 'blob',
-      metadata: { id_token: ID_TOKEN, scope: 'openid email profile' },
+      metadata: {
+        id_token: ID_TOKEN,
+        session: sessionFor(ID_TOKEN),
+        scope: 'openid email profile',
+      },
       updated_at: new Date().toISOString(),
     }
     made = []

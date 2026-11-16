@@ -12,7 +12,12 @@ import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
 import { googleKind } from './google-address.ts'
 import { type GoogleApi, realGoogle } from './google-auth.ts'
-import { authenticate, googleProvider, type IdentityProvider } from './identity.ts'
+import {
+  authenticate,
+  type IdentityProvider,
+  SESSION_PROVIDER,
+  sessionProvider,
+} from './identity.ts'
 import { checkTeamStorage, serviceAccountAddress, serviceAccountToken } from './service-account.ts'
 import type { AdminContext } from './team-admin.ts'
 import type { TeamContext } from './team-api.ts'
@@ -37,7 +42,7 @@ export interface TeamDeps {
 /** What a request uses to know who is asking and to reach Google: the real ones unless a test gives its own */
 function resolve(env: Env, deps: TeamDeps) {
   return {
-    providers: deps.providers ?? [googleProvider(env)],
+    providers: deps.providers ?? [sessionProvider(env)],
     google: deps.google ?? realGoogle,
     now: deps.now ?? Date.now,
   }
@@ -127,6 +132,17 @@ export function createAdminContext(env: Env, deps: TeamDeps = {}): AdminContext 
       const token = serviceAccountToken({ env, fetch: tracedFetch(deps.tokenFetch), now })
       const api = createDriveApi({ getAccessToken: token, fetch: tracedFetch(deps.fetch) })
       return checkTeamStorage(api, rootRef, address)
+    },
+    async hasGoogleLogin(identity, sub) {
+      if (identity.provider === 'google') return identity.sub === sub
+      if (identity.provider !== SESSION_PROVIDER) return false
+      const linked = await (env.DB as D1Db)
+        .prepare(
+          "SELECT 1 AS found FROM account_identities WHERE provider = 'google' AND sub = ? AND account_id = ?"
+        )
+        .bind(sub, identity.sub)
+        .first()
+      return Boolean(linked)
     },
     newSpaceId: () => crypto.randomUUID(),
     googleKind: email => googleKind(email, tracedFetch(deps.dnsFetch)),

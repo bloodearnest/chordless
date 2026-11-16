@@ -22,6 +22,7 @@ const secrets = {
   GOOGLE_CLIENT_SECRET: 'GOCSPX-test-client-secret',
   GOOGLE_API_KEY: `AIza${'x'.repeat(35)}`,
   JWE_ENCRYPTION_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
+  SESSION_SIGNING_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
 }
 
 const worker = createTestHarness({ workers: [{ configPath: 'wrangler.toml', secrets }] })

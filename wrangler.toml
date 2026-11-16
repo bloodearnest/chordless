@@ -112,6 +112,8 @@ new_sqlite_classes = ["TeamRoom"]
 
 # Secrets (set via `wrangler secret put`):
 # - JWE_ENCRYPTION_KEY: Symmetric key for encrypting/decrypting token blobs (base64 encoded)
+# - SESSION_SIGNING_KEY: the key the Chordless session's access tokens are signed with (32 random bytes, base64:
+#   openssl rand -base64 32). Set it BEFORE the deploy that first needs it: the deploy refuses without it
 # - GOOGLE_CLIENT_ID: Google OAuth client ID
 # - GOOGLE_CLIENT_SECRET: Google OAuth client secret
 # - GOOGLE_API_KEY: Google API key restricted to the Drive API, for share link downloads

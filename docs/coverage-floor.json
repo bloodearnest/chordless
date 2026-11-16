@@ -5,9 +5,15 @@
     "functions": 0,
     "unloaded": 0
   },
+  "src/js/copy-editor.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 0
+  },
   "src/js/score-musicxml-read.ts": {
     "lines": 0,
-    "branches": 18,
+    "branches": 16,
     "functions": 0
   },
   "src/js/score-musicxml.ts": {
@@ -21,9 +27,9 @@
     "functions": 0
   },
   "src/js/score-pdf.ts": {
-    "lines": 60,
-    "branches": 57,
-    "functions": 24
+    "lines": 41,
+    "branches": 41,
+    "functions": 23
   },
   "src/js/score-pdfjs.ts": {
     "lines": 1,
@@ -90,12 +96,6 @@
     "unloaded": 0
   },
   "worker/src/team-room.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 0,
-    "unloaded": 0
-  },
-  "src/js/copy-editor.ts": {
     "lines": 0,
     "branches": 0,
     "functions": 0,

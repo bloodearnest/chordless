@@ -39,7 +39,7 @@ import {
 import type { BlobData } from './blob.ts'
 import type { GoogleKind } from './google-address.ts'
 import { answering, jsonResponse, Refusal, readJson } from './http.ts'
-import type { Identity } from './identity.ts'
+import { type Identity, SESSION_PROVIDER } from './identity.ts'
 import { refusal } from './team-api.ts'
 import type { MySpace, SpaceInfo, TeamSpaceApi } from './team-state.ts'
 import { annotateRequest } from './trace.ts'
@@ -63,6 +63,8 @@ export interface AdminContext {
   serviceAccount(): string | null
   /** Why the service account cannot keep the folder's files, or null if it can (service-account.ts) */
   checkServiceAccount(rootRef: string, address: string): Promise<string | null>
+  /** Whether this is the Google login with this id, or the account of a session that has that login linked */
+  hasGoogleLogin(identity: Identity, sub: string): Promise<boolean>
   /** A new id for a space */
   newSpaceId(): string
   /** Whether an address looks like a Google account's (google-address.ts) */
@@ -88,21 +90,36 @@ function licenceFrom(value: unknown): string {
   return licence
 }
 
-/** Check that a blob is this person's, and that they can write to the folder with it */
-async function checkSharing(ctx: AdminContext, identity: Identity, blob: string, rootRef: string) {
+/**
+ * Check that a blob is this person's, and that they can write to the folder with it. It is the Google
+ * sign-in of a login the person has (the caller's own, or one their account has linked), and the login it
+ * is for is returned: the space keeps it as the one whose Drive access it uses.
+ */
+async function checkSharing(
+  ctx: AdminContext,
+  identity: Identity,
+  blob: string,
+  rootRef: string
+): Promise<Identity> {
   let data: BlobData
   try {
     data = await ctx.openBlob(blob)
   } catch {
     throw new Refusal(400, 'That Google sign-in is not one this server made')
   }
-  if (identity.provider !== 'google' || data.owner_sub !== identity.sub) {
+  if (!data.owner_sub || !(await ctx.hasGoogleLogin(identity, data.owner_sub))) {
     throw new Refusal(403, 'That Google sign-in is not yours')
   }
-  const root = await ctx.inspectRoot(blob, identity, rootRef)
+  const owner: Identity = {
+    provider: 'google',
+    sub: data.owner_sub,
+    email: (data.owner_email ?? identity.email).toLowerCase(),
+  }
+  const root = await ctx.inspectRoot(blob, owner, rootRef)
   if (!root || root.trashed || root.canWrite === false) {
     throw new Refusal(400, 'That folder is not there, or you cannot change it')
   }
+  return owner
 }
 
 /** GET /api/spaces: the spaces the person is in, with their role in each */
@@ -127,11 +144,12 @@ export function handleCreateSpace(request: Request, ctx: AdminContext): Promise<
     }
     if (!name || name.length > 200) throw new Refusal(400, 'A space needs a name')
     const ccliLicence = body.ccliLicence === undefined ? '' : licenceFrom(body.ccliLicence)
-    await checkSharing(ctx, identity, blob, rootRef)
+    const owner = await checkSharing(ctx, identity, blob, rootRef)
 
     const spaceId = ctx.newSpaceId()
     const room = ctx.room(spaceId)
-    if (!(await room.create({ rootRef, name, owner: identity }))) {
+    const ownerAccount = identity.provider === SESSION_PROVIDER ? identity.sub : undefined
+    if (!(await room.create({ rootRef, name, owner, ownerAccount }))) {
       throw new Refusal(409, 'That space already exists')
     }
     await room.setOwnerBlob(blob)

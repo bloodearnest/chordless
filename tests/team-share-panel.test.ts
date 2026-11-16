@@ -15,7 +15,7 @@ import {
 import type { Space } from '../src/js/data-types.ts'
 import { createSpace, deleteSpace, getSpaceById, updateSpace } from '../src/js/space.ts'
 import type { TeamRole } from '../src/js/team-roles.ts'
-import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
+import { type FakeAuthWorker, installFakeAuthWorker, sessionFor } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -105,7 +105,11 @@ describe('the team share panel', () => {
     ;({ worker, uninstall: uninstallWorker } = installFakeAuthWorker())
     worker.stored = {
       blob: 'the-blob',
-      metadata: { id_token: ID_TOKEN, scope: 'openid email profile' },
+      metadata: {
+        id_token: ID_TOKEN,
+        session: sessionFor(ID_TOKEN),
+        scope: 'openid email profile',
+      },
       updated_at: new Date().toISOString(),
     }
     calls = []
