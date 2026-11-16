@@ -43,7 +43,7 @@ nothing shipped is made from them. (Other Markdown, such as the READMEs, may shi
 
 `ci-ok` is the one required check, so jobs can be renamed, split or skipped without touching the
 ruleset. The macOS and Windows end-to-end jobs are required too (they are in `ci-ok`'s `needs`): they are
-slow (4 to 6 minutes against Linux's 2) and their runners flaky, so they skip the tests tagged `@logic`
+slow (4 to 6 minutes against Linux's 2) and their runners flaky (macOS: see "A job that never gets a runner", below), so they skip the tests tagged `@logic`
 (`--grep-invert @logic`): about half of them, the ones that do not depend on the browser or the platform
 (`docs/TESTING.md`). Linux runs every test, every time. The weekly run (Mondays, 06:00 UTC) and a run by hand run them all, so a break only they would catch is found within a week.
 
@@ -60,6 +60,36 @@ On a failure, the end-to-end jobs keep the Playwright report and traces as an ar
 the failing tests are marked on the pull request's diff. Each also lists, in its summary, the tests that
 only passed on a retry (`scripts/flaky-summary.ts`, from the JSON report): `retries: 2` keeps one flaky
 test from failing a run, and would hide it. Log each in `docs/test-catches.jsonl` (kind `flaky`).
+
+### A job that never gets a runner (`.github/workflows/rerun-unacquired.yml`)
+
+The macOS jobs run on GitHub's arm64 pool, which is at times short of capacity (its own annotation says so).
+A job that waits about 15 minutes for a runner is cancelled with "The job was not acquired by Runner of type
+hosted even after multiple attempts", and the run then fails as a whole, because `ci-ok` counts it. That
+says nothing of the code: on 2026-11-16 three of the day's attempts were lost to it, and a deploy was missed.
+Over the 43 macOS attempts before that, 38 passed, none failed a test, and one was a capacity cancel (the
+others were superseded by a newer push, or by hand).
+
+When a CI or Deploy run ends in failure, `rerun-unacquired.yml` runs `scripts/ci/rerun-unacquired.sh`, which
+re-runs the failed jobs (`gh run rerun --failed`) **only if every job that failed or was cancelled, apart from
+`ci-ok`, had no runner and carries that annotation**. It leaves alone:
+
+- a **real failure**, or one beside a job that never got a runner (nothing is retried over a test that failed);
+- a job cancelled by a **newer push** ("a higher priority waiting request") or **by a person**, which also had
+  no runner;
+- a run **not for the newest commit** of its pull request: the two share a concurrency group, so re-running
+  the old one cancels the new one (this is also why you should not re-run an old run by hand after pushing);
+- a run at **attempt 3**, so at most two re-runs. (A re-run started with the workflow's token should itself end
+  with a `workflow_run` event, which is what makes the second one possible; if it does not, there is one retry.)
+
+It checks out only the default branch and takes nothing from the run but its numbers and commit SHA, in `env`
+(zizmor's `dangerous-triggers` is ignored for this one file, in `.github/zizmor.yml`, for that reason). It
+always exits 0: it must never be what fails a run. The cases are tested in `tests/flaky-summary.node.test.ts`
+with a fake `gh`. A Deploy run it re-runs deploys, if it is still the newest commit (the deploy step checks).
+
+Not done, and the options if the capacity problem outlasts this: an Intel macOS runner (`macos-15-intel`, a
+separate pool, slower), or macOS only on `main` with Linux WebKit on pull requests (loses the real Safari
+engine before merge, which has caught a WebKit-only bug: `docs/test-catches.jsonl`, 2026-10-22).
 
 ## Actions, and why so few
 

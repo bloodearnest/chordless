@@ -5,3 +5,10 @@ rules:
   # are in it), so `./` names the same commit. Turn this back on when actionlint knows `$/`.
   self-repository:
     disable: true
+  # `workflow_run` runs with a write token, and is dangerous when it checks out or runs what the run it
+  # follows built (a pull request's code). rerun-unacquired.yml does neither: it checks out the default
+  # branch, and uses only the run's id, attempt, commit SHA and pull request number (all numbers or hex),
+  # passed in `env`, to ask the API whether a job was never given a runner and to re-run it. Only this file.
+  dangerous-triggers:
+    ignore:
+      - rerun-unacquired.yml
