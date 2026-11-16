@@ -367,9 +367,9 @@ describe('team spaces on this device', () => {
       expect(outranks('reader', 'reader')).to.equal(false)
     })
 
-    it('has the invite link hold the space and the code in the fragment', () => {
+    it('has the invite link hold the space and the code in the path', () => {
       expect(inviteLink('https://chordless.app', 'space-1', 'code')).to.equal(
-        'https://chordless.app/join#space-1.code'
+        'https://chordless.app/join/space-1/code'
       )
     })
   })

@@ -7,6 +7,7 @@ import {
   SignInExpiredError,
 } from '../js/google-auth.ts'
 import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
+import { matchRoute, type Route } from '../js/router.ts'
 import { setCurrentSpace, switchSpace } from '../js/space.ts'
 import { storageFor } from '../js/storage/space-storage.ts'
 import type { ProgressCallback, SyncProgress } from '../js/sync-manager.ts'
@@ -27,7 +28,7 @@ type State =
   | 'joined'
   | 'failed'
 
-/** The space and the invite's code, from the link's fragment: `#<space id>.<code>` */
+/** The space and the invite's code, from an older link's fragment: `#<space id>.<code>` */
 export function parseInvite(fragment: string): { teamId: string; code: string } | null {
   const match = /^#?([A-Za-z0-9_-]{8,64})\.([A-Za-z0-9_-]{16,64})$/.exec(fragment)
   return match ? { teamId: match[1], code: match[2] } : null
@@ -35,7 +36,7 @@ export function parseInvite(fragment: string): { teamId: string; code: string } 
 
 /**
  * Join a team space (docs/SPACES.md, "Setting up and joining a team space") with the link an admin
- * sent: /join#<space id>.<code>. The person signs in with Google if they have not (for who they
+ * sent: /join/<space id>/<code> (links sent before that have them in the fragment, #<space id>.<code>). The person signs in with Google if they have not (for who they
  * are only: Chordless asks for no access to their Drive), is shown who they are signed in as, and
  * chooses to join. The invite is for one email address, so a different account is told so and can
  * sign in again. Once joined, the space is on this device and opening it starts the app afresh.
@@ -49,6 +50,7 @@ export class TeamJoin extends LitElement {
     _role: { state: true },
     _syncError: { state: true },
     _progress: { state: true },
+    route: { attribute: false },
   }
 
   declare _state: State
@@ -62,6 +64,8 @@ export class TeamJoin extends LitElement {
   declare _syncError: string
   /** How far the first sync has got, while it runs */
   declare _progress: SyncProgress | null
+  /** The page's route (the address, if the page does not say), which holds the invite in a new link */
+  declare route: Route | undefined
 
   /** Shows the space once it is the one in use (a test gives its own; by default the home page, afresh) */
   show: (() => unknown) | undefined = undefined
@@ -101,7 +105,7 @@ export class TeamJoin extends LitElement {
     super.connectedCallback()
     window.addEventListener(IncomingLinkEvent.type, this._onLink)
     window.addEventListener('hashchange', this._onHash)
-    // (the installed app is given the link's fragment, launch.ts; a tab keeps it in the address)
+    // (an older link's fragment: the installed app is given it, launch.ts; a tab keeps it in the address)
     this._read(takeLink('/join') ?? this.fragment)
   }
 
@@ -109,6 +113,11 @@ export class TeamJoin extends LitElement {
     window.removeEventListener(IncomingLinkEvent.type, this._onLink)
     window.removeEventListener('hashchange', this._onHash)
     super.disconnectedCallback()
+  }
+
+  override willUpdate(changed: Map<string, unknown>): void {
+    // Another invite link opened while this page is: the route changes, the page stays
+    if (this.hasUpdated && changed.has('route')) this._read(this.fragment)
   }
 
   /** An invite the installed app was launched with while this page is open */
@@ -126,7 +135,11 @@ export class TeamJoin extends LitElement {
   /** Take the invite in a link's fragment, and see where they stand */
   _read(fragment: string): void {
     this.fragment = fragment
-    this._invite = parseInvite(fragment)
+    const route = this.route ?? matchRoute(window.location)
+    this._invite =
+      route.name === 'join' && route.teamId && route.code
+        ? { teamId: route.teamId, code: route.code }
+        : parseInvite(fragment)
     this._message = ''
     if (this._invite) void this._check()
     else this._state = 'bad-link'

@@ -467,7 +467,7 @@ Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
   nothing. The cost of binding it: a person who signs in with another address than the one invited
   is turned away, and the admin has to invite the address that appears in their Google account (a
   Gmail address with dots or a `+tag` is a different address from the plain one). The link to hand
-  out is the page's, with the space id and code in its fragment (built), and is handed on from the
+  out is the page's, `/join/<space id>/<code>` (built; links sent before 2026-11-16 have them in the fragment, `/join#<space id>.<code>`, which the page still reads, and invites last a week), and is handed on from the
   admin's own account by the share sheet, WhatsApp or Gmail (`invite-send.ts`).
   The message says how to make a Google account with an address that is not Gmail's (a link to
   Google's sign-up and "Use my existing email address"; `googleAccountHelp`). Whether an address is

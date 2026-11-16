@@ -319,6 +319,16 @@ describe('the join page', () => {
     expect(text()).to.contain('sent to a different Google account. Sign in with the address')
   })
 
+  it('takes the invite from the path of the link, and another when the route changes', async () => {
+    await open('', true)
+    page.route = { name: 'join', teamId: TEAM, code: CODE }
+    await until(() => text().includes('Join the team space'), 'the offer')
+    expect(page._invite).to.deep.equal({ teamId: TEAM, code: CODE })
+
+    page.route = { name: 'join', teamId: 'space-bbbb2222', code: 'zyxwvutsrqponmlk' }
+    await until(() => page._invite?.teamId === 'space-bbbb2222', 'the second link')
+  })
+
   it('takes the invite the installed app was launched with, in place of the address’s', async () => {
     offerLink('/join', LINK)
     await open('', true)

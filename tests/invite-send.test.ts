@@ -15,7 +15,7 @@ import { must } from './must.ts'
 
 const { describe, it, afterEach } = window
 
-const URL = 'https://chordless.app/join#space.code'
+const URL = 'https://chordless.app/join/space/code'
 
 const original = Object.getOwnPropertyDescriptor(navigator, 'share')
 afterEach(() => {
