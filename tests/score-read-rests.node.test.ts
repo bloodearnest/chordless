@@ -1,4 +1,4 @@
-/** Rests in a lead sheet's SVG (src/js/score-read.ts): the chords over them, and the ones it cannot read */
+/** Rests and notes in a lead sheet's SVG (src/js/score-read.ts): the chords over them, and the ones it cannot read */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { readScoreSvg } from '../scripts/melody-xml.ts'
@@ -58,5 +58,33 @@ describe('rests in a lead sheet SVG', () => {
       'measure 1: rest a has no glyph',
       'measure 1: rest glyph E4FF',
     ])
+  })
+})
+
+describe('notes in a lead sheet SVG', () => {
+  it('says so, and goes on, for a note with no head or one whose head glyph it does not know', () => {
+    const stats = { warnings: [] as string[] } as NonNullable<Parameters<typeof readScoreSvg>[1]>
+    const use = (code: string) =>
+      `<use xlink:href="#${code}-x" transform="translate(2000, 3777) scale(0.72, 0.72)" />`
+    const note = (id: string, head: string) =>
+      `<g id="${id}" class="note">${head}<g class="stem"><path d="M2100 3777 L2100 3400" /></g></g>`
+    readScoreSvg(
+      [sheet(note('a', '') + note('b', `<g class="notehead">${use('E0FF')}</g>`))],
+      stats
+    )
+    assert.deepEqual(stats.warnings, [
+      'measure 1: note a has no head',
+      'measure 1: head glyph E0FF',
+    ])
+  })
+
+  it('reads a plain note: no accidental, no key signature and no id, so it is natural and unnamed', () => {
+    const head =
+      '<g class="notehead"><use xlink:href="#E0A4-x" transform="translate(2000, 3777) scale(0.72, 0.72)" /></g>'
+    const score = readScoreSvg([sheet(`<g class="note">${head}</g>`)])
+    const [event] = score.measures[0]?.voices[0] ?? []
+    assert.equal(event?.kind, 'note')
+    assert.equal((event as { id: string }).id, '')
+    assert.equal((event as { alter: number }).alter, 0)
   })
 })

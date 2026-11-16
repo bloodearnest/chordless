@@ -350,7 +350,8 @@ export function readScoreTrees(roots: El[], stats?: ReadStats): Score {
               const dia = bottomDia + Math.round((bottomY - hg.y) / half)
               const stepIndex = ((dia % 7) + 7) % 7
               const octave = Math.floor(dia / 7)
-              let alter = measureAlters.get(dia) ?? keyAlters[STEPS[stepIndex] as Step] ?? 0
+              // (the key signature has a value for every letter: 0 for one it does not alter)
+              let alter = measureAlters.get(dia) ?? keyAlters[STEPS[stepIndex] as Step]
               const acc = firstByClass(note, 'accid')
               const ag = acc ? glyphs(acc)[0] : undefined
               if (ag && ACCIDENTAL[ag.code] !== undefined) {
