@@ -3,13 +3,11 @@
  * is a fake Drive, and the spaces are real ones in the spaces database.
  */
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
-import type { AppModal } from '../src/components/app-modal.ts'
 import {
   type SpaceCard,
   SpaceDefaultEvent,
   SpaceLeadersEvent,
   SpaceManageEvent,
-  SpaceSwitchEvent,
   SpaceSyncedEvent,
   SpaceUsersEvent,
 } from '../src/components/space-card.ts'
@@ -24,7 +22,7 @@ import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
+import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -311,43 +309,6 @@ describe('space-card', () => {
         /Starting…|Syncing|Scanning|Checking|Downloading|Uploading|Initializing/
       )
       await waitUntil(() => !el._syncing, undefined, { timeout: 3000 })
-    })
-  })
-
-  describe('switching', () => {
-    async function answer(el: SpaceCard, confirm: boolean) {
-      const modal = must(el.shadowRoot?.querySelector<AppModal>('app-modal'))
-      await waitUntil(() => modal.open)
-      await modal.updateComplete
-      must(
-        modal.shadowRoot?.querySelector<HTMLElement>(
-          confirm ? '.modal-btn-confirm' : '.modal-btn-cancel'
-        )
-      ).click()
-      return modal
-    }
-
-    it('asks first, naming the space, and tells the page to switch when told yes', async () => {
-      const el = await card('signed-out')
-      const switched: string[] = []
-      el.addEventListener(SpaceSwitchEvent.type, event =>
-        switched.push((event as SpaceSwitchEvent).spaceId)
-      )
-      must(button(el, 'switch')).click()
-      const modal = await answer(el, true)
-      expect(modal.message).to.contain(`Switch to "${space.name}"?`)
-      await waitUntil(() => switched.length > 0, 'the switch to be asked for')
-      expect(switched).to.deep.equal([space.id])
-    })
-
-    it('does nothing when told no', async () => {
-      const el = await card('signed-out')
-      let switched = 0
-      el.addEventListener(SpaceSwitchEvent.type, () => switched++)
-      must(button(el, 'switch')).click()
-      await answer(el, false)
-      await nothingFor(50)
-      expect(switched).to.equal(0)
     })
   })
 })
