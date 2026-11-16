@@ -166,18 +166,21 @@ describe('team-invite-step', () => {
     expect(sends.every(each => each.teamName === 'Grace Church')).to.equal(true)
   })
 
-  it('says the message explains making a Google account, except for a Gmail address', async () => {
+  it('says the message explains making a Google account only for an admin invite to an address that is not Gmail’s', async () => {
     await open([
       { name: 'Ann', email: 'ann@example.com' },
       { name: 'Bob', email: 'bob@gmail.com' },
+      { name: 'Cy', email: 'cy@example.com' },
     ])
-    button('Make 2 invites').click()
+    page._role('ann@example.com', 'admin')
+    page._role('bob@gmail.com', 'admin')
+    button('Make 3 invites').click()
     await waitUntil(() => !page._busy, 'the invites to be made')
     await page.updateComplete
     const hints = Array.from(page.shadowRoot?.querySelectorAll('li') ?? []).map(item =>
-      item.textContent?.includes('Not a Gmail address')
+      item.textContent?.includes('An admin invite only works with this address')
     )
-    expect(hints).to.deep.equal([true, false])
+    expect(hints).to.deep.equal([true, false, false])
   })
 
   it('copies a link, and says so', async () => {

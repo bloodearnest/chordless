@@ -31,15 +31,28 @@ const render = async () =>
 describe('inviteMessage and inviteSendLinks', () => {
   it('says who is invited, as what, and with which account', () => {
     expect(inviteMessage('Grace Church', 'reader', 'fay@example.com', URL)).to.contain(
-      'join Grace Church on Chordless as a team member. Before you open the link'
+      'join Grace Church on Chordless as a team member. Open the link and sign in with any Google account'
+    )
+    expect(inviteMessage('Grace Church', 'admin', 'fay@example.com', URL)).to.contain(
+      'join Grace Church on Chordless as an admin. Before you open the link'
     )
     expect(inviteMessage('Grace Church', 'reader', 'fay@gmail.com', URL)).to.contain(
       'join Grace Church on Chordless as a team member. Sign in with the Google account fay@gmail.com'
     )
   })
 
-  it('tells an address that may not be a Google account to make one first, with the page of steps, and leaves it out for Gmail', () => {
-    const other = inviteMessage('Grace Church', 'writer', 'fay@church.org', URL)
+  it('tells a team member or a worship leader to sign in with any Google account, and that the page helps', () => {
+    for (const role of ['reader', 'writer'] as const) {
+      const other = inviteMessage('Grace Church', role, 'fay@church.org', URL)
+      expect(other).to.contain('sign in with any Google account you use')
+      expect(other).to.contain('it does not have to be fay@church.org')
+      expect(other).to.contain('the page shows how to make one')
+      expect(other).to.not.contain('google-account')
+    }
+  })
+
+  it('tells an admin invited at an address that may not be a Google account to make one first, with the page of steps, and leaves it out for Gmail', () => {
+    const other = inviteMessage('Grace Church', 'admin', 'fay@church.org', URL)
     expect(other).to.contain('fay@church.org must be a Google account')
     expect(other).to.contain('make it one first')
     expect(other).to.contain('https://chordless.app/google-account.html')
@@ -47,12 +60,12 @@ describe('inviteMessage and inviteSendLinks', () => {
     expect(other.indexOf('google-account.html')).to.be.lessThan(
       other.indexOf('sign in with the Google account')
     )
-    expect(googleAccountGuideUrl('http://localhost:8787/join#a.b')).to.equal(
+    expect(googleAccountGuideUrl('http://localhost:8787/join/a/b')).to.equal(
       'http://localhost:8787/google-account.html'
     )
     for (const gmail of ['fay@gmail.com', 'Fay@GoogleMail.com ']) {
       expect(isGmailAddress(gmail)).to.equal(true)
-      expect(inviteMessage('Grace Church', 'writer', gmail, URL)).to.not.contain('google-account')
+      expect(inviteMessage('Grace Church', 'admin', gmail, URL)).to.not.contain('google-account')
     }
     expect(isGmailAddress('fay@notgmail.com')).to.equal(false)
   })

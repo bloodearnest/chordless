@@ -229,8 +229,8 @@ export class TeamInviteStep extends LitElement {
                       .url=${outcome.url}
                     ></invite-send>
                     ${
-                      !isGmailAddress(outcome.email)
-                        ? html`<p class="hint">Not a Gmail address, so the message also tells them how to make a Google account with it.</p>`
+                      outcome.role === 'admin' && !isGmailAddress(outcome.email)
+                        ? html`<p class="hint">An admin invite only works with this address, and it is not a Gmail address, so the message also tells them how to make a Google account with it.</p>`
                         : nothing
                     }
                   </li>`

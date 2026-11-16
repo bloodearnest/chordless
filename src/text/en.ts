@@ -245,18 +245,58 @@ confirm-person-delete-message = Delete { $person }? They lead no setlists. They 
 status-loading = Loading…
 status-checking = Checking…
 
-# On the page an invite's link opens, above the steps for making a Google account: for someone whose
-# invite was sent to a Hotmail, Outlook, Yahoo or work address, who thinks they need a Gmail one.
-join-no-gmail-needed = You do not need a Gmail address. A Google account can be made with the email address the invite was sent to (Hotmail, Outlook, Yahoo or any other), and it has to be made first, before you sign in here. If you already have a Google account with that address, sign in below.
+## Joining a team with an invite link (src/components/team-join.ts)
 
-# The link, after join-no-gmail-needed, to the page that shows the steps with pictures.
-join-make-google-account = Show me how, step by step.
+# The heading once the invite is known. { $team } is the team's name, { $role } the role with its article
+# ("a team member", "a worship leader", "an admin").
+join-welcome-heading = You are invited to join { $team } as { $role }.
 
-# If Google will not take their address, the way out is another address.
-join-google-refused = If Google will not accept your address, tell whoever invited you: they can invite a Gmail address (or another Google account) instead.
+# The same, when the invite could not be looked up (the device is offline, or too many tries).
+join-welcome-unknown = You have been invited to join a team on Chordless.
 
-# Shown when the account they signed in with is not the one the invite was sent to.
-join-wrong-account-help = The invite was sent to one particular address, and you need to sign in with that one. If it is not a Gmail address, it must first be made a Google account: the page of steps shows how.
+# Above the sign-in button when the invite was sent to a Gmail or Google Workspace address, which is then the
+# account to use. { $email } is that address.
+join-sign-in-invited = Sign in with the Google account { $email }. Chordless asks only who you are: it gets no access to your Google Drive.
+
+# For an invite that makes someone an admin: it only works with the address it was sent to. { $email } is that address.
+join-admin-exact = This invite makes you an admin, so it can only be used with the address it was sent to: { $email }. Sign in with the Google account that has that address.
+
+# Above the sign-in button on an Android phone, which has a Google account on it. { $email } is the address the invite was sent to.
+join-sign-in-android = Sign in with the Google account on this phone. It does not have to be { $email }. Chordless asks only who you are: it gets no access to your Google Drive.
+
+# Above the sign-in button for someone who has said they have a Google account. { $email } is the address the invite was sent to.
+join-sign-in-any = Sign in with the Google account you use. It does not have to be { $email }. Chordless asks only who you are: it gets no access to your Google Drive.
+
+# The same, when the address the invite was sent to is not known.
+join-sign-in-any-nameless = Sign in with the Google account you use. Chordless asks only who you are: it gets no access to your Google Drive.
+
+join-sign-in-button = Sign in with Google
+
+# The question for someone who may not have a Google account, on a device that does not say.
+join-has-google-question = Do you already have a Google account? It can be a Gmail address, or any other address that someone has made a Google account with.
+join-has-google-yes = Yes, sign in
+join-has-google-no = No, I need one
+
+join-make-heading = Make a Google account
+join-make-easiest = The easiest way is a new Gmail address. It takes a few minutes, and you can use it with Chordless straight away.
+join-make-open-signup = Make a Gmail address
+# { $email } is the address the invite was sent to.
+join-make-existing = Or make a Google account with the address you already have, { $email }. This is fiddlier: Google offers a new Gmail address first, and the link to use your own is small.
+join-make-guide-link = Show me how, step by step
+join-make-done = I have made one: sign in
+join-make-back = Back
+
+# For a page opened inside another app's own browser. { $app } is the app's name.
+join-in-app-heading = Open this page in your browser
+join-in-app-body = You are looking at this inside { $app }, whose built-in browser often stops Google sign-in from working. Open this page in Chrome or Safari instead.
+join-copy-link = Copy link
+join-link-copied = Link copied
+join-continue-here = Continue here anyway
+
+# Before joining with an account that is not the address the invite was sent to. { $invited } and { $email } are addresses.
+join-as-other = This invite was sent to { $invited }, and you are signed in as { $email }. You can join with this account. It will be the one the team knows you by, and { $invited } is noted as yours too.
+
+join-not-valid = This invite is not valid. It may have been used, withdrawn or have run out: ask the person who sent it for a new one.
 
 status-setlists-loading = Loading setlists...
 status-setlists-failed = Error loading setlists. Please check the console.

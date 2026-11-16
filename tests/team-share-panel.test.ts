@@ -232,7 +232,23 @@ describe('the team share panel', () => {
       expect(send.email).to.equal('fay@example.com')
       expect(send.role).to.equal('reader')
       expect(send.url).to.contain(`/join/${TEAM}/`)
-      expect(text()).to.contain('Not a Gmail address')
+      // (a team member's invite works with any Google account, so there is nothing to say of making one)
+      expect(text()).to.not.contain('An admin invite only works with this address')
+    })
+
+    it('says the message explains making a Google account for an admin invite to an address that is not Gmail’s', async () => {
+      routes[`POST /api/space/${TEAM}/invites`] = () =>
+        json({ code: 'CODE1234567890ab', expiresAt: 'later' })
+      await open(await space('owner'))
+      await until(() => text().includes('Invite someone'), 'the form')
+      must(panel.shadowRoot?.querySelector<HTMLInputElement>('input[type="email"]')).value =
+        'fay@example.com'
+      must(
+        panel.shadowRoot?.querySelector<HTMLSelectElement>('select[aria-label="Their role"]')
+      ).value = 'admin'
+      button('Make the invite').click()
+      await until(() => panel.shadowRoot?.querySelector('.link-box'), 'the link')
+      expect(text()).to.contain('An admin invite only works with this address')
     })
 
     it('does not mention making a Google account for a Gmail address', async () => {
@@ -245,7 +261,7 @@ describe('the team share panel', () => {
       button('Make the invite').click()
       await until(() => panel.shadowRoot?.querySelector('.link-box'), 'the link')
       expect(text()).to.contain('Link for fay@gmail.com')
-      expect(text()).to.not.contain('Not a Gmail address')
+      expect(text()).to.not.contain('An admin invite only works with this address')
     })
 
     it('copies the link, or selects it when it cannot', async () => {

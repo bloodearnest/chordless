@@ -3,6 +3,7 @@
  * not from the user agent, which an iPad sets to a Mac's.
  */
 import { expect } from '@open-wc/testing'
+import { joinDevice } from '../src/js/join-device.ts'
 import { baselineAttributes } from '../src/js/telemetry/baseline.ts'
 import { deviceDetails, parseUserAgent } from '../src/js/telemetry/device.ts'
 
@@ -256,5 +257,35 @@ describe('parseUserAgent', () => {
       browser: { name: 'other' },
       os: { name: 'other' },
     })
+  })
+})
+
+describe('joinDevice', () => {
+  const chromeAndroid =
+    'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36'
+  const safariIphone =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
+  const macSafari =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15'
+
+  it('tells Android from iOS (an iPad sends a Mac’s string, and its touch points give it away) and the rest', () => {
+    expect(joinDevice(chromeAndroid, 5)).to.deep.equal({ os: 'android', inAppBrowser: null })
+    expect(joinDevice(safariIphone, 5)).to.deep.equal({ os: 'ios', inAppBrowser: null })
+    expect(joinDevice(macSafari, 5).os).to.equal('ios')
+    expect(joinDevice(macSafari, 0).os).to.equal('other')
+    expect(joinDevice('Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0', 0).os).to.equal('other')
+  })
+
+  it('knows a page that is inside another app’s browser, which Google does not sign anyone in through', () => {
+    const inApp: [string, string][] = [
+      ['Facebook', `${safariIphone} [FBAN/FBIOS;FBAV/450.0.0]`],
+      ['Facebook', `${chromeAndroid} [FB_IAB/FB4A;FBAV/440.0.0]`],
+      ['Instagram', `${safariIphone} Instagram 320.0`],
+      ['Line', `${safariIphone} Line/13.6.0`],
+      ['WeChat', `${chromeAndroid} MicroMessenger/8.0`],
+      ['another app', chromeAndroid.replace('Pixel 8)', 'Pixel 8; wv)')],
+    ]
+    for (const [app, ua] of inApp) expect(joinDevice(ua, 5).inAppBrowser, ua).to.equal(app)
+    expect(joinDevice(navigator.userAgent).inAppBrowser).to.equal(null)
   })
 })

@@ -9,7 +9,7 @@ import type { Person } from './data-types.ts'
 import { getIdentityToken } from './google-auth.ts'
 import type { StoredFile } from './storage/types.ts'
 import type { InviteInfo, MemberRole, TeamMember, TeamRole } from './team-roles.ts'
-import { callWorker, type WorkerCall } from './worker-call.ts'
+import { callWorker, TeamError, type WorkerCall } from './worker-call.ts'
 
 async function call<T>(method: WorkerCall['method'], path: string, body?: unknown): Promise<T> {
   const response = await callWorker(
@@ -32,6 +32,16 @@ export interface TeamCredential {
 
 const space = (id: string) => `/api/space/${encodeURIComponent(id)}`
 
+/** What an invite is for, as the Worker says before anyone has signed in (`POST /api/spaces/invite`) */
+export interface InviteLookup {
+  teamName: string
+  role: MemberRole
+  /** The address the invite was sent to */
+  email: string
+  /** Whether that address looks like a Google account's: Gmail, a domain whose mail is Google's, or neither (or not known) */
+  google: 'gmail' | 'workspace' | 'other' | 'unknown'
+}
+
 export const teamApi = {
   /** The spaces you are in (owner or member), for a device that has not set them up */
   list: () =>
@@ -44,7 +54,23 @@ export const teamApi = {
   createSpace: (details: { blob: string; rootRef: string; name: string; ccliLicence?: string }) =>
     call<{ spaceId: string; role: TeamRole }>('POST', '/api/spaces', details),
 
-  /** Join a space with the code from an invite sent to your Google address */
+  /**
+   * What an invite is for, with no sign-in (the join page asks before it does anything): null if the code is
+   * not good (unknown, used, expired, or the team has ended). Other failures (offline, too many tries) throw.
+   */
+  async lookupInvite(spaceId: string, code: string): Promise<InviteLookup | null> {
+    const response = await window.fetch('/api/spaces/invite', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ spaceId, code }),
+    })
+    if (response.status === 404) return null
+    if (!response.ok)
+      throw new TeamError(`Could not look the invite up (${response.status})`, response.status)
+    return (await response.json()) as InviteLookup
+  },
+
+  /** Join a space with the code from an invite */
   join: (spaceId: string, code: string) =>
     call<{ spaceId: string; role: TeamRole }>('POST', '/api/spaces/join', { spaceId, code }),
 

@@ -5,10 +5,14 @@
  * sign-in window a stub, and the service worker that keeps the sign-in a fake one.
  */
 import { expect, waitUntil } from '@open-wc/testing'
+import { trace } from '@opentelemetry/api'
+import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace'
 import '../src/components/team-join.ts'
 import { parseInvite, type TeamJoin } from '../src/components/team-join.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import { offerLink, takeLink } from '../src/js/incoming-link.ts'
+import type { JoinDevice } from '../src/js/join-device.ts'
+import { setTelemetryPreference } from '../src/js/preferences.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import {
   createSpace,
@@ -95,7 +99,11 @@ describe('the join page', () => {
     expect(condition(), what).to.be.ok
   }
 
-  async function open(fragment = LINK, signedIn = true) {
+  async function open(
+    fragment = LINK,
+    signedIn = true,
+    configure: (page: TeamJoin) => void = () => {}
+  ) {
     if (signedIn) {
       worker.stored = {
         blob: 'blob',
@@ -110,6 +118,9 @@ describe('the join page', () => {
       }
     }
     page = document.createElement('team-join')
+    // (a device that is not this browser's, and a lookup that is not the default's, are given before it starts)
+    page.device = { os: 'other', inAppBrowser: null }
+    configure(page)
     page.fragment = fragment
     page.show = () => {
       shown++
@@ -123,6 +134,8 @@ describe('the join page', () => {
   }
 
   beforeEach(() => {
+    // (what they said of having a Google account is kept for the invite)
+    localStorage.removeItem(`chordless:join-has-google:${TEAM}`)
     ;({ worker, uninstall: uninstallWorker } = installFakeAuthWorker())
     before = getCurrentSpace()
     shown = 0
@@ -140,6 +153,14 @@ describe('the join page', () => {
         user,
       })
     routes = {
+      // (an invite for the address of the account signed in, which Google does not say is its own)
+      'POST /api/spaces/invite': () =>
+        Response.json({
+          teamName: 'Pat Church',
+          role: 'writer',
+          email: 'bea@example.com',
+          google: 'other',
+        }),
       'POST /api/spaces/join': () => Response.json({ spaceId: TEAM, role: 'writer' }),
       [`GET /api/space/${TEAM}/root`]: () =>
         Response.json({
@@ -189,23 +210,26 @@ describe('the join page', () => {
     expect(requested).to.deep.equal([])
   })
 
-  it('asks them to sign in first, for who they are alone, and then offers to join as who they are', async () => {
+  /** Say whether they have a Google account (the page asks, on a device that does not say) */
+  const say = async (label: string) => {
+    await until(() => text().includes('Do you already have a Google account?'), 'the question')
+    button(label).click()
+  }
+
+  it('asks whether they have a Google account, then to sign in with any, for who they are alone, and then offers to join as who they are', async () => {
     await open(LINK, false)
     await until(
-      () => text().includes('Sign in with the Google account the invite was sent to'),
-      'the sign-in'
+      () => text().includes('You are invited to join Pat Church as a worship leader.'),
+      'the welcome'
     )
+    await say('Yes, sign in')
+    await until(() => text().includes('It does not have to be bea@example.com'), 'the sign-in')
     expect(text()).to.contain('no access to your Google Drive')
-    // an invite to a Hotmail address is not a reason to think a Gmail one is needed
-    expect(text()).to.contain('You do not need a Gmail address')
-    const guide = page.shadowRoot?.querySelector<HTMLAnchorElement>(
-      'a[href$="/google-account.html"]'
-    )
-    expect(guide, 'a link to the page of steps').to.not.equal(null)
 
     button('Sign in with Google').click()
-    await until(() => text().includes('bea@example.com'), 'to be signed in')
+    await until(() => text().includes('You are signed in as'), 'to be signed in')
     expect(requested).to.include('ASK openid email profile')
+    expect(text()).to.contain('bea@example.com')
     expect(text()).to.contain('Join the team space')
     expect(requested).to.not.include('POST /api/spaces/join')
   })
@@ -323,7 +347,6 @@ describe('the join page', () => {
     button('Join the team space').click()
     await until(() => text().includes("Couldn't join"), 'the refusal')
     expect(text()).to.contain('sent to a different Google account. Sign in with the address')
-    expect(text()).to.contain('the page of steps shows how')
   })
 
   it('takes the invite from the path of the link, and another when the route changes', async () => {
@@ -365,7 +388,7 @@ describe('the join page', () => {
     window.location.hash = LINK
     try {
       await until(
-        () => text().includes('Sign in with the Google account'),
+        () => text().includes('Do you already have a Google account?'),
         'the new link to be read'
       )
     } finally {
@@ -444,15 +467,235 @@ describe('the join page', () => {
           : original(input, init)) as typeof fetch)(window.fetch)
 
     button('Join the team space').click()
-    await until(() => text().includes('Sign in with the Google account'), 'the sign-in again')
+    await until(
+      () => text().includes('Sign in with the Google account you use'),
+      'the sign-in again'
+    )
   })
 
   it('says so when the sign-in window gives nothing', async () => {
     codeResponse = { error: 'access_denied' }
     await open(LINK, false)
+    await say('Yes, sign in')
     await until(() => text().includes('Sign in with Google'), 'the sign-in')
     button('Sign in with Google').click()
     await until(() => text().includes("Couldn't join"), 'the failure')
     expect(text()).to.contain('access_denied')
+  })
+
+  /** What the Worker says the invite is for: the default is an address of the person signed in, which Google does not say is its own */
+  const inviteFor = (over: Record<string, unknown>) => {
+    routes['POST /api/spaces/invite'] = () =>
+      Response.json({
+        teamName: 'Pat Church',
+        role: 'writer',
+        email: 'bea@example.com',
+        google: 'other',
+        ...over,
+      })
+  }
+  const device = (over: Partial<JoinDevice>) => (page: TeamJoin) => {
+    page.device = { os: 'other', inAppBrowser: null, ...over }
+  }
+
+  it('does not ask a phone whether it has a Google account: it has one, and any will do', async () => {
+    await open(LINK, false, device({ os: 'android' }))
+    await until(
+      () => text().includes('Sign in with the Google account on this phone'),
+      'the sign-in'
+    )
+    expect(text()).to.contain('It does not have to be bea@example.com')
+    expect(text()).to.not.contain('Do you already have a Google account?')
+    expect(page.shadowRoot?.querySelector('button.primary')?.textContent).to.contain(
+      'Sign in with Google'
+    )
+  })
+
+  it('goes straight to signing in with the address, when it is a Gmail or Google Workspace one', async () => {
+    for (const google of ['gmail', 'workspace']) {
+      inviteFor({ email: 'bea@church.example', google })
+      await open(LINK, false)
+      await until(
+        () => text().includes('Sign in with the Google account bea@church.example.'),
+        google
+      )
+      expect(text()).to.not.contain('Do you already have')
+      page.remove()
+    }
+  })
+
+  it('says an invite for an admin is for its address alone, and offers no way to join as another', async () => {
+    inviteFor({ role: 'admin', email: 'boss@example.com' })
+    await open()
+    await until(() => text().includes('You are signed in as'), 'to be signed in')
+    expect(text()).to.contain('can only be used with the address it was sent to: boss@example.com')
+    expect(
+      Array.from(page.shadowRoot?.querySelectorAll('button') ?? []).map(each =>
+        each.textContent?.trim()
+      )
+    ).to.deep.equal(['Use a different account'])
+    expect(requested).to.not.include('POST /api/spaces/join')
+  })
+
+  it('lets someone join an admin invite with the address it was sent to', async () => {
+    inviteFor({ role: 'admin', email: 'BEA@Example.com' })
+    await open()
+    await until(() => text().includes('Join the team space'), 'the offer')
+    expect(text()).to.not.contain('can only be used')
+    button('Join the team space').click()
+    await until(() => text().includes('You have joined'), 'to be joined')
+  })
+
+  it('says it is joining with another address than the one invited, and joins', async () => {
+    inviteFor({ email: 'bea@hotmail.example' })
+    await open()
+    await until(() => text().includes('Join the team space'), 'the offer')
+    expect(text()).to.contain(
+      'This invite was sent to bea@hotmail.example, and you are signed in as bea@example.com.'
+    )
+    button('Join the team space').click()
+    await until(() => text().includes('You have joined'), 'to be joined')
+  })
+
+  it('helps someone with no Google account make one, and does not ask again once they have', async () => {
+    await open(LINK, false)
+    await say('No, I need one')
+    await until(() => text().includes('Make a Google account'), 'the help')
+    expect(
+      page.shadowRoot?.querySelector('a[href="https://accounts.google.com/signup"]')
+    ).to.not.equal(null)
+    expect(
+      page.shadowRoot?.querySelector('a[href$="/google-account.html"]'),
+      'the steps, for their own address'
+    ).to.not.equal(null)
+    expect(text()).to.contain('the address you already have, bea@example.com')
+
+    button('Back').click()
+    await until(() => text().includes('Do you already have a Google account?'), 'asked again')
+
+    await say('No, I need one')
+    await until(() => text().includes('Make a Google account'), 'the help again')
+    button('I have made one: sign in').click()
+    await until(() => text().includes('Sign in with the Google account you use'), 'the sign-in')
+    expect(localStorage.getItem(`chordless:join-has-google:${TEAM}`)).to.equal('yes')
+
+    // (they left to make it, and come back to the page: it remembers, and does not ask)
+    page.remove()
+    await open(LINK, false)
+    await until(() => text().includes('Sign in with the Google account you use'), 'remembered')
+    expect(text()).to.not.contain('Do you already have')
+  })
+
+  it('asks for the page to be opened in the browser when it is inside another app’s, and can carry on', async () => {
+    const copied: string[] = []
+    await open(LINK, false, current => {
+      current.device = { os: 'ios', inAppBrowser: 'Facebook' }
+      current.copyText = async text => void copied.push(text)
+    })
+    await until(() => text().includes('Open this page in your browser'), 'the advice')
+    expect(text()).to.contain('inside Facebook')
+    button('Copy link').click()
+    await until(() => text().includes('Link copied'), 'the link to be copied')
+    expect(copied).to.deep.equal([window.location.href])
+
+    button('Continue here anyway').click()
+    await until(() => text().includes('Do you already have a Google account?'), 'the question')
+  })
+
+  it('welcomes without the details when the invite cannot be looked up, and says one that is no good is not', async () => {
+    routes['POST /api/spaces/invite'] = () => Response.json({ error: 'busy' }, { status: 429 })
+    await open(LINK, false)
+    await until(
+      () => text().includes('You have been invited to join a team on Chordless.'),
+      'the welcome'
+    )
+    await say('Yes, sign in')
+    await until(
+      () => text().includes('Sign in with the Google account you use. Chordless asks'),
+      'the sign-in'
+    )
+
+    page.remove()
+    routes['POST /api/spaces/invite'] = () => Response.json({ error: 'no' }, { status: 404 })
+    await open(LINK, false)
+    await until(() => text().includes("This invite doesn't work"), 'the refusal')
+    expect(text()).to.contain('It may have been used, withdrawn or have run out')
+  })
+
+  describe('where it leaves a trace of how it went', () => {
+    const exporter = new InMemorySpanExporter()
+    beforeEach(() => {
+      setTelemetryPreference(true)
+      trace.disable()
+      trace.setGlobalTracerProvider(
+        new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] })
+      )
+      exporter.reset()
+    })
+    afterEach(() => {
+      trace.disable()
+      setTelemetryPreference(false)
+    })
+    const joinSpans = () =>
+      exporter.getFinishedSpans().filter(span => span.name === 'chordless.join')
+
+    it('says how a join went: the steps, what was known of the invite, and that they were the invited address', async () => {
+      await open()
+      await until(() => text().includes('Join the team space'), 'the offer')
+      button('Join the team space').click()
+      await until(() => text().includes('You have joined'), 'to be joined')
+      page.remove()
+
+      expect(joinSpans()).to.have.length(1)
+      const { attributes } = joinSpans()[0]
+      expect(attributes['chordless.join.outcome']).to.equal('joined')
+      expect(attributes['chordless.join.steps']).to.equal('checking,ready,joining,syncing,joined')
+      expect(attributes['chordless.join.last_step']).to.equal('joined')
+      expect(attributes['chordless.join.role']).to.equal('writer')
+      expect(attributes['chordless.join.invite_google']).to.equal('other')
+      expect(attributes['chordless.join.in_app_browser']).to.equal('none')
+      expect(attributes['chordless.join.signed_in_as_invited']).to.equal(true)
+      expect(attributes['chordless.join.ms']).to.be.a('number')
+      expect(JSON.stringify(attributes)).to.not.contain('example.com')
+    })
+
+    it('says where they stopped when they leave without joining, and what they had answered', async () => {
+      await open(LINK, false, device({ os: 'android' }))
+      await until(
+        () => text().includes('Sign in with the Google account on this phone'),
+        'the sign-in'
+      )
+      codeResponse = { error: 'access_denied' }
+      button('Sign in with Google').click()
+      await until(() => text().includes("Couldn't join"), 'the failure')
+      page.remove()
+
+      const { attributes } = joinSpans()[0]
+      expect(attributes['chordless.join.outcome']).to.equal('abandoned')
+      expect(attributes['chordless.join.last_step']).to.equal('failed')
+      expect(attributes['chordless.join.has_google_answer']).to.equal('assumed')
+      expect(attributes['chordless.join.sign_in_error']).to.be.a('string')
+    })
+
+    it('says an admin invite was not used with its address, and a link that is no good', async () => {
+      inviteFor({ role: 'admin', email: 'boss@example.com' })
+      await open()
+      await until(() => text().includes('can only be used'), 'the lock')
+      page.remove()
+      expect(joinSpans()[0].attributes['chordless.join.outcome']).to.equal('needs_admin_address')
+
+      exporter.reset()
+      await open('#cut-short', false)
+      expect(joinSpans()[0].attributes['chordless.join.outcome']).to.equal('bad_link')
+    })
+
+    it('makes one span for a visit however it ends', async () => {
+      routes['POST /api/spaces/invite'] = () => Response.json({}, { status: 404 })
+      await open(LINK, false)
+      await until(() => text().includes("This invite doesn't work"), 'the refusal')
+      page.remove()
+      expect(joinSpans()).to.have.length(1)
+      expect(joinSpans()[0].attributes['chordless.join.outcome']).to.equal('not_valid')
+    })
   })
 })

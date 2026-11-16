@@ -175,9 +175,10 @@ export function isGmailAddress(email: string): boolean {
 }
 
 /**
- * What to say with an invite's link, to the person it is for. For an address that may not be a
- * Google account yet, the first thing said is to make one *before* opening the link (the page the
- * link opens asks them to sign in at once), and where to see how.
+ * What to say with an invite's link, to the person it is for. The address it was sent to is a label for a
+ * team member or a worship leader: they sign in with any Google account, and the page they open helps
+ * them make one. An **admin** invite only works with its address, so for one that may not be a Google
+ * account yet, the message says to make it one *before* opening the link, and where to see how.
  */
 export function inviteMessage(
   teamName: string,
@@ -188,6 +189,9 @@ export function inviteMessage(
   const intro = `You are invited to join ${teamName} on Chordless as ${roleWithArticle(role)}.`
   const end = `Sign in with the Google account ${email}; the link works once, for a week.`
   if (isGmailAddress(email)) return `${intro} ${end}`
+  if (role !== 'admin') {
+    return `${intro} Open the link and sign in with any Google account you use: it does not have to be ${email}. If you have none, the page shows how to make one. The link works once, for a week.`
+  }
   return `${intro} Before you open the link, ${email} must be a Google account, so if it is not one yet, make it one first (you need no Gmail). The steps, with pictures:\n${googleAccountGuideUrl(inviteUrl)}\n\nThen ${end.charAt(0).toLowerCase()}${end.slice(1)}`
 }
 

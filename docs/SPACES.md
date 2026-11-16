@@ -487,12 +487,27 @@ Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
   `other`; or `unknown`). Whether an address like a Hotmail one has a Google account cannot be known, and
   probing Google's sign-in to find out is not something Chordless does, so the page asks. It tells whoever
   holds the code the invited address, which is the person the code is a secret for; wrong-shaped codes
-  make no query, and a sender is limited (`INVITE_LOOKUP`, docs/SECURITY.md). The link to hand
+  make no query, and a sender is limited (`INVITE_LOOKUP`, docs/SECURITY.md).
+  **The join page is a wizard** (`team-join.ts`, `join-device.ts`; 2026-11-16, after two invitees on Hotmail
+  addresses could not get through the old page). It welcomes ("You are invited to join Grace Church as a team
+  member") and then, by what the lookup says and the device: an **Android** phone has a Google account, so it is
+  told to sign in with the one on the phone (it need not be the invited address); an invite to a **Gmail or
+  Workspace** address says to sign in with that address; an **admin** invite says it needs exactly that address, and
+  shows no way to join as another; anything else (iOS, a laptop) is asked "Do you already have a Google account?",
+  and **No** leads to making one (a new Gmail address is the easy way; the picture guide `/google-account.html`
+  is for keeping their own address). The answer is kept on the device for the invite, because they leave for
+  Google and come back, often to a reloaded tab. A page opened **inside another app's browser** (Facebook,
+  Instagram, an Android WebView: Google does not sign anyone in there) is first told to open it in the real one,
+  with a copy-link button. Signed in with another address than the invite's, a team member or worship leader is
+  told so and joins. Without the lookup (offline, or too many tries) the welcome has no details and the rest works.
+  Where people stop is a span (`chordless.join`, docs/OBSERVABILITY.md). Untested on a real iPhone or Mac until the
+  owner tries it: the telemetry is how it is learned. The link to hand
   out is the page's, `/join/<space id>/<code>` (built; links sent before 2026-11-16 have them in the fragment, `/join#<space id>.<code>`, which the page still reads, and invites last a week), and is handed on from the
   admin's own account by the share sheet, WhatsApp or Gmail (`invite-send.ts`).
-  The message says, **first**, to make the address a Google account *before* opening the link (the
-  page the link opens asks them to sign in at once, and someone invited at a Hotmail address believed
-  they had to turn it into a Gmail one, 2026-11-16), and links `/google-account.html`
+  The message for a team member or worship leader says to open the link and sign in with any Google account
+  (the page helps make one). For an **admin** invited at an address that may not be a Google account, it says,
+  **first**, to make that address one *before* opening the link (the page the link opens asks them to sign in
+  at once), and links `/google-account.html`
   (`googleAccountGuideUrl`, on the invite's own site). That page is static, like `privacy.html`: no app and no
   service worker, so that it opens the same from WhatsApp, Gmail or anywhere. It walks the steps with
   pictures of Google's own sign-up (`public/google-account/`, kept out of the offline cache): name,
