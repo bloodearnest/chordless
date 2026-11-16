@@ -59,6 +59,13 @@ name = "EMAIL_LOGIN"
 namespace_id = "7305"
 simple = { limit = 10, period = 60 }
 
+# ...and all senders together: addresses that do not exist bounce, and many bounces get the sending domain
+# blocked. A few people sign in at a time; thirty a minute is far above that.
+[[ratelimits]]
+name = "EMAIL_LOGIN_OVERALL"
+namespace_id = "7306"
+simple = { limit = 30, period = 60 }
+
 # Sends the sign-in code: Cloudflare Email Sending, from signin@mail.chordless.app (infra/cloudflare owns
 # the subdomain's DNS). No key: the binding is the permission.
 [[send_email]]
@@ -169,6 +176,11 @@ simple = { limit = 60, period = 60 }
 name = "EMAIL_LOGIN"
 namespace_id = "7305"
 simple = { limit = 10, period = 60 }
+
+[[env.dev.ratelimits]]
+name = "EMAIL_LOGIN_OVERALL"
+namespace_id = "7306"
+simple = { limit = 30, period = 60 }
 
 # (local development writes the code's email to the terminal's log, it sends nothing)
 [[env.dev.send_email]]

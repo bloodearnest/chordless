@@ -71,7 +71,7 @@ user's own cloud storage (e.g. Google Drive).** Charts, lyrics and pad
 audio live in the user's own browser and in a Drive the user (or their team space's owner) controls.
 The Worker passes team-space traffic through (streamed, never buffered to storage) without
 persisting or caching it: no KV, R2, D1, Durable Object or Cache API entry may hold song or pad
-content. They hold only accounts (a person's logins and the addresses they are known by), their sessions (a hash of each refresh token), membership, roles, invites, the ids of the Drive files in a team's tree, a
+content. They hold only accounts (a person's logins and the addresses they are known by), their sessions (a hash of each refresh token), sign-in codes (hashes, for ten minutes), membership, roles, invites, the ids of the Drive files in a team's tree, a
 team's CCLI licence number and the log of who changed it (a record CCLI may ask for), the register of
 teams in D1 that outlives them (name, owner's email, dates: `docs/SPACES.md`; the members and the rest
 go when sharing ends), the owner's encrypted token blob (or that a space uses Chordless's

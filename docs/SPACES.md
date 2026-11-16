@@ -228,6 +228,20 @@ The Worker keeps no per-user state (a team's members are the team's, in D1).
   (an app from before sessions: it has to reload to update; nothing local is blocked). There was no period of
   accepting both. Where the Worker has no database or `SESSION_SIGNING_KEY` (a development one without them)
   a sign-in still works and has no session.
+- **Signing in with an emailed code (2026-11-16):** for someone with no Google account (Hotmail, Yahoo, iCloud, a
+  work address). `POST /session/email/start {address}` mails a six-digit code from `signin@mail.chordless.app`
+  (Cloudflare Email Sending, a `send_email` binding; the subdomain's DNS is in `infra/cloudflare`);
+  `POST /session/email/verify {address, code}` takes it and answers with a session as `/session/token` does.
+  Neither the address nor the code is kept: `login_codes` (migration `0005`) holds keyed hashes (SESSION_SIGNING_KEY).
+  A code works once, for 10 minutes and five tries; five codes an hour go to one address (the same answer is given
+  after that), a sender is limited by address (10 a minute) and all senders together (30 a minute), because mail to
+  addresses that do not exist bounces, and bounces get a sending domain blocked. The answer to `start` is the same for any
+  address that is one. A proved address is a login of provider `email` (the address is its `sub`), and joins the account of a
+  Google login with the same address: the same mailbox is the same person. An invitation's address never links anything.
+  The sign-in has no Google blob, so the page is signed in without Drive (`'no-drive'`): it can join and use Teams, but cannot own
+  a Team or sync a personal space until Google is connected. When its session ends, signing in again is the only way
+  (there is no blob to start from). Where mail landed in a test (2026-11-16, one address each): Hotmail/Outlook, Gmail and a work
+  address in the inbox, Yahoo in spam: the screen says to look in spam and offers to send again.
 - **Signing in without Drive (checked and built 2026-10-21):** asking for `openid email profile`
   alone gives a refresh token, an ID token with a verified email, and an access token, and asking
   later for `drive.file` alone (with `include_granted_scopes` and `prompt: consent`) adds the Drive

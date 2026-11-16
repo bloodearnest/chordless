@@ -276,6 +276,67 @@ export async function connectDrive(): Promise<AuthorizeResult> {
   return signInWith({ scope: DRIVE_SCOPE, include_granted_scopes: true })
 }
 
+/** Why a code was not taken (the Worker's `reason`), or that it could not be asked */
+export class EmailCodeError extends Error {
+  readonly reason: 'wrong' | 'expired' | 'too_many' | 'too_often' | 'invalid_address' | 'failed'
+  constructor(reason: EmailCodeError['reason'], text: string) {
+    super(text)
+    this.name = 'EmailCodeError'
+    this.reason = reason
+  }
+}
+
+/** Ask for a sign-in code to be emailed to this address (the Worker answers the same for any address) */
+export async function startEmailSignIn(address: string): Promise<void> {
+  const response = await fetch(`${AUTH_PROXY_URL}/session/email/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address }),
+  })
+  if (response.ok) return
+  const error = await response.json().catch(() => ({}))
+  if (error.error === 'invalid_address') throw new EmailCodeError('invalid_address', error.error)
+  if (response.status === 429) throw new EmailCodeError('too_often', 'Too many requests')
+  throw new EmailCodeError('failed', error.error || 'The code could not be sent')
+}
+
+/**
+ * Sign in with the code that was emailed. The sign-in is a Chordless session and nothing else (no Google
+ * blob, so no Drive): `getSignInState()` says 'no-drive' until Google is connected.
+ */
+export async function signInWithEmail(address: string, code: string): Promise<void> {
+  const response = await fetch(`${AUTH_PROXY_URL}/session/email/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address, code }),
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const reason = ['wrong', 'expired', 'too_many'].includes(body.reason) ? body.reason : 'failed'
+    throw new EmailCodeError(reason, body.error || 'The code was not accepted')
+  }
+  const email = String(body.email ?? address)
+  const stored = await sendToServiceWorker('STORE_BLOB', {
+    blob: '',
+    metadata: {
+      scope: '',
+      session: sessionFrom(body),
+      user: {
+        name: null,
+        email,
+        picture: null,
+        given_name: null,
+        family_name: null,
+        sub: null,
+      },
+    },
+  })
+  if (!stored.success) throw new Error(stored.error || 'Failed to save the sign-in')
+  import('./team-memberships.ts').then(({ checkTeamMemberships }) =>
+    checkTeamMemberships({ force: true })
+  )
+}
+
 /**
  * Whether the stored sign-in includes Drive (not if there is none). One made before the scope was
  * kept did, as signing in without Drive was not possible then.
@@ -350,6 +411,8 @@ export async function getAccessToken(): Promise<string> {
   }
 
   const { blob, metadata } = response.data
+  // (signed in with an emailed code: no Google, so nothing to renew)
+  if (!blob) throw new Error('Not signed in with Google')
   const expiresAt = new Date(metadata.expires_at ?? 0)
   const now = new Date()
 
@@ -419,6 +482,8 @@ async function renewSession(stored: StoredBlob): Promise<StoredSession> {
       refresh_token: stored.metadata.session.refresh_token,
     })
   }
+  // (an emailed code's sign-in has no blob to start again from: signing in again is the only way)
+  if (!response?.ok && !stored.blob) throw new SignInExpiredError('invalid_blob')
   if (!response?.ok) {
     // (no session yet, or it ended or was revoked: the blob still proves who this is)
     response = await post('/session/upgrade', { blob: stored.blob })
@@ -583,6 +648,16 @@ export async function storeSignIn(blob: string, metadata: AuthMetadata): Promise
  * `revokeAccess()`, asked for on its own.
  */
 export async function logout(): Promise<void> {
+  // (the session ends at the Worker too, if it can be reached; the device is signed out whatever happens)
+  const session = (await getStoredBlob())?.metadata.session
+  if (session) {
+    fetch(`${AUTH_PROXY_URL}/session/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+      signal: AbortSignal.timeout(10_000),
+    }).catch(() => {})
+  }
   const response = await sendToServiceWorker('DELETE_BLOB')
   if (!response.success) throw new Error(response.error || 'Failed to delete the sign-in')
 }
@@ -596,14 +671,14 @@ export async function logout(): Promise<void> {
 export async function revokeAccess(): Promise<{ revoked: boolean }> {
   const stored = await getStoredBlob()
   await logout()
-  if (!stored?.blob) return { revoked: false }
+  if (!stored?.blob && !stored?.metadata.session) return { revoked: false }
 
   try {
     const revoked = await fetch(`${AUTH_PROXY_URL}/session/logout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        blob: stored.blob,
+        blob: stored.blob || undefined,
         refresh_token: stored.metadata.session?.refresh_token,
       }),
       signal: AbortSignal.timeout(10_000),

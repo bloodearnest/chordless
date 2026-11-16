@@ -236,6 +236,46 @@ describe('the join page', () => {
     expect(requested).to.not.include('POST /api/spaces/join')
   })
 
+  it('offers an emailed code to someone with no Google account, and then offers to join as who they signed in as', async () => {
+    await open(LINK, false)
+    await say('Email me a code instead')
+    await until(() => text().includes('Sign in with your email address'), 'the email sign-in')
+    const form = must(page.shadowRoot?.querySelector('email-code-sign-in')) as unknown as {
+      address: string
+      start: (to: string) => Promise<void>
+      verify: (to: string, code: string) => Promise<void>
+    }
+    expect(form.address).to.equal('bea@example.com')
+    form.start = async () => {}
+    form.verify = async () => {
+      worker.stored = {
+        blob: '',
+        metadata: { scope: '', session: sessionFor('a'), user },
+        updated_at: new Date().toISOString(),
+      }
+    }
+    const root = must(form as unknown as Element).shadowRoot as ShadowRoot
+    must(root.querySelector('form')).requestSubmit()
+    await until(() => root.querySelector('input[name=code]') !== null, 'the code box')
+    must(root.querySelector<HTMLInputElement>('input[name=code]')).value = '123456'
+    must(root.querySelector('form')).requestSubmit()
+    await until(() => text().includes('You are signed in as'), 'to be signed in')
+    expect(text()).to.contain('Join the team space')
+    expect(requested).to.not.include('POST /api/spaces/join')
+  })
+
+  it('goes back from the emailed code to the Google sign-in, with no address to start from when the invite names none', async () => {
+    await open(LINK, false, page => {
+      page.lookupInvite = async () => {
+        throw new Error('offline')
+      }
+    })
+    await say('Email me a code instead')
+    await until(() => text().includes('Sign in with your email address'), 'the email sign-in')
+    button('Back').click()
+    await until(() => !text().includes('Sign in with your email address'), 'to leave it')
+  })
+
   it('offers to join as who is signed in already, and joins when told to', async () => {
     await open()
     await until(() => text().includes('Join the team space'), 'the offer')

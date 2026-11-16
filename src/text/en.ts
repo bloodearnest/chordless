@@ -286,6 +286,28 @@ join-make-guide-link = Show me how, step by step
 join-make-done = I have made one: sign in
 join-make-back = Back
 
+## Signing in with an emailed code
+
+# The other way to sign in, for someone with no Google account: Chordless emails a code to their address.
+email-code-button = Email me a code instead
+email-code-heading = Sign in with your email address
+email-code-address-label = Your email address
+email-code-send = Email me a code
+email-code-sending = Sending…
+email-code-sent = We have emailed a 6-digit code to { $email }. It can take a minute, and it may be in your spam folder.
+email-code-label = The 6-digit code
+email-code-submit = Sign in
+email-code-checking = Checking…
+email-code-resend = Send it again
+email-code-other-address = Use a different address
+email-code-error-address = That does not look like an email address.
+email-code-error-too-often = Too many tries. Wait a minute and try again.
+email-code-error-send = The code could not be sent. Try again in a moment.
+email-code-error-wrong = That code is not right. Check it and try again.
+email-code-error-expired = That code has run out, or was used. Ask for a new one.
+email-code-error-too-many = Too many wrong codes. Ask for a new one.
+email-code-error-failed = Signing in did not work. Try again in a moment.
+
 # For a page opened inside another app's own browser. { $app } is the app's name.
 join-in-app-heading = Open this page in your browser
 join-in-app-body = You are looking at this inside { $app }, whose built-in browser often stops Google sign-in from working. Open this page in Chrome or Safari instead.
