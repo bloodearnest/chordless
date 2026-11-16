@@ -245,6 +245,16 @@ confirm-person-delete-message = Delete { $person }? They lead no setlists. They 
 status-loading = Loading…
 status-checking = Checking…
 
+# On the page an invite's link opens, under "sign in with Google": for someone whose invite was sent
+# to a Hotmail, Outlook, Yahoo or work address, who thinks they need a Gmail one.
+join-no-gmail-needed = No Gmail needed: a Google account can be made with the email address you already have (Hotmail, Outlook, Yahoo or any other). Make it with that same address, then come back to this page and sign in.
+
+# The link, after join-no-gmail-needed, to Google's page for making that account.
+join-make-google-account = Make a Google account with my existing email address
+
+# The same, shown when the account they signed in with is not the one the invite was sent to.
+join-wrong-account-help = If the invite was sent to an address that is not Gmail's, make a Google account with that address first (choose "Use my existing email address"), then sign in with it.
+
 status-setlists-loading = Loading setlists...
 status-setlists-failed = Error loading setlists. Please check the console.
 status-setlist-loading = Loading setlist...
