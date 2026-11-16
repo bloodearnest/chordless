@@ -6,13 +6,17 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import * as jose from 'jose'
+import { Refusal } from '../worker/src/http.ts'
 import {
   authenticate,
   googleProvider,
   type Identity,
   type IdentityProvider,
   identityKey,
+  SESSION_PROVIDER,
+  sessionProvider,
 } from '../worker/src/identity.ts'
+import { signAccessToken } from '../worker/src/session-tokens.ts'
 
 const env = {
   GOOGLE_CLIENT_ID: 'client-123.apps.googleusercontent.com',
@@ -146,4 +150,34 @@ test('a member is keyed by provider and sub, so the same sub from two providers 
   const elsewhere: Identity = { provider: 'elsewhere', sub: '42', email: 'a@example.com' }
   assert.equal(identityKey(google), 'google:42')
   assert.notEqual(identityKey(google), identityKey(elsewhere))
+})
+
+describe('a Chordless session token', () => {
+  const key = { SESSION_SIGNING_KEY: btoa('s'.repeat(32)) }
+  const sessionProviders = [sessionProvider(key)]
+  const claims = { accountId: 'acct-1', sessionId: 'sess-1', email: 'ann@example.com' }
+
+  test('names the account, as a chordless login', async () => {
+    const token = await signAccessToken(claims, key)
+    assert.deepEqual(await authenticate(asking(token), sessionProviders), {
+      provider: SESSION_PROVIDER,
+      sub: 'acct-1',
+      email: 'ann@example.com',
+    })
+  })
+
+  test('names no one when it has ended, or was signed with another key', async () => {
+    const old = await signAccessToken(claims, key, new Date(Date.now() - 3_600_000))
+    assert.equal(await authenticate(asking(old), sessionProviders), null)
+    const forged = await signAccessToken(claims, { SESSION_SIGNING_KEY: btoa('x'.repeat(32)) })
+    assert.equal(await authenticate(asking(forged), sessionProviders), null)
+  })
+
+  test('is the only bearer: a Google ID token is told to update the app', async () => {
+    await assert.rejects(
+      async () => authenticate(asking(await sign()), sessionProviders),
+      (error: unknown) =>
+        error instanceof Refusal && error.status === 401 && error.message === 'update_required'
+    )
+  })
 })

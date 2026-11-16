@@ -53,4 +53,6 @@ export interface Env extends GoogleEnv, ShareEnv, ServiceAccountEnv {
   PICKER_API_KEY?: string
   /** Base64 AES-256 key for the token blobs */
   JWE_ENCRYPTION_KEY: string
+  /** Base64, 32 random bytes: the key the Chordless session's access tokens are signed with (session-tokens.ts) */
+  SESSION_SIGNING_KEY: string
 }

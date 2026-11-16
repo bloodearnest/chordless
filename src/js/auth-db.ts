@@ -20,8 +20,18 @@ export interface StoredUser {
   avatarUpdatedAt?: string
 }
 
+/** The Chordless session (docs/SPACES.md): what the Worker's team API takes as proof of who is asking */
+export interface StoredSession {
+  access_token: string
+  /** ISO time the access token ends */
+  expires_at: string
+  /** Single use: each refresh gives the next */
+  refresh_token: string
+}
+
 /** What is kept beside the encrypted blob */
 export interface AuthMetadata {
+  session?: StoredSession
   access_token?: string
   /** ISO time */
   expires_at?: string

@@ -23,7 +23,7 @@ import {
 } from '../src/js/space.ts'
 import type { ProgressCallback } from '../src/js/sync-manager.ts'
 import { makeSetlist } from './builders.ts'
-import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
+import { type FakeAuthWorker, installFakeAuthWorker, sessionFor } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -111,6 +111,7 @@ describe('the join page', () => {
           access_token: 'token',
           expires_at: new Date(Date.now() + 3600_000).toISOString(),
           id_token: idToken(),
+          session: sessionFor(idToken()),
           scope: 'openid email profile',
           user,
         },
@@ -149,6 +150,7 @@ describe('the join page', () => {
         access_token: 'tok',
         expires_in: 3600,
         id_token: idToken(),
+        session: { access_token: idToken(), refresh_token: 'id.secret', expires_in: 900 },
         scope: 'openid email profile',
         user,
       })
@@ -334,6 +336,7 @@ describe('the join page', () => {
         access_token: 'token',
         expires_at: new Date(Date.now() + 3600_000).toISOString(),
         id_token: idToken(),
+        session: sessionFor(idToken()),
         scope: 'openid email profile',
       },
       updated_at: new Date().toISOString(),
@@ -455,15 +458,15 @@ describe('the join page', () => {
   it('asks them to sign in again when Google no longer honours the sign-in', async () => {
     await open()
     await until(() => text().includes('Join the team space'), 'the offer')
-    // (the access token is good, the ID token has run out, and Google refuses a new one)
+    // (the access token is good, there is no session, and the blob is no longer readable)
     const stored = must(worker.stored)
-    worker.stored = { ...stored, metadata: { ...stored.metadata, id_token: idToken(-60) } }
-    routes['POST /session/refresh'] = () =>
-      Response.json({ error: 'invalid_grant' }, { status: 401 })
+    worker.stored = { ...stored, metadata: { ...stored.metadata, session: undefined } }
+    routes['POST /session/upgrade'] = () =>
+      Response.json({ error: 'invalid_blob' }, { status: 401 })
     window.fetch = ((original: typeof fetch) =>
       (async (input: RequestInfo | URL, init?: RequestInit) =>
-        String(input) === '/session/refresh'
-          ? Response.json({ error: 'invalid_grant' }, { status: 401 })
+        String(input) === '/session/upgrade'
+          ? Response.json({ error: 'invalid_blob' }, { status: 401 })
           : original(input, init)) as typeof fetch)(window.fetch)
 
     button('Join the team space').click()

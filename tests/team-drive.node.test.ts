@@ -14,6 +14,7 @@ import { FakeDrive } from './fake-drive.ts'
 
 const env = {
   JWE_ENCRYPTION_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
+  SESSION_SIGNING_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
   GOOGLE_CLIENT_ID: 'client',
   GOOGLE_CLIENT_SECRET: 'secret',
 }

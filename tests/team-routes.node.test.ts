@@ -10,14 +10,15 @@ import * as jose from 'jose'
 import { encryptBlob } from '../worker/src/blob.ts'
 import type { Env } from '../worker/src/env.ts'
 import { googleKind } from '../worker/src/google-address.ts'
-import { googleProvider, type Identity } from '../worker/src/identity.ts'
+import { googleProvider, type Identity, sessionProvider } from '../worker/src/identity.ts'
 import { handleRequest } from '../worker/src/router.ts'
 import { forgetServiceAccountTokens } from '../worker/src/service-account.ts'
+import { signAccessToken } from '../worker/src/session-tokens.ts'
 import type { ShareCache } from '../worker/src/share.ts'
 import { handleCreateSpace } from '../worker/src/team-admin.ts'
 import { createAdminContext, createTeamContext, type TeamDeps } from '../worker/src/team-context.ts'
 import { teamDrive } from '../worker/src/team-drive.ts'
-import { TeamSpaceState } from '../worker/src/team-state.ts'
+import { accountOf, TeamSpaceState } from '../worker/src/team-state.ts'
 import { d1Db } from './d1-db.ts'
 import { FakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
@@ -29,6 +30,7 @@ const env0 = {
   GOOGLE_CLIENT_ID: 'client-123.apps.googleusercontent.com',
   GOOGLE_CLIENT_SECRET: 'secret',
   JWE_ENCRYPTION_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
+  SESSION_SIGNING_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
 }
 const { publicKey, privateKey } = await jose.generateKeyPair('RS256', { extractable: true })
 const jwk = { ...(await jose.exportJWK(publicKey)), kid: 'k1', alg: 'RS256', use: 'sig' }
@@ -1260,7 +1262,14 @@ describe('the register of teams', () => {
       204
     )
     assert.equal(count(), 2)
-    assert.deepEqual(w.dropped.at(-1), { space: SPACE, identity: 'google:g-bob' })
+    // (a socket is known by its account, whichever login opened it)
+    const [bobAccount] = w.all(
+      "SELECT account_id FROM account_identities WHERE provider = 'google' AND sub = 'g-bob'"
+    )
+    assert.deepEqual(w.dropped.at(-1), {
+      space: SPACE,
+      identity: `chordless:${bobAccount.account_id}`,
+    })
   })
 
   test('keeps a space that ended, marked, with its number and what happened to it, and forgets its people', async () => {
@@ -1479,5 +1488,111 @@ describe('the live route', () => {
     const w = await world()
     assert.equal((await w.call('x/live', null, await upgrade(bob))).status, 404)
     assert.deepEqual(w.asked, [])
+  })
+})
+
+describe('a Chordless session', () => {
+  /** The session access token for a login's account (made if it has none) */
+  const sessionFor = async (w: Awaited<ReturnType<typeof world>>, who: Identity) =>
+    signAccessToken(
+      {
+        accountId: (await accountOf(w.db, who, true)) as string,
+        sessionId: 'session-1',
+        email: who.email,
+      },
+      w.env
+    )
+
+  test('is the only bearer: a Google ID token is answered update_required, in JSON', async () => {
+    const w = await world()
+    const answer = await w.call('/api/spaces', ann, {}, w.env, null)
+    assert.equal(answer.status, 401)
+    assert.equal(answer.headers.get('Cache-Control'), 'no-store')
+    assert.deepEqual(await json(answer), { error: 'update_required' })
+  })
+
+  test('is the account: its spaces and its role in one, whichever login made it a member', async () => {
+    const w = await world()
+    const own: TeamDeps = { ...w.deps, providers: [sessionProvider(w.env)] }
+    const bobSession = await sessionFor(w, bob)
+    const list = await w.call('/api/spaces', bobSession, {}, w.env, own)
+    assert.equal(list.status, 200)
+    assert.deepEqual(await list.json(), [{ spaceId: SPACE, name: 'Team', role: 'writer' }])
+    assert.equal((await w.call(`${SPACE}/root`, bobSession, {}, w.env, own)).status, 200)
+    const nobody = await sessionFor(w, {
+      provider: 'google',
+      sub: 'g-new',
+      email: 'new@example.com',
+    })
+    assert.equal((await w.call(`${SPACE}/root`, nobody, {}, w.env, own)).status, 403)
+  })
+
+  test('makes a space for the account that owns the Google sign-in, and for no other', async () => {
+    const w = await world()
+    const own: TeamDeps = { ...w.deps, providers: [sessionProvider(w.env)] }
+    const eveSession = await sessionFor(w, eve)
+    const body = (blob: string) =>
+      post({ blob, rootRef: w.root, name: 'Eve Church' }) satisfies RequestInit
+    const made = await w.call('/api/spaces', eveSession, body(await blobFor(eve)), w.env, own)
+    assert.equal(made.status, 200)
+    const [team] = w.all(`SELECT owner_account_id FROM teams WHERE name = 'Eve Church'`)
+    assert.equal(team.owner_account_id, await accountOf(w.db, eve, false))
+    // (someone else's sign-in, sent by a session that is not theirs)
+    const borrowed = await w.call('/api/spaces', eveSession, body(await blobFor(ann)), w.env, own)
+    assert.equal(borrowed.status, 403)
+    assert.match(String((await json(borrowed)).error), /not yours/)
+    // (and a Google sign-in that is not a login of the account at all)
+    const other = await sessionFor(w, {
+      provider: 'google',
+      sub: 'g-zed',
+      email: 'zed@example.com',
+    })
+    assert.equal(
+      (await w.call('/api/spaces', other, body(await blobFor(eve)), w.env, own)).status,
+      403
+    )
+  })
+
+  test('is its own account: nothing is looked up for it', async () => {
+    const w = await world()
+    const session: Identity = { provider: 'chordless', sub: 'acct-x', email: 'x@example.com' }
+    assert.equal(await accountOf(w.db, session, false), 'acct-x')
+  })
+
+  test('takes the address of a Google sign-in from the session when the blob has none', async () => {
+    const w = await world()
+    const own: TeamDeps = { ...w.deps, providers: [sessionProvider(w.env)] }
+    const blob = await encryptBlob(
+      {
+        owner_email: undefined,
+        owner_sub: eve.sub,
+        scopes: '',
+        refresh_token: 'r',
+        created_at: '2026-10-22T00:00:00Z',
+        blob_id: crypto.randomUUID(),
+        kid: 'default',
+      },
+      w.env
+    )
+    const made = await w.call(
+      '/api/spaces',
+      await sessionFor(w, eve),
+      post({ blob, rootRef: w.root, name: 'Eve Church' }),
+      w.env,
+      own
+    )
+    assert.equal(made.status, 200)
+    assert.equal(
+      w.all("SELECT owner_email FROM teams WHERE name = 'Eve Church'")[0].owner_email,
+      eve.email
+    )
+  })
+
+  test('does not take a login of a provider it does not know as a Google sign-in', async () => {
+    const w = await world()
+    const admin = createAdminContext(w.env, w.deps)
+    const elsewhere: Identity = { provider: 'elsewhere', sub: 'g-eve', email: eve.email }
+    assert.equal(await admin.hasGoogleLogin(elsewhere, 'g-eve'), false)
+    assert.equal(await admin.hasGoogleLogin(eve, 'g-eve'), true)
   })
 })

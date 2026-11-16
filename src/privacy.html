@@ -105,6 +105,12 @@
         to a Team, so it stays when they leave a Team or the Team stops sharing, until they ask for it to
         be deleted (see below).
       </p>
+      <p>
+        Signing in also starts a <strong>session</strong> with the server: a short-lived pass your device
+        shows with each request, and a longer-lived secret that renews it. The server keeps only a
+        one-way hash of that secret, with the account, when it was last used and when it ends (after 90
+        days unused). Signing out ends it.
+      </p>
 
       <h2 id="reports">Anonymous usage reports</h2>
       <p>

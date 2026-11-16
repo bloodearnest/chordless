@@ -210,17 +210,24 @@ The Worker keeps no per-user state (a team's members are the team's, in D1).
   stay on the device and are sent after reconnecting.
 - **Scope:** `drive.file openid email profile`. Drive access is limited to files the app created
   (or the user picked with the Picker).
-- **Who is asking the team service (built 2026-10-21):** Google's own ID token, as
-  `Authorization: Bearer`. Google sends a new one (an hour, checked on a real refresh) with every
-  refreshed access token, so `/session/refresh` passes it on and the page keeps it beside the access
-  token. `getIdentityToken()` (`google-auth.ts`) renews it silently (the old One Tap
-  prompt, `getIdToken`, has been removed). The Worker side is `worker/src/identity.ts`: an
-  `IdentityProvider` says which issuers it answers for and verifies a token (signature, issuer,
-  audience, expiry, and a *verified* email), and `authenticate(request, providers)` matches the token
-  to its provider by issuer. Google is the only provider. It gives an `Identity`
-  `{provider, sub, email}`: members are keyed by `provider:sub` (`identityKey`), since a `sub` is
-  unique only within a provider. It says who someone is, not what they may do: roles are the
-  space's. There is no Worker signing key.
+- **Who is asking the Worker: a Chordless session (2026-11-16).** Proof of who someone is is the Worker's own,
+  not Google's. A sign-in with Google (`/oauth/callback`) or a device that is signed in from before
+  (`POST /session/upgrade {blob}`: the blob already proves who it is, so there is no popup) ends with a
+  session for the person's *account* (`accountOf`): a short-lived **access token** (HS256 JWT, 15 minutes,
+  signed with `SESSION_SIGNING_KEY`, issuer and audience `chordless`, `sub` the account id) and a **refresh
+  token** (`<session id>.<256 random bits>`, kept only as a hash in D1 `sessions`, migration `0004`). The page
+  sends the access token as `Authorization: Bearer` (`getIdentityToken()`, which renews it with
+  `POST /session/token`, under a Web Lock so one tab at a time spends the single-use refresh token).
+  Each refresh token works once and gives the next pair; one used again after a 30-second grace (a lost
+  answer, retried) revokes the session (`reused`), and a session ends after 90 days unused, at sign-out
+  (`/session/logout` with the refresh token) or by revoking it. The Worker side is
+  `worker/src/session-tokens.ts` and `identity.ts` (`sessionProvider`): an `Identity` from a session is
+  `{provider: 'chordless', sub: <account id>, email}`, and `accountOf` returns it as it is. Google stays the
+  proof at sign-in and the **storage credential** (the blob and `/session/refresh` give Drive's access token):
+  Google's ID token is no longer a bearer, and a request carrying one is answered `401 update_required`
+  (an app from before sessions: it has to reload to update; nothing local is blocked). There was no period of
+  accepting both. Where the Worker has no database or `SESSION_SIGNING_KEY` (a development one without them)
+  a sign-in still works and has no session.
 - **Signing in without Drive (checked and built 2026-10-21):** asking for `openid email profile`
   alone gives a refresh token, an ID token with a verified email, and an access token, and asking
   later for `drive.file` alone (with `include_granted_scopes` and `prompt: consent`) adds the Drive

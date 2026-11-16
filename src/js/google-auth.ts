@@ -29,7 +29,7 @@
  * allowing direct browser-to-Drive API calls for better performance and offline support.
  */
 
-import type { AuthMetadata, BlobBackup, StoredBlob, StoredUser } from './auth-db.ts'
+import type { AuthMetadata, BlobBackup, StoredBlob, StoredSession, StoredUser } from './auth-db.ts'
 import {
   type AuthMessageData,
   type AuthMessageType,
@@ -209,7 +209,7 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
             throw new Error(error.error || 'Failed to exchange code for tokens')
           }
 
-          const { blob, access_token, expires_in, id_token, scope, user } =
+          const { blob, access_token, expires_in, id_token, scope, user, session } =
             await blobResponse.json()
 
           const normalizedUser = user ? await buildStoredUserProfile(user).catch(() => user) : null
@@ -226,6 +226,7 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
           if (typeof scope === 'string') {
             metadata.scope = scope
           }
+          if (session) metadata.session = sessionFrom(session)
 
           // Store blob in Service Worker: with no blob kept the user is not signed in, whatever
           // the page was told
@@ -362,34 +363,82 @@ export async function getAccessToken(): Promise<string> {
 }
 
 /**
- * Get a valid Google ID token for the team space API, which takes it as proof of who is asking
- * (worker/src/identity.ts). It never shows anything: the Worker sends a new one with each
- * refreshed access token.
- * Refreshed if it is about to expire.
+ * Get a valid Chordless access token for the team space API and the live channel, which take it as
+ * proof of who is asking (worker/src/identity.ts). It never shows anything: it is renewed with the
+ * session's refresh token, which each renewal replaces, so one tab at a time does it (a lock).
+ * A device signed in before sessions got a session from its blob, with no sign-in.
  *
- * @throws If not authenticated, refresh fails, or Google sends no ID token
+ * @throws If not signed in, or `SignInExpiredError` if the sign-in has to be made again
  */
 export async function getIdentityToken(): Promise<string> {
-  const response = await sendToServiceWorker('GET_BLOB')
-  if (!response.success || !response.data) {
-    throw new Error('Not authenticated - please authorize first')
+  const stored = await getStoredBlob()
+  if (!stored) throw new Error('Not authenticated - please authorize first')
+  if (sessionFresh(stored.metadata.session)) return stored.metadata.session.access_token
+  return withSessionLock(async () => {
+    // (another tab may have renewed it while this one waited)
+    const current = (await getStoredBlob()) ?? stored
+    if (sessionFresh(current.metadata.session)) return current.metadata.session.access_token
+    return (await renewSession(current)).access_token
+  })
+}
+
+/** Whether this session's access token still has time to be used */
+function sessionFresh(session: StoredSession | undefined): session is StoredSession {
+  return !!session && Date.parse(session.expires_at) - Date.now() > TOKEN_EXPIRY_BUFFER_MS
+}
+
+/** The Worker's tokens, as kept */
+function sessionFrom(tokens: {
+  access_token: string
+  refresh_token: string
+  expires_in: number
+}): StoredSession {
+  return {
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
   }
-  const { blob, metadata } = response.data
-  if (metadata.id_token && idTokenEnd(metadata.id_token) - Date.now() > TOKEN_EXPIRY_BUFFER_MS) {
-    return metadata.id_token
+}
+
+/** One at a time across tabs and the worker, where the browser has locks (a refresh token is single use) */
+function withSessionLock<T>(run: () => Promise<T>): Promise<T> {
+  return navigator.locks ? navigator.locks.request('chordless-session', run) : run()
+}
+
+/** A new session: by the refresh token, or (none, or it is no longer good) from the blob */
+async function renewSession(stored: StoredBlob): Promise<StoredSession> {
+  const post = async (path: string, body: object) =>
+    fetch(`${AUTH_PROXY_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  let response: Response | undefined
+  if (stored.metadata.session) {
+    response = await post('/session/token', {
+      refresh_token: stored.metadata.session.refresh_token,
+    })
   }
-  const refreshed = await refreshTokens(blob, metadata)
-  if (!refreshed.id_token) throw new Error('Google sent no ID token')
-  return refreshed.id_token
+  if (!response?.ok) {
+    // (no session yet, or it ended or was revoked: the blob still proves who this is)
+    response = await post('/session/upgrade', { blob: stored.blob })
+  }
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    if (response.status === 401 && error.error === 'invalid_blob') {
+      throw new SignInExpiredError('invalid_blob')
+    }
+    throw new Error(error.error || 'Failed to start a session')
+  }
+  const session = sessionFrom(await response.json())
+  // (kept on what is stored now, not what was read before: a new access token must not undo another's)
+  const latest = (await getStoredBlob()) ?? stored
+  await storeSignIn(latest.blob, { ...latest.metadata, session })
+  return session
 }
 
 /** A token this close to its end is replaced before it is used */
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000
-
-/** When an ID token ends, in ms (its own `exp` claim); 0 for one that cannot be read */
-function idTokenEnd(idToken: string): number {
-  return Number(jwtClaims(idToken)?.exp ?? 0) * 1000
-}
 
 /**
  * Refresh the access token (and the ID token) using the encrypted blob.
@@ -553,7 +602,10 @@ export async function revokeAccess(): Promise<{ revoked: boolean }> {
     const revoked = await fetch(`${AUTH_PROXY_URL}/session/logout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ blob: stored.blob }),
+      body: JSON.stringify({
+        blob: stored.blob,
+        refresh_token: stored.metadata.session?.refresh_token,
+      }),
       signal: AbortSignal.timeout(10_000),
     })
     return { revoked: revoked.ok }

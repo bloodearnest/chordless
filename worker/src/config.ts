@@ -32,6 +32,13 @@ export const SECRETS: SecretSpec[] = [
     problem: value => (base64Bytes(value) === 32 ? null : 'is not 32 bytes of base64'),
   },
   {
+    name: 'SESSION_SIGNING_KEY',
+    required: true,
+    about:
+      "Base64 key (32 random bytes: openssl rand -base64 32) that the Chordless session's access tokens are signed with",
+    problem: value => (base64Bytes(value) === 32 ? null : 'is not 32 bytes of base64'),
+  },
+  {
     name: 'GOOGLE_CLIENT_ID',
     required: true,
     about:

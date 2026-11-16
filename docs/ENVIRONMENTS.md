@@ -31,7 +31,7 @@ names every secret `wrangler.toml` lists.
 
 1. `just dev-vars` writes `.dev.vars` (readable by you only, from `.dev.vars.example`): the client id from
    `.env.development`, the dev project's two API keys from gcloud (their ids are Terraform outputs of
-   `infra/google-dev/`), and a new `JWE_ENCRYPTION_KEY`. It asks for the client secret (not shown; or set
+   `infra/google-dev/`), and a new `JWE_ENCRYPTION_KEY` and `SESSION_SIGNING_KEY`. It asks for the client secret (not shown; or set
    `DEV_CLIENT_SECRET`): that is in neither gcloud nor Terraform, and the console shows it once, when the
    secret is made (use "Add secret" on the OAuth client of project `chordless-dev` for a new one). A `.dev.vars` that
    holds another client's values (production's, as it used to) is moved to `.dev.vars.prod-backup` (delete

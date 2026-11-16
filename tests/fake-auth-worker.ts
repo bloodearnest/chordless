@@ -1,4 +1,13 @@
-import type { AuthMetadata, StoredBlob } from '../src/js/auth-db.ts'
+import type { AuthMetadata, StoredBlob, StoredSession } from '../src/js/auth-db.ts'
+
+/** A Chordless session, as kept with a sign-in: its access token is what the Worker is shown */
+export function sessionFor(accessToken: string, endsInMs = 3600_000): StoredSession {
+  return {
+    access_token: accessToken,
+    refresh_token: 'session-id.refresh-secret',
+    expires_at: new Date(Date.now() + endsInMs).toISOString(),
+  }
+}
 
 /** The service worker's end of the sign-in: it keeps the blob and answers the page's messages */
 export class FakeAuthWorker {

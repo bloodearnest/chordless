@@ -4,7 +4,7 @@
 // - GOOGLE_CLIENT_ID: the dev client in .env.development
 // - GOOGLE_API_KEY, PICKER_API_KEY: the dev project's two keys, from gcloud (their ids come from
 //   Terraform: infra/google-dev/)
-// - JWE_ENCRYPTION_KEY: made new, if there is none
+// - JWE_ENCRYPTION_KEY and SESSION_SIGNING_KEY: made new, if there are none
 // - GOOGLE_CLIENT_SECRET: not in gcloud or Terraform (the console shows it once, at creation, or
 //   makes a new one): taken from the environment variable DEV_CLIENT_SECRET, or asked for
 //
@@ -61,6 +61,7 @@ const fill = async (name: string, make: () => string | Promise<string>) => {
 await fill('GOOGLE_API_KEY', () => keyString(terraformOutput('sharing_key_uid')))
 await fill('PICKER_API_KEY', () => keyString(terraformOutput('team_key_uid')))
 await fill('JWE_ENCRYPTION_KEY', () => randomBytes(32).toString('base64'))
+await fill('SESSION_SIGNING_KEY', () => randomBytes(32).toString('base64'))
 await fill(
   'GOOGLE_CLIENT_SECRET',
   async () =>
@@ -83,5 +84,6 @@ const blank = [
   'GOOGLE_API_KEY',
   'PICKER_API_KEY',
   'JWE_ENCRYPTION_KEY',
+  'SESSION_SIGNING_KEY',
 ].filter(name => !values[name])
 if (blank.length > 0) console.log(`Still empty: ${blank.join(', ')}.`)

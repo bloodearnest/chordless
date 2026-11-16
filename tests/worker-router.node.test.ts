@@ -20,6 +20,7 @@ function setupEnv(env: Partial<Env> = {}, assetRequests: string[] = []) {
     GOOGLE_CLIENT_ID: 'client-id',
     GOOGLE_CLIENT_SECRET: 'client-secret',
     JWE_ENCRYPTION_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
+    SESSION_SIGNING_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
     ASSETS: {
       async fetch(request: Request) {
         const path = new URL(request.url).pathname
@@ -64,6 +65,8 @@ test('the API is refused to a page from another origin, before it is routed', as
     '/oauth/callback',
     '/session/refresh',
     '/session/logout',
+    '/session/token',
+    '/session/upgrade',
     '/api/share/abc',
     '/api/config',
   ]) {
@@ -96,7 +99,12 @@ test('the API sends no CORS headers', async () => {
 
 test("each session route is the Worker's: an empty request is refused by its own handler", async () => {
   const { send, assetRequests } = setup()
-  for (const path of ['/session/refresh', '/session/logout']) {
+  for (const path of [
+    '/session/refresh',
+    '/session/logout',
+    '/session/token',
+    '/session/upgrade',
+  ]) {
     assert.equal((await send(path, postJson('{}'))).status, 400, path)
   }
   assert.deepEqual(assetRequests, [])
@@ -106,7 +114,14 @@ test('only POST reaches the auth routes: other methods fall through to the asset
   const { send, assetRequests } = setup()
   await send('/oauth/callback')
   await send('/session/refresh', { method: 'PUT' })
-  assert.deepEqual(assetRequests, ['GET /oauth/callback', 'PUT /session/refresh'])
+  await send('/session/token')
+  await send('/session/upgrade')
+  assert.deepEqual(assetRequests, [
+    'GET /oauth/callback',
+    'PUT /session/refresh',
+    'GET /session/token',
+    'GET /session/upgrade',
+  ])
 })
 
 test('a route that throws is a JSON 500 with the reason, not a crash', async () => {

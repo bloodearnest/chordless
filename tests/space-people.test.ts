@@ -10,7 +10,7 @@ import { type ChordlessDB, openSpace } from '../src/js/db.ts'
 import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
 import { personHasLocalChanges } from '../src/js/sync/person-hash.ts'
 import { makeSetlist } from './builders.ts'
-import { installFakeAuthWorker } from './fake-auth-worker.ts'
+import { installFakeAuthWorker, sessionFor } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { shownToast, suppressConsoleLogs } from './test-helpers.ts'
 import '../src/components/space-people.ts'
@@ -311,6 +311,7 @@ describe('space-people', () => {
         blob: 'blob',
         metadata: {
           id_token: ID_TOKEN,
+          session: sessionFor(ID_TOKEN),
           access_token: 'token',
           expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
           user: {

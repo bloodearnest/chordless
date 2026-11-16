@@ -2,8 +2,8 @@
 
 Things to handle, not yet handled. The space model is in SPACES.md.
 
-There is no session signing key to rotate: the team service takes Google's own ID token as proof of
-who is asking (SPACES.md, "Sign-in model"), checked against Google's published keys.
+The team service and the live channel take a Chordless access token as proof of who is asking (SPACES.md,
+"Sign-in model"), signed by the Worker with `SESSION_SIGNING_KEY`.
 
 ## Key rotation (to do)
 
@@ -12,6 +12,8 @@ Not designed or checked against the code yet. What is known from the design (202
 | Key | Where it lives | Effect of rotating |
 |---|---|---|
 | Blob key (`JWE_ENCRYPTION_KEY`) | Worker secret | The one with consequences, see below |
+| Session signing key (`SESSION_SIGNING_KEY`) | Worker secret | Every access token stops working at once (15 minutes of life at most): pages renew them with their refresh tokens, which are in D1 and are unaffected, so nobody signs in again. Change it with a deploy; no overlap is needed. Set it before the deploy that first needs it |
+| Refresh tokens | D1 `sessions`, hashed (sha256) | Never readable from the database. A stolen one is good until it is used by its owner (reuse revokes the session) or the session is revoked; a leak of the table gives nothing to present |
 | Service account key | Worker secret | Invisible to members: mint a new key, deploy it, delete the old one. Nothing stored to migrate (access tokens are minted in memory) |
 
 **The blob key.** Blobs carry a `kid`, so the Worker can hold old and new keys together, decrypt by

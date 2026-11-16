@@ -8,6 +8,7 @@ import { configProblems, misconfigured, SECRETS } from '../worker/src/config.ts'
 const key = `AIza${'x'.repeat(35)}`
 const good = {
   JWE_ENCRYPTION_KEY: btoa('k'.repeat(32)),
+  SESSION_SIGNING_KEY: btoa('s'.repeat(32)),
   GOOGLE_CLIENT_ID: '123456789-abc123.apps.googleusercontent.com',
   GOOGLE_CLIENT_SECRET: 'GOCSPX-abcdefghijkl',
   GOOGLE_API_KEY: key,
@@ -71,6 +72,9 @@ test('a mangled value is named without repeating it', () => {
   }
   assert.deepEqual(configProblems({ ...good, JWE_ENCRYPTION_KEY: btoa('short') }), [
     'JWE_ENCRYPTION_KEY is not 32 bytes of base64',
+  ])
+  assert.deepEqual(configProblems({ ...good, SESSION_SIGNING_KEY: btoa('short') }), [
+    'SESSION_SIGNING_KEY is not 32 bytes of base64',
   ])
   assert.deepEqual(configProblems({ ...good, GOOGLE_API_KEY: 5 }), [
     'GOOGLE_API_KEY is not a string',

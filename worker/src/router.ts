@@ -7,7 +7,13 @@
 import type { Env } from './env.ts'
 import type { GoogleApi } from './google-auth.ts'
 import { isCrossOrigin, jsonResponse, message } from './http.ts'
-import { handleOAuthCallback, handleSessionLogout, handleTokenRefresh } from './session.ts'
+import {
+  handleOAuthCallback,
+  handleSessionLogout,
+  handleSessionToken,
+  handleSessionUpgrade,
+  handleTokenRefresh,
+} from './session.ts'
 import { handleShareDownload, type ShareCache, shareFileId } from './share.ts'
 import { handleShareLive, shareLiveId } from './share-live.ts'
 import { withSharePreview } from './share-page.ts'
@@ -45,6 +51,14 @@ async function route(
     // Token refresh endpoint
     if (path === '/session/refresh' && request.method === 'POST') {
       return await handleTokenRefresh(request, env, google)
+    }
+
+    // A Chordless session: the next tokens for a refresh token, and a first one for a blob from before
+    if (path === '/session/token' && request.method === 'POST') {
+      return await handleSessionToken(request, env)
+    }
+    if (path === '/session/upgrade' && request.method === 'POST') {
+      return await handleSessionUpgrade(request, env)
     }
 
     // Signing out: the refresh token is revoked at Google

@@ -30,7 +30,7 @@ import {
   stopSharing,
 } from '../src/js/team-spaces.ts'
 import { TeamError } from '../src/js/worker-call.ts'
-import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
+import { type FakeAuthWorker, installFakeAuthWorker, sessionFor } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -72,7 +72,11 @@ describe('team spaces on this device', () => {
     ;({ worker, uninstall: uninstallWorker } = installFakeAuthWorker())
     worker.stored = {
       blob: 'the-blob',
-      metadata: { id_token: ID_TOKEN, scope: 'openid email profile' },
+      metadata: {
+        id_token: ID_TOKEN,
+        session: sessionFor(ID_TOKEN),
+        scope: 'openid email profile',
+      },
       updated_at: new Date().toISOString(),
     }
     before = getCurrentSpace()
