@@ -1,5 +1,5 @@
 /**
- * One space's card on Account and Teams: what it says of the space, and its Sync and Switch. Drive
+ * One space's card on Account and Teams: what it says of the space, and its Sync. Drive
  * is a fake Drive, and the spaces are real ones in the spaces database.
  */
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
@@ -191,7 +191,7 @@ describe('space-card', () => {
     )
     must(button(el, 'users')).click()
     expect(asked).to.deep.equal([team.id])
-    expect(order(el)).to.deep.equal(['sync', 'manage', 'leaders', 'users', 'switch'])
+    expect(order(el)).to.deep.equal(['sync', 'manage', 'leaders', 'users'])
   })
 
   it('calls the button for a space’s data Data', async () => {
@@ -202,15 +202,9 @@ describe('space-card', () => {
   const order = (el: SpaceCard) =>
     Array.from(el.shadowRoot?.querySelectorAll('.actions button') ?? []).map(each => each.id)
 
-  it('puts Sync and Data on the left, and Switch flush right', async () => {
+  it('has no Switch button: the space tabs switch', async () => {
     const el = await card('signed-in')
-    const order = Array.from(el.shadowRoot?.querySelectorAll('.actions button') ?? []).map(
-      each => each.id
-    )
-    expect(order).to.deep.equal(['sync', 'manage', 'leaders', 'switch'])
-    const switchButton = must(button(el, 'switch'))
-    const row = must(el.shadowRoot?.querySelector('.actions')).getBoundingClientRect()
-    expect(Math.round(switchButton.getBoundingClientRect().right)).to.equal(Math.round(row.right))
+    expect(order(el)).to.deep.equal(['sync', 'manage', 'leaders'])
   })
 
   it('says a Team is a Team, and what the person is in it', async () => {
@@ -222,13 +216,11 @@ describe('space-card', () => {
     expect(labels(el)).to.deep.equal(['Team', 'Worship leader'])
   })
 
-  it('marks the space in use, which has no Switch, and gives the others one', async () => {
+  it('marks the space in use', async () => {
     const current = await card('signed-out', { current: true })
     expect(text(current)).to.contain('Current')
-    expect(button(current, 'switch')).to.equal(null)
     const other = await card('signed-out')
     expect(text(other)).to.not.contain('Current')
-    expect(button(other, 'switch')).to.not.equal(null)
   })
 
   it('says one song and one setlist in the singular, and a changed space is counted again', async () => {
