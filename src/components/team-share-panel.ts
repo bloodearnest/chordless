@@ -350,8 +350,8 @@ export class TeamSharePanel extends LitElement {
             ></invite-send>
             <p>It is shown once. Send it to them yourself.</p>
             ${
-              !isGmailAddress(this._link.email)
-                ? html`<p>Not a Gmail address, so the message also tells them how to make a Google account with it.</p>`
+              this._link.role === 'admin' && !isGmailAddress(this._link.email)
+                ? html`<p>An admin invite only works with this address, and it is not a Gmail address, so the message also tells them how to make a Google account with it.</p>`
                 : nothing
             }
           </div>`

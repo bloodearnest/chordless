@@ -117,6 +117,32 @@ describe('team spaces on this device', () => {
       expect(requests[0].body).to.equal(undefined)
     })
 
+    it('look an invite up with no sign-in, and say not valid for a code that is no good, and fail for anything else', async () => {
+      routes['POST /api/spaces/invite'] = () =>
+        json({ teamName: 'Church', role: 'reader', email: 'bea@example.com', google: 'other' })
+      expect(await teamApi.lookupInvite('space-1', 'code')).to.deep.equal({
+        teamName: 'Church',
+        role: 'reader',
+        email: 'bea@example.com',
+        google: 'other',
+      })
+      expect(requests[0].headers.get('Authorization')).to.equal(null)
+      expect(requests[0].body).to.deep.equal({ spaceId: 'space-1', code: 'code' })
+
+      routes['POST /api/spaces/invite'] = () => json({ error: 'This invite is not valid' }, 404)
+      expect(await teamApi.lookupInvite('space-1', 'code')).to.equal(null)
+
+      routes['POST /api/spaces/invite'] = () => json({ error: 'Too many tries' }, 429)
+      let failure: unknown
+      try {
+        await teamApi.lookupInvite('space-1', 'code')
+      } catch (error) {
+        failure = error
+      }
+      expect(failure).to.be.instanceOf(TeamError)
+      expect((failure as TeamError).status).to.equal(429)
+    })
+
     it('keep an id or an email in the path whole', async () => {
       routes['DELETE /api/space/a%2Fb/members/ann%40example.com'] = () =>
         new Response(null, { status: 204 })
