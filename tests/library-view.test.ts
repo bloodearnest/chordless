@@ -43,7 +43,10 @@ const CHART = `{title: Library Test Song}
 {comment: Bridge}
 [Em]I once was [D]lost`
 
-describe('the library view, with a song open', () => {
+describe('the library view, with a song open', function () {
+  // (a test here opens the song, changes it, waits for the save and opens it again, which is more than
+  // mocha's 2 s on a busy CI runner: docs/TESTING.md, "give a test that does a lot a timeout to match")
+  this.timeout(10_000)
   let db: ChordlessDB
   let song: { uuid: string; id: string }
   let keyless: { uuid: string; id: string }
@@ -253,6 +256,27 @@ describe('the library view, with a song open', () => {
         view.querySelector<HTMLElement & { parsed: unknown }>('song-display')?.parsed
       )
       expect(text).to.contain('"A"')
+    })
+
+    it('leaves the key picker alone when the song is closed while it is drawn again in the new key', async () => {
+      await open()
+      // (anything thrown in a promise nobody waits for would show up here, as the old code made one)
+      const lost: unknown[] = []
+      const onRejection = (event: PromiseRejectionEvent) => {
+        event.preventDefault()
+        lost.push(event.reason)
+      }
+      window.addEventListener('unhandledrejection', onRejection)
+      try {
+        control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('A'))
+        // (back to the list straight away, before the song has been drawn in A)
+        view.route = { name: 'songs' }
+        await settle()
+        await nothingFor(100)
+      } finally {
+        window.removeEventListener('unhandledrejection', onRejection)
+      }
+      expect(lost).to.deep.equal([])
     })
 
     describe('the melody sheet', () => {
@@ -692,6 +716,11 @@ describe('the library view, with a song open', () => {
             'song-display'
           )?.parsed.metadata.key === 'A',
         'the song in A'
+      )
+      // (the key picker follows once the song is drawn: closing the song first leaves it as it was)
+      await until(
+        () => control<KeySelector>('library-key-selector').value === 'A',
+        'the key selector to show A'
       )
       control('library-reset-button').click()
       const modal = control<AppModal>('library-reset-confirm-modal')
