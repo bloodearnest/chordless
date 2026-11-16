@@ -7,6 +7,7 @@ import type { Env } from './env.ts'
 import { jsonResponse } from './http.ts'
 import {
   handleCreateSpace,
+  handleInviteLookup,
   handleJoin,
   handleListSpaces,
   handleSpaceAdmin,
@@ -19,7 +20,12 @@ import { handleLive, livePathSpace } from './team-live.ts'
 
 /** Whether a path is one of these routes */
 export function isTeamPath(path: string): boolean {
-  return path === '/api/spaces' || path === '/api/spaces/join' || teamSpacePath(path) !== null
+  return (
+    path === '/api/spaces' ||
+    path === '/api/spaces/join' ||
+    path === '/api/spaces/invite' ||
+    teamSpacePath(path) !== null
+  )
 }
 
 /** The answer for a team space path, as the router passes it (`isTeamPath` said yes) */
@@ -41,6 +47,11 @@ export async function handleTeamRoutes(
       if (request.method === 'GET') return handleListSpaces(request, admin)
       return request.method === 'POST'
         ? handleCreateSpace(request, admin)
+        : jsonResponse({ error: 'Not found' }, 404)
+    }
+    if (path === '/api/spaces/invite') {
+      return request.method === 'POST'
+        ? handleInviteLookup(request, admin)
         : jsonResponse({ error: 'Not found' }, 404)
     }
     if (path === '/api/spaces/join') {

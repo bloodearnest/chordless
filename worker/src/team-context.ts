@@ -10,6 +10,7 @@ import { createDriveApi } from '../../src/js/drive-client.ts'
 import { decryptBlob } from './blob.ts'
 import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
+import { googleKind } from './google-address.ts'
 import { type GoogleApi, realGoogle } from './google-auth.ts'
 import { authenticate, googleProvider, type IdentityProvider } from './identity.ts'
 import { checkTeamStorage, serviceAccountAddress, serviceAccountToken } from './service-account.ts'
@@ -28,6 +29,8 @@ export interface TeamDeps {
   fetch?: typeof fetch
   /** The `fetch` that reaches Google's token endpoint, for the service account */
   tokenFetch?: typeof fetch
+  /** The `fetch` that asks DNS whether an invited address's mail is Google's (google-address.ts) */
+  dnsFetch?: typeof fetch
   now?: () => number
 }
 
@@ -126,6 +129,17 @@ export function createAdminContext(env: Env, deps: TeamDeps = {}): AdminContext 
       return checkTeamStorage(api, rootRef, address)
     },
     newSpaceId: () => crypto.randomUUID(),
+    googleKind: email => googleKind(email, tracedFetch(deps.dnsFetch)),
+    async allowInviteLookup(request) {
+      if (!env.INVITE_LOOKUP) return true
+      try {
+        const key = request.headers.get('CF-Connecting-IP') ?? 'unknown'
+        return (await env.INVITE_LOOKUP.limit({ key })).success !== false
+      } catch {
+        // (a limit that cannot be asked is no reason to refuse)
+        return true
+      }
+    },
     async trashRoot(spaceId) {
       const room = roomsOf(env)(spaceId)
       // (the space is there: whoever asks has a role in it)

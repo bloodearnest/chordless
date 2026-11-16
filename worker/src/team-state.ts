@@ -44,8 +44,12 @@ export interface TeamSpaceApi {
   roleOf(identity: Pick<Identity, 'provider' | 'sub'>): Promise<TeamRole | null>
   /** The owner first, then the members by email, each with every address the team knows them by */
   members(): Promise<TeamMember[]>
-  /** Add a member, or change their role */
-  setMember(identity: Identity, role: MemberRole): Promise<void>
+  /**
+   * Add a member, or change their role. `invitedAs` is the address an invite was sent to, when they
+   * joined with another: kept as one of the member's addresses (a label, never proof), unless
+   * another member already has it
+   */
+  setMember(identity: Identity, role: MemberRole, options?: { invitedAs?: string }): Promise<void>
   removeMember(identity: Identity): Promise<void>
   /**
    * Make an invite for the person with this email to join with this role; the code is returned
@@ -60,9 +64,16 @@ export interface TeamSpaceApi {
   /** True if there was such an invite */
   revokeInvite(id: string): Promise<boolean>
   /**
+   * What an invite's code is for, without using it up: the team's name, the role and the address it was
+   * sent to; null if the code is not good (unknown, used, expired, or the team has ended)
+   */
+  inviteInfo(code: string): Promise<{ teamName: string; role: MemberRole; email: string } | null>
+  /**
    * Join with an invite's code: the role given, null if the code is not good (unknown, used,
-   * expired), or 'other-account' if it is for another email than this account's. It is used up
-   * once; someone already in the space keeps their role and uses nothing.
+   * expired), or 'other-account' for an **admin** invite and an account whose email is not the one
+   * it was sent to. Any other invite is for whoever has it: the address it was sent to is kept as one
+   * of their addresses when it is not theirs, and the join is noted in the team's history. It is used
+   * up once; someone already in the space keeps their role and uses nothing.
    */
   redeemInvite(code: string, identity: Identity): Promise<TeamRole | 'other-account' | null>
   /** Change a member's role by email; false if there is no such member */
@@ -423,7 +434,11 @@ export class TeamSpaceState implements TeamSpaceApi {
     ).first<{ identity: string; account_id: string | null }>()
   }
 
-  async setMember(identity: Identity, role: MemberRole): Promise<void> {
+  async setMember(
+    identity: Identity,
+    role: MemberRole,
+    options: { invitedAs?: string } = {}
+  ): Promise<void> {
     const info = await this.info()
     if (!info) throw new Error('No such space')
     const accountId = (await accountOf(this.#db, identity, true, this.#now())) as string
@@ -434,6 +449,7 @@ export class TeamSpaceState implements TeamSpaceApi {
       throw new Error('The owner is not a member: their role cannot be changed')
     }
     const email = identity.email.toLowerCase()
+    const invitedAs = options.invitedAs?.trim().toLowerCase()
     const member = await this.#memberOf(identity, accountId)
     // (the member's key stays the first login's: a second login of the account is the same member)
     const key = member?.identity ?? identityKey(identity)
@@ -455,6 +471,17 @@ export class TeamSpaceState implements TeamSpaceApi {
         email,
         accountId
       ),
+      // (an address another member has is theirs: it is not taken by the label of an invite)
+      ...(invitedAs && invitedAs !== email
+        ? [
+            this.#sql(
+              `INSERT OR IGNORE INTO team_member_emails (space_id, email, account_id, source)
+                VALUES (?, ?, ?, 'invite')`,
+              invitedAs,
+              accountId
+            ),
+          ]
+        : []),
     ])
     await this.#dropMember({ identity: key, account_id: accountId })
   }
@@ -561,6 +588,19 @@ export class TeamSpaceState implements TeamSpaceApi {
     return gone.meta.changes > 0
   }
 
+  async inviteInfo(
+    code: string
+  ): Promise<{ teamName: string; role: MemberRole; email: string } | null> {
+    const row = await this.#sql(
+      `SELECT i.email, i.role, i.expires_at, t.name FROM team_invites i
+        JOIN teams t ON t.space_id = i.space_id
+        WHERE i.space_id = ? AND i.id = ? AND t.ended_at IS NULL`,
+      await hashOf(code)
+    ).first<{ email: string; role: MemberRole; expires_at: string; name: string }>()
+    if (!row || row.expires_at <= this.#at()) return null
+    return { teamName: row.name, role: row.role, email: row.email }
+  }
+
   async redeemInvite(code: string, identity: Identity): Promise<TeamRole | 'other-account' | null> {
     const id = await hashOf(code)
     const invite = await this.#sql(
@@ -570,9 +610,15 @@ export class TeamSpaceState implements TeamSpaceApi {
     if (!invite || invite.expires_at <= this.#at()) return null
     const current = await this.roleOf(identity)
     if (current) return current
-    // (Google verified the account's email at sign-in: the invite is for whoever has that address)
-    if (identity.email.toLowerCase() !== invite.email) return 'other-account'
-    await this.setMember(identity, invite.role)
+    // (Google verified the account's email at sign-in. An invite for an admin is for that address
+    // alone: the role is too much to hand to whoever has the link. Any other is for whoever has it,
+    // and the address is kept as theirs, so the people who know them by it still do)
+    const theirs = identity.email.toLowerCase() === invite.email
+    if (!theirs && invite.role === 'admin') return 'other-account'
+    await this.setMember(identity, invite.role, theirs ? {} : { invitedAs: invite.email })
+    if (!theirs) {
+      await this.#event('joined_as_other', identity.email, { invitedAs: invite.email }).run()
+    }
     await this.#sql('DELETE FROM team_invites WHERE space_id = ? AND id = ?', id).run()
     return invite.role
   }

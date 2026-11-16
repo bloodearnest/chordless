@@ -466,16 +466,28 @@ Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
   writable and not in the bin, then issues the space's id and keeps the blob in D1
   (`team_credentials`). The owner's client keeps the id (nothing records a folder against an id on the Worker, so
   sharing the same folder twice makes two spaces).
-- **Invites are for an email address.** An admin makes one for a role and an email
-  (`POST /invites`) and gets its code once. Only the code's hash is kept; it lasts a week, is used
-  up once, and can be used only by an account whose email Google verified as the invited one
-  (`POST /api/spaces/join`): anyone else with the code is told it was sent to a different Google
-  account, and the code stays good for the right person. The member is then recorded by
-  `provider:sub`, not by email, so a later change of address does not matter. Unknown, used and
-  expired codes all get the same answer. Someone already in the space keeps their role and uses
-  nothing. The cost of binding it: a person who signs in with another address than the one invited
-  is turned away, and the admin has to invite the address that appears in their Google account (a
-  Gmail address with dots or a `+tag` is a different address from the plain one). The link to hand
+- **Invites are for an email address, as a label; for an admin, as a lock** (changed 2026-11-16: two
+  invitees on Hotmail addresses could not join, because they had to make that address a Google account,
+  and Google's sign-up offers a new Gmail address first). An admin makes one for a role and an email
+  (`POST /invites`) and gets its code once. Only the code's hash is kept; it lasts a week and is used up
+  once. For a team member or a worship leader it is for **whoever has the link** (`POST /api/spaces/join`):
+  they sign in with any Google account, and when it is not the address invited, that address is kept as
+  one of theirs in `team_member_emails` (source `invite`: a label, never proof, and never taken from
+  another member), the join is noted in the team's history (`joined_as_other`, both addresses), and the
+  people who know them by the invited address still do (docs/IDENTITIES.md). The cost: a forwarded link
+  can be used by the wrong person, so it is single-use, lasts a week, and the admin sees whoever joined in
+  the members list and can remove them. An **admin** invite stays bound to the invited address: anyone
+  else is told it was sent to a different Google account, and the code stays good for the right person.
+  An invite never attaches a login to an existing account (a person on two logins is one account only
+  when they proved both). The member is recorded by account, not by email. Unknown, used and expired
+  codes all get the same answer. Someone already in the space keeps their role and uses nothing.
+  **Before signing in**, the page asks `POST /api/spaces/invite {spaceId, code}` (no token) what the
+  invite is for: the team's name, the role, the address it was sent to and `google` (`gmail`; `workspace`, when
+  the domain's mail is Google's by a DNS-over-HTTPS MX lookup the Worker makes, `google-address.ts`;
+  `other`; or `unknown`). Whether an address like a Hotmail one has a Google account cannot be known, and
+  probing Google's sign-in to find out is not something Chordless does, so the page asks. It tells whoever
+  holds the code the invited address, which is the person the code is a secret for; wrong-shaped codes
+  make no query, and a sender is limited (`INVITE_LOOKUP`, docs/SECURITY.md). The link to hand
   out is the page's, `/join/<space id>/<code>` (built; links sent before 2026-11-16 have them in the fragment, `/join#<space id>.<code>`, which the page still reads, and invites last a week), and is handed on from the
   admin's own account by the share sheet, WhatsApp or Gmail (`invite-send.ts`).
   The message says, **first**, to make the address a Google account *before* opening the link (the

@@ -71,6 +71,11 @@ The Worker's span for `/session/refresh` says why a sign-in was refused, and how
 "why did this sign-in expire?" is a query: `chordless.auth.refresh_result` (`ok`, `invalid_grant`,
 `invalid_blob`), `chordless.auth.google_description` (Google's own words, e.g. "Token has been expired
 or revoked."), `chordless.auth.blob_age_days` (since the person signed in) and `chordless.auth.blob_kid`.
+The Worker's span for an invite says what it was for, never who: `chordless.invite.found` (`yes`, `no`),
+`.role`, `.google_kind` (`gmail`, `workspace`, `other`, `unknown`, on the lookup the page makes before sign-in),
+`.dns_ms` (the MX question) and, on a join, `.joined_as_other` (`yes` when the account's address was not the
+one invited). No address or domain is recorded.
+
 A device whose sign-in has expired stops syncing, which leaves no sync span; the toast that tells the
 person is a `chordless.error` span, once a visit.
 

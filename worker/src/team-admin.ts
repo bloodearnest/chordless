@@ -5,6 +5,7 @@
  *   GET    /api/spaces                                      the spaces you are in (for a device that has not set them up)
  *   POST   /api/spaces                  {blob, rootRef, name, ccliLicence?}  make a space from a folder you own
  *   POST   /api/spaces/join             {spaceId, code}         join with an invite
+ *   POST   /api/spaces/invite           {spaceId, code}         what an invite is for (no sign-in: the page asks it first)
  *   GET    /api/space/<id>/invites                              admin: the open invites
  *   POST   /api/space/<id>/invites      {role, email}           admin: a new one, with its code
  *   DELETE /api/space/<id>/invites/<id>                         admin: revoke
@@ -36,10 +37,12 @@ import {
   type TeamRole,
 } from '../../src/js/team-roles.ts'
 import type { BlobData } from './blob.ts'
+import type { GoogleKind } from './google-address.ts'
 import { answering, jsonResponse, Refusal, readJson } from './http.ts'
 import type { Identity } from './identity.ts'
 import { refusal } from './team-api.ts'
 import type { MySpace, SpaceInfo, TeamSpaceApi } from './team-state.ts'
+import { annotateRequest } from './trace.ts'
 
 /** What these routes need from the Worker */
 export interface AdminContext {
@@ -62,6 +65,10 @@ export interface AdminContext {
   checkServiceAccount(rootRef: string, address: string): Promise<string | null>
   /** A new id for a space */
   newSpaceId(): string
+  /** Whether an address looks like a Google account's (google-address.ts) */
+  googleKind(email: string): Promise<{ kind: GoogleKind; ms: number }>
+  /** Whether this sender may look an invite up now (a limit that cannot be asked allows it) */
+  allowInviteLookup(request: Request): Promise<boolean>
   /** Put the space's Drive folder, with all in it, in the trash, with the space's own credential */
   trashRoot(spaceId: string): Promise<void>
 }
@@ -133,6 +140,48 @@ export function handleCreateSpace(request: Request, ctx: AdminContext): Promise<
   })
 }
 
+/** What a code looks like (the Worker makes them: 128 random bits as URL-safe text), so anything else is not one */
+const INVITE_CODE = /^[A-Za-z0-9_-]{16,64}$/
+
+/**
+ * POST /api/spaces/invite: what an invite is for, before anyone has signed in, so the page can welcome
+ * them and say what to do ("You are invited to Grace Church as a team member"). It tells whoever
+ * holds the code the team's name, the role and the address it was sent to: the code is a secret meant for
+ * that person. A code that is not good is just that, and one of the wrong shape makes no query; the
+ * lookups of one sender are limited (docs/SECURITY.md, "Probing for team spaces").
+ */
+export function handleInviteLookup(request: Request, ctx: AdminContext): Promise<Response> {
+  return answering('Team space admin', async () => {
+    if (!(await ctx.allowInviteLookup(request))) {
+      return jsonResponse({ error: 'Too many tries: wait a minute' }, 429)
+    }
+    const { spaceId, code } = await readJson(request)
+    if (
+      typeof spaceId !== 'string' ||
+      typeof code !== 'string' ||
+      !SPACE_ID.test(spaceId) ||
+      !INVITE_CODE.test(code)
+    ) {
+      return jsonResponse({ error: 'This invite is not valid' }, 404)
+    }
+    const info = await ctx.room(spaceId).inviteInfo(code)
+    annotateRequest({ 'chordless.invite.found': info ? 'yes' : 'no' })
+    if (!info) return jsonResponse({ error: 'This invite is not valid' }, 404)
+    const { kind, ms } = await ctx.googleKind(info.email)
+    annotateRequest({
+      'chordless.invite.role': info.role,
+      'chordless.invite.google_kind': kind,
+      'chordless.invite.dns_ms': ms,
+    })
+    return jsonResponse({
+      teamName: info.teamName,
+      role: info.role,
+      email: info.email,
+      google: kind,
+    })
+  })
+}
+
 /** POST /api/spaces/join: use an invite. A code that is not good is just that, whatever the reason */
 export function handleJoin(request: Request, ctx: AdminContext): Promise<Response> {
   return answering('Team space admin', async () => {
@@ -142,7 +191,16 @@ export function handleJoin(request: Request, ctx: AdminContext): Promise<Respons
     if (typeof spaceId !== 'string' || typeof code !== 'string' || !SPACE_ID.test(spaceId)) {
       return jsonResponse({ error: 'This invite is not valid' }, 404)
     }
-    const role = await ctx.room(spaceId).redeemInvite(code, identity)
+    const room = ctx.room(spaceId)
+    // (for the telemetry: whether they join with another address than the one it was sent to)
+    const info = await room.inviteInfo(code)
+    const role = await room.redeemInvite(code, identity)
+    if (info && role && role !== 'other-account') {
+      annotateRequest({
+        'chordless.invite.role': info.role,
+        'chordless.invite.joined_as_other': info.email === identity.email ? 'no' : 'yes',
+      })
+    }
     if (role === 'other-account') {
       // (they hold the code, so telling them it is for someone else gives nothing away)
       return jsonResponse({ error: 'This invite was sent to a different Google account' }, 403)
