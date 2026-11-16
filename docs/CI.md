@@ -82,6 +82,31 @@ re-runs the failed jobs (`gh run rerun --failed`) **only if every job that faile
 - a run at **attempt 3**, so at most two re-runs. (A re-run started with the workflow's token should itself end
   with a `workflow_run` event, which is what makes the second one possible; if it does not, there is one retry.)
 
+It also re-runs a run that the **watchdog** cancelled (below): its jobs are then cancelled with "canceled by
+@github-actions", which a person's cancel, with their own name, is not.
+
+**The watchdog** (`watch-runners` in `ci.yml`, "Watch for a runner", `scripts/ci/watch-unacquired.sh`) is there
+so that a stuck job is retried in minutes and not after GitHub's own 15. A job that gets a runner does so in
+seconds (34 of 38 macOS jobs: 6 s; four waited 5 to 10 minutes, and GitHub appears to try again about every 5).
+There is no way to cancel or re-run one queued job, so the watchdog polls the run's jobs every 20 seconds and
+**cancels the run only when all of this holds**, and has held for a minute (the instant between one job
+finishing and the next starting looks the same):
+
+- **no other job is running**, so nothing in progress is lost to the cancel: it waits for the other end-to-end
+  jobs to finish;
+- **no job has failed** (a failed run is not retried, so there is nothing to gain);
+- a job has been **waiting for a runner for at least three minutes** since it was queued.
+
+It then says so in the run's summary, and the re-run above does the rest. It looks only at the run's own jobs
+(in a Deploy run, those named "CI / …", not the deploy's own, which wait for CI), leaves `ci-ok` out, does
+nothing at attempt 3, and always exits 0. It needs `actions: write`, so `deploy.yml` gives its call of CI that;
+a pull request from Dependabot or a fork has a read-only token, where the cancel is refused and nothing
+happens. `ci-ok` does not wait for it. Its cases, and the reason for each condition (take one away and a test
+fails), are in `tests/flaky-summary.node.test.ts`. **Not known until it has run for real:** whether a fresh
+request gets a runner sooner than the old one would have (the summary says when it cancelled, so a week of
+runs will show it), and whether the text of a cancel by the workflow's token is as the re-run expects
+(`canceled by @github-actions`): if not, a cancelled run is simply not re-run, as before.
+
 It checks out only the default branch and takes nothing from the run but its numbers and commit SHA, in `env`
 (zizmor's `dangerous-triggers` is ignored for this one file, in `.github/zizmor.yml`, for that reason). It
 always exits 0: it must never be what fails a run. The cases are tested in `tests/flaky-summary.node.test.ts`

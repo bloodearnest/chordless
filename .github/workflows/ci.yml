@@ -281,6 +281,28 @@ jobs:
           npm: "false"
       - run: just lint-infra
 
+  # Cancels the run when nothing else is running and a job is still waiting for a runner (macOS arm64 is
+  # at times short of them), so that rerun-unacquired.yml re-runs it in minutes and not after GitHub's own
+  # 15. Not part of ci-ok: it only helps (scripts/ci/watch-unacquired.sh, docs/CI.md)
+  watch-runners:
+    name: Watch for a runner
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      actions: write # cancel the run
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: scripts/ci/watch-unacquired.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+
   # The one required check: every job above passed, or was skipped as not needed (a change of
   # prose only, nothing in infra/, an unchanged lockfile)
   ci-ok:

@@ -1,6 +1,7 @@
 # Re-run a CI or Deploy run whose only failure is a job GitHub never gave a runner (macOS runners are at
-# times short of capacity): scripts/ci/rerun-unacquired.sh decides, and docs/CI.md ("A job that never
-# gets a runner") says why. It runs on the default branch's copy of this file and checks out nothing
+# times short of capacity), or one that the watchdog (ci.yml, "Watch for a runner") cancelled because it was
+# only waiting for one: scripts/ci/rerun-unacquired.sh decides, and docs/CI.md ("A job that never gets a
+# runner") says why. It runs on the default branch's copy of this file and checks out nothing
 # from the run it looks at, so a pull request cannot change what it does.
 name: Rerun when no runner was acquired
 
@@ -13,8 +14,9 @@ permissions: {}
 
 jobs:
   rerun:
-    # (a run cancelled as a whole was replaced by a newer one; a run that passed needs nothing)
-    if: github.event.workflow_run.conclusion == 'failure'
+    # (a run that passed needs nothing. One cancelled as a whole was replaced by a newer push, or cancelled by
+    # the watchdog: the script tells them apart)
+    if: github.event.workflow_run.conclusion == 'failure' || github.event.workflow_run.conclusion == 'cancelled'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
