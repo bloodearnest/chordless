@@ -27,10 +27,6 @@ export class JoinTrail {
     Object.assign(this.#facts, facts)
   }
 
-  get ended(): boolean {
-    return this.#ended
-  }
-
   /** The visit is over: the span is made, once, and only for a visit that got as far as a step */
   end(outcome: JoinOutcome): void {
     if (this.#ended) return
@@ -40,7 +36,7 @@ export class JoinTrail {
       ...this.#facts,
       'chordless.join.outcome': outcome,
       'chordless.join.steps': this.#steps.join(','),
-      'chordless.join.last_step': this.#steps[this.#steps.length - 1] ?? '',
+      'chordless.join.last_step': this.#steps[this.#steps.length - 1],
       'chordless.join.ms': Math.round(performance.now() - this.#started),
     })
   }
