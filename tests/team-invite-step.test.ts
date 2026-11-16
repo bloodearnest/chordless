@@ -152,8 +152,8 @@ describe('team-invite-step', () => {
       page.shadowRoot?.querySelectorAll<HTMLInputElement>('input.link') ?? []
     )
     expect(links.map(link => link.value)).to.deep.equal([
-      `${window.location.origin}/join#space-eeee5555.code-1-abcdefghijklmnop`,
-      `${window.location.origin}/join#space-eeee5555.code-2-abcdefghijklmnop`,
+      `${window.location.origin}/join/space-eeee5555/code-1-abcdefghijklmnop`,
+      `${window.location.origin}/join/space-eeee5555/code-2-abcdefghijklmnop`,
     ])
     // (those done with leave the list; the one not ticked stays)
     expect(boxes()).to.have.length(1)
@@ -197,7 +197,7 @@ describe('team-invite-step', () => {
     } finally {
       navigator.clipboard.writeText = real
     }
-    expect(written[0]).to.contain('/join#space-eeee5555.')
+    expect(written[0]).to.contain('/join/space-eeee5555/')
     expect(text()).to.contain('✓ Copied')
   })
 

@@ -151,9 +151,9 @@ export function roleWithArticle(role: TeamRole): string {
   return `${/^[aeiou]/.test(label) ? 'an' : 'a'} ${label}`
 }
 
-/** The link to send someone an invite: the space and the code are in the fragment, which is never sent to a server */
+/** The link to send someone an invite: /join/<space id>/<code> */
 export function inviteLink(origin: string, teamId: string, code: string): string {
-  return `${origin}/join#${teamId}.${code}`
+  return `${origin}/join/${encodeURIComponent(teamId)}/${encodeURIComponent(code)}`
 }
 
 /** Google's page for making a Google account with an address from somewhere else */

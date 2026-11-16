@@ -45,7 +45,11 @@ describe('matchRoute', () => {
     ['/index.html', { name: 'home' }],
     // What was shared by link is the home page's other list
     ['/?shared', { name: 'home', shared: true }],
-    // An invite link: the space and the code are in the fragment, which the route leaves out
+    // An invite link: the space and the code are in the path (an older one has them in the fragment, which the route leaves out)
+    [
+      '/join/space-aaaa1111/abcdefghijklmnopqrstuv',
+      { name: 'join', teamId: 'space-aaaa1111', code: 'abcdefghijklmnopqrstuv' },
+    ],
     ['/join#space-aaaa1111.abcdefghijklmnopqrstuv', { name: 'join' }],
     ['/media', { name: 'media' }],
 
@@ -120,6 +124,10 @@ describe('buildUrl', () => {
     [{ name: 'account' }, '/account'],
     [{ name: 'import-song' }, '/import-song'],
     [{ name: 'join' }, '/join'],
+    [
+      { name: 'join', teamId: 'space-aaaa1111', code: 'abc_DEF-123' },
+      '/join/space-aaaa1111/abc_DEF-123',
+    ],
     [{ name: 'new-team-space' }, '/account/new'],
     [{ name: 'media' }, '/media'],
     [{ name: 'setlist', setlistId: 'abc', songIndex: -1 }, '/setlist/abc'],

@@ -224,14 +224,14 @@ describe('the team share panel', () => {
       })
       expect(text()).to.contain('Link for fay@example.com')
       expect(must(panel.shadowRoot?.querySelector<HTMLInputElement>('input.link')).value).to.equal(
-        `${window.location.origin}/join#${TEAM}.CODE1234567890ab`
+        `${window.location.origin}/join/${TEAM}/CODE1234567890ab`
       )
       expect(email.value).to.equal('')
       // (and a way to hand it on, for the role chosen)
       const send = must(panel.shadowRoot?.querySelector('invite-send'))
       expect(send.email).to.equal('fay@example.com')
       expect(send.role).to.equal('reader')
-      expect(send.url).to.contain(`/join#${TEAM}.`)
+      expect(send.url).to.contain(`/join/${TEAM}/`)
       expect(text()).to.contain('Not a Gmail address')
     })
 
@@ -267,7 +267,7 @@ describe('the team share panel', () => {
       try {
         button('Copy the link').click()
         await until(() => text().includes('✓ Copied'), 'the copy')
-        expect(copied[0]).to.contain(`/join#${TEAM}.`)
+        expect(copied[0]).to.contain(`/join/${TEAM}/`)
 
         Object.defineProperty(navigator, 'clipboard', {
           configurable: true,
