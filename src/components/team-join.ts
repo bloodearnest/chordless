@@ -417,7 +417,6 @@ export class TeamJoin extends LitElement {
         question
           ? html`
               <p>${t('join-has-google-question')}</p>
-              ${this._message ? html`<p class="status error" role="alert">${this._message}</p>` : nothing}
               <div class="actions">
                 <button class="btn primary" @click=${() => this._answerHasGoogle('yes')}>
                   ${t('join-has-google-yes')}
