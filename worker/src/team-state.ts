@@ -7,9 +7,12 @@
  * sharing stops, with its `team_events`: the register CCLI may ask for and charging may use. Everything
  * else of the space is deleted when sharing ends.
  *
- * Members are keyed by `identityKey` (provider and sub), not by email: an email is for showing and
- * for matching an invite, but it is the account that is a member. The live sockets are the Durable
- * Object's (team-room.ts), told when someone's membership changes.
+ * A member is an **account** (migrations/0003_accounts.sql): a person's Chordless account, which holds
+ * the logins they sign in with (a provider and its id for them: `identityKey`) and the addresses they
+ * are known by. A login is looked up to its account, and the account has the role; an email is for
+ * showing and for matching an invite. `team_members.identity` (the first login) and `.email` stay,
+ * kept right, for the Worker a rollback would bring back. The live sockets are the Durable Object's
+ * (team-room.ts), told when someone's membership changes.
  */
 import { toBase64Url } from '../../src/js/base64url.ts'
 import type { LicenceChange } from '../../src/js/ccli-licence.ts'
@@ -39,7 +42,7 @@ export interface TeamSpaceApi {
   info(): Promise<SpaceInfo | null>
   /** This account's role in the space, or null if it is not a member */
   roleOf(identity: Pick<Identity, 'provider' | 'sub'>): Promise<TeamRole | null>
-  /** The owner first, then the members by email */
+  /** The owner first, then the members by email, each with every address the team knows them by */
   members(): Promise<TeamMember[]>
   /** Add a member, or change their role */
   setMember(identity: Identity, role: MemberRole): Promise<void>
@@ -153,6 +156,61 @@ function chunks<T>(items: T[], size: number): T[][] {
   return pieces
 }
 
+/** The key for a new account: 128 random bits as hex, as the migration's backfill makes them */
+function newAccountId(): string {
+  return [...crypto.getRandomValues(new Uint8Array(16))]
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+/**
+ * The account a login belongs to. With `create`, one is made (with the login) the first time a team
+ * operation sees it (making a space, joining one), never by a bare request; the login's email and
+ * `last_seen_at` are refreshed. Without it, null for a login nothing has made an account for.
+ */
+export async function accountOf(
+  db: D1Db,
+  identity: Identity,
+  create: boolean,
+  now: Date = new Date()
+): Promise<string | null> {
+  const find = () =>
+    db
+      .prepare('SELECT account_id FROM account_identities WHERE provider = ? AND sub = ?')
+      .bind(identity.provider, identity.sub)
+      .first<{ account_id: string }>()
+  const found = await find()
+  const at = now.toISOString()
+  if (found) {
+    if (create) {
+      await db
+        .prepare(
+          'UPDATE account_identities SET email = ?, last_seen_at = ? WHERE provider = ? AND sub = ?'
+        )
+        .bind(identity.email.toLowerCase(), at, identity.provider, identity.sub)
+        .run()
+    }
+    return found.account_id
+  }
+  if (!create) return null
+  const made = newAccountId()
+  await db.batch([
+    db.prepare('INSERT INTO accounts (account_id, created_at) VALUES (?, ?)').bind(made, at),
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at)
+          VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .bind(identity.provider, identity.sub, made, identity.email.toLowerCase(), at, at),
+  ])
+  const winner = ((await find()) as { account_id: string }).account_id
+  // (two requests made the login's account at once: the one that lost leaves no orphan)
+  if (winner !== made) {
+    await db.prepare('DELETE FROM accounts WHERE account_id = ?').bind(made).run()
+  }
+  return winner
+}
+
 /** A team space the signed-in person is in, as they are told of it on a device that does not have it yet */
 export interface MySpace {
   spaceId: string
@@ -171,16 +229,25 @@ export async function spacesOf(
   identity: Pick<Identity, 'provider' | 'sub'>
 ): Promise<MySpace[]> {
   const key = identityKey(identity)
+  // (the login's account, if it has one, is owner or member; a row the previous Worker made, with no
+  // account yet, is still found by the login's key)
   const { results } = await db
     .prepare(
       `SELECT t.space_id, t.name, t.root_ref,
-          CASE WHEN t.owner_provider || ':' || t.owner_sub = ? THEN 'owner' ELSE m.role END AS role
-        FROM teams t LEFT JOIN team_members m ON m.space_id = t.space_id AND m.identity = ?
+          CASE WHEN t.owner_provider || ':' || t.owner_sub = ?
+                 OR (a.account_id IS NOT NULL AND t.owner_account_id = a.account_id)
+               THEN 'owner' ELSE m.role END AS role
+        FROM teams t
+        LEFT JOIN account_identities a ON a.provider = ? AND a.sub = ?
+        LEFT JOIN team_members m ON m.space_id = t.space_id
+          AND (m.identity = ? OR (a.account_id IS NOT NULL AND m.account_id = a.account_id))
         WHERE t.ended_at IS NULL
-          AND (t.owner_provider || ':' || t.owner_sub = ? OR m.identity IS NOT NULL)
+          AND (t.owner_provider || ':' || t.owner_sub = ?
+               OR (a.account_id IS NOT NULL AND t.owner_account_id = a.account_id)
+               OR m.identity IS NOT NULL)
         ORDER BY t.created_at, t.space_id`
     )
-    .bind(key, key, key)
+    .bind(key, identity.provider, identity.sub, key, key)
     .all<{ space_id: string; name: string; root_ref: string; role: TeamRole }>()
   return results.map(row => ({
     spaceId: row.space_id,
@@ -234,11 +301,12 @@ export class TeamSpaceState implements TeamSpaceApi {
   async create(space: { rootRef: string; name: string; owner: Identity }): Promise<boolean> {
     const at = this.#at()
     const { owner } = space
+    const ownerAccount = await accountOf(this.#db, owner, true, this.#now())
     const made = await this.#db
       .prepare(
         `INSERT OR IGNORE INTO teams
-          (space_id, name, owner_email, created_at, updated_at, root_ref, owner_provider, owner_sub)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          (space_id, name, owner_email, created_at, updated_at, root_ref, owner_provider, owner_sub, owner_account_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         this.#id,
@@ -248,7 +316,8 @@ export class TeamSpaceState implements TeamSpaceApi {
         at,
         space.rootRef,
         owner.provider,
-        owner.sub
+        owner.sub,
+        ownerAccount
       )
       .run()
     if (made.meta.changes === 0) return false
@@ -273,14 +342,20 @@ export class TeamSpaceState implements TeamSpaceApi {
 
   async roleOf(identity: Pick<Identity, 'provider' | 'sub'>): Promise<TeamRole | null> {
     const key = identityKey(identity)
-    // (one round trip: every request asks)
+    // (one round trip: every request asks. The login's account has the role; a row the previous
+    // Worker made, with no account yet, is still found by the login's key)
     const row = await this.#db
       .prepare(
-        `SELECT CASE WHEN t.owner_provider || ':' || t.owner_sub = ? THEN 'owner' ELSE m.role END AS role
-          FROM teams t LEFT JOIN team_members m ON m.space_id = t.space_id AND m.identity = ?
+        `SELECT CASE WHEN t.owner_provider || ':' || t.owner_sub = ?
+                       OR (a.account_id IS NOT NULL AND t.owner_account_id = a.account_id)
+                     THEN 'owner' ELSE m.role END AS role
+          FROM teams t
+          LEFT JOIN account_identities a ON a.provider = ? AND a.sub = ?
+          LEFT JOIN team_members m ON m.space_id = t.space_id
+            AND (m.identity = ? OR (a.account_id IS NOT NULL AND m.account_id = a.account_id))
           WHERE t.space_id = ? AND t.ended_at IS NULL`
       )
-      .bind(key, key, this.#id)
+      .bind(key, identity.provider, identity.sub, key, this.#id)
       .first<{ role: TeamRole | null }>()
     return row?.role ?? null
   }
@@ -288,61 +363,163 @@ export class TeamSpaceState implements TeamSpaceApi {
   async members(): Promise<TeamMember[]> {
     const info = await this.info()
     if (!info) return []
-    const { results } = await this.#sql(
-      'SELECT email, role FROM team_members WHERE space_id = ? ORDER BY email'
-    ).all<TeamMember>()
-    return [{ email: info.owner.email, role: 'owner' }, ...results]
+    const [{ results: rows }, { results: addresses }] = await Promise.all([
+      this.#sql(
+        'SELECT email, role, account_id FROM team_members WHERE space_id = ? ORDER BY email'
+      ).all<{ email: string; role: MemberRole; account_id: string | null }>(),
+      this.#sql(
+        'SELECT account_id, email FROM team_member_emails WHERE space_id = ? ORDER BY email'
+      ).all<{ account_id: string; email: string }>(),
+    ])
+    const known = new Map<string, string[]>()
+    for (const { account_id, email } of addresses) {
+      known.set(account_id, [...(known.get(account_id) ?? []), email])
+    }
+    return [
+      { email: info.owner.email, emails: [info.owner.email], role: 'owner' },
+      ...rows.map(row => {
+        // (the primary address first, and always there, as an older app reads `email`)
+        const others = (row.account_id ? known.get(row.account_id) : undefined) ?? []
+        return {
+          email: row.email,
+          emails: [row.email, ...others.filter(each => each !== row.email)],
+          role: row.role,
+        }
+      }),
+    ]
+  }
+
+  /** The keys of every login of the account a member row belongs to (a row with no account: just its own) */
+  async #loginsOf(accountId: string | null, key: string): Promise<string[]> {
+    if (!accountId) return [key]
+    const { results } = await this.#db
+      .prepare("SELECT provider || ':' || sub AS key FROM account_identities WHERE account_id = ?")
+      .bind(accountId)
+      .all<{ key: string }>()
+    return [...new Set([key, ...results.map(row => row.key)])]
+  }
+
+  /** Close the live sockets of every login of a member: what they may do has changed */
+  async #dropMember(member: { identity: string; account_id: string | null }): Promise<void> {
+    for (const key of await this.#loginsOf(member.account_id, member.identity)) {
+      await this.#drop(key)
+    }
+  }
+
+  /**
+   * The member of this space that this login is: by its account, or by its key for a row the
+   * previous Worker made, which has no account yet
+   */
+  async #memberOf(
+    identity: Identity,
+    accountId: string | null
+  ): Promise<{ identity: string; account_id: string | null } | null> {
+    return this.#sql(
+      `SELECT identity, account_id FROM team_members
+        WHERE space_id = ? AND (identity = ? OR (? IS NOT NULL AND account_id = ?))`,
+      identityKey(identity),
+      accountId,
+      accountId
+    ).first<{ identity: string; account_id: string | null }>()
   }
 
   async setMember(identity: Identity, role: MemberRole): Promise<void> {
     const info = await this.info()
     if (!info) throw new Error('No such space')
-    if (identityKey(info.owner) === identityKey(identity)) {
+    const accountId = (await accountOf(this.#db, identity, true, this.#now())) as string
+    if (
+      identityKey(info.owner) === identityKey(identity) ||
+      (await this.#ownerAccount()) === accountId
+    ) {
       throw new Error('The owner is not a member: their role cannot be changed')
     }
-    const key = identityKey(identity)
-    await this.#sql(
-      `INSERT INTO team_members (space_id, identity, email, role, since) VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT (space_id, identity) DO UPDATE SET email = excluded.email, role = excluded.role`,
-      key,
-      identity.email.toLowerCase(),
-      role,
-      this.#at()
-    ).run()
-    await this.#drop(key)
+    const email = identity.email.toLowerCase()
+    const member = await this.#memberOf(identity, accountId)
+    // (the member's key stays the first login's: a second login of the account is the same member)
+    const key = member?.identity ?? identityKey(identity)
+    await this.#db.batch([
+      this.#sql(
+        `INSERT INTO team_members (space_id, identity, email, role, since, account_id) VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT (space_id, identity)
+          DO UPDATE SET email = excluded.email, role = excluded.role, account_id = excluded.account_id`,
+        key,
+        email,
+        role,
+        this.#at(),
+        accountId
+      ),
+      // (a verified sign-in address is theirs, whatever else the team had noted for it)
+      this.#sql(
+        `INSERT INTO team_member_emails (space_id, email, account_id, source) VALUES (?, ?, ?, 'signin')
+          ON CONFLICT (space_id, email) DO UPDATE SET account_id = excluded.account_id, source = 'signin'`,
+        email,
+        accountId
+      ),
+    ])
+    await this.#dropMember({ identity: key, account_id: accountId })
+  }
+
+  /** The account that owns this space (null for a space the previous Worker made, before accounts) */
+  async #ownerAccount(): Promise<string | null> {
+    const row = await this.#sql('SELECT owner_account_id FROM teams WHERE space_id = ?').first<{
+      owner_account_id: string | null
+    }>()
+    return row?.owner_account_id ?? null
+  }
+
+  /** Forget a member: the membership and every address the team had for them */
+  async #forget(member: { identity: string; account_id: string | null }): Promise<void> {
+    const logins = await this.#loginsOf(member.account_id, member.identity)
+    await this.#db.batch([
+      this.#sql('DELETE FROM team_members WHERE space_id = ? AND identity = ?', member.identity),
+      ...(member.account_id
+        ? [
+            this.#sql(
+              'DELETE FROM team_member_emails WHERE space_id = ? AND account_id = ?',
+              member.account_id
+            ),
+          ]
+        : []),
+    ])
+    for (const key of logins) await this.#drop(key)
   }
 
   async removeMember(identity: Identity): Promise<void> {
-    const key = identityKey(identity)
-    await this.#sql('DELETE FROM team_members WHERE space_id = ? AND identity = ?', key).run()
-    await this.#drop(key)
+    const accountId = await accountOf(this.#db, identity, false)
+    const member = await this.#memberOf(identity, accountId)
+    if (member) await this.#forget(member)
+    else await this.#drop(identityKey(identity))
   }
 
-  /** The key of the member with this email */
-  async #byEmail(email: string): Promise<string | null> {
-    const row = await this.#sql(
-      'SELECT identity FROM team_members WHERE space_id = ? AND email = ?',
-      email.toLowerCase()
-    ).first<{ identity: string }>()
-    return row?.identity ?? null
+  /** The member this address is one of (the address they signed in with, or one the team noted) */
+  async #byEmail(email: string): Promise<{ identity: string; account_id: string | null } | null> {
+    const address = email.toLowerCase()
+    return this.#sql(
+      `SELECT m.identity, m.account_id FROM team_members m
+        WHERE m.space_id = ?
+          AND (m.email = ?
+               OR m.account_id IN (SELECT account_id FROM team_member_emails WHERE space_id = ? AND email = ?))`,
+      address,
+      this.#id,
+      address
+    ).first<{ identity: string; account_id: string | null }>()
   }
 
   async setRoleByEmail(email: string, role: MemberRole): Promise<boolean> {
-    const key = await this.#byEmail(email)
-    if (!key) return false
+    const member = await this.#byEmail(email)
+    if (!member) return false
     await this.#db
       .prepare('UPDATE team_members SET role = ? WHERE space_id = ? AND identity = ?')
-      .bind(role, this.#id, key)
+      .bind(role, this.#id, member.identity)
       .run()
-    await this.#drop(key)
+    await this.#dropMember(member)
     return true
   }
 
   async removeByEmail(email: string): Promise<boolean> {
-    const key = await this.#byEmail(email)
-    if (!key) return false
-    await this.#sql('DELETE FROM team_members WHERE space_id = ? AND identity = ?', key).run()
-    await this.#drop(key)
+    const member = await this.#byEmail(email)
+    if (!member) return false
+    await this.#forget(member)
     return true
   }
 
@@ -409,6 +586,7 @@ export class TeamSpaceState implements TeamSpaceApi {
         .bind(at, at, this.#id),
       this.#event('ended', by.email),
       this.#sql('DELETE FROM team_members WHERE space_id = ?'),
+      this.#sql('DELETE FROM team_member_emails WHERE space_id = ?'),
       this.#sql('DELETE FROM team_invites WHERE space_id = ?'),
       this.#sql('DELETE FROM team_refs WHERE space_id = ?'),
       this.#sql('DELETE FROM team_credentials WHERE space_id = ?'),

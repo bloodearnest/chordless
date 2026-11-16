@@ -122,6 +122,14 @@ serve:
 db-local:
     npx wrangler d1 migrations apply DB --local --env dev
 
+# A copy of the register of teams' database (members' addresses and all) before a migration changes it:
+# run it before merging a pull request that adds a file to migrations/, as the deploy applies it by itself
+# (docs/MIGRATIONS.md, "Backing up first"). Needs a Cloudflare login (wrangler login, or a token in the
+# environment). .backups/ is git-ignored: it holds email addresses, so it is never committed or uploaded.
+db-backup:
+    mkdir -p .backups
+    npx wrangler d1 export chordless-teams --remote --output ".backups/chordless-teams-$(date -u +%Y%m%dT%H%M%SZ).sql"
+
 # The same, for trying live sync (docs/LIVE_SYNC.md): the Worker is its own process (wrangler dev), as the
 # Vite plugin cannot pass WebSockets to it. Slower to start and heavier; `just serve` is for everything else
 serve-live:

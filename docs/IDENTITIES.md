@@ -119,6 +119,11 @@ people as they are.
 
 ## Team spaces
 
+- **A member is an account, known by several addresses** (2026-11-16, `docs/SPACES.md`): the Worker lists each
+  member with every address the team has for them (`emails`, the first being `email`), and a person is the
+  member if **any** of them is among theirs (`personForMember`), so a person typed in by the address an invite
+  was sent to is the member even when they joined with another address. An address another person has is not
+  moved to this one.
 - **The link to a team member is the email**, not `provider:sub` as first designed (changed 2026-10-30).
   The page never sees a member's `sub`, and handing teammates each other's Google account ids would
   be a new thing for the Worker to give out; the Worker already has each caller's *verified* email,

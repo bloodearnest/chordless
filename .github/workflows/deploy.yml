@@ -212,6 +212,15 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      # A restore point for the register of teams' database, noted before a migration can change it: D1
+      # Time Travel keeps the history, and `wrangler d1 time-travel restore chordless-teams --timestamp
+      # <this one>` goes back to it (docs/MIGRATIONS.md, "Backing up first"). It holds a time, not data.
+      - if: steps.live.outputs.deploy == 'true'
+        run: |
+          mise exec -- npx wrangler d1 time-travel info chordless-teams --config dist/chordless/wrangler.json | tee -a "$GITHUB_STEP_SUMMARY"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       # The register of teams' tables (migrations/): after the deploy, which makes the database the
       # first time. Only ever additive, as the Worker before it must carry on with them if a rollback
       # follows. The Worker writes to the register best effort, so the moments before it are safe.

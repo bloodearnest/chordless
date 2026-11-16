@@ -369,6 +369,8 @@ export interface SetlistLocalState {
 /** A person the space's Drive folder is shared with (cached at each sync) */
 export interface SpaceMember {
   email: string
+  /** Every address the team knows this person by, `email` first: where they are one person, not a login */
+  emails?: string[]
   name?: string
   role?: string
 }

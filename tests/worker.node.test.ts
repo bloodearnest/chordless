@@ -272,8 +272,8 @@ describe('a team space', () => {
       assert.equal(await team.roleOf(bob), 'writer')
       assert.equal(await team.owns('file-1'), true)
       assert.deepEqual(await team.members(), [
-        { email: 'ann@example.com', role: 'owner' },
-        { email: 'bob@example.com', role: 'writer' },
+        { email: 'ann@example.com', emails: ['ann@example.com'], role: 'owner' },
+        { email: 'bob@example.com', emails: ['bob@example.com'], role: 'writer' },
       ])
     })
   })
