@@ -66,7 +66,8 @@ they must be able to. Overly restrictive is an antipattern here.
 
 ## Spaces and copyright
 
-**Chordless never stores copyrighted content; it only passes access on to it.** Charts, lyrics and pad
+**Chordless never stores copyrighted content itself: that is stored locally, and optionally synced with the
+user's own cloud storage (e.g. Google Drive).** Charts, lyrics and pad
 audio live in the user's own browser and in a Drive the user (or their team space's owner) controls.
 The Worker passes team-space traffic through (streamed, never buffered to storage) without
 persisting or caching it: no KV, R2, D1, Durable Object or Cache API entry may hold song or pad

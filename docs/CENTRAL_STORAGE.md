@@ -36,9 +36,10 @@ space. That is the existing opt-in, and a Gmail account is only needed for that.
 - Holding this data centrally is fine for the privacy policy: it already says what the server keeps about a
   user (`src/privacy.html`), and accounts were added to it with `0003_accounts.sql`.
 - **Preferences are a new feature, not part of this move: they come last.**
-- The rule in CLAUDE.md and the privacy page changes from "never stores copyrighted content" to "never stores
-  song content (lyrics, chords, notation, audio)": **when the first part is built, not before**, so that the
-  text never says something the code does not do.
+- The rule is now worded as CLAUDE.md has it (2026-11-16): Chordless never stores copyrighted content
+  itself; that is stored locally, and optionally synced with the user's own cloud storage (e.g. Google Drive).
+  The privacy page and `docs/SPACES.md` follow when the first part is built, so that no text says something
+  the code does not do.
 
 ## What a setlist is when its songs are not on the device
 
