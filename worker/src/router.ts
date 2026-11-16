@@ -4,6 +4,7 @@
  * it runs in Node as well as in the Worker (`index.ts` passes in what only the Worker has).
  */
 
+import { handleEmailStart, handleEmailVerify } from './email-login.ts'
 import type { Env } from './env.ts'
 import type { GoogleApi } from './google-auth.ts'
 import { isCrossOrigin, jsonResponse, message } from './http.ts'
@@ -56,6 +57,12 @@ async function route(
     // A Chordless session: the next tokens for a refresh token, and a first one for a blob from before
     if (path === '/session/token' && request.method === 'POST') {
       return await handleSessionToken(request, env)
+    }
+    if (path === '/session/email/start' && request.method === 'POST') {
+      return await handleEmailStart(request, env)
+    }
+    if (path === '/session/email/verify' && request.method === 'POST') {
+      return await handleEmailVerify(request, env)
     }
     if (path === '/session/upgrade' && request.method === 'POST') {
       return await handleSessionUpgrade(request, env)

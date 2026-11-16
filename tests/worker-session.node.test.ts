@@ -8,6 +8,12 @@ import assert from 'node:assert/strict'
 import { beforeEach, describe, test } from 'node:test'
 import * as jose from 'jose'
 import { type BlobData, decryptBlob, encryptBlob } from '../worker/src/blob.ts'
+import {
+  CODE_TTL_MS,
+  handleEmailStart,
+  handleEmailVerify,
+  loginEmail,
+} from '../worker/src/email-login.ts'
 import type { Env } from '../worker/src/env.ts'
 import type { GoogleApi } from '../worker/src/google-auth.ts'
 import {
@@ -18,6 +24,7 @@ import {
   handleTokenRefresh,
 } from '../worker/src/session.ts'
 import { revokeSession, rotateSession, verifyAccessToken } from '../worker/src/session-tokens.ts'
+import { accountOf } from '../worker/src/team-state.ts'
 import { d1Db } from './d1-db.ts'
 
 const randomKey = () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64')
@@ -713,5 +720,221 @@ describe('a Chordless session', () => {
     )
     assert.equal(out.status, 200)
     assert.equal((await tokenFor(e, start.refresh_token, later(1000))).status, 401)
+  })
+})
+
+describe('signing in with an emailed code', () => {
+  const NOW = new Date('2026-11-16T12:00:00.000Z')
+  const later = (ms: number) => new Date(NOW.getTime() + ms)
+  type Sent = { to: string; from: { email: string; name: string }; subject: string; text: string }
+
+  function world(over: Partial<Env> = {}) {
+    const { db, sql } = d1Db()
+    const sent: Sent[] = []
+    const e = {
+      ...env,
+      DB: db,
+      EMAIL: {
+        send: async (message: Sent) => {
+          sent.push(message)
+          return { messageId: 'm1' }
+        },
+      },
+      ...over,
+    } satisfies Env
+    const start = (address: unknown, now = NOW, headers: Record<string, string> = {}) =>
+      handleEmailStart(
+        new Request('https://chordless.test/session/email/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ address }),
+        }),
+        e,
+        now
+      )
+    const verify = (address: unknown, code: unknown, now = NOW) =>
+      handleEmailVerify(post('/session/email/verify', { address, code }), e, now)
+    const codeSent = () => /(\d{6})/.exec(sent.at(-1)?.subject ?? '')?.[1] ?? ''
+    return { e, sql, sent, start, verify, codeSent }
+  }
+
+  test('mails a six-digit code, from Chordless, and says only that it did', async () => {
+    const w = world()
+    const response = await w.start('Ann@Example.com ')
+    assert.equal(response.status, 200)
+    assert.deepEqual(await bodyOf(response), { ok: true })
+    assert.equal(w.sent.length, 1)
+    assert.equal(w.sent[0].to, 'ann@example.com')
+    assert.equal(w.sent[0].from.email, 'signin@mail.chordless.app')
+    assert.match(w.codeSent(), /^\d{6}$/)
+    assert.ok(w.sent[0].text.includes(w.codeSent()))
+    assert.equal(loginEmail('123456').subject, 'Your Chordless sign-in code: 123456')
+  })
+
+  test('keeps neither the address nor the code', async () => {
+    const w = world()
+    await w.start('ann@example.com')
+    const rows = JSON.stringify(w.sql.prepare('SELECT * FROM login_codes').all())
+    assert.ok(!rows.includes('ann@example.com') && !rows.includes(w.codeSent()))
+  })
+
+  test('refuses what is not an address, and a Worker that cannot send', async () => {
+    const w = world()
+    for (const bad of ['', 'nope', 'a@b', 'a b@c.d', 5, null, `${'a'.repeat(250)}@x.example`]) {
+      assert.equal((await w.start(bad)).status, 400, String(bad))
+    }
+    const { DB: _db, ...noDb } = w.e
+    assert.equal(
+      (await handleEmailStart(post('/session/email/start', { address: 'a@b.co' }), noDb)).status,
+      503
+    )
+    assert.equal(
+      (await handleEmailVerify(post('/x', { address: 'a@b.co', code: '123456' }), noDb)).status,
+      503
+    )
+    assert.equal(w.sent.length, 0)
+  })
+
+  test('sends no more than five codes an hour to an address, and says the same', async () => {
+    const w = world()
+    for (let n = 0; n < 7; n++) {
+      const response = await w.start('ann@example.com', later(n * 1000))
+      assert.deepEqual(await bodyOf(response), { ok: true })
+    }
+    assert.equal(w.sent.length, 5)
+    await w.start('ann@example.com', later(61 * 60 * 1000))
+    assert.equal(w.sent.length, 6, 'an hour later it is allowed again')
+  })
+
+  test('limits a sender, by its address, and carries on if the limit cannot be asked', async () => {
+    const limited = world({ EMAIL_LOGIN: { limit: async () => ({ success: false }) } })
+    assert.equal((await limited.start('ann@example.com')).status, 429)
+    assert.equal(limited.sent.length, 0)
+    const broken = world({
+      EMAIL_LOGIN: {
+        limit: async () => {
+          throw new Error('down')
+        },
+      },
+    })
+    assert.equal(
+      (await broken.start('ann@example.com', NOW, { 'CF-Connecting-IP': '1.2.3.4' })).status,
+      200
+    )
+  })
+
+  test('says when the mail could not be handed over', async () => {
+    const w = world({
+      EMAIL: {
+        send: async () => {
+          throw Object.assign(new Error('no'), { code: 'E_DELIVERY_FAILED' })
+        },
+      },
+    })
+    assert.equal((await w.start('ann@example.com')).status, 502)
+  })
+
+  test('signs in with the code, once, as a new account', async () => {
+    const w = world()
+    await w.start('ann@example.com')
+    const response = await w.verify('ANN@example.com', ` ${w.codeSent()} `, later(60_000))
+    assert.equal(response.status, 200)
+    const session = (await bodyOf(response)) as { access_token: string; email: string }
+    assert.equal(session.email, 'ann@example.com')
+    const claims = await verifyAccessToken(session.access_token, w.e, later(60_000))
+    const [login] = w.sql
+      .prepare(
+        "SELECT account_id FROM account_identities WHERE provider = 'email' AND sub = 'ann@example.com'"
+      )
+      .all() as { account_id: string }[]
+    assert.equal(claims?.accountId, login.account_id)
+    const again = await w.verify('ann@example.com', w.codeSent(), later(61_000))
+    assert.equal(again.status, 401)
+    assert.equal((await bodyOf(again)).reason, 'expired')
+    // (the same address, later: the same account)
+    await w.start('ann@example.com', later(3_600_000))
+    const second = (await bodyOf(
+      await w.verify('ann@example.com', w.codeSent(), later(3_601_000))
+    )) as { access_token: string }
+    assert.equal(
+      (await verifyAccessToken(second.access_token, w.e, later(3_601_000)))?.accountId,
+      login.account_id
+    )
+  })
+
+  test('is the account of a Google login with the same address, and of no other', async () => {
+    const w = world()
+    const ann = await accountOf(
+      w.e.DB,
+      { provider: 'google', sub: 'g-ann', email: 'ann@example.com' },
+      true
+    )
+    const bob = await accountOf(
+      w.e.DB,
+      { provider: 'google', sub: 'g-bob', email: 'bob@example.com' },
+      true
+    )
+    await w.start('ann@example.com')
+    const session = (await bodyOf(await w.verify('ann@example.com', w.codeSent()))) as {
+      access_token: string
+    }
+    assert.equal((await verifyAccessToken(session.access_token, w.e, NOW))?.accountId, ann)
+    assert.notEqual(ann, bob)
+    // (a different address is a different account, even for a similar one)
+    await w.start('ann+x@example.com')
+    const other = (await bodyOf(await w.verify('ann+x@example.com', w.codeSent()))) as {
+      access_token: string
+    }
+    assert.notEqual((await verifyAccessToken(other.access_token, w.e, NOW))?.accountId, ann)
+  })
+
+  test('refuses a wrong code, counts the tries, and stops after five', async () => {
+    const w = world()
+    await w.start('ann@example.com')
+    const right = w.codeSent()
+    const wrong = right === '000000' ? '111111' : '000000'
+    for (let n = 1; n <= 5; n++) {
+      const response = await w.verify('ann@example.com', wrong)
+      assert.equal(response.status, 401)
+      assert.equal((await bodyOf(response)).reason, n < 5 ? 'wrong' : 'too_many')
+    }
+    const late = await w.verify('ann@example.com', right)
+    assert.equal(
+      (await bodyOf(late)).reason,
+      'too_many',
+      'the right one is no good once tries are spent'
+    )
+    await w.start('ann@example.com', later(1000))
+    assert.equal(
+      (await w.verify('ann@example.com', w.codeSent(), later(2000))).status,
+      200,
+      'a new code starts afresh'
+    )
+  })
+
+  test('refuses a code that has ended, was never asked for, or is not six digits', async () => {
+    const w = world()
+    await w.start('ann@example.com')
+    const code = w.codeSent()
+    assert.equal(
+      (await bodyOf(await w.verify('ann@example.com', code, later(CODE_TTL_MS + 1)))).reason,
+      'expired'
+    )
+    assert.equal((await bodyOf(await w.verify('nobody@example.com', '123456'))).reason, 'expired')
+    for (const bad of ['', '12345', '1234567', 'abcdef', 123456, null]) {
+      assert.equal((await w.verify('ann@example.com', bad)).status, 401, String(bad))
+    }
+    assert.equal((await w.verify('nope', '123456')).status, 401)
+  })
+
+  test('lets one of two requests with the right code in, at the same moment', async () => {
+    const w = world()
+    await w.start('ann@example.com')
+    const code = w.codeSent()
+    const answers = await Promise.all([
+      w.verify('ann@example.com', code),
+      w.verify('ann@example.com', code),
+    ])
+    assert.deepEqual(answers.map(each => each.status).sort(), [200, 401])
   })
 })

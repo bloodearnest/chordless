@@ -52,6 +52,18 @@ name = "INVITE_LOOKUP"
 namespace_id = "7304"
 simple = { limit = 60, period = 60 }
 
+# Asking for a sign-in code to be emailed (worker/src/email-login.ts), by sender address: a person asks a
+# few times (a typo, a resend), and a band on one wifi shares an address, so this stops floods, not use.
+[[ratelimits]]
+name = "EMAIL_LOGIN"
+namespace_id = "7305"
+simple = { limit = 10, period = 60 }
+
+# Sends the sign-in code: Cloudflare Email Sending, from signin@mail.chordless.app (infra/cloudflare owns
+# the subdomain's DNS). No key: the binding is the permission.
+[[send_email]]
+name = "EMAIL"
+
 # The running version's id, on the Worker's own spans (worker/src/trace.ts)
 [version_metadata]
 binding = "CF_VERSION_METADATA"
@@ -152,6 +164,15 @@ simple = { limit = 600, period = 60 }
 name = "INVITE_LOOKUP"
 namespace_id = "7304"
 simple = { limit = 60, period = 60 }
+
+[[env.dev.ratelimits]]
+name = "EMAIL_LOGIN"
+namespace_id = "7305"
+simple = { limit = 10, period = 60 }
+
+# (local development writes the code's email to the terminal's log, it sends nothing)
+[[env.dev.send_email]]
+name = "EMAIL"
 
 # (so do Durable Objects and their migrations)
 # (the register in dev is a local database: `just db-local` makes its tables)
