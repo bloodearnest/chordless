@@ -324,7 +324,7 @@ test.describe('Account and Teams page', () => {
     await expect(card).toContainText('about')
   })
 
-  test('switching asks first, and no Team is made from the cards', { tag: '@logic' }, async ({
+  test('the cards have no Switch, and no Team is made from them', { tag: '@logic' }, async ({
     page,
   }) => {
     const dialogs: string[] = []
@@ -348,13 +348,7 @@ test.describe('Account and Teams page', () => {
 
     const other = cards.filter({ hasText: 'Second Org' })
     await expect(other).toContainText('Personal') // what kind it is is a label beside its name
-    await other.getByRole('button', { name: 'Switch' }).click()
-    const modal = other.locator('app-modal')
-    await expect(modal).toHaveAttribute('open', '')
-    await expect(modal).toContainText('Switch to "Second Org"?')
-    await modal.getByRole('button', { name: 'Cancel' }).click()
-    await expect(modal).not.toHaveAttribute('open', '')
-    await expect(cards.filter({ hasText: 'Current' })).not.toContainText('Second Org')
+    await expect(other.getByRole('button', { name: 'Switch' })).toHaveCount(0)
     // No native alert() or confirm() along the way
     expect(dialogs).toEqual([])
   })
