@@ -522,13 +522,67 @@ describe('invites', () => {
     assert.equal(await state.roleOf(cat), null)
   })
 
-  test('are for the invited email only: another account is turned away, and the code stays good', async () => {
-    const { state } = await made()
+  test('are for whoever has the code, unless they are for an admin: the address is kept as theirs, and the join is noted', async () => {
+    const { state, rows } = await made()
     const { code } = await state.createInvite('writer', 'bob@example.com', ann)
+
+    assert.equal(await state.redeemInvite(code, cat), 'writer')
+    assert.equal(await state.roleOf(cat), 'writer')
+    assert.deepEqual((await state.members())[1], {
+      email: 'cat@example.com',
+      emails: ['cat@example.com', 'bob@example.com'],
+      role: 'writer',
+    })
+    assert.deepEqual(rows('SELECT email, source FROM team_member_emails ORDER BY email'), [
+      { email: 'bob@example.com', source: 'invite' },
+      { email: 'cat@example.com', source: 'signin' },
+    ])
+    assert.deepEqual(
+      rows("SELECT by_email, detail FROM team_events WHERE kind = 'joined_as_other'"),
+      [{ by_email: 'cat@example.com', detail: JSON.stringify({ invitedAs: 'bob@example.com' }) }]
+    )
+    assert.equal(await state.redeemInvite(code, bob), null, 'used up')
+  })
+
+  test('are for the invited email only when they are for an admin: another account is turned away, and the code stays good', async () => {
+    const { state } = await made()
+    const { code } = await state.createInvite('admin', 'bob@example.com', ann)
 
     assert.equal(await state.redeemInvite(code, cat), 'other-account')
     assert.equal(await state.roleOf(cat), null)
-    assert.equal(await state.redeemInvite(code, bob), 'writer', 'the invited person still can')
+    assert.equal(await state.redeemInvite(code, bob), 'admin', 'the invited person still can')
+  })
+
+  test('never take an address from another member: a label for one they already have is not kept', async () => {
+    const { state, rows } = await made()
+    await state.setMember(bob, 'admin')
+    const { code } = await state.createInvite('reader', 'bob@example.com', ann)
+    assert.equal(await state.redeemInvite(code, cat), 'reader')
+    assert.deepEqual(rows("SELECT email FROM team_member_emails WHERE source = 'invite'"), [])
+    assert.equal(
+      (await state.members()).find(member => member.email === 'bob@example.com')?.role,
+      'admin',
+      'bob is still only himself'
+    )
+  })
+
+  test('say what they are for without using them up, and nothing for one that is not good', async () => {
+    const { state, at } = await made()
+    const { code } = await state.createInvite('reader', 'bob@example.com', ann)
+    assert.deepEqual(await state.inviteInfo(code), {
+      teamName: 'Pat Church',
+      role: 'reader',
+      email: 'bob@example.com',
+    })
+    assert.deepEqual(
+      await state.inviteInfo(code),
+      await state.inviteInfo(code),
+      'asking uses nothing'
+    )
+    assert.equal(await state.inviteInfo('made-up'), null)
+    assert.equal(await at(new Date(NOW.getTime() + INVITE_TTL_MS + 1)).inviteInfo(code), null)
+    await state.destroy(ann)
+    assert.equal(await state.inviteInfo(code), null, 'the team ended')
   })
 
   test('are matched on the email whatever its case, and however it was typed', async () => {

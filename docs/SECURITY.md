@@ -40,7 +40,10 @@ A team space's id is the key of its rows in D1, so a request for any id reads a 
 it makes nothing and costs a query. Anyone signed in could still ask for random ids. Done when the route
 was wired (2026-10-21): the ID token is verified before the database is touched, a stranger and an
 unknown space get the same 403, and an id that is not 8 to 64 letters, digits, `-` or `_` is a 404 with
-no query made. Still to do: unguessable ids and per-account rate limits. (While the state was in
+no query made. Still to do: unguessable ids and per-account rate limits. The one route that is not behind a sign-in,
+`POST /api/spaces/invite` (what an invite is for, asked by the page before sign-in), makes no query for an id
+or a code of the wrong shape (codes are 128 random bits), answers every bad code alike, and is limited per sender
+address (`INVITE_LOOKUP`, `wrangler.toml`). (While the state was in
 Durable Objects, a read of an unknown id made a persisted empty object; that is gone with them.) The
 original list:
 

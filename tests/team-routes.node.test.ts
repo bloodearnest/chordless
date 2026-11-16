@@ -9,6 +9,7 @@ import { describe, test } from 'node:test'
 import * as jose from 'jose'
 import { encryptBlob } from '../worker/src/blob.ts'
 import type { Env } from '../worker/src/env.ts'
+import { googleKind } from '../worker/src/google-address.ts'
 import { googleProvider, type Identity } from '../worker/src/identity.ts'
 import { handleRequest } from '../worker/src/router.ts'
 import { forgetServiceAccountTokens } from '../worker/src/service-account.ts'
@@ -696,16 +697,43 @@ describe('joining', () => {
     assert.ok(bodies.every(body => body.error === 'This invite is not valid'))
   })
 
-  test('is for the invited email only: another account is told so, and the code stays good', async () => {
+  test('is for whoever has the code, when it is not for an admin: the address it was sent to is kept as theirs', async () => {
     const w = await world()
     const { code } = await invite(w, 'writer', eve.email)
+
+    assert.deepEqual(await json(await join(w, stranger, code)), { spaceId: SPACE, role: 'writer' })
+    assert.equal((await w.call(`${SPACE}/root`, stranger)).status, 200, 'a member')
+    const members = (await (await w.call(`${SPACE}/members`, ann)).json()) as {
+      email: string
+      emails: string[]
+    }[]
+    assert.deepEqual(members.find(member => member.email === stranger.email)?.emails, [
+      stranger.email,
+      eve.email,
+    ])
+    assert.equal((await join(w, eve, code)).status, 404, 'used up')
+    assert.deepEqual(
+      w.all("SELECT kind, by_email, detail FROM team_events WHERE kind = 'joined_as_other'"),
+      [
+        {
+          kind: 'joined_as_other',
+          by_email: stranger.email,
+          detail: JSON.stringify({ invitedAs: eve.email }),
+        },
+      ]
+    )
+  })
+
+  test('is for the invited email only when it is for an admin: another account is told so, and the code stays good', async () => {
+    const w = await world()
+    const { code } = await invite(w, 'admin', eve.email)
 
     const turnedAway = await join(w, stranger, code)
     assert.equal(turnedAway.status, 403)
     assert.match(String((await json(turnedAway)).error), /different Google account/)
     assert.equal((await w.call(`${SPACE}/root`, stranger)).status, 403, 'not a member')
 
-    assert.deepEqual(await json(await join(w, eve, code)), { spaceId: SPACE, role: 'writer' })
+    assert.deepEqual(await json(await join(w, eve, code)), { spaceId: SPACE, role: 'admin' })
   })
 
   test('needs a sign-in', async () => {
@@ -779,6 +807,169 @@ describe('invites', () => {
     assert.equal(await status({ role: 'reader', email: 'not an email' }), 400)
     assert.equal(await status({ role: 'reader', email: 7 }), 400)
     assert.equal(await status({ role: 'reader', email: `${'a'.repeat(250)}@example.com` }), 400)
+  })
+})
+
+describe('looking an invite up before signing in', () => {
+  const invite = async (
+    w: Awaited<ReturnType<typeof world>>,
+    role: string,
+    email: string
+  ): Promise<string> =>
+    ((await json(await w.call(`${SPACE}/invites`, ann, post({ role, email })))) as { code: string })
+      .code
+  const lookup = (w: Awaited<ReturnType<typeof world>>, body: unknown, withEnv?: Env) =>
+    w.call('/api/spaces/invite', null, post(body), withEnv, {
+      ...w.deps,
+      dnsFetch: (async () => Response.json({ Status: 0, Answer: [] })) as never,
+    })
+
+  test('says what the invite is for to someone not signed in, and uses nothing up', async () => {
+    const w = await world()
+    const code = await invite(w, 'reader', 'Eve@Gmail.com')
+    const answer = await lookup(w, { spaceId: SPACE, code })
+    assert.equal(answer.status, 200)
+    assert.equal(answer.headers.get('Cache-Control'), 'no-store')
+    assert.deepEqual(await json(answer), {
+      teamName: 'Team',
+      role: 'reader',
+      email: 'eve@gmail.com',
+      google: 'gmail',
+    })
+    assert.equal((await lookup(w, { spaceId: SPACE, code })).status, 200, 'still good')
+    assert.equal(
+      (await w.call('/api/spaces/join', eve, post({ spaceId: SPACE, code }))).status,
+      200
+    )
+    assert.equal((await lookup(w, { spaceId: SPACE, code })).status, 404, 'used up')
+  })
+
+  test('answers an unknown code, an old one and one for a space that ended the same, as not valid', async () => {
+    const w = await world()
+    const code = await invite(w, 'reader', eve.email)
+    const bad = [
+      { spaceId: SPACE, code: 'a'.repeat(22) },
+      { spaceId: 'space-bbbbbbbb', code },
+    ]
+    for (const body of bad) {
+      const answer = await lookup(w, body)
+      assert.equal(answer.status, 404)
+      assert.equal((await json(answer)).error, 'This invite is not valid')
+    }
+    assert.equal((await w.call(`${SPACE}/`, ann, send('DELETE'))).status, 204)
+    assert.equal((await lookup(w, { spaceId: SPACE, code })).status, 404)
+  })
+
+  test('asks nothing of the database for a code or a space of the wrong shape', async () => {
+    const w = await world()
+    w.fail(true)
+    for (const body of [
+      { spaceId: SPACE, code: 'short' },
+      { spaceId: 'no', code: 'a'.repeat(22) },
+      { spaceId: SPACE, code: 7 },
+      {},
+    ]) {
+      assert.equal((await lookup(w, body)).status, 404, JSON.stringify(body))
+    }
+    assert.equal((await w.call('/api/spaces/invite', null, send('GET'))).status, 404)
+  })
+
+  test('is limited by the sender: past the limit, a try is told to wait', async () => {
+    const w = await world()
+    const code = await invite(w, 'reader', eve.email)
+    let tries = 0
+    const limited = { ...w.env, INVITE_LOOKUP: { limit: async () => ({ success: ++tries <= 2 }) } }
+    const statuses: number[] = []
+    for (let i = 0; i < 3; i++) {
+      statuses.push((await lookup(w, { spaceId: SPACE, code }, limited)).status)
+    }
+    assert.deepEqual(statuses, [200, 200, 429])
+    // (a limit that cannot be asked is no reason to refuse)
+    const broken = {
+      ...w.env,
+      INVITE_LOOKUP: {
+        limit: async () => {
+          throw new Error('down')
+        },
+      },
+    }
+    assert.equal((await lookup(w, { spaceId: SPACE, code }, broken)).status, 200)
+  })
+
+  test('says whether the address looks like a Google account', async () => {
+    const w = await world()
+    const kindOf = async (email: string, dns: typeof fetch) => {
+      const code = await invite(w, 'reader', email)
+      const answer = await w.call(
+        '/api/spaces/invite',
+        null,
+        post({ spaceId: SPACE, code }),
+        undefined,
+        {
+          ...w.deps,
+          dnsFetch: dns,
+        }
+      )
+      return (await json(answer)).google
+    }
+    const mx = (...hosts: string[]) =>
+      (async () =>
+        Response.json({
+          Status: 0,
+          Answer: hosts.map(host => ({ type: 15, data: `10 ${host}.` })),
+        })) as never
+    assert.equal(await kindOf('a@church.example', mx('aspmx.l.google.com')), 'workspace')
+    assert.equal(await kindOf('b@church.example', mx('mail.protection.outlook.com')), 'other')
+    assert.equal(
+      await kindOf('c@church.example', (async () => new Response('', { status: 500 })) as never),
+      'unknown'
+    )
+  })
+})
+
+describe('the Google address check', () => {
+  const answer = (body: unknown, status = 200) =>
+    (async () => Response.json(body, { status })) as never
+
+  test('is certain of Gmail, and asks DNS nothing for it', async () => {
+    const never = (async () => {
+      throw new Error('asked')
+    }) as never
+    for (const email of ['a@gmail.com', ' B@GoogleMail.com ']) {
+      assert.deepEqual(await googleKind(email, never), { kind: 'gmail', ms: 0 })
+    }
+  })
+
+  test('takes a domain whose mail is Google’s for a Workspace one, and the rest as other', async () => {
+    const ask = async (hosts: string[]) =>
+      (
+        await googleKind(
+          'a@church.example',
+          answer({ Status: 0, Answer: hosts.map(host => ({ type: 15, data: `5 ${host}` })) })
+        )
+      ).kind
+    assert.equal(await ask(['alt1.aspmx.l.google.com.', 'smtp.google.com.']), 'workspace')
+    assert.equal(await ask(['aspmx2.googlemail.com']), 'workspace')
+    assert.equal(await ask(['church-example.mail.protection.outlook.com']), 'other')
+    assert.equal(await ask(['notgoogle.com']), 'other', 'only google.com and googlemail.com')
+    assert.equal(await ask([]), 'other', 'no mail records')
+    // (an answer with no records at all, as for a domain that does not exist, and records that are not mail's)
+    assert.equal((await googleKind('a@church.example', answer({ Status: 3 }))).kind, 'other')
+    const notMail = answer({
+      Status: 0,
+      Answer: [{ type: 5, data: 'aspmx.l.google.com.' }, { type: 15 }],
+    })
+    assert.equal((await googleKind('a@church.example', notMail)).kind, 'other')
+  })
+
+  test('says nothing when it cannot tell, and asks nothing for what is not a domain', async () => {
+    assert.equal((await googleKind('a@church.example', answer({}, 503))).kind, 'unknown')
+    const broken = (async () => {
+      throw new Error('timeout')
+    }) as never
+    assert.equal((await googleKind('a@church.example', broken)).kind, 'unknown')
+    assert.deepEqual(await googleKind('nobody', broken), { kind: 'other', ms: 0 })
+    assert.deepEqual(await googleKind('a@bad domain.example', broken), { kind: 'other', ms: 0 })
   })
 })
 
