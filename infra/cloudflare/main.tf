@@ -138,6 +138,54 @@ resource "cloudflare_dns_record" "google_site_verification" {
   ttl     = 3600
 }
 
+# Sending the sign-in code (docs/SPACES.md, "Signing in without Google"): Cloudflare Email Sending, on a
+# subdomain of its own so that the sending reputation and the DMARC policy are apart from chordless.app's
+# (whose mail is only the import address). Enabled with `wrangler email sending enable mail.chordless.app`,
+# which made these records; Terraform owns them from here. If sending is ever disabled and enabled again,
+# Cloudflare makes a new DKIM key: copy it into `content` below.
+locals {
+  mail_bounce_mx = {
+    route1 = 19
+    route2 = 45
+    route3 = 71
+  }
+}
+
+resource "cloudflare_dns_record" "mail_bounce_mx" {
+  for_each = local.mail_bounce_mx
+  zone_id  = var.zone_id
+  name     = "cf-bounce.mail.chordless.app"
+  type     = "MX"
+  content  = "${each.key}.mx.cloudflare.net"
+  priority = each.value
+  ttl      = 1
+}
+
+resource "cloudflare_dns_record" "mail_bounce_spf" {
+  zone_id = var.zone_id
+  name    = "cf-bounce.mail.chordless.app"
+  type    = "TXT"
+  content = "\"v=spf1 include:_spf.mx.cloudflare.net ~all\""
+  ttl     = 1
+}
+
+resource "cloudflare_dns_record" "mail_dkim" {
+  zone_id = var.zone_id
+  name    = "cf-bounce._domainkey.mail.chordless.app"
+  type    = "TXT"
+  content = "\"v=DKIM1; h=sha256; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAiweykoi+o48IOGuP7GR3X0MOExCUDY/BCRHoWBnh3rChl7WhdyCxW3jgq1daEjPPqoi7sJvdg5hEQVsgVRQP4DcnQDVjGMbASQtrY4WmB1VebF+RPJB2ECPsEDTpeiI5ZyUAwJaVX7r6bznU67g7LvFq35yIo4sdlmtZGV+i0H4cpYH9+3JJ78k\" \"m4KXwaf9xUJCWF6nxeD+qG6Fyruw1Qlbds2r85U9dkNDVAS3gioCvELryh1TxKGiVTkg4wqHTyHfWsp7KD3WQHYJn0RyfJJu6YEmL77zonn7p2SRMvTMP3ZEXibnC9gz3nnhR6wcYL8Q7zXypKTMD58bTixDSJwIDAQAB\""
+  ttl     = 1
+}
+
+# Reject what claims to be from mail.chordless.app and fails SPF and DKIM alignment.
+resource "cloudflare_dns_record" "mail_dmarc" {
+  zone_id = var.zone_id
+  name    = "_dmarc.mail.chordless.app"
+  type    = "TXT"
+  content = "\"v=DMARC1; p=reject;\""
+  ttl     = 1
+}
+
 # Zone settings: only the ones about TLS and HTTPS, the rest are Cloudflare's defaults. Tightened
 # 2026-10-20 from full / off / 1.0: plain http is redirected, and TLS 1.2 is the floor (the app's
 # browser floor, iOS/Safari 17 and Chrome 120, speaks it).
@@ -166,6 +214,31 @@ import {
 import {
   to = cloudflare_dns_record.google_site_verification
   id = "${var.zone_id}/b52573488a6c939a55c4ec30bf9f8bfa"
+}
+
+import {
+  for_each = {
+    route1 = "35f1f2803edc1c376cc463f03fc00f69"
+    route2 = "500fb44f0f6323e132499f316ba8f700"
+    route3 = "c549187657bb4a32883b0bc105e4395d"
+  }
+  to = cloudflare_dns_record.mail_bounce_mx[each.key]
+  id = "${var.zone_id}/${each.value}"
+}
+
+import {
+  to = cloudflare_dns_record.mail_bounce_spf
+  id = "${var.zone_id}/0fc5d6d2003bb02d63dad927499976c1"
+}
+
+import {
+  to = cloudflare_dns_record.mail_dkim
+  id = "${var.zone_id}/3ab99ffe58e148b56834927b1b8a1833"
+}
+
+import {
+  to = cloudflare_dns_record.mail_dmarc
+  id = "${var.zone_id}/4c991779387e7846a3cbcb4d2d8524f8"
 }
 
 import {
