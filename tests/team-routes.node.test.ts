@@ -789,10 +789,10 @@ describe('looking after the people', () => {
   test('the members are the space’s own list, with the owner first', async () => {
     const w = await world()
     assert.deepEqual(await members(w), [
-      { email: 'ann@example.com', role: 'owner' },
-      { email: 'bob@example.com', role: 'writer' },
-      { email: 'cat@example.com', role: 'reader' },
-      { email: 'dan@example.com', role: 'admin' },
+      { email: 'ann@example.com', emails: ['ann@example.com'], role: 'owner' },
+      { email: 'bob@example.com', emails: ['bob@example.com'], role: 'writer' },
+      { email: 'cat@example.com', emails: ['cat@example.com'], role: 'reader' },
+      { email: 'dan@example.com', emails: ['dan@example.com'], role: 'admin' },
     ])
   })
 

@@ -11,6 +11,7 @@ import {
   mergePersonInto,
   newPerson,
   personFor,
+  personForMember,
   settleLeader,
 } from '../src/js/people.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
@@ -39,6 +40,57 @@ describe('newPerson', () => {
     expect(newPerson({ email: 'nat@example.com' })?.name).to.equal('nat@example.com')
     expect(newPerson({ name: 'Visiting Vic' })?.emails).to.deep.equal([])
     expect(newPerson({})).to.equal(null)
+  })
+})
+
+describe('personForMember', () => {
+  const ann = person({ id: 'ann', name: 'Ann Smith', emails: ['ann@example.com'] })
+
+  it('is the one person for every address the team knows a member by, and gives them all', () => {
+    const typed = person({
+      id: 'bea',
+      name: 'bea@hotmail.example',
+      emails: ['bea@hotmail.example'],
+    })
+    const made = personForMember(
+      [ann, typed],
+      {
+        email: 'bea@gmail.example',
+        emails: ['bea@gmail.example', 'bea@hotmail.example'],
+        name: 'Bea',
+      },
+      NOW
+    )
+    expect(made?.person.id).to.equal('bea')
+    expect(made?.person.emails).to.deep.equal(['bea@hotmail.example', 'bea@gmail.example'])
+    expect(made?.changed).to.have.length(1)
+  })
+
+  it('changes nothing for a person who has every address already, and makes one for a stranger', () => {
+    const both = person({ id: 'bea', name: 'Bea', emails: ['b@x.example', 'bea@x.example'] })
+    expect(
+      personForMember([both], { email: 'bea@x.example', emails: ['bea@x.example', 'b@x.example'] })
+        ?.changed
+    ).to.deep.equal([])
+    const stranger = personForMember(
+      [ann],
+      { email: 'cy@x.example', emails: ['cy@x.example', 'c@y.example'], name: 'Cy' },
+      NOW
+    )
+    expect(stranger?.person.emails).to.deep.equal(['cy@x.example', 'c@y.example'])
+    expect(personForMember([], { email: '' })).to.equal(null)
+  })
+
+  it('leaves an address another person has with them, never moved', () => {
+    const typed = person({ id: 'bea', name: 'Bea', emails: ['bea@x.example'] })
+    const made = personForMember(
+      [ann, typed],
+      { email: 'bea@x.example', emails: ['bea@x.example', 'ann@example.com'] },
+      NOW
+    )
+    expect(made?.person.id).to.equal('bea')
+    expect(made?.person.emails).to.deep.equal(['bea@x.example'])
+    expect(made?.changed).to.deep.equal([])
   })
 })
 

@@ -4,9 +4,11 @@
  * object's storage.
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
 import { describe, test } from 'node:test'
 import type { Identity } from '../worker/src/identity.ts'
-import { INVITE_TTL_MS, TeamSpaceState } from '../worker/src/team-state.ts'
+import { accountOf, INVITE_TTL_MS, spacesOf, TeamSpaceState } from '../worker/src/team-state.ts'
 import { d1Db } from './d1-db.ts'
 
 const ann: Identity = { provider: 'google', sub: 'g-1', email: 'Ann@Example.com' }
@@ -110,10 +112,259 @@ describe('members', () => {
     await state.setMember(cat, 'reader')
     await state.setMember(bob, 'writer')
     assert.deepEqual(await state.members(), [
-      { email: 'ann@example.com', role: 'owner' },
-      { email: 'bob@example.com', role: 'writer' },
-      { email: 'cat@example.com', role: 'reader' },
+      { email: 'ann@example.com', emails: ['ann@example.com'], role: 'owner' },
+      { email: 'bob@example.com', emails: ['bob@example.com'], role: 'writer' },
+      { email: 'cat@example.com', emails: ['cat@example.com'], role: 'reader' },
     ])
+  })
+})
+
+describe('accounts', () => {
+  /** The keys of the logins whose sockets were closed, in order */
+  const dropping = () => {
+    const dropped: (string | undefined)[] = []
+    const sockets = {
+      fetch: () => new Response(null, { status: 204 }),
+      async dropSockets(identity?: string) {
+        dropped.push(identity)
+      },
+    }
+    return { dropped, sockets }
+  }
+
+  /** A second login (another provider) for an account: what a later sign-in method will add */
+  const addLogin = (
+    sql: DatabaseSync,
+    account: string,
+    provider: string,
+    sub: string,
+    email: string
+  ) =>
+    sql
+      .prepare(
+        `INSERT INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at)
+          VALUES (?, ?, ?, ?, 't', 't')`
+      )
+      .run(provider, sub, account, email)
+
+  const accountOfLogin = (sql: DatabaseSync, identity: Identity) =>
+    (
+      sql
+        .prepare('SELECT account_id FROM account_identities WHERE provider = ? AND sub = ?')
+        .get(identity.provider, identity.sub) as { account_id: string } | undefined
+    )?.account_id
+
+  test('are made when a team operation first sees a login, never by a request that only asks', async () => {
+    const { state, sql, db } = await made()
+    const count = () => (sql.prepare('SELECT COUNT(*) AS n FROM accounts').get() as { n: number }).n
+    assert.equal(count(), 1, 'the owner’s, made with the space')
+    assert.equal(await state.roleOf(cat), null)
+    assert.deepEqual(await spacesOf(db, cat), [])
+    assert.equal(count(), 1, 'asking about a stranger makes nothing')
+    await state.setMember(bob, 'writer')
+    assert.equal(count(), 2)
+    await state.setMember(bob, 'reader')
+    assert.equal(count(), 2, 'the same login is the same account')
+  })
+
+  test('record the owner’s, and the owner on another login is still the owner', async () => {
+    const { state, sql } = await made()
+    const owner = accountOfLogin(sql, ann)
+    assert.ok(owner)
+    assert.equal(
+      (sql.prepare('SELECT owner_account_id AS id FROM teams').get() as { id: string }).id,
+      owner
+    )
+    addLogin(sql, owner, 'microsoft', 'm-1', 'ann@work.example')
+    assert.equal(await state.roleOf({ provider: 'microsoft', sub: 'm-1' }), 'owner')
+    await assert.rejects(
+      state.setMember({ provider: 'microsoft', sub: 'm-1', email: 'ann@work.example' }, 'admin'),
+      /owner is not a member/
+    )
+  })
+
+  test('give a member the same role on every login of their account, and find the team for each', async () => {
+    const { state, sql, db } = await made()
+    await state.setMember(bob, 'writer')
+    addLogin(sql, accountOfLogin(sql, bob) as string, 'microsoft', 'm-2', 'bob@hotmail.example')
+    const other = { provider: 'microsoft', sub: 'm-2' }
+    assert.equal(await state.roleOf(other), 'writer')
+    assert.deepEqual(
+      (await spacesOf(db, other)).map(space => [space.spaceId, space.role]),
+      [[SPACE, 'writer']]
+    )
+    // (joining again with the other login is the same member, not a second one)
+    await state.setMember({ ...other, email: 'bob@hotmail.example' }, 'admin')
+    assert.deepEqual(
+      (await state.members()).map(member => [member.email, member.role]),
+      [
+        ['ann@example.com', 'owner'],
+        ['bob@hotmail.example', 'admin'],
+      ]
+    )
+  })
+
+  test('list every address the team knows a member by, and any of them names the member', async () => {
+    const { state, sql, rows } = await made()
+    await state.setMember(bob, 'writer')
+    sql
+      .prepare(
+        `INSERT INTO team_member_emails (space_id, email, account_id, source) VALUES (?, 'bob@hotmail.example', ?, 'invite')`
+      )
+      .run(SPACE, accountOfLogin(sql, bob) as string)
+    assert.deepEqual((await state.members())[1], {
+      email: 'bob@example.com',
+      emails: ['bob@example.com', 'bob@hotmail.example'],
+      role: 'writer',
+    })
+    assert.equal(await state.setRoleByEmail('Bob@Hotmail.example', 'reader'), true)
+    assert.equal(await state.roleOf(bob), 'reader')
+    assert.equal(await state.removeByEmail('bob@hotmail.example'), true)
+    assert.equal(await state.roleOf(bob), null)
+    assert.deepEqual(
+      rows('SELECT email FROM team_member_emails'),
+      [],
+      'every address goes with them'
+    )
+    assert.equal(await state.removeByEmail('bob@hotmail.example'), false)
+  })
+
+  test('close the live sockets of every login of a member that changes or goes', async () => {
+    const { db, sql } = await made()
+    const { dropped, sockets } = dropping()
+    const state = new TeamSpaceState(db, SPACE, { now: () => NOW, sockets })
+    await state.setMember(bob, 'writer')
+    addLogin(sql, accountOfLogin(sql, bob) as string, 'microsoft', 'm-2', 'bob@hotmail.example')
+    dropped.length = 0
+    await state.setRoleByEmail('bob@example.com', 'reader')
+    assert.deepEqual([...dropped].sort(), ['google:g-2', 'microsoft:m-2'])
+    dropped.length = 0
+    await state.removeMember(bob)
+    assert.deepEqual([...dropped].sort(), ['google:g-2', 'microsoft:m-2'])
+    assert.equal(await state.roleOf({ provider: 'microsoft', sub: 'm-2' }), null)
+  })
+
+  test('lose no account to a race: the login another request made first is the one used, and the loser leaves nothing', async () => {
+    const { db, sql } = await made()
+    const before = () =>
+      (sql.prepare('SELECT COUNT(*) AS n FROM accounts').get() as { n: number }).n
+    const base = before()
+    const batch = db.batch.bind(db)
+    // (another request makes the same login's account between this one looking and writing)
+    db.batch = async statements => {
+      sql.exec("INSERT INTO accounts (account_id, created_at) VALUES ('first', 't')")
+      sql.exec(
+        "INSERT INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at) VALUES ('google', 'g-5', 'first', 'eve@example.com', 't', 't')"
+      )
+      return batch(statements)
+    }
+    const eve = { provider: 'google', sub: 'g-5', email: 'eve@example.com' }
+    assert.equal(await accountOf(db, eve, true), 'first')
+    assert.equal(before(), base + 1, 'the account that lost is not left behind')
+  })
+
+  test('still work for a space made before accounts, whose owner has none recorded', async () => {
+    const { state, sql } = await made()
+    sql.exec('UPDATE teams SET owner_account_id = NULL')
+    assert.equal(await state.roleOf(ann), 'owner')
+    await assert.rejects(state.setMember(ann, 'admin'), /owner is not a member/)
+    await state.setMember(bob, 'writer')
+    assert.equal(await state.roleOf(bob), 'writer')
+  })
+
+  test('are not part of a space once sharing ends: its members and their addresses go, the accounts stay', async () => {
+    const { state, rows } = await made()
+    await state.setMember(bob, 'writer')
+    await state.destroy(ann)
+    assert.deepEqual(rows('SELECT * FROM team_members'), [])
+    assert.deepEqual(rows('SELECT * FROM team_member_emails'), [])
+    assert.equal(rows('SELECT * FROM accounts').length, 2)
+  })
+
+  test('still find a member the previous Worker made, with no account yet, by the key of their login', async () => {
+    const { state, sql } = await made()
+    sql
+      .prepare(
+        `INSERT INTO team_members (space_id, identity, email, role, since) VALUES (?, 'google:g-9', 'dee@example.com', 'reader', 't')`
+      )
+      .run(SPACE)
+    const dee = { provider: 'google', sub: 'g-9', email: 'dee@example.com' }
+    assert.equal(await state.roleOf(dee), 'reader')
+    assert.equal((await state.members())[1].email, 'dee@example.com')
+    assert.equal(await state.setRoleByEmail('dee@example.com', 'writer'), true)
+    assert.equal(await state.roleOf(dee), 'writer')
+    // (one more with no account, who leaves: nothing but their row to forget)
+    sql
+      .prepare(
+        `INSERT INTO team_members (space_id, identity, email, role, since) VALUES (?, 'google:g-8', 'eve@example.com', 'reader', 't')`
+      )
+      .run(SPACE)
+    assert.equal(await state.removeByEmail('eve@example.com'), true)
+    assert.equal(await state.roleOf({ provider: 'google', sub: 'g-8' }), null)
+    // (the next time they join, they get the account)
+    await state.setMember(dee, 'writer')
+    assert.ok(accountOfLogin(sql, dee))
+    assert.equal(
+      (
+        sql
+          .prepare('SELECT account_id AS id FROM team_members WHERE identity = ?')
+          .get('google:g-9') as { id: string }
+      ).id,
+      accountOfLogin(sql, dee)
+    )
+  })
+})
+
+describe('the migration that made accounts (0003)', () => {
+  test('gives each member and each owner an account, once between teams, and keeps the old columns right', () => {
+    const directory = new URL('../migrations/', import.meta.url)
+    const sql = new DatabaseSync(':memory:')
+    for (const file of ['0001_team_register.sql', '0002_team_state.sql']) {
+      sql.exec(readFileSync(new URL(file, directory), 'utf8'))
+    }
+    sql.exec(`INSERT INTO teams (space_id, name, owner_email, created_at, updated_at, root_ref, owner_provider, owner_sub)
+      VALUES ('s1', 'A', 'ann@x.com', 't', 't', 'r', 'google', 'g-1'), ('s2', 'B', 'bob@x.com', 't', 't', 'r', 'google', 'g-2')`)
+    sql.exec(`INSERT INTO team_members (space_id, identity, email, role, since)
+      VALUES ('s1', 'google:g-2', 'bob@x.com', 'writer', 't'), ('s1', 'google:g-3', 'cat@x.com', 'reader', 't'),
+             ('s2', 'google:g-1', 'ann@x.com', 'admin', 't')`)
+    sql.exec(readFileSync(new URL('0003_accounts.sql', directory), 'utf8'))
+
+    const one = (query: string) => sql.prepare(query).get() as Record<string, unknown>
+    assert.equal(
+      one('SELECT COUNT(*) AS n FROM accounts').n,
+      3,
+      'Ann owns one and is a member of the other: one account'
+    )
+    assert.equal(one('SELECT COUNT(*) AS n FROM account_identities').n, 3)
+    assert.equal(one('SELECT COUNT(*) AS n FROM team_members WHERE account_id IS NULL').n, 0)
+    assert.equal(one('SELECT COUNT(*) AS n FROM teams WHERE owner_account_id IS NULL').n, 0)
+    assert.equal(
+      one(`SELECT COUNT(*) AS n FROM team_members m JOIN teams t ON t.owner_account_id = m.account_id
+             WHERE m.identity = 'google:g-1' AND t.space_id = 's1'`).n,
+      1,
+      'the same account is the owner of one and a member of the other'
+    )
+    assert.deepEqual(
+      sql
+        .prepare('SELECT space_id, email, source FROM team_member_emails ORDER BY space_id, email')
+        .all()
+        .map(row => ({ ...row })),
+      [
+        { space_id: 's1', email: 'bob@x.com', source: 'signin' },
+        { space_id: 's1', email: 'cat@x.com', source: 'signin' },
+        { space_id: 's2', email: 'ann@x.com', source: 'signin' },
+      ]
+    )
+    assert.equal(
+      one("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = '_account_backfill'").n,
+      0,
+      'the scratch table is gone'
+    )
+    assert.equal(
+      one("SELECT identity FROM team_members WHERE email = 'bob@x.com'").identity,
+      'google:g-2',
+      'the old columns stay'
+    )
   })
 })
 
@@ -177,8 +428,11 @@ test('keeps nothing but the space, its members, its refs, the blob, which creden
     .filter(name => name !== 'sqlite_sequence')
     .filter(name => (sql.prepare(`SELECT COUNT(*) AS n FROM ${name}`).get() as { n: number }).n > 0)
   assert.deepEqual(tables.sort(), [
+    'account_identities',
+    'accounts',
     'team_credentials',
     'team_events',
+    'team_member_emails',
     'team_members',
     'team_refs',
     'teams',

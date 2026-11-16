@@ -54,3 +54,6 @@ tests/fixtures/private/
 
 # Terraform plans CI makes (scripts/terraform-ci.sh)
 /plans/
+
+# Copies of the register of teams' database (just db-backup): they hold email addresses
+.backups/

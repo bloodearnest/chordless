@@ -219,7 +219,10 @@ const ADMIN_ROUTES: AdminRoute[] = [
     needs: 'admin',
     async run({ request, room, params: [who], above }) {
       const email = decodeURIComponent(who).toLowerCase()
-      const current = (await room.members()).find(each => each.email === email)
+      // (any address the team knows them by names them)
+      const current = (await room.members()).find(
+        each => each.email === email || each.emails?.includes(email)
+      )
       if (!current) return jsonResponse({ error: 'No such member' }, 404)
       above(current.role)
       if (request.method === 'PUT') {

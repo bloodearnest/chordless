@@ -34,17 +34,26 @@ members of their church. Each space is self-contained, so copyright compliance i
 ### The register of teams
 
 A team space's state is in **D1**
-(`migrations/0001_team_register.sql`, `0002_team_state.sql`, `worker/src/team-state.ts`), not in a
+(`migrations/0001_team_register.sql`, `0002_team_state.sql`, `0003_accounts.sql`, `worker/src/team-state.ts`), not in a
 Durable Object, so it can be asked across teams and outlives them. `teams` has a row per team:
 its id, name, owner (account and email), its Drive folder, which credential it uses, its licence
-number, when it was made, and when sharing ended (the row stays). `team_members` (account, email,
-role, since), `team_invites` (the hash of the code, never the code), `team_refs` (the Drive file
+number, when it was made, and when sharing ended (the row stays). A member is an **account**
+(`accounts`, `account_identities`, 0003): a person's Chordless account, which holds the logins they sign in
+with (a provider and its id for them: today Google's) and the addresses they are known by, so that one
+person on two logins is one member, and a later sign-in with Microsoft, Apple or an emailed link is another
+login of the same account, not a new kind of member. No password is ever kept. `team_members` (the
+member's key, the account, the primary email, role, since) and `team_member_emails` (the addresses *this team*
+knows the member by: the one they signed in with, and one an invite was sent to, which is a label and never
+proof), `team_invites` (the hash of the code, never the code), `team_refs` (the Drive file
 ids in its tree) and `team_credentials` (the owner's encrypted token, a table of its own so a
 query about teams never selects it; a team on the service account has no row) are deleted when
-sharing ends, so the register that outlives a team names no member. `team_events` is added to and
+sharing ends, so the register that outlives a team names no member (the accounts are not the team's and stay). `team_events` is added to and
 never changed: `created`, `licence` (from, to, and who) and `ended`. Nothing in D1 is song,
-setlist or pad content, and an email other than the owner's is kept only while its member is in
-(CLAUDE.md; `src/privacy.html` says so).
+setlist or pad content. A team's own records of a member (`team_members`, `team_member_emails`) go
+with the member; the **account** (`accounts`, `account_identities`: the login's id and the address its provider
+gave) is the person's, not the team's, so it stays until they ask for it to be deleted (CLAUDE.md;
+`src/privacy.html` says so, and was changed with 0003: it used to say a member's email was kept only
+while they were in).
 - **The Durable Object keeps only the live sockets** (`TeamRoom`, binding `TEAM_ROOM`,
   `worker/src/team-room.ts`), which a hibernating WebSocket needs, and no storage. A socket's
   attachment is its account and space (no email); when a message arrives the room asks D1 for the
@@ -64,7 +73,7 @@ setlist or pad content, and an email other than the owner's is kept only while i
 - **Asking it.** There is no route that reads the register: the operator asks with wrangler, for
   example `npx wrangler d1 execute chordless-teams --remote --command "SELECT name, owner_email FROM teams WHERE ccli_licence = '471102'"`,
   or how many people a team has: `SELECT t.name, COUNT(m.identity) + 1 AS people FROM teams t LEFT JOIN team_members m USING (space_id) WHERE t.ended_at IS NULL GROUP BY t.space_id`,
-  or the teams a person is in: `SELECT t.name FROM team_members m JOIN teams t USING (space_id) WHERE m.email = 'x@example.com'`.
+  or the teams a person is in, by any address the team knows them by: `SELECT t.name FROM team_member_emails e JOIN team_members m ON m.account_id = e.account_id AND m.space_id = e.space_id JOIN teams t ON t.space_id = e.space_id WHERE e.email = 'x@example.com'`.
 - **Not covered.** A team's renaming is not noted (a team cannot be renamed yet).
 
 The CCLI licence number and SongSelect's terms are in [CCLI.md](CCLI.md).

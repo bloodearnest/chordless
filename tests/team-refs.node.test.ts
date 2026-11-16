@@ -110,8 +110,8 @@ describe('noting refs', () => {
     await state.setMember(bob, 'writer')
     const space = notingRefs(storage.space(root), state)
     assert.deepEqual(await space.members(), [
-      { email: 'ann@example.com', role: 'owner' },
-      { email: 'bob@example.com', role: 'writer' },
+      { email: 'ann@example.com', emails: ['ann@example.com'], role: 'owner' },
+      { email: 'bob@example.com', emails: ['bob@example.com'], role: 'writer' },
     ])
   })
 

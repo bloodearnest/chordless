@@ -52,6 +52,35 @@ export function personFor(
 }
 
 /**
+ * The person for a team member, who is known by every address the team has for them (the one they
+ * signed in with, and one an invite was sent to when they joined with another): found by any of
+ * them, else as `personFor` finds or makes one for the first, and given the rest, so a person typed in
+ * by the address of an invite is the member and not a second person. An address another person has is
+ * left with them, never moved.
+ */
+export function personForMember(
+  people: Person[],
+  member: { name?: string | null; email: string; emails?: string[] },
+  now = new Date().toISOString()
+): { person: Person; changed: Person[] } | null {
+  const emails = [...new Set([member.email, ...(member.emails ?? [])].map(normalizeEmail))].filter(
+    Boolean
+  )
+  const byAddress = emails.map(email => findPerson(people, { email })).find(Boolean)
+  const base = byAddress
+    ? { person: byAddress, changed: [] as Person[] }
+    : personFor(people, { name: member.name || member.email, email: emails[0] }, now)
+  if (!base) return null
+  const theirs = new Set(
+    people.filter(each => each.id !== base.person.id && isLive(each)).flatMap(each => each.emails)
+  )
+  const added = emails.filter(email => !base.person.emails.includes(email) && !theirs.has(email))
+  if (added.length === 0) return base
+  const person = { ...base.person, emails: [...base.person.emails, ...added], modifiedDate: now }
+  return { person, changed: [...base.changed.filter(each => each.id !== person.id), person] }
+}
+
+/**
  * A new person for a name and/or email, with the id the same leader always gets (null for neither).
  * It is not looked for among the people: see `personFor` for that.
  */
@@ -120,7 +149,7 @@ export async function getSpacePeople(
     return made.person
   }
   for (const member of space?.members || []) {
-    const made = personFor(people, { name: member.name || member.email, email: member.email })
+    const made = personForMember(people, member)
     if (made) keep(made)
   }
 

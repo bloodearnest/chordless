@@ -14,7 +14,10 @@ export const MEMBER_ROLES = ['reader', 'writer', 'admin'] as const satisfies rea
 
 /** A person in a team space, as the Worker lists them (the owner first) */
 export interface TeamMember {
+  /** The address they last signed in with: what an app from before `emails` reads */
   email: string
+  /** Every address the team knows them by (the one they signed in with, and any an invite was sent to), the first being `email` */
+  emails?: string[]
   role: TeamRole
 }
 

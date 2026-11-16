@@ -93,6 +93,22 @@ must only add (a column with a default, a table, an index), because the Worker t
 before the deploy keeps running on it for a moment, and again after a rollback. The tests run the files
 as they stand against SQLite (`tests/register-db.ts`).
 
+**Expand, then contract.** Because a migration may only add, a change of shape is two steps: the first
+migration adds the new tables and columns and fills them from the old (`0003_accounts.sql` made accounts
+and filled them from the members), the new Worker writes both, and a later migration drops the old
+columns once nothing that could be rolled back to reads them.
+
+**Backing up first.** The deploy applies a migration by itself, so the database is backed up before a pull
+request that adds one is merged:
+- `just db-backup` writes the whole database to `.backups/` (`wrangler d1 export --remote`; git-ignored,
+  because it holds email addresses: never committed, never uploaded as a CI artifact). Restoring it is
+  `wrangler d1 execute chordless-teams --remote --file .backups/<file>.sql` into an emptied database, or
+  into the local one to rehearse a migration on real data (`just db-local` first).
+- The deploy also notes a restore point just before it migrates: `wrangler d1 time-travel info` in the
+  job's summary gives the bookmark, and `wrangler d1 time-travel restore chordless-teams --bookmark <it>`
+  puts the database back to that moment (D1 keeps that history for a limited time: check how long on the
+  account's plan before relying on it past the day). It holds a time, not data.
+
 ## Tests
 
 - `tests/old-database.ts` makes a database as an older version left it (a written-out schema, and records), and
