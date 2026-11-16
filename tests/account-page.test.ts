@@ -12,7 +12,6 @@ import {
   SpaceDefaultEvent,
   SpaceLeadersEvent,
   SpaceManageEvent,
-  SpaceSwitchEvent,
   SpaceSyncedEvent,
   SpaceUsersEvent,
 } from '../src/components/space-card.ts'
@@ -119,21 +118,6 @@ describe('account-page', () => {
     el.shadowRoot?.querySelector('account-card')?.dispatchEvent(new AccountStateEvent('expired'))
     await el.updateComplete
     expect(cards(el).every(card => card.signIn === 'expired')).to.equal(true)
-  })
-
-  it('switches to the space asked for, and shows it', async () => {
-    const first = await space('First')
-    const second = await space('Second')
-    await setCurrentSpace(first.id, first.name)
-    const el = await page()
-    let shown = 0
-    el.show = () => {
-      shown++
-    }
-    must(el.shadowRoot?.querySelector('space-card')).dispatchEvent(new SpaceSwitchEvent(second.id))
-    await waitUntil(() => shown !== 0)
-    expect(shown).to.equal(1)
-    expect(getCurrentSpace().id).to.equal(second.id)
   })
 
   it('keeps the space asked for as the default, and marks only that one', async () => {

@@ -194,10 +194,7 @@ confirm-drive-replace-heading = Replace this device's copy?
 confirm-drive-replace-button = Replace
 confirm-drive-replace-message = For when another device has already synced this space with this version of the app. This device's setlists and songs are replaced with the folder of this name in Google Drive, and anything only on this device is lost. If there is no such folder, nothing is changed.
 
-confirm-space-switch-heading = Switch?
-confirm-space-switch-button = Switch
 # { $space } is the space.
-confirm-space-switch-message = Switch to "{ $space }"?
 
 confirm-space-delete-heading = Delete from this device?
 confirm-space-delete-button = Delete

@@ -4,7 +4,7 @@ import type { Space } from '../js/data-types.ts'
 import { defaultSpaceOf, setDefaultSpaceId } from '../js/default-space.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { goTo } from '../js/navigation.ts'
-import { getCurrentSpace, listSpaces, switchSpace } from '../js/space.ts'
+import { getCurrentSpace, listSpaces } from '../js/space.ts'
 import { checkTeamMemberships, TeamSpacesAddedEvent } from '../js/team-memberships.ts'
 import { AccountStateEvent } from './account-card.ts'
 import './account-card.ts'
@@ -15,7 +15,6 @@ import {
   SpaceDefaultEvent,
   SpaceLeadersEvent,
   SpaceManageEvent,
-  SpaceSwitchEvent,
   SpaceSyncedEvent,
   SpaceUsersEvent,
 } from './space-card.ts'
@@ -124,7 +123,6 @@ export class AccountPage extends LitElement {
     super.connectedCallback()
     this.addEventListener(AccountStateEvent.type, this._onAccount)
     this.addEventListener(SpaceSyncedEvent.type, this._onSynced)
-    this.addEventListener(SpaceSwitchEvent.type, this._onSwitch)
     this.addEventListener(SpaceDefaultEvent.type, this._onDefault)
     this.addEventListener(SpaceManageEvent.type, this._onManage)
     this.addEventListener(SpaceUsersEvent.type, this._onUsers)
@@ -138,7 +136,6 @@ export class AccountPage extends LitElement {
   override disconnectedCallback(): void {
     this.removeEventListener(AccountStateEvent.type, this._onAccount)
     this.removeEventListener(SpaceSyncedEvent.type, this._onSynced)
-    this.removeEventListener(SpaceSwitchEvent.type, this._onSwitch)
     this.removeEventListener(SpaceDefaultEvent.type, this._onDefault)
     this.removeEventListener(SpaceManageEvent.type, this._onManage)
     this.removeEventListener(SpaceUsersEvent.type, this._onUsers)
@@ -185,10 +182,6 @@ export class AccountPage extends LitElement {
     const id = (event as SpaceDefaultEvent).spaceId
     setDefaultSpaceId(id)
     this._defaultId = id
-  }
-
-  _onSwitch = (event: Event): void => {
-    void switchSpace((event as SpaceSwitchEvent).spaceId, this.show)
   }
 
   /** Show everything to do with a space in a modal */

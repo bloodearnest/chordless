@@ -1,5 +1,4 @@
 import { css, html, LitElement, nothing } from 'lit'
-import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { formatSyncTime, lastSyncOf } from '../js/last-sync.ts'
@@ -7,10 +6,8 @@ import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
 import { syncSpaceNow } from '../js/space-sync.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
-import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
 import { errorMessage } from '../js/utils/errors.ts'
-import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles, spinnerStyles } from './shared-styles.ts'
 
@@ -19,16 +16,6 @@ export class SpaceSyncedEvent extends Event {
   static readonly type = 'space-card:synced'
   constructor() {
     super(SpaceSyncedEvent.type, { bubbles: true, composed: true })
-  }
-}
-
-/** A person asked to switch to this space (and has said yes): the page does it */
-export class SpaceSwitchEvent extends Event {
-  static readonly type = 'space-card:switch'
-  readonly spaceId: string
-  constructor(spaceId: string) {
-    super(SpaceSwitchEvent.type, { bubbles: true, composed: true })
-    this.spaceId = spaceId
   }
 }
 
@@ -107,8 +94,6 @@ export class SpaceCard extends LitElement {
   declare _progress: string
   declare _error: string
   declare _syncedAt: string | null
-
-  _switchModal: Ref<AppModal> = createRef()
 
   static override styles = [
     buttonStyles,
@@ -207,12 +192,6 @@ export class SpaceCard extends LitElement {
     }
   }
 
-  async _switch(): Promise<void> {
-    const modal = this._switchModal.value as AppModal
-    modal.message = t('confirm-space-switch-message', { space: this.space.name })
-    if (await modal.ask()) this.dispatchEvent(new SpaceSwitchEvent(this.space.id))
-  }
-
   /** The line about syncing: when it last did, or what stands in the way */
   _syncLine(): string {
     switch (this.signIn) {
@@ -286,20 +265,8 @@ export class SpaceCard extends LitElement {
               </button>`
               : nothing
           }
-          ${
-            this.current
-              ? nothing
-              : html`<button class="btn switch" id="switch" @click=${this._switch}>Switch</button>`
-          }
         </div>
       </div>
-      <app-modal
-        ${ref(this._switchModal)}
-        type="confirm"
-        size="small"
-        heading=${t('confirm-space-switch-heading')}
-        confirm-label=${t('confirm-space-switch-button')}
-      ></app-modal>
     `
   }
 }
