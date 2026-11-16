@@ -11,7 +11,12 @@ import { matchRoute, type Route } from '../js/router.ts'
 import { setCurrentSpace, switchSpace } from '../js/space.ts'
 import { storageFor } from '../js/storage/space-storage.ts'
 import type { ProgressCallback, SyncProgress } from '../js/sync-manager.ts'
-import { GOOGLE_SIGNUP_URL, joinSpace, roleWithArticle, syncTeamSpace } from '../js/team-spaces.ts'
+import {
+  googleAccountGuideUrl,
+  joinSpace,
+  roleWithArticle,
+  syncTeamSpace,
+} from '../js/team-spaces.ts'
 import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { TeamError } from '../js/worker-call.ts'
@@ -249,15 +254,8 @@ export class TeamJoin extends LitElement {
             to. Chordless asks only who you are: it gets no access to your Google Drive.
           </p>
           <p>${t('join-no-gmail-needed')}</p>
-          <h3>${t('join-steps-heading')}</h3>
-          <ol>
-            <li>${t('join-step-1')}</li>
-            <li>${t('join-step-2')}</li>
-            <li>${t('join-step-3')}</li>
-            <li>${t('join-step-4')}</li>
-          </ol>
           <p>
-            <a href=${GOOGLE_SIGNUP_URL} target="_blank" rel="noopener">${t('join-make-google-account')}</a>
+            <a href=${googleAccountGuideUrl(window.location.origin)}>${t('join-make-google-account')}</a>
           </p>
           <p class="hint">${t('join-google-refused')}</p>
           ${this._message ? html`<p class="status error" role="alert">${this._message}</p>` : nothing}
@@ -312,7 +310,11 @@ export class TeamJoin extends LitElement {
         return html`
           <h2>Couldn't join</h2>
           <p class="status error" role="alert">${this._message}</p>
-          <p class="hint">${t('join-wrong-account-help')} ${t('join-google-refused')}</p>
+          <p class="hint">
+            ${t('join-wrong-account-help')}
+            <a href=${googleAccountGuideUrl(window.location.origin)}>${t('join-make-google-account')}</a>
+            ${t('join-google-refused')}
+          </p>
           <div class="actions">
             <button class="btn primary" @click=${this._check}>Try again</button>
             <button class="btn" @click=${this._signIn}>Use a different account</button>

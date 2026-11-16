@@ -11,8 +11,8 @@ import {
   type TeamRole,
 } from '../js/team-roles.ts'
 import {
-  googleAccountHelp,
   inviteLink,
+  isGmailAddress,
   leaveSpace,
   roleLabel,
   roleWithArticle,
@@ -350,7 +350,7 @@ export class TeamSharePanel extends LitElement {
             ></invite-send>
             <p>It is shown once. Send it to them yourself.</p>
             ${
-              googleAccountHelp(this._link.email)
+              !isGmailAddress(this._link.email)
                 ? html`<p>Not a Gmail address, so the message also tells them how to make a Google account with it.</p>`
                 : nothing
             }

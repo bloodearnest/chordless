@@ -25,7 +25,9 @@ const NEVER_CACHED = (path: string) =>
   path === '.assetsignore' ||
   path === '_headers' ||
   path.endsWith('.map') ||
-  path.startsWith('icons/splash/')
+  path.startsWith('icons/splash/') ||
+  // the pictures of Google's sign-up (google-account.html): seen once, online, by someone making an account
+  path.startsWith('google-account/')
 
 // Not precached, so the install stays quick, but fetched and kept shortly after the app has
 // loaded (the page asks: src/js/precache-deferred.ts), so they work offline too: the PDF reader

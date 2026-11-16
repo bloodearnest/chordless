@@ -116,7 +116,7 @@ test('the heavy files are fetched after the page has loaded, and work with no ne
   }
 })
 
-test('the privacy, terms and licences pages are styled under the page security policy', async ({
+test('the privacy, terms, licences and Google account pages are styled under the page security policy', async ({
   page,
 }) => {
   // (an inline <style> is refused by style-src 'self', which left them bare)
@@ -124,7 +124,7 @@ test('the privacy, terms and licences pages are styled under the page security p
   page.on('console', message => {
     if (/Refused to/.test(message.text())) refused.push(message.text())
   })
-  for (const path of ['/privacy.html', '/terms.html', '/licences.html']) {
+  for (const path of ['/privacy.html', '/terms.html', '/licences.html', '/google-account.html']) {
     await page.goto(path)
     await expect(page.locator('.doc h1'), path).toBeVisible()
     // The app's own theme reached it: the header's colour, not the browser's default (transparent)
