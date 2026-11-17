@@ -254,6 +254,13 @@ The Worker keeps no per-user state (a team's members are the team's, in D1).
   a Team or sync a personal space until Google is connected. When its session ends, signing in again is the only way
   (there is no blob to start from). Where mail landed in a test (2026-11-16, one address each): Hotmail/Outlook, Gmail and a work
   address in the inbox, Yahoo in spam: the screen says to look in spam and offers to send again.
+- **Connecting Google to an account (2026-11-17):** Google's sign-in (`/oauth/callback`) takes the session the page already has
+  as its bearer, and the Google login joins that account, whatever its address (an emailed sign-in then has Drive, and a Team
+  it owns can be made); a Google login that is already on another account is refused (`409 google_in_use`: two accounts are
+  not merged here). With no session, the same mailbox is the same person both ways: a Google login whose address Google says it
+  verified joins the account of an emailed sign-in of that address (never an unverified one, nor a different address, `ann+x`
+  included). The Account page shows an emailed sign-in as "Signed in with your email address", with **Connect Google** (the whole
+  Google sign-in, with Drive), and no revoke or token tools, which are Google's; signed out, it offers the email form beside Google.
 - **Signing in without Drive (checked and built 2026-10-21):** asking for `openid email profile`
   alone gives a refresh token, an ID token with a verified email, and an access token, and asking
   later for `drive.file` alone (with `include_granted_scopes` and `prompt: consent`) adds the Drive

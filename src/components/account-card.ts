@@ -6,6 +6,7 @@ import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
+import './email-code-sign-in.ts'
 import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.ts'
 
 /** Who is signed in now, or what is wrong with the sign-in */
@@ -37,12 +38,18 @@ export class AccountCard extends LitElement {
     _state: { state: true },
     _user: { state: true },
     _message: { state: true },
+    _emailOnly: { state: true },
+    _emailForm: { state: true },
   }
 
   /** Null until the sign-in has been looked at */
   declare _state: SignInState | null
   declare _user: UserInfo | null
   declare _message: Message | null
+  /** Signed in with an emailed code alone: no Google, so no Drive */
+  declare _emailOnly: boolean
+  /** The form for an emailed code is open */
+  declare _emailForm: boolean
 
   _logoutModal: Ref<AppModal> = createRef()
   _revokeModal: Ref<AppModal> = createRef()
@@ -97,6 +104,8 @@ export class AccountCard extends LitElement {
     this._state = null
     this._user = null
     this._message = null
+    this._emailOnly = false
+    this._emailForm = false
   }
 
   override connectedCallback(): void {
@@ -107,11 +116,19 @@ export class AccountCard extends LitElement {
   /** Look at the sign-in again (the first look, and after anything that changes it) */
   async refresh(): Promise<void> {
     // (neither of these throws: a failed check is a user who is not signed in)
-    const { getSignInState, getCurrentUserInfo } = await import('../js/google-auth.ts')
+    const { getSignInState, getCurrentUserInfo, isEmailOnly } = await import('../js/google-auth.ts')
     const state = await getSignInState()
+    this._emailOnly = state !== 'signed-out' && (await isEmailOnly())
+    if (state !== 'signed-out') this._emailForm = false
     this._user = state === 'signed-out' ? null : await getCurrentUserInfo()
     this._state = state
     this.dispatchEvent(new AccountStateEvent(state))
+  }
+
+  /** They signed in with an emailed code: look again, and say so */
+  async _emailSignedIn(): Promise<void> {
+    await this.refresh()
+    this._message = { text: t('account-email-signed-in'), type: 'success' }
   }
 
   async _signIn(): Promise<void> {
@@ -294,6 +311,11 @@ export class AccountCard extends LitElement {
         ${state === 'signed-out' ? this._renderSignedOut() : this._renderWho(state)}
         <div class="actions">${this._renderMainAction(state)}</div>
       </div>
+      ${
+        this._emailForm && state === 'signed-out'
+          ? html`<email-code-sign-in @email-code:signed-in=${this._emailSignedIn}></email-code-sign-in>`
+          : nothing
+      }
       <details>
         <summary>Manage</summary>
         <div class="manage">
@@ -302,7 +324,11 @@ export class AccountCard extends LitElement {
               ? nothing
               : html`<div class="row">
                 <button class="btn" id="logout" @click=${this._logout}>Log out</button>
-                <button class="btn danger" id="revoke" @click=${this._revokeAccess}>Revoke access on all devices</button>
+                ${
+                  this._emailOnly
+                    ? nothing
+                    : html`<button class="btn danger" id="revoke" @click=${this._revokeAccess}>Revoke access on all devices</button>`
+                }
               </div>`
           }
           <details class="advanced">
@@ -310,7 +336,7 @@ export class AccountCard extends LitElement {
             <div class="manage">
               <div class="row">
                 ${
-                  state === 'signed-out'
+                  state === 'signed-out' || this._emailOnly
                     ? nothing
                     : html`<button class="btn" id="test-refresh" @click=${this._testTokenRefresh}>
                       Test token refresh
@@ -347,9 +373,11 @@ export class AccountCard extends LitElement {
     const status =
       state === 'expired'
         ? 'Sign-in expired: reconnect to sync'
-        : state === 'no-drive'
-          ? 'Signed in, Google Drive not connected'
-          : 'Google Drive connected'
+        : this._emailOnly
+          ? t('account-email-only-status')
+          : state === 'no-drive'
+            ? 'Signed in, Google Drive not connected'
+            : 'Google Drive connected'
     return html`<div class="who">
       ${
         photo
@@ -368,10 +396,15 @@ export class AccountCard extends LitElement {
 
   _renderMainAction(state: SignInState) {
     if (state === 'signed-out') {
-      return html`<button class="btn primary" id="sign-in" @click=${this._signIn}>${t('action-sign-in')}</button>`
+      return html`<button class="btn primary" id="sign-in" @click=${this._signIn}>${t('action-sign-in')}</button>
+        <button class="btn" id="sign-in-email" @click=${() => (this._emailForm = true)}>${t('email-code-button')}</button>`
     }
     if (state === 'expired') {
       return html`<button class="btn primary" id="reconnect" @click=${this._signIn}>Reconnect with Google</button>`
+    }
+    if (this._emailOnly) {
+      // (no Google at all yet: Google's whole sign-in, with Drive, is joined to this account)
+      return html`<button class="btn primary" id="connect-google" @click=${this._signIn}>${t('account-connect-google')}</button>`
     }
     if (state === 'no-drive') {
       return html`<button class="btn primary" id="connect-drive" @click=${this._connectDrive}>Connect Google Drive</button>`

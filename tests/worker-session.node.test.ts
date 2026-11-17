@@ -26,7 +26,12 @@ import {
   handleSessionUpgrade,
   handleTokenRefresh,
 } from '../worker/src/session.ts'
-import { revokeSession, rotateSession, verifyAccessToken } from '../worker/src/session-tokens.ts'
+import {
+  revokeSession,
+  rotateSession,
+  signAccessToken,
+  verifyAccessToken,
+} from '../worker/src/session-tokens.ts'
 import { accountOf } from '../worker/src/team-state.ts'
 import { d1Db } from './d1-db.ts'
 
@@ -1148,5 +1153,129 @@ describe('signing in with an emailed code', () => {
       w.verify('ann@example.com', code),
     ])
     assert.deepEqual(answers.map(each => each.status).sort(), [200, 401])
+  })
+})
+
+describe('connecting Google to an account', () => {
+  const NOW = new Date('2026-11-16T12:00:00.000Z')
+  const withDb = () => {
+    const { db, sql } = d1Db()
+    return { sql, e: { ...env, DB: db } satisfies Env }
+  }
+  const googleAs = (claims: Record<string, unknown>) =>
+    fakeGoogle({
+      exchangeCode: async () => ({
+        refresh_token: REFRESH_TOKEN,
+        access_token: 'access-1',
+        expires_in: 3600,
+        scope: `openid email ${DRIVE_SCOPE}`,
+        id_token: 'id-token',
+        claims: { name: 'Ann', ...claims },
+      }),
+    } as never).google
+  const callback = async (
+    e: Env,
+    google: GoogleApi,
+    bearer?: string
+  ): Promise<{ status: number; session?: { access_token: string }; error?: string }> => {
+    const request = new Request('https://chordless.test/oauth/callback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+      },
+      body: JSON.stringify({ code: 'c', redirect_uri: 'https://chordless.test' }),
+    })
+    const response = await handleOAuthCallback(request, e, google, NOW)
+    return { status: response.status, ...((await response.json()) as object) }
+  }
+  const accountOfToken = async (e: Env, token?: string) =>
+    token ? (await verifyAccessToken(token, e, NOW))?.accountId : undefined
+  /** An account that signed in by an emailed code, with a session */
+  const emailAccount = async (e: Env, sql: ReturnType<typeof withDb>['sql'], address: string) => {
+    const id = `acct-${address}`
+    const at = NOW.toISOString()
+    sql.prepare('INSERT INTO accounts (account_id, created_at) VALUES (?, ?)').run(id, at)
+    sql
+      .prepare(
+        "INSERT INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at) VALUES ('email', ?, ?, ?, ?, ?)"
+      )
+      .run(address, id, address, at, at)
+    return {
+      id,
+      token: await signAccessToken({ accountId: id, sessionId: 's1', email: address }, e, NOW),
+    }
+  }
+
+  test('adds the Google login to the account of the session it is made from, whatever its address', async () => {
+    const { e, sql } = withDb()
+    const mine = await emailAccount(e, sql, 'ann@hotmail.example')
+    const answer = await callback(
+      e,
+      googleAs({ sub: 'g-1', email: 'ann@gmail.example', email_verified: true }),
+      mine.token
+    )
+    assert.equal(answer.status, 200)
+    assert.equal(await accountOfToken(e, answer.session?.access_token), mine.id)
+    const logins = sql
+      .prepare('SELECT provider FROM account_identities WHERE account_id = ? ORDER BY provider')
+      .all(mine.id)
+      .map(row => row.provider)
+    assert.deepEqual(logins, ['email', 'google'])
+    // (and again: nothing more is made)
+    const again = await callback(
+      e,
+      googleAs({ sub: 'g-1', email: 'ann@gmail.example' }),
+      mine.token
+    )
+    assert.equal(await accountOfToken(e, again.session?.access_token), mine.id)
+  })
+
+  test('is refused when that Google login is already on another account', async () => {
+    const { e, sql } = withDb()
+    const first = await callback(e, googleAs({ sub: 'g-1', email: 'ann@gmail.example' }))
+    const theirs = await accountOfToken(e, first.session?.access_token)
+    const mine = await emailAccount(e, sql, 'bob@hotmail.example')
+    const answer = await callback(
+      e,
+      googleAs({ sub: 'g-1', email: 'ann@gmail.example' }),
+      mine.token
+    )
+    assert.equal(answer.status, 409)
+    assert.equal(answer.error, 'google_in_use')
+    assert.notEqual(theirs, mine.id)
+    const row = sql
+      .prepare("SELECT account_id FROM account_identities WHERE provider = 'google'")
+      .get()
+    assert.equal(row?.account_id, theirs, 'it stays where it was')
+  })
+
+  test('ignores a bearer that is not a session of ours', async () => {
+    const { e } = withDb()
+    const answer = await callback(
+      e,
+      googleAs({ sub: 'g-2', email: 'cat@gmail.example' }),
+      'garbage'
+    )
+    assert.equal(answer.status, 200)
+    assert.ok(answer.session)
+  })
+
+  test('is the account of an emailed sign-in of the same address, if Google says it has verified it', async () => {
+    const { e, sql } = withDb()
+    const mine = await emailAccount(e, sql, 'ann@example.com')
+    const answer = await callback(
+      e,
+      googleAs({ sub: 'g-3', email: 'Ann@Example.com', email_verified: true })
+    )
+    assert.equal(await accountOfToken(e, answer.session?.access_token), mine.id)
+    // (not when Google has not verified it, or the address is another)
+    const unverified = await callback(e, googleAs({ sub: 'g-4', email: 'ann@example.com' }))
+    assert.notEqual(await accountOfToken(e, unverified.session?.access_token), mine.id)
+    const other = await callback(
+      e,
+      googleAs({ sub: 'g-5', email: 'ann+x@example.com', email_verified: true })
+    )
+    assert.notEqual(await accountOfToken(e, other.session?.access_token), mine.id)
   })
 })

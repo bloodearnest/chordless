@@ -10,9 +10,70 @@ import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
 import { type GoogleApi, realGoogle } from './google-auth.ts'
 import { jsonResponse, message, Refusal, readJson, refusing } from './http.ts'
-import { issueSession, revokeSession, rotateSession, type SessionTokens } from './session-tokens.ts'
+import {
+  issueSession,
+  revokeSession,
+  rotateSession,
+  type SessionTokens,
+  verifyAccessToken,
+} from './session-tokens.ts'
 import { accountOf } from './team-state.ts'
 import { annotateRequest } from './trace.ts'
+
+/** The account behind the session a request carries as its bearer, if it carries a good one */
+async function bearerAccount(request: Request, env: Env, now: Date): Promise<string | undefined> {
+  const token = /^Bearer (.+)$/.exec(request.headers.get('Authorization') ?? '')?.[1]
+  if (!token || !env.SESSION_SIGNING_KEY) return undefined
+  return (await verifyAccessToken(token, env, now))?.accountId
+}
+
+/**
+ * The account for a Google login that has just proved who it is:
+ * - signed in already (a session as the bearer): the login joins that account, as an explicit link (a person who
+ *   signed in with an emailed code connects Google, whatever address it has); 409 `google_in_use` if the login is
+ *   already on another account (two accounts are not merged, here);
+ * - not: the login's own account; and a new login whose address Google says it has verified, and that an emailed
+ *   code has proved for an account, joins that account (the same mailbox is the same person); otherwise a new one.
+ */
+async function accountOfGoogle(
+  db: D1Db,
+  who: { sub: string; email: string; verified: boolean },
+  linkTo: string | undefined,
+  now: Date
+): Promise<string> {
+  const at = now.toISOString()
+  const email = who.email.toLowerCase()
+  const existing = await db
+    .prepare("SELECT account_id FROM account_identities WHERE provider = 'google' AND sub = ?")
+    .bind(who.sub)
+    .first<{ account_id: string }>()
+  if (existing && linkTo && existing.account_id !== linkTo) {
+    throw new Refusal(409, 'google_in_use')
+  }
+  let account = linkTo
+  if (!account && !existing && who.verified) {
+    const mailbox = await db
+      .prepare(
+        "SELECT account_id FROM account_identities WHERE provider = 'email' AND email = ? ORDER BY created_at LIMIT 1"
+      )
+      .bind(email)
+      .first<{ account_id: string }>()
+    account = mailbox?.account_id
+  }
+  if (account && !existing) {
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at)
+          VALUES ('google', ?, ?, ?, ?, ?)`
+      )
+      .bind(who.sub, account, email, at, at)
+      .run()
+  }
+  return (
+    account ??
+    ((await accountOf(db, { provider: 'google', sub: who.sub, email }, true, now)) as string)
+  )
+}
 
 /**
  * A new Chordless session for a Google login that has just proved who it is (a code exchanged, or a blob that
@@ -22,16 +83,12 @@ import { annotateRequest } from './trace.ts'
  */
 async function startSession(
   env: Env,
-  who: { sub: string; email: string },
-  now: Date
+  who: { sub: string; email: string; verified: boolean },
+  now: Date,
+  linkTo?: string
 ): Promise<SessionTokens | undefined> {
   if (!env.DB || !env.SESSION_SIGNING_KEY) return undefined
-  const accountId = (await accountOf(
-    env.DB,
-    { provider: 'google', sub: who.sub, email: who.email },
-    true,
-    now
-  )) as string
+  const accountId = await accountOfGoogle(env.DB, who, linkTo, now)
   return issueSession(env.DB, env, { accountId, email: who.email }, now)
 }
 
@@ -146,7 +203,12 @@ export function handleOAuthCallback(
       sub: payload.sub || null,
     }
 
-    const session = await startSession(env, { sub: sub as string, email: email ?? '' }, now)
+    const session = await startSession(
+      env,
+      { sub: sub as string, email: email ?? '', verified: payload.email_verified === true },
+      now,
+      await bearerAccount(request, env, now)
+    )
     annotateRequest({ 'chordless.auth.session_result': session ? 'issued' : 'unavailable' })
 
     return jsonResponse({
@@ -301,7 +363,7 @@ export function handleSessionUpgrade(
     sessionsOf(env)
     const session = await startSession(
       env,
-      { sub: blobData.owner_sub as string, email: blobData.owner_email as string },
+      { sub: blobData.owner_sub as string, email: blobData.owner_email as string, verified: false },
       now
     )
     annotateRequest({ 'chordless.auth.session_result': 'upgraded' })
