@@ -52,7 +52,7 @@ interface MadeInvite {
  * member's role and removal (the Worker's). **Invite someone** emails the invite (the Worker does) and shows its link.
  * What a role may do is the Worker's rule, and the controls follow it: a role acts only on those below it.
  */
-export class TeamPeople extends LitElement {
+export class PeopleList extends LitElement {
   static override properties = {
     space: { attribute: false },
     _members: { state: true },
@@ -161,25 +161,35 @@ export class TeamPeople extends LitElement {
     return (this.space as Space).team as TeamLink
   }
 
-  /** What this person is: their role in the Team */
+  /** Whether this is a Team's: a Personal space has people (who lead its setlists) and no members, roles or invites */
+  get _isTeam(): boolean {
+    return !!this.space?.team
+  }
+
+  /** What this person is: their role in the Team (only asked of a Team's people) */
   get _mine(): TeamRole {
     return this._team.role
   }
 
-  /** Whether they may change people (names and addresses): worship leaders and above */
+  /** Whether they may change people (names and addresses): worship leaders and above in a Team; anyone in a space of their own that is not view-only */
   get _canEdit(): boolean {
-    return atLeast(this._mine, 'writer')
+    return this._isTeam ? atLeast(this._mine, 'writer') : !this.space?.readOnly
   }
 
-  /** Whether they look after members (roles, invites, removal): admins and the owner */
+  /** Whether they look after members (roles, invites, removal): admins and the owner of a Team */
   get _canManage(): boolean {
-    return outranks(this._mine, 'writer')
+    return this._isTeam && outranks(this._mine, 'writer')
   }
 
   override willUpdate(changed: Map<string, unknown>): void {
     if (!changed.has('space')) return
     const previous = changed.get('space') as Space | null | undefined
-    if (this.space?.team && previous?.team?.id !== this.space.team.id) void this.load()
+    if (
+      this.space &&
+      (previous?.id !== this.space.id || previous?.team?.id !== this.space.team?.id)
+    ) {
+      void this.load()
+    }
   }
 
   /** The members the space kept at its last sync, until the Team is asked */
@@ -192,14 +202,16 @@ export class TeamPeople extends LitElement {
   /** Read the people: members and invites from the Worker (the cached members offline), names and what each leads from the space */
   async load(): Promise<void> {
     const space = this.space as Space
-    const team = this._team
-    this._members = this._members.length ? this._members : this._cachedMembers()
-    const [members, invites] = await Promise.all([
-      teamApi.members(team.id).catch(() => null),
-      this._canManage ? teamApi.invites(team.id).catch(() => []) : Promise.resolve([]),
-    ])
-    if (members) this._members = members
-    this._invites = invites
+    if (space.team) {
+      const team = space.team
+      this._members = this._members.length ? this._members : this._cachedMembers()
+      const [members, invites] = await Promise.all([
+        teamApi.members(team.id).catch(() => null),
+        this._canManage ? teamApi.invites(team.id).catch(() => []) : Promise.resolve([]),
+      ])
+      if (members) this._members = members
+      this._invites = invites
+    }
     const db = await openSpace(space.id)
     try {
       const [people, setlists, user] = await Promise.all([
@@ -423,6 +435,13 @@ export class TeamPeople extends LitElement {
     return days === 1 ? t('people-yesterday') : t('people-days-ago', { days })
   }
 
+  /** What the page says under the list: what Edit does, or that it is for looking at */
+  _hint(): string {
+    if (!this._isTeam)
+      return t(this._canEdit ? 'people-hint-personal' : 'people-hint-read-personal')
+    return t(this._canEdit ? 'people-hint-edit' : 'people-hint-read')
+  }
+
   _renderRow(row: PersonRow) {
     return html`<tr>
       <td>
@@ -431,8 +450,12 @@ export class TeamPeople extends LitElement {
         ${row.leads > 0 ? html`<span class="chip">${t('people-leads', { count: row.leads })}</span>` : nothing}
       </td>
       <td class="sub">${row.email}${row.more > 0 ? html` <span class="chip">+${row.more}</span>` : nothing}</td>
-      <td>${row.role ? sentenceCase(roleLabel(row.role)) : ''}</td>
-      <td class="sub">${this._status(row)}</td>
+      ${
+        this._isTeam
+          ? html`<td>${row.role ? sentenceCase(roleLabel(row.role)) : ''}</td>
+            <td class="sub">${this._status(row)}</td>`
+          : nothing
+      }
       <td><div class="actions">${this._renderActions(row)}</div></td>
     </tr>`
   }
@@ -537,7 +560,7 @@ export class TeamPeople extends LitElement {
   }
 
   override render() {
-    if (!this.space?.team) return nothing
+    if (!this.space) return nothing
     const rows = this._shown()
     const total = this._rows().length
     const header = (
@@ -549,7 +572,7 @@ export class TeamPeople extends LitElement {
     const row = this._rows().find(each => each.key === this._editing)
     return html`
       <div class="panel">
-        <h3>${t('people-heading', { count: total })}</h3>
+        <h3>${t(this._isTeam ? 'people-heading' : 'people-heading-personal', { count: total })}</h3>
         <div class="bar">
           ${
             total > SEARCH_FROM
@@ -573,21 +596,21 @@ export class TeamPeople extends LitElement {
           !this._loaded
             ? html`<p class="hint">${t('status-checking')}</p>`
             : rows.length === 0
-              ? html`<p class="hint">${t('people-none')}</p>`
+              ? html`<p class="hint">${t(this._isTeam || this._query ? 'people-none' : 'people-none-personal')}</p>`
               : html`<table>
                 <thead>
                   <tr>
                     ${header('name', t('people-column-name'))}
                     <th scope="col">${t('people-column-email')}</th>
-                    ${header('role', t('people-column-role'))}
-                    ${header('status', t('people-column-status'))}
+                    ${this._isTeam ? header('role', t('people-column-role')) : nothing}
+                    ${this._isTeam ? header('status', t('people-column-status')) : nothing}
                     <th scope="col"><span class="sub">${t('people-column-actions')}</span></th>
                   </tr>
                 </thead>
                 <tbody>${rows.map(each => this._renderRow(each))}</tbody>
               </table>`
         }
-        <p class="hint">${this._canEdit ? t('people-hint-edit') : t('people-hint-read')}</p>
+        <p class="hint">${this._hint()}</p>
       </div>
       <app-modal
         ${ref(this._editor)}
@@ -605,10 +628,10 @@ export class TeamPeople extends LitElement {
     `
   }
 }
-customElements.define('team-people', TeamPeople)
+customElements.define('people-list', PeopleList)
 
 declare global {
   interface HTMLElementTagNameMap {
-    'team-people': TeamPeople
+    'people-list': PeopleList
   }
 }

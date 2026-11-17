@@ -7,11 +7,10 @@ import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 import { SpaceGoneEvent } from './space-manager.ts'
 import './space-manager.ts'
-import './space-people.ts'
-import './team-people.ts'
-import { TeamShareLeftEvent } from './team-share-panel.ts'
+import './people-list.ts'
 import './team-licence-panel.ts'
-import './team-share-panel.ts'
+import { TeamLeftEvent, TeamSharingStoppedEvent } from './team-membership-panel.ts'
+import './team-membership-panel.ts'
 import './team-storage-panel.ts'
 
 /**
@@ -97,15 +96,22 @@ export class SpacePage extends LitElement {
     void this.go('/account')
   }
 
+  /** The owner stopped sharing: it is a Personal space again, so read it again (and show it so) */
+  _onStopped = (): void => {
+    void this._load()
+  }
+
   override connectedCallback(): void {
     super.connectedCallback()
     this.addEventListener(SpaceGoneEvent.type, this._onGone)
-    this.addEventListener(TeamShareLeftEvent.type, this._onLeft)
+    this.addEventListener(TeamLeftEvent.type, this._onLeft)
+    this.addEventListener(TeamSharingStoppedEvent.type, this._onStopped)
   }
 
   override disconnectedCallback(): void {
     this.removeEventListener(SpaceGoneEvent.type, this._onGone)
-    this.removeEventListener(TeamShareLeftEvent.type, this._onLeft)
+    this.removeEventListener(TeamLeftEvent.type, this._onLeft)
+    this.removeEventListener(TeamSharingStoppedEvent.type, this._onStopped)
     super.disconnectedCallback()
   }
 
@@ -127,16 +133,13 @@ export class SpacePage extends LitElement {
         ${kind ? html`<span class="label">${kind}</span>` : nothing}
         ${role ? html`<span class="label">${role}</span>` : nothing}
       </h2>
+      <people-list .space=${space}></people-list>
       ${
         space.team
-          ? html`<team-people .space=${space}></team-people>
-            <team-share-panel compact .space=${space}></team-share-panel>
+          ? html`<team-membership-panel .space=${space}></team-membership-panel>
             <team-licence-panel .space=${space}></team-licence-panel>
             <team-storage-panel .space=${space}></team-storage-panel>`
-          : html`<div class="panel">
-            <h3>Leaders</h3>
-            <space-people .spaceId=${space.id}></space-people>
-          </div>`
+          : nothing
       }
       <div class="panel">
         <h3>Data</h3>

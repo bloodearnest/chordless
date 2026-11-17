@@ -35,7 +35,7 @@ export class SpaceGoneEvent extends Event {
 /**
  * The data of one Personal space or Team (docs/ACCOUNT.md): resetting it from Drive, export and
  * import, and deleting it from this device. (Syncing and switching are on the space's card, and a
- * Team's people in their own modal: team-share-panel.ts.) It is shown in a modal over the list, like
+ * Team's people are the space page's own first section: people-list.ts.) It is shown in a modal over the list, like
  * the app's other settings, and works on any space on this device, not only the one in use. The name
  * is the modal's heading, so it is not repeated here.
  *

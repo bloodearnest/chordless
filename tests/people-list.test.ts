@@ -1,13 +1,13 @@
 /**
- * A Team's list of people (team-people.ts): its members, the invites waiting and the people who only lead, in one table
+ * A Team's list of people (people-list.ts): its members, the invites waiting and the people who only lead, in one table
  * that sorts and searches, with an editor for one person and a way to invite. The Worker is a fetch that answers from a
  * table, and the service worker that keeps the sign-in a fake one.
  */
 import { expect, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import { SpacePeopleChangedEvent } from '../src/components/space-people.ts'
-import '../src/components/team-people.ts'
-import type { TeamPeople } from '../src/components/team-people.ts'
+import '../src/components/people-list.ts'
+import type { PeopleList } from '../src/components/people-list.ts'
 import type { Person, Space } from '../src/js/data-types.ts'
 import { openSpace } from '../src/js/db.ts'
 import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
@@ -56,14 +56,14 @@ const person = (id: string, name: string, emails: string[]): Person => ({
   modifiedDate: '2026-11-17T00:00:00Z',
 })
 
-describe('team-people', () => {
+describe('people-list', () => {
   let worker: FakeAuthWorker
   let uninstallWorker: () => void
   const realFetch = window.fetch
   const realClipboard = Object.getOwnPropertyDescriptor(Navigator.prototype, 'clipboard')
   let calls: { key: string; body?: unknown }[]
   let routes: Record<string, (body?: unknown) => Response>
-  let list: TeamPeople
+  let list: PeopleList
   const made: string[] = []
 
   const json = (body: unknown, status = 200) => Response.json(body, { status })
@@ -121,7 +121,7 @@ describe('team-people', () => {
   }
 
   async function open(shared: Space) {
-    list = document.createElement('team-people')
+    list = document.createElement('people-list')
     list.now = () => NOW
     list.space = shared
     document.body.append(list)
@@ -162,12 +162,8 @@ describe('team-people', () => {
   })
 
   describe('what it shows', () => {
-    it('is nothing for a space that is not a Team’s, and asks nothing', async () => {
-      list = document.createElement('team-people')
-      list.space = await createSpace(`Mine ${crypto.randomUUID().slice(0, 8)}`).then(each => {
-        made.push(each.id)
-        return each
-      })
+    it('is nothing without a space, and asks nothing', async () => {
+      list = document.createElement('people-list')
       document.body.append(list)
       await list.updateComplete
       expect(list.shadowRoot?.textContent?.trim()).to.equal('')
@@ -622,7 +618,7 @@ describe('team-people', () => {
       expect(list._ago('2026-11-16T12:00:00Z')).to.equal('yesterday')
       expect(list._ago('2026-11-14T12:00:00Z')).to.equal('3 days ago')
       // (and it uses the real clock when it is not given one)
-      expect(document.createElement('team-people').now()).to.be.instanceOf(Date)
+      expect(document.createElement('people-list').now()).to.be.instanceOf(Date)
     })
 
     it('says how many setlists a person leads, and who is using the app by a choice made on the device', async () => {
@@ -680,6 +676,71 @@ describe('team-people', () => {
       await answer(true)
       await until(() => shownToast(), 'the message')
       expect(shownToast()?.message).to.contain('could not be emailed')
+    })
+  })
+
+  describe('in a Personal space', () => {
+    const personal = async (updates: Partial<Space> = {}) => {
+      const created = await createSpace(`Mine ${crypto.randomUUID().slice(0, 8)}`)
+      made.push(created.id)
+      return updateSpace(created.id, updates)
+    }
+
+    it('lists the people who lead setlists, with no roles, statuses, invites or Worker', async () => {
+      const mine = await personal()
+      await withPeople(mine, [
+        person('ann', 'Ann Lee', ['ann@example.com']),
+        person('vic', 'Visiting Vic', []),
+      ])
+      await open(mine)
+      expect(rowsText()).to.deep.equal(['Ann Lee', 'Visiting Vic'])
+      expect(text()).to.contain('People who lead setlists (2)')
+      const headings = Array.from(list.shadowRoot?.querySelectorAll('th') ?? []).map(each =>
+        each.textContent?.trim()
+      )
+      expect(headings).to.deep.equal(['Name', 'Email', 'Actions'])
+      expect(text()).to.not.contain('Invite someone')
+      expect(text()).to.not.contain('Not a member')
+      expect(text()).to.contain('Two spellings of one person')
+      expect(calls).to.deep.equal([])
+      expect(button('Edit', rowOf('Ann Lee'))).to.exist
+    })
+
+    it('opens an editor with a name and addresses, and nothing of a Team', async () => {
+      const mine = await personal()
+      await withPeople(mine, [person('ann', 'Ann Lee', ['ann@example.com'])])
+      await open(mine)
+      button('Edit', rowOf('Ann Lee')).click()
+      await until(() => list.shadowRoot?.querySelector('space-people'), 'the person')
+      expect(text()).to.not.contain('Role in the Team')
+      expect(text()).to.not.contain('Remove from the Team')
+    })
+
+    it('says nobody leads a setlist yet, and that a search found nobody', async () => {
+      await open(await personal())
+      expect(text()).to.contain('Nobody leads a setlist here yet')
+      list._query = 'zzz'
+      await list.updateComplete
+      expect(text()).to.contain('Nobody matches')
+    })
+
+    it('can be looked at but not changed when the space is view only', async () => {
+      const mine = await personal({ readOnly: true })
+      await withPeople(mine, [person('ann', 'Ann Lee', [])])
+      await open(mine)
+      expect(rowOf('Ann Lee').querySelector('button')).to.equal(null)
+      expect(text()).to.contain('view only')
+    })
+
+    it('reads the people again for another space', async () => {
+      const first = await personal()
+      const second = await personal()
+      await withPeople(first, [person('ann', 'Ann Lee', [])])
+      await withPeople(second, [person('bea', 'Bea Singer', [])])
+      await open(first)
+      expect(rowsText()).to.deep.equal(['Ann Lee'])
+      list.space = second
+      await until(() => rowsText()[0] === 'Bea Singer', 'the other space’s people')
     })
   })
 })

@@ -111,7 +111,7 @@ describe('space-manager', () => {
     expect(text(el)).to.match(/1 song · 0 setlists · about \d+ B/)
     expect(has(el, 'drive-sync-panel')).to.equal(true)
     expect(has(el, 'space-export-panel')).to.equal(true)
-    expect(has(el, 'team-share-panel')).to.equal(false)
+    expect(has(el, 'team-membership-panel')).to.equal(false)
     expect(text(el)).to.contain('Delete from this device')
     expect(has(el, '#switch')).to.equal(false)
   })
@@ -127,7 +127,7 @@ describe('space-manager', () => {
     const team = await space('Team', { team: { id: 'space-gggg7777', role: 'owner' } })
     const el = await page(team.id)
     expect(labels(el)).to.deep.equal(['Team', 'Owner'])
-    expect(has(el, 'team-share-panel')).to.equal(false)
+    expect(has(el, 'team-membership-panel')).to.equal(false)
   })
 
   it('has no sync button of its own: that is on the card', async () => {
