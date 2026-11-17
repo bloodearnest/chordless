@@ -7,7 +7,7 @@ import { expect, waitUntil } from '@open-wc/testing'
 import { type AccountCard, AccountStateEvent } from '../src/components/account-card.ts'
 import type { AppModal } from '../src/components/app-modal.ts'
 import '../src/components/account-card.ts'
-import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
+import { type FakeAuthWorker, installFakeAuthWorker, sessionFor } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -455,6 +455,102 @@ describe('account-card', () => {
       worker.stored = undefined
       control('test-refresh').click()
       await until(() => text().includes('Not signed in: sign in with Google first'), 'the message')
+    })
+  })
+
+  describe('with an email address alone', () => {
+    const emailUser = { ...user, name: null, sub: null }
+    const signInByEmail = () => {
+      worker.stored = {
+        blob: '',
+        metadata: { scope: '', session: sessionFor('access-1'), user: emailUser },
+        updated_at: new Date().toISOString(),
+      }
+    }
+
+    it('says so, and offers to connect Google, with nothing that only a Google sign-in has', async () => {
+      signInByEmail()
+      await open(false)
+      expect(text()).to.contain('Signed in with your email address')
+      expect(text()).to.contain('Google is not connected')
+      expect(control('connect-google').textContent).to.contain('Connect Google')
+      expect(card.shadowRoot?.querySelector('#connect-drive')).to.equal(null)
+      expect(card.shadowRoot?.querySelector('#revoke')).to.equal(null)
+      expect(card.shadowRoot?.querySelector('#test-refresh')).to.equal(null)
+      expect(control('logout')).to.exist
+    })
+
+    describe('connecting Google', () => {
+      let sent: { authorization: string | null }[]
+      let answer: () => Response
+      beforeEach(() => {
+        sent = []
+        answer = () =>
+          Response.json({
+            blob: 'new-blob',
+            access_token: 'tok',
+            expires_in: 3600,
+            scope: 'https://www.googleapis.com/auth/drive.file openid email profile',
+            user: { name: 'Bea Singer', email: 'bea@gmail.example', picture: null },
+            session: { access_token: 'access-2', refresh_token: 'id.secret', expires_in: 900 },
+          })
+        window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+          if (String(input) !== '/oauth/callback') return realFetch(input, init)
+          sent.push({ authorization: new Headers(init?.headers).get('Authorization') })
+          return answer()
+        }) as typeof fetch
+        ;(window as { google?: unknown }).google = {
+          accounts: {
+            oauth2: {
+              initCodeClient: (config: { callback: (response: object) => void }) => ({
+                requestCode: () => config.callback({ code: 'the-code' }),
+              }),
+            },
+          },
+        }
+      })
+
+      it('adds Google to the account they are signed in to, by showing the session', async () => {
+        signInByEmail()
+        await open(false)
+        control('connect-google').click()
+        await until(() => text().includes('Google Drive connected'), 'Google to be connected')
+        expect(sent).to.deep.equal([{ authorization: 'Bearer access-1' }])
+        expect(must(worker.stored).blob).to.equal('new-blob')
+        expect(card.shadowRoot?.querySelector('#revoke')).to.exist
+      })
+
+      it('says when that Google account is already another Chordless account', async () => {
+        signInByEmail()
+        answer = () => Response.json({ error: 'google_in_use' }, { status: 409 })
+        await open(false)
+        control('connect-google').click()
+        await until(
+          () => text().includes('already used by another Chordless account'),
+          'the message'
+        )
+        expect(must(worker.stored).blob).to.equal('')
+      })
+    })
+  })
+
+  describe('signing in with an email address', () => {
+    it('offers it beside Google, and signs in when the code is right', async () => {
+      await open(false)
+      expect(card.shadowRoot?.querySelector('email-code-sign-in')).to.equal(null)
+      control('sign-in-email').click()
+      await until(() => card.shadowRoot?.querySelector('email-code-sign-in'), 'the form')
+      worker.stored = {
+        blob: '',
+        metadata: { scope: '', session: sessionFor('a'), user: { ...user, sub: null } },
+        updated_at: new Date().toISOString(),
+      }
+      card.shadowRoot
+        ?.querySelector('email-code-sign-in')
+        ?.dispatchEvent(new Event('email-code:signed-in', { bubbles: true, composed: true }))
+      await until(() => text().includes('Signed in with your email address.'), 'the message')
+      expect(card.shadowRoot?.querySelector('email-code-sign-in')).to.equal(null)
+      expect(states.at(-1)).to.equal('no-drive')
     })
   })
 })

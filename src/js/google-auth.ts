@@ -198,19 +198,32 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
           }
 
           // Exchange auth code for encrypted blob via auth proxy
+          // (signed in already, by an emailed code: Google is connected to that account, not made another)
+          const session = (await getStoredBlob())?.metadata.session
           const blobResponse = await fetch(`${AUTH_PROXY_URL}/oauth/callback`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+            },
             body: JSON.stringify({ code: response.code, redirect_uri: window.location.origin }),
           })
 
           if (!blobResponse.ok) {
             const error = await blobResponse.json()
+            if (error.error === 'google_in_use') throw new GoogleInUseError()
             throw new Error(error.error || 'Failed to exchange code for tokens')
           }
 
-          const { blob, access_token, expires_in, id_token, scope, user, session } =
-            await blobResponse.json()
+          const {
+            blob,
+            access_token,
+            expires_in,
+            id_token,
+            scope,
+            user,
+            session: newSession,
+          } = await blobResponse.json()
 
           const normalizedUser = user ? await buildStoredUserProfile(user).catch(() => user) : null
 
@@ -226,7 +239,7 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
           if (typeof scope === 'string') {
             metadata.scope = scope
           }
-          if (session) metadata.session = sessionFrom(session)
+          if (newSession) metadata.session = sessionFrom(newSession)
 
           // Store blob in Service Worker: with no blob kept the user is not signed in, whatever
           // the page was told
@@ -274,6 +287,20 @@ export async function authorizeWithGoogle({
 export async function connectDrive(): Promise<AuthorizeResult> {
   await initGoogleAuth()
   return signInWith({ scope: DRIVE_SCOPE, include_granted_scopes: true })
+}
+
+/** The Google account is already one of another Chordless account: it cannot also be connected to this one */
+export class GoogleInUseError extends Error {
+  constructor() {
+    super('That Google account is already used by another Chordless account')
+    this.name = 'GoogleInUseError'
+  }
+}
+
+/** Whether the sign-in is an emailed code's alone: a session, and no Google blob (so no Drive) */
+export async function isEmailOnly(): Promise<boolean> {
+  const stored = await getStoredBlob()
+  return !!stored && !stored.blob
 }
 
 /** Why a code was not taken (the Worker's `reason`), or that it could not be asked */

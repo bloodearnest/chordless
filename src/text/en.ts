@@ -377,6 +377,9 @@ space-sync-sign-in-hint = Sign in on the Account and Teams page to sync.
 ## Signing in
 
 action-sign-in = Sign in with Google
+account-email-only-status = Signed in with your email address. Google is not connected, so your own spaces will not sync.
+account-connect-google = Connect Google
+account-email-signed-in = Signed in with your email address.
 account-signed-out-name = Not signed in
 account-signed-out-text = Your songs and setlists stay on this device. Signing in with Google lets you sync them, share setlists, and join a team.
 
