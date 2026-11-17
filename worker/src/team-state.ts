@@ -569,6 +569,8 @@ export class TeamSpaceState implements TeamSpaceApi {
   }
 
   async createInvite(role: MemberRole, email: string, by: Identity) {
+    // (invites that have run out are only hidden from the list: they go when the next is made)
+    await this.#db.prepare('DELETE FROM team_invites WHERE expires_at < ?').bind(this.#at()).run()
     const code = newCode()
     const created = this.#now()
     const expiresAt = new Date(created.getTime() + INVITE_TTL_MS).toISOString()

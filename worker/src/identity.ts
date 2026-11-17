@@ -32,6 +32,12 @@ export interface IdentityProvider {
 }
 
 /** The provider of an identity that comes from a session: its `sub` is the account itself, not a login of one */
+/**
+ * What an app from before sessions is told when it sends a Google ID token. It shows the reason the Worker gives, as
+ * it is, so this is a sentence for a person: the app that reads it is the old one, which cannot be changed.
+ */
+export const UPDATE_REQUIRED = 'Chordless has been updated: reload this page to carry on'
+
 export const SESSION_PROVIDER = 'chordless'
 
 /** The key a member is stored under: `sub` is unique only within a provider */
@@ -89,6 +95,6 @@ export async function authenticate(
   }
   // (the issuer picks the provider; the provider then checks everything, the issuer included)
   const provider = providers.find(each => each.issuers.some(name => name === issuer))
-  if (!provider && ISSUERS.some(name => name === issuer)) throw new Refusal(401, 'update_required')
+  if (!provider && ISSUERS.some(name => name === issuer)) throw new Refusal(401, UPDATE_REQUIRED)
   return provider ? provider.verify(match[1]) : null
 }

@@ -224,7 +224,7 @@ The Worker keeps no per-user state (a team's members are the team's, in D1).
   `worker/src/session-tokens.ts` and `identity.ts` (`sessionProvider`): an `Identity` from a session is
   `{provider: 'chordless', sub: <account id>, email}`, and `accountOf` returns it as it is. Google stays the
   proof at sign-in and the **storage credential** (the blob and `/session/refresh` give Drive's access token):
-  Google's ID token is no longer a bearer, and a request carrying one is answered `401 update_required`
+  Google's ID token is no longer a bearer, and a request carrying one is answered `401` with the reason "Chordless has been updated: reload this page to carry on" (`UPDATE_REQUIRED`, in words because the app that shows it is the old one)
   (an app from before sessions: it has to reload to update; nothing local is blocked). There was no period of
   accepting both. Where the Worker has no database or `SESSION_SIGNING_KEY` (a development one without them)
   a sign-in still works and has no session.

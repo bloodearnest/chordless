@@ -10,7 +10,12 @@ import * as jose from 'jose'
 import { encryptBlob } from '../worker/src/blob.ts'
 import type { Env } from '../worker/src/env.ts'
 import { googleKind } from '../worker/src/google-address.ts'
-import { googleProvider, type Identity, sessionProvider } from '../worker/src/identity.ts'
+import {
+  googleProvider,
+  type Identity,
+  sessionProvider,
+  UPDATE_REQUIRED,
+} from '../worker/src/identity.ts'
 import { handleRequest } from '../worker/src/router.ts'
 import { forgetServiceAccountTokens } from '../worker/src/service-account.ts'
 import { signAccessToken } from '../worker/src/session-tokens.ts'
@@ -1508,7 +1513,7 @@ describe('a Chordless session', () => {
     const answer = await w.call('/api/spaces', ann, {}, w.env, null)
     assert.equal(answer.status, 401)
     assert.equal(answer.headers.get('Cache-Control'), 'no-store')
-    assert.deepEqual(await json(answer), { error: 'update_required' })
+    assert.deepEqual(await json(answer), { error: UPDATE_REQUIRED })
   })
 
   test('is the account: its spaces and its role in one, whichever login made it a member', async () => {

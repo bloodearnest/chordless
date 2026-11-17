@@ -179,6 +179,33 @@ rule "switch to another first" was about an open database connection, which the 
 
 There is no "clear everything on this device": a space is deleted one at a time (decided 2026-10-22).
 
+## Deleting an account (not built: by request, 2026-11-17)
+
+The privacy page promises an account is deleted when its person asks (they write to the address on the page).
+**There is no button or script for it yet**: the operator does it by hand, after `just db-backup`. What the Worker
+holds about an account, by table (migrations/):
+
+| Table | What | On deletion |
+|---|---|---|
+| `accounts` | the account's id and date | delete the row |
+| `account_identities` | each login (`google` sub, `email` address) and its address | delete the account's rows |
+| `sessions` | refresh-token hashes, address | delete the account's rows (signs out every device) |
+| `team_members`, `team_member_emails` | membership in teams, and the addresses a team knows them by | delete the account's rows (they leave every team) |
+| `teams` | an **owner's** team (`owner_account_id`, `owner_email`) | **first** end sharing or hand the team on: a team with no owner cannot be looked after. Then the team's own rows go with it (docs/SPACES.md, "Deleting a space") |
+| `team_invites` | open invites **to** an address (`email`) or **by** them (`created_by`) | delete both kinds that name the address |
+| `team_events` | the register: a team's creation, licence changes and end, with the address of who did it (`by_email`), and a joined-as-other note with the invited address | the licence record is kept for CCLI (`docs/CCLI.md`, the log of who changed the number); replace the person's address in `by_email` and `detail` with `deleted` |
+| `login_codes` | an emailed code's address and code (for three days at most) | goes by itself; delete the address's row |
+| `team_credentials` | the owner's encrypted Google token for a team | goes with the team |
+
+Their songs, setlists and pads are on their devices and in their own Drive (the copyright rule, CLAUDE.md):
+Chordless holds none, and the deletion does not touch them. The owner's Drive grant is revoked at
+myaccount.google.com/permissions.
+
+**To build, if requests come in:** `DELETE /api/account` (signed in, asks for the address typed), which refuses while the
+person owns a team (and says which), then deletes the rows above in one batch and the session with them; an Account page
+"Delete my account" under Manage with a confirmation and a backup offer. Until then the by-hand list above is the
+procedure, and a test that every table holding an address or an account id is on this list would stop it going stale.
+
 ## Pad sets and the media player: their own page, `/media`
 
 Decided 2026-10-22. The media player has a page of its own and a **permanent** menu entry, so it can be

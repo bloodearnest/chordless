@@ -26,6 +26,9 @@ export const REFRESH_TTL_MS = 90 * 24 * 60 * 60 * 1000
 /** A replaced refresh token presented again within this long is a retry, not theft */
 export const RETRY_GRACE_MS = 30_000
 
+/** How long a revoked session's row is kept */
+export const REVOKED_KEPT_MS = 30 * 24 * 60 * 60 * 1000
+
 export interface SessionKey {
   /** Base64, 32 random bytes: the key access tokens are signed with */
   SESSION_SIGNING_KEY: string
@@ -134,6 +137,12 @@ export async function issueSession(
   who: { accountId: string; email: string },
   now: Date = new Date()
 ): Promise<SessionTokens> {
+  // (sessions that have run out, and ones revoked a month ago, go when the next is made; a revoked session is kept
+  // for a while so that its tokens are refused as revoked, not as unknown)
+  await db
+    .prepare('DELETE FROM sessions WHERE expires_at < ? OR revoked_at < ?')
+    .bind(now.toISOString(), new Date(now.getTime() - REVOKED_KEPT_MS).toISOString())
+    .run()
   const sessionId = [...crypto.getRandomValues(new Uint8Array(16))]
     .map(byte => byte.toString(16).padStart(2, '0'))
     .join('')
