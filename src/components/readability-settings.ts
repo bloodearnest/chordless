@@ -9,13 +9,35 @@ import {
   setChordTint,
   setFontChoice,
 } from '../js/preferences.ts'
+import { t } from '../js/text.ts'
 import { ThemeManager } from '../js/theme-manager.ts'
 import { fieldStyles } from './shared-styles.ts'
 
 const AREA_LABELS: Record<FontArea, { label: string; description: string }> = {
-  ui: { label: 'App', description: 'menus, buttons and settings' },
-  lyrics: { label: 'Lyrics', description: 'the words of the song' },
-  chords: { label: 'Chords', description: 'the chord names above the words' },
+  ui: {
+    get label() {
+      return t('font-area-ui')
+    },
+    get description() {
+      return t('font-area-ui-description')
+    },
+  },
+  lyrics: {
+    get label() {
+      return t('font-area-lyrics')
+    },
+    get description() {
+      return t('font-area-lyrics-description')
+    },
+  },
+  chords: {
+    get label() {
+      return t('font-area-chords')
+    },
+    get description() {
+      return t('font-area-chords-description')
+    },
+  },
 }
 
 /** A verse to show the choices on: the chords and the words they fall on */
@@ -292,15 +314,15 @@ export class ReadabilitySettings extends LitElement {
   _renderSwatches() {
     const custom = this._tint.startsWith('#')
     return html`
-      <div class="swatches" role="group" aria-label="Chord highlight colour">
+      <div class="swatches" role="group" aria-label=${t('tint-group-label')}>
         <button
           class="swatch none"
           type="button"
           aria-pressed=${this._tint === ''}
-          aria-label="No highlight"
+          aria-label=${t('tint-none-label')}
           @click=${() => this._chooseTint('')}
         >
-          <span class="chip"></span>None
+          <span class="chip"></span>${t('tint-none')}
         </button>
         ${TINT_PRESETS.map(
           preset => html`
@@ -308,7 +330,7 @@ export class ReadabilitySettings extends LitElement {
               class="swatch"
               type="button"
               aria-pressed=${this._tint === preset.id}
-              aria-label="${preset.label} highlight"
+              aria-label=${t('tint-preset-label', { colour: preset.label })}
               @click=${() => this._chooseTint(preset.id)}
             >
               <span
@@ -322,11 +344,11 @@ export class ReadabilitySettings extends LitElement {
         <label class="swatch custom ${custom ? 'on' : ''}">
           <input
             type="color"
-            aria-label="Your own highlight colour"
+            aria-label=${t('tint-own-label')}
             .value=${custom ? this._tint : '#ffe08a'}
             @input=${(event: Event) => this._chooseTint((event.target as HTMLInputElement).value)}
           />
-          Your own
+          ${t('tint-own')}
         </label>
       </div>
     `
@@ -370,7 +392,7 @@ export class ReadabilitySettings extends LitElement {
         </div>
         ${
           ratio
-            ? html`<div class="ratio">Chords read at ${ratio.toFixed(1)}:1 contrast</div>`
+            ? html`<div class="ratio">${t('tint-contrast', { ratio: ratio.toFixed(1) })}</div>`
             : nothing
         }
       </div>
@@ -384,7 +406,7 @@ export class ReadabilitySettings extends LitElement {
         <span class="area">${label}</span>
         <select
           class="field"
-          aria-label="${label} font"
+          aria-label=${t('font-picker-label', { area: label })}
           .value=${this._fonts[area]}
           @change=${(event: Event) => this._chooseFont(area, event)}
         >
@@ -408,19 +430,18 @@ export class ReadabilitySettings extends LitElement {
   override render() {
     return html`
       <div class="group">
-        <span class="label">Chord highlight</span>
+        <span class="label">${t('tint-heading')}</span>
         <div class="description">
-          A coloured background behind the chords, not the words: some readers with dyslexia or
-          visual stress find it easier. Pick whichever suits you.
+          ${t('tint-text')}
         </div>
         ${this._renderSwatches()}
         <div class="previews">${THEMES.map(theme => this._renderPreview(theme))}</div>
       </div>
 
       <div class="group">
-        <span class="label">Fonts</span>
+        <span class="label">${t('font-heading')}</span>
         <div class="description">
-          A typeface for each part, from the fonts your device has. Saved on this device only.
+          ${t('font-text')}
         </div>
         <div class="fonts">${FONT_AREAS.map(area => this._renderFontPicker(area))}</div>
       </div>

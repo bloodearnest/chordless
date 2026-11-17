@@ -5,6 +5,8 @@
  * default, and one for a setlist that wins over it; on the device and never synced.
  */
 
+import { t } from './text.ts'
+
 /** How far down the guitar is tuned: 0 standard, 1 a half step, 2 a whole step */
 export type Tuning = 0 | 1 | 2
 
@@ -14,9 +16,24 @@ export interface TuningOption {
 }
 
 export const TUNINGS: readonly TuningOption[] = [
-  { semitones: 0, label: 'Standard' },
-  { semitones: 1, label: 'Half step down' },
-  { semitones: 2, label: 'Whole step down' },
+  {
+    semitones: 0,
+    get label() {
+      return t('tuning-standard')
+    },
+  },
+  {
+    semitones: 1,
+    get label() {
+      return t('tuning-half-step')
+    },
+  },
+  {
+    semitones: 2,
+    get label() {
+      return t('tuning-whole-step')
+    },
+  },
 ]
 
 /** A tuning from whatever was stored: one of the three, and standard for anything else */

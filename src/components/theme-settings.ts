@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { t } from '../js/text.ts'
 import {
   MAX_FONT_SCALE,
   MIN_FONT_SCALE,
@@ -232,36 +233,36 @@ export class ThemeSettings extends LitElement {
 
     return html`
       <div class="settings-group">
-        <span class="settings-label">Theme</span>
+        <span class="settings-label">${t('theme-heading')}</span>
         <div class="theme-buttons">
           <button
             class="theme-button ${this._currentTheme === 'system' ? 'active' : ''}"
             @click=${this._detectSystemPreference}
-            aria-label="Use system preference"
-            title="Follow your system's theme preference automatically"
+            aria-label=${t('theme-system-label')}
+            title=${t('theme-system-title')}
           >
-            <span>System</span>
+            <span>${t('theme-system')}</span>
           </button>
           <button
             class="theme-button ${this._currentTheme === 'light' ? 'active' : ''}"
             @click=${() => this._setTheme('light')}
-            aria-label="Light theme"
+            aria-label=${t('theme-light-label')}
           >
-            <span>Light</span>
+            <span>${t('theme-light')}</span>
           </button>
           <button
             class="theme-button ${this._currentTheme === 'dark' ? 'active' : ''}"
             @click=${() => this._setTheme('dark')}
-            aria-label="Dark theme"
+            aria-label=${t('theme-dark-label')}
           >
-            <span>Dark</span>
+            <span>${t('theme-dark')}</span>
           </button>
         </div>
         ${
           usingSystemMode
             ? html`
               <div class="system-preference">
-                ✓ Following system preference (currently ${systemPreference})
+                ${t('theme-following', { current: systemPreference })}
               </div>
             `
             : ''
@@ -269,9 +270,9 @@ export class ThemeSettings extends LitElement {
       </div>
 
       <div class="settings-group">
-        <span class="settings-label">Font size</span>
+        <span class="settings-label">${t('scale-heading')}</span>
         <div class="settings-description">
-          All text in the app, lyrics included. Saved on this device only.
+          ${t('scale-text')}
         </div>
         <div class="font-scale-controls">
           <input
@@ -282,22 +283,22 @@ export class ThemeSettings extends LitElement {
             step="0.05"
             .value=${this._fontScale.toString()}
             @input=${this._handleFontScaleChange}
-            aria-label="Font scale slider"
+            aria-label=${t('scale-slider-label')}
           />
           <div class="scale-value">${Math.round(this._fontScale * 100)}%</div>
         </div>
         <div class="preset-buttons">
           <button class="preset-button" @click=${() => this._setPresetScale(0.8)}>
-            Small 80%
+            ${t('scale-small')}
           </button>
           <button class="preset-button" @click=${() => this._setPresetScale(1.0)}>
-            Normal 100%
+            ${t('scale-normal')}
           </button>
           <button class="preset-button" @click=${() => this._setPresetScale(1.25)}>
-            Large 125%
+            ${t('scale-large')}
           </button>
           <button class="preset-button" @click=${() => this._setPresetScale(1.5)}>
-            Largest 150%
+            ${t('scale-largest')}
           </button>
         </div>
       </div>

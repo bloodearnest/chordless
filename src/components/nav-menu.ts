@@ -2,6 +2,7 @@ import { ContextConsumer } from '@lit/context'
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { AppUpdateChangeEvent, appUpdate } from '../js/app-update.ts'
+import { t } from '../js/text.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './icon.ts'
@@ -290,7 +291,7 @@ export class NavMenu extends LitElement {
         ${ref(this._popup.ref)}
         class="nav-menu-popover"
         part="popover"
-        aria-label="Navigation menu"
+        aria-label=${t('menu-label')}
         @click=${this._onClick}
         @close=${this._popup.onClose}
       >
@@ -304,7 +305,7 @@ export class NavMenu extends LitElement {
                   @click=${() => appUpdate.apply()}
                 >
                   <app-icon name="refresh" size="20" class="nav-icon"></app-icon>
-                  <span>Update ready: reload</span>
+                  <span>${t('menu-update-ready')}</span>
                 </button>
               `
               : ''
@@ -323,7 +324,7 @@ export class NavMenu extends LitElement {
                           @click=${this._handleOverviewClick}
                         >
                           <app-icon name="grid" size="20" class="nav-icon"></app-icon>
-                          <span>Overview</span>
+                          <span>${t('menu-overview')}</span>
                         </button>
                       `
                       : ''
@@ -362,46 +363,46 @@ export class NavMenu extends LitElement {
 
           <a href="/" class="nav-menu-item" part="nav-item">
             <app-icon name="calendar" size="20" class="nav-icon"></app-icon>
-            <span>Setlists</span>
+            <span>${t('menu-setlists')}</span>
           </a>
 
           <a href="/songs" class="nav-menu-item" part="nav-item">
             <app-icon name="music" size="20" class="nav-icon"></app-icon>
-            <span>Song Library</span>
+            <span>${t('menu-library')}</span>
           </a>
 
           ${
             this._helpPage
               ? html`<button class="nav-menu-item" part="nav-item" @click=${this._handleHelpClick}>
                 <app-icon name="help" size="20" class="nav-icon"></app-icon>
-                <span>Help: ${this._helpPage.title}</span>
+                <span>${t('menu-help', { title: this._helpPage.title })}</span>
               </button>`
               : nothing
           }
 
           <button class="nav-menu-item" part="nav-item" @click=${this._handlePreferencesClick}>
             <app-icon name="settings" size="20" class="nav-icon"></app-icon>
-            <span>Preferences</span>
+            <span>${t('menu-preferences')}</span>
           </button>
 
           <a href="/account" class="nav-menu-item" part="nav-item">
             <app-icon name="layers" size="20" class="nav-icon"></app-icon>
-            <span>Account and Teams</span>
+            <span>${t('menu-account')}</span>
           </a>
 
           <a href="/media" class="nav-menu-item" part="nav-item">
             <app-icon name="play" size="20" class="nav-icon"></app-icon>
-            <span>Media Player</span>
+            <span>${t('menu-media-player')}</span>
           </a>
 
           <a href="/import-song" class="nav-menu-item" part="nav-item">
                 <app-icon name="upload" size="20" class="nav-icon"></app-icon>
-                <span>Import Songs</span>
+                <span>${t('menu-import')}</span>
               </a>
 
           <a href="/about" class="nav-menu-item" part="nav-item">
             <app-icon name="info" size="20" class="nav-icon"></app-icon>
-            <span>About</span>
+            <span>${t('menu-about')}</span>
           </a>
         </nav>
       </dialog>
@@ -419,7 +420,7 @@ export class NavMenu extends LitElement {
           : nothing
       }
 
-      <app-modal ${ref(this._preferencesModal)} size="fullscreen" heading="Preferences">
+      <app-modal ${ref(this._preferencesModal)} size="fullscreen" heading=${t('menu-preferences')}>
         ${this._preferencesOpened ? html`<app-preferences></app-preferences>` : ''}
       </app-modal>
     `

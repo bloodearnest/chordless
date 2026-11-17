@@ -31,6 +31,7 @@ import {
   setUseNashvilleNumbers,
   setUseUnicodeAccidentals,
 } from '../js/preferences.ts'
+import { t } from '../js/text.ts'
 import { TUNINGS, type Tuning } from '../js/tuning.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../js/wake-lock.ts'
 import { PLAYS } from '../js/what-do-you-play.ts'
@@ -267,10 +268,9 @@ export class AppPreferences extends LitElement {
 
   /** A limit in words: "15 minutes", "1 hour", "2 hours" */
   _limitLabel(minutes: number): string {
-    if (minutes === 0) return 'no limit'
-    if (minutes < 60) return `${minutes} minutes`
-    const hours = minutes / 60
-    return hours === 1 ? '1 hour' : `${hours} hours`
+    if (minutes === 0) return t('pref-limit-none')
+    if (minutes < 60) return t('pref-limit-minutes', { count: minutes })
+    return t('pref-limit-hours', { count: minutes / 60 })
   }
 
   /** What the wake lock is doing, to show: a look (see data-state), an icon, a word, and why */
@@ -278,51 +278,53 @@ export class AppPreferences extends LitElement {
     const refused = (error: string) => ({
       look: 'bad' as const,
       icon: 'warning' as const,
-      label: 'Refused',
-      detail: `The device refused it (${error}). Battery Saver can cause this.`,
+      label: t('wake-refused'),
+      detail: t('wake-refused-detail', { reason: error }),
     })
     switch (wakeLock.state) {
       case 'unsupported':
         return {
           look: 'none',
           icon: 'ban',
-          label: 'Unsupported',
-          detail: "This browser can't keep the screen awake.",
+          label: t('wake-unsupported'),
+          detail: t('wake-unsupported-detail'),
         }
       case 'off':
         return {
           look: 'none',
           icon: 'moon',
-          label: 'Off',
-          detail: 'The screen may turn off while you play.',
+          label: t('wake-off'),
+          detail: t('wake-off-detail'),
         }
       case 'active':
         return {
           look: 'good',
           icon: 'sun',
-          label: 'Awake',
-          detail:
-            (wakeLock.live
-              ? 'The screen is being kept awake, on any page, while you are live'
-              : 'The screen is being kept awake') +
-            (this.keepAwakeMinutes === 0 || wakeLock.onMains
-              ? '.'
-              : `, until there is no touch for ${this._limitLabel(this.keepAwakeMinutes)}.`),
+          label: t('wake-awake'),
+          detail: t(
+            this.keepAwakeMinutes === 0 || wakeLock.onMains
+              ? wakeLock.live
+                ? 'wake-awake-live'
+                : 'wake-awake-detail'
+              : wakeLock.live
+                ? 'wake-awake-live-limit'
+                : 'wake-awake-limit',
+            { limit: this._limitLabel(this.keepAwakeMinutes) }
+          ),
         }
       case 'released':
         return {
           look: 'warn',
           icon: 'moon',
-          label: 'Let go',
-          detail:
-            'The device let go (another app, the screen off, or a low battery). It is taken again when you come back.',
+          label: t('wake-released'),
+          detail: t('wake-released-detail'),
         }
       case 'expired':
         return {
           look: 'warn',
           icon: 'clock',
-          label: 'Timed out',
-          detail: `Let go after ${this._limitLabel(this.keepAwakeMinutes)} with no touch, to spare the battery. Touch the screen to keep it awake again.`,
+          label: t('wake-expired'),
+          detail: t('wake-expired-detail', { limit: this._limitLabel(this.keepAwakeMinutes) }),
         }
       case 'failed':
         return refused(wakeLock.error)
@@ -330,9 +332,8 @@ export class AppPreferences extends LitElement {
         return {
           look: 'idle',
           icon: 'sun',
-          label: 'Ready',
-          detail:
-            'The screen is kept awake while a setlist is open, and on any page while you are live.',
+          label: t('wake-ready'),
+          detail: t('wake-ready-detail'),
         }
       }
     }
@@ -342,11 +343,11 @@ export class AppPreferences extends LitElement {
   _powerStatus(): string {
     switch (wakeLock.onMains) {
       case true:
-        return 'On mains power: there is no time limit.'
+        return t('wake-power-mains')
       case false:
-        return 'On battery: the time limit applies.'
+        return t('wake-power-battery')
       default:
-        return "This device can't say whether it is on mains power, so the time limit always applies."
+        return t('wake-power-unknown')
     }
   }
 
@@ -369,7 +370,7 @@ export class AppPreferences extends LitElement {
   _wakeLockAction(): { label: string; run: () => void } | null {
     if (!WakeLockController.supported) return null
     if (['released', 'failed', 'expired'].includes(wakeLock.state)) {
-      return { label: 'Ask again', run: () => void wakeLock.requestAgain() }
+      return { label: t('wake-ask-again'), run: () => void wakeLock.requestAgain() }
     }
     return null
   }
@@ -378,16 +379,16 @@ export class AppPreferences extends LitElement {
     return html`
       <div class="preferences-content">
         <div class="panel">
-          <h3>Appearance</h3>
+          <h3>${t('pref-appearance-heading')}</h3>
           <theme-settings></theme-settings>
         </div>
 
         <div class="panel">
-          <h3>Behaviour and options</h3>
+          <h3>${t('pref-behaviour-heading')}</h3>
 
           <section class="group">
-            <h4>What do you play?</h4>
-            <p>What each song shows when you open it, and which controls you get. Only you see it.</p>
+            <h4>${t('pref-play-heading')}</h4>
+            <p>${t('pref-play-text')}</p>
           <div class="radio-group">
             ${PLAYS.map(
               option => html`
@@ -419,7 +420,7 @@ export class AppPreferences extends LitElement {
                     ?checked=${this.lyricsOnly}
                     @change=${this._onLyricsOnlyToggle}
                   />
-                  <span>Start each song with only the lyrics</span>
+                  <span>${t('pref-lyrics-only')}</span>
                 </label>
                 <label class="toggle" for="toggle-capo">
                   <input
@@ -429,7 +430,7 @@ export class AppPreferences extends LitElement {
                     ?checked=${this.capoEnabled}
                     @change=${this._onCapoToggle}
                   />
-                  <span>Show the capo and tuning controls</span>
+                  <span>${t('pref-show-capo')}</span>
                 </label>
                 <label class="toggle" for="toggle-pitch">
                   <input
@@ -439,7 +440,7 @@ export class AppPreferences extends LitElement {
                     ?checked=${this.pitchControls}
                     @change=${this._onPitchControlsToggle}
                   />
-                  <span>Show the instrument pitch controls</span>
+                  <span>${t('pref-show-pitch')}</span>
                 </label>
                 </div>
               `
@@ -449,7 +450,7 @@ export class AppPreferences extends LitElement {
             this.pitchControls
               ? html`
                 <label class="field" for="pitch">
-                  <span>My instrument</span>
+                  <span>${t('pref-my-instrument')}</span>
                   <select id="pitch" name="pitch" @change=${this._onPitchChange}>
                     ${PITCHES.map(
                       option => html`<option value=${option.id} ?selected=${option.id === this.pitch}>
@@ -458,7 +459,7 @@ export class AppPreferences extends LitElement {
                     )}
                   </select>
                 </label>
-                <p>Each setlist, and each song, can have its own: choose it there, in edit mode.</p>
+                <p>${t('pref-pitch-text')}</p>
               `
               : ''
           }
@@ -466,7 +467,7 @@ export class AppPreferences extends LitElement {
             this.capoEnabled
               ? html`
                 <label class="field" for="tuning">
-                  <span>My guitar is tuned</span>
+                  <span>${t('pref-my-tuning')}</span>
                   <select id="tuning" name="tuning" @change=${this._onTuningChange}>
                     ${TUNINGS.map(
                       option => html`<option
@@ -478,16 +479,14 @@ export class AppPreferences extends LitElement {
                     )}
                   </select>
                 </label>
-                <p>
-                  Each setlist can have its own tuning: choose it on the setlist, in edit mode.
-                </p>
+                <p>${t('pref-tuning-text')}</p>
               `
               : ''
           }
           </section>
 
           <section class="group">
-            <h4>Chords</h4>
+            <h4>${t('pref-chords-heading')}</h4>
             <label class="toggle" for="toggle-use-nashville">
               <input
                 type="checkbox"
@@ -496,7 +495,7 @@ export class AppPreferences extends LitElement {
                 ?checked=${this.useNashville}
                 @change=${this._onNashvilleToggle}
               />
-              <span>Nashville numbers instead of letter names</span>
+              <span>${t('pref-nashville')}</span>
             </label>
             <label class="toggle" for="toggle-unicode-accidentals">
               <input
@@ -506,12 +505,12 @@ export class AppPreferences extends LitElement {
                 ?checked=${this.useUnicodeAccidentals}
                 @change=${this._onAccidentalToggle}
               />
-              <span>Unicode accidentals (♯/♭)</span>
+              <span>${t('pref-unicode')}</span>
             </label>
           </section>
 
           <section class="group">
-            <h4>Lead sheets</h4>
+            <h4>${t('pref-leadsheets-heading')}</h4>
             <label class="toggle" for="toggle-real-book">
               <input
                 type="checkbox"
@@ -520,12 +519,12 @@ export class AppPreferences extends LitElement {
                 ?checked=${this.realBook}
                 @change=${this._onRealBookToggle}
               />
-              <span>Real Book style: handwritten notation and chords (-7, ø7, °)</span>
+              <span>${t('pref-real-book')}</span>
             </label>
           </section>
 
           <section class="group">
-            <h4>Moving between songs</h4>
+            <h4>${t('pref-moving-heading')}</h4>
             <label class="toggle" for="toggle-scroll-to-top">
               <input
                 type="checkbox"
@@ -534,16 +533,13 @@ export class AppPreferences extends LitElement {
                 ?checked=${this.scrollToTop}
                 @change=${this._onScrollToTopToggle}
               />
-              <span>Start each song at its top (off: find it where you left it)</span>
+              <span>${t('pref-scroll-top')}</span>
             </label>
           </section>
 
           <section class="group">
-            <h4>Screen and live mode</h4>
-            <p>
-              Keep the screen on while a setlist is open, and on any page while you are live (Go
-              live is on a setlist's overview).
-            </p>
+            <h4>${t('pref-screen-heading')}</h4>
+            <p>${t('pref-screen-text')}</p>
           <label class="toggle" for="toggle-keep-awake">
             <input
               type="checkbox"
@@ -553,11 +549,11 @@ export class AppPreferences extends LitElement {
               ?disabled=${!WakeLockController.supported}
               @change=${this._onKeepAwakeToggle}
             />
-            <span>Keep the screen awake</span>
+            <span>${t('pref-keep-awake')}</span>
           </label>
           ${this._renderWakeLockStatus()}
           <label class="field" for="keep-awake-limit">
-            <span>On battery, let go after no touch for</span>
+            <span>${t('pref-battery-limit')}</span>
             <select
               id="keep-awake-limit"
               name="keep-awake-limit"
@@ -569,7 +565,7 @@ export class AppPreferences extends LitElement {
                   value=${minutes}
                   ?selected=${minutes === this.keepAwakeMinutes}
                 >
-                  ${minutes === 0 ? 'No limit' : this._limitLabel(minutes)}
+                  ${minutes === 0 ? t('pref-no-limit') : this._limitLabel(minutes)}
                 </option>`
               )}
             </select>
@@ -582,7 +578,7 @@ export class AppPreferences extends LitElement {
         </div>
 
         <div class="panel">
-          <h3>Accessibility</h3>
+          <h3>${t('pref-accessibility-heading')}</h3>
           <readability-settings></readability-settings>
         </div>
       </div>

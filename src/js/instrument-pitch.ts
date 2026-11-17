@@ -4,6 +4,8 @@
  * wins over it, and one for a song that wins over both: on the device, never synced.
  */
 
+import { t } from './text.ts'
+
 export type PitchId = 'concert' | 'bb' | 'eb' | 'f'
 
 export interface PitchOption {
@@ -14,10 +16,34 @@ export interface PitchOption {
 }
 
 export const PITCHES: readonly PitchOption[] = [
-  { id: 'concert', label: 'Concert pitch', semitones: 0 },
-  { id: 'bb', label: 'B♭ (trumpet, clarinet, tenor sax)', semitones: 2 },
-  { id: 'eb', label: 'E♭ (alto or baritone sax)', semitones: 9 },
-  { id: 'f', label: 'F (horn)', semitones: 7 },
+  {
+    id: 'concert',
+    get label() {
+      return t('pitch-concert')
+    },
+    semitones: 0,
+  },
+  {
+    id: 'bb',
+    get label() {
+      return t('pitch-bb')
+    },
+    semitones: 2,
+  },
+  {
+    id: 'eb',
+    get label() {
+      return t('pitch-eb')
+    },
+    semitones: 9,
+  },
+  {
+    id: 'f',
+    get label() {
+      return t('pitch-f')
+    },
+    semitones: 7,
+  },
 ]
 
 /** A pitch from whatever was stored: one of the four, and concert pitch for anything else */

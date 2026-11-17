@@ -2,6 +2,8 @@ import { css, html, LitElement, nothing } from 'lit'
 import { loadMediaSettings, type MediaSettings, saveMediaSettings } from '../js/media-settings.ts'
 import type { PadSet } from '../js/pad-set-service.ts'
 import { PadSetsController } from '../js/pad-sets-controller.ts'
+import { rich } from '../js/rich-text.ts'
+import { t } from '../js/text.ts'
 import './pad-set-upload.ts'
 import { fieldStyles, switchStyles } from './shared-styles.ts'
 
@@ -264,17 +266,17 @@ export class MediaPlayerSettings extends LitElement {
   override render() {
     return html`
       <div class="container">
-        <h2>🎵 Media Player Settings</h2>
+        <h2>${t('mps-heading')}</h2>
 
         <!-- Master toggle -->
         <div class="setting-group">
           <div class="setting-item">
             <div>
-              <div class="setting-label">Enable Media Player</div>
-              <div class="setting-description">Master control for all media player features</div>
+              <div class="setting-label">${t('mps-player')}</div>
+              <div class="setting-description">${t('mps-player-text')}</div>
             </div>
             ${this._renderSwitch(
-              'Enable Media Player',
+              t('mps-player'),
               this.mediaPlayerEnabled,
               this._toggleMediaPlayer,
               { master: true }
@@ -286,10 +288,10 @@ export class MediaPlayerSettings extends LitElement {
         <div class="setting-group">
           <div class="setting-item ${!this.mediaPlayerEnabled ? 'disabled' : ''}">
             <div>
-              <div class="setting-label">Enable Metronome</div>
-              <div class="setting-description">Click track with tempo and time signature</div>
+              <div class="setting-label">${t('mps-metronome')}</div>
+              <div class="setting-description">${t('mps-metronome-text')}</div>
             </div>
-            ${this._renderSwitch('Enable Metronome', this.metronomeEnabled, this._toggleMetronome, {
+            ${this._renderSwitch(t('mps-metronome'), this.metronomeEnabled, this._toggleMetronome, {
               disabled: !this.mediaPlayerEnabled,
             })}
           </div>
@@ -301,11 +303,11 @@ export class MediaPlayerSettings extends LitElement {
             }"
           >
             <div>
-              <div class="setting-label">Stereo Split (L/R)</div>
-              <div class="setting-description">Pads → Left, Click → Right</div>
+              <div class="setting-label">${t('mps-stereo')}</div>
+              <div class="setting-description">${t('mps-stereo-text')}</div>
             </div>
             ${this._renderSwitch(
-              'Stereo Split (L/R)',
+              t('mps-stereo'),
               this.stereoSplitEnabled,
               this._toggleStereoSplit,
               { disabled: !this.mediaPlayerEnabled || !this.metronomeEnabled }
@@ -318,13 +320,11 @@ export class MediaPlayerSettings extends LitElement {
             }"
           >
             <div>
-              <div class="setting-label">Emphasise downbeat</div>
-              <div class="setting-description">
-                Off, every click sounds like an off-beat one
-              </div>
+              <div class="setting-label">${t('mps-downbeat')}</div>
+              <div class="setting-description">${t('mps-downbeat-text')}</div>
             </div>
             ${this._renderSwitch(
-              'Emphasise downbeat',
+              t('mps-downbeat'),
               this.emphasiseDownbeat,
               this._toggleEmphasiseDownbeat,
               { disabled: !this.mediaPlayerEnabled || !this.metronomeEnabled }
@@ -337,13 +337,11 @@ export class MediaPlayerSettings extends LitElement {
             }"
           >
             <div>
-              <div class="setting-label">Double the click for slow songs</div>
-              <div class="setting-description">
-                Two clicks per beat at or below this tempo, unless a song says otherwise
-              </div>
+              <div class="setting-label">${t('mps-double')}</div>
+              <div class="setting-description">${t('mps-double-text')}</div>
             </div>
             ${this._renderSwitch(
-              'Double the click for slow songs',
+              t('mps-double'),
               this.autoDoubleClick,
               this._toggleAutoDoubleClick,
               { disabled: !this.mediaPlayerEnabled || !this.metronomeEnabled }
@@ -358,7 +356,7 @@ export class MediaPlayerSettings extends LitElement {
             }"
           >
             <div>
-              <label class="setting-label" for="double-click-below-bpm">At or below (BPM)</label>
+              <label class="setting-label" for="double-click-below-bpm">${t('mps-double-below')}</label>
             </div>
             <input
               id="double-click-below-bpm"
@@ -377,10 +375,10 @@ export class MediaPlayerSettings extends LitElement {
         <div class="setting-group">
           <div class="setting-item ${!this.mediaPlayerEnabled ? 'disabled' : ''}">
             <div>
-              <div class="setting-label">Enable Pads</div>
-              <div class="setting-description">Background pad audio playback</div>
+              <div class="setting-label">${t('mps-pads')}</div>
+              <div class="setting-description">${t('mps-pads-text')}</div>
             </div>
-            ${this._renderSwitch('Enable Pads', this.padsEnabled, this._togglePads, {
+            ${this._renderSwitch(t('mps-pads'), this.padsEnabled, this._togglePads, {
               disabled: !this.mediaPlayerEnabled,
             })}
           </div>
@@ -391,14 +389,16 @@ export class MediaPlayerSettings extends LitElement {
             }"
           >
             <div style="flex: 1;">
-              <label class="setting-label" for="padset-select">Pad Sound Set</label>
+              <label class="setting-label" for="padset-select">${t('mps-padset')}</label>
               <div class="setting-description">
                 ${
                   this._padSets.list.length || this._padSets.loading
-                    ? 'Select which pad audio library to use'
+                    ? t('mps-padset-text')
                     : this.uploads
-                      ? 'Chordless has no pads of its own: choose "Upload a new pad set…" to add a set you own'
-                      : html`Chordless has no pads of its own: upload a set you own on the <a href="/media">Media Player page</a>`
+                      ? t('mps-padset-none-upload')
+                      : rich('mps-padset-none', undefined, {
+                          media: words => html`<a href="/media">${words}</a>`,
+                        })
                 }
               </div>
               <select
@@ -417,7 +417,7 @@ export class MediaPlayerSettings extends LitElement {
                         ${
                           this._padSets.activeId || this._uploadOpen
                             ? nothing
-                            : html`<option value="" selected disabled>Choose a pad set</option>`
+                            : html`<option value="" selected disabled>${t('mps-padset-choose')}</option>`
                         }
                         ${this._padSets.groups.map(group =>
                           group.name === null
@@ -429,7 +429,7 @@ export class MediaPlayerSettings extends LitElement {
                       `
                     : this._uploadOpen
                       ? nothing
-                      : html`<option value="" selected disabled>No pad sets yet</option>`
+                      : html`<option value="" selected disabled>${t('mps-padset-none-yet')}</option>`
                 }
                 ${
                   this.uploads
@@ -437,14 +437,14 @@ export class MediaPlayerSettings extends LitElement {
                       value=${MediaPlayerSettings.UPLOAD}
                       .selected=${this._uploadOpen}
                     >
-                      Upload a new pad set…
+                      ${t('mps-padset-upload')}
                     </option>`
                     : nothing
                 }
               </select>
               ${
                 this._padSets.loading || this._padSets.switching
-                  ? html`<div class="padset-message">Preparing pad set…</div>`
+                  ? html`<div class="padset-message">${t('mps-padset-preparing')}</div>`
                   : ''
               }
               ${
