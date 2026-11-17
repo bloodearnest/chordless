@@ -1,9 +1,10 @@
 // The people who lead a space's setlists, from Account and Teams: the "Manage" button on a
-// space's card opens its page, where two spellings of one person are merged.
+// space's card opens its page, where each person is a row to edit, and two spellings of one person
+// are merged.
 import { expect, fromDB, seedSong, test } from './fixtures.ts'
 
 test.describe('Leaders', () => {
-  test('two spellings of one leader are merged from the Account and Teams page', {
+  test('two spellings of one leader are merged from the space’s page', {
     tag: '@logic',
   }, async ({ page }) => {
     // Ann leads one setlist; "Ann S." (with an address) leads another
@@ -22,18 +23,20 @@ test.describe('Leaders', () => {
 
     await page.goto('/account')
     await page.getByRole('button', { name: 'Manage' }).first().click()
-    const leaders = page.locator('space-people')
-    await expect(leaders.getByRole('textbox', { name: 'Name' })).toHaveCount(2)
-    await expect(leaders).toContainText('ann@example.com')
+    const people = page.locator('people-list')
+    await expect(people.locator('tbody tr')).toHaveCount(2)
+    await expect(people).toContainText('ann@example.com')
 
-    await leaders.getByLabel('Merge Ann S. into').selectOption({ label: 'Ann' })
+    await people.getByRole('button', { name: 'Edit Ann S.' }).click()
+    const editor = people.locator('space-people')
+    await editor.getByLabel('Merge Ann S. into').selectOption({ label: 'Ann' })
     await page.getByRole('button', { name: 'Merge', exact: true }).click()
 
     // One person is left, who leads both and has the address
-    await expect(leaders.getByRole('textbox', { name: 'Name' })).toHaveCount(1)
-    await expect(leaders.getByRole('textbox', { name: 'Name' })).toHaveValue('Ann')
-    await expect(leaders).toContainText('leads 2')
-    await expect(leaders).toContainText('ann@example.com')
+    await expect(people.locator('tbody tr')).toHaveCount(1)
+    await expect(people.locator('tbody tr')).toContainText('Ann')
+    await expect(people.locator('tbody tr')).toContainText('leads 2')
+    await expect(people.locator('tbody tr')).toContainText('ann@example.com')
     const moved = await fromDB(page, 'getSetlist', 'by-ann-s')
     expect(moved.leaderId).toBe('ann-leader')
   })
@@ -52,22 +55,24 @@ test.describe('Leaders', () => {
 
     await page.goto('/account')
     await page.getByRole('button', { name: 'Manage' }).first().click()
-    const leaders = page.locator('space-people')
-    await leaders.getByLabel('Add an email address to Ann').fill('Ann@Example.com')
-    await leaders.getByLabel('Add an email address to Ann').press('Enter')
-    await expect(leaders).toContainText('ann@example.com')
+    const people = page.locator('people-list')
+    const editor = people.locator('space-people')
 
-    await leaders.getByLabel('Add an email address to Visiting Vic').fill('nonsense')
-    await leaders.getByLabel('Add an email address to Visiting Vic').press('Enter')
-    await expect(leaders).not.toContainText('nonsense')
+    await people.getByRole('button', { name: 'Edit Ann' }).click()
+    await editor.getByLabel('Add an email address to Ann').fill('Ann@Example.com')
+    await editor.getByLabel('Add an email address to Ann').press('Enter')
+    await expect(editor).toContainText('ann@example.com')
+    await page.keyboard.press('Escape')
 
-    await leaders
-      .locator('.person', { hasText: 'leads none' })
-      .getByRole('button', { name: 'Delete' })
-      .click()
+    await people.getByRole('button', { name: 'Edit Visiting Vic' }).click()
+    await editor.getByLabel('Add an email address to Visiting Vic').fill('nonsense')
+    await editor.getByLabel('Add an email address to Visiting Vic').press('Enter')
+    await expect(editor).not.toContainText('nonsense')
+
+    await editor.getByRole('button', { name: 'Delete' }).click()
     await page.getByRole('button', { name: 'Delete', exact: true }).last().click()
-    await expect(leaders.getByRole('textbox', { name: 'Name' })).toHaveCount(1)
-    const people = await fromDB(page, 'getAllPeople', undefined)
-    expect(people.find((each: { id: string }) => each.id === 'vic').deleted).toBe(true)
+    await expect(people.locator('tbody tr')).toHaveCount(1)
+    const all = await fromDB(page, 'getAllPeople', undefined)
+    expect(all.find((each: { id: string }) => each.id === 'vic').deleted).toBe(true)
   })
 })

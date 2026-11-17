@@ -294,7 +294,17 @@ invite-not-emailed = The invite could not be emailed, so send the link to { $ema
 
 ## A Team's list of people
 
+membership-heading = Your place in the Team
+membership-owner = You are the owner of this Team.
+membership-member = You are { $role } in this Team.
+membership-stop = Stop sharing
+membership-leave = Leave this Team
+
 people-heading = People ({ $count })
+people-heading-personal = People who lead setlists ({ $count })
+people-none-personal = Nobody leads a setlist here yet.
+people-hint-personal = Edit changes a person's name and addresses. Two spellings of one person are put right by merging one into the other.
+people-hint-read-personal = This space is view only, so the people cannot be changed.
 people-search = Search people
 people-none = Nobody matches.
 people-column-name = Name

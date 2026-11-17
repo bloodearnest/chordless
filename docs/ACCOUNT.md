@@ -19,7 +19,8 @@ keeps the scopes apart: the account first, then one card per space, then the dev
 | `space-page.ts` (`/account/space/<id>`, `space-view.ts`) | One space on a page of its own: the sections below, under **Manage** on its card |
 | `space-manager.ts` | **Data**: everything to do with one space's data (a section of the space page) |
 | `space-people.ts` | **Leaders**: who leads a space's setlists (a section of the space page) |
-| `team-share-panel.ts`, `team-licence-panel.ts`, `team-storage-panel.ts` | A Team's people, its CCLI licence number and its storage (sections of the space page) |
+| `people-list.ts`, `person-rows.ts` | The one list of a space's people: a Team's members, invites and visiting leaders, or a Personal space's leaders (the first section of the space page) |
+| `team-membership-panel.ts`, `team-licence-panel.ts`, `team-storage-panel.ts` | A Team's place for the person (stop sharing, leave), its CCLI licence number and its storage (sections of the space page) |
 | `drive-sync-panel.ts`, `space-export-panel.ts`, `space-delete-everywhere.ts` | The panels of the Data modal. Each takes the space it is given, and a sync manager made for a space works on that space, not the one in use (`sync-manager.ts`) |
 | `storage-summary.ts` | The device |
 | `team-space-wizard.ts` (`/account/new`), `team-join.ts` (`/join`) | Making a Team, and joining one: docs/SPACES.md |
@@ -111,10 +112,11 @@ here; a space that is not on this device says so, with a link back.
 <- Account and Teams
 Gateway Church  [Team] [Worship leader]
 
-  People (a Team): who is in it, their roles, invites       team-share-panel.ts
+  People: members, invites, visiting leaders (a Team);       people-list.ts
+          who leads the setlists (a Personal space)
+  Your place in the Team (a Team): stop sharing / leave     team-membership-panel.ts
   CCLI licence number (a Team)                              team-licence-panel.ts
   Team storage (a Team's owner)                             team-storage-panel.ts
-  Leaders: who leads the setlists                           space-people.ts
   Data: reset from Drive, export and import, delete         space-manager.ts
 ```
 
@@ -138,10 +140,10 @@ Team, goes back to the list (to the home page, afresh, if it was the one in use:
 
 ### A Team's sections
 
-- **People** (`team-share-panel.ts`): who is in the Team and their roles, and for those who may manage
+- **People** (`people-list.ts`): who is in the Team and their roles, and for those who may manage
   people, **Invite someone** (an email and a role; the Worker emails the invite, and the link is shown once, with a **Send…**
-  button for the share sheet or WhatsApp or Gmail), the invites **waiting to be used** and a way to revoke each. The
-  owner can **stop sharing**, and any other member can **leave**. A role acts only on those below it (the
+  button for the share sheet or WhatsApp or Gmail), the invites **waiting to be used** with **Send again** and **Revoke**. The
+  owner can **stop sharing**, and any other member can **leave** (`team-membership-panel.ts`). A role acts only on those below it (the
   Worker's rule, docs/SPACES.md, "Roles"; the controls shown follow it).
 - **CCLI licence number** (`team-licence-panel.ts`): anyone sees it, a writer sets it where there is
   none, an admin changes or clears it and sees the log of changes (docs/CCLI.md).
@@ -150,7 +152,7 @@ Team, goes back to the list (to the home page, afresh, if it was the one in use:
   add and **Check and switch** (docs/SPACES.md, "Credentials").
 - **Leaders**, on every space (`space-people.ts`): who leads a space's setlists (docs/IDENTITIES.md, "People page").
 
-### People: one list (built 2026-11-17: `team-people.ts`, `person-rows.ts`)
+### People: one list (built 2026-11-17: `people-list.ts`, `person-rows.ts`)
 
 The People and Leaders sections become **one list of a space's people** (a Team's members, their pending invites, and visiting
 leaders who are not members), one row each: name, first address (and "+n"), role, **Edit**. A table that can be sorted by name,
@@ -171,13 +173,13 @@ nothing and is not you), each after a question. Rules are unchanged: a role acts
 the list and names themselves, and the list is built from the cached members and local people, so it shows offline (role
 changes and invites say they need a connection). **Invite someone** is a button over the list.
 
-As built: a Team's page shows `team-people` in place of the People and Leaders sections; `team-share-panel` stays beside it
-in a `compact` form (who you are in the Team, **Stop sharing** or **Leave**), and its old list and invite form are dead code to
-remove next, with their tests. The editor modal is `space-people` shown for one person (`only`), under a member's role,
-read-only addresses and **Remove from the Team**; it tells the list when a person changed (`space-people:changed`). **Send again**
-makes a new invite and revokes the old; the invite row's "Emailed 2 days ago" is `team_invites.emailed_at` (migration `0007`),
-set by the Worker when the mail was handed over. A **Personal space** still shows the old Leaders section (the same page
-without roles and invites is the polish step).
+As built (2026-11-17): every space's page shows `people-list.ts` as its first section, for a Team (members, invites, visiting
+leaders) and for a Personal space alike; in a Personal space it is only the people who lead setlists (no roles, status or invites,
+and view-only if the space is). Beside it a Team has `team-membership-panel.ts` (who you are in the Team, **Stop sharing** or **Leave**,
+each after a question), the licence and the storage; stopping sharing makes the page read the space again, as a Personal one. The
+editor modal is `space-people` shown for one person (`only`), under a member's role, read-only addresses and **Remove from the
+Team**; it tells the list when a person changed (`space-people:changed`). **Send again** makes a new invite and revokes the old; the
+invite row's "Emailed 2 days ago" is `team_invites.emailed_at` (migration `0007`), set by the Worker when the mail was handed over.
 
 ## Deleting a space
 
