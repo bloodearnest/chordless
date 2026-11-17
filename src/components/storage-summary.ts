@@ -105,20 +105,20 @@ export class StorageSummary extends LitElement {
       initial: loading,
       pending: loading,
       complete: stats => this._renderStats(stats),
-      error: () => html`<div class="error-card">Unable to read local storage details.</div>`,
+      error: () => html`<div class="error-card">${t('storage-unreadable')}</div>`,
     })
   }
 
   _renderStats(stats: StorageStats) {
     return html`
       <div class="summary-grid">
-        ${this._renderListStat('Storage Usage', [
-          { label: 'Browser data', value: this._formatBytes(stats.dbBytes) },
-          { label: 'App Cache', value: this._formatMegabytes(stats.appCacheBytes) },
-          { label: 'Media Cache', value: this._formatBytes(stats.mediaCacheBytes) },
+        ${this._renderListStat(t('storage-heading'), [
+          { label: t('storage-browser-data'), value: this._formatBytes(stats.dbBytes) },
+          { label: t('storage-app-cache'), value: this._formatMegabytes(stats.appCacheBytes) },
+          { label: t('storage-media-cache'), value: this._formatBytes(stats.mediaCacheBytes) },
         ])}
       </div>
-      <p class="footnote">Data on this device only. Each team's size is on its own card.</p>
+      <p class="footnote">${t('storage-footnote')}</p>
     `
   }
 

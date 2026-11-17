@@ -140,13 +140,16 @@ export class AccountCard extends LitElement {
       this._message =
         this._state === 'no-drive'
           ? {
-              text: 'Signed in. Google Drive was not connected, so your own spaces will not sync yet.',
+              text: t('account-signed-in-no-drive'),
               type: 'success',
             }
-          : { text: 'Signed in.', type: 'success' }
+          : { text: t('account-signed-in'), type: 'success' }
     } catch (error) {
       console.error('[AccountCard] Sign-in failed:', error)
-      this._message = { text: `Signing in failed: ${errorMessage(error)}`, type: 'error' }
+      this._message = {
+        text: t('account-signin-failed', { reason: errorMessage(error) }),
+        type: 'error',
+      }
     }
   }
 
@@ -159,12 +162,12 @@ export class AccountCard extends LitElement {
       await this.refresh()
       this._message =
         this._state === 'no-drive'
-          ? { text: 'Google Drive was not connected.', type: 'error' }
-          : { text: 'Google Drive connected.', type: 'success' }
+          ? { text: t('account-drive-not-connected'), type: 'error' }
+          : { text: t('account-drive-connected'), type: 'success' }
     } catch (error) {
       console.error('[AccountCard] Connecting Google Drive failed:', error)
       this._message = {
-        text: `Connecting Google Drive failed: ${errorMessage(error)}`,
+        text: t('account-drive-connect-failed', { reason: errorMessage(error) }),
         type: 'error',
       }
     }
@@ -176,10 +179,13 @@ export class AccountCard extends LitElement {
       const { logout } = await import('../js/google-auth.ts')
       await logout()
       await this.refresh()
-      this._message = { text: 'Logged out on this device.', type: 'success' }
+      this._message = { text: t('account-logged-out'), type: 'success' }
     } catch (error) {
       console.error('[AccountCard] Logout failed:', error)
-      this._message = { text: `Logging out failed: ${errorMessage(error)}`, type: 'error' }
+      this._message = {
+        text: t('account-logout-failed', { reason: errorMessage(error) }),
+        type: 'error',
+      }
     }
   }
 
@@ -190,14 +196,15 @@ export class AccountCard extends LitElement {
       const { revoked } = await revokeAccess()
       await this.refresh()
       this._message = {
-        text: revoked
-          ? "Logged out, and Chordless's access to your Drive was revoked."
-          : "Logged out on this device, but Google could not be reached to revoke Chordless's access. You can remove it at myaccount.google.com/permissions",
+        text: revoked ? t('account-revoked') : t('account-revoked-unreached'),
         type: 'success',
       }
     } catch (error) {
       console.error('[AccountCard] Revoking access failed:', error)
-      this._message = { text: `Revoking access failed: ${errorMessage(error)}`, type: 'error' }
+      this._message = {
+        text: t('account-revoke-failed', { reason: errorMessage(error) }),
+        type: 'error',
+      }
     }
   }
 
@@ -208,7 +215,7 @@ export class AccountCard extends LitElement {
     } catch (error) {
       console.error('[AccountCard] Backup download failed:', error)
       this._message = {
-        text: `Downloading the backup failed: ${errorMessage(error)}`,
+        text: t('account-backup-download-failed', { reason: errorMessage(error) }),
         type: 'error',
       }
     }
@@ -226,11 +233,11 @@ export class AccountCard extends LitElement {
         const { importBlobBackup } = await import('../js/google-auth.ts')
         await importBlobBackup(backup)
         await this.refresh()
-        this._message = { text: 'Sign-in backup imported.', type: 'success' }
+        this._message = { text: t('account-backup-imported'), type: 'success' }
       } catch (error) {
         console.error('[AccountCard] Import backup failed:', error)
         this._message = {
-          text: `Importing the backup failed: ${errorMessage(error)}`,
+          text: t('account-backup-import-failed', { reason: errorMessage(error) }),
           type: 'error',
         }
       }
@@ -244,7 +251,7 @@ export class AccountCard extends LitElement {
       const { getAccessToken, getStoredBlob, storeSignIn } = await import('../js/google-auth.ts')
       const blobData = await getStoredBlob()
       if (!blobData) {
-        this._message = { text: 'Not signed in: sign in with Google first.', type: 'error' }
+        this._message = { text: t('account-refresh-not-signed-in'), type: 'error' }
         return
       }
       const { blob, metadata } = blobData
@@ -258,21 +265,27 @@ export class AccountCard extends LitElement {
       const newExpiry = new Date(updated.metadata.expires_at as string)
       if (newExpiry <= new Date()) throw new Error('The new token is still expired')
       this._message = {
-        text: `Token refresh works: expiry ${oldExpiry.toLocaleTimeString()} → ${newExpiry.toLocaleTimeString()}`,
+        text: t('account-refresh-works', {
+          old: oldExpiry.toLocaleTimeString(),
+          new: newExpiry.toLocaleTimeString(),
+        }),
         type: 'success',
       }
     } catch (error) {
       console.error('[AccountCard] Token refresh test failed:', error)
       const { SignInExpiredError } = await import('../js/google-auth.ts')
       if (error instanceof SignInExpiredError) await this.refresh()
-      this._message = { text: `Token refresh failed: ${errorMessage(error)}`, type: 'error' }
+      this._message = {
+        text: t('account-refresh-failed', { reason: errorMessage(error) }),
+        type: 'error',
+      }
     }
   }
 
   override render() {
     return html`
       <div class="panel">
-        <h3>Account</h3>
+        <h3>${t('account-heading')}</h3>
         ${this._state === null ? html`<p><span class="spinner"></span> ${t('status-checking')}</p>` : this._renderState()}
         ${
           this._message
@@ -317,36 +330,36 @@ export class AccountCard extends LitElement {
           : nothing
       }
       <details>
-        <summary>Manage</summary>
+        <summary>${t('account-manage')}</summary>
         <div class="manage">
           ${
             state === 'signed-out'
               ? nothing
               : html`<div class="row">
-                <button class="btn" id="logout" @click=${this._logout}>Log out</button>
+                <button class="btn" id="logout" @click=${this._logout}>${t('account-logout')}</button>
                 ${
                   this._emailOnly
                     ? nothing
-                    : html`<button class="btn danger" id="revoke" @click=${this._revokeAccess}>Revoke access on all devices</button>`
+                    : html`<button class="btn danger" id="revoke" @click=${this._revokeAccess}>${t('account-revoke')}</button>`
                 }
               </div>`
           }
           <details class="advanced">
-            <summary>Advanced</summary>
+            <summary>${t('account-advanced')}</summary>
             <div class="manage">
               <div class="row">
                 ${
                   state === 'signed-out' || this._emailOnly
                     ? nothing
                     : html`<button class="btn" id="test-refresh" @click=${this._testTokenRefresh}>
-                      Test token refresh
+                      ${t('account-test-refresh')}
                     </button>
                     <button class="btn" id="download-backup" @click=${this._downloadBackup}>
-                      Download sign-in backup
+                      ${t('account-backup-download')}
                     </button>`
                 }
                 <button class="btn" id="import-backup" @click=${this._importBackup}>
-                  Import sign-in backup
+                  ${t('account-backup-import')}
                 </button>
               </div>
             </div>
@@ -372,12 +385,12 @@ export class AccountCard extends LitElement {
     const photo = user?.avatarDataUrl || user?.picture
     const status =
       state === 'expired'
-        ? 'Sign-in expired: reconnect to sync'
+        ? t('account-status-expired')
         : this._emailOnly
           ? t('account-email-only-status')
           : state === 'no-drive'
-            ? 'Signed in, Google Drive not connected'
-            : 'Google Drive connected'
+            ? t('account-status-no-drive')
+            : t('account-status-connected')
     return html`<div class="who">
       ${
         photo
@@ -385,7 +398,7 @@ export class AccountCard extends LitElement {
           : html`<div class="avatar" aria-hidden="true">${(user?.name || user?.email || '?').charAt(0).toUpperCase()}</div>`
       }
       <div>
-        <span class="name">${user?.name || 'Signed in'}</span>
+        <span class="name">${user?.name || t('account-name-unknown')}</span>
         ${user?.email ? html`<span class="email">${user.email}</span>` : nothing}
         <span class="status ${state === 'expired' ? 'problem' : ''}" role=${state === 'expired' ? 'alert' : nothing}>
           ${status}
@@ -400,14 +413,14 @@ export class AccountCard extends LitElement {
         <button class="btn" id="sign-in-email" @click=${() => (this._emailForm = true)}>${t('email-code-button')}</button>`
     }
     if (state === 'expired') {
-      return html`<button class="btn primary" id="reconnect" @click=${this._signIn}>Reconnect with Google</button>`
+      return html`<button class="btn primary" id="reconnect" @click=${this._signIn}>${t('action-reconnect-google')}</button>`
     }
     if (this._emailOnly) {
       // (no Google at all yet: Google's whole sign-in, with Drive, is joined to this account)
       return html`<button class="btn primary" id="connect-google" @click=${this._signIn}>${t('account-connect-google')}</button>`
     }
     if (state === 'no-drive') {
-      return html`<button class="btn primary" id="connect-drive" @click=${this._connectDrive}>Connect Google Drive</button>`
+      return html`<button class="btn primary" id="connect-drive" @click=${this._connectDrive}>${t('account-connect-drive')}</button>`
     }
     return nothing
   }

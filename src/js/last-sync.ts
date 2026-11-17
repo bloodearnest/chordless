@@ -2,7 +2,9 @@
  * When a space last synced, kept on this device for each space (the one before there were several
  * kept a single time, which the space in use still reads until it syncs).
  */
+
 import { getCurrentSpace } from './space.ts'
+import { t } from './text.ts'
 
 const LEGACY_KEY = 'last-sync-time'
 const key = (spaceId: string) => `${LEGACY_KEY}:${spaceId}`
@@ -33,10 +35,10 @@ export function formatSyncTime(isoString: string, now = new Date()): string {
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
 
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`
-  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
-  if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`
+  if (diffMins < 1) return t('sync-time-now')
+  if (diffMins < 60) return t('sync-time-minutes', { count: diffMins })
+  if (diffHours < 24) return t('sync-time-hours', { count: diffHours })
+  if (diffDays < 7) return t('sync-time-days', { count: diffDays })
 
   return date.toLocaleDateString()
 }

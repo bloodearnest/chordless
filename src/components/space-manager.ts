@@ -3,6 +3,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { loadMediaSettings } from '../js/media-settings.ts'
+import { rich } from '../js/rich-text.ts'
 import { getCurrentSpace, getSpaceById } from '../js/space.ts'
 import { removeSpaceFromDevice } from '../js/space-deletion.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
@@ -168,7 +169,7 @@ export class SpaceManager extends LitElement {
   override render() {
     if (this._missing) {
       return html`<div class="content">
-        <div class="panel"><p>This device has no such Personal space or Team. It may have been deleted.</p></div>
+        <div class="panel"><p>${t('space-missing')}</p></div>
       </div>`
     }
     const space = this._space
@@ -182,26 +183,24 @@ export class SpaceManager extends LitElement {
           ${kind ? html`<span class="chip">${kind}</span>` : nothing}
           ${role ? html`<span class="chip">${role}</span>` : nothing}
           <span class="spacer"></span>
-          ${this._current ? html`<span class="badge">Current</span>` : nothing}
+          ${this._current ? html`<span class="badge">${t('space-current')}</span>` : nothing}
         </div>
         ${
           summary
             ? html`<p class="meta">
-              ${summary.songs} song${summary.songs === 1 ? '' : 's'} ·
-              ${summary.setlists} setlist${summary.setlists === 1 ? '' : 's'} · about
-              ${formatBytes(summary.bytes)}
+              ${t('space-summary', {
+                songs: summary.songs,
+                setlists: summary.setlists,
+                size: formatBytes(summary.bytes),
+              })}
             </p>`
             : nothing
         }
 
         <div class="panel">
-          <h3>${isTeamMember(space) ? 'Team copy' : 'Google Drive'}</h3>
+          <h3>${isTeamMember(space) ? t('space-copy-team-heading') : t('space-copy-drive-heading')}</h3>
           <p>
-            ${
-              isTeamMember(space)
-                ? "Replace this device's songs and setlists with the Team's copy. Sync is on the space's card."
-                : "Replace this device's songs and setlists with the copy in Google Drive. Sync is on the space's card."
-            }
+            ${isTeamMember(space) ? t('space-copy-team-text') : t('space-copy-drive-text')}
           </p>
           <drive-sync-panel .space=${space} ?disabled=${!this._canSync}></drive-sync-panel>
           ${
@@ -209,19 +208,18 @@ export class SpaceManager extends LitElement {
               ? nothing
               : this._signIn === 'no-drive'
                 ? html`<p class="hint">
-                  You are signed in, but Google Drive is not connected, so this space is not syncing.
-                  <a href="/account">Connect Google Drive</a> on the Account and Teams page.
+                  ${rich('space-drive-not-connected', undefined, {
+                    connect: words => html`<a href="/account">${words}</a>`,
+                  })}
                 </p>`
                 : html`<p class="hint">${t('space-sync-sign-in-hint')}</p>`
           }
         </div>
 
         <div class="panel">
-          <h3>Export and import</h3>
+          <h3>${t('space-export-heading')}</h3>
           <p>
-            Export this ${space.team ? 'Team' : 'space'}'s songs and setlists as a zip file, and import an export into
-            it, on this device or another: it needs no Google account, and an import only adds what
-            is missing.
+            ${t(space.team ? 'space-export-text-team' : 'space-export-text')}
           </p>
           <space-export-panel
             .space=${space}
@@ -232,21 +230,25 @@ export class SpaceManager extends LitElement {
         </div>
 
         <div class="panel danger-zone">
-          <h3>Delete from this device</h3>
+          <h3>${t('space-delete-heading')}</h3>
           <p>
-            Remove this ${space.team ? 'Team' : 'space'} and its songs and setlists from this device. Its
-            folder in Google Drive stays.
+            ${t(space.team ? 'space-delete-text-team' : 'space-delete-text')}
             ${this._current ? 'It is the one you are in: you will be taken to another.' : ''}
           </p>
-          <button class="btn danger" id="delete" @click=${this._delete}>Delete…</button>
-          ${this._error ? html`<p class="error" role="alert">Failed to delete it: ${this._error}</p>` : nothing}
+          <button class="btn danger" id="delete" @click=${this._delete}>${t('space-delete-button')}</button>
+          ${this._error ? html`<p class="error" role="alert">${t('space-delete-failed', { reason: this._error })}</p>` : nothing}
         </div>
 
         <div class="panel danger-zone">
-          <h3>Delete everywhere</h3>
+          <h3>${t('space-delete-everywhere-heading')}</h3>
           <p>
-            Delete this ${space.team ? 'Team' : 'space'} from this device <em>and</em> from Google
-            Drive, whose trash keeps its folder for thirty days. It asks for a backup first.
+            ${rich(
+              space.team ? 'space-delete-everywhere-text-team' : 'space-delete-everywhere-text',
+              undefined,
+              {
+                em: words => html`<em>${words}</em>`,
+              }
+            )}
           </p>
           <space-delete-everywhere
             .space=${space}

@@ -4,6 +4,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import { nameSpaceBeforeSync } from '../js/first-time-auth.ts'
 import { formatSyncTime, lastSyncOf, recordSync } from '../js/last-sync.ts'
+import { rich } from '../js/rich-text.ts'
 import { getCurrentSpace } from '../js/space.ts'
 import { driveFolderProblem } from '../js/space-access.ts'
 import {
@@ -198,7 +199,7 @@ export class DriveSyncPanel extends LitElement {
 
     this.syncing = true
     this.syncError = null
-    this.syncProgress = { stage: 'starting', message: 'Starting reset...' }
+    this.syncProgress = { stage: 'starting', message: t('drive-sync-starting-reset') }
 
     try {
       await nameSpaceBeforeSync(this.space)
@@ -227,7 +228,10 @@ export class DriveSyncPanel extends LitElement {
     } catch (error) {
       console.error('[DriveSyncPanel] Reset from Drive failed:', error)
       this.syncError = errorMessage(error)
-      this.syncProgress = { stage: 'error', message: `Failed: ${errorMessage(error)}` }
+      this.syncProgress = {
+        stage: 'error',
+        message: t('drive-sync-failed', { reason: errorMessage(error) }),
+      }
       this.syncing = false
     }
   }
@@ -239,7 +243,7 @@ export class DriveSyncPanel extends LitElement {
 
     this.syncing = true
     this.syncError = null
-    this.syncProgress = { stage: 'starting', message: 'Starting over in Drive...' }
+    this.syncProgress = { stage: 'starting', message: t('drive-sync-starting-over') }
 
     try {
       await nameSpaceBeforeSync(this.space)
@@ -259,7 +263,10 @@ export class DriveSyncPanel extends LitElement {
       console.error('[DriveSyncPanel] Starting over in Drive failed:', error)
       this.syncing = false
       this.syncError = errorMessage(error)
-      this.syncProgress = { stage: 'error', message: `Failed: ${errorMessage(error)}` }
+      this.syncProgress = {
+        stage: 'error',
+        message: t('drive-sync-failed', { reason: errorMessage(error) }),
+      }
     }
   }
 
@@ -270,7 +277,7 @@ export class DriveSyncPanel extends LitElement {
 
     this.syncing = true
     this.syncError = null
-    this.syncProgress = { stage: 'starting', message: 'Replacing from Drive...' }
+    this.syncProgress = { stage: 'starting', message: t('drive-sync-replacing') }
 
     try {
       await nameSpaceBeforeSync(this.space)
@@ -288,7 +295,10 @@ export class DriveSyncPanel extends LitElement {
       console.error('[DriveSyncPanel] Replacing from a Drive folder failed:', error)
       this.syncing = false
       this.syncError = errorMessage(error)
-      this.syncProgress = { stage: 'error', message: `Failed: ${errorMessage(error)}` }
+      this.syncProgress = {
+        stage: 'error',
+        message: t('drive-sync-failed', { reason: errorMessage(error) }),
+      }
     }
   }
 
@@ -297,9 +307,11 @@ export class DriveSyncPanel extends LitElement {
       return html`
         <div class="sync-panel disabled">
           <div class="unavailable-notice">
-            <strong>⚠️ Drive Sync Unavailable</strong>
+            <strong>${t('drive-sync-unavailable')}</strong>
             <p style="margin: 0.5rem 0 0 0;">
-              You need to <a href="/account">connect with Google Drive</a> to enable sync.
+              ${rich('drive-sync-unavailable-text', undefined, {
+                connect: words => html`<a href="/account">${words}</a>`,
+              })}
             </p>
           </div>
         </div>
@@ -315,7 +327,7 @@ export class DriveSyncPanel extends LitElement {
         }
 
         <button class="btn" ?disabled=${this.syncing} @click=${this._handleReset}>
-          ⤓ Reset from Google Drive
+          ${t('drive-sync-reset')}
         </button>
         <app-modal
           ${ref(this._resetModal)}
@@ -329,7 +341,7 @@ export class DriveSyncPanel extends LitElement {
         ${
           this.lastSyncTime
             ? html`
-              <div class="last-sync">Last synced: ${this._formatSyncTime(this.lastSyncTime)}</div>
+              <div class="last-sync">${t('drive-sync-last', { when: this._formatSyncTime(this.lastSyncTime) })}</div>
             `
             : ''
         }
@@ -342,11 +354,11 @@ export class DriveSyncPanel extends LitElement {
       <div class="sync-status error">
         <div class="status-row">
           <span class="status-icon">⚠️</span>
-          <span class="status-text">Drive folder not found</span>
+          <span class="status-text">${t('drive-sync-folder-missing')}</span>
         </div>
         <div class="error-message">${this.folderProblem}</div>
         <button class="btn" ?disabled=${this.syncing} @click=${this._handleStartOver}>
-          ↻ Start over in Drive
+          ${t('drive-sync-start-over')}
         </button>
         <app-modal
           ${ref(this._startOverModal)}
@@ -357,7 +369,7 @@ export class DriveSyncPanel extends LitElement {
           message=${t('confirm-drive-start-over-message')}
         ></app-modal>
         <button class="btn" ?disabled=${this.syncing} @click=${this._handleReplaceFromFolder}>
-          ⤓ Replace with the copy in Drive
+          ${t('drive-sync-replace')}
         </button>
         <app-modal
           ${ref(this._replaceModal)}
@@ -377,7 +389,7 @@ export class DriveSyncPanel extends LitElement {
         <div class="sync-status">
           <div class="status-row">
             <span class="status-icon">☁️</span>
-            <span class="status-text">Ready</span>
+            <span class="status-text">${t('drive-sync-ready')}</span>
           </div>
         </div>
       `
@@ -388,7 +400,7 @@ export class DriveSyncPanel extends LitElement {
         <div class="sync-status error">
           <div class="status-row">
             <span class="status-icon">❌</span>
-            <span class="status-text">Failed</span>
+            <span class="status-text">${t('drive-sync-failed-status')}</span>
           </div>
           <div class="error-message">${this.syncError}</div>
         </div>
@@ -415,7 +427,7 @@ export class DriveSyncPanel extends LitElement {
   _renderProgressBar() {
     const { current, total } = this.syncProgress as PanelProgress
     return html`<progress-bar
-      label="Sync progress"
+      label=${t('drive-sync-progress-label')}
       .current=${current}
       .total=${total}
     ></progress-bar>`

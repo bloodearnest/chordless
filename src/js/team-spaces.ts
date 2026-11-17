@@ -4,6 +4,7 @@
  * (team-client.ts); the space's files are synced as any space's, by whichever backend
  * `storageFor` gives it.
  */
+
 import { cleanLicence } from './ccli-licence.ts'
 import type { Person, Setlist, Space } from './data-types.ts'
 import { ChordlessDB } from './db.ts'
@@ -16,6 +17,7 @@ import type { ProgressCallback } from './sync/session.ts'
 import { trackSync } from './sync-status.ts'
 import { teamApi } from './team-client.ts'
 import type { TeamRole } from './team-roles.ts'
+import { t } from './text.ts'
 
 /** What making a team space needs from Drive: a folder inside the one the person picked */
 export interface TeamFolders {
@@ -137,18 +139,30 @@ async function joinTeamSpace(
   })
 }
 
+const ROLE_LABELS: Record<TeamRole, string> = {
+  owner: 'role-owner',
+  admin: 'role-admin',
+  writer: 'role-writer',
+  reader: 'role-reader',
+}
+const ROLE_LABELS_WITH_ARTICLE: Record<TeamRole, string> = {
+  owner: 'role-owner-with-article',
+  admin: 'role-admin-with-article',
+  writer: 'role-writer-with-article',
+  reader: 'role-reader-with-article',
+}
+
 /**
  * What a role is called to people: the roles are the Worker's (a reader may only read, a writer may
  * change files), but a church knows them as team members and worship leaders.
  */
 export function roleLabel(role: TeamRole): string {
-  return { owner: 'owner', admin: 'admin', writer: 'worship leader', reader: 'team member' }[role]
+  return t(ROLE_LABELS[role])
 }
 
 /** A role as part of a sentence: "a worship leader", "an admin" */
 export function roleWithArticle(role: TeamRole): string {
-  const label = roleLabel(role)
-  return `${/^[aeiou]/.test(label) ? 'an' : 'a'} ${label}`
+  return t(ROLE_LABELS_WITH_ARTICLE[role])
 }
 
 /** The link to send someone an invite: /join/<space id>/<code> */
