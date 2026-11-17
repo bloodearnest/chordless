@@ -229,10 +229,14 @@ The Worker keeps no per-user state (a team's members are the team's, in D1).
   accepting both. Where the Worker has no database or `SESSION_SIGNING_KEY` (a development one without them)
   a sign-in still works and has no session.
 - **Signing in with an emailed code (2026-11-16):** for someone with no Google account (Hotmail, Yahoo, iCloud, a
-  work address). `POST /session/email/start {address}` mails a six-digit code from `signin@mail.chordless.app`
+  work address). `POST /session/email/start {address, next?}` mails one email with both ways in, a link and a six-digit code, from `signin@mail.chordless.app`
   (Cloudflare Email Sending, a `send_email` binding; the subdomain's DNS is in `infra/cloudflare`);
   `POST /session/email/verify {address, code}` takes it and answers with a session as `/session/token` does.
-  Neither the address nor the code is kept: `login_codes` (migration `0005`) holds keyed hashes (SESSION_SIGNING_KEY).
+  The link is `/sign-in#a=<address>&c=<code>&n=<page to go on to>` (`sign-in-page.ts`): the address and code are in the
+  #fragment, so no server sees them and a mail scanner that opens the link does not use the code up; the page signs in,
+  clears the fragment, and goes on to `n` (a path of the app only: the Worker and the page both refuse another). The code
+  is for a device whose mail app opens links somewhere else (an installed app on iOS has its own storage, apart from
+  Safari's): both are in the one message, the link first. Neither the address nor the code is kept: `login_codes` (migration `0005`) holds keyed hashes (SESSION_SIGNING_KEY).
   A code works once, for 10 minutes and five tries; five codes an hour go to one address (the same answer is given
   after that), a sender is limited by address (10 a minute) and all senders together (30 a minute), because mail to
   addresses that do not exist bounces, and bounces get a sending domain blocked. The answer to `start` is the same for any

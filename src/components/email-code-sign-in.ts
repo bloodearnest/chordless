@@ -21,22 +21,26 @@ type Step = 'address' | 'sending' | 'code' | 'checking'
 export class EmailCodeSignIn extends LitElement {
   static override properties = {
     address: { type: String },
+    next: { type: String },
     _step: { state: true },
     _error: { state: true },
   }
 
   /** The address to start from (an invite's, say); the person may change it */
   declare address: string
+  /** The page the link in the email goes on to: this one, by default */
+  declare next: string
   declare _step: Step
   declare _error: string
 
   /** Asks for the code to be mailed, and signs in with it (a test gives its own) */
-  start: (address: string) => Promise<void> = startEmailSignIn
+  start: (address: string, next?: string) => Promise<void> = startEmailSignIn
   verify: (address: string, code: string) => Promise<void> = signInWithEmail
 
   constructor() {
     super()
     this.address = ''
+    this.next = ''
     this._step = 'address'
     this._error = ''
   }
@@ -79,7 +83,7 @@ export class EmailCodeSignIn extends LitElement {
     const from = this._step
     this._step = 'sending'
     try {
-      await this.start(this.address)
+      await this.start(this.address, this.next || undefined)
       this._step = 'code'
     } catch (error) {
       this._error = this._explain(error, 'email-code-error-send')

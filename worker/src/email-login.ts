@@ -50,13 +50,40 @@ function newCode(): string {
   return String(word[0] % 1_000_000).padStart(6, '0')
 }
 
-/** The email: short and plain, with the code in the subject so that it shows without opening */
-export function loginEmail(code: string) {
+/** A page of the app to come back to, as a path: not another site, and not an address with a scheme */
+export function cleanNext(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length <= 300 && /^\/(?![/\\])\S*$/.test(value)
+    ? value
+    : undefined
+}
+
+/**
+ * The link in the email: the page that signs in with it, which holds the address and the code in its #fragment,
+ * so that they are never sent to a server (nor used up by a mail scanner that opens the link), and `next`, the
+ * page to go on to.
+ */
+export function loginLink(origin: string, address: string, code: string, next?: string): string {
+  const fragment = new URLSearchParams({ a: address, c: code, ...(next ? { n: next } : {}) })
+  return `${origin}/sign-in#${fragment}`
+}
+
+/**
+ * The email: short and plain. One message with both ways in: the link (one tap, on the device that opens it) and
+ * the code (typed, for a device whose mail app opens links somewhere else, such as an installed app on iOS).
+ * The code is in the subject too, so that it shows without opening.
+ */
+export function loginEmail(code: string, link: string) {
   return {
     subject: `Your Chordless sign-in code: ${code}`,
-    text: `Your Chordless sign-in code is ${code}.
+    text: `Sign in to Chordless by opening this link on the device you want to sign in on:
 
-It works once, for 10 minutes. If you did not ask for it, you can ignore this email: nothing happens unless the code is entered.
+${link}
+
+Or, if the link does not open in the right place, enter this code in Chordless:
+
+${code}
+
+Either works once, for 10 minutes. If you did not ask for this, ignore it: nothing happens unless the link is opened or the code is entered.
 `,
   }
 }
@@ -81,9 +108,9 @@ async function allowed(request: Request, env: Env): Promise<boolean> {
 }
 
 /**
- * POST /session/email/start { address }
+ * POST /session/email/start { address, next? }
  *
- * Mails a code. 200 `{ok: true}` whether or not the address has had codes before, and also when it has had
+ * Mails a code and a link that signs in with it (`next` is the page, a path of the app, the link goes on to). 200 `{ok: true}` whether or not the address has had codes before, and also when it has had
  * its five this hour (nothing more is sent); 400 for text that is not an address; 429 for a sender asking
  * too often; 502 if the mail could not be handed over; 503 where the Worker cannot send.
  */
@@ -93,8 +120,10 @@ export function handleEmailStart(
   now: Date = new Date()
 ): Promise<Response> {
   return refusing(async () => {
-    const address = cleanAddress((await readJson(request)).address)
+    const body = await readJson(request)
+    const address = cleanAddress(body.address)
     if (!address) return jsonResponse({ error: 'invalid_address' }, 400)
+    const next = cleanNext(body.next)
     if (!env.DB || !env.EMAIL) return jsonResponse({ error: 'Email sign-in is not set up' }, 503)
     if (!(await allowed(request, env))) {
       annotateRequest({ 'chordless.auth.email_result': 'sender_limited' })
@@ -135,7 +164,11 @@ export function handleEmailStart(
       .run()
 
     try {
-      await env.EMAIL.send({ to: address, from: LOGIN_SENDER, ...loginEmail(code) })
+      await env.EMAIL.send({
+        to: address,
+        from: LOGIN_SENDER,
+        ...loginEmail(code, loginLink(new URL(request.url).origin, address, code, next)),
+      })
     } catch (error) {
       annotateRequest({
         'chordless.auth.email_result': 'send_failed',

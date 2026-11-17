@@ -287,11 +287,11 @@ export class EmailCodeError extends Error {
 }
 
 /** Ask for a sign-in code to be emailed to this address (the Worker answers the same for any address) */
-export async function startEmailSignIn(address: string): Promise<void> {
+export async function startEmailSignIn(address: string, next?: string): Promise<void> {
   const response = await fetch(`${AUTH_PROXY_URL}/session/email/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ address }),
+    body: JSON.stringify({ address, next }),
   })
   if (response.ok) return
   const error = await response.json().catch(() => ({}))

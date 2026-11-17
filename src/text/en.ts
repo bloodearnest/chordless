@@ -294,7 +294,7 @@ email-code-heading = Sign in with your email address
 email-code-address-label = Your email address
 email-code-send = Email me a code
 email-code-sending = Sending…
-email-code-sent = We have emailed a 6-digit code to { $email }. It can take a minute, and it may be in your spam folder.
+email-code-sent = We have emailed { $email } a link and a 6-digit code. Open the link on this device, or enter the code here. It can take a minute, and it may be in your spam folder.
 email-code-label = The 6-digit code
 email-code-submit = Sign in
 email-code-checking = Checking…
@@ -306,6 +306,9 @@ email-code-error-send = The code could not be sent. Try again in a moment.
 email-code-error-wrong = That code is not right. Check it and try again.
 email-code-error-expired = That code has run out, or was used. Ask for a new one.
 email-code-error-too-many = Too many wrong codes. Ask for a new one.
+email-link-working = Signing you in…
+email-link-failed = That link has been used or has run out. Ask for a new one.
+email-link-none = To sign in, enter your email address and we will email you a link and a code.
 email-code-error-failed = Signing in did not work. Try again in a moment.
 
 # For a page opened inside another app's own browser. { $app } is the app's name.
