@@ -90,6 +90,31 @@ describe('space-people', () => {
     expect((await indexedDB.databases()).length).to.equal(before)
   })
 
+  it('shows one person, without the introduction, and nothing for one that is not there', async () => {
+    await db.savePeople([ann, tomSmith])
+    element = await fixture<SpacePeople>(
+      html`<space-people .spaceId=${spaceId} only="ann"></space-people>`
+    )
+    await waitUntil(() => element._loaded, 'the people to be read')
+    expect($$('.person')).to.have.length(1)
+    expect(text()).to.not.contain('The people who lead')
+    element.only = 'nobody'
+    await element.updateComplete
+    expect($$('.person')).to.have.length(0)
+  })
+
+  it('tells whoever shows it when a person is changed', async () => {
+    await db.savePeople([ann])
+    await open()
+    let changed = 0
+    element.addEventListener('space-people:changed', () => changed++)
+    const input = must(card('Ann Lee').querySelector<HTMLInputElement>('.name'))
+    input.value = 'Ann Leigh'
+    input.dispatchEvent(new Event('change'))
+    await settled()
+    expect(changed).to.equal(1)
+  })
+
   it('says so when nobody leads a setlist here', async () => {
     await open()
     expect(text()).to.contain('Nobody leads a setlist here yet')

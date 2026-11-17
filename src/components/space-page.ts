@@ -8,6 +8,7 @@ import { buttonStyles, panelStyles } from './shared-styles.ts'
 import { SpaceGoneEvent } from './space-manager.ts'
 import './space-manager.ts'
 import './space-people.ts'
+import './team-people.ts'
 import { TeamShareLeftEvent } from './team-share-panel.ts'
 import './team-licence-panel.ts'
 import './team-share-panel.ts'
@@ -128,15 +129,15 @@ export class SpacePage extends LitElement {
       </h2>
       ${
         space.team
-          ? html`<team-share-panel .space=${space}></team-share-panel>
+          ? html`<team-people .space=${space}></team-people>
+            <team-share-panel compact .space=${space}></team-share-panel>
             <team-licence-panel .space=${space}></team-licence-panel>
             <team-storage-panel .space=${space}></team-storage-panel>`
-          : nothing
+          : html`<div class="panel">
+            <h3>Leaders</h3>
+            <space-people .spaceId=${space.id}></space-people>
+          </div>`
       }
-      <div class="panel">
-        <h3>Leaders</h3>
-        <space-people .spaceId=${space.id}></space-people>
-      </div>
       <div class="panel">
         <h3>Data</h3>
         <space-manager .spaceId=${space.id}></space-manager>

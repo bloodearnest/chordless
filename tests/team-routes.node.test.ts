@@ -1643,6 +1643,21 @@ describe('the email that invites someone', () => {
     assert.ok(sent[0].text.includes('does not have to be new@example.com'))
   })
 
+  test('is noted on the invite, so the list can say when, and that it was not', async () => {
+    const w = await world()
+    const { invite } = mailed(w)
+    await invite(ann, 'sent@example.com')
+    // (no mail can be sent here: the invite is made, and says it was not emailed)
+    await w.call(`${SPACE}/invites`, ann, post({ role: 'writer', email: 'held@example.com' }))
+    const listed = (await json(await w.call(`${SPACE}/invites`, ann))) as unknown as {
+      email: string
+      emailedAt: string | null
+    }[]
+    const by = (email: string) => listed.find(each => each.email === email)
+    assert.match(String(by('sent@example.com')?.emailedAt), /^\d{4}-\d\d-\d\dT/)
+    assert.equal(by('held@example.com')?.emailedAt, null)
+  })
+
   test('says an admin invite is for its address alone, and how to use it', async () => {
     const w = await world()
     const { sent, invite } = mailed(w)

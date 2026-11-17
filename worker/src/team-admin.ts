@@ -293,6 +293,7 @@ const ADMIN_ROUTES: AdminRoute[] = [
         by: identity,
         code: made.code,
       })
+      if (emailed) await room.markInviteEmailed(made.code)
       return jsonResponse({ ...made, emailed })
     },
   },
