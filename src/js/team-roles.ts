@@ -31,6 +31,8 @@ export interface InviteInfo {
   createdBy: string
   createdAt: string
   expiresAt: string
+  /** When Chordless emailed it; null if it was not (held back, or it could not be sent) */
+  emailedAt?: string | null
 }
 
 const RANK: Record<TeamRole, number> = { reader: 0, writer: 1, admin: 2, owner: 3 }

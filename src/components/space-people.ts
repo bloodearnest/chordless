@@ -37,9 +37,18 @@ import { buttonStyles, panelStyles } from './shared-styles.ts'
  * (the way to clear up two spellings of one person) or deleted if they lead nothing. In a Team,
  * only worship leaders and above change people.
  */
+/** A person was changed here (named, given or lost an address, merged or deleted): whoever shows the list may read it again */
+export class SpacePeopleChangedEvent extends Event {
+  static readonly type = 'space-people:changed'
+  constructor() {
+    super(SpacePeopleChangedEvent.type, { bubbles: true, composed: true })
+  }
+}
+
 export class SpacePeople extends LitElement {
   static override properties = {
     spaceId: { type: String },
+    only: { type: String },
     _space: { state: true },
     _people: { state: true },
     _counts: { state: true },
@@ -50,6 +59,8 @@ export class SpacePeople extends LitElement {
 
   /** The space whose people are shown */
   declare spaceId: string
+  /** Show only this person (by id), without the introduction: the editor of the Team's list of people */
+  declare only: string
   declare _space: Space | null
   declare _people: Person[]
   /** How many setlists each person leads, by id */
@@ -173,6 +184,7 @@ export class SpacePeople extends LitElement {
   constructor() {
     super()
     this.spaceId = ''
+    this.only = ''
     this._space = null
     this._people = []
     this._counts = new Map()
@@ -259,6 +271,7 @@ export class SpacePeople extends LitElement {
       toast(t(failure), { kind: 'error', details: errorMessage(error) })
     }
     await this.load()
+    this.dispatchEvent(new SpacePeopleChangedEvent())
   }
 
   _rename(person: Person, event: Event): void {
@@ -424,6 +437,13 @@ export class SpacePeople extends LitElement {
     if (!this._loaded) return html`<div class="content"><p class="hint">Reading…</p></div>`
     if (!this._space) {
       return html`<div class="content"><p class="hint">This space is not on this device.</p></div>`
+    }
+    if (this.only) {
+      const person = this._people.find(each => each.id === this.only)
+      return html`
+        <ul class="people" aria-label="Person">${person ? this._renderPerson(person) : nothing}</ul>
+        <app-modal ${ref(this._confirm)} type="confirm" size="small"></app-modal>
+      `
     }
     return html`
       <div class="content">

@@ -150,7 +150,7 @@ Team, goes back to the list (to the home page, afresh, if it was the one in use:
   add and **Check and switch** (docs/SPACES.md, "Credentials").
 - **Leaders**, on every space (`space-people.ts`): who leads a space's setlists (docs/IDENTITIES.md, "People page").
 
-### People: one list (planned, agreed 2026-11-17; not built)
+### People: one list (built 2026-11-17: `team-people.ts`, `person-rows.ts`)
 
 The People and Leaders sections become **one list of a space's people** (a Team's members, their pending invites, and visiting
 leaders who are not members), one row each: name, first address (and "+n"), role, **Edit**. A table that can be sorted by name,
@@ -169,8 +169,15 @@ one: they match the email import and recognise the member); the addresses the Te
 the role (only those below your own); **Remove from the team**, **Merge into…** and **Delete person** (only for one who leads
 nothing and is not you), each after a question. Rules are unchanged: a role acts only on those below it, a team member sees
 the list and names themselves, and the list is built from the cached members and local people, so it shows offline (role
-changes and invites say they need a connection). **Invite someone** is a button over the list. Build order: this page (done),
-the list and editor (`personRows`, `team-people.ts`), retiring the old panels, polish for a Personal space.
+changes and invites say they need a connection). **Invite someone** is a button over the list.
+
+As built: a Team's page shows `team-people` in place of the People and Leaders sections; `team-share-panel` stays beside it
+in a `compact` form (who you are in the Team, **Stop sharing** or **Leave**), and its old list and invite form are dead code to
+remove next, with their tests. The editor modal is `space-people` shown for one person (`only`), under a member's role,
+read-only addresses and **Remove from the Team**; it tells the list when a person changed (`space-people:changed`). **Send again**
+makes a new invite and revokes the old; the invite row's "Emailed 2 days ago" is `team_invites.emailed_at` (migration `0007`),
+set by the Worker when the mail was handed over. A **Personal space** still shows the old Leaders section (the same page
+without roles and invites is the polish step).
 
 ## Deleting a space
 

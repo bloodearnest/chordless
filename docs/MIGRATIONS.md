@@ -95,7 +95,7 @@ as they stand against SQLite (`tests/register-db.ts`).
 
 **Expand, then contract.** Because a migration may only add, a change of shape is two steps: the first
 migration adds the new tables and columns and fills them from the old (`0003_accounts.sql` made accounts
-and filled them from the members; `0004_sessions.sql` only adds the table of sessions, `0005_login_codes.sql` the table of emailed sign-in codes, and `0006_login_links.sql` four columns on it), the new Worker writes both, and a later migration drops the old
+and filled them from the members; `0004_sessions.sql` only adds the table of sessions, `0005_login_codes.sql` the table of emailed sign-in codes, `0006_login_links.sql` four columns on it, and `0007_invite_emailed.sql` one on `team_invites`), the new Worker writes both, and a later migration drops the old
 columns once nothing that could be rolled back to reads them.
 
 **Backing up first.** The deploy applies a migration by itself, so the database is backed up before a pull

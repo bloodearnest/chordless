@@ -55,6 +55,7 @@ export class TeamShareLeftEvent extends Event {
 export class TeamSharePanel extends LitElement {
   static override properties = {
     space: { attribute: false },
+    compact: { type: Boolean },
     _members: { state: true },
     _invites: { state: true },
     _error: { state: true },
@@ -65,6 +66,8 @@ export class TeamSharePanel extends LitElement {
 
   /** The current space */
   declare space: Space | null
+  /** Only who the person is in the Team, and leaving or stopping sharing: the list of people is team-people.ts */
+  declare compact: boolean
   declare _members: TeamMember[]
   declare _invites: InviteInfo[]
   declare _error: string
@@ -100,6 +103,7 @@ export class TeamSharePanel extends LitElement {
   constructor() {
     super()
     this.space = null
+    this.compact = false
     this._members = []
     this._invites = []
     this._error = ''
@@ -253,7 +257,7 @@ export class TeamSharePanel extends LitElement {
     if (!team) return nothing
     return html`
       <div class="panel">
-        <h3>People</h3>
+        <h3>${this.compact ? 'Your place in the Team' : 'People'}</h3>
         ${this._renderTeam(team.role)}
         ${this._error ? html`<p class="error" role="alert">✗ ${this._error}</p>` : nothing}
       </div>
@@ -265,8 +269,12 @@ export class TeamSharePanel extends LitElement {
     const canInvite = outranks(mine, 'writer')
     return html`
       <p>You are ${mine === 'owner' ? 'the owner of' : `${roleWithArticle(mine)} in`} this Team.</p>
-      <ul class="people">${this._members.map(member => this._renderMember(member, mine))}</ul>
-      ${canInvite ? this._renderInvites(mine) : nothing}
+      ${
+        this.compact
+          ? nothing
+          : html`<ul class="people">${this._members.map(member => this._renderMember(member, mine))}</ul>
+            ${canInvite ? this._renderInvites(mine) : nothing}`
+      }
       <div class="actions">
         ${
           mine === 'owner'

@@ -68,6 +68,8 @@ export interface TeamSpaceApi {
     email: string,
     by: Identity
   ): Promise<{ code: string; expiresAt: string }>
+  /** Note that the invite with this code was emailed, now */
+  markInviteEmailed(code: string): Promise<void>
   invites(): Promise<InviteInfo[]>
   /** True if there was such an invite */
   revokeInvite(id: string): Promise<boolean>
@@ -165,6 +167,7 @@ interface InviteRow {
   created_by: string
   created_at: string
   expires_at: string
+  emailed_at: string | null
 }
 
 /** The list in pieces of this size */
@@ -587,9 +590,16 @@ export class TeamSpaceState implements TeamSpaceApi {
     return { code, expiresAt }
   }
 
+  async markInviteEmailed(code: string): Promise<void> {
+    await this.#db
+      .prepare('UPDATE team_invites SET emailed_at = ? WHERE id = ? AND space_id = ?')
+      .bind(this.#at(), await hashOf(code), this.#id)
+      .run()
+  }
+
   async invites(): Promise<InviteInfo[]> {
     const { results } = await this.#sql(
-      `SELECT id, email, role, created_by, created_at, expires_at FROM team_invites
+      `SELECT id, email, role, created_by, created_at, expires_at, emailed_at FROM team_invites
         WHERE space_id = ? AND expires_at > ? ORDER BY created_at`,
       this.#at()
     ).all<InviteRow>()
@@ -600,6 +610,7 @@ export class TeamSpaceState implements TeamSpaceApi {
       createdBy: row.created_by,
       createdAt: row.created_at,
       expiresAt: row.expires_at,
+      emailedAt: row.emailed_at,
     }))
   }
 

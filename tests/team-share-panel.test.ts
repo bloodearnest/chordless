@@ -136,6 +136,25 @@ describe('the team share panel', () => {
     for (const id of made.splice(0)) await deleteSpace(id).catch(() => {})
   })
 
+  describe('in its compact form (beside the list of people)', () => {
+    it('shows who the person is in the Team and the way out, and no list or invites', async () => {
+      await open(await space('owner'))
+      panel.compact = true
+      await until(() => text().includes('Your place in the Team'), 'the heading')
+      expect(text()).to.contain('the owner of this Team')
+      expect(text()).to.contain('Stop sharing')
+      expect(panel.shadowRoot?.querySelector('ul.people')).to.equal(null)
+      expect(text()).to.not.contain('Invite someone')
+    })
+
+    it('has a way to leave for a member', async () => {
+      await open(await space('writer'))
+      panel.compact = true
+      await until(() => text().includes('Your place in the Team'), 'the heading')
+      expect(text()).to.contain('Leave this Team')
+    })
+  })
+
   describe('a space that is not shared', () => {
     it('shows nothing for a space that is not a Team’s, and asks the Worker nothing', async () => {
       await open(await space(null, { rootRef: 'folder-1' }))

@@ -292,6 +292,52 @@ join-make-back = Back
 invite-emailed = We have emailed the invite to { $email }. The link is here too, in case you want to send it another way.
 invite-not-emailed = The invite could not be emailed, so send the link to { $email } yourself. It is shown once.
 
+## A Team's list of people
+
+people-heading = People ({ $count })
+people-search = Search people
+people-none = Nobody matches.
+people-column-name = Name
+people-column-email = Email
+people-column-role = Role
+people-column-status = Status
+people-column-actions = Actions
+people-edit = Edit
+people-edit-aria = Edit { $name }
+people-you = you
+people-leads = leads { $count }
+people-status-member = Member
+people-status-visitor = Not a member
+people-status-invited = Invited · { $days } days left · not emailed
+people-status-invited-emailed = Invited · { $days } days left · emailed { $emailed }
+people-today = today
+people-yesterday = yesterday
+people-days-ago = { $days } days ago
+people-resend = Send again
+people-resend-heading = Send the invite to { $email } again?
+people-resend-message = This makes a new invite and emails it. The link in the earlier email stops working.
+people-resend-button = Send again
+people-resent = The invite was emailed to { $email } again.
+people-resend-not-emailed = The invite to { $email } could not be emailed, so its new link is copied: send it yourself.
+people-copy-link = Copy the link
+people-link-copied = The link is copied.
+people-revoke = Revoke
+people-invite = Invite someone
+people-invite-email = Their email address
+people-invite-role = Their role
+people-invite-make = Invite
+people-invite-hint = Chordless emails them a link that works once, for a week. They can sign in with any Google account, or with a code emailed to them.
+people-invite-link = Invite link
+people-invite-them = Invite them to the Team
+people-team-role = Role in the Team
+people-role-aria = Role of { $name }
+people-remove = Remove from the Team
+people-known-as = The Team knows them as { $emails }.
+people-no-name-yet = They have no name here yet.
+people-name-them = Give them a name
+people-hint-edit = Edit changes a person's name and addresses, and a member's role. A role acts only on those below it.
+people-hint-read = You can see who is in the Team, and change your own name.
+
 ## Signing in with an emailed code
 
 # The other way to sign in, for someone with no Google account: Chordless emails a code to their address.
