@@ -35,12 +35,20 @@ interface Said {
 const said = new Map<string, Said[]>()
 const showKeys = new URLSearchParams(location.search).get('copy') === 'keys'
 
+function remember(words: string, key: string, args: TextArgs | undefined): void {
+  const same = said.get(words) ?? []
+  said.delete(words)
+  said.set(words, [...same.filter(each => each.key !== key), { key, args }])
+  if (said.size > REMEMBERED) said.delete(said.keys().next().value as string)
+}
+
 setTextTap((key, text, args) => {
   const shown = showKeys ? key : text
-  const same = said.get(shown) ?? []
-  said.delete(shown)
-  said.set(shown, [...same.filter(each => each.key !== key), { key, args }])
-  if (said.size > REMEMBERED) said.delete(said.keys().next().value as string)
+  remember(shown, key, args)
+  // (a message with tags, js/rich-text.ts, is on the page in pieces: each is the message too)
+  for (const piece of shown.split(/<\/?[a-z][a-z0-9-]*>/)) {
+    if (piece.trim().length > 3 && piece !== shown) remember(piece.trim(), key, args)
+  }
   return shown
 })
 
@@ -134,6 +142,8 @@ function renderAgain(root: ParentNode = document): void {
 /** Where the old words were put on the page, put the new: what is in a toast or an attribute is not drawn again */
 function patch(found: Found, message: Said): void {
   const now = t(message.key, message.args)
+  // (the pieces of a message with tags are drawn again, with the rest of the page)
+  if (/<[a-z]/.test(now)) return
   if (found.attribute) {
     const element = found.node as Element
     element.setAttribute(found.attribute, now)

@@ -2,16 +2,18 @@
  * How a space is shown to people (docs/SPACES.md, "Naming"): the UI says Personal and Team, never
  * "space". The name is the title, and what kind it is goes beside it as a label.
  */
+
 import type { Space } from './data-types.ts'
 import { roleLabel } from './team-spaces.ts'
+import { t } from './text.ts'
 
 /**
  * The label for what kind of space it is: "Team", or "Personal" for a space of one's own. A personal
  * space still called "Personal" needs no label, as its name says it.
  */
 export function spaceKind(space: Pick<Space, 'name' | 'team'>): string | null {
-  if (space.team) return 'Team'
-  return space.name === 'Personal' ? null : 'Personal'
+  if (space.team) return t('space-kind-team')
+  return space.name === 'Personal' ? null : t('space-kind-personal')
 }
 
 /**
@@ -20,7 +22,7 @@ export function spaceKind(space: Pick<Space, 'name' | 'team'>): string | null {
  */
 export function spaceRole(space: Pick<Space, 'team' | 'readOnly'>): string | null {
   if (space.team) return sentenceCase(roleLabel(space.team.role))
-  return space.readOnly ? 'View only' : null
+  return space.readOnly ? t('space-role-view-only') : null
 }
 
 const sentenceCase = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)

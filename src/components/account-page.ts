@@ -5,6 +5,7 @@ import type { SignInState } from '../js/google-auth.ts'
 import { goTo } from '../js/navigation.ts'
 import { getCurrentSpace, listSpaces } from '../js/space.ts'
 import { checkTeamMemberships, TeamSpacesAddedEvent } from '../js/team-memberships.ts'
+import { t } from '../js/text.ts'
 import { AccountStateEvent } from './account-card.ts'
 import './account-card.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
@@ -120,10 +121,12 @@ export class AccountPage extends LitElement {
     try {
       const { added } = await this.checkTeams({ force: true, includeDeclined: true })
       this._lookMessage = added.length
-        ? `Added ${added.map(space => space.name).join(', ')}.`
-        : 'Every team you are in is on this device.'
+        ? t('account-teams-added', { names: added.map(space => space.name).join(', ') })
+        : t('account-teams-all-here')
     } catch (error) {
-      this._lookMessage = `Could not look for your teams: ${error instanceof Error ? error.message : error}`
+      this._lookMessage = t('account-teams-look-failed', {
+        reason: error instanceof Error ? error.message : String(error),
+      })
     }
     this._looking = false
   }
@@ -164,7 +167,7 @@ export class AccountPage extends LitElement {
     return html`
       <div class="content">
         <account-card></account-card>
-        <h2>Personal and Team Spaces</h2>
+        <h2>${t('account-spaces-heading')}</h2>
         <div class="spaces">
           ${this._spaces.map(
             space => html`<space-card
@@ -176,20 +179,20 @@ export class AccountPage extends LitElement {
             ></space-card>`
           )}
         </div>
-        <p class="hint">To join a Team, open the invite link its admin sent you.</p>
-        <a class="btn" id="create-team" href="/account/new">Create a new Team</a>
+        <p class="hint">${t('account-join-hint')}</p>
+        <a class="btn" id="create-team" href="/account/new">${t('account-create-team')}</a>
         ${
           this._signIn === 'signed-in'
             ? html`<button class="btn" id="look-for-teams" ?disabled=${this._looking} @click=${this._lookForTeams}>
-                ${this._looking ? 'Looking…' : 'Look for my teams'}
+                ${this._looking ? t('account-teams-looking') : t('account-teams-look')}
               </button>
               <p class="hint" id="look-message" role="status">
-                ${this._lookMessage || 'Teams you are in on another device are added by themselves; this looks now, and brings back any you took off this device.'}
+                ${this._lookMessage || t('account-teams-look-hint')}
               </p>`
             : nothing
         }
         <div class="panel">
-          <h3>This device</h3>
+          <h3>${t('account-device-heading')}</h3>
           <storage-summary></storage-summary>
         </div>
       </div>

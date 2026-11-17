@@ -6,6 +6,7 @@ import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
 import { syncSpaceNow } from '../js/space-sync.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
+import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import './app-modal.ts'
@@ -155,7 +156,7 @@ export class SpaceCard extends LitElement {
     if (this._syncing) return
     this._syncing = true
     this._error = ''
-    this._progress = 'Starting…'
+    this._progress = t('space-sync-starting')
     try {
       this._syncedAt = await syncSpaceNow(this.space, progress => {
         this._progress = progress.message
@@ -164,7 +165,7 @@ export class SpaceCard extends LitElement {
       void this._loadSummary()
     } catch (error) {
       console.error('[SpaceCard] Sync failed:', error)
-      this._error = `Sync failed: ${errorMessage(error)}`
+      this._error = t('space-sync-failed', { reason: errorMessage(error) })
     } finally {
       this._syncing = false
       this._progress = ''
@@ -177,14 +178,16 @@ export class SpaceCard extends LitElement {
       case null:
         return ''
       case 'signed-out':
-        return 'Sign in to sync'
+        return t('space-sync-sign-in')
       case 'expired':
-        return 'Sign-in expired: reconnect to sync'
+        return t('account-status-expired')
       case 'no-drive':
-        if (!isTeamMember(this.space)) return 'Connect Google Drive to sync'
+        if (!isTeamMember(this.space)) return t('space-sync-connect-drive')
         break
     }
-    return this._syncedAt ? `Synced ${formatSyncTime(this._syncedAt)}` : 'Not synced yet'
+    return this._syncedAt
+      ? t('space-synced', { when: formatSyncTime(this._syncedAt) })
+      : t('space-not-synced')
   }
 
   override render() {
@@ -198,17 +201,21 @@ export class SpaceCard extends LitElement {
           <span class="title">${space.name}</span>
           ${kind ? html`<span class="chip">${kind}</span>` : nothing}
           ${role ? html`<span class="chip">${role}</span>` : nothing}
-          ${this.several && this.isDefault ? html`<span class="chip default">Default</span>` : nothing}
-          ${this.current ? html`<span class="badge">Current</span>` : nothing}
+          ${this.several && this.isDefault ? html`<span class="chip default">${t('space-default')}</span>` : nothing}
+          ${this.current ? html`<span class="badge">${t('space-current')}</span>` : nothing}
         </div>
         <p class="line">
           ${
             summary
-              ? `${summary.songs} song${summary.songs === 1 ? '' : 's'} · ${summary.setlists} setlist${summary.setlists === 1 ? '' : 's'} · about ${formatBytes(summary.bytes)}`
+              ? t('space-summary', {
+                  songs: summary.songs,
+                  setlists: summary.setlists,
+                  size: formatBytes(summary.bytes),
+                })
               : '…'
           }
         </p>
-        ${space.ccliLicence ? html`<p class="line">CCLI licence ${space.ccliLicence}</p>` : nothing}
+        ${space.ccliLicence ? html`<p class="line">${t('space-ccli', { licence: space.ccliLicence })}</p>` : nothing}
         <p class="line ${this._error ? 'error' : ''}" role=${this._error ? 'alert' : nothing}>
           ${
             this._syncing
@@ -220,17 +227,17 @@ export class SpaceCard extends LitElement {
           ${
             this._canSync
               ? html`<button class="btn primary" id="sync" ?disabled=${this._syncing} @click=${this._sync}>
-                Sync
+                ${t('action-sync')}
               </button>`
               : nothing
           }
           <button class="btn" id="manage" @click=${() => this.dispatchEvent(new SpaceManageEvent(space.id))}>
-            Manage
+            ${t('action-manage')}
           </button>
           ${
             this.several && !this.isDefault
               ? html`<button class="btn" id="make-default" @click=${() => this.dispatchEvent(new SpaceDefaultEvent(space.id))}>
-                Make default
+                ${t('action-make-default')}
               </button>`
               : nothing
           }

@@ -39,6 +39,25 @@ songs-count = { $count ->
   where a clause does (", and its file goes to the Drive trash"), the message in its two forms.
   A number in a sentence, singular or plural, is a selector in the message.
 
+## A link or emphasis in a sentence
+
+A message marks the words with a tag, `<name>words</name>`, and the code says what each tag is
+(`js/rich-text.ts`):
+
+```fluent
+space-drive-not-connected = Google Drive is not connected. <connect>Connect it</connect> on the Account page.
+```
+
+```ts
+html`<p>${rich('space-drive-not-connected', undefined, {
+  connect: words => html`<a href="/account">${words}</a>`,
+})}</p>`
+```
+
+One level only (no tag inside a tag), and only the names the code gives are tags; any other `<…>` is
+shown as it is, and so is anything in a value given to the message (a Team called `<b>`). In the dev
+editor the message is edited with its tags in it.
+
 ## Changing a message
 
 By hand in the file, or in the running app (`just serve`, dev only):
@@ -71,11 +90,11 @@ The migration is by area. Done: the toasts (`toast(...)` and the buttons on them
 about a lost Drive folder, and the questions asked before something is changed (the confirmation
 dialogs, and `app-modal`'s own Confirm and Cancel), what the pages say while they load, when they have
 nothing to show and when they could not (`status-…`), the signed-out card, and the lead sheet and pad
-messages. Still in the code: the other dialogs and panels, the sync's progress messages
+messages. The Account and Teams page and a space's page (the cards, the manager, the Drive panel, storage), and
+what a role is called (`role-…`) and how long ago a sync was (`sync-time-…`). Still in the code: the other
+dialogs and panels, the sync's progress messages
 (`js/sync/`), labels, the Help
 page (`js/help-content.ts`), the text `describeSetlistChange` makes, and the Worker's emails.
-Text with a link or bold in it needs a markup convention that is not built; say so when you reach one
-rather than splitting the sentence.
 
 New messages go in the catalogue, not in a template. Keep what only the developer needs (an error's
 text, a version number) in a toast's `details` or the console, not in the message.

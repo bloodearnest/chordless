@@ -456,4 +456,173 @@ pad-error-none = No pad set yet: upload one in Storage
 
 about-update-none-label = No updates here
 about-update-none-detail = This browser isn't keeping the app's files, so every visit loads the latest.
+
+
+## Who someone is in a Team (these are also in sentences: "as a worship leader")
+
+role-owner = owner
+role-admin = admin
+# The role the Worker calls a writer, who may change the songs and setlists.
+role-writer = worship leader
+# The role the Worker calls a reader, who may only read.
+role-reader = team member
+role-owner-with-article = an owner
+role-admin-with-article = an admin
+role-writer-with-article = a worship leader
+role-reader-with-article = a team member
+
+
+## What a space is called (the page says Personal and Team, never "space")
+
+space-kind-team = Team
+space-kind-personal = Personal
+space-role-view-only = View only
+space-default = Default
+space-current = Current
+# { $licence } is the CCLI licence number of the Team.
+space-ccli = CCLI licence { $licence }
+
+# What a space holds: { $songs } songs, { $setlists } setlists and { $size } (a size, "1.2 MB").
+space-summary =
+    { $songs ->
+        [one] { $songs } song
+       *[other] { $songs } songs
+    } · { $setlists ->
+        [one] { $setlists } setlist
+       *[other] { $setlists } setlists
+    } · about { $size }
+
+# When a space last synced. { $when } is how long ago, or the date.
+space-synced = Synced { $when }
+space-not-synced = Not synced yet
+space-sync-starting = Starting…
+# { $reason } is what went wrong.
+space-sync-failed = Sync failed: { $reason }
+space-sync-sign-in = Sign in to sync
+space-sync-connect-drive = Connect Google Drive to sync
+
+# How long ago a sync was, for "Synced { $when }" and "Last synced: { $when }". { $count } is the number.
+sync-time-now = Just now
+sync-time-minutes =
+    { $count ->
+        [one] { $count } minute ago
+       *[other] { $count } minutes ago
+    }
+sync-time-hours =
+    { $count ->
+        [one] { $count } hour ago
+       *[other] { $count } hours ago
+    }
+sync-time-days =
+    { $count ->
+        [one] { $count } day ago
+       *[other] { $count } days ago
+    }
+
+action-sync = Sync
+action-manage = Manage
+action-make-default = Make default
+action-reconnect-google = Reconnect with Google
+
+# A page for a space that is not on this device (an old link, say).
+space-missing = This device has no such Personal space or Team. It may have been deleted.
+
+# On the page of one space: the panel for what it syncs with, and its parts.
+space-copy-team-heading = Team copy
+space-copy-drive-heading = Google Drive
+space-copy-team-text = Replace this device's songs and setlists with the Team's copy. Sync is on the space's card.
+space-copy-drive-text = Replace this device's songs and setlists with the copy in Google Drive. Sync is on the space's card.
+# <connect> is a link to the Account and Teams page.
+space-drive-not-connected = You are signed in, but Google Drive is not connected, so this space is not syncing. <connect>Connect Google Drive</connect> on the Account and Teams page.
+
+space-export-heading = Export and import
+space-export-text = Export this space's songs and setlists as a zip file, and import an export into it, on this device or another: it needs no Google account, and an import only adds what is missing.
+space-export-text-team = Export this Team's songs and setlists as a zip file, and import an export into it, on this device or another: it needs no Google account, and an import only adds what is missing.
+
+space-delete-heading = Delete from this device
+space-delete-text = Remove this space and its songs and setlists from this device. Its folder in Google Drive stays.
+space-delete-text-team = Remove this Team and its songs and setlists from this device. Its folder in Google Drive stays.
+space-delete-button = Delete…
+space-delete-failed = Failed to delete it: { $reason }
+
+space-delete-everywhere-heading = Delete everywhere
+# <em> is the word that is stressed.
+space-delete-everywhere-text = Delete this space from this device <em>and</em> from Google Drive, whose trash keeps its folder for thirty days. It asks for a backup first.
+space-delete-everywhere-text-team = Delete this Team from this device <em>and</em> from Google Drive, whose trash keeps its folder for thirty days. It asks for a backup first.
+
+
+## The Account and Teams page
+
+account-heading = Account
+account-spaces-heading = Personal and Team Spaces
+account-join-hint = To join a Team, open the invite link its admin sent you.
+account-create-team = Create a new Team
+account-teams-look = Look for my teams
+account-teams-looking = Looking…
+account-teams-look-hint = Teams you are in on another device are added by themselves; this looks now, and brings back any you took off this device.
+# { $names } is the Teams that were put on this device, a list.
+account-teams-added = Added { $names }.
+account-teams-all-here = Every team you are in is on this device.
+account-teams-look-failed = Could not look for your teams: { $reason }
+account-device-heading = This device
+
+account-manage = Manage
+account-advanced = Advanced
+account-logout = Log out
+account-revoke = Revoke access on all devices
+account-test-refresh = Test token refresh
+account-backup-download = Download sign-in backup
+account-backup-import = Import sign-in backup
+account-connect-drive = Connect Google Drive
+# The name of someone whose Google account gave none.
+account-name-unknown = Signed in
+account-status-expired = Sign-in expired: reconnect to sync
+account-status-no-drive = Signed in, Google Drive not connected
+account-status-connected = Google Drive connected
+
+# What the card says after something was done. { $reason } is what went wrong.
+account-signed-in = Signed in.
+account-signed-in-no-drive = Signed in. Google Drive was not connected, so your own spaces will not sync yet.
+account-signin-failed = Signing in failed: { $reason }
+account-drive-connected = Google Drive connected.
+account-drive-not-connected = Google Drive was not connected.
+account-drive-connect-failed = Connecting Google Drive failed: { $reason }
+account-logged-out = Logged out on this device.
+account-logout-failed = Logging out failed: { $reason }
+account-revoked = Logged out, and Chordless's access to your Drive was revoked.
+account-revoked-unreached = Logged out on this device, but Google could not be reached to revoke Chordless's access. You can remove it at myaccount.google.com/permissions
+account-revoke-failed = Revoking access failed: { $reason }
+account-backup-download-failed = Downloading the backup failed: { $reason }
+account-backup-imported = Sign-in backup imported.
+account-backup-import-failed = Importing the backup failed: { $reason }
+account-refresh-not-signed-in = Not signed in: sign in with Google first.
+# { $old } and { $new } are the times the token was due to expire before and after.
+account-refresh-works = Token refresh works: expiry { $old } → { $new }
+account-refresh-failed = Token refresh failed: { $reason }
+
+storage-heading = Storage Usage
+storage-browser-data = Browser data
+storage-app-cache = App Cache
+storage-media-cache = Media Cache
+storage-unreadable = Unable to read local storage details.
+storage-footnote = Data on this device only. Each team's size is on its own card.
+
+
+## Syncing a space with Google Drive (the panel on a space's page)
+
+drive-sync-unavailable = ⚠️ Drive Sync Unavailable
+# <connect> is a link to the Account and Teams page.
+drive-sync-unavailable-text = You need to <connect>connect with Google Drive</connect> to enable sync.
+drive-sync-reset = ⤓ Reset from Google Drive
+drive-sync-start-over = ↻ Start over in Drive
+drive-sync-replace = ⤓ Replace with the copy in Drive
+drive-sync-last = Last synced: { $when }
+drive-sync-folder-missing = Drive folder not found
+drive-sync-ready = Ready
+drive-sync-failed-status = Failed
+drive-sync-progress-label = Sync progress
+drive-sync-starting-reset = Starting reset...
+drive-sync-starting-over = Starting over in Drive...
+drive-sync-replacing = Replacing from Drive...
+drive-sync-failed = Failed: { $reason }
 `
