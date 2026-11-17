@@ -5,18 +5,13 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import { AccountStateEvent } from '../src/components/account-card.ts'
 import type { AccountPage } from '../src/components/account-page.ts'
-import { type AppModal, ModalCloseEvent } from '../src/components/app-modal.ts'
 import '../src/components/account-page.ts'
 import type { SpaceCard } from '../src/components/space-card.ts'
 import {
   SpaceDefaultEvent,
-  SpaceLeadersEvent,
   SpaceManageEvent,
   SpaceSyncedEvent,
-  SpaceUsersEvent,
 } from '../src/components/space-card.ts'
-import { SpaceGoneEvent } from '../src/components/space-manager.ts'
-import { TeamShareLeftEvent } from '../src/components/team-share-panel.ts'
 import { getDefaultSpaceId, setDefaultSpaceId } from '../src/js/default-space.ts'
 import type { SignInState } from '../src/js/google-auth.ts'
 import {
@@ -25,7 +20,6 @@ import {
   getCurrentSpace,
   renameSpace,
   setCurrentSpace,
-  updateSpace,
 } from '../src/js/space.ts'
 import { TeamSpacesAddedEvent } from '../src/js/team-memberships.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
@@ -157,185 +151,22 @@ describe('account-page', () => {
   })
 
   describe('managing a space', () => {
-    const modal = (el: AccountPage) => must(el.shadowRoot?.querySelector<AppModal>('app-modal'))
-    const manager = (el: AccountPage) => el.shadowRoot?.querySelector('space-manager') ?? null
-
-    async function manage(el: AccountPage, id: string) {
-      const card = must(cards(el).find(each => each.space.id === id))
-      card.dispatchEvent(new SpaceManageEvent(id))
-      await waitUntil(() => modal(el).open)
-      await el.updateComplete
-    }
-
-    it('opens a modal named for the space, with everything to do with it, over the list', async () => {
+    it('goes to the space’s own page when asked to manage it', async () => {
       const first = await space('First')
       const el = await page()
-      expect(modal(el).open).to.equal(false)
-      expect(manager(el)).to.equal(null)
-
-      await manage(el, first.id)
-      expect(modal(el).open).to.equal(true)
-      expect(modal(el).heading).to.equal(first.name)
-      expect(manager(el)?.spaceId).to.equal(first.id)
-      expect(el.shadowRoot?.querySelector('space-card')).to.not.equal(null)
+      const went: string[] = []
+      el.go = url => void went.push(url)
+      must(cards(el).find(each => each.space.id === first.id)).dispatchEvent(
+        new SpaceManageEvent(first.id)
+      )
+      expect(went).to.deep.equal([`/account/space/${first.id}`])
     })
 
-    it('goes when closed, and reads the list again, as what was done in it may have changed it', async () => {
-      const first = await space('First')
+    it('has no modals: everything to do with a space is on that page', async () => {
+      await space('First')
       const el = await page()
-      await manage(el, first.id)
-      const renamed = `Renamed ${crypto.randomUUID().slice(0, 8)}`
-      await renameSpace(first.id, renamed)
-      modal(el).close()
-      await waitUntil(() => cards(el).some(card => card.space.name === renamed))
-      expect(manager(el)).to.equal(null)
-      expect(cards(el).some(card => card.space.name === renamed)).to.equal(true)
-    })
-
-    it('stays open when a question asked inside it closes', async () => {
-      const first = await space('First')
-      const el = await page()
-      await manage(el, first.id)
-      must(manager(el)).dispatchEvent(new ModalCloseEvent())
-      await nothingFor(50)
-      expect(modal(el).open).to.equal(true)
-      expect(manager(el)).to.not.equal(null)
-    })
-
-    it('closes, and shows the list without it, when the space is gone', async () => {
-      const first = await space('First')
-      await space('Second')
-      const el = await page()
-      await manage(el, first.id)
-      await deleteSpace(first.id)
-      must(manager(el)).dispatchEvent(new SpaceGoneEvent())
-      await waitUntil(() => !modal(el).open)
-      expect(modal(el).open).to.equal(false)
-      await waitUntil(() => !cards(el).some(card => card.space.id === first.id))
-      expect(cards(el).some(card => card.space.id === first.id)).to.equal(false)
-    })
-
-    it('starts the app again in the space now in use when the one deleted was in use, and not otherwise', async () => {
-      const first = await space('First')
-      const second = await space('Second')
-      const el = await page()
-      let shown = 0
-      el.show = () => {
-        shown++
-      }
-      await manage(el, first.id)
-      await deleteSpace(first.id)
-      must(manager(el)).dispatchEvent(new SpaceGoneEvent(false))
-      await waitUntil(() => !modal(el).open)
-      await nothingFor(50)
-      expect(shown).to.equal(0)
-
-      await manage(el, second.id)
-      must(manager(el)).dispatchEvent(new SpaceGoneEvent(true))
-      await waitUntil(() => shown === 1)
-    })
-
-    it('does nothing for a space that is not on the list', async () => {
-      const el = await page()
-      el.dispatchEvent(new SpaceManageEvent('no-such-space'))
-      await nothingFor(50)
-      expect(modal(el).open).to.equal(false)
-    })
-  })
-
-  describe('who leads a space’s setlists', () => {
-    const modal = (el: AccountPage) =>
-      must(el.shadowRoot?.querySelectorAll<AppModal>('app-modal')[2])
-    const people = (el: AccountPage) => el.shadowRoot?.querySelector('space-people') ?? null
-
-    async function showLeaders(el: AccountPage, id: string) {
-      must(cards(el).find(each => each.space.id === id)).dispatchEvent(new SpaceLeadersEvent(id))
-      await waitUntil(() => modal(el).open)
-      await el.updateComplete
-    }
-
-    it('opens in a modal named for the space, and goes when closed', async () => {
-      const first = await space('Band')
-      const el = await page()
-      expect(people(el)).to.equal(null)
-      await showLeaders(el, first.id)
-      expect(modal(el).open).to.equal(true)
-      expect(modal(el).heading).to.equal(`${first.name}: leaders`)
-      expect(people(el)?.spaceId).to.equal(first.id)
-      modal(el).close()
-      await waitUntil(() => !people(el))
-      expect(people(el)).to.equal(null)
-    })
-
-    it('does nothing for a space that is not on the list', async () => {
-      const el = await page()
-      el.dispatchEvent(new SpaceLeadersEvent('no-such-space'))
-      await nothingFor(50)
-      expect(modal(el).open).to.equal(false)
-    })
-
-    it('ignores another modal closing', async () => {
-      const first = await space('Band')
-      const el = await page()
-      await showLeaders(el, first.id)
-      el._onLeadersClosed(Object.assign(new Event('x'), {}))
-      expect(people(el)?.spaceId).to.equal(first.id)
-    })
-  })
-
-  describe('a Team’s people', () => {
-    const modal = (el: AccountPage) =>
-      must(el.shadowRoot?.querySelectorAll<AppModal>('app-modal')[1])
-    const panel = (el: AccountPage) => el.shadowRoot?.querySelector('team-share-panel') ?? null
-
-    async function team(name: string) {
-      const created = await space(name)
-      return updateSpace(created.id, {
-        team: { id: `space-${crypto.randomUUID()}`, role: 'writer' },
-      })
-    }
-
-    async function showUsers(el: AccountPage, id: string) {
-      must(cards(el).find(each => each.space.id === id)).dispatchEvent(new SpaceUsersEvent(id))
-      await waitUntil(() => modal(el).open)
-      await el.updateComplete
-    }
-
-    it('opens in a modal named for the Team, apart from its data', async () => {
-      const first = await team('Band')
-      const el = await page()
-      expect(panel(el)).to.equal(null)
-      await showUsers(el, first.id)
-      expect(modal(el).open).to.equal(true)
-      expect(modal(el).heading).to.equal(`${first.name}: people`)
-      expect(panel(el)?.space?.id).to.equal(first.id)
+      expect(el.shadowRoot?.querySelector('app-modal')).to.equal(null)
       expect(el.shadowRoot?.querySelector('space-manager')).to.equal(null)
-    })
-
-    it('goes when closed, and reads the list again', async () => {
-      const first = await team('Band')
-      const el = await page()
-      await showUsers(el, first.id)
-      modal(el).close()
-      await waitUntil(() => !panel(el))
-      expect(panel(el)).to.equal(null)
-    })
-
-    it('closes when the person leaves the Team', async () => {
-      const first = await team('Band')
-      const el = await page()
-      await showUsers(el, first.id)
-      must(panel(el)).dispatchEvent(new TeamShareLeftEvent())
-      await waitUntil(() => !modal(el).open)
-      expect(modal(el).open).to.equal(false)
-    })
-
-    it('stays closed for a space that is not a Team', async () => {
-      const first = await space('Mine')
-      const el = await page()
-      el.dispatchEvent(new SpaceUsersEvent(first.id))
-      await nothingFor(50)
-      expect(modal(el).open).to.equal(false)
     })
   })
 

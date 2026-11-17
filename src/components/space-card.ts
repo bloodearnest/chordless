@@ -29,7 +29,7 @@ export class SpaceDefaultEvent extends Event {
   }
 }
 
-/** A person asked to manage this space: the page shows everything to do with it in a modal */
+/** A person asked to manage this space: the page goes to the space's own page */
 export class SpaceManageEvent extends Event {
   static readonly type = 'space-card:manage'
   readonly spaceId: string
@@ -39,32 +39,11 @@ export class SpaceManageEvent extends Event {
   }
 }
 
-/** A person asked to look after this Team's people: the page shows them in a modal */
-export class SpaceUsersEvent extends Event {
-  static readonly type = 'space-card:users'
-  readonly spaceId: string
-  constructor(spaceId: string) {
-    super(SpaceUsersEvent.type, { bubbles: true, composed: true })
-    this.spaceId = spaceId
-  }
-}
-
-/** A person asked to look after who leads this space's setlists: the page shows them in a modal */
-export class SpaceLeadersEvent extends Event {
-  static readonly type = 'space-card:leaders'
-  readonly spaceId: string
-  constructor(spaceId: string) {
-    super(SpaceLeadersEvent.type, { bubbles: true, composed: true })
-    this.spaceId = spaceId
-  }
-}
-
 /**
  * One space on the Account and Teams page (docs/ACCOUNT.md): its name, with what kind it is (and
  * the person's role in a Team) as labels on the right, how big it is, when it last synced, and the
  * things done most: switch to it, sync it. Its data (export and import, resetting from Drive, delete)
- * is under "Data", who leads its setlists under "Leaders", and a Team's members under "Users"; each
- * asks the page to show it in a modal.
+ * is under "Manage", which opens the space's own page (space-page.ts).
  */
 export class SpaceCard extends LitElement {
   static override properties = {
@@ -246,18 +225,8 @@ export class SpaceCard extends LitElement {
               : nothing
           }
           <button class="btn" id="manage" @click=${() => this.dispatchEvent(new SpaceManageEvent(space.id))}>
-            Data
+            Manage
           </button>
-          <button class="btn" id="leaders" @click=${() => this.dispatchEvent(new SpaceLeadersEvent(space.id))}>
-            Leaders
-          </button>
-          ${
-            space.team
-              ? html`<button class="btn" id="users" @click=${() => this.dispatchEvent(new SpaceUsersEvent(space.id))}>
-                Users
-              </button>`
-              : nothing
-          }
           ${
             this.several && !this.isDefault
               ? html`<button class="btn" id="make-default" @click=${() => this.dispatchEvent(new SpaceDefaultEvent(space.id))}>

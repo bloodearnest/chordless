@@ -70,8 +70,11 @@ test.describe('Themes', () => {
     await page.emulateMedia({ colorScheme: 'dark' })
     await seedSong(page)
     await page.goto('/account')
-    await page.locator('space-card').getByRole('button', { name: 'Data' }).click()
-    const card = page.locator('account-page > app-modal').locator('.modal-content').first()
+    await page.locator('space-card').getByRole('button', { name: 'Manage' }).click()
+    await page.locator('space-manager').getByRole('button', { name: 'Delete…' }).click()
+    const card = page
+      .locator('space-manager app-modal[heading="Delete from this device?"] .modal-content')
+      .first()
     await expect(card).toBeVisible()
     const { cardBg, pageBg, border } = await card.evaluate(element => ({
       cardBg: getComputedStyle(element).backgroundColor,
@@ -373,7 +376,7 @@ test.describe('Account and Teams page', () => {
     })
   })
 
-  test('works signed out: a space is managed in a modal, and deleting one asks first', {
+  test('works signed out: a space is managed on its own page, and deleting one asks first', {
     tag: '@logic',
   }, async ({ page }) => {
     await seedSong(page, { setlistId: 'delete-test-setlist' })
@@ -385,12 +388,11 @@ test.describe('Account and Teams page', () => {
     await page
       .locator('space-card')
       .filter({ hasText: 'Second Org' })
-      .getByRole('button', { name: 'Data' })
+      .getByRole('button', { name: 'Manage' })
       .click()
-    const manage = page.locator('account-page > app-modal').first()
-    await expect(manage).toHaveAttribute('open', '')
+    const manage = page.locator('space-page')
     await expect(manage).toContainText('Second Org')
-    await expect(page).toHaveURL(/\/account$/) // a modal, not a page: nothing to go back from
+    await expect(page).toHaveURL(/\/account\/space\/[^/]+$/) // a page of its own, with a back button
     const confirm = manage.locator('app-modal[heading="Delete from this device?"]')
 
     // Cancelling keeps it
@@ -398,12 +400,12 @@ test.describe('Account and Teams page', () => {
     await expect(confirm).toHaveAttribute('open', '')
     await confirm.getByRole('button', { name: 'Cancel' }).click()
     await expect(confirm).not.toHaveAttribute('open', '')
-    await expect(manage).toHaveAttribute('open', '')
+    await expect(manage).toContainText('Second Org')
 
-    // Confirming deletes it, closes the modal, and the list no longer has it
+    // Confirming deletes it, goes back to the list, and the list no longer has it
     await manage.getByRole('button', { name: 'Delete…' }).click()
     await confirm.getByRole('button', { name: 'Delete', exact: true }).click()
-    await expect(manage).not.toHaveAttribute('open', '')
+    await expect(page).toHaveURL(/\/account$/)
     await expect(page.locator('space-card')).toHaveCount(1)
     await expect(page.locator('space-card')).toContainText('Current')
   })

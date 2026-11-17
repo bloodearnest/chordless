@@ -14,6 +14,8 @@
  *                                             /account is Account and Teams (/storage still opens it);
  *                                             /account/new makes a team (team-space-wizard.ts)
  *                                             /join is a team space's invite link
+ *   { name: 'space', spaceId }               /account/space/<id>: everything about one space (its people, licence,
+ *                                             storage and data); the id is this device's own for it
  *   { name: 'sign-in', linkId? }             /sign-in/<id>: the link in the sign-in email (a bare /sign-in
  *                                             is the form to ask for one)
  *   { name: 'join', teamId?, code? }         /join/<space id>/<code>: the invite link itself (an older
@@ -43,6 +45,7 @@ export type Route =
   | { name: 'home'; shared: true }
   | { name: 'join'; teamId?: string; code?: string }
   | { name: 'sign-in'; linkId?: string }
+  | { name: 'space'; spaceId: string }
   | { name: 'songs'; songUuid?: string; search?: string; melody?: true }
   | { name: 'setlist'; setlistId: string; songIndex: number; melody?: true }
   | { name: 'share'; fileId: string; songIndex: number }
@@ -79,6 +82,7 @@ export const ROUTE_NAMES: Route['name'][] = [
   ...Object.values(PAGES),
   'setlist',
   'share',
+  'space',
   'not-found',
 ]
 
@@ -86,6 +90,7 @@ const SONGS_SONG_PATH = /^\/songs\/([^/]+)$/
 const SETLIST_PATH = /^\/setlist\/([^/]+)$/
 const SETLIST_SONG_PATH = /^\/setlist\/([^/]+)\/song\/(\d+)$/
 const JOIN_PATH = /^\/join\/([^/]+)\/([^/]+)$/
+const SPACE_PATH = /^\/account\/space\/([^/]+)$/
 const SIGN_IN_PATH = /^\/sign-in\/([^/]+)$/
 const SHARE_PATH = /^\/s\/([^/]+)$/
 const SHARE_SONG_PATH = /^\/s\/([^/]+)\/song\/(\d+)$/
@@ -168,6 +173,9 @@ export function matchRoute(location: string | { pathname: string; search?: strin
   const join = path.match(JOIN_PATH)
   if (join) return { name: 'join', teamId: decode(join[1]), code: decode(join[2]) }
 
+  const space = path.match(SPACE_PATH)
+  if (space) return { name: 'space', spaceId: decode(space[1]) }
+
   const signIn = path.match(SIGN_IN_PATH)
   if (signIn) return { name: 'sign-in', linkId: decode(signIn[1]) }
 
@@ -208,6 +216,8 @@ export function buildUrl(route: Route): string {
       return route.teamId && route.code
         ? `/join/${encodeURIComponent(route.teamId)}/${encodeURIComponent(route.code)}`
         : '/join'
+    case 'space':
+      return `/account/space/${encodeURIComponent(route.spaceId)}`
     case 'sign-in':
       return route.linkId ? `/sign-in/${encodeURIComponent(route.linkId)}` : '/sign-in'
     default: {

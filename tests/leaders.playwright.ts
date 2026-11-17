@@ -1,5 +1,5 @@
-// The people who lead a space's setlists, from Account and Teams: the "Leaders" button on a
-// space's card opens them in a modal, where two spellings of one person are merged.
+// The people who lead a space's setlists, from Account and Teams: the "Manage" button on a
+// space's card opens its page, where two spellings of one person are merged.
 import { expect, fromDB, seedSong, test } from './fixtures.ts'
 
 test.describe('Leaders', () => {
@@ -21,7 +21,7 @@ test.describe('Leaders', () => {
     })
 
     await page.goto('/account')
-    await page.getByRole('button', { name: 'Leaders' }).first().click()
+    await page.getByRole('button', { name: 'Manage' }).first().click()
     const leaders = page.locator('space-people')
     await expect(leaders.getByRole('textbox', { name: 'Name' })).toHaveCount(2)
     await expect(leaders).toContainText('ann@example.com')
@@ -51,7 +51,7 @@ test.describe('Leaders', () => {
     })
 
     await page.goto('/account')
-    await page.getByRole('button', { name: 'Leaders' }).first().click()
+    await page.getByRole('button', { name: 'Manage' }).first().click()
     const leaders = page.locator('space-people')
     await leaders.getByLabel('Add an email address to Ann').fill('Ann@Example.com')
     await leaders.getByLabel('Add an email address to Ann').press('Enter')
