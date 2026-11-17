@@ -289,10 +289,10 @@ join-make-back = Back
 ## Signing in with an emailed code
 
 # The other way to sign in, for someone with no Google account: Chordless emails a code to their address.
-email-code-button = Email me a code instead
+email-code-button = Use my email address instead
 email-code-heading = Sign in with your email address
 email-code-address-label = Your email address
-email-code-send = Email me a code
+email-code-send = Email me a sign-in link
 email-code-sending = Sending…
 email-code-sent = We have emailed { $email } a link and a 6-digit code. Open the link on this device, or enter the code here. It can take a minute, and it may be in your spam folder.
 email-code-label = The 6-digit code
@@ -315,7 +315,7 @@ email-link-app = I use the installed app: show me the code
 email-link-code-intro = Enter this code in Chordless to sign in as { $email }.
 email-link-copied = The code is copied.
 email-link-copy-by-hand = Copy the code by hand.
-email-link-code-steps = Open Chordless from your Home Screen, go back to where you were signing in, choose "Email me a code instead" and then "I already have a code", and enter your address and this code. It works once, so do not also sign in in this browser.
+email-link-code-steps = Open Chordless from your Home Screen, go back to where you were signing in, choose "Use my email address instead" and then "I already have a code", and enter your address and this code. It works once, so do not also sign in in this browser.
 email-link-failed = That link has been used or has run out. Ask for a new one.
 email-link-none = To sign in, enter your email address and we will email you a link and a code.
 email-code-error-failed = Signing in did not work. Try again in a moment.
