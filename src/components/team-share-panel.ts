@@ -70,7 +70,7 @@ export class TeamSharePanel extends LitElement {
   declare _error: string
   declare _busy: boolean
   /** The invite just made: its link is shown once, to send */
-  declare _link: { email: string; url: string; role: MemberRole } | null
+  declare _link: { email: string; url: string; role: MemberRole; emailed: boolean } | null
   declare _copied: boolean
 
   _modal: Ref<AppModal> = createRef()
@@ -216,11 +216,16 @@ export class TeamSharePanel extends LitElement {
     const email = this._inviteEmail.value as HTMLInputElement
     const role = this._inviteRole.value as HTMLSelectElement
     await this._run(async () => {
-      const { code } = await teamApi.createInvite(team.id, role.value as MemberRole, email.value)
+      const { code, emailed } = await teamApi.createInvite(
+        team.id,
+        role.value as MemberRole,
+        email.value
+      )
       this._link = {
         email: email.value.trim().toLowerCase(),
         url: inviteLink(window.location.origin, team.id, code),
         role: role.value as MemberRole,
+        emailed: emailed === true,
       }
       this._copied = false
       email.value = ''
@@ -348,7 +353,7 @@ export class TeamSharePanel extends LitElement {
               .email=${this._link.email}
               .url=${this._link.url}
             ></invite-send>
-            <p>It is shown once. Send it to them yourself.</p>
+            <p>${t(this._link.emailed ? 'invite-emailed' : 'invite-not-emailed', { email: this._link.email })}</p>
             ${
               this._link.role === 'admin' && !isGmailAddress(this._link.email)
                 ? html`<p>An admin invite only works with this address, and it is not a Gmail address, so the message also tells them how to make a Google account with it.</p>`

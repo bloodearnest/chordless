@@ -10,6 +10,7 @@ import type { LiveSockets } from './team-state.ts'
 export interface EmailMessage {
   to: string
   from: { email: string; name: string }
+  replyTo?: string
   subject: string
   text: string
 }

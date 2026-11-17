@@ -1596,3 +1596,126 @@ describe('a Chordless session', () => {
     assert.equal(await admin.hasGoogleLogin(eve, 'g-eve'), true)
   })
 })
+
+describe('the email that invites someone', () => {
+  type Sent = {
+    to: string
+    from: { email: string }
+    replyTo?: string
+    subject: string
+    text: string
+  }
+  const mailed = (w: Awaited<ReturnType<typeof world>>, over: Partial<Env> = {}) => {
+    const sent: Sent[] = []
+    const env = {
+      ...w.env,
+      EMAIL: {
+        send: async (message: Sent) => {
+          sent.push(message)
+          return { messageId: 'm' }
+        },
+      },
+      ...over,
+    } satisfies Env
+    const invite = (who: Identity, email: string, role = 'writer') =>
+      w.call(`${SPACE}/invites`, who, post({ role, email }), env)
+    return { sent, env, invite }
+  }
+
+  test('is sent to the address the invite is for, from Chordless, with the link, and answers to the admin', async () => {
+    const w = await world()
+    const { sent, invite } = mailed(w)
+    const made = await json(await invite(ann, 'New@Example.com'))
+    assert.equal(made.emailed, true)
+    assert.equal(sent.length, 1)
+    assert.equal(sent[0].to, 'new@example.com')
+    assert.equal(sent[0].from.email, 'invites@mail.chordless.app')
+    assert.equal(sent[0].replyTo, 'ann@example.com')
+    assert.equal(sent[0].subject, 'Join Team on Chordless')
+    assert.ok(sent[0].text.includes(`${ORIGIN}/join/${SPACE}/${made.code}`))
+    assert.ok(sent[0].text.includes('ann@example.com invited you'))
+    assert.ok(sent[0].text.includes('a worship leader'))
+    assert.ok(sent[0].text.includes('does not have to be new@example.com'))
+  })
+
+  test('says an admin invite is for its address alone, and how to use it', async () => {
+    const w = await world()
+    const { sent, invite } = mailed(w)
+    assert.equal((await json(await invite(ann, 'boss@example.com', 'admin'))).emailed, true)
+    assert.ok(
+      sent[0].text.includes('An admin invite only works with this address, boss@example.com')
+    )
+    assert.ok(sent[0].text.includes('an admin'))
+  })
+
+  test('is not sent where the Worker cannot send, and the invite is made all the same', async () => {
+    const w = await world()
+    const answer = await w.call(
+      `${SPACE}/invites`,
+      ann,
+      post({ role: 'writer', email: 'a@example.com' })
+    )
+    assert.equal(answer.status, 200)
+    const made = await json(answer)
+    assert.equal(made.emailed, false)
+    assert.ok(made.code)
+  })
+
+  test('is not sent when the mail cannot be handed over, and the invite is made all the same', async () => {
+    const w = await world()
+    const { invite } = mailed(w, {
+      EMAIL: {
+        send: async () => {
+          throw Object.assign(new Error('no'), { code: 'E_DELIVERY_FAILED' })
+        },
+      },
+    })
+    const made = await json(await invite(ann, 'a@example.com'))
+    assert.equal(made.emailed, false)
+    assert.ok(made.code)
+    const odd = mailed(w, {
+      EMAIL: {
+        send: async () => {
+          throw new Error('no code')
+        },
+      },
+    })
+    assert.equal((await json(await odd.invite(ann, 'b@example.com'))).emailed, false)
+  })
+
+  test('sends an address no more than three in an hour, from any team, and the invites are still made', async () => {
+    const w = await world()
+    const { sent, invite } = mailed(w)
+    const answers: unknown[] = []
+    for (let n = 0; n < 5; n++)
+      answers.push((await json(await invite(ann, 'victim@example.com'))).emailed)
+    assert.deepEqual(answers, [true, true, true, false, false])
+    assert.equal(sent.length, 3)
+    assert.equal(w.all("SELECT 1 FROM team_invites WHERE email = 'victim@example.com'").length, 5)
+  })
+
+  test('is held back by the limit on the one who invites, and on everyone together', async () => {
+    const w = await world()
+    const keys: string[] = []
+    const both = mailed(w, {
+      EMAIL_LOGIN: { limit: async ({ key }) => (keys.push(key), { success: true }) },
+      EMAIL_LOGIN_OVERALL: { limit: async ({ key }) => (keys.push(key), { success: true }) },
+    })
+    assert.equal((await json(await both.invite(ann, 'x@example.com'))).emailed, true)
+    assert.deepEqual(keys, ['invite:ann@example.com', 'all'])
+    const one = mailed(w, { EMAIL_LOGIN: { limit: async () => ({ success: false }) } })
+    assert.equal((await json(await one.invite(ann, 'y@example.com'))).emailed, false)
+    const all = mailed(w, { EMAIL_LOGIN_OVERALL: { limit: async () => ({ success: false }) } })
+    assert.equal((await json(await all.invite(ann, 'z@example.com'))).emailed, false)
+    assert.equal(one.sent.length + all.sent.length, 0)
+    // (a limit that cannot be asked is no reason to hold it back)
+    const broken = mailed(w, {
+      EMAIL_LOGIN: {
+        limit: async () => {
+          throw new Error('down')
+        },
+      },
+    })
+    assert.equal((await json(await broken.invite(ann, 'w@example.com'))).emailed, true)
+  })
+})

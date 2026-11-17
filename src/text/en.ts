@@ -286,6 +286,12 @@ join-make-guide-link = Show me how, step by step
 join-make-done = I have made one: sign in
 join-make-back = Back
 
+## Inviting people
+
+# Under an invite just made: whether Chordless emailed it. { $email } is who it is for.
+invite-emailed = We have emailed the invite to { $email }. The link is here too, in case you want to send it another way.
+invite-not-emailed = The invite could not be emailed, so send the link to { $email } yourself. It is shown once.
+
 ## Signing in with an emailed code
 
 # The other way to sign in, for someone with no Google account: Chordless emails a code to their address.

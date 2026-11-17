@@ -40,6 +40,7 @@ import type { BlobData } from './blob.ts'
 import type { GoogleKind } from './google-address.ts'
 import { answering, jsonResponse, Refusal, readJson } from './http.ts'
 import { type Identity, SESSION_PROVIDER } from './identity.ts'
+import type { InviteEmailInput } from './invite-email.ts'
 import { refusal } from './team-api.ts'
 import type { MySpace, SpaceInfo, TeamSpaceApi } from './team-state.ts'
 import { annotateRequest } from './trace.ts'
@@ -71,6 +72,8 @@ export interface AdminContext {
   googleKind(email: string): Promise<{ kind: GoogleKind; ms: number }>
   /** Whether this sender may look an invite up now (a limit that cannot be asked allows it) */
   allowInviteLookup(request: Request): Promise<boolean>
+  /** Mail an invite to the address it is for; whether it was handed over (false: held back, or it could not be sent) */
+  sendInviteEmail(input: InviteEmailInput): Promise<boolean>
   /** Put the space's Drive folder, with all in it, in the trash, with the space's own credential */
   trashRoot(spaceId: string): Promise<void>
 }
@@ -271,7 +274,7 @@ const ADMIN_ROUTES: AdminRoute[] = [
     methods: ['POST'],
     path: /^\/invites$/,
     needs: 'admin',
-    async run({ request, room, identity, above }) {
+    async run({ request, ctx, room, spaceId, identity, above }) {
       const body = await readJson(request)
       const target = asRole(body.role)
       above(target)
@@ -279,7 +282,18 @@ const ADMIN_ROUTES: AdminRoute[] = [
       if (!EMAIL.test(email) || email.length > 254) {
         throw new Refusal(400, 'An invite is for an email address')
       }
-      return jsonResponse(await room.createInvite(target, email, identity))
+      const made = await room.createInvite(target, email, identity)
+      // (the invite is made whether or not the mail goes: its link is shown for the admin to pass on)
+      const emailed = await ctx.sendInviteEmail({
+        origin: new URL(request.url).origin,
+        spaceId,
+        teamName: ((await room.info()) as SpaceInfo).name,
+        role: target,
+        to: email,
+        by: identity,
+        code: made.code,
+      })
+      return jsonResponse({ ...made, emailed })
     },
   },
   {

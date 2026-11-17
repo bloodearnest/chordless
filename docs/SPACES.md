@@ -391,8 +391,8 @@ Steps, each on the one page:
    exists, since an invite needs its id). The setlists brought across have leaders (people,
    with emails). Leaders with an email are listed once each (`leadersOf`), ticked, with a
    role to choose (writer by default), and an email can be added by hand; the person making the
-   space is left out. Nothing is sent without being ticked, and Chordless sends nothing itself:
-   each invite is a link, shown once, to copy and pass on. A leader typed by name alone has no
+   space is left out. Nothing is sent without being ticked, and each invite is mailed to its address, and
+   its link shown once, to copy and pass on as well. A leader typed by name alone has no
    email and is listed as someone who cannot be invited. A refused invite stays in the list to try
    again. Invites are the existing ones (single use, bound to the email, a week).
    Each link has a "Send…" button next to "Copy the link" (`invite-send.ts`, 2026-11-11, also in the
@@ -555,11 +555,17 @@ Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
   `googlemail.com` leave the text out, and nothing is ever refused for it. The invite carries no name:
   on joining, the person named by the address alone (a placeholder) is renamed to the Google account's
   name by `getSpacePeople`; a name someone gave is kept.
-- **Chordless does not email invites itself** (decided 2026-11-11). It would make chordless.app a
-  sender anyone with a team could point at any address (spam and phishing under the domain, which
-  would also hurt Email Routing), and mail from a new domain lands in spam, so "I never got it" would
-  be a support problem. Revisit only if links are shown to get lost; then it needs per-account and
-  per-space rate limits first (the probing protections list).
+- **Chordless emails the invite itself** (changed 2026-11-17; before, it did not: decided 2026-11-11, because anyone with
+  a team could point it at any address, and mail from a new domain lands in spam). It can now, from
+  `invites@mail.chordless.app` (the sign-in codes' Email Sending subdomain), and the person who makes an invite no longer has to
+  pass the link on. `POST /invites` makes the invite as before and mails it to its address (`invite-email.ts`) with the link,
+  who made it (their address, which the mail also answers to) and the role; the answer says `emailed`. The link is still shown
+  once, to copy or "Send…" another way, and says so when the mail did not go. The invite is made whether or not the mail is
+  sent. Limited, since a team can name any address: three invites an hour to one address from all teams together, the same
+  limit per inviter as for sign-in codes (10 a minute), and the same limit on everyone together (30 a minute): past a limit
+  nothing is mailed and `emailed` is false. An admin invite's mail says it is for that address alone, and that a code
+  emailed to it signs in as well as a Google account of it. Mail from the new domain may land in spam at some providers (Yahoo did in the
+  first test, 2026-11-16), so the link stays on screen as the way round.
 - **Looking after people:** a role acts only on those below it (an admin on writers and readers,
   the owner on admins too; nobody on the owner), so an admin cannot make or remove an admin. A
   member can leave; the owner ends sharing instead (`DELETE`), which forgets the space; the owner can
