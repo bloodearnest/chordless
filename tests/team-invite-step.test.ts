@@ -109,7 +109,12 @@ describe('team-invite-step', () => {
           return Response.json({ error: 'Too many invites' }, { status: 429 })
         }
         made.push({ path, body })
-        return Response.json({ code: `code-${made.length}-abcdefghijklmnop`, expiresAt: 'later' })
+        return Response.json({
+          code: `code-${made.length}-abcdefghijklmnop`,
+          expiresAt: 'later',
+          // (the first is mailed, the second is held back)
+          emailed: made.length === 1,
+        })
       }
       return Response.json({ error: 'no such route' }, { status: 404 })
     }) as typeof fetch
@@ -161,7 +166,9 @@ describe('team-invite-step', () => {
     ])
     // (those done with leave the list; the one not ticked stays)
     expect(boxes()).to.have.length(1)
-    expect(text()).to.contain('Links to send')
+    expect(text()).to.contain('Invites')
+    expect(text()).to.contain('We have emailed the invite to ann@example.com')
+    expect(text()).to.contain('could not be emailed, so send the link to bob@example.com yourself')
     // (each with a way to hand it on, carrying its own role and the team's name)
     const sends = Array.from(page.shadowRoot?.querySelectorAll('invite-send') ?? [])
     expect(sends).to.have.length(2)

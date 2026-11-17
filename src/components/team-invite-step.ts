@@ -3,6 +3,7 @@ import type { TeamLink } from '../js/data-types.ts'
 import { teamApi } from '../js/team-client.ts'
 import { MEMBER_ROLES, type MemberRole } from '../js/team-roles.ts'
 import { inviteLink, isGmailAddress, type Leader, roleLabel } from '../js/team-spaces.ts'
+import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import './invite-send.ts'
 import { buttonStyles } from './shared-styles.ts'
@@ -20,14 +21,15 @@ interface Outcome {
   email: string
   url?: string
   role?: MemberRole
+  emailed?: boolean
   error?: string
 }
 
 /**
  * The last step of making a team space (docs/SPACES.md, "Creating a team space"): invite the
  * people who lead its setlists, and anyone else, each with a role. Nothing is sent without being
- * ticked, and Chordless sends nothing itself: each invite is a link, shown once, for the owner to
- * pass on. A leader typed in by name alone has no email, so is listed as someone who cannot be
+ * ticked. Each invite is mailed to its address (the Worker does it), and its link is shown once, for the
+ * owner to pass on as well. A leader typed in by name alone has no email, so is listed as someone who cannot be
  * invited.
  */
 export class TeamInviteStep extends LitElement {
@@ -123,10 +125,11 @@ export class TeamInviteStep extends LitElement {
     const outcomes: Outcome[] = []
     for (const entry of this._chosen) {
       try {
-        const { code } = await teamApi.createInvite(this.team.id, entry.role, entry.email)
+        const { code, emailed } = await teamApi.createInvite(this.team.id, entry.role, entry.email)
         outcomes.push({
           email: entry.email,
           role: entry.role,
+          emailed: emailed === true,
           url: inviteLink(window.location.origin, this.team.id, code),
         })
       } catch (error) {
@@ -211,13 +214,14 @@ export class TeamInviteStep extends LitElement {
       </div>
       ${
         this._outcomes.length
-          ? html`<h3>Links to send</h3>
-            <p class="hint">Each is shown once. Copy it and send it to that person yourself.</p>
+          ? html`<h3>Invites</h3>
+            <p class="hint">Each is emailed to that person. The links are shown once, in case you want to send one another way.</p>
             <ul>
               ${this._outcomes.map(outcome =>
                 outcome.url
                   ? html`<li>
                     <span class="who">${outcome.email}</span>
+                    <p class="hint">${t(outcome.emailed ? 'invite-emailed' : 'invite-not-emailed', { email: outcome.email })}</p>
                     <input class="link" readonly .value=${outcome.url} aria-label="Invite link for ${outcome.email}" />
                     <button class="btn" @click=${() => this._copy(outcome)}>
                       ${this._copied === outcome.email ? '✓ Copied' : 'Copy the link'}

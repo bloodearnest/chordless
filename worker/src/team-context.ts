@@ -18,6 +18,7 @@ import {
   SESSION_PROVIDER,
   sessionProvider,
 } from './identity.ts'
+import { sendInviteEmail } from './invite-email.ts'
 import { checkTeamStorage, serviceAccountAddress, serviceAccountToken } from './service-account.ts'
 import type { AdminContext } from './team-admin.ts'
 import type { TeamContext } from './team-api.ts'
@@ -145,6 +146,7 @@ export function createAdminContext(env: Env, deps: TeamDeps = {}): AdminContext 
       return Boolean(linked)
     },
     newSpaceId: () => crypto.randomUUID(),
+    sendInviteEmail: input => sendInviteEmail(env, input),
     googleKind: email => googleKind(email, tracedFetch(deps.dnsFetch)),
     async allowInviteLookup(request) {
       if (!env.INVITE_LOOKUP) return true

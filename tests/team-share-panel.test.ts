@@ -211,7 +211,7 @@ describe('the team share panel', () => {
 
     it('makes an invite for an email, shows its link once, and lists it as waiting', async () => {
       routes[`POST /api/space/${TEAM}/invites`] = () =>
-        json({ code: 'CODE1234567890ab', expiresAt: 'later' })
+        json({ code: 'CODE1234567890ab', expiresAt: 'later', emailed: true })
       await open(await space('owner'))
       await until(() => text().includes('Invite someone'), 'the form')
       const email = must(panel.shadowRoot?.querySelector<HTMLInputElement>('input[type="email"]'))
@@ -227,6 +227,7 @@ describe('the team share panel', () => {
         email: 'Fay@Example.com',
       })
       expect(text()).to.contain('Link for fay@example.com')
+      expect(text()).to.contain('We have emailed the invite to fay@example.com')
       expect(must(panel.shadowRoot?.querySelector<HTMLInputElement>('input.link')).value).to.equal(
         `${window.location.origin}/join/${TEAM}/CODE1234567890ab`
       )

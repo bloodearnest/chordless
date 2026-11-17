@@ -77,7 +77,10 @@ export const teamApi = {
   members: (id: string) => call<TeamMember[]>('GET', `${space(id)}/members`),
   invites: (id: string) => call<InviteInfo[]>('GET', `${space(id)}/invites`),
   createInvite: (id: string, role: MemberRole, email: string) =>
-    call<{ code: string; expiresAt: string }>('POST', `${space(id)}/invites`, { role, email }),
+    call<{ code: string; expiresAt: string; emailed?: boolean }>('POST', `${space(id)}/invites`, {
+      role,
+      email,
+    }),
   revokeInvite: (id: string, inviteId: string) =>
     call<void>('DELETE', `${space(id)}/invites/${encodeURIComponent(inviteId)}`),
 
