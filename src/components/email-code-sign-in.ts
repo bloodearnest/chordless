@@ -24,6 +24,7 @@ export class EmailCodeSignIn extends LitElement {
     next: { type: String },
     _step: { state: true },
     _error: { state: true },
+    _sent: { state: true },
   }
 
   /** The address to start from (an invite's, say); the person may change it */
@@ -32,6 +33,8 @@ export class EmailCodeSignIn extends LitElement {
   declare next: string
   declare _step: Step
   declare _error: string
+  /** Whether a code was just asked for (not one they already have, from an earlier email) */
+  declare _sent: boolean
 
   /** Asks for the code to be mailed, and signs in with it (a test gives its own) */
   start: (address: string, next?: string) => Promise<void> = startEmailSignIn
@@ -43,6 +46,7 @@ export class EmailCodeSignIn extends LitElement {
     this.next = ''
     this._step = 'address'
     this._error = ''
+    this._sent = false
   }
 
   static override styles = [
@@ -84,12 +88,26 @@ export class EmailCodeSignIn extends LitElement {
     this._step = 'sending'
     try {
       await this.start(this.address, this.next || undefined)
+      this._sent = true
       this._step = 'code'
     } catch (error) {
       this._error = this._explain(error, 'email-code-error-send')
       // (a failed resend leaves them at the code box)
       this._step = from === 'code' ? 'code' : 'address'
     }
+  }
+
+  /** Go straight to the code box for a code they already have (an earlier email, or a link that showed it), asking for none */
+  _haveCode(): void {
+    const input = this.renderRoot.querySelector<HTMLInputElement>('input[name=address]')
+    this.address = (input as HTMLInputElement).value.trim()
+    if (!input?.checkValidity()) {
+      this._error = t('email-code-error-address')
+      return
+    }
+    this._error = ''
+    this._sent = false
+    this._step = 'code'
   }
 
   async _submit(event: Event): Promise<void> {
@@ -115,7 +133,7 @@ export class EmailCodeSignIn extends LitElement {
       const busy = this._step === 'checking'
       return html`
         <form @submit=${this._submit}>
-          <p role="status">${t('email-code-sent', { email: this.address })}</p>
+          <p role="status">${this._sent ? t('email-code-sent', { email: this.address }) : t('email-code-enter', { email: this.address })}</p>
           <label for="code">${t('email-code-label')}</label>
           <input
             id="code"
@@ -168,6 +186,9 @@ export class EmailCodeSignIn extends LitElement {
         <div class="actions">
           <button class="btn primary" type="submit" ?disabled=${sending}>
             ${sending ? t('email-code-sending') : t('email-code-send')}
+          </button>
+          <button class="btn" type="button" ?disabled=${sending} @click=${this._haveCode}>
+            ${t('email-code-have')}
           </button>
         </div>
       </form>

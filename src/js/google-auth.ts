@@ -315,7 +315,44 @@ export async function signInWithEmail(address: string, code: string): Promise<vo
     const reason = ['wrong', 'expired', 'too_many'].includes(body.reason) ? body.reason : 'failed'
     throw new EmailCodeError(reason, body.error || 'The code was not accepted')
   }
-  const email = String(body.email ?? address)
+  await keepEmailSession(body, address)
+}
+
+/**
+ * Sign in with the link in the email (/sign-in/<id>): the same sign-in as typing the code, for the address the
+ * link was sent to. Resolves to the page the person asked for the link from.
+ */
+export async function signInWithLink(id: string): Promise<string> {
+  const response = await fetch(`${AUTH_PROXY_URL}/session/email/link`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) throw new EmailCodeError('expired', body.error || 'The link was not accepted')
+  await keepEmailSession(body, String(body.email))
+  return typeof body.next === 'string' ? body.next : '/'
+}
+
+/** What a link is for, without signing in with it: the address and the code (for the app that has the form, not this browser) */
+export async function peekSignInLink(
+  id: string
+): Promise<{ address: string; code: string; next: string }> {
+  const response = await fetch(`${AUTH_PROXY_URL}/session/email/link/peek`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) throw new EmailCodeError('expired', body.error || 'The link was not accepted')
+  return { address: String(body.address), code: String(body.code), next: String(body.next ?? '/') }
+}
+
+/** Keep a session from an emailed code or link, with no Google blob (so no Drive), and look for the teams the person is in */
+async function keepEmailSession(
+  body: { email?: string; access_token: string; refresh_token: string; expires_in: number },
+  address: string
+): Promise<void> {
   const stored = await sendToServiceWorker('STORE_BLOB', {
     blob: '',
     metadata: {
@@ -323,7 +360,7 @@ export async function signInWithEmail(address: string, code: string): Promise<vo
       session: sessionFrom(body),
       user: {
         name: null,
-        email,
+        email: String(body.email ?? address),
         picture: null,
         given_name: null,
         family_name: null,
@@ -332,9 +369,9 @@ export async function signInWithEmail(address: string, code: string): Promise<vo
     },
   })
   if (!stored.success) throw new Error(stored.error || 'Failed to save the sign-in')
-  import('./team-memberships.ts').then(({ checkTeamMemberships }) =>
-    checkTeamMemberships({ force: true })
-  )
+  // (the teams this person is in are looked for in the background)
+  const { checkTeamMemberships } = await import('./team-memberships.ts')
+  void checkTeamMemberships({ force: true })
 }
 
 /**
@@ -656,7 +693,10 @@ export async function logout(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: session.refresh_token }),
       signal: AbortSignal.timeout(10_000),
-    }).catch(() => {})
+    }).catch(
+      /* v8 ignore next -- offline: the session ends by itself, after 90 days unused */
+      () => {}
+    )
   }
   const response = await sendToServiceWorker('DELETE_BLOB')
   if (!response.success) throw new Error(response.error || 'Failed to delete the sign-in')

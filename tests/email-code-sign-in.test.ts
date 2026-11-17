@@ -115,4 +115,29 @@ describe('email-code-sign-in', () => {
     await waitUntil(() => page.shadowRoot?.querySelector('input[name=address]'), 'the address box')
     expect(field('address').value).to.equal('bea@example.com')
   })
+
+  it('goes to the code box for a code they already have, asking for no new one', async () => {
+    const { asked, checked, field, press, submit, text } = await open('bea@example.com')
+    press('I already have a code').click()
+    await waitUntil(
+      () => text().includes('Enter the 6-digit code for bea@example.com'),
+      'the code box'
+    )
+    expect(asked).to.deep.equal([])
+    expect(text()).to.not.contain('We have emailed')
+    field('code').value = '654321'
+    submit()
+    await waitUntil(() => checked.length === 1, 'to be checked')
+    expect(checked).to.deep.equal(['bea@example.com 654321'])
+  })
+
+  it('wants the address before it takes a code they already have', async () => {
+    const { field, press, text } = await open('')
+    field('address').value = ''
+    press('I already have a code').click()
+    await waitUntil(() => text().includes('does not look like'), 'the error')
+    field('address').value = 'not an address'
+    press('I already have a code').click()
+    await waitUntil(() => text().includes('does not look like'), 'the error again')
+  })
 })

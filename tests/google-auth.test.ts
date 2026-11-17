@@ -10,9 +10,11 @@ import {
   hasDriveAccess,
   isAuthenticated,
   logout,
+  peekSignInLink,
   revokeAccess,
   SignInExpiredError,
   signInWithEmail,
+  signInWithLink,
   startEmailSignIn,
 } from '../src/js/google-auth.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
@@ -271,6 +273,43 @@ describe('google-auth', () => {
         error = e
       })
       expect((error as Error | null)?.message).to.include('Not signed in with Google')
+    })
+
+    it('signs in with the link, with no Google blob, and says where to go on to', async () => {
+      respondTo = () =>
+        json({
+          access_token: 'a1',
+          refresh_token: 'id.secret',
+          expires_in: 900,
+          email: 'ann@example.com',
+          next: '/join/x/y',
+        })
+      expect(await signInWithLink('abcdefghijklmnopqrstuv')).to.equal('/join/x/y')
+      expect(fetches).to.deep.equal([
+        { url: '/session/email/link', body: { id: 'abcdefghijklmnopqrstuv' } },
+      ])
+      expect(must(worker.stored).blob).to.equal('')
+      expect(must(worker.stored).metadata.user?.email).to.equal('ann@example.com')
+      respondTo = () =>
+        json({ access_token: 'a', refresh_token: 'r', expires_in: 9, email: 'a@b.co' })
+      expect(await signInWithLink('abcdefghijklmnopqrstuv')).to.equal('/')
+    })
+
+    it('says so when the link is not good, and shows what it is for without using it', async () => {
+      respondTo = () => json({ error: 'invalid_link' }, 401)
+      const reason = await signInWithLink('x').catch(e => (e as EmailCodeError).reason)
+      expect(reason).to.equal('expired')
+      expect(await peekSignInLink('x').catch(e => (e as EmailCodeError).reason)).to.equal('expired')
+      respondTo = () => json({ address: 'ann@example.com', code: '123456', next: '/songs' })
+      expect(await peekSignInLink('abcdefghijklmnopqrstuv')).to.deep.equal({
+        address: 'ann@example.com',
+        code: '123456',
+        next: '/songs',
+      })
+      expect(fetches.at(-1)?.url).to.equal('/session/email/link/peek')
+      respondTo = () => json({ address: 'ann@example.com', code: '123456' })
+      expect((await peekSignInLink('x')).next).to.equal('/')
+      expect(worker.stored).to.equal(undefined)
     })
 
     it('says so when the sign-in cannot be kept', async () => {

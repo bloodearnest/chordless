@@ -4,14 +4,16 @@
  * answers with a Chordless session (session-tokens.ts), as a sign-in with Google does.
  *
  * The answer to `start` is the same for any address that is one, so it does not say whether an account exists.
- * Neither the address nor the code is kept: `login_codes` (migration 0005) holds keyed hashes of them. A code
- * works once, for ten minutes, for five tries; five codes an hour go to one address, and a sender (by its
+ * `login_codes` (migrations 0005, 0006) holds keyed hashes to check a typed code and the limits, and, for the
+ * link in the email (`/sign-in/<id>`), the address and code themselves until they are used or have run out. A code
+ * works once, for three days, for five tries; five codes an hour go to one address, and a sender (by its
  * address) is limited too, so that Chordless cannot be used to fill someone's inbox.
  *
  * An address that has been proved is a login of provider `email` (the address is its `sub`). If a Google login
  * of the same address is on an account, the address joins that account: the same mailbox is the same person
  * (an invitation's address never does this: it is a label, not proof).
  */
+import { toBase64Url } from '../../src/js/base64url.ts'
 import { sha256Hex } from '../../src/js/utils/bytes.ts'
 import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
@@ -23,7 +25,8 @@ import { annotateRequest } from './trace.ts'
 /** Who the code comes from: Email Sending is enabled on this subdomain (infra/cloudflare) */
 export const LOGIN_SENDER = { email: 'signin@mail.chordless.app', name: 'Chordless' }
 
-export const CODE_TTL_MS = 10 * 60 * 1000
+/** How long a code and its link work: an email may wait in an inbox, and none of this is very sensitive */
+export const CODE_TTL_MS = 3 * 24 * 60 * 60 * 1000
 export const MAX_TRIES = 5
 export const MAX_CODES_PER_HOUR = 5
 const HOUR_MS = 60 * 60 * 1000
@@ -57,14 +60,14 @@ export function cleanNext(value: unknown): string | undefined {
     : undefined
 }
 
-/**
- * The link in the email: the page that signs in with it, which holds the address and the code in its #fragment,
- * so that they are never sent to a server (nor used up by a mail scanner that opens the link), and `next`, the
- * page to go on to.
- */
-export function loginLink(origin: string, address: string, code: string, next?: string): string {
-  const fragment = new URLSearchParams({ a: address, c: code, ...(next ? { n: next } : {}) })
-  return `${origin}/sign-in#${fragment}`
+/** The link in the email: the page that signs in with it, and an id that means nothing but this row (`login_codes`) */
+export function loginLink(origin: string, id: string): string {
+  return `${origin}/sign-in/${id}`
+}
+
+/** A new id for a link: 128 random bits */
+function newLinkId(): string {
+  return toBase64Url(crypto.getRandomValues(new Uint8Array(16)))
 }
 
 /**
@@ -83,7 +86,7 @@ Or, if the link does not open in the right place, enter this code in Chordless:
 
 ${code}
 
-Either works once, for 10 minutes. If you did not ask for this, ignore it: nothing happens unless the link is opened or the code is entered.
+Either works once, for 3 days (a new code replaces the old one). If you did not ask for this, ignore it: nothing happens unless the link is opened or the code is entered.
 `,
   }
 }
@@ -110,7 +113,8 @@ async function allowed(request: Request, env: Env): Promise<boolean> {
 /**
  * POST /session/email/start { address, next? }
  *
- * Mails a code and a link that signs in with it (`next` is the page, a path of the app, the link goes on to). 200 `{ok: true}` whether or not the address has had codes before, and also when it has had
+ * Mails a code and a link that signs in with it (`next` is the page, a path of the app, the link goes on to). The
+ * address, the code and `next` are kept in the row the link's id names, until they are used or have run out. 200 `{ok: true}` whether or not the address has had codes before, and also when it has had
  * its five this hour (nothing more is sent); 400 for text that is not an address; 429 for a sender asking
  * too often; 502 if the mail could not be handed over; 503 where the Worker cannot send.
  */
@@ -144,13 +148,18 @@ export function handleEmailStart(
     }
 
     const code = newCode()
+    const id = newLinkId()
+    // (what has run out goes, so addresses do not stay in a table that has no other reason to keep them)
+    await env.DB.prepare('DELETE FROM login_codes WHERE expires_at < ?').bind(at).run()
     await env.DB.prepare(
-      `INSERT INTO login_codes (address_hash, code_hash, created_at, expires_at, attempts, window_start, sent)
-        VALUES (?, ?, ?, ?, 0, ?, 1)
+      `INSERT INTO login_codes (address_hash, code_hash, created_at, expires_at, attempts, window_start, sent,
+          link_hash, address, code, next)
+        VALUES (?, ?, ?, ?, 0, ?, 1, ?, ?, ?, ?)
         ON CONFLICT (address_hash) DO UPDATE SET code_hash = excluded.code_hash, created_at = excluded.created_at,
           expires_at = excluded.expires_at, attempts = 0,
           window_start = CASE WHEN ? THEN window_start ELSE excluded.window_start END,
-          sent = CASE WHEN ? THEN sent + 1 ELSE 1 END`
+          sent = CASE WHEN ? THEN sent + 1 ELSE 1 END,
+          link_hash = excluded.link_hash, address = excluded.address, code = excluded.code, next = excluded.next`
     )
       .bind(
         key,
@@ -158,6 +167,10 @@ export function handleEmailStart(
         at,
         new Date(now.getTime() + CODE_TTL_MS).toISOString(),
         at,
+        await hashed(env, 'link', id),
+        address,
+        code,
+        next ?? null,
         inWindow ? 1 : 0,
         inWindow ? 1 : 0
       )
@@ -167,7 +180,7 @@ export function handleEmailStart(
       await env.EMAIL.send({
         to: address,
         from: LOGIN_SENDER,
-        ...loginEmail(code, loginLink(new URL(request.url).origin, address, code, next)),
+        ...loginEmail(code, loginLink(new URL(request.url).origin, id)),
       })
     } catch (error) {
       annotateRequest({
@@ -262,5 +275,75 @@ export function handleEmailVerify(
     const session = await issueSession(env.DB, env, { accountId, email: address }, now)
     annotateRequest({ 'chordless.auth.email_result': 'signed_in' })
     return jsonResponse({ ...session, email: address })
+  })
+}
+
+interface LinkRow {
+  address_hash: string
+  address: string
+  code: string
+  next: string | null
+  expires_at: string
+}
+
+/** The row a link's id names, if it has not run out */
+async function linkRow(env: Env, id: unknown, now: Date): Promise<LinkRow | null> {
+  if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(id) || !env.DB) return null
+  const row = await env.DB.prepare(
+    'SELECT address_hash, address, code, next, expires_at FROM login_codes WHERE link_hash = ?'
+  )
+    .bind(await hashed(env, 'link', id))
+    .first<LinkRow>()
+  return row && row.address && row.expires_at > now.toISOString() ? row : null
+}
+
+/**
+ * POST /session/email/link { id }
+ *
+ * Signs in with the link in the email: a session for the address it was sent to, as `/session/email/verify`
+ * answers, with the page to go on to (`next`). The link and the code are one row: using either ends both. 401
+ * `invalid_link` for an id that is not one, has been used, was replaced by a newer code, or has run out.
+ */
+export function handleEmailLink(
+  request: Request,
+  env: Env,
+  now: Date = new Date()
+): Promise<Response> {
+  return refusing(async () => {
+    if (!env.DB) return jsonResponse({ error: 'Email sign-in is not set up' }, 503)
+    const row = await linkRow(env, (await readJson(request)).id, now)
+    if (!row) {
+      annotateRequest({ 'chordless.auth.email_result': 'link_expired' })
+      return jsonResponse({ error: 'invalid_link' }, 401)
+    }
+    // (once: of two requests with the link, the one that deletes the row signs in)
+    const used = await env.DB.prepare('DELETE FROM login_codes WHERE address_hash = ? AND code = ?')
+      .bind(row.address_hash, row.code)
+      .run()
+    if (used.meta.changes === 0) return jsonResponse({ error: 'invalid_link' }, 401)
+    const accountId = await accountOfMailbox(env.DB, row.address, now)
+    const session = await issueSession(env.DB, env, { accountId, email: row.address }, now)
+    annotateRequest({ 'chordless.auth.email_result': 'link_signed_in' })
+    return jsonResponse({ ...session, email: row.address, next: row.next ?? '/' })
+  })
+}
+
+/**
+ * POST /session/email/link/peek { id }
+ *
+ * What the link is for, without using it up: the address and the code, for a person whose link opened in a browser
+ * that is not the app they are signing in to (an installed app on iOS has storage apart from Safari's) and who
+ * enters the code in the app instead. The id is as good as the code for signing in, so this gives away nothing more.
+ */
+export function handleEmailLinkPeek(
+  request: Request,
+  env: Env,
+  now: Date = new Date()
+): Promise<Response> {
+  return refusing(async () => {
+    if (!env.DB) return jsonResponse({ error: 'Email sign-in is not set up' }, 503)
+    const row = await linkRow(env, (await readJson(request)).id, now)
+    if (!row) return jsonResponse({ error: 'invalid_link' }, 401)
+    return jsonResponse({ address: row.address, code: row.code, next: row.next ?? '/' })
   })
 }

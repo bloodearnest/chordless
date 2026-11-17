@@ -69,6 +69,8 @@ test('the API is refused to a page from another origin, before it is routed', as
     '/session/upgrade',
     '/session/email/start',
     '/session/email/verify',
+    '/session/email/link',
+    '/session/email/link/peek',
     '/api/share/abc',
     '/api/config',
   ]) {
@@ -111,6 +113,8 @@ test("each session route is the Worker's: an empty request is refused by its own
   }
   assert.equal((await send('/session/email/start', postJson('{}'))).status, 400)
   assert.equal((await send('/session/email/verify', postJson('{}'))).status, 401)
+  assert.equal((await send('/session/email/link', postJson('{}'))).status, 503)
+  assert.equal((await send('/session/email/link/peek', postJson('{}'))).status, 503)
   assert.deepEqual(assetRequests, [])
 })
 
@@ -122,6 +126,8 @@ test('only POST reaches the auth routes: other methods fall through to the asset
   await send('/session/upgrade')
   await send('/session/email/start')
   await send('/session/email/verify')
+  await send('/session/email/link')
+  await send('/session/email/link/peek')
   assert.deepEqual(assetRequests, [
     'GET /oauth/callback',
     'PUT /session/refresh',
@@ -129,6 +135,8 @@ test('only POST reaches the auth routes: other methods fall through to the asset
     'GET /session/upgrade',
     'GET /session/email/start',
     'GET /session/email/verify',
+    'GET /session/email/link',
+    'GET /session/email/link/peek',
   ])
 })
 
