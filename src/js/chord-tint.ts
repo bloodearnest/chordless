@@ -9,6 +9,8 @@
  * nearest dark or light ink that does.
  */
 
+import { t } from './text.ts'
+
 /** The contrast WCAG asks of text (level AA) */
 export const MIN_CONTRAST = 4.5
 
@@ -22,12 +24,54 @@ export interface TintPreset {
 }
 
 export const TINT_PRESETS: readonly TintPreset[] = [
-  { id: 'yellow', label: 'Yellow', light: '#fff4a3', dark: '#5c5212' },
-  { id: 'cream', label: 'Cream', light: '#fbf1dc', dark: '#4d4330' },
-  { id: 'peach', label: 'Peach', light: '#ffe3cc', dark: '#6b4020' },
-  { id: 'pink', label: 'Pink', light: '#ffdfe9', dark: '#6a2c44' },
-  { id: 'green', label: 'Green', light: '#d8f5d0', dark: '#1f5a2a' },
-  { id: 'blue', label: 'Blue', light: '#d6ecff', dark: '#1d4a6e' },
+  {
+    id: 'yellow',
+    get label() {
+      return t('tint-yellow')
+    },
+    light: '#fff4a3',
+    dark: '#5c5212',
+  },
+  {
+    id: 'cream',
+    get label() {
+      return t('tint-cream')
+    },
+    light: '#fbf1dc',
+    dark: '#4d4330',
+  },
+  {
+    id: 'peach',
+    get label() {
+      return t('tint-peach')
+    },
+    light: '#ffe3cc',
+    dark: '#6b4020',
+  },
+  {
+    id: 'pink',
+    get label() {
+      return t('tint-pink')
+    },
+    light: '#ffdfe9',
+    dark: '#6a2c44',
+  },
+  {
+    id: 'green',
+    get label() {
+      return t('tint-green')
+    },
+    light: '#d8f5d0',
+    dark: '#1f5a2a',
+  },
+  {
+    id: 'blue',
+    get label() {
+      return t('tint-blue')
+    },
+    light: '#d6ecff',
+    dark: '#1d4a6e',
+  },
 ]
 
 const HEX = /^#[0-9a-f]{6}$/i

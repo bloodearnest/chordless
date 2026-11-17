@@ -2,7 +2,9 @@
  * The choices of "What do you play?" (docs/PERSONAL_LAYER.md, "How I play it"), as the first-use setup
  * and Preferences ask it. A type is a preset of what is switched on; `custom` leaves each to the person.
  */
+
 import type { MusicianType } from './preferences.ts'
+import { t } from './text.ts'
 
 export interface PlayOption {
   type: MusicianType
@@ -13,27 +15,47 @@ export interface PlayOption {
 export const PLAYS: readonly PlayOption[] = [
   {
     type: 'singer',
-    label: 'I sing, or play drums',
-    description: 'Lyrics only to start, with no chord controls',
+    get label() {
+      return t('play-singer')
+    },
+    get description() {
+      return t('play-singer-description')
+    },
   },
   {
     type: 'guitarist',
-    label: 'I play guitar',
-    description: 'Chords and lyrics, with capo and tuning controls',
+    get label() {
+      return t('play-guitarist')
+    },
+    get description() {
+      return t('play-guitarist-description')
+    },
   },
   {
     type: 'transposing',
-    label: 'I play a B♭, E♭ or F instrument',
-    description: 'Chords and lyrics, with an instrument pitch control',
+    get label() {
+      return t('play-transposing')
+    },
+    get description() {
+      return t('play-transposing-description')
+    },
   },
   {
     type: 'general',
-    label: 'Another instrument',
-    description: 'Chords and lyrics, as they are written',
+    get label() {
+      return t('play-general')
+    },
+    get description() {
+      return t('play-general-description')
+    },
   },
   {
     type: 'custom',
-    label: 'Custom',
-    description: 'Choose each setting yourself',
+    get label() {
+      return t('play-custom')
+    },
+    get description() {
+      return t('play-custom-description')
+    },
   },
 ]

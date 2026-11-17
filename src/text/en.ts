@@ -625,4 +625,269 @@ drive-sync-starting-reset = Starting reset...
 drive-sync-starting-over = Starting over in Drive...
 drive-sync-replacing = Replacing from Drive...
 drive-sync-failed = Failed: { $reason }
+
+
+## Preferences
+
+pref-appearance-heading = Appearance
+pref-behaviour-heading = Behaviour and options
+pref-accessibility-heading = Accessibility
+
+pref-play-heading = What do you play?
+pref-play-text = What each song shows when you open it, and which controls you get. Only you see it.
+pref-lyrics-only = Start each song with only the lyrics
+pref-show-capo = Show the capo and tuning controls
+pref-show-pitch = Show the instrument pitch controls
+pref-my-instrument = My instrument
+pref-pitch-text = Each setlist, and each song, can have its own: choose it there, in edit mode.
+pref-my-tuning = My guitar is tuned
+pref-tuning-text = Each setlist can have its own tuning: choose it on the setlist, in edit mode.
+
+# The choices of "What do you play?" (and the first-use setup): the choice and a line under it.
+play-singer = I sing, or play drums
+play-singer-description = Lyrics only to start, with no chord controls
+play-guitarist = I play guitar
+play-guitarist-description = Chords and lyrics, with capo and tuning controls
+play-transposing = I play a B♭, E♭ or F instrument
+play-transposing-description = Chords and lyrics, with an instrument pitch control
+play-general = Another instrument
+play-general-description = Chords and lyrics, as they are written
+play-custom = Custom
+play-custom-description = Choose each setting yourself
+
+# The instrument pitches. The first word of each (B♭, E♭, F) is also what the header shows.
+pitch-concert = Concert pitch
+pitch-bb = B♭ (trumpet, clarinet, tenor sax)
+pitch-eb = E♭ (alto or baritone sax)
+pitch-f = F (horn)
+
+tuning-standard = Standard
+tuning-half-step = Half step down
+tuning-whole-step = Whole step down
+
+pref-chords-heading = Chords
+pref-nashville = Nashville numbers instead of letter names
+pref-unicode = Unicode accidentals (♯/♭)
+pref-leadsheets-heading = Lead sheets
+pref-real-book = Real Book style: handwritten notation and chords (-7, ø7, °)
+pref-moving-heading = Moving between songs
+pref-scroll-top = Start each song at its top (off: find it where you left it)
+
+pref-screen-heading = Screen and live mode
+pref-screen-text = Keep the screen on while a setlist is open, and on any page while you are live (Go live is on a setlist's overview).
+pref-keep-awake = Keep the screen awake
+pref-battery-limit = On battery, let go after no touch for
+pref-no-limit = No limit
+
+# A limit in words, in a sentence ("no touch for { $limit }"). { $count } is the number.
+pref-limit-none = no limit
+pref-limit-minutes =
+    { $count ->
+        [one] { $count } minute
+       *[other] { $count } minutes
+    }
+pref-limit-hours =
+    { $count ->
+        [one] { $count } hour
+       *[other] { $count } hours
+    }
+
+# What keeping the screen awake is doing: a word, and why.
+wake-refused = Refused
+# { $reason } is what the device said.
+wake-refused-detail = The device refused it ({ $reason }). Battery Saver can cause this.
+wake-unsupported = Unsupported
+wake-unsupported-detail = This browser can't keep the screen awake.
+wake-off = Off
+wake-off-detail = The screen may turn off while you play.
+wake-awake = Awake
+wake-awake-detail = The screen is being kept awake.
+wake-awake-live = The screen is being kept awake, on any page, while you are live.
+# { $limit } is the time limit on battery ("15 minutes").
+wake-awake-limit = The screen is being kept awake, until there is no touch for { $limit }.
+wake-awake-live-limit = The screen is being kept awake, on any page, while you are live, until there is no touch for { $limit }.
+wake-released = Let go
+wake-released-detail = The device let go (another app, the screen off, or a low battery). It is taken again when you come back.
+wake-expired = Timed out
+wake-expired-detail = Let go after { $limit } with no touch, to spare the battery. Touch the screen to keep it awake again.
+wake-ready = Ready
+wake-ready-detail = The screen is kept awake while a setlist is open, and on any page while you are live.
+wake-power-mains = On mains power: there is no time limit.
+wake-power-battery = On battery: the time limit applies.
+wake-power-unknown = This device can't say whether it is on mains power, so the time limit always applies.
+wake-ask-again = Ask again
+
+
+## About (the version, updates, offline use, install and storage)
+
+about-version-heading = Version
+about-version-unknown = Version unknown
+# { $version } is the build's id.
+about-version = Version { $version }
+# { $date } is the day it was released ("12 October 2026").
+about-version-released = Version { $version }, released { $date }
+about-reload-now = Reload now
+
+about-update-ready = Update ready
+about-update-ready-detail = A new version is saved on this device. Reload to use it.
+about-update-getting = Getting the update
+about-update-getting-detail = A new version is being saved on this device.
+about-update-checking = Checking
+about-update-checking-detail = Looking for a new version.
+about-update-failed = Couldn't check
+about-update-failed-detail = The server couldn't be reached. Are you offline? It tries again from time to time.
+about-update-current = Up to date
+# { $ago } is when ("just now", "5 minutes ago").
+about-update-checked = Checked { $ago }.
+about-update-current-detail = It checks when you open the app, and now and then while it is open.
+
+# How long ago, in the middle of a sentence. { $count } is the number.
+ago-now = just now
+ago-minutes =
+    { $count ->
+        [one] { $count } minute ago
+       *[other] { $count } minutes ago
+    }
+ago-hours =
+    { $count ->
+        [one] { $count } hour ago
+       *[other] { $count } hours ago
+    }
+
+about-offline-heading = Offline
+about-offline-none = Not offline
+about-offline-none-detail = This browser can't save the app for offline use.
+about-offline-ready = Ready offline
+about-offline-ready-detail = The whole app is saved on this device, so it opens without a connection.
+about-offline-not-yet = Not yet
+about-offline-not-yet-detail = Reload the app once, so it can save itself for offline use.
+
+about-install-heading = Install
+about-install-button = Install Chordless
+about-install-done = Installed
+about-install-done-detail = Running as an installed app.
+about-install-not = Not installed
+about-install-not-detail = Install it to open full screen and keep its data safe.
+# For an iPhone or iPad.
+about-install-ios-detail = Tap the Share button, then Add to Home Screen. The installed app keeps its own data, so you will sign in again in it.
+about-install-mac-detail = In the menu bar, choose File, then Add to Dock.
+about-install-cannot = Can't install here
+about-install-cannot-detail = This browser has no way to install the app.
+
+about-storage-heading = Storage on this device
+about-storage-protect = Ask the browser to keep it
+about-storage-protected = Protected
+about-storage-protected-detail = The browser will not clear this app's songs and setlists to make room.
+about-storage-not-protected = Not protected
+about-storage-not-protected-detail = The browser may clear this app's data if the device runs short of room. Installing the app helps.
+# Added after either of the two above, with a space between. { $size } is what the app uses ("3.2 MB").
+about-storage-using = Using { $size }.
+about-storage-unknown = Unknown
+about-storage-unknown-detail = This browser can't say whether it will keep this app's data.
+
+
+## The menu
+
+menu-label = Navigation menu
+menu-update-ready = Update ready: reload
+menu-overview = Overview
+menu-setlists = Setlists
+menu-library = Song Library
+# { $title } is the name of the page the Help is for ("Setlist Overview").
+menu-help = Help: { $title }
+menu-preferences = Preferences
+menu-account = Account and Teams
+menu-media-player = Media Player
+menu-import = Import Songs
+menu-about = About
+
+
+## Highlight colours, fonts, theme and text size (Preferences > Accessibility and Appearance)
+
+tint-heading = Chord highlight
+tint-text = A coloured background behind the chords, not the words: some readers with dyslexia or visual stress find it easier. Pick whichever suits you.
+tint-group-label = Chord highlight colour
+tint-none = None
+tint-none-label = No highlight
+# { $colour } is one of the colours below.
+tint-preset-label = { $colour } highlight
+tint-own = Your own
+tint-own-label = Your own highlight colour
+# { $ratio } is the contrast of the chords against the highlight ("7.2").
+tint-contrast = Chords read at { $ratio }:1 contrast
+tint-yellow = Yellow
+tint-cream = Cream
+tint-peach = Peach
+tint-pink = Pink
+tint-green = Green
+tint-blue = Blue
+
+font-heading = Fonts
+font-text = A typeface for each part, from the fonts your device has. Saved on this device only.
+# { $area } is the part: App, Lyrics or Chords.
+font-picker-label = { $area } font
+font-area-ui = App
+font-area-ui-description = menus, buttons and settings
+font-area-lyrics = Lyrics
+font-area-lyrics-description = the words of the song
+font-area-chords = Chords
+font-area-chords-description = the chord names above the words
+font-default = Default
+font-default-note = the app's own
+font-clear = Clear sans
+font-clear-note = wide, open letters (Verdana, Tahoma)
+font-friendly = Friendly
+font-friendly-note = rounded, easy to tell apart (Comic Sans)
+font-humanist = Humanist sans
+font-humanist-note = softer shapes (Calibri, Gill Sans)
+font-serif = Serif
+font-serif-note = with feet (Georgia)
+font-mono = Monospace
+font-mono-note = every letter the same width
+
+theme-heading = Theme
+theme-system = System
+theme-system-label = Use system preference
+theme-system-title = Follow your system's theme preference automatically
+theme-light = Light
+theme-light-label = Light theme
+theme-dark = Dark
+theme-dark-label = Dark theme
+# { $current } is the theme the system has now ("light" or "dark").
+theme-following = ✓ Following system preference (currently { $current })
+
+scale-heading = Font size
+scale-text = All text in the app, lyrics included. Saved on this device only.
+scale-slider-label = Font scale slider
+scale-small = Small 80%
+scale-normal = Normal 100%
+scale-large = Large 125%
+scale-largest = Largest 150%
+
+
+## The media player's settings
+
+mps-heading = 🎵 Media Player Settings
+mps-player = Enable Media Player
+mps-player-text = Master control for all media player features
+mps-metronome = Enable Metronome
+mps-metronome-text = Click track with tempo and time signature
+mps-stereo = Stereo Split (L/R)
+mps-stereo-text = Pads → Left, Click → Right
+mps-downbeat = Emphasise downbeat
+mps-downbeat-text = Off, every click sounds like an off-beat one
+mps-double = Double the click for slow songs
+mps-double-text = Two clicks per beat at or below this tempo, unless a song says otherwise
+mps-double-below = At or below (BPM)
+mps-pads = Enable Pads
+mps-pads-text = Background pad audio playback
+mps-padset = Pad Sound Set
+mps-padset-text = Select which pad audio library to use
+mps-padset-none-upload = Chordless has no pads of its own: choose "Upload a new pad set…" to add a set you own
+# <media> is a link to the Media Player page.
+mps-padset-none = Chordless has no pads of its own: upload a set you own on the <media>Media Player page</media>
+mps-padset-choose = Choose a pad set
+mps-padset-none-yet = No pad sets yet
+mps-padset-upload = Upload a new pad set…
+mps-padset-preparing = Preparing pad set…
 `

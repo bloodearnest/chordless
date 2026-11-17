@@ -4,6 +4,8 @@
  * cost nothing to load; where one is missing the next in its list is used.
  */
 
+import { t } from './text.ts'
+
 export const FONT_AREAS = ['ui', 'lyrics', 'chords'] as const
 export type FontArea = (typeof FONT_AREAS)[number]
 
@@ -17,35 +19,64 @@ export interface FontChoice {
 }
 
 export const FONT_CHOICES: readonly FontChoice[] = [
-  { id: 'default', label: 'Default', note: "the app's own", family: null },
+  {
+    id: 'default',
+    get label() {
+      return t('font-default')
+    },
+    get note() {
+      return t('font-default-note')
+    },
+    family: null,
+  },
   {
     id: 'clear',
-    label: 'Clear sans',
-    note: 'wide, open letters (Verdana, Tahoma)',
+    get label() {
+      return t('font-clear')
+    },
+    get note() {
+      return t('font-clear-note')
+    },
     family: "Verdana, Tahoma, 'Trebuchet MS', sans-serif",
   },
   {
     id: 'friendly',
-    label: 'Friendly',
-    note: 'rounded, easy to tell apart (Comic Sans)',
+    get label() {
+      return t('font-friendly')
+    },
+    get note() {
+      return t('font-friendly-note')
+    },
     family: "'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', 'Marker Felt', sans-serif",
   },
   {
     id: 'humanist',
-    label: 'Humanist sans',
-    note: 'softer shapes (Calibri, Gill Sans)',
+    get label() {
+      return t('font-humanist')
+    },
+    get note() {
+      return t('font-humanist-note')
+    },
     family: "Calibri, Candara, 'Gill Sans', 'Segoe UI', Optima, sans-serif",
   },
   {
     id: 'serif',
-    label: 'Serif',
-    note: 'with feet (Georgia)',
+    get label() {
+      return t('font-serif')
+    },
+    get note() {
+      return t('font-serif-note')
+    },
     family: "Georgia, 'Iowan Old Style', Cambria, serif",
   },
   {
     id: 'mono',
-    label: 'Monospace',
-    note: 'every letter the same width',
+    get label() {
+      return t('font-mono')
+    },
+    get note() {
+      return t('font-mono-note')
+    },
     family: "ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace",
   },
 ]

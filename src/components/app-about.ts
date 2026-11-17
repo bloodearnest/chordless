@@ -144,8 +144,8 @@ export class AppAbout extends LitElement {
         state: 'ready',
         look: 'warn',
         icon: 'refresh',
-        label: 'Update ready',
-        detail: 'A new version is saved on this device. Reload to use it.',
+        label: t('about-update-ready'),
+        detail: t('about-update-ready-detail'),
       }
     }
     if (appUpdate.installing) {
@@ -153,8 +153,8 @@ export class AppAbout extends LitElement {
         state: 'installing',
         look: 'warn',
         icon: 'clock',
-        label: 'Getting the update',
-        detail: 'A new version is being saved on this device.',
+        label: t('about-update-getting'),
+        detail: t('about-update-getting-detail'),
       }
     }
     if (appUpdate.checking) {
@@ -162,8 +162,8 @@ export class AppAbout extends LitElement {
         state: 'checking',
         look: 'none',
         icon: 'clock',
-        label: 'Checking',
-        detail: 'Looking for a new version.',
+        label: t('about-update-checking'),
+        detail: t('about-update-checking-detail'),
       }
     }
     if (appUpdate.failed) {
@@ -171,9 +171,8 @@ export class AppAbout extends LitElement {
         state: 'failed',
         look: 'bad',
         icon: 'warning',
-        label: "Couldn't check",
-        detail:
-          "The server couldn't be reached. Are you offline? It tries again from time to time.",
+        label: t('about-update-failed'),
+        detail: t('about-update-failed-detail'),
       }
     }
     if (!appUpdate.available) {
@@ -189,20 +188,19 @@ export class AppAbout extends LitElement {
       state: 'current',
       look: 'good',
       icon: 'check',
-      label: 'Up to date',
+      label: t('about-update-current'),
       detail: appUpdate.lastChecked
-        ? `Checked ${this._ago(appUpdate.lastChecked)}.`
-        : 'It checks when you open the app, and now and then while it is open.',
+        ? t('about-update-checked', { ago: this._ago(appUpdate.lastChecked) })
+        : t('about-update-current-detail'),
     }
   }
 
   /** "just now", "5 minutes ago", "2 hours ago" */
   _ago(time: number): string {
     const minutes = Math.floor((this._now - time) / 60_000)
-    if (minutes < 1) return 'just now'
-    if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`
-    const hours = Math.floor(minutes / 60)
-    return `${hours} hour${hours === 1 ? '' : 's'} ago`
+    if (minutes < 1) return t('ago-now')
+    if (minutes < 60) return t('ago-minutes', { count: minutes })
+    return t('ago-hours', { count: Math.floor(minutes / 60) })
   }
 
   _offlineStatus(): StatusShown & { state: string } {
@@ -211,8 +209,8 @@ export class AppAbout extends LitElement {
         state: 'none',
         look: 'none',
         icon: 'ban',
-        label: 'Not offline',
-        detail: "This browser can't save the app for offline use.",
+        label: t('about-offline-none'),
+        detail: t('about-offline-none-detail'),
       }
     }
     return this._offline
@@ -220,15 +218,15 @@ export class AppAbout extends LitElement {
           state: 'ready',
           look: 'good',
           icon: 'check',
-          label: 'Ready offline',
-          detail: 'The whole app is saved on this device, so it opens without a connection.',
+          label: t('about-offline-ready'),
+          detail: t('about-offline-ready-detail'),
         }
       : {
           state: 'not-yet',
           look: 'warn',
           icon: 'clock',
-          label: 'Not yet',
-          detail: 'Reload the app once, so it can save itself for offline use.',
+          label: t('about-offline-not-yet'),
+          detail: t('about-offline-not-yet-detail'),
         }
   }
 
@@ -239,41 +237,40 @@ export class AppAbout extends LitElement {
           state: 'installed',
           look: 'good',
           icon: 'check',
-          label: 'Installed',
-          detail: 'Running as an installed app.',
+          label: t('about-install-done'),
+          detail: t('about-install-done-detail'),
         }
       case 'prompt':
         return {
           state: 'prompt',
           look: 'none',
           icon: 'add',
-          label: 'Not installed',
-          detail: 'Install it to open full screen and keep its data safe.',
+          label: t('about-install-not'),
+          detail: t('about-install-not-detail'),
         }
       case 'ios':
         return {
           state: 'ios',
           look: 'none',
           icon: 'add',
-          label: 'Not installed',
-          detail:
-            'Tap the Share button, then Add to Home Screen. The installed app keeps its own data, so you will sign in again in it.',
+          label: t('about-install-not'),
+          detail: t('about-install-ios-detail'),
         }
       case 'mac-safari':
         return {
           state: 'mac-safari',
           look: 'none',
           icon: 'add',
-          label: 'Not installed',
-          detail: 'In the menu bar, choose File, then Add to Dock.',
+          label: t('about-install-not'),
+          detail: t('about-install-mac-detail'),
         }
       default:
         return {
           state: 'none',
           look: 'none',
           icon: 'ban',
-          label: "Can't install here",
-          detail: 'This browser has no way to install the app.',
+          label: t('about-install-cannot'),
+          detail: t('about-install-cannot-detail'),
         }
     }
   }
@@ -282,14 +279,15 @@ export class AppAbout extends LitElement {
     const info = this._storage
     // Only what is used: the quota a browser reports is not the real limit (Chrome says 10 GB
     // more than is used, whatever the disk), and this app uses megabytes
-    const usage = info?.usage != null ? ` Using ${this._size(info.usage)}.` : ''
+    const usage =
+      info?.usage != null ? ` ${t('about-storage-using', { size: this._size(info.usage) })}` : ''
     if (info?.persisted) {
       return {
         state: 'persistent',
         look: 'good',
         icon: 'check',
-        label: 'Protected',
-        detail: `The browser will not clear this app's songs and setlists to make room.${usage}`,
+        label: t('about-storage-protected'),
+        detail: `${t('about-storage-protected-detail')}${usage}`,
       }
     }
     if (info?.persisted === false) {
@@ -297,29 +295,35 @@ export class AppAbout extends LitElement {
         state: 'best-effort',
         look: 'warn',
         icon: 'warning',
-        label: 'Not protected',
-        detail: `The browser may clear this app's data if the device runs short of room. Installing the app helps.${usage}`,
+        label: t('about-storage-not-protected'),
+        detail: `${t('about-storage-not-protected-detail')}${usage}`,
       }
     }
     return {
       state: 'unknown',
       look: 'none',
       icon: 'ban',
-      label: 'Unknown',
-      detail: "This browser can't say whether it will keep this app's data.",
+      label: t('about-storage-unknown'),
+      detail: t('about-storage-unknown-detail'),
     }
   }
 
   /** "Version abc123, released 12 October 2026" */
   _versionLine(): string {
     const running = this._running
-    if (!running) return 'Version unknown'
+    if (!running) return t('about-version-unknown')
     const date = running.released ? new Date(running.released) : null
-    const released =
-      date && !Number.isNaN(date.getTime())
-        ? `, released ${date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}`
-        : ''
-    return `Version ${running.version}${released}`
+    if (date && !Number.isNaN(date.getTime())) {
+      return t('about-version-released', {
+        version: running.version,
+        date: date.toLocaleDateString(undefined, {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }),
+      })
+    }
+    return t('about-version', { version: running.version })
   }
 
   /** A size in words: "3.2 MB", "24 GB" */
@@ -365,7 +369,7 @@ export class AppAbout extends LitElement {
     return html`
       <div class="about-content">
         <div class="panel">
-          <h3>Version</h3>
+          <h3>${t('about-version-heading')}</h3>
           <p class="version-line" id="app-version">
             ${this._versionLine()}
           </p>
@@ -374,7 +378,7 @@ export class AppAbout extends LitElement {
             ${
               appUpdate.ready
                 ? html`<button class="btn primary" type="button" @click=${() => appUpdate.apply()}>
-                  Reload now
+                  ${t('about-reload-now')}
                 </button>`
                 : html`<button
                   class="btn"
@@ -382,26 +386,26 @@ export class AppAbout extends LitElement {
                   ?disabled=${appUpdate.checking || appUpdate.installing || !appUpdate.available}
                   @click=${this._checkNow}
                 >
-                  Check for updates
+                  ${t('action-check-for-updates')}
                 </button>`
             }
           </div>
         </div>
 
         <div class="panel">
-          <h3>Offline</h3>
+          <h3>${t('about-offline-heading')}</h3>
           ${renderStatus(offline, { id: 'offline-status', state: offline.state })}
         </div>
 
         <div class="panel">
-          <h3>Install</h3>
+          <h3>${t('about-install-heading')}</h3>
           ${renderStatus(install, { id: 'install-status', state: install.state })}
           <p><why-install></why-install></p>
           ${
             this._installMode === 'prompt'
               ? html`<div class="actions">
                 <button class="btn primary" type="button" @click=${this._install}>
-                  Install Chordless
+                  ${t('about-install-button')}
                 </button>
               </div>`
               : ''
@@ -409,13 +413,13 @@ export class AppAbout extends LitElement {
         </div>
 
         <div class="panel">
-          <h3>Storage on this device</h3>
+          <h3>${t('about-storage-heading')}</h3>
           ${renderStatus(storage, { id: 'storage-status', state: storage.state })}
           ${
             this._storage?.persisted === false
               ? html`<div class="actions">
                 <button class="btn" type="button" @click=${this._protect}>
-                  Ask the browser to keep it
+                  ${t('about-storage-protect')}
                 </button>
               </div>`
               : ''
