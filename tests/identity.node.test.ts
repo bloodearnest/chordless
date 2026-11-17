@@ -15,6 +15,7 @@ import {
   identityKey,
   SESSION_PROVIDER,
   sessionProvider,
+  UPDATE_REQUIRED,
 } from '../worker/src/identity.ts'
 import { signAccessToken } from '../worker/src/session-tokens.ts'
 
@@ -177,7 +178,7 @@ describe('a Chordless session token', () => {
     await assert.rejects(
       async () => authenticate(asking(await sign()), sessionProviders),
       (error: unknown) =>
-        error instanceof Refusal && error.status === 401 && error.message === 'update_required'
+        error instanceof Refusal && error.status === 401 && error.message === UPDATE_REQUIRED
     )
   })
 })

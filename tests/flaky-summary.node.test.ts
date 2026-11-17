@@ -368,7 +368,8 @@ test('waits while another job is running, and cancels once it is done and the jo
 test('does not cancel when the job gets its runner after all, or has waited less than three minutes', () => {
   assert.equal(watchFor([[...everyoneElseDone, running(MAC), watching()]]).cancelled, false)
   const { cancelled, asked } = watchFor([[...everyoneElseDone, waiting(MAC, 1), watching()]], {
-    limit: '1',
+    // (a few seconds, so that a slow start of the script under load does not use the time up on the first look)
+    limit: '4',
   })
   assert.equal(cancelled, false)
   assert.ok(asked > 1, 'it kept watching until its time was up')

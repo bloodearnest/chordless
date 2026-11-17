@@ -714,6 +714,40 @@ describe('a Chordless session', () => {
     assert.equal([a, b].filter(each => each.ok).length >= 1, true)
   })
 
+  test('that have run out, or were revoked a month ago, are deleted when the next is made', async () => {
+    const { env: e, sql } = withDb()
+    const blob = await encryptBlob(blobData(), e)
+    const ids = async (now: Date) => {
+      const answer = (await bodyOf(
+        await handleSessionUpgrade(post('/session/upgrade', { blob }), e, now)
+      )) as Tokens
+      return answer.refresh_token.split('.')[0]
+    }
+    const old = await ids(NOW)
+    const revoked = await ids(NOW)
+    sql
+      .prepare('UPDATE sessions SET revoked_at = ? WHERE session_id = ?')
+      .run(later(1000).toISOString(), revoked)
+    // (past the first's 90 days: the revoked one is still within its month's grace of being kept, the unused one is not)
+    const day = 24 * 60 * 60 * 1000
+    const keptIds = () =>
+      (sql.prepare('SELECT session_id FROM sessions').all() as { session_id: string }[]).map(
+        row => row.session_id
+      )
+    await ids(later(91 * day))
+    assert.ok(!keptIds().includes(old), 'a session past its 90 days is gone')
+    assert.ok(!keptIds().includes(revoked), 'so is a revoked one that has also run out')
+    // (a revoked session that has not run out is kept for a month, and then goes)
+    const fresh = await ids(later(91 * day))
+    sql
+      .prepare('UPDATE sessions SET revoked_at = ? WHERE session_id = ?')
+      .run(later(91 * day).toISOString(), fresh)
+    await ids(later(100 * day))
+    assert.ok(keptIds().includes(fresh), 'a revoked session is kept for a while')
+    await ids(later(122 * day))
+    assert.ok(!keptIds().includes(fresh), 'and goes after a month')
+  })
+
   test('ends at sign-out, for the device that signed out', async () => {
     const { env: e } = withDb()
     const { google } = fakeGoogle()

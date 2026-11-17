@@ -607,6 +607,20 @@ describe('invites', () => {
     assert.deepEqual(await later.invites(), [], 'an expired one is not listed')
   })
 
+  test('that have run out are deleted when the next is made, and the others stay', async () => {
+    const { state, at, rows } = await made()
+    await state.createInvite('reader', 'old@example.com', ann)
+    const week = new Date(NOW.getTime() + INVITE_TTL_MS + 1000)
+    const fresh = at(week)
+    await fresh.createInvite('reader', 'new@example.com', ann)
+    assert.deepEqual(
+      rows('SELECT email FROM team_invites ORDER BY email').map(row => row.email),
+      ['new@example.com']
+    )
+    await at(new Date(week.getTime() + 1000)).createInvite('reader', 'next@example.com', ann)
+    assert.equal(rows('SELECT email FROM team_invites').length, 2, 'one still open is kept')
+  })
+
   test('are not used up by someone already in the space, who keeps their role', async () => {
     const { state } = await made()
     await state.setMember(bob, 'admin')
