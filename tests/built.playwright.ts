@@ -18,6 +18,7 @@ const VIEWS = [
   ['/about', 'about-view'],
   ['/contact', 'contact-view'],
   ['/join', 'join-view'],
+  ['/sign-in', 'sign-in-view'],
   ['/account/new', 'new-team-space-view'],
   ['/media', 'media-view'],
   ['/no/such/page', 'not-found-view'],

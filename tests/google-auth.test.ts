@@ -273,6 +273,16 @@ describe('google-auth', () => {
       expect((error as Error | null)?.message).to.include('Not signed in with Google')
     })
 
+    it('says so when the sign-in cannot be kept', async () => {
+      respondTo = () => json({ access_token: 'a1', refresh_token: 'id.secret', expires_in: 900 })
+      worker.failing.add('STORE_BLOB')
+      let error: Error | null = null
+      await signInWithEmail('ann@example.com', '123456').catch(e => {
+        error = e
+      })
+      expect((error as Error | null)?.message).to.equal('worker failed')
+    })
+
     it('says why a code was refused', async () => {
       const why = async (body: object) => {
         respondTo = () => json(body, 401)

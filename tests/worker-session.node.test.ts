@@ -10,6 +10,7 @@ import * as jose from 'jose'
 import { type BlobData, decryptBlob, encryptBlob } from '../worker/src/blob.ts'
 import {
   CODE_TTL_MS,
+  cleanNext,
   handleEmailStart,
   handleEmailVerify,
   loginEmail,
@@ -768,7 +769,55 @@ describe('signing in with an emailed code', () => {
     assert.equal(w.sent[0].from.email, 'signin@mail.chordless.app')
     assert.match(w.codeSent(), /^\d{6}$/)
     assert.ok(w.sent[0].text.includes(w.codeSent()))
-    assert.equal(loginEmail('123456').subject, 'Your Chordless sign-in code: 123456')
+    assert.equal(loginEmail('123456', 'https://x/').subject, 'Your Chordless sign-in code: 123456')
+  })
+
+  test('puts the link and the code in the one email, and the link goes on to the page it was asked from', async () => {
+    const w = world()
+    await w.start('Ann@Example.com')
+    const text = w.sent[0].text
+    const link = /https:\/\/chordless\.test\/sign-in#\S+/.exec(text)?.[0] ?? ''
+    const fragment = new URLSearchParams(link.split('#')[1])
+    assert.equal(fragment.get('a'), 'ann@example.com')
+    assert.equal(fragment.get('c'), w.codeSent())
+    assert.equal(fragment.get('n'), null)
+    assert.ok(text.includes(`\n${w.codeSent()}\n`), 'and the code, to type')
+
+    const asked = world()
+    const request = (next: unknown) =>
+      handleEmailStart(
+        new Request('https://chordless.test/session/email/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: 'ann@example.com', next }),
+        }),
+        asked.e,
+        NOW
+      )
+    await request('/join/space-aaaa1111/abcdefghijklmnopqrstuv')
+    assert.equal(
+      new URLSearchParams((/#(\S+)/.exec(asked.sent[0].text) ?? [])[1]).get('n'),
+      '/join/space-aaaa1111/abcdefghijklmnopqrstuv'
+    )
+    // (a page of this app only: never another site)
+    for (const bad of [
+      'https://evil.example/',
+      '//evil.example',
+      '/\\evil',
+      'join',
+      '/a b',
+      `/${'a'.repeat(300)}`,
+      5,
+      null,
+    ]) {
+      await request(bad)
+      assert.equal(
+        new URLSearchParams((/#(\S+)/.exec(asked.sent.at(-1)?.text ?? '') ?? [])[1]).get('n'),
+        null,
+        String(bad)
+      )
+    }
+    assert.equal(cleanNext('/songs?q=a'), '/songs?q=a')
   })
 
   test('keeps neither the address nor the code', async () => {

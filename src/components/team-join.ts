@@ -458,6 +458,7 @@ export class TeamJoin extends LitElement {
       <h2>${t('email-code-heading')}</h2>
       <email-code-sign-in
         .address=${this._info?.email ?? ''}
+        .next=${window.location.pathname + window.location.search}
         @email-code:signed-in=${this._emailSignedIn}
       ></email-code-sign-in>
       <div class="actions">
