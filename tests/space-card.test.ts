@@ -6,10 +6,8 @@ import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import {
   type SpaceCard,
   SpaceDefaultEvent,
-  SpaceLeadersEvent,
   SpaceManageEvent,
   SpaceSyncedEvent,
-  SpaceUsersEvent,
 } from '../src/components/space-card.ts'
 import '../src/components/space-card.ts'
 import type { Space } from '../src/js/data-types.ts'
@@ -157,46 +155,18 @@ describe('space-card', () => {
     expect(asked).to.equal(space.id)
   })
 
-  it('asks the page to show it when told to manage it', async () => {
+  it('has one Manage button, which asks the page to go to the space’s own page', async () => {
     const el = await card('signed-out')
     const asked: string[] = []
     el.addEventListener(SpaceManageEvent.type, event =>
       asked.push((event as SpaceManageEvent).spaceId)
     )
+    expect(must(button(el, 'manage')).textContent?.trim()).to.equal('Manage')
     must(button(el, 'manage')).click()
     expect(asked).to.deep.equal([space.id])
-  })
-
-  it('has a Leaders button for every space, which asks the page to show who leads its setlists', async () => {
-    const el = await card('signed-in')
-    const asked: string[] = []
-    el.addEventListener(SpaceLeadersEvent.type, event =>
-      asked.push((event as SpaceLeadersEvent).spaceId)
-    )
-    expect(must(button(el, 'leaders')).textContent?.trim()).to.equal('Leaders')
-    must(button(el, 'leaders')).click()
-    expect(asked).to.deep.equal([space.id])
-  })
-
-  it('has a Users button for a Team only, which asks the page to show its people', async () => {
-    const own = await card('signed-in')
-    expect(button(own, 'users')).to.equal(null)
-    const team = await make(`Team ${crypto.randomUUID().slice(0, 8)}`, {
-      team: { id: 't-2', role: 'reader' },
-    })
-    const el = await card('signed-in', { space: team })
-    const asked: string[] = []
-    el.addEventListener(SpaceUsersEvent.type, event =>
-      asked.push((event as SpaceUsersEvent).spaceId)
-    )
-    must(button(el, 'users')).click()
-    expect(asked).to.deep.equal([team.id])
-    expect(order(el)).to.deep.equal(['sync', 'manage', 'leaders', 'users'])
-  })
-
-  it('calls the button for a space’s data Data', async () => {
-    const el = await card('signed-out')
-    expect(button(el, 'manage')?.textContent?.trim()).to.equal('Data')
+    // (its data, leaders and people are all there: no button of their own here)
+    expect(button(el, 'leaders')).to.equal(null)
+    expect(button(el, 'users')).to.equal(null)
   })
 
   const order = (el: SpaceCard) =>
@@ -204,7 +174,7 @@ describe('space-card', () => {
 
   it('has no Switch button: the space tabs switch', async () => {
     const el = await card('signed-in')
-    expect(order(el)).to.deep.equal(['sync', 'manage', 'leaders'])
+    expect(order(el)).to.deep.equal(['sync', 'manage'])
   })
 
   it('says a Team is a Team, and what the person is in it', async () => {

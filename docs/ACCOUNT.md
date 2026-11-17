@@ -16,9 +16,10 @@ keeps the scopes apart: the account first, then one card per space, then the dev
 | `account-page.ts` | The page: the list, and the modals below |
 | `account-card.ts` | The account |
 | `space-card.ts` | One space on the list |
-| `space-manager.ts` | **Data**: everything to do with one space's data, in a modal |
-| `space-people.ts` | **Leaders**: who leads a space's setlists, in a modal |
-| `team-share-panel.ts`, `team-licence-panel.ts`, `team-storage-panel.ts` | **Users**: a Team's people, its CCLI licence number and its storage, in a modal |
+| `space-page.ts` (`/account/space/<id>`, `space-view.ts`) | One space on a page of its own: the sections below, under **Manage** on its card |
+| `space-manager.ts` | **Data**: everything to do with one space's data (a section of the space page) |
+| `space-people.ts` | **Leaders**: who leads a space's setlists (a section of the space page) |
+| `team-share-panel.ts`, `team-licence-panel.ts`, `team-storage-panel.ts` | A Team's people, its CCLI licence number and its storage (sections of the space page) |
 | `drive-sync-panel.ts`, `space-export-panel.ts`, `space-delete-everywhere.ts` | The panels of the Data modal. Each takes the space it is given, and a sync manager made for a space works on that space, not the one in use (`sync-manager.ts`) |
 | `storage-summary.ts` | The device |
 | `team-space-wizard.ts` (`/account/new`), `team-join.ts` (`/join`) | Making a Team, and joining one: docs/SPACES.md |
@@ -38,13 +39,13 @@ Personal and Team Spaces
 +- Bea Singer [Personal]                        Current -+
 | 31 songs · 6 setlists · about 190 KB                    |
 | Synced 5 min ago                                        |
-| [Sync] [Data] [Leaders]                                 |
+| [Sync] [Manage]                                         |
 +--------------------------------------------------------+
 +- Gateway Church [Team] [owner]                          +
 | 212 songs · 48 setlists · about 1.4 MB                  |
 | CCLI licence 471102                                     |
 | Synced 2 min ago                                        |
-| [Sync] [Data] [Leaders] [Users]                [Switch] |
+| [Sync] [Manage]                                [Switch] |
 +--------------------------------------------------------+
 
 To join a Team, open the invite link its admin sent you.
@@ -80,9 +81,8 @@ sign-in backup (download, import).
   "Connect Google Drive to sync").
 - **Sync** is on the card, and the card runs the sync itself (`space-sync.ts`). It is shown for any
   space once syncing can work: a sign-in with Drive, or for a Team's member a sign-in alone.
-- **Data**, **Leaders** and (for a Team) **Users** open the modals below. **Users** is shown to every
-  member, not only those who manage people, because leaving is there and any member can see who is in
-  the Team; the controls inside follow the role.
+- **Manage** goes to the space's own page (below). It is shown to every member, not only those who manage
+  people, because leaving is there and any member can see who is in the Team; the controls inside follow the role.
 - **Switch** (not "Open") is the word. After a confirmation it makes that space the one in use and
   shows the home page afresh in it, without reloading the app. It is the second way to switch: the
   main one is the tabs under the header of the Setlists, Library and Add Song pages
@@ -100,31 +100,28 @@ sign-in backup (download, import).
 The browser's own total for the app's data, and the caches (the app, and media), which belong to the
 device and not to a space.
 
-## Data: one space's modal
+## The space page: `/account/space/<id>`
 
-**Data** on a card opens a modal over the list, like the app's other settings (Preferences, Help, the
-info dialogs), not a page of its own with a back button. Whether the whole app should move to settings
-pages with forward and back is a decision for the app, not for this page, so it follows what the app
-has. The cost is that a space's management has no address of its own.
+**Manage** on a card goes to a page of its own for that space (`space-page.ts`; `docs/ROUTING.md`), which replaced
+three modals (Data, Leaders, Users, 2026-11-17): a modal has no address, no back button and no link, and could not
+hold a list of people beside an editor for one of them. The id is this device's own for the space, so a link works only
+here; a space that is not on this device says so, with a link back.
 
 ```
-+- Gateway Church ---------------------------------------- x -+
-| [Team] [owner]                                     Current  |
-| 31 songs · 6 setlists · about 190 KB                         |
-|                                                              |
-| Team copy / Google Drive                                     |
-|   [Reset from Google Drive]                                  |
-| Export and import   [Export...]  [Import...]                 |
-| Delete from this device   [Delete...]                        |
-| Delete everywhere         [Delete everywhere...]             |
-+--------------------------------------------------------------+
+<- Account and Teams
+Gateway Church  [Team] [Worship leader]
+
+  People (a Team): who is in it, their roles, invites       team-share-panel.ts
+  CCLI licence number (a Team)                              team-licence-panel.ts
+  Team storage (a Team's owner)                             team-storage-panel.ts
+  Leaders: who leads the setlists                           space-people.ts
+  Data: reset from Drive, export and import, delete         space-manager.ts
 ```
 
-The space's name is the modal's heading. It works for any space, not only the one in use, so nothing
-is switched to be managed: the first sync takes the space's own database (`syncTeamSpace`), export and
-delete need only that database, and the people and invite calls need only the team id. Every
-destructive action asks first (CLAUDE.md: friction, not prohibition). When a space is deleted the modal
-closes (`SpaceGoneEvent`) and the list is read again; closing it any other way reads the list again too.
+It works for any space on the device, not only the one in use (nothing is switched to manage it): the first sync takes the
+space's own database, export and delete need only that, and the people and invite calls need only the team id. Every
+destructive action asks first (CLAUDE.md: friction, not prohibition). Deleting the space, or the person leaving the
+Team, goes back to the list (to the home page, afresh, if it was the one in use: `SpaceGoneEvent.wasCurrent`).
 
 - **Google Drive** (a Team's is "Team copy"): **Reset from Google Drive** replaces this device's songs
   and setlists with Drive's, after saying what it will lose. Syncing itself is the card's. When the
@@ -139,18 +136,11 @@ closes (`SpaceGoneEvent`) and the list is read again; closing it any other way r
   "Export and import"). With the media player on and Drive reached, it can include the pad sets.
 - **Delete** (below).
 
-## Leaders
-
-**Leaders**, on every card (after Data), is `space-people.ts` in a modal: who leads a space's setlists
-(docs/IDENTITIES.md, "People page").
-
-## Users: a Team's people, licence and storage
-
-**Users**, on a Team's card (after Data), opens a modal of three panels:
+### A Team's sections
 
 - **People** (`team-share-panel.ts`): who is in the Team and their roles, and for those who may manage
-  people, **Invite someone** (an email and a role; the link, shown once, with a **Send…** button for the
-  share sheet or WhatsApp or Gmail), the invites **waiting to be used** and a way to revoke each. The
+  people, **Invite someone** (an email and a role; the Worker emails the invite, and the link is shown once, with a **Send…**
+  button for the share sheet or WhatsApp or Gmail), the invites **waiting to be used** and a way to revoke each. The
   owner can **stop sharing**, and any other member can **leave**. A role acts only on those below it (the
   Worker's rule, docs/SPACES.md, "Roles"; the controls shown follow it).
 - **CCLI licence number** (`team-licence-panel.ts`): anyone sees it, a writer sets it where there is
@@ -158,12 +148,33 @@ closes (`SpaceGoneEvent`) and the list is read again; closing it any other way r
 - **Team storage** (`team-storage-panel.ts`, the owner only): how the Team's folder is reached, the
   owner's own Google sign-in or Chordless's service account on a shared drive, with the address to
   add and **Check and switch** (docs/SPACES.md, "Credentials").
+- **Leaders**, on every space (`space-people.ts`): who leads a space's setlists (docs/IDENTITIES.md, "People page").
 
-Leaving, stopping sharing, or closing the modal reads the list again.
+### People: one list (planned, agreed 2026-11-17; not built)
+
+The People and Leaders sections become **one list of a space's people** (a Team's members, their pending invites, and visiting
+leaders who are not members), one row each: name, first address (and "+n"), role, **Edit**. A table that can be sorted by name,
+role or status on a wide screen and stacked cards on a phone, with a search box once there are more than about eight people. Rows:
+
+- a **member**: their name (from the synced people record), the address they signed in with, their role;
+- a **pending invite**: the address, the role, "Invited · 6 days left" and "Emailed 2 days ago" or "Not emailed"
+  (`team_invites.emailed_at`, to add), with **Resend** (a new invite for the address replaces the old, and is emailed:
+  the code is never kept, so the old link cannot be sent again; the confirmation says the old link stops working),
+  **Copy link** (of the new one) and **Revoke**;
+- a **visiting leader**: a person who leads setlists but is no member, "Not a member", with **Invite** in their editor.
+
+**Edit** opens one modal for one person: the name; their addresses (the person record's: each with an ×, and a field to add
+one: they match the email import and recognise the member); the addresses the Team knows the member by shown read-only
+("signed in with", "invited as": they prove who someone is, so an admin does not edit them, and no Worker route is needed);
+the role (only those below your own); **Remove from the team**, **Merge into…** and **Delete person** (only for one who leads
+nothing and is not you), each after a question. Rules are unchanged: a role acts only on those below it, a team member sees
+the list and names themselves, and the list is built from the cached members and local people, so it shows offline (role
+changes and invites say they need a connection). **Invite someone** is a button over the list. Build order: this page (done),
+the list and editor (`personRows`, `team-people.ts`), retiring the old panels, polish for a Personal space.
 
 ## Deleting a space
 
-Two ways, both on the Data modal, and **both work on any space, the one in use included**: it is not a
+Two ways, both in the Data section of the space's page, and **both work on any space, the one in use included**: it is not a
 reason to refuse. The one in use is replaced by another (or none: Personal is made again when the app
 needs one), and the page starts again in it, as a switch does (`SpaceGoneEvent.wasCurrent`). The old
 rule "switch to another first" was about an open database connection, which the app already lets go of.

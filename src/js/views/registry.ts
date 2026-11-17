@@ -68,6 +68,11 @@ export const views: Record<string, ViewEntry> = {
     () => import('./import-song-view.ts'),
     () => 'Import Songs - Chordless'
   ),
+  space: view(
+    'space-view',
+    () => import('./space-view.ts'),
+    () => 'Space - Chordless'
+  ),
   'sign-in': view(
     'sign-in-view',
     () => import('./sign-in-view.ts'),

@@ -51,6 +51,7 @@ describe('matchRoute', () => {
       { name: 'join', teamId: 'space-aaaa1111', code: 'abcdefghijklmnopqrstuv' },
     ],
     ['/join#space-aaaa1111.abcdefghijklmnopqrstuv', { name: 'join' }],
+    ['/account/space/abc-123', { name: 'space', spaceId: 'abc-123' }],
     ['/sign-in', { name: 'sign-in' }],
     ['/sign-in/abc_DEF-123', { name: 'sign-in', linkId: 'abc_DEF-123' }],
     ['/media', { name: 'media' }],
@@ -126,6 +127,7 @@ describe('buildUrl', () => {
     [{ name: 'account' }, '/account'],
     [{ name: 'import-song' }, '/import-song'],
     [{ name: 'join' }, '/join'],
+    [{ name: 'space', spaceId: 'abc 123' }, '/account/space/abc%20123'],
     [{ name: 'sign-in' }, '/sign-in'],
     [{ name: 'sign-in', linkId: 'abc_DEF-123' }, '/sign-in/abc_DEF-123'],
     [

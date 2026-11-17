@@ -94,7 +94,7 @@ new one.
 
 ## People page
 
-**Built.** On the Account and Teams page (docs/ACCOUNT.md) every space's card has a **Leaders** button
+**Built.** On the Account and Teams page (docs/ACCOUNT.md) every space's page (**Manage** on its card) has a **Leaders** section
 (the page says "Leaders", not "People": a Team's *Users* are its members and their roles, a different
 list) that opens `space-people.ts` in a modal, for any space on the device, not only the one in use.
 Each person has:
