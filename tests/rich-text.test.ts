@@ -13,7 +13,10 @@ const { describe, it, afterEach } = window
 describe('rich', () => {
   afterEach(() => setCatalogue(catalogue))
 
-  const render = async (key: string, args: Record<string, string> | undefined = undefined) => {
+  const render = async (
+    key: string,
+    args: Record<string, string | number> | undefined = undefined
+  ) => {
     const element = await fixture<HTMLElement>(
       html`<p>${rich(key, args, { go: words => html`<a href="/x">${words}</a>`, em: words => html`<em>${words}</em>` })}</p>`
     )
@@ -46,5 +49,20 @@ describe('rich', () => {
   it('says a message with no tags as it is', async () => {
     setCatalogue('m = Just words')
     expect((await render('m')).textContent).to.equal('Just words')
+  })
+
+  it('says a message that starts and ends with a tag, and one that comes out empty', async () => {
+    setCatalogue('m = <go>All of it</go>\nempty = { $nothing }')
+    const element = await render('m')
+    expect(element.textContent).to.equal('All of it')
+    expect(element.querySelector('a')?.textContent).to.equal('All of it')
+    expect((await render('empty', { nothing: '' })).textContent).to.equal('')
+  })
+
+  it('gives a number to the message as a number', async () => {
+    setCatalogue(
+      'm =\n    { $n ->\n        [one] One song\n       *[other] { $n } songs\n    }, <go>see</go>'
+    )
+    expect((await render('m', { n: 3 })).textContent).to.equal('3 songs, see')
   })
 })
