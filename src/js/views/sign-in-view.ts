@@ -8,7 +8,7 @@ export class SignInView extends PageView {
   override render() {
     return html`
       <app-header heading="Sign in"></app-header>
-      <sign-in-page></sign-in-page>
+      <sign-in-page .route=${this.route}></sign-in-page>
     `
   }
 }

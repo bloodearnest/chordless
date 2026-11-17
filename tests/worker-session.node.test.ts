@@ -11,6 +11,8 @@ import { type BlobData, decryptBlob, encryptBlob } from '../worker/src/blob.ts'
 import {
   CODE_TTL_MS,
   cleanNext,
+  handleEmailLink,
+  handleEmailLinkPeek,
   handleEmailStart,
   handleEmailVerify,
   loginEmail,
@@ -772,34 +774,164 @@ describe('signing in with an emailed code', () => {
     assert.equal(loginEmail('123456', 'https://x/').subject, 'Your Chordless sign-in code: 123456')
   })
 
-  test('puts the link and the code in the one email, and the link goes on to the page it was asked from', async () => {
+  /** The link id in an email's text */
+  const idIn = (text: string) =>
+    /https:\/\/chordless\.test\/sign-in\/([A-Za-z0-9_-]+)/.exec(text)?.[1] ?? ''
+
+  test('puts the link and the code in the one email, and the link is a path with an id that means nothing', async () => {
     const w = world()
     await w.start('Ann@Example.com')
     const text = w.sent[0].text
-    const link = /https:\/\/chordless\.test\/sign-in#\S+/.exec(text)?.[0] ?? ''
-    const fragment = new URLSearchParams(link.split('#')[1])
-    assert.equal(fragment.get('a'), 'ann@example.com')
-    assert.equal(fragment.get('c'), w.codeSent())
-    assert.equal(fragment.get('n'), null)
+    const id = idIn(text)
+    assert.match(id, /^[A-Za-z0-9_-]{20,}$/)
+    assert.ok(!text.includes('#'), 'nothing is in a fragment')
+    assert.ok(
+      !text.split('/sign-in/')[1].split('\n')[0].includes('ann@example.com'),
+      'nor is the address in the link'
+    )
     assert.ok(text.includes(`\n${w.codeSent()}\n`), 'and the code, to type')
+    assert.ok(text.includes('3 days'))
+    assert.equal(CODE_TTL_MS, 3 * 24 * 60 * 60 * 1000)
+    assert.notEqual(idIn(w.sent[0].text), '')
+  })
 
-    const asked = world()
-    const request = (next: unknown) =>
+  test('has the link sign in, once, as the address it was sent to, and go on to the page it was asked from', async () => {
+    const w = world()
+    const asked = (next: unknown) =>
       handleEmailStart(
         new Request('https://chordless.test/session/email/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ address: 'ann@example.com', next }),
         }),
-        asked.e,
+        w.e,
         NOW
       )
-    await request('/join/space-aaaa1111/abcdefghijklmnopqrstuv')
+    await asked('/join/space-aaaa1111/abcdefghijklmnopqrstuv')
+    const id = idIn(w.sent[0].text)
+    const signIn = (given: unknown, now = later(60_000)) =>
+      handleEmailLink(post('/session/email/link', { id: given }), w.e, now)
+    const answer = await signIn(id)
+    assert.equal(answer.status, 200)
+    const body = (await bodyOf(answer)) as { access_token: string; email: string; next: string }
+    assert.equal(body.email, 'ann@example.com')
+    assert.equal(body.next, '/join/space-aaaa1111/abcdefghijklmnopqrstuv')
+    assert.ok(await verifyAccessToken(body.access_token, w.e, later(60_000)))
+    // (used: the code is gone with it, and the link does not work twice)
+    assert.equal((await signIn(id)).status, 401)
+    assert.equal((await w.verify('ann@example.com', w.codeSent(), later(61_000))).status, 401)
+  })
+
+  test('has no link used once the code is, or a newer code is asked for, or three days have passed', async () => {
+    const w = world()
+    await w.start('ann@example.com')
+    const first = idIn(w.sent[0].text)
+    await w.verify('ann@example.com', w.codeSent(), later(1000))
+    assert.equal((await handleEmailLink(post('/x', { id: first }), w.e, later(2000))).status, 401)
+
+    await w.start('ann@example.com', later(3000))
+    const old = idIn(w.sent[1].text)
+    await w.start('ann@example.com', later(4000))
+    assert.equal((await handleEmailLink(post('/x', { id: old }), w.e, later(5000))).status, 401)
+    const current = idIn(w.sent[2].text)
     assert.equal(
-      new URLSearchParams((/#(\S+)/.exec(asked.sent[0].text) ?? [])[1]).get('n'),
-      '/join/space-aaaa1111/abcdefghijklmnopqrstuv'
+      (await handleEmailLink(post('/x', { id: current }), w.e, later(4000 + CODE_TTL_MS + 1)))
+        .status,
+      401
     )
-    // (a page of this app only: never another site)
+  })
+
+  test('refuses an id that is not one, or is not there, or was never asked for, without a query for the shape', async () => {
+    const w = world()
+    for (const id of [
+      '',
+      'short',
+      'has space and is long enough',
+      5,
+      null,
+      `${'a'.repeat(65)}`,
+      'a'.repeat(22),
+    ]) {
+      assert.equal((await handleEmailLink(post('/x', { id }), w.e, NOW)).status, 401, String(id))
+      assert.equal(
+        (await handleEmailLinkPeek(post('/x', { id }), w.e, NOW)).status,
+        401,
+        String(id)
+      )
+    }
+    const { DB: _db, ...noDb } = w.e
+    assert.equal((await handleEmailLink(post('/x', { id: 'a'.repeat(22) }), noDb, NOW)).status, 503)
+    assert.equal(
+      (await handleEmailLinkPeek(post('/x', { id: 'a'.repeat(22) }), noDb, NOW)).status,
+      503
+    )
+  })
+
+  test('lets only the request that uses the link up in, when another got there between the lookup and the use', async () => {
+    const w = world()
+    await w.start('ann@example.com')
+    const id = idIn(w.sent[0].text)
+    const racing = {
+      ...w.e,
+      DB: {
+        ...w.e.DB,
+        batch: w.e.DB.batch.bind(w.e.DB),
+        prepare(sql: string) {
+          // (the other request's use of it, just before this one's)
+          if (sql.startsWith('DELETE FROM login_codes WHERE address_hash = ? AND code = ?')) {
+            w.sql.exec('DELETE FROM login_codes')
+          }
+          return w.e.DB.prepare(sql)
+        },
+      },
+    }
+    const answer = await handleEmailLink(post('/x', { id }), racing, later(1000))
+    assert.equal(answer.status, 401)
+  })
+
+  test('shows what a link is for without using it up, for a browser that is not the app', async () => {
+    const w = world()
+    await w.start('ann@example.com')
+    const id = idIn(w.sent[0].text)
+    const peek = await handleEmailLinkPeek(post('/x', { id }), w.e, later(1000))
+    assert.deepEqual(await bodyOf(peek), {
+      address: 'ann@example.com',
+      code: w.codeSent(),
+      next: '/',
+    })
+    // (still good, for the app to use the code, or for this browser to use the link)
+    assert.equal((await handleEmailLink(post('/x', { id }), w.e, later(2000))).status, 200)
+    assert.equal((await handleEmailLinkPeek(post('/x', { id }), w.e, later(3000))).status, 401)
+  })
+
+  test('keeps the address only until it is used or has run out, and a new request clears what has', async () => {
+    const w = world()
+    await w.start('ann@example.com')
+    const rows = () =>
+      w.sql
+        .prepare('SELECT address FROM login_codes')
+        .all()
+        .map(row => ({ ...row }))
+    assert.deepEqual(rows(), [{ address: 'ann@example.com' }])
+    await w.start('bob@example.com', later(CODE_TTL_MS + 1000))
+    assert.deepEqual(rows(), [{ address: 'bob@example.com' }])
+    await w.verify('bob@example.com', w.codeSent(), later(CODE_TTL_MS + 2000))
+    assert.deepEqual(rows(), [])
+  })
+
+  test('refuses a link when the next page is not a path of the app', async () => {
+    const w = world()
+    const asked = (next: unknown, now: Date) =>
+      handleEmailStart(
+        new Request('https://chordless.test/session/email/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: 'ann@example.com', next }),
+        }),
+        w.e,
+        now
+      )
+    let at = 0
     for (const bad of [
       'https://evil.example/',
       '//evil.example',
@@ -810,21 +942,28 @@ describe('signing in with an emailed code', () => {
       5,
       null,
     ]) {
-      await request(bad)
-      assert.equal(
-        new URLSearchParams((/#(\S+)/.exec(asked.sent.at(-1)?.text ?? '') ?? [])[1]).get('n'),
-        null,
-        String(bad)
+      at += 1000
+      await asked(bad, later(at))
+      const answer = await handleEmailLink(
+        post('/x', { id: idIn(w.sent.at(-1)?.text ?? '') }),
+        w.e,
+        later(at + 1)
       )
+      assert.equal(((await bodyOf(answer)) as { next: string }).next, '/', String(bad))
     }
     assert.equal(cleanNext('/songs?q=a'), '/songs?q=a')
   })
 
-  test('keeps neither the address nor the code', async () => {
+  test('looks a row up by keyed hashes, which are not the address, the code or the link id', async () => {
     const w = world()
     await w.start('ann@example.com')
-    const rows = JSON.stringify(w.sql.prepare('SELECT * FROM login_codes').all())
-    assert.ok(!rows.includes('ann@example.com') && !rows.includes(w.codeSent()))
+    const [row] = w.sql
+      .prepare('SELECT address_hash, code_hash, link_hash FROM login_codes')
+      .all() as { address_hash: string; code_hash: string; link_hash: string }[]
+    const hashes = JSON.stringify(row)
+    assert.ok(!hashes.includes('ann@example.com'))
+    assert.ok(!hashes.includes(w.codeSent()))
+    assert.ok(!hashes.includes(idIn(w.sent[0].text)))
   })
 
   test('refuses what is not an address, and a Worker that cannot send', async () => {

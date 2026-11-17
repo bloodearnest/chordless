@@ -10,10 +10,12 @@
  *   { name: 'home', shared: true }            /?shared: the home page of what was shared by link
  *   { name: 'songs', songUuid?: string, melody?: true }  /songs, /songs/<song uuid> (?melody: the song's melody sheet, not its lyrics)
  *   { name: 'songs', search: string }        /songs?q=<search>: the list, searched
- *   { name: 'preferences' | 'account' | 'import-song' | 'import-setlist' | 'about' | 'contact' | 'new-team-space' | 'media' | 'sign-in' }
+ *   { name: 'preferences' | 'account' | 'import-song' | 'import-setlist' | 'about' | 'contact' | 'new-team-space' | 'media' }
  *                                             /account is Account and Teams (/storage still opens it);
  *                                             /account/new makes a team (team-space-wizard.ts)
  *                                             /join is a team space's invite link
+ *   { name: 'sign-in', linkId? }             /sign-in/<id>: the link in the sign-in email (a bare /sign-in
+ *                                             is the form to ask for one)
  *   { name: 'join', teamId?, code? }         /join/<space id>/<code>: the invite link itself (an older
  *                                             one has them in its #fragment, which routes ignore)
  *   { name: 'setlist', setlistId, songIndex, melody?: true } /setlist/<id> (the overview, songIndex -1)
@@ -35,19 +37,19 @@ export type PageName =
   | 'contact'
   | 'new-team-space'
   | 'media'
-  | 'sign-in'
 
 export type Route =
   | { name: PageName }
   | { name: 'home'; shared: true }
   | { name: 'join'; teamId?: string; code?: string }
+  | { name: 'sign-in'; linkId?: string }
   | { name: 'songs'; songUuid?: string; search?: string; melody?: true }
   | { name: 'setlist'; setlistId: string; songIndex: number; melody?: true }
   | { name: 'share'; fileId: string; songIndex: number }
   | { name: 'not-found'; path: string }
 
 /** Pages that are a path of their own and nothing else. */
-const PAGES: Readonly<Record<string, PageName | 'songs' | 'join'>> = {
+const PAGES: Readonly<Record<string, PageName | 'songs' | 'join' | 'sign-in'>> = {
   '/': 'home',
   '/songs': 'songs',
   '/preferences': 'preferences',
@@ -84,6 +86,7 @@ const SONGS_SONG_PATH = /^\/songs\/([^/]+)$/
 const SETLIST_PATH = /^\/setlist\/([^/]+)$/
 const SETLIST_SONG_PATH = /^\/setlist\/([^/]+)\/song\/(\d+)$/
 const JOIN_PATH = /^\/join\/([^/]+)\/([^/]+)$/
+const SIGN_IN_PATH = /^\/sign-in\/([^/]+)$/
 const SHARE_PATH = /^\/s\/([^/]+)$/
 const SHARE_SONG_PATH = /^\/s\/([^/]+)\/song\/(\d+)$/
 
@@ -136,6 +139,7 @@ export function matchRoute(location: string | { pathname: string; search?: strin
   if (page === 'home' && new URLSearchParams(search).has('shared'))
     return { name: 'home', shared: true }
   if (page === 'join') return { name: 'join' }
+  if (page === 'sign-in') return { name: 'sign-in' }
   if (page) return { name: page }
 
   // A song can be shown as its melody sheet instead of its lyrics: ?melody
@@ -163,6 +167,9 @@ export function matchRoute(location: string | { pathname: string; search?: strin
 
   const join = path.match(JOIN_PATH)
   if (join) return { name: 'join', teamId: decode(join[1]), code: decode(join[2]) }
+
+  const signIn = path.match(SIGN_IN_PATH)
+  if (signIn) return { name: 'sign-in', linkId: decode(signIn[1]) }
 
   const shareSong = path.match(SHARE_SONG_PATH)
   if (shareSong) {
@@ -201,6 +208,8 @@ export function buildUrl(route: Route): string {
       return route.teamId && route.code
         ? `/join/${encodeURIComponent(route.teamId)}/${encodeURIComponent(route.code)}`
         : '/join'
+    case 'sign-in':
+      return route.linkId ? `/sign-in/${encodeURIComponent(route.linkId)}` : '/sign-in'
     default: {
       const path = PAGE_PATHS[route.name]
       if (!path) throw new Error(`Unknown route: ${route.name}`)

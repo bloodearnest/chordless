@@ -232,12 +232,20 @@ The Worker keeps no per-user state (a team's members are the team's, in D1).
   work address). `POST /session/email/start {address, next?}` mails one email with both ways in, a link and a six-digit code, from `signin@mail.chordless.app`
   (Cloudflare Email Sending, a `send_email` binding; the subdomain's DNS is in `infra/cloudflare`);
   `POST /session/email/verify {address, code}` takes it and answers with a session as `/session/token` does.
-  The link is `/sign-in#a=<address>&c=<code>&n=<page to go on to>` (`sign-in-page.ts`): the address and code are in the
-  #fragment, so no server sees them and a mail scanner that opens the link does not use the code up; the page signs in,
-  clears the fragment, and goes on to `n` (a path of the app only: the Worker and the page both refuse another). The code
-  is for a device whose mail app opens links somewhere else (an installed app on iOS has its own storage, apart from
-  Safari's): both are in the one message, the link first. Neither the address nor the code is kept: `login_codes` (migration `0005`) holds keyed hashes (SESSION_SIGNING_KEY).
-  A code works once, for 10 minutes and five tries; five codes an hour go to one address (the same answer is given
+  The link is `/sign-in/<id>` (`sign-in-page.ts`): `id` is 128 random bits that mean nothing, and the row in `login_codes`
+  it names (migration `0006`) holds the address, the code and the page to go on to (a path of the app only: the Worker refuses
+  another), in the clear, until the link or the code is used (either ends both), a newer code replaces them, or three days are
+  up (the next request for a code deletes what has run out). Three days, and readable, because none of this is very sensitive:
+  the address is already held for as long as there is a membership or an invite, and the code is six digits with five tries.
+  A mail scanner's GET only gets the page; signing in is a POST (`/session/email/link`) the page makes, so a scanner does not
+  use the link up. **On iOS the link opens in Safari, never in an app installed from its Home Screen, which keeps its own storage:**
+  so the page asks first, and does not use the link up until told: "sign in in this browser", or "I use the installed app", which
+  copies the code (`/session/email/link/peek`, which does not use it up) and says to enter it in the app, where the form has
+  "I already have a code" (no new code, which would cancel this one). The code is for any device whose mail app opens links
+  somewhere else: both are in the one message. Of the address and code, the table also keeps keyed hashes for the typed code's
+  checks and the limits, and a keyed hash of the id.
+`login_codes` (migrations `0005`, `0006`).
+  A code works once, for 3 days and five tries; five codes an hour go to one address (the same answer is given
   after that), a sender is limited by address (10 a minute) and all senders together (30 a minute), because mail to
   addresses that do not exist bounces, and bounces get a sending domain blocked. The answer to `start` is the same for any
   address that is one. A proved address is a login of provider `email` (the address is its `sub`), and joins the account of a

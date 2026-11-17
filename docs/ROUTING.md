@@ -17,7 +17,7 @@ URLs are paths; the router doesn't use `#hashes` (a lint rule forbids them).
 | `/songs`, `/songs?q=<search>`, `/songs/<uuid>` (`?melody` on a song: its lead sheet) | `songs` | `library-view.ts` |
 | `/setlist/<id>`, `/setlist/<id>/song/<n>`, `/setlist/<id>/song/<n>?melody` | `setlist` (`songIndex` -1 is the overview; `melody: true` is the song as its lead sheet) | `setlist-view.ts` |
 | `/join/<space id>/<code>` (a team space's invite link; bare `/join` is the page for a link that has none) | `join` with `teamId` and `code` | `join-view.ts` |
-| `/sign-in` (the link in the sign-in email: `#a=<address>&c=<code>&n=<path>`; docs/SPACES.md) | `sign-in` | `sign-in-view.ts` |
+| `/sign-in/<id>` (the link in the sign-in email; bare `/sign-in` is the form to ask for one: docs/SPACES.md) | `sign-in` with `linkId` | `sign-in-view.ts` |
 | `/s/<id>`, `/s/<id>/song/<n>` (a received share, read-only: docs/SHARING.md) | `share` | `share-view.ts` |
 | `/account` (Account and Teams, docs/ACCOUNT.md; `/storage` opens it too), `/account/new`, `/media`, `/about`, `/contact`, `/preferences`, `/import-song`, `/import-setlist` | by name | `*-view.ts` |
 | anything else | `not-found` | `not-found-view.ts` |

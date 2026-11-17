@@ -14,7 +14,7 @@ Not designed or checked against the code yet. What is known from the design (202
 | Blob key (`JWE_ENCRYPTION_KEY`) | Worker secret | The one with consequences, see below |
 | Session signing key (`SESSION_SIGNING_KEY`) | Worker secret | Every access token stops working at once (15 minutes of life at most): pages renew them with their refresh tokens, which are in D1 and are unaffected, so nobody signs in again. Change it with a deploy; no overlap is needed. Set it before the deploy that first needs it |
 | Refresh tokens | D1 `sessions`, hashed (sha256) | Never readable from the database. A stolen one is good until it is used by its owner (reuse revokes the session) or the session is revoked; a leak of the table gives nothing to present |
-| Emailed codes | D1 `login_codes`, keyed hashes of address and code | Never readable from the table. Six digits are guessable, so a code lasts 10 minutes and five tries, and five go to an address an hour; changing the signing key ends any code out |
+| Emailed codes and links | D1 `login_codes`: keyed hashes for checking, and the address and code in the clear for up to 3 days (so the link page can show the code) | Six digits are guessable, so a code has five tries, and five go to an address an hour; the link's id is 128 random bits. The row is deleted when used, replaced, or on the next request after three days. Accepted: the address is held for as long as there is a membership or invite anyway |
 | Service account key | Worker secret | Invisible to members: mint a new key, deploy it, delete the old one. Nothing stored to migrate (access tokens are minted in memory) |
 
 **The blob key.** Blobs carry a `kid`, so the Worker can hold old and new keys together, decrypt by
