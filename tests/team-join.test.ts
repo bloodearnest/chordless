@@ -361,7 +361,8 @@ describe('the join page', () => {
     button('Join the team space').click()
     await until(() => text().includes('You have joined'), 'to be joined')
     expect(text()).to.contain('have not come across yet')
-    expect(text()).to.contain('Drive is not answering')
+    expect(text()).to.contain("Couldn't get the team's songs and setlists.")
+    expect(text()).to.not.contain('Drive is not answering')
 
     syncFails = false
     button('Try again').click()
@@ -489,7 +490,9 @@ describe('the join page', () => {
     await until(() => text().includes('Join the team space'), 'the offer')
     button('Join the team space').click()
     await until(() => text().includes("Couldn't join"), 'the failure')
-    expect(text()).to.contain('Error 500')
+    // (the Worker failing is not for them to read: they are told what could not be done)
+    expect(text()).to.contain("Couldn't join the team space.")
+    expect(text()).to.not.contain('Error 500')
 
     button('Try again').click()
     await until(() => text().includes('Join the team space'), 'the offer again')
@@ -523,7 +526,8 @@ describe('the join page', () => {
     await until(() => text().includes('Sign in with Google'), 'the sign-in')
     button('Sign in with Google').click()
     await until(() => text().includes("Couldn't join"), 'the failure')
-    expect(text()).to.contain('access_denied')
+    expect(text()).to.contain("Couldn't sign in.")
+    expect(text()).to.not.contain('access_denied')
   })
 
   /** What the Worker says the invite is for: the default is an address of the person signed in, which Google does not say is its own */

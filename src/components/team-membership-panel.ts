@@ -3,7 +3,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space, TeamLink } from '../js/data-types.ts'
 import { leaveSpace, roleWithArticle, stopSharing } from '../js/team-spaces.ts'
 import { t } from '../js/text.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { whatToSay } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
@@ -74,7 +74,7 @@ export class TeamMembershipPanel extends LitElement {
     try {
       await work()
     } catch (error) {
-      this._error = errorMessage(error)
+      this._error = whatToSay(error, t('membership-failed'))
     } finally {
       this._busy = false
     }

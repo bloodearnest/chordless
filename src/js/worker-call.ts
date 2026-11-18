@@ -6,16 +6,22 @@
  */
 
 /** An answer from the Worker that was not a success, with its HTTP status */
-export class TeamError extends Error {
+export class TeamError extends UserError {
   status: number
   constructor(message: string, status: number) {
     super(message)
     this.name = 'TeamError'
     this.status = status
   }
+
+  /** The Worker says in words why it refuses a request ("This invite is not valid"); a failure of its own is not for people */
+  override get forPeople(): boolean {
+    return this.status >= 400 && this.status < 500
+  }
 }
 
 import { timedFetch } from './telemetry/telemetry.ts'
+import { UserError } from './utils/errors.ts'
 
 export interface WorkerCall {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'

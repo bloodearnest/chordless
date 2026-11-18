@@ -25,7 +25,7 @@ import {
 import { inviteLink, roleLabel } from '../js/team-spaces.ts'
 import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { whatToSay } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './invite-send.ts'
@@ -276,7 +276,7 @@ export class PeopleList extends LitElement {
       await work()
       await this.load()
     } catch (error) {
-      this._error = errorMessage(error)
+      this._error = whatToSay(error, t('people-failed'))
     } finally {
       this._busy = false
     }

@@ -3,7 +3,8 @@ import { ifDefined } from 'lit/directives/if-defined.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { derivePadSetName, listPadDestinations, uploadPadSet } from '../js/pad-set-service.ts'
 import { getCurrentSpace } from '../js/space.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { t } from '../js/text.ts'
+import { whatToSay } from '../js/utils/errors.ts'
 import { buttonStyles, fieldStyles } from './shared-styles.ts'
 
 /** A pad set was uploaded (to this device and to Google Drive when signed in) */
@@ -153,7 +154,7 @@ export class PadSetUpload extends LitElement {
     this._error = ''
 
     if (!this._selectedFile) {
-      this._error = 'Please select a ZIP file to upload.'
+      this._error = t('pads-select-zip')
       return
     }
 
@@ -175,7 +176,7 @@ export class PadSetUpload extends LitElement {
     } catch (error) {
       console.error('[PadSetUpload] Upload failed:', error)
       /* v8 ignore next -- only for an error with no message, which the upload does not throw */
-      this._error = errorMessage(error) || 'Failed to upload pad set.'
+      this._error = whatToSay(error, t('pads-upload-failed'))
     } finally {
       this._uploading = false
       this._progress = null

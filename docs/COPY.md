@@ -58,6 +58,24 @@ One level only (no tag inside a tag), and only the names the code gives are tags
 shown as it is, and so is anything in a value given to the message (a Team called `<b>`). In the dev
 editor the message is edited with its tags in it.
 
+## Errors
+
+An error has two possible readers, and says what it says for one of them.
+
+- **A message written for the person** is a `UserError` (`js/utils/errors.ts`) made from a message of the
+  catalogue: `throw new UserError(t('pads-no-name'))`. "Please provide a pad set name." is for them, and
+  shown as it is. The Worker's refusal of a request (a `TeamError` with a 4xx status: "This invite is not
+  valid") is one too, in the Worker's own words.
+- **Any other error is for a developer** ("Upload error: 403", "The share key is the wrong length", a
+  failure of the Worker's own, Google's `access_denied`). Where a page has no place for it, say what could
+  not be done in words, from the catalogue, and keep the error itself for the console and the reports:
+  `this._error = whatToSay(error, t('licence-save-failed'))`. A toast does the same with the error behind
+  "Details" (`details: errorMessage(error)`).
+
+So a person is never given text only a developer can use, and one who is given a reason is given it in
+words that are theirs to edit. Do not decide what to do by what an error's text says (`message.includes(…)`):
+check its type.
+
 ## Changing a message
 
 By hand in the file, or in the running app (`just serve`, dev only):
@@ -97,7 +115,8 @@ what a role is called (`role-…`) and how long ago a sync was (`sync-time-…`)
 pitch, tuning, chords, screen, the highlight colour, fonts, theme and text size), About, the menu and the media
 player's settings, and the first time (the first-use questions, the welcome card, and why to install), and importing songs (the page, the SongSelect bookmarklet and its help, and what is said of each song's melody range, and the choices when a song is already in the library), the header, the key, capo, instrument and tuning pickers, a song's settings and the media player, a setlist's details and a song's (the forms and dialogs, and how long ago something was), the pages (their headings, the titles of the browser's tabs, the links at the bottom, the shared setlist's notes), making a Team (the wizard, inviting people, its CCLI licence number and where its files are reached from), deleting a Team or space everywhere, exporting and importing a space, and importing a setlist from an email (what the review says, the leader matching, the changes to an existing setlist; the warning about a doubtful date is made in `js/email-setlist.ts` and still in code). Where a list of options has its words in a module (`PLAYS`, `PITCHES`, `TUNINGS`,
 `FONT_CHOICES`, `TINT_PRESETS`), each `label` is a getter that asks for its message, so that an edit in the
-dev editor shows at once. Still in the code: the other
+dev editor shows at once. Errors follow the policy above in the places that print them whole (the Team wizard, the panels of a
+Team, the Drive sync panel, the pad sets, the export panel). Still in the code: the other
 dialogs and panels, the sync's progress messages
 (`js/sync/`), labels, the text `describeSetlistChange` makes, and the Worker's emails.
 

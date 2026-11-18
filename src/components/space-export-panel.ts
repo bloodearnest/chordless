@@ -13,7 +13,7 @@ import {
 } from '../js/space-export.ts'
 import { planReset, type ResetPlan, resetToExport } from '../js/space-restore.ts'
 import { t } from '../js/text.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { errorMessage, whatToSay } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
 
 /** The pad sets in Drive that an export could include, with their sizes */
@@ -202,7 +202,7 @@ export class SpaceExportPanel extends LitElement {
       this._reset = null
     } catch (error) {
       this._pending = null
-      this._message = { text: errorMessage(error), kind: 'error' }
+      this._message = { text: whatToSay(error, t('export-read-failed')), kind: 'error' }
     }
   }
 

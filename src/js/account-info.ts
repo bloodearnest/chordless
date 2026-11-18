@@ -4,6 +4,8 @@
  * forgotten when they log out.
  */
 
+import { TeamError } from './worker-call.ts'
+
 export interface AccountInfo {
   /** The name they gave (or Google gave at a first sign-in); null if they have none yet */
   name: string | null
@@ -59,7 +61,8 @@ async function call(method: 'GET' | 'PUT', body?: object): Promise<AccountInfo> 
     body: body ? JSON.stringify(body) : undefined,
   })
   const answer = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(answer.error || response.statusText)
+  // (the Worker's refusal of a request, in words for the person: a 4xx is shown, a failure of its own is not)
+  if (!response.ok) throw new TeamError(answer.error || response.statusText, response.status)
   return keep(answer as AccountInfo)
 }
 

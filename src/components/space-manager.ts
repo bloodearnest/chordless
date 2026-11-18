@@ -11,7 +11,7 @@ import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
 import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { whatToSay } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './drive-sync-panel.ts'
@@ -157,7 +157,7 @@ export class SpaceManager extends LitElement {
       this.dispatchEvent(new SpaceGoneEvent(wasCurrent))
     } catch (error) {
       console.error('[SpaceManager] Failed to delete the space:', error)
-      this._error = errorMessage(error)
+      this._error = whatToSay(error, t('error-something'))
     }
   }
 

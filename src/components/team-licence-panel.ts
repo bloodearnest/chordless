@@ -3,7 +3,7 @@ import type { LicenceChange } from '../js/ccli-licence.ts'
 import type { Space } from '../js/data-types.ts'
 import { mayEditLicence, readLicence, saveLicence } from '../js/space-licence.ts'
 import { t } from '../js/text.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { whatToSay } from '../js/utils/errors.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 
 /**
@@ -70,7 +70,7 @@ export class TeamLicencePanel extends LitElement {
       this._typed = ccliLicence ?? ''
       this._history = history ?? null
     } catch (error) {
-      this._error = errorMessage(error)
+      this._error = whatToSay(error, t('licence-load-failed'))
     }
     this._loaded = true
   }
@@ -92,7 +92,7 @@ export class TeamLicencePanel extends LitElement {
       await this._load(space)
       this._saved = true
     } catch (error) {
-      this._error = errorMessage(error)
+      this._error = whatToSay(error, t('licence-save-failed'))
     }
     this._busy = false
   }

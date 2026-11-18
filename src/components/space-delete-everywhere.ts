@@ -8,7 +8,7 @@ import { deleteSpaceEverywhere, mayDeleteEverywhere } from '../js/space-deletion
 import type { SpaceSummary } from '../js/space-summary.ts'
 import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { errorMessage, whatToSay } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles } from './shared-styles.ts'
@@ -122,7 +122,7 @@ export class SpaceDeleteEverywhere extends LitElement {
       this._modal.value?.close()
       this.dispatchEvent(new SpaceDeletedEvent(wasCurrent))
     } catch (error) {
-      this._error = errorMessage(error)
+      this._error = whatToSay(error, t('de-delete-failed'))
     }
     this._busy = ''
   }

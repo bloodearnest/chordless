@@ -18,6 +18,7 @@ import { trackSync } from './sync-status.ts'
 import { teamApi } from './team-client.ts'
 import type { TeamRole } from './team-roles.ts'
 import { t } from './text.ts'
+import { UserError } from './utils/errors.ts'
 
 /** What making a team space needs from Drive: a folder inside the one the person picked */
 export interface TeamFolders {
@@ -47,9 +48,9 @@ async function makeTeamSpace(
   options: { ccliLicence?: string }
 ): Promise<Space> {
   const teamName = name.trim()
-  if (!teamName) throw new Error('A team space needs a name')
+  if (!teamName) throw new UserError(t('team-needs-name'))
   const stored = await getStoredBlob()
-  if (!stored) throw new Error('Sign in with Google first')
+  if (!stored) throw new UserError(t('team-sign-in-first'))
 
   const ccliLicence = cleanLicence(options.ccliLicence)
   const rootRef = await folders.createTeamFolder(parentId, teamFolderName(teamName))
@@ -230,7 +231,7 @@ export function inviteSendLinks(
  */
 export async function returnToOwnSignIn(teamId: string): Promise<void> {
   const stored = await getStoredBlob()
-  if (!stored) throw new Error('Sign in with Google first')
+  if (!stored) throw new UserError(t('team-sign-in-first'))
   await teamApi.replaceCredential(teamId, stored.blob)
 }
 

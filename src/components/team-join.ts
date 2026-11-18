@@ -21,7 +21,7 @@ import {
   syncTeamSpace,
 } from '../js/team-spaces.ts'
 import { t } from '../js/text.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { whatToSay } from '../js/utils/errors.ts'
 import { TeamError } from '../js/worker-call.ts'
 import './email-code-sign-in.ts'
 import './progress-bar.ts'
@@ -312,7 +312,7 @@ export class TeamJoin extends LitElement {
         /* v8 ignore next -- authorizeWithGoogle throws Errors; the fallback is for anything else thrown */
         'chordless.join.sign_in_error': error instanceof Error ? error.name : 'unknown',
       })
-      this._message = errorMessage(error)
+      this._message = whatToSay(error, t('join-sign-in-failed'))
       this._state = 'failed'
       return
     }
@@ -333,7 +333,7 @@ export class TeamJoin extends LitElement {
       await setCurrentSpace(joined.id, joined.name)
       this._role = roleWithArticle((joined.team as TeamLink).role)
     } catch (error) {
-      this._message = this._explain(error)
+      this._message = this._explain(error, t('join-failed'))
       if (error instanceof SignInExpiredError) this._answer = 'yes'
       this._state = error instanceof SignInExpiredError ? 'sign-in' : 'failed'
       return
@@ -351,14 +351,14 @@ export class TeamJoin extends LitElement {
         this._progress = progress
       })
     } catch (error) {
-      this._syncError = this._explain(error)
+      this._syncError = this._explain(error, t('join-sync-failed'))
     }
     this._progress = null
     this._state = 'joined'
   }
 
   /** What to tell them of a refusal */
-  _explain(error: unknown): string {
+  _explain(error: unknown, what: string): string {
     if (error instanceof TeamError && error.status === 403) {
       return `This invite was sent to a different Google account${
         this._email ? `, not ${this._email}` : ''
@@ -367,7 +367,7 @@ export class TeamJoin extends LitElement {
     if (error instanceof TeamError && error.status === 404) {
       return t('join-not-valid')
     }
-    return errorMessage(error)
+    return whatToSay(error, what)
   }
 
   /** The space is on this device: start the app afresh in it */

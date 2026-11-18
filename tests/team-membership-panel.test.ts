@@ -158,7 +158,7 @@ describe('the team membership panel', () => {
     })
 
     it('says what the Worker said when it refuses', async () => {
-      routes[`DELETE /api/space/${TEAM}`] = () => json({ error: 'Not now' }, 500)
+      routes[`DELETE /api/space/${TEAM}`] = () => json({ error: 'Not now' }, 403)
       await open(await space('owner'))
       button('Stop sharing').click()
       await answer(true)
