@@ -19,22 +19,25 @@ describe('tuning-selector', () => {
 
   it('shows the setlist’s own tuning, or the device’s when it has none', async () => {
     await show({ deviceTuning: 1 })
-    expect(selector._displayValue()).to.equal('Half step down')
+    expect(selector._displayValue()).to.equal('E♭ standard (-1)')
     selector.value = '2'
-    expect(selector._displayValue()).to.equal('Whole step down')
+    expect(selector._displayValue()).to.equal('D standard (-2)')
     selector.value = '0'
-    expect(selector._displayValue()).to.equal('Standard')
+    expect(selector._displayValue()).to.equal('Standard (E)')
   })
 
-  it('offers the device’s tuning first, naming it, then the three', async () => {
+  it('offers the device’s tuning first, naming it, then each tuning', async () => {
     await show({ deviceTuning: 2 })
     expect(
       selector._options().map(option => [option.value, option.label, option.hint])
     ).to.deep.equal([
-      ['', 'Same as my device', 'Whole step down'],
-      ['0', 'Standard', ''],
-      ['1', 'Half step down', ''],
-      ['2', 'Whole step down', ''],
+      ['', 'Same as my device', 'D standard (-2)'],
+      ['0', 'Standard (E)', ''],
+      ['1', 'E♭ standard (-1)', ''],
+      ['2', 'D standard (-2)', ''],
+      ['3', 'D♭ standard (-3)', ''],
+      ['4', 'C standard (-4)', ''],
+      ['5', 'B standard (-5)', ''],
     ])
   })
 

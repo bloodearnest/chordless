@@ -166,19 +166,19 @@ describe('setlist-overview', () => {
       expect(row(overview)).to.equal(null)
       overview.deviceTuning = 1
       await overview.updateComplete
-      expect(row(overview)?._displayValue()).to.equal('Half step down')
+      expect(row(overview)?._displayValue()).to.equal('E♭ standard (-1)')
       // (a setlist standard in itself, over a device that is not: standard, so nothing to say)
       overview.tuning = 0
       await overview.updateComplete
       expect(row(overview)).to.equal(null)
       overview.tuning = 2
       await overview.updateComplete
-      expect(row(overview)?._displayValue()).to.equal('Whole step down')
+      expect(row(overview)?._displayValue()).to.equal('D standard (-2)')
       // (and in edit mode it is there to be changed, whatever it is)
       overview.tuning = 0
       overview.editMode = true
       await overview.updateComplete
-      expect(row(overview)?._displayValue()).to.equal('Standard')
+      expect(row(overview)?._displayValue()).to.equal('Standard (E)')
     })
 
     it('shows the setlist’s own tuning, or the device’s when it has none, and can be changed in edit mode', async () => {
@@ -186,10 +186,10 @@ describe('setlist-overview', () => {
       overview.showTuning = true
       overview.deviceTuning = 1
       await overview.updateComplete
-      expect(row(overview)?._displayValue()).to.equal('Half step down')
+      expect(row(overview)?._displayValue()).to.equal('E♭ standard (-1)')
       overview.tuning = 2
       await overview.updateComplete
-      expect(row(overview)?._displayValue()).to.equal('Whole step down')
+      expect(row(overview)?._displayValue()).to.equal('D standard (-2)')
       expect(row(overview)?.editMode).to.equal(false)
       overview.editMode = true
       await overview.updateComplete

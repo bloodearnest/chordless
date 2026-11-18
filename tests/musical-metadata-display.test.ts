@@ -40,11 +40,11 @@ describe('musical-metadata-display', () => {
     expect(items(await show({ keyValue: 'G', capoValue: 2, tuning: 1 }))).to.deep.equal([
       'Key: G',
       'Capo: 2',
-      'Tuning: Half step down',
+      'Tuning: E♭ standard (-1)',
     ])
     expect(items(await show({ keyValue: 'G', tuning: 2 }))).to.deep.equal([
       'Key: G',
-      'Tuning: Whole step down',
+      'Tuning: D standard (-2)',
     ])
     expect(items(await show({ keyValue: 'G', tuning: 0 }))).to.deep.equal(['Key: G'])
   })

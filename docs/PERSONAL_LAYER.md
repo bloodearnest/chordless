@@ -118,10 +118,10 @@ preset that sets them, not a fact kept beside them.) A person with the capo on b
 who chose lyrics only a singer, anyone else "Other".
 
 **Guitarist.** Two things move the shapes, and they add:
-- **Tuning**, for a guitar tuned down: standard, half step down, whole step down. A device default
+- **Tuning**, for a guitar tuned down: standard, or down from E♭ standard (-1) to B standard (-5). A device default
   ("I always tune down"), and one for **this setlist** ("tuned down tonight") that wins over it.
 - **Capo**, per song, 0 to 11, as now. It is added to the tuning, and the song's header shows the total, so
-  it is clear what is being applied: tuned a half step down with a capo 2 plays as a capo 1.
+  it is clear what is being applied: tuned to E♭ standard with a capo 2 plays as a capo 1.
 
 **Transposing instrument.** The **instrument pitch**: Concert, B♭, E♭ or F (for the chords: a B♭ horn
 reads up a whole step, an E♭ up a sixth, an F up a fifth). A device default ("I play alto sax"), one for

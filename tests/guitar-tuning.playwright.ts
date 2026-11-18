@@ -17,23 +17,23 @@ test('a guitarist tunes down for a setlist, in edit mode, and the chords move up
 
   // (it is changed in edit mode, as the rest of the setlist's settings are, where it is always there)
   await enterEditMode(page)
-  await expect(tuning).toHaveText('Standard')
+  await expect(tuning).toHaveText('Standard (E)')
   await tuning.click()
-  await page.getByRole('option', { name: /Half step down/ }).click()
-  await expect(tuning).toHaveText('Half step down')
+  await page.getByRole('option', { name: /E♭ standard (-1)/ }).click()
+  await expect(tuning).toHaveText('E♭ standard (-1)')
   // (out of edit mode it is still shown, as it is not standard, and cannot be changed)
   await page.locator('#app-header').getByRole('button', { name: 'Toggle edit mode' }).click()
-  await expect(tuning).toHaveText('Half step down')
+  await expect(tuning).toHaveText('E♭ standard (-1)')
   await expect(tuning).toHaveCSS('pointer-events', 'none')
 
   // Alpha is in G: the shapes are a half step up, in A flat
   await page.locator('song-card').first().click()
-  await expect(page.locator('#musical-metadata')).toContainText('Tuning: Half step down')
+  await expect(page.locator('#musical-metadata')).toContainText('Tuning: E♭ standard (-1)')
   await expect(page.locator('#song-0 song-display').getByText('Ab').first()).toBeVisible()
 
   // (and it is kept on this device: reloaded, it is still there)
   await page.goto(url)
   await expect(
     page.locator('setlist-overview').getByRole('button', { name: /^Tuning/ })
-  ).toHaveText('Half step down')
+  ).toHaveText('E♭ standard (-1)')
 })

@@ -155,9 +155,12 @@ describe('app-preferences', () => {
       const select = control<HTMLSelectElement>(el, '#tuning')
       expect(select.value).to.equal('0')
       expect([...select.options].map(option => option.textContent?.trim())).to.deep.equal([
-        'Standard',
-        'Half step down',
-        'Whole step down',
+        'Standard (E)',
+        'E♭ standard (-1)',
+        'D standard (-2)',
+        'D♭ standard (-3)',
+        'C standard (-4)',
+        'B standard (-5)',
       ])
       select.value = '1'
       select.dispatchEvent(new Event('change'))
