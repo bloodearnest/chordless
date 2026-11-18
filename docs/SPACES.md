@@ -93,8 +93,8 @@ The CCLI licence number and SongSelect's terms are in [CCLI.md](CCLI.md).
   (none on a personal space still called "Personal"), and the person's role in a Team; the button is "Create a new Team" and the page that lists them is "Account
   and Teams" (`docs/ACCOUNT.md`). Roles read owner, admin, worship leader (the `writer` role) and
   team member (the `reader` role). The code, the routes of the API and these docs keep "space".
-- Each space also has its own name (a team space is named by its owner; the personal space defaults
-  to the account name, as `first-time-auth.ts` does today). The kind shows as a small label beside
+- Each space also has its own name (a team space is named by its owner; the personal space is "Personal",
+  and is not renamed to the person's name: decided 2026-11-18). The kind shows as a small label beside
   the name, and only when the user has more than one space.
 - Not "Personal Library": the Library page (`/songs`) is the song list and every space has its own,
   so keep "Library" for the page only.
@@ -155,8 +155,8 @@ a re-pointing of the folder.
   folder).
 - localStorage caches the current space's id (`current-space-id`) and name
   (`current-space-name`) for synchronous rendering.
-- On first load a space named "Personal" is created and made current. On a first Google
-  sign-in, a space still called "Personal" is renamed to the user's name (metadata only).
+- On first load a space named "Personal" is created and made current. It keeps that name (before 2026-11-18 a first Google
+  sign-in renamed it to the user's name; a space already renamed keeps its name, and so its Drive folder).
 - **Deleting a space:** from this device only, or everywhere (the Drive folder to the trash):
   see "Deleting a space", below.
 - Spaces are completely isolated: songs and setlists belong to exactly one; switching (a tab, or
@@ -718,7 +718,7 @@ never meet a "Personal" space they did not ask for.
 **Tabs under the header** of the Setlists, Library and Add Song pages, replacing the title-only
 "Setlists - Gateway Church" as the way to see and change space.
 
-- One tab per place: each Team (by its own name), Personal (by the person's name once signed in),
+- One tab per place: each Team (by its own name), Personal,
   and **Shared** (the `shared-with-me` database, `docs/SHARING.md`). A small Team/Personal label sits
   beside the name, so two teams are never both "Team".
 - **Only places that exist.** One place means no tab bar; Shared appears only when something was shared. **A Personal
@@ -752,8 +752,8 @@ never meet a "Personal" space they did not ask for.
   nothing else, gets an empty one, not made current but with its tab, so there is somewhere
   private for their own sets. A device with no spaces yet is left alone (first use makes one; an invite's first contact
   makes none). Someone who deletes their only Personal space has one again at the next start.
-- Check first what else assumes a Personal space: the sign-in rename of "Personal" to the Google
-  name, the repair page, the export.
+- Check first what else assumes a Personal space: the repair page, the export. (The sign-in rename of "Personal" to the Google name
+  is gone: 2026-11-18.)
 - The Import page's "Import into" picker offers every space, as every space has a tab.
 
 **Teams on another device** (built 2026-11-12; `team-memberships.ts`, `GET /api/spaces`)

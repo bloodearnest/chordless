@@ -6,19 +6,14 @@
 import '../components/nav-menu.ts'
 import { AppRouter, RouteChangeEvent } from './app-router.ts'
 import { appUpdate } from './app-update.ts'
-import { checkFirstTimeAuth } from './first-time-auth.ts'
 import { maybeShowFirstUseSetup } from './first-use.ts'
 import './install.ts'
+import { maybeAskName } from './account-name.ts'
 import { listenForLaunches } from './launch.ts'
 import { startMediaPlayer } from './media-player-loader.ts'
 import { setRouter } from './navigation.ts'
 import { ensurePersonalSpace, SpaceChangeEvent } from './space.ts'
 import { views } from './views/registry.ts'
-
-// The first sign-in renames the space: before anything shows its name. (A page the service worker
-// does not control yet, the first visit or a hard reload, reads the sign-in itself: a quick read
-// of the auth database, empty on a first visit.)
-await checkFirstTimeAuth()
 
 const outlet = document.getElementById('view-outlet')
 if (!outlet) throw new Error('The page has no #view-outlet')
@@ -37,6 +32,8 @@ await router.start()
 
 // The one-time question of how they read a song, on whatever page they arrive at
 void maybeShowFirstUseSetup()
+// Someone signed in with no name is asked for one (once a visit): a Google sign-in need not say one, an emailed code never does
+void maybeAskName()
 // Someone who joined a Team and nothing else is given a Personal space now (not on the page of their first invite)
 void ensurePersonalSpace().catch(error =>
   console.warn('[Space] Could not make a Personal space:', error)

@@ -1,12 +1,5 @@
 import { expect } from '@open-wc/testing'
-import {
-  deleteBlob,
-  exportBlobBackup,
-  getBlob,
-  importBlobBackup,
-  initAuthDB,
-  storeBlob,
-} from '../src/js/auth-db.ts'
+import { deleteBlob, getBlob, initAuthDB, storeBlob } from '../src/js/auth-db.ts'
 import { requestResult } from '../src/js/utils/idb.ts'
 import { deleteDatabase } from './test-helpers.ts'
 
@@ -25,33 +18,6 @@ describe('auth-db', () => {
     expect((await getBlob())?.metadata).to.deep.equal({})
     await deleteBlob()
     expect(await getBlob()).to.equal(undefined)
-  })
-
-  it('exports the blob as a backup, and imports it again', async () => {
-    try {
-      await exportBlobBackup()
-      expect.fail('should have thrown')
-    } catch (error) {
-      expect((error as Error).message).to.equal('No auth blob found')
-    }
-    await storeBlob('secret', { id_token: 't' })
-    const backup = await exportBlobBackup()
-    expect(backup.version).to.equal(1)
-    expect(backup.blob).to.equal('secret')
-    await deleteBlob()
-    await importBlobBackup(backup)
-    expect((await getBlob())?.metadata.id_token).to.equal('t')
-  })
-
-  it('refuses a backup of the wrong shape', async () => {
-    for (const bad of [null, undefined, {}, { version: 2, blob: 'x' }, { version: 1 }] as const) {
-      try {
-        await importBlobBackup(bad as never)
-        expect.fail('should have thrown')
-      } catch (error) {
-        expect((error as Error).message).to.equal('Invalid backup format')
-      }
-    }
   })
 
   it('rejects with the error of a request that fails', async () => {

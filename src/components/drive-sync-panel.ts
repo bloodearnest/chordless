@@ -2,7 +2,6 @@ import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
-import { nameSpaceBeforeSync } from '../js/first-time-auth.ts'
 import { formatSyncTime, lastSyncOf, recordSync } from '../js/last-sync.ts'
 import { rich } from '../js/rich-text.ts'
 import { getCurrentSpace } from '../js/space.ts'
@@ -202,7 +201,6 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: t('drive-sync-starting-reset') }
 
     try {
-      await nameSpaceBeforeSync(this.space)
       const { id, name } = this.space
       const orchestrator = await createSyncOrchestrator(name, id)
 
@@ -246,7 +244,6 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: t('drive-sync-starting-over') }
 
     try {
-      await nameSpaceBeforeSync(this.space)
       const { id, name } = this.space
       await new SyncOrchestrator(name, id).startOverInDrive(progress => {
         this.syncProgress = progress
@@ -280,7 +277,6 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: t('drive-sync-replacing') }
 
     try {
-      await nameSpaceBeforeSync(this.space)
       const { id, name } = this.space
       await new SyncOrchestrator(name, id).resetFromFolderByName(progress => {
         this.syncProgress = progress

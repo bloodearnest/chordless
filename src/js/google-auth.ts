@@ -29,7 +29,8 @@
  * allowing direct browser-to-Drive API calls for better performance and offline support.
  */
 
-import type { AuthMetadata, BlobBackup, StoredBlob, StoredSession, StoredUser } from './auth-db.ts'
+import { forgetAccount } from './account-info.ts'
+import type { AuthMetadata, StoredBlob, StoredSession, StoredUser } from './auth-db.ts'
 import {
   type AuthMessageData,
   type AuthMessageType,
@@ -255,6 +256,7 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
           import('./team-memberships.ts').then(({ checkTeamMemberships }) =>
             checkTeamMemberships({ force: true })
           )
+          askForName()
 
           resolve({ blob, access_token, expires_in, user: normalizedUser || user })
         } catch (error) {
@@ -301,6 +303,11 @@ export class GoogleInUseError extends Error {
 export async function isEmailOnly(): Promise<boolean> {
   const stored = await getStoredBlob()
   return !!stored && !stored.blob
+}
+
+/** Ask for their name, if they have none, now they have signed in (it waits for the join page to finish) */
+function askForName(): void {
+  import('./account-name.ts').then(({ maybeAskName }) => maybeAskName())
 }
 
 /** Why a code was not taken (the Worker's `reason`), or that it could not be asked */
@@ -399,6 +406,7 @@ async function keepEmailSession(
   // (the teams this person is in are looked for in the background)
   const { checkTeamMemberships } = await import('./team-memberships.ts')
   void checkTeamMemberships({ force: true })
+  askForName()
 }
 
 /**
@@ -708,10 +716,10 @@ export async function storeSignIn(blob: string, metadata: AuthMetadata): Promise
 /**
  * Logout: forget the sign-in on this device (the blob in the service worker), and nothing more.
  * Google keeps one grant for the account and this app, so revoking the refresh token to end this
- * device's sign-in ends every other device's too (their next refresh is `invalid_grant`): that is
- * `revokeAccess()`, asked for on its own.
+ * device's sign-in would end every other device's too (their next refresh is `invalid_grant`): it is not done.
  */
 export async function logout(): Promise<void> {
+  forgetAccount()
   // (the session ends at the Worker too, if it can be reached; the device is signed out whatever happens)
   const session = (await getStoredBlob())?.metadata.session
   if (session) {
@@ -730,66 +738,20 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * Logout, and ask the auth proxy to revoke the access at Google. That ends the sign-in on every
- * device with this Google account, and needs the network: offline, or if Google does not answer,
- * this device is still signed out and the result says the access was not revoked.
- * @returns whether Google revoked the access
+ * Turn Personal-space sync off on this device: the Google sign-in (the blob, and so Drive) is forgotten, and the Chordless
+ * session stays, so they are still signed in, as by email alone. Nothing is revoked at Google: Google keeps one grant for the
+ * account and this app, so revoking it would end every other device's sync too (their next refresh is `invalid_grant`).
+ * That is done at myaccount.google.com/permissions, and the Account page says so.
  */
-export async function revokeAccess(): Promise<{ revoked: boolean }> {
+export async function disableGoogleSync(): Promise<void> {
   const stored = await getStoredBlob()
-  await logout()
-  if (!stored?.blob && !stored?.metadata.session) return { revoked: false }
-
-  try {
-    const revoked = await fetch(`${AUTH_PROXY_URL}/session/logout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        blob: stored.blob || undefined,
-        refresh_token: stored.metadata.session?.refresh_token,
-      }),
-      signal: AbortSignal.timeout(10_000),
-    })
-    return { revoked: revoked.ok }
-  } catch (error) {
-    console.warn('[GoogleAuth] Could not revoke the access at Google:', error)
-    return { revoked: false }
-  }
-}
-
-/**
- * Export blob as backup for user to save
- */
-export async function exportBlobBackup(): Promise<BlobBackup> {
-  const response = await sendToServiceWorker('EXPORT_BLOB')
-  if (!response.success || !response.backup) {
-    throw new Error(response.error || 'Failed to export blob')
-  }
-  return response.backup
-}
-
-/**
- * Import blob from backup
- */
-export async function importBlobBackup(backup: Partial<BlobBackup>): Promise<void> {
-  await sendToServiceWorker('IMPORT_BLOB', { backup })
-}
-
-/**
- * Download blob backup as JSON file
- */
-export async function downloadBlobBackup(): Promise<void> {
-  const backup = await exportBlobBackup()
-
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `chordless-auth-backup-${new Date().toISOString().split('T')[0]}.json`
-  a.click()
-
-  URL.revokeObjectURL(url)
+  if (!stored?.blob) return
+  const { access_token: _access, expires_at: _expires, id_token: _id, ...kept } = stored.metadata
+  const response = await sendToServiceWorker('STORE_BLOB', {
+    blob: '',
+    metadata: { ...kept, scope: '' },
+  })
+  if (!response.success) throw new Error(response.error || 'Failed to turn the sync off')
 }
 
 /**

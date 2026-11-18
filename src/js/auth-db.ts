@@ -48,14 +48,6 @@ export interface StoredBlob {
   updated_at: string
 }
 
-/** A blob exported for the user to keep */
-export interface BlobBackup {
-  version: 1
-  exported_at: string
-  blob: string
-  metadata: AuthMetadata
-}
-
 const STORES = {
   BLOB: 'auth-blob', // Stores the encrypted token blob
   // A queue of Drive invite/revoke operations that were never used: the store is still made, so
@@ -139,34 +131,4 @@ export async function deleteBlob(): Promise<void> {
   await requestResult(store.delete('current'))
 
   db.close()
-}
-
-/**
- * Export blob as backup (for user to save)
- */
-export async function exportBlobBackup(): Promise<BlobBackup> {
-  const data = await getBlob()
-  if (!data) {
-    throw new Error('No auth blob found')
-  }
-
-  return {
-    version: 1,
-    exported_at: new Date().toISOString(),
-    blob: data.blob,
-    metadata: data.metadata,
-  }
-}
-
-/**
- * Import blob from backup
- */
-export async function importBlobBackup(
-  backup: Partial<BlobBackup> | null | undefined
-): Promise<void> {
-  if (backup?.version !== 1 || !backup.blob) {
-    throw new Error('Invalid backup format')
-  }
-
-  await storeBlob(backup.blob, backup.metadata)
 }
