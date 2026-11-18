@@ -1,3 +1,4 @@
+import { t } from '../js/text.ts'
 import { normalizeTuning, TUNINGS, type Tuning, tuningLabel } from '../js/tuning.ts'
 import { OptionPicker, type PickerOption } from './option-picker.ts'
 
@@ -35,7 +36,7 @@ export class TuningSelector extends OptionPicker<string> {
 
   constructor() {
     super()
-    this.label = 'Tuning'
+    this.label = t('selector-tuning')
     this.value = ''
     this.deviceTuning = 0
   }
@@ -50,7 +51,7 @@ export class TuningSelector extends OptionPicker<string> {
 
   override _options(): PickerOption<string>[] {
     return [
-      { value: '', label: 'Same as my device', hint: tuningLabel(this.deviceTuning) },
+      { value: '', label: t('selector-same-as-device'), hint: tuningLabel(this.deviceTuning) },
       ...TUNINGS.map(each => ({ value: String(each.semitones), label: each.label, hint: '' })),
     ]
   }

@@ -12,6 +12,8 @@
  * which keys it stops being red in.
  */
 
+import { t } from './text.ts'
+
 /** The lowest and highest note of a melody, as MIDI numbers */
 export interface NoteRange {
   low: number
@@ -56,7 +58,17 @@ export function describeRange(check: RangeCheck): RangeNote {
   ] as const
   const words = ends
     .filter(([, status]) => status !== 'green')
-    .map(([end, status]) => `${status === 'red' ? 'too ' : ''}${end}`)
+    .map(([end, status]) =>
+      t(
+        status === 'red'
+          ? end === 'high'
+            ? 'range-too-high'
+            : 'range-too-low'
+          : end === 'high'
+            ? 'range-high'
+            : 'range-low'
+      )
+    )
     .join(', ')
   const high = check.high !== 'green'
   const low = check.low !== 'green'

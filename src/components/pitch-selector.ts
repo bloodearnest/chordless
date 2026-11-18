@@ -5,6 +5,7 @@ import {
   pitchLabel,
   pitchShort,
 } from '../js/instrument-pitch.ts'
+import { t } from '../js/text.ts'
 import { OptionPicker, type PickerOption } from './option-picker.ts'
 
 /** A pitch was chosen: an id, or null to follow the one above (the setlist's, or the device's) */
@@ -44,10 +45,10 @@ export class PitchSelector extends OptionPicker<string> {
 
   constructor() {
     super()
-    this.label = 'Instrument'
+    this.label = t('selector-instrument')
     this.value = ''
     this.followed = 'concert'
-    this.follows = 'my device'
+    this.follows = t('selector-follows-device')
   }
 
   override _displayValue(): string {
@@ -62,7 +63,7 @@ export class PitchSelector extends OptionPicker<string> {
     return [
       {
         value: '',
-        label: `Same as ${this.follows}`,
+        label: t('selector-same-as', { follows: this.follows }),
         hint: pitchShort(this.followed),
       },
       ...PITCHES.map(each => ({ value: each.id, label: pitchLabel(each.id), hint: '' })),

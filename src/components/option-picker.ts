@@ -1,6 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { DialogPopup } from '../js/dialog-popup.ts'
+import { t } from '../js/text.ts'
 import { frameBounds } from '../js/utils/frame.ts'
 import type { RangeNote } from '../js/voice-range.ts'
 import { rangeBadge, rangeBadgeStyles } from './range-badge.ts'
@@ -224,7 +225,7 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
   _spoken(option: PickerOption<V>, range: RangeNote): string {
     const key = [option.label, option.hint].filter(Boolean).join(' ')
     const notes = option.notes ? `, ${option.notes.low}–${option.notes.high}` : ''
-    return `${key}${notes}, ${range.words || 'in range'}`
+    return `${key}${notes}, ${range.words || t('range-in-range')}`
   }
 
   /** The lowest and highest note, the end that is out of range in bold */
@@ -255,11 +256,11 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
         id="options"
         ${ref(this._popup.ref)}
         class="picker-popover"
-        aria-label=${this.label || 'Options'}
+        aria-label=${this.label || t('selector-options')}
         @click=${this._popup.onClick}
         @close=${this._popup.onClose}
       >
-        <div role="listbox" aria-label=${this.label || 'Options'}>
+        <div role="listbox" aria-label=${this.label || t('selector-options')}>
           ${options.map(
             option => html`
               <button

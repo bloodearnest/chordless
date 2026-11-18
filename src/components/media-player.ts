@@ -886,7 +886,7 @@ export class MediaPlayer extends LitElement {
           class="volume-knob ${this._activeVolumeControl === type ? 'dragging' : ''}"
           @mousedown=${(e: MouseEvent) => this._startVolumeControl(e, type)}
           @touchstart=${(e: TouchEvent) => this._startVolumeControl(e, type)}
-          title="${type === 'pad' ? 'Pad' : 'Click'} Volume"
+          title=${t(type === 'pad' ? 'player-volume-pad' : 'player-volume-click')}
         >
           <div class="volume-indicator" style="transform: rotate(${(volume - 0.5) * 270}deg)"></div>
           <div class="volume-value">${Math.round(volume * 11)}</div>
@@ -905,7 +905,7 @@ export class MediaPlayer extends LitElement {
         title=${title}
       >
         <div class="led-light ${on ? lightClass : ''}"></div>
-        <span class="led-caption" aria-hidden="true">${on ? 'On' : 'Off'}</span>
+        <span class="led-caption" aria-hidden="true">${on ? t('player-on') : t('player-off')}</span>
       </button>
     `
   }
@@ -917,8 +917,8 @@ export class MediaPlayer extends LitElement {
         <button
           class="pill-button"
           @click=${this._startSong}
-          aria-label="Start song"
-          title="Start song"
+          aria-label=${t('player-start')}
+          title=${t('player-start')}
           ?disabled=${!this.currentKey || this._isCurrentSongActive()}
         >
           <app-icon name="play" size="30"></app-icon>
@@ -926,8 +926,8 @@ export class MediaPlayer extends LitElement {
         <button
           class="pill-button"
           @click=${this._stop}
-          aria-label="Stop"
-          title="Stop"
+          aria-label=${t('player-stop')}
+          title=${t('player-stop')}
           ?disabled=${!this._isPlaying()}
         >
           <app-icon name="stop" size="24" style="--icon-stroke: 2.5"></app-icon>
@@ -935,8 +935,8 @@ export class MediaPlayer extends LitElement {
         <button
           class="pill-button"
           @click=${this._toggleCollapse}
-          aria-label="Expand player"
-          title="Expand player"
+          aria-label=${t('player-expand')}
+          title=${t('player-expand')}
         >
           <app-icon name="chevron-up" size="28"></app-icon>
         </button>
@@ -947,7 +947,11 @@ export class MediaPlayer extends LitElement {
   /** The display: what is playing, and what is next (the song being viewed) */
   _renderDisplay() {
     const isDownloading = this._isPadLoading
-    const statusText = isDownloading ? 'DOWNLOAD' : this._isPlaying() ? 'PLAYING' : 'STOPPED'
+    const statusText = isDownloading
+      ? t('player-status-download')
+      : this._isPlaying()
+        ? t('player-status-playing')
+        : t('player-status-stopped')
     const statusClass = isDownloading ? 'status-downloading' : ''
 
     // Next shows the song being viewed, when nothing is active or it isn't the active one
@@ -973,20 +977,20 @@ export class MediaPlayer extends LitElement {
           <!-- Row 1: Headers -->
           <div class="led-label"></div>
           <div class="led-value led-header ${statusClass}">${statusText}</div>
-          <div class="led-value led-header">Next</div>
+          <div class="led-value led-header">${t('player-next')}</div>
 
           <!-- Row 2: Key -->
-          <div class="led-label">Key</div>
+          <div class="led-label">${t('player-key')}</div>
           <div class="led-value ${showPadError ? 'pad-error' : ''}">${activeKeyDisplay}</div>
           <div class="led-value">${next(this.currentKey)}</div>
 
           <!-- Row 3: BPM -->
-          <div class="led-label">BPM</div>
+          <div class="led-label">${t('player-bpm')}</div>
           <div class="led-value">${this._activeSongBpm || '-'}</div>
           <div class="led-value">${next(this._currentBpm)}</div>
 
           <!-- Row 4: Time -->
-          <div class="led-label">Time</div>
+          <div class="led-label">${t('player-time')}</div>
           <div class="led-value">${this._activeSongTimeSignature || '-'}</div>
           <div class="led-value">${next(this._currentTimeSignature)}</div>
         </div>
@@ -1007,8 +1011,8 @@ export class MediaPlayer extends LitElement {
             class="play-button ${this._isPlaying() ? 'playing' : ''}"
             part="start-song-button"
             @click=${this._startSong}
-            aria-label="Start song"
-            title="Start song (Space)"
+            aria-label=${t('player-start')}
+            title=${t('player-start-space')}
             ?disabled=${!this.currentKey || this._isCurrentSongActive()}
           >
             <app-icon name="play" size="32"></app-icon>
@@ -1017,8 +1021,8 @@ export class MediaPlayer extends LitElement {
             class="stop-button"
             part="stop-button"
             @click=${this._stop}
-            aria-label="Stop (Escape)"
-            title="Stop - Press Escape"
+            aria-label=${t('player-stop-escape')}
+            title=${t('player-stop-escape-title')}
           >
             <app-icon name="stop" size="32"></app-icon>
           </button>
@@ -1031,8 +1035,8 @@ export class MediaPlayer extends LitElement {
                   class="led-button speed-button ${doubleClick ? 'active' : ''}"
                   @click=${this._toggleDoubleClick}
                   aria-pressed=${doubleClick ? 'true' : 'false'}
-                  aria-label="Double-speed click for this song"
-                  title="Double-speed click for this song"
+                  aria-label=${t('player-double-click')}
+                  title=${t('player-double-click')}
                   ?disabled=${!canToggleSpeed}
                 >
                   <div class="led-light ${doubleClick ? 'click-on' : ''}"></div>
@@ -1053,7 +1057,7 @@ export class MediaPlayer extends LitElement {
     const anything = this._padsEnabled || this._metronomeGlobalEnabled
     return html`
       <app-modal
-        heading="Media Player Settings"
+        heading=${t('player-settings-heading')}
         .open=${this._showingSettings}
         @app-modal:close=${this._closeSettings}
       >
@@ -1079,12 +1083,12 @@ export class MediaPlayer extends LitElement {
       >
         <!-- Title bar -->
         <div class="title-bar" @mousedown=${this._startDrag} @touchstart=${this._startDrag}>
-          <div class="title-bar-content">${this._activeSongTitle || 'Media Player'}</div>
+          <div class="title-bar-content">${this._activeSongTitle || t('menu-media-player')}</div>
           <div class="title-bar-buttons">
-            <button class="title-bar-button" @click=${this._toggleSettings} title="Settings">
+            <button class="title-bar-button" @click=${this._toggleSettings} title=${t('player-settings')}>
               <app-icon name="settings"></app-icon>
             </button>
-            <button class="title-bar-button" @click=${this._toggleCollapse} title="Minimize">
+            <button class="title-bar-button" @click=${this._toggleCollapse} title=${t('player-minimize')}>
               <app-icon name="chevron-down"></app-icon>
             </button>
           </div>
@@ -1101,8 +1105,8 @@ export class MediaPlayer extends LitElement {
               ? html`
                 <div class="knobs-section">
                   <div class="knobs-row">
-                    ${this._metronomeGlobalEnabled ? this._renderKnob('click', 'Click', this._clickVolume) : ''}
-                    ${this._padsEnabled ? this._renderKnob('pad', 'Pads', this._padVolume) : ''}
+                    ${this._metronomeGlobalEnabled ? this._renderKnob('click', t('player-knob-click'), this._clickVolume) : ''}
+                    ${this._padsEnabled ? this._renderKnob('pad', t('player-knob-pads'), this._padVolume) : ''}
                   </div>
                 </div>
               `
@@ -1120,7 +1124,7 @@ export class MediaPlayer extends LitElement {
                         ? this._renderToggle(
                             this._clickOn,
                             'click-on',
-                            'Toggle click on/off',
+                            t('player-toggle-click'),
                             this._toggleClick
                           )
                         : ''
@@ -1130,7 +1134,7 @@ export class MediaPlayer extends LitElement {
                         ? this._renderToggle(
                             this._padsOn,
                             'pads-on',
-                            'Toggle pads on/off',
+                            t('player-toggle-pads'),
                             this._togglePads
                           )
                         : ''

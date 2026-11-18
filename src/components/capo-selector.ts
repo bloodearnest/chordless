@@ -1,3 +1,4 @@
+import { t } from '../js/text.ts'
 import { transposeKeyName } from '../js/transpose.ts'
 import { OptionPicker, type PickerOption } from './option-picker.ts'
 
@@ -41,7 +42,7 @@ export class CapoSelector extends OptionPicker<number> {
 
   constructor() {
     super()
-    this.label = 'Capo'
+    this.label = t('selector-capo')
     this.value = 0
     this.maxValue = 11
     this.referenceKey = ''
@@ -67,7 +68,7 @@ export class CapoSelector extends OptionPicker<number> {
 
   /** The key the chords are played in at this capo, or how far down it is */
   _keyAtCapo(capo: number): string {
-    if (!this.referenceKey) return capo === 0 ? 'Open' : `Down ${capo}`
+    if (!this.referenceKey) return capo === 0 ? t('capo-open') : t('capo-down', { count: capo })
     if (capo === 0) return this.referenceKey
     return transposeKeyName(this.referenceKey, -capo)
   }

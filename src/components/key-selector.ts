@@ -2,6 +2,7 @@ import { rangeOfMetadata } from '../js/chart-range.ts'
 import type { ChartMetadata, ScoreRecord } from '../js/data-types.ts'
 import { songMelody } from '../js/melody-analysis.ts'
 import { noteName, semitonesBetween } from '../js/pitch.ts'
+import { t } from '../js/text.ts'
 import { describeRange, type NoteRange, octaveNearGreen, rangeStatus } from '../js/voice-range.ts'
 import { OptionPicker, type PickerOption } from './option-picker.ts'
 
@@ -55,7 +56,7 @@ export class KeySelector extends OptionPicker<string> {
 
   constructor() {
     super()
-    this.label = 'Key'
+    this.label = t('selector-key')
     this.value = '-'
     this.keys = []
     this.originalKey = ''
