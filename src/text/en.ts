@@ -1441,7 +1441,6 @@ player-toggle-pads = Toggle pads on/off
 
 ## A setlist's details (the form, and what the dialog says of a setlist)
 
-action-save = Save
 action-remove = Remove
 songs-count =
     { $count ->
@@ -1569,4 +1568,98 @@ when-years-ago =
         [one] { $count } year ago
        *[other] { $count } years ago
     }
+
+
+## Deleting a Team or space everywhere
+
+de-only-admin = Only an admin can delete a Team everywhere.
+de-button = Delete everywhere…
+de-sign-in = Sign in with Google to reach its folder in Drive.
+# { $space } is the name of the space.
+de-heading = Delete "{ $space }" everywhere?
+de-what-team = This ends sharing for everyone in the Team, and deletes it from Google Drive.
+de-what-personal = This deletes it from this device and from Google Drive.
+# Added after one of the two above, with a space, when it is known what the space holds.
+de-holds =
+    It holds { $songs ->
+        [one] 1 song
+       *[other] { $songs } songs
+    } and { $setlists ->
+        [one] 1 setlist
+       *[other] { $setlists } setlists
+    } here.
+de-item-trash = Its folder in Google Drive, with everything in it, goes to the Drive trash. You can restore it from there for thirty days.
+de-item-team = Its members can no longer sync it, and nobody can join it with an invitation. Each device keeps its own copy until it is deleted there.
+de-item-personal = Your other devices stop syncing it: they will say its Drive folder is gone.
+de-item-device = This device's copy is deleted. It cannot be undone.
+# <strong> is the number and name of the step.
+de-step-backup = <strong>1. Keep a backup.</strong>
+de-backup-text = The backup is an export file with its songs and setlists as they are on this device: sync first if others have changed it. It does not have the audio pads.
+de-backup-button = Download a backup
+de-backup-again = Download it again
+# { $file } is the name of the file, { $size } its size ("1.2 MB").
+de-backup-done = ✓ { $file } ({ $size }) was handed to your browser.
+de-backup-needed = Needed before you can delete.
+de-backup-failed = The backup could not be made: { $reason }
+# { $space } is the name of the space the person types.
+de-step-name = <strong>2. Type the name,</strong> { $space }, to confirm.
+de-deleting = Deleting…
+de-do-delete = Delete everywhere
+
+
+## Exporting a space, and importing an export (a zip file of its songs and setlists)
+
+export-button = 📦 Export this space
+export-exporting = Exporting…
+export-choose = 📥 Import a Chordless export…
+export-include-pads = Include my pad sets ({ $count }, about { $size })
+export-include-personal = Include my own settings and annotations (capo, tuning, sections shown, private annotations). They are private: leave this off for a file you will share.
+# { $file } is the name of the file, { $size } its size.
+export-done = Exported as { $file } ({ $size }).
+export-failed = Exporting failed: { $reason }
+
+export-import-legend = Import this export into { $space }
+# { $space } is where the export is from, { $when } when it was made.
+export-from = Exported from { $space }, { $when }: { $songs } charts, { $setlists } setlists.
+export-from-pads = Exported from { $space }, { $when }: { $songs } charts, { $setlists } setlists, { $padSets } pad sets.
+export-import-note = Import adds only what is missing and deletes nothing; “Reset from this export” also replaces the charts and setlists here that differ from the file's.
+export-also-personal = Also put back the file's own settings and annotations (capo, tuning, sections shown, private annotations, songs added for the person alone). What this device already keeps is left as it is.
+export-also-pads = Also upload its pad sets to Google Drive. A pad set with the same name there is replaced.
+export-also-pads-offline = Also upload its pad sets to Google Drive (connect with Google first). A pad set with the same name there is replaced.
+export-importing = Importing…
+export-reset-start = Reset from this export…
+import-failed = Importing failed: { $reason }
+export-check-failed = Could not check the space: { $reason }
+
+# What an import did: the first clause, then each of the others that is so (a semicolon between, and a full stop at the end).
+export-imported = Imported into { $where }: { $songsAdded } charts and { $setlistsAdded } setlists added, { $songsSkipped } charts and { $setlistsSkipped } setlists were already there
+export-lead-sheets-added =
+    { $count ->
+        [one] 1 lead sheet
+       *[other] { $count } lead sheets
+    } added
+export-personal-restored =
+    your own settings and annotations put back for { $count ->
+        [one] 1 setlist
+       *[other] { $count } setlists
+    }
+export-pads-uploaded = { $count } pad sets uploaded to Drive
+
+export-reset-legend = Reset { $space } to this export
+export-reset-plan = { $songsReplaced } charts and { $setlistsReplaced } setlists here will be replaced by the file's, and { $songsAdded } charts and { $setlistsAdded } setlists added. { $same } are already the same.
+export-reset-only-here = { $songs } charts and { $setlists } setlists that are here and not in the file are kept: nothing is deleted.
+export-reset-drive = They keep their place in Drive, so sync sends the changes as edits to the same files.
+# { $count } things changed here after the file was made, { $labels } the first of them.
+export-reset-newer = { $count } changed here after the file was made, and the file's version will replace it: { $labels }.
+# The same, with { $more } not named.
+export-reset-newer-more = { $count } changed here after the file was made, and the file's version will replace it: { $labels }, and { $more } more.
+export-first = 📦 Export this space first, as a backup
+export-resetting = Resetting…
+export-nothing = Nothing to change
+export-reset-button = Reset
+export-reset-failed = Resetting failed: { $reason }
+# What a reset did: the first clause, each of the others that is so, then the last sentence.
+export-reset-done = Reset { $where } from the export: { $songsReplaced } charts and { $setlistsReplaced } setlists replaced, { $songsAdded } charts and { $setlistsAdded } setlists added, { $songsSame } charts and { $setlistsSame } setlists were already the same
+export-reset-kept = { $songs } charts and { $setlists } setlists that are not in the file were kept
+export-reset-sync = Sync sends the changes to Drive.
 `

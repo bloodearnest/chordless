@@ -2,9 +2,11 @@ import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
+import { rich } from '../js/rich-text.ts'
 import { type BackupFile, downloadBackup } from '../js/space-backup.ts'
 import { deleteSpaceEverywhere, mayDeleteEverywhere } from '../js/space-deletion.ts'
 import type { SpaceSummary } from '../js/space-summary.ts'
+import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -106,7 +108,7 @@ export class SpaceDeleteEverywhere extends LitElement {
     try {
       this._backup = await this.backup(this.space)
     } catch (error) {
-      this._error = `The backup could not be made: ${errorMessage(error)}`
+      this._error = t('de-backup-failed', { reason: errorMessage(error) })
     }
     this._busy = ''
   }
@@ -127,70 +129,50 @@ export class SpaceDeleteEverywhere extends LitElement {
 
   _what() {
     const { songs = 0, setlists = 0 } = this.summary ?? {}
-    const has =
-      this.summary === null
-        ? ''
-        : ` It holds ${songs} song${songs === 1 ? '' : 's'} and ${setlists} setlist${setlists === 1 ? '' : 's'} here.`
-    return this.space.team
-      ? html`This ends sharing for everyone in the Team, and deletes it from Google Drive.${has}`
-      : html`This deletes it from this device and from Google Drive.${has}`
+    const has = this.summary === null ? '' : ` ${t('de-holds', { songs, setlists })}`
+    return `${t(this.space.team ? 'de-what-team' : 'de-what-personal')}${has}`
   }
 
   override render() {
     const space = this.space
     if (!mayDeleteEverywhere(space)) {
-      return html`<p class="hint">Only an admin can delete a Team everywhere.</p>`
+      return html`<p class="hint">${t('de-only-admin')}</p>`
     }
     const busy = this._busy !== ''
     return html`
       <button class="btn danger" id="delete-everywhere" ?disabled=${!this._reachable} @click=${this._open}>
-        Delete everywhere…
+        ${t('de-button')}
       </button>
-      ${
-        this._reachable
-          ? nothing
-          : html`<p class="hint">Sign in with Google to reach its folder in Drive.</p>`
-      }
-      <app-modal ${ref(this._modal)} heading=${`Delete "${space.name}" everywhere?`}>
+      ${this._reachable ? nothing : html`<p class="hint">${t('de-sign-in')}</p>`}
+      <app-modal ${ref(this._modal)} heading=${t('de-heading', { space: space.name })}>
         <p>${this._what()}</p>
         <ul>
-          <li>
-            Its folder in Google Drive, with everything in it, goes to the Drive trash. You can
-            restore it from there for thirty days.
-          </li>
+          <li>${t('de-item-trash')}</li>
           ${
             space.team
-              ? html`<li>
-                Its members can no longer sync it, and nobody can join it with an invitation. Each
-                device keeps its own copy until it is deleted there.
-              </li>`
-              : html`<li>
-                Your other devices stop syncing it: they will say its Drive folder is gone.
-              </li>`
+              ? html`<li>${t('de-item-team')}</li>`
+              : html`<li>${t('de-item-personal')}</li>`
           }
-          <li>This device's copy is deleted. It cannot be undone.</li>
+          <li>${t('de-item-device')}</li>
         </ul>
 
         <div class="step">
-          <strong>1. Keep a backup.</strong>
-          <p class="hint">
-            The backup is an export file with its songs and setlists as they are on this device:
-            sync first if others have changed it. It does not have the audio pads.
-          </p>
+          ${rich('de-step-backup', undefined, { strong: words => html`<strong>${words}</strong>` })}
+          <p class="hint">${t('de-backup-text')}</p>
           <button class="btn" id="make-backup" ?disabled=${busy} @click=${this._makeBackup}>
-            ${this._backup ? 'Download it again' : 'Download a backup'}
+            ${this._backup ? t('de-backup-again') : t('de-backup-button')}
           </button>
           ${
             this._backup
               ? html`<span role="status">
-                ✓ ${this._backup.fileName} (${formatBytes(this._backup.bytes)}) was handed to your browser.
+                ${t('de-backup-done', { file: this._backup.fileName, size: formatBytes(this._backup.bytes) })}
               </span>`
-              : html`<span class="hint">Needed before you can delete.</span>`
+              : html`<span class="hint">${t('de-backup-needed')}</span>`
           }
         </div>
 
         <div class="step">
-          <label for="confirm-name"><strong>2. Type the name,</strong> ${space.name}, to confirm.</label>
+          <label for="confirm-name">${rich('de-step-name', { space: space.name }, { strong: words => html`<strong>${words}</strong>` })}</label>
           <input
             id="confirm-name"
             .value=${this._typed}
@@ -206,7 +188,7 @@ export class SpaceDeleteEverywhere extends LitElement {
         ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
         <div class="actions step" slot="actions">
           <button class="btn" id="cancel-delete" ?disabled=${busy} @click=${() => this._modal.value?.close()}>
-            Cancel
+            ${t('action-cancel')}
           </button>
           <button
             class="btn danger"
@@ -214,7 +196,7 @@ export class SpaceDeleteEverywhere extends LitElement {
             ?disabled=${busy || !this._backup || !this._named}
             @click=${this._delete}
           >
-            ${this._busy === 'delete' ? 'Deleting…' : 'Delete everywhere'}
+            ${this._busy === 'delete' ? t('de-deleting') : t('de-do-delete')}
           </button>
         </div>
       </app-modal>
