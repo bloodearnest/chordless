@@ -8,6 +8,7 @@ import type { AccountPage } from '../src/components/account-page.ts'
 import '../src/components/account-page.ts'
 import type { SpaceCard } from '../src/components/space-card.ts'
 import {
+  SpaceConnectGoogleEvent,
   SpaceDefaultEvent,
   SpaceManageEvent,
   SpaceSyncedEvent,
@@ -24,7 +25,13 @@ import {
 import { TeamSpacesAddedEvent } from '../src/js/team-memberships.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { nextTimestamp, nothingFor, suppressConsoleLogs } from './test-helpers.ts'
+import {
+  clearToasts,
+  nextTimestamp,
+  nothingFor,
+  shownToast,
+  suppressConsoleLogs,
+} from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -148,6 +155,77 @@ describe('account-page', () => {
     must(el.shadowRoot?.querySelector('space-card')).dispatchEvent(new SpaceSyncedEvent())
     await waitUntil(() => cards(el).some(card => card.space.name === renamed))
     expect(cards(el).some(card => card.space.name === renamed)).to.equal(true)
+  })
+
+  describe('connecting Google to sync a Personal space', () => {
+    afterEach(() => clearToasts())
+
+    it('tells the cards when the sign-in is by email alone, and not otherwise', async () => {
+      await space('First')
+      const el = await page()
+      el.shadowRoot
+        ?.querySelector('account-card')
+        ?.dispatchEvent(new AccountStateEvent('no-drive', true))
+      await el.updateComplete
+      expect(cards(el).every(card => card.emailOnly)).to.equal(true)
+      el.shadowRoot
+        ?.querySelector('account-card')
+        ?.dispatchEvent(new AccountStateEvent('signed-in'))
+      await el.updateComplete
+      expect(cards(el).some(card => card.emailOnly)).to.equal(false)
+    })
+
+    it('connects Google when a card asks, and reads the sign-in again', async () => {
+      await space('First')
+      const el = await page()
+      let connected = 0
+      el.connectGoogle = async () => void connected++
+      let refreshed = 0
+      const account = must(el.shadowRoot?.querySelector('account-card'))
+      account.refresh = async () => void refreshed++
+      must(cards(el)[0]).dispatchEvent(new SpaceConnectGoogleEvent())
+      await waitUntil(() => refreshed === 1, 'the sign-in to be read again')
+      expect(connected).to.equal(1)
+      expect(shownToast()).to.equal(null)
+    })
+
+    it('says so when Google could not be connected, and reads the sign-in all the same', async () => {
+      await space('First')
+      const el = await page()
+      el.connectGoogle = async () => {
+        throw new Error('That Google account is already used by another Chordless account')
+      }
+      let refreshed = 0
+      must(el.shadowRoot?.querySelector('account-card')).refresh = async () => void refreshed++
+      must(cards(el)[0]).dispatchEvent(new SpaceConnectGoogleEvent())
+      await waitUntil(() => shownToast(), 'the message')
+      expect(shownToast()?.message).to.contain('connect Google')
+      expect(shownToast()?.details).to.contain('already used')
+      expect(refreshed).to.equal(1)
+    })
+
+    it('starts Google’s sign-in by default, which says when the window gives nothing', async () => {
+      const real = (window as { google?: unknown }).google
+      ;(window as { google?: unknown }).google = {
+        accounts: {
+          oauth2: {
+            initCodeClient: (config: { callback: (response: object) => void }) => ({
+              requestCode: () => config.callback({ error: 'access_denied' }),
+            }),
+          },
+        },
+      }
+      try {
+        const el = await page()
+        let message = ''
+        await el.connectGoogle().catch(error => {
+          message = error.message
+        })
+        expect(message).to.equal('access_denied')
+      } finally {
+        ;(window as { google?: unknown }).google = real
+      }
+    })
   })
 
   describe('managing a space', () => {

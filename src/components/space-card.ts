@@ -30,6 +30,14 @@ export class SpaceDefaultEvent extends Event {
   }
 }
 
+/** A person asked to connect Google, to sync a Personal space between their devices: the page does it */
+export class SpaceConnectGoogleEvent extends Event {
+  static readonly type = 'space-card:connect-google'
+  constructor() {
+    super(SpaceConnectGoogleEvent.type, { bubbles: true, composed: true })
+  }
+}
+
 /** A person asked to manage this space: the page goes to the space's own page */
 export class SpaceManageEvent extends Event {
   static readonly type = 'space-card:manage'
@@ -53,6 +61,7 @@ export class SpaceCard extends LitElement {
     isDefault: { type: Boolean },
     several: { type: Boolean },
     signIn: { attribute: false },
+    emailOnly: { type: Boolean },
     _summary: { state: true },
     _syncing: { state: true },
     _progress: { state: true },
@@ -69,6 +78,8 @@ export class SpaceCard extends LitElement {
   declare several: boolean
   /** How the person is signed in, or null while that is not known yet */
   declare signIn: SignInState | null
+  /** Signed in with an emailed code alone: a Personal space needs Google to sync between devices */
+  declare emailOnly: boolean
   declare _summary: SpaceSummary | null
   declare _syncing: boolean
   declare _progress: string
@@ -126,6 +137,7 @@ export class SpaceCard extends LitElement {
     super()
     this.current = false
     this.signIn = null
+    this.emailOnly = false
     this._summary = null
     this._syncing = false
     this._progress = ''
@@ -182,7 +194,9 @@ export class SpaceCard extends LitElement {
       case 'expired':
         return t('account-status-expired')
       case 'no-drive':
-        if (!isTeamMember(this.space)) return t('space-sync-connect-drive')
+        if (!isTeamMember(this.space)) {
+          return t(this.emailOnly ? 'space-sync-connect-google' : 'space-sync-connect-drive')
+        }
         break
     }
     return this._syncedAt
@@ -229,6 +243,13 @@ export class SpaceCard extends LitElement {
               ? html`<button class="btn primary" id="sync" ?disabled=${this._syncing} @click=${this._sync}>
                 ${t('action-sync')}
               </button>`
+              : nothing
+          }
+          ${
+            this.emailOnly && !space.team && this.signIn === 'no-drive'
+              ? html`<button class="btn primary" id="connect-google" @click=${() => this.dispatchEvent(new SpaceConnectGoogleEvent())}>
+                  ${t('action-connect-google')}
+                </button>`
               : nothing
           }
           <button class="btn" id="manage" @click=${() => this.dispatchEvent(new SpaceManageEvent(space.id))}>

@@ -22,6 +22,7 @@ action-open-account = Open Account and Teams
 ## Setlists
 
 # A setlist could not be deleted.
+toast-connect-google-failed = Couldn't connect Google.
 toast-setlist-delete-failed = Couldn't delete the setlist.
 
 # A setlist was deleted; the message offers Undo. { $title } is its name.
@@ -630,6 +631,7 @@ space-sync-starting = Starting…
 space-sync-failed = Sync failed: { $reason }
 space-sync-sign-in = Sign in to sync
 space-sync-connect-drive = Connect Google Drive to sync
+space-sync-connect-google = Connect Google to sync this space between your devices
 
 # How long ago a sync was, for "Synced { $when }" and "Last synced: { $when }". { $count } is the number.
 sync-time-now = Just now
@@ -650,6 +652,7 @@ sync-time-days =
     }
 
 action-sync = Sync
+action-connect-google = Connect Google
 action-manage = Manage
 action-make-default = Make default
 action-reconnect-google = Reconnect with Google

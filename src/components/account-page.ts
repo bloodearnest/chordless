@@ -6,10 +6,17 @@ import { goTo } from '../js/navigation.ts'
 import { getCurrentSpace, listSpaces } from '../js/space.ts'
 import { checkTeamMemberships, TeamSpacesAddedEvent } from '../js/team-memberships.ts'
 import { t } from '../js/text.ts'
+import { toast } from '../js/toast.ts'
+import { errorMessage } from '../js/utils/errors.ts'
 import { AccountStateEvent } from './account-card.ts'
 import './account-card.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
-import { SpaceDefaultEvent, SpaceManageEvent, SpaceSyncedEvent } from './space-card.ts'
+import {
+  SpaceConnectGoogleEvent,
+  SpaceDefaultEvent,
+  SpaceManageEvent,
+  SpaceSyncedEvent,
+} from './space-card.ts'
 import './space-card.ts'
 import './storage-summary.ts'
 
@@ -25,6 +32,7 @@ export class AccountPage extends LitElement {
     _currentId: { state: true },
     _defaultId: { state: true },
     _signIn: { state: true },
+    _emailOnly: { state: true },
     _looking: { state: true },
     _lookMessage: { state: true },
   }
@@ -37,6 +45,8 @@ export class AccountPage extends LitElement {
   /** The default space (docs/SPACES.md, "Presenting spaces") */
   declare _defaultId: string | null
   declare _signIn: SignInState | null
+  /** Signed in with an emailed code alone */
+  declare _emailOnly: boolean
   /** Moves on to another page (a test gives its own) */
   go: (url: string) => unknown = goTo
 
@@ -83,6 +93,7 @@ export class AccountPage extends LitElement {
     this._currentId = null
     this._defaultId = null
     this._signIn = null
+    this._emailOnly = false
     this._looking = false
     this._lookMessage = ''
   }
@@ -93,6 +104,7 @@ export class AccountPage extends LitElement {
     this.addEventListener(SpaceSyncedEvent.type, this._onSynced)
     this.addEventListener(SpaceDefaultEvent.type, this._onDefault)
     this.addEventListener(SpaceManageEvent.type, this._onManage)
+    this.addEventListener(SpaceConnectGoogleEvent.type, this._onConnectGoogle)
     window.addEventListener(TeamSpacesAddedEvent.type, this._onTeamsAdded)
     void this.load()
   }
@@ -102,6 +114,7 @@ export class AccountPage extends LitElement {
     this.removeEventListener(SpaceSyncedEvent.type, this._onSynced)
     this.removeEventListener(SpaceDefaultEvent.type, this._onDefault)
     this.removeEventListener(SpaceManageEvent.type, this._onManage)
+    this.removeEventListener(SpaceConnectGoogleEvent.type, this._onConnectGoogle)
     window.removeEventListener(TeamSpacesAddedEvent.type, this._onTeamsAdded)
     super.disconnectedCallback()
   }
@@ -133,6 +146,7 @@ export class AccountPage extends LitElement {
 
   _onAccount = (event: Event): void => {
     this._signIn = (event as AccountStateEvent).state
+    this._emailOnly = (event as AccountStateEvent).emailOnly
   }
 
   /** A sync can rename a personal space (after its owner), so read the list again */
@@ -144,6 +158,23 @@ export class AccountPage extends LitElement {
     const id = (event as SpaceDefaultEvent).spaceId
     setDefaultSpaceId(id)
     this._defaultId = id
+  }
+
+  /** Connects Google to the account (a test gives its own) */
+  connectGoogle: () => Promise<unknown> = async () => {
+    const { authorizeWithGoogle } = await import('../js/google-auth.ts')
+    return authorizeWithGoogle()
+  }
+
+  /** A Personal space's card asked to sync it between devices: Google is connected, and the sign-in read again */
+  _onConnectGoogle = async (): Promise<void> => {
+    try {
+      await this.connectGoogle()
+    } catch (error) {
+      console.error('[AccountPage] Connecting Google failed:', error)
+      toast(t('toast-connect-google-failed'), { kind: 'error', details: errorMessage(error) })
+    }
+    await this.shadowRoot?.querySelector('account-card')?.refresh()
   }
 
   /** Everything to do with a space is on its own page */
@@ -173,6 +204,7 @@ export class AccountPage extends LitElement {
             space => html`<space-card
               .space=${space}
               .signIn=${this._signIn}
+              ?emailOnly=${this._emailOnly}
               ?current=${space.id === this._currentId}
               ?isDefault=${space.id === this._defaultId}
               ?several=${this._spaces.length > 1}

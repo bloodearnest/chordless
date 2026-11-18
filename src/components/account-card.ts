@@ -13,9 +13,12 @@ import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.ts'
 export class AccountStateEvent extends Event {
   static readonly type = 'account-card:state'
   readonly state: SignInState
-  constructor(state: SignInState) {
+  /** Signed in with an emailed code alone: no Google, so a Personal space cannot sync between devices yet */
+  readonly emailOnly: boolean
+  constructor(state: SignInState, emailOnly = false) {
     super(AccountStateEvent.type, { bubbles: true, composed: true })
     this.state = state
+    this.emailOnly = emailOnly
   }
 }
 
@@ -122,7 +125,7 @@ export class AccountCard extends LitElement {
     if (state !== 'signed-out') this._emailForm = false
     this._user = state === 'signed-out' ? null : await getCurrentUserInfo()
     this._state = state
-    this.dispatchEvent(new AccountStateEvent(state))
+    this.dispatchEvent(new AccountStateEvent(state, this._emailOnly))
   }
 
   /** They signed in with an emailed code: look again, and say so */
