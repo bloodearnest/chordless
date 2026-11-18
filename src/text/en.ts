@@ -1274,4 +1274,88 @@ import-bulk-apply = Import all with these choices
 # Where a song came from, beside it. { $user } is who imported it.
 origin-imported-by = Imported by { $user }
 origin-unknown = Importer unknown
+
+
+## Importing a setlist from an email (the page that opens from the link Chordless replies with)
+
+email-import-heading = Import a setlist from an email
+# <mail> is the address to forward to, as a link. { $address } is that address.
+email-import-text = Forward the email a worship leader sent, with the songs attached as PDFs, to <mail>{ $address }</mail>. Chordless replies with a link: open it and the songs, keys, date and leader are shown here for you to check.
+email-import-privacy = The email and its charts are not kept, and the charts are not imported: a song your library does not have is fetched from SongSelect.
+email-import-reading = Reading the email…
+# { $reason } is what went wrong.
+email-import-link-failed = Could not read that link: { $reason }
+email-import-create-failed = Could not create the setlist: { $reason }
+
+# The heading of the review, for an email with no subject.
+email-import-untitled = Setlist from an email
+email-import-start-over = Start over
+# { $warning } is why the date is doubtful ("Sunday 12 October is a Saturday", from the email).
+email-import-date-warning = { $warning }. Check the date below.
+email-import-no-date = The email gave no date: check the one below (the nearest Sunday).
+email-import-setlist = Setlist
+email-import-songs = Songs
+email-import-no-list = The email had no list of songs, so they are in the order the charts were attached. Check the order.
+
+# Songs the email has that the library does not. <bookmarklet> is a link to the SongSelect bookmarklet. { $count } is how many.
+email-import-missing-one = 1 song is not in your library yet. Open it on SongSelect and import it with the <bookmarklet>SongSelect bookmarklet</bookmarklet> (when asked where to put it, keep it in the library), then come back here: this page looks again when you return. Or leave it out.
+email-import-missing-many = { $count } songs are not in your library yet. Open each on SongSelect and import it with the <bookmarklet>SongSelect bookmarklet</bookmarklet> (when asked where to put it, keep it in the library), then come back here: this page looks again when you return. Or leave a song out.
+
+email-import-saving = Saving…
+email-import-update = Update setlist
+email-import-create = Create setlist
+
+# Who leads. { $label } is the leader as the email names them, <strong> the person it matched.
+email-import-who-leads = Who leads
+email-import-leader-match = The email's leader, “{ $label }”, is <strong>{ $person }</strong> by name.
+email-import-leader-suggest = The email's leader, “{ $label }”, might be one of your people. Who is it?
+email-import-leader-new = The email's leader, “{ $label }”, is not one of your people yet.
+# Added after one of the three above, with a space. { $email } is the address in the email.
+email-import-learns = { $email } is added to them, so the next email from it is matched by its address.
+email-import-new-person = A new person: { $label }
+
+# When the library already has a setlist for the date. { $date } is the date.
+email-import-same-date-label = A setlist for this date
+email-import-same-date-one = You already have a setlist for { $date }
+email-import-same-date-many = You already have setlists for { $date }
+# <setlist> is a link to the setlist. { $setlist } is its name.
+email-import-update-target = Update <setlist>{ $setlist }</setlist>
+email-import-new-setlist = Make a new setlist
+
+# What updating would change.
+email-import-a-song = A song
+email-import-changes-label = Changes to the setlist
+# { $setlist } is the name of the setlist.
+email-import-changes = Changes to { $setlist }
+email-import-changes-unnamed = Changes to the setlist
+email-import-adds = Adds { $title }
+email-import-keep = Keep { $title }, which the email does not have (it is removed otherwise)
+# { $from } and { $to } are the old and the new key.
+email-import-key-change = { $title }: key { $from } → { $to }
+email-import-no-key = none
+email-import-reordered = The songs are in the email’s order
+email-import-nothing = The email has the same songs, in the same order and keys: nothing changes.
+email-import-left-as-is = Its date, name, time and leader are left as they are.
+
+# One song of the email.
+email-import-include = Include { $title }
+email-import-listed-as = listed as “{ $listed }”
+email-import-paired = The email attached “{ $title }” in the same key, and no other song was left: taken to be this one.
+email-import-key = Key
+email-import-note = Note
+email-import-in-library = ✓ In your library
+# { $space } is the space the song is in, if not this one.
+email-import-in-space = ✓ In “{ $space }”: it is copied into your library when you create the setlist
+email-import-by-lyrics = No song has that title, but its words are in these:
+email-import-is-it = Is it one of these?
+email-import-which = Which song is { $title }
+email-import-none-of-these = None of these
+email-import-not-in-library = Not in your library.
+email-import-open = Open it on SongSelect ↗
+email-import-search = Search SongSelect for it ↗
+email-import-leave-out = Leave it out
+
+email-import-unlisted = Charts attached but not in the list
+email-import-unlisted-label = Songs attached but not listed
+email-import-add = Add { $title }
 `
