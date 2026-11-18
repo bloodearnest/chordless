@@ -1725,25 +1725,18 @@ wizard-copy = Keep a copy in { $source }
 wizard-ready = { $name } is ready
 wizard-ready-text = It is a new space with its own folder in Google Drive.
 wizard-open = Open { $name }
-# What came across, after the sentence above, with a space.
-wizard-came-both =
-    { $songs ->
-        [one] 1 song
-       *[other] { $songs } songs
-    } and { $setlists ->
-        [one] 1 setlist
-       *[other] { $setlists } setlists
-    } came across.
+# What came across, after the sentence above, with a space: the things that did, as a list ("2 songs and 1 setlist").
+wizard-came = { $list } came across.
 wizard-came-songs =
     { $count ->
         [one] 1 song
        *[other] { $count } songs
-    } came across.
+    }
 wizard-came-setlists =
     { $count ->
         [one] 1 setlist
        *[other] { $count } setlists
-    } came across.
+    }
 wizard-came-nothing = Nothing new came across.
 wizard-bring-failed = Couldn't bring your songs across: { $reason }
 wizard-save-failed = Couldn’t save it to Google Drive yet, so the team can’t get it: { $reason }
