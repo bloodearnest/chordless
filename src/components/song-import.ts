@@ -265,7 +265,7 @@ export class SongImport extends LitElement {
   async _loadSpaces(): Promise<void> {
     this._currentSpaceId = (await ensureCurrentSpace()).id
     this._spaceId ||= this._currentSpaceId
-    this._spaces = await visibleSpaces(this._currentSpaceId)
+    this._spaces = await visibleSpaces()
   }
 
   /**

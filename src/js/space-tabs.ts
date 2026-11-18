@@ -7,7 +7,7 @@ import type { Space } from './data-types.ts'
 import { bySpaceAge, defaultSpaceOf } from './default-space.ts'
 import { withSource } from './other-songs.ts'
 import { databaseExists, SHARED_DB_ID } from './share-receiver.ts'
-import { getCurrentSpace, listSpaces } from './space.ts'
+import { listSpaces } from './space.ts'
 import { spaceKind } from './space-label.ts'
 import { contentsOf } from './space-transfer.ts'
 
@@ -55,34 +55,25 @@ async function hasShared(): Promise<boolean> {
 
 /**
  * The tabs there are, in their fixed order: Teams, Personal, Shared, with the default space first.
- * A Personal space with nothing in it is left out unless it is the current one; Shared is there
- * only when something was shared.
+ * Every Teams and Personal space has one, however little is in it (a Personal space is the safe place to try
+ * a setlist, so it is always there); Shared is there only when something was shared.
  * Fewer than two is no choice to make: none (the rule under "Presenting spaces").
  */
-export async function loadSpaceTabs(
-  currentId: string | null = getCurrentSpace().id,
-  spaces?: Space[]
-): Promise<SpaceTab[]> {
-  const tabs = await allPlaces(currentId, spaces)
+export async function loadSpaceTabs(spaces?: Space[]): Promise<SpaceTab[]> {
+  const tabs = await allPlaces(spaces)
   return tabs.length < 2 ? [] : tabs
 }
 
-/** The spaces that have a tab, or all of them if none would (a space hidden is not offered unless it is the only one) */
-export async function visibleSpaces(currentId: string | null, given?: Space[]): Promise<Space[]> {
-  const spaces = given ?? (await listSpaces())
-  const shown = new Set((await allPlaces(currentId, spaces)).map(tab => tab.id))
-  const visible = spaces.filter(space => shown.has(space.id))
-  return visible.length ? visible : spaces
+/** The spaces that have a tab: every one (and Shared is not a space) */
+export async function visibleSpaces(given?: Space[]): Promise<Space[]> {
+  return given ?? (await listSpaces())
 }
 
-async function allPlaces(currentId: string | null, given?: Space[]): Promise<SpaceTab[]> {
+async function allPlaces(given?: Space[]): Promise<SpaceTab[]> {
   // (in the order they were made: the database lists them by id, which is no order at all)
   const spaces = [...(given ?? (await listSpaces()))].sort(bySpaceAge)
   const teams = spaces.filter(space => space.team)
-  const personal: typeof spaces = []
-  for (const space of spaces.filter(space => !space.team)) {
-    if (space.id === currentId || (await hasContents(space.id))) personal.push(space)
-  }
+  const personal = spaces.filter(space => !space.team)
   const preferred = defaultSpaceOf(spaces)?.id
   const tabs: SpaceTab[] = [...teams, ...personal].map(space => ({
     id: space.id,
@@ -94,12 +85,6 @@ async function allPlaces(currentId: string | null, given?: Space[]): Promise<Spa
   if (first > 0) tabs.unshift(...tabs.splice(first, 1))
   if (await hasShared()) tabs.push({ id: SHARED_DB_ID, name: 'Shared', kind: null })
   return tabs
-}
-
-async function hasContents(spaceId: string): Promise<boolean> {
-  if (!(await databaseExists(spaceId))) return false
-  const { songs, setlists } = await withSource(spaceId, db => contentsOf(db))
-  return songs.count + setlists.count > 0
 }
 
 /**

@@ -695,7 +695,7 @@ space there is nothing to choose, so neither shows). It is a preference of this 
 browser, and it never stops anything:
 - **It is the leftmost tab** on the Setlists, Library and Add Song pages, the others keeping their
   fixed order, and it stays a tab when there are too many (the current tab and the default are
-  always shown). A default that is a Personal space with nothing in it has no tab, as any such space.
+  always shown).
 - **It is where an import from outside the app goes:** what the SongSelect bookmarklet brings, and
   files or text shared to Chordless. They arrive with no tab in front of the person, so they go to
   the default, with "Import into" saying so and open to change; once the person picks another,
@@ -721,10 +721,9 @@ never meet a "Personal" space they did not ask for.
 - One tab per place: each Team (by its own name), Personal (by the person's name once signed in),
   and **Shared** (the `shared-with-me` database, `docs/SHARING.md`). A small Team/Personal label sits
   beside the name, so two teams are never both "Team".
-- **Only tabs that exist.** One place means no tab bar; Shared
-  appears only when something was shared; a Personal space with nothing in it (and not the current
-  one) has no tab. It returns as soon as something is saved there, and the Account and Teams page can
-  always show it.
+- **Only places that exist.** One place means no tab bar; Shared appears only when something was shared. **A Personal
+  space always has its tab, however little is in it** (changed 2026-11-18: it was hidden while empty, which was a mistake:
+  it is the safe place to try a setlist without touching a Team's, so it should be there to go to).
 - Fixed order (Teams, Personal, Shared), the current tab marked. About three or four fit a phone;
   beyond that the rest go under a "More" menu, the most recently used staying as tabs.
 - A tab is the space switch (the home page, made afresh: no reload). Reading another space's
@@ -750,13 +749,12 @@ never meet a "Personal" space they did not ask for.
   current and Personal is never made. If the join fails (sign-in cancelled, expired code), fall back
   to creating Personal, so there is always a space. **Personal is made on a later start** (2026-11-18, `ensurePersonalSpace`
   in `space.ts`, called by `app.ts`): a device that has spaces and none of the person's own, because they joined a Team and
-  nothing else, gets an empty one, not made current and with no tab until something is saved in it, so there is somewhere
+  nothing else, gets an empty one, not made current but with its tab, so there is somewhere
   private for their own sets. A device with no spaces yet is left alone (first use makes one; an invite's first contact
   makes none). Someone who deletes their only Personal space has one again at the next start.
 - Check first what else assumes a Personal space: the sign-in rename of "Personal" to the Google
   name, the repair page, the export.
-- The Import page's "Import into" picker follows the same tabs: a space that is hidden is not
-  offered unless it is the only one.
+- The Import page's "Import into" picker offers every space, as every space has a tab.
 
 **Teams on another device** (built 2026-11-12; `team-memberships.ts`, `GET /api/spaces`)
 - A team space is on a device because that device joined it, so a second device, or a new browser,
