@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import type { LicenceChange } from '../js/ccli-licence.ts'
 import type { Space } from '../js/data-types.ts'
 import { mayEditLicence, readLicence, saveLicence } from '../js/space-licence.ts'
+import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 
@@ -101,13 +102,10 @@ export class TeamLicencePanel extends LitElement {
     if (!space) return nothing
     const may = mayEditLicence(space, this._current)
     return html`
-      <h3>CCLI licence number</h3>
-      <p class="hint">
-        Your church's Church Copyright Licence number. Chordless keeps it with the team, as a record
-        of who is using it, and may be asked for it by CCLI. It is not checked.
-      </p>
+      <h3>${t('licence-heading')}</h3>
+      <p class="hint">${t('licence-text')}</p>
       <form class="row" @submit=${this._save}>
-        <label for="licence">Licence number</label>
+        <label for="licence">${t('licence-label')}</label>
         <input
           id="licence"
           .value=${this._typed}
@@ -119,24 +117,24 @@ export class TeamLicencePanel extends LitElement {
         ${
           may
             ? html`<button class="btn primary" id="save-licence" ?disabled=${this._busy || !this._loaded}>
-              Save
+              ${t('action-save')}
             </button>`
-            : html`<span class="hint">Only an admin can change it.</span>`
+            : html`<span class="hint">${t('licence-admin-only')}</span>`
         }
-        ${this._saved ? html`<span role="status">Saved</span>` : nothing}
+        ${this._saved ? html`<span role="status">${t('licence-saved')}</span>` : nothing}
       </form>
       ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
       ${
         this._history?.length
-          ? html`<ul class="history" aria-label="Changes to the licence number">
+          ? html`<ul class="history" aria-label=${t('licence-history-label')}>
             ${this._history.map(
               change =>
                 html`<li>${new Date(change.at).toLocaleDateString()}: ${change.by} ${
                   change.to
                     ? change.from
-                      ? `changed it from ${change.from} to ${change.to}`
-                      : `set it to ${change.to}`
-                    : `cleared it (was ${change.from})`
+                      ? t('licence-changed', { from: change.from, to: change.to })
+                      : t('licence-set', { to: change.to })
+                    : t('licence-cleared', { from: change.from ?? '' })
                 }</li>`
             )}
           </ul>`

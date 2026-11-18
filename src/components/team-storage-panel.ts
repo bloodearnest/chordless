@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import type { Space } from '../js/data-types.ts'
 import { type TeamCredential, teamApi } from '../js/team-client.ts'
 import { returnToOwnSignIn } from '../js/team-spaces.ts'
+import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 
@@ -117,7 +118,7 @@ export class TeamStoragePanel extends LitElement {
     if (credential && !credential.serviceAccount) return nothing
     return html`
       <div class="panel">
-        <h3>Team storage</h3>
+        <h3>${t('storage-team-heading')}</h3>
         ${credential ? this._renderCredential(credential, credential.serviceAccount as string) : nothing}
         ${this._error ? html`<p class="error" role="alert">✗ ${this._error}</p>` : nothing}
       </div>
@@ -127,35 +128,26 @@ export class TeamStoragePanel extends LitElement {
   _renderCredential(credential: TeamCredential, address: string) {
     const addressBox = html`<div class="address">
       <code>${address}</code>
-      <button class="btn" @click=${() => this._copy(address)}>${this._copied ? 'Copied' : 'Copy'}</button>
+      <button class="btn" @click=${() => this._copy(address)}>${this._copied ? t('storage-copied') : t('storage-copy')}</button>
     </div>`
     if (credential.kind === 'service-account') {
       return html`
-        <p>
-          This Team reaches its files with Chordless’s own account, a Content manager of your shared
-          drive, so it does not depend on your Google sign-in, which is not kept for it.
-        </p>
+        <p>${t('storage-service-account')}</p>
         ${addressBox}
         <div class="actions">
           <button class="btn" ?disabled=${this._busy} @click=${this._goBack}>
-            Use my Google sign-in instead
+            ${t('storage-go-back')}
           </button>
         </div>
       `
     }
     return html`
-      <p>
-        This Team reaches its files with your Google sign-in, so its syncing stops if you leave or
-        your sign-in stops working.
-      </p>
-      <p>
-        If the Team’s folder is in a Google shared drive, Chordless can reach it with an account of
-        its own instead. Add this address to the shared drive as a Content manager, then check it:
-      </p>
+      <p>${t('storage-own-sign-in')}</p>
+      <p>${t('storage-switch-text')}</p>
       ${addressBox}
       <div class="actions">
         <button class="btn primary" ?disabled=${this._busy} @click=${this._switch}>
-          ${this._busy ? 'Checking…' : 'Check and switch'}
+          ${this._busy ? t('status-checking') : t('storage-switch')}
         </button>
       </div>
     `

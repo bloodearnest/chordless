@@ -1685,4 +1685,121 @@ export-reset-failed = Resetting failed: { $reason }
 export-reset-done = Reset { $where } from the export: { $songsReplaced } charts and { $setlistsReplaced } setlists replaced, { $songsAdded } charts and { $setlistsAdded } setlists added, { $songsSame } charts and { $setlistsSame } setlists were already the same
 export-reset-kept = { $songs } charts and { $setlists } setlists that are not in the file were kept
 export-reset-sync = Sync sends the changes to Drive.
+
+
+## Making a Team (the page that makes a Team space, and what it asks)
+
+wizard-heading = New team space
+wizard-sign-in-text = A team space keeps its songs and setlists in a folder in your Google Drive, so Chordless needs access to Drive to make it.
+wizard-connect-drive = 📁 Connect Google Drive
+wizard-sign-in = 🔑 Sign in with Google
+wizard-intro = A new space for your team, separate from your personal space. Everyone you invite keeps its songs and setlists in step.
+wizard-name = Team name
+wizard-name-example = St Mary's Music
+wizard-licence = CCLI licence number (optional)
+wizard-licence-text = Your church's Church Copyright Licence number, kept for your records. It is not checked, and you can leave it blank for now.
+wizard-folder = Where to keep it in Google Drive
+wizard-folder-choose = 📁 Choose a folder…
+wizard-folder-change = 📁 Choose a different folder
+wizard-folder-text = A shared drive is best: the files stay with the team if you leave, and everyone can see them in Drive. A folder in your own Drive works too. Chordless makes a folder inside the one you choose, named for the team, with “Chordless” after it.
+wizard-create = Create team space
+wizard-creating = Creating…
+# What it is doing, while the space is made.
+wizard-stage-making = Making the space…
+wizard-stage-bringing = Bringing your songs and setlists across…
+wizard-stage-saving = Saving to Google Drive…
+
+# Bringing songs and setlists from a space of the person's own.
+wizard-bring = Bring across
+wizard-from-label = From
+# { $source } is the name of the space they come from.
+wizard-from = From { $source }
+# { $amount } is how many, and how big ("12, 1.2 MB").
+wizard-songs = Songs ({ $amount }), copied
+wizard-setlists = Setlists ({ $amount }), with the songs they use
+wizard-mode-label = What happens to the setlists
+wizard-move = Move them: they leave { $source }
+wizard-copy = Keep a copy in { $source }
+
+# When the space is made. { $name } is its name.
+wizard-ready = { $name } is ready
+wizard-ready-text = It is a new space with its own folder in Google Drive.
+wizard-open = Open { $name }
+# What came across, after the sentence above, with a space.
+wizard-came-both =
+    { $songs ->
+        [one] 1 song
+       *[other] { $songs } songs
+    } and { $setlists ->
+        [one] 1 setlist
+       *[other] { $setlists } setlists
+    } came across.
+wizard-came-songs =
+    { $count ->
+        [one] 1 song
+       *[other] { $count } songs
+    } came across.
+wizard-came-setlists =
+    { $count ->
+        [one] 1 setlist
+       *[other] { $count } setlists
+    } came across.
+wizard-came-nothing = Nothing new came across.
+wizard-bring-failed = Couldn't bring your songs across: { $reason }
+wizard-save-failed = Couldn’t save it to Google Drive yet, so the team can’t get it: { $reason }
+
+
+## Inviting people to a Team that was just made
+
+invite-heading = Invite your team
+invite-text-leaders = These people lead setlists you brought across. Tick who to invite and what they may do, or add an email address.
+invite-text = Add the email address of the Google account each person will sign in with.
+# After one of the two above, with a space.
+invite-text-links = You get a link for each, to send yourself: it works once, for a week, and only for that account.
+invite-roles = A worship leader can edit songs and setlists, a team member can see them, and an admin can also look after the people.
+# { $email } is the person.
+invite-role-label = Role of { $email }
+# { $names } is a list of people with no email address.
+invite-name-only = No email address, so they can't be invited from here: { $names }.
+invite-email-example = name@example.com
+invite-another-label = Another email address
+invite-making = Making invites…
+invite-make =
+    { $count ->
+        [one] Make 1 invite
+       *[other] Make { $count } invites
+    }
+invite-invites-heading = Invites
+invite-invites-text = Each is emailed to that person. The links are shown once, in case you want to send one another way.
+invite-link-label = Invite link for { $email }
+invite-copy = Copy the link
+invite-copied = ✓ Copied
+invite-admin-not-gmail = An admin invite only works with this address, and it is not a Gmail address, so the message also tells them how to make a Google account with it.
+action-add = Add
+
+
+## A Team's CCLI licence number
+
+licence-heading = CCLI licence number
+licence-text = Your church's Church Copyright Licence number. Chordless keeps it with the team, as a record of who is using it, and may be asked for it by CCLI. It is not checked.
+licence-label = Licence number
+licence-admin-only = Only an admin can change it.
+licence-saved = Saved
+licence-history-label = Changes to the licence number
+# After "{ date }: { who } ": what they did.
+licence-changed = changed it from { $from } to { $to }
+licence-set = set it to { $to }
+licence-cleared = cleared it (was { $from })
+
+
+## Where a Team's files are reached from
+
+storage-team-heading = Team storage
+storage-copy = Copy
+storage-copied = Copied
+storage-service-account = This Team reaches its files with Chordless’s own account, a Content manager of your shared drive, so it does not depend on your Google sign-in, which is not kept for it.
+storage-go-back = Use my Google sign-in instead
+storage-own-sign-in = This Team reaches its files with your Google sign-in, so its syncing stops if you leave or your sign-in stops working.
+storage-switch-text = If the Team’s folder is in a Google shared drive, Chordless can reach it with an account of its own instead. Add this address to the shared drive as a Content manager, then check it:
+storage-switch = Check and switch
 `

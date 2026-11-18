@@ -229,7 +229,7 @@ export class TeamSpaceWizard extends LitElement {
     if (!this._name.trim() || !this._parent) return
     if (this._moves && !(await this._sureOfMove())) return
     this._message = ''
-    this._stage = 'Making the space…'
+    this._stage = t('wizard-stage-making')
     this._state = 'creating'
     try {
       this._created = await createTeamSpace(this._name, this._parent.id, this.folders, {
@@ -251,11 +251,11 @@ export class TeamSpaceWizard extends LitElement {
   async _finish(): Promise<void> {
     this._state = 'creating'
     if (!this._brought) {
-      this._stage = 'Bringing your songs and setlists across…'
+      this._stage = t('wizard-stage-bringing')
       await this._bring()
     }
     if (this._brought && !this._saved) {
-      this._stage = 'Saving to Google Drive…'
+      this._stage = t('wizard-stage-saving')
       await this._save()
     }
     this._state = 'created'
@@ -351,15 +351,12 @@ export class TeamSpaceWizard extends LitElement {
         return html`<p class="status" role="status">${t('status-checking')}</p>`
       case 'sign-in':
         return html`
-          <h2>New team space</h2>
-          <p>
-            A team space keeps its songs and setlists in a folder in your Google Drive, so Chordless
-            needs access to Drive to make it.
-          </p>
+          <h2>${t('wizard-heading')}</h2>
+          <p>${t('wizard-sign-in-text')}</p>
           ${this._message ? html`<p class="status error" role="alert">${this._message}</p>` : nothing}
           <div class="actions">
             <button class="btn primary" @click=${this._connect}>
-              ${this._signIn === 'no-drive' ? '📁 Connect Google Drive' : '🔑 Sign in with Google'}
+              ${this._signIn === 'no-drive' ? t('wizard-connect-drive') : t('wizard-sign-in')}
             </button>
           </div>
         `
@@ -368,28 +365,26 @@ export class TeamSpaceWizard extends LitElement {
         return this._renderForm()
       case 'created':
         return html`
-          <h2>${this._created?.name} is ready</h2>
-          <p>
-            It is a new space with its own folder in Google Drive. ${this._reportText()}
-          </p>
+          <h2>${t('wizard-ready', { name: this._created?.name ?? '' })}</h2>
+          <p>${t('wizard-ready-text')} ${this._reportText()}</p>
           ${
             this._bringError
               ? html`<p class="status error" role="alert">
-                Couldn't bring your songs across: ${this._bringError}
+                ${t('wizard-bring-failed', { reason: this._bringError })}
               </p>`
               : nothing
           }
           ${
             this._syncError
               ? html`<p class="status error" role="alert">
-                Couldn’t save it to Google Drive yet, so the team can’t get it: ${this._syncError}
+                ${t('wizard-save-failed', { reason: this._syncError })}
               </p>`
               : nothing
           }
           ${
             this._bringError || this._syncError
               ? html`<div class="actions">
-                <button class="btn" @click=${this._finish}>Try again</button>
+                <button class="btn" @click=${this._finish}>${t('action-try-again')}</button>
               </div>`
               : nothing
           }
@@ -399,7 +394,7 @@ export class TeamSpaceWizard extends LitElement {
             .leaders=${this._leaders}
           ></team-invite-step>
           <div class="actions">
-            <button class="btn primary" @click=${this._open}>Open ${this._created?.name}</button>
+            <button class="btn primary" @click=${this._open}>${t('wizard-open', { name: this._created?.name ?? '' })}</button>
           </div>
         `
     }
@@ -409,13 +404,12 @@ export class TeamSpaceWizard extends LitElement {
   _reportText(): string {
     const report = this._report
     if (!report) return ''
-    const parts: string[] = []
-    if (report.songsAdded)
-      parts.push(`${report.songsAdded} song${report.songsAdded === 1 ? '' : 's'}`)
-    if (report.setlistsAdded) {
-      parts.push(`${report.setlistsAdded} setlist${report.setlistsAdded === 1 ? '' : 's'}`)
+    if (report.songsAdded && report.setlistsAdded) {
+      return t('wizard-came-both', { songs: report.songsAdded, setlists: report.setlistsAdded })
     }
-    return parts.length ? `${parts.join(' and ')} came across. ` : 'Nothing new came across. '
+    if (report.songsAdded) return t('wizard-came-songs', { count: report.songsAdded })
+    if (report.setlistsAdded) return t('wizard-came-setlists', { count: report.setlistsAdded })
+    return t('wizard-came-nothing')
   }
 
   _renderBring() {
@@ -424,10 +418,10 @@ export class TeamSpaceWizard extends LitElement {
     const busy = this._state === 'creating'
     return html`
       <fieldset ?disabled=${busy}>
-        <legend>Bring across</legend>
+        <legend>${t('wizard-bring')}</legend>
         ${
           this._sources.length > 1
-            ? html`<label for="source">From</label>
+            ? html`<label for="source">${t('wizard-from-label')}</label>
               <select id="source" @change=${this._pickSource}>
                 ${this._sources.map(
                   space => html`<option value=${space.id} ?selected=${space.id === this._sourceId}>
@@ -435,7 +429,7 @@ export class TeamSpaceWizard extends LitElement {
                   </option>`
                 )}
               </select>`
-            : html`<p class="hint">From ${this._sourceName}</p>`
+            : html`<p class="hint">${t('wizard-from', { source: this._sourceName })}</p>`
         }
         ${
           contents.songs.count > 0
@@ -448,7 +442,7 @@ export class TeamSpaceWizard extends LitElement {
                   this._songs = (event.target as HTMLInputElement).checked
                 }}
               />
-              Songs (${amount(contents.songs.count, contents.songs.bytes)}), copied
+              ${t('wizard-songs', { amount: amount(contents.songs.count, contents.songs.bytes) })}
             </label>`
             : nothing
         }
@@ -463,11 +457,11 @@ export class TeamSpaceWizard extends LitElement {
                     this._setlists = (event.target as HTMLInputElement).checked
                   }}
                 />
-                Setlists (${amount(contents.setlists.count, contents.setlists.bytes)}), with the songs they use
+                ${t('wizard-setlists', { amount: amount(contents.setlists.count, contents.setlists.bytes) })}
               </label>
               ${
                 this._setlists
-                  ? html`<div class="mode" role="radiogroup" aria-label="What happens to the setlists">
+                  ? html`<div class="mode" role="radiogroup" aria-label=${t('wizard-mode-label')}>
                     <label class="check">
                       <input
                         type="radio"
@@ -478,7 +472,7 @@ export class TeamSpaceWizard extends LitElement {
                           this._mode = 'move'
                         }}
                       />
-                      Move them: they leave ${this._sourceName}
+                      ${t('wizard-move', { source: this._sourceName })}
                     </label>
                     <label class="check">
                       <input
@@ -490,7 +484,7 @@ export class TeamSpaceWizard extends LitElement {
                           this._mode = 'copy'
                         }}
                       />
-                      Keep a copy in ${this._sourceName}
+                      ${t('wizard-copy', { source: this._sourceName })}
                     </label>
                   </div>`
                   : nothing
@@ -504,23 +498,20 @@ export class TeamSpaceWizard extends LitElement {
   _renderForm() {
     const busy = this._state === 'creating'
     return html`
-      <h2>New team space</h2>
-      <p class="hint">
-        A new space for your team, separate from your personal space. Everyone you invite keeps its
-        songs and setlists in step.
-      </p>
+      <h2>${t('wizard-heading')}</h2>
+      <p class="hint">${t('wizard-intro')}</p>
       <form @submit=${this._create}>
-        <label for="name">Team name</label>
+        <label for="name">${t('wizard-name')}</label>
         <input
           id="name"
           .value=${this._name}
           @input=${this._rename}
           ?disabled=${busy}
-          placeholder="St Mary's Music"
+          placeholder=${t('wizard-name-example')}
           autocomplete="off"
           required
         />
-        <label for="licence">CCLI licence number (optional)</label>
+        <label for="licence">${t('wizard-licence')}</label>
         <input
           id="licence"
           .value=${this._licence}
@@ -529,22 +520,15 @@ export class TeamSpaceWizard extends LitElement {
           inputmode="numeric"
           autocomplete="off"
         />
-        <p class="hint">
-          Your church's Church Copyright Licence number, kept for your records. It is not checked,
-          and you can leave it blank for now.
-        </p>
-        <label>Where to keep it in Google Drive</label>
+        <p class="hint">${t('wizard-licence-text')}</p>
+        <label>${t('wizard-folder')}</label>
         <div class="folder">
           <button type="button" class="btn" ?disabled=${busy} @click=${this._choose}>
-            📁 ${this._parent ? 'Choose a different folder' : 'Choose a folder…'}
+            ${this._parent ? t('wizard-folder-change') : t('wizard-folder-choose')}
           </button>
           ${this._parent ? html`<span>${this._parent.name}</span>` : nothing}
         </div>
-        <p class="hint">
-          A shared drive is best: the files stay with the team if you leave, and everyone can see them
-          in Drive. A folder in your own Drive works too. Chordless makes a folder inside the one you choose,
-          named for the team, with “Chordless” after it.
-        </p>
+        <p class="hint">${t('wizard-folder-text')}</p>
         ${this._renderBring()}
         ${this._message ? html`<p class="status error" role="alert">${this._message}</p>` : nothing}
         <div class="actions">
@@ -553,7 +537,7 @@ export class TeamSpaceWizard extends LitElement {
             class="btn primary"
             ?disabled=${busy || !this._name.trim() || !this._parent}
           >
-            ${busy ? this._stage || 'Creating…' : 'Create team space'}
+            ${busy ? this._stage || t('wizard-creating') : t('wizard-create')}
           </button>
         </div>
         ${
