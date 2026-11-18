@@ -90,8 +90,8 @@ async function getSpaceDB(): Promise<SpaceDB> {
  * Make sure there is a Personal space, as there is for everyone but someone whose first contact was an invite (that
  * one makes none, so they are never shown a space they did not ask for: docs/SPACES.md, "Joining by invite"). On a
  * later start, a device that has spaces and none of the person's own (they joined a Team and nothing else) gets one,
- * with nothing in it, so there is somewhere private for their own sets. It is not made the current space, and has no
- * tab until something is saved in it. A device with no spaces yet is left alone: first use makes one. (The spaces may
+ * with nothing in it, so there is somewhere private for their own sets. It is not made the current space, but it has
+ * its tab, as every Personal space does. A device with no spaces yet is left alone: first use makes one. (The spaces may
  * be given, for a test.)
  */
 export async function ensurePersonalSpace(known?: Space[]): Promise<void> {

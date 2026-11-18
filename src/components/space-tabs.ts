@@ -99,7 +99,7 @@ export class SpaceTabs extends LitElement {
   async load(): Promise<void> {
     this._currentId = this.shared ? SHARED_DB_ID : getCurrentSpace().id
     try {
-      this._tabs = await loadSpaceTabs(getCurrentSpace().id, this.spaces)
+      this._tabs = await loadSpaceTabs(this.spaces)
     } catch (error) {
       // The page works without its tabs
       console.error('[SpaceTabs] Could not read the spaces:', error)

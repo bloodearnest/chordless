@@ -744,7 +744,7 @@ describe('song-import', () => {
     ) {
       const current = await ensureCurrentSpace()
       const other = await createSpace(unique('Other space'))
-      // (a space with nothing in it has no tab, so it is not offered either: docs/SPACES.md)
+      // (the space is given something, so the comparison below has a chart to find)
       const db = await openSpace(other.id)
       await addChart(db, '{title: Already here}\n{key: G}\n[G]Already here', {
         variantLabel: 'Test',

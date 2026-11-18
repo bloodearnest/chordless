@@ -90,8 +90,7 @@ sign-in backup (download, import).
 - **Switch** (not "Open") is the word. After a confirmation it makes that space the one in use and
   shows the home page afresh in it, without reloading the app. It is the second way to switch: the
   main one is the tabs under the header of the Setlists, Library and Add Song pages
-  (`space-tabs.ts`, docs/SPACES.md, "Space tabs"), which show only spaces with something in them.
-  So this button is the way to a space that has no tab, such as an empty Personal one.
+  (`space-tabs.ts`, docs/SPACES.md, "Space tabs"), which show every space, a Personal one even when it is empty.
 - **Signed out disables nothing that works without an account.** The Personal space, export, import
   and deleting from the device all work. Sync is not offered, and **Delete everywhere** is disabled
   (it needs Drive); a card's line says "Sign in to sync".

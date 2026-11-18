@@ -86,16 +86,23 @@ describe('the tabs of the spaces on this device', () => {
   })
 
   it('has none for one place', async () => {
-    const only = await space('Only', 1)
-    expect(await loadSpaceTabs(only, await mine())).to.deep.equal([])
+    await space('Only', 1)
+    expect(await loadSpaceTabs(await mine())).to.deep.equal([])
   })
 
-  it('leaves out a Personal space with nothing in it, unless it is the current one', async () => {
+  it('shows a Personal space with nothing in it: it is the safe place to try a setlist', async () => {
     const empty = await space('Empty')
     const full = await space('Full', 1)
-    expect(await loadSpaceTabs(full, await mine())).to.deep.equal([])
-    const tabs = await loadSpaceTabs(empty, await mine())
+    const tabs = await loadSpaceTabs(await mine())
     expect(tabs.map(each => each.id).sort()).to.deep.equal([empty, full].sort())
+    // (and a Personal space alone with a Team, with nothing in it, is a tab too)
+    const team = await space('Choir')
+    const { updateSpace } = await import('../src/js/space.ts')
+    await updateSpace(team, { team: { id: 'team-x', role: 'reader' } })
+    const withTeam = (await mine()).filter(each => each.id === empty || each.id === team)
+    expect((await loadSpaceTabs(withTeam)).map(each => each.id).sort()).to.deep.equal(
+      [empty, team].sort()
+    )
   })
 
   it('puts Teams before Personal, labelled, and Shared last, once something was shared', async () => {
@@ -112,7 +119,7 @@ describe('the tabs of the spaces on this device', () => {
     })
     shared.db?.close()
 
-    const tabs = await loadSpaceTabs(personal, await mine())
+    const tabs = await loadSpaceTabs(await mine())
     expect(tabs.map(each => each.id)).to.deep.equal([team, personal, SHARED_DB_ID])
     expect(tabs[0].kind).to.equal('Team')
     expect(tabs[1].kind).to.equal('Personal')
@@ -131,18 +138,18 @@ describe('the tabs of the spaces on this device', () => {
       // (none chosen: the first Team made)
       setDefaultSpaceId(null)
       const spaces = await mine()
-      expect((await loadSpaceTabs(personal, spaces)).map(each => each.id)).to.deep.equal([
+      expect((await loadSpaceTabs(spaces)).map(each => each.id)).to.deep.equal([
         first,
         second,
         personal,
       ])
       // (a Team chosen goes first; so does Personal)
       setDefaultSpaceId(second)
-      let tabs = await loadSpaceTabs(personal, spaces)
+      let tabs = await loadSpaceTabs(spaces)
       expect(tabs.map(each => each.id)).to.deep.equal([second, first, personal])
       expect(tabs.map(each => Boolean(each.isDefault))).to.deep.equal([true, false, false])
       setDefaultSpaceId(personal)
-      tabs = await loadSpaceTabs(personal, spaces)
+      tabs = await loadSpaceTabs(spaces)
       expect(tabs.map(each => each.id)).to.deep.equal([personal, first, second])
     } finally {
       setDefaultSpaceId(null)
@@ -184,15 +191,13 @@ describe('the tabs of the spaces on this device', () => {
     expect(switched).to.deep.equal([second])
   })
 
-  it('offers imports only the spaces that have a tab, unless that leaves none', async () => {
+  it('offers imports every space, as every space has a tab', async () => {
     const empty = await space('Empty')
     const full = await space('Full', 1)
-    const offered = (await visibleSpaces(full, await mine())).map(each => each.id)
-    expect(offered).to.include(full)
-    expect(offered).to.not.include(empty)
-    // (with none to show, all are offered: a space hidden is not offered unless it is the only one)
-    const lonely = (await mine()).filter(each => each.id === empty)
-    expect((await visibleSpaces(null, lonely)).map(each => each.id)).to.deep.equal([empty])
+    const offered = (await visibleSpaces(await mine())).map(each => each.id)
+    expect(offered).to.include.members([full, empty])
+    // (read from the device when not given them)
+    expect((await visibleSpaces()).map(each => each.id)).to.include.members([full, empty])
   })
 
   it('keeps the tabs in their order when the recent list cannot be read or kept', async () => {
@@ -289,7 +294,7 @@ describe('the tabs of the spaces on this device', () => {
   })
 
   it('draws no tabs, and does not fail, when the spaces cannot be read', async () => {
-    const broken = [] as unknown as Parameters<typeof loadSpaceTabs>[1]
+    const broken = [] as unknown as Parameters<typeof loadSpaceTabs>[0]
     Object.defineProperty(broken, 'filter', {
       get() {
         throw new Error('no database')
