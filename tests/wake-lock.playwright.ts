@@ -98,7 +98,9 @@ test('the Preferences panel shows the state, and keeps the screen awake while li
   await setLive(page, true)
   await expect(status).toHaveAttribute('data-state', 'failed')
   await expect(status).toHaveAttribute('data-look', 'bad')
-  await expect(status).toContainText('NotAllowedError')
+  // (what the browser called the refusal is for a developer: the page says what the device did)
+  await expect(status).toContainText('The device refused it')
+  await expect(status).not.toContainText('NotAllowedError')
   await expect(panel.getByRole('button', { name: 'Ask again' })).toBeVisible()
 
   await panel.getByRole('checkbox', { name: 'Keep the screen awake' }).uncheck()
