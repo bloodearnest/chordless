@@ -38,7 +38,7 @@ export type { ProgressCallback, SyncProgress } from './sync/session.ts'
 import { ChangeTokenLost } from './storage/types.ts'
 import { type ProgressCallback, type SyncReport, SyncRun } from './sync/session.ts'
 import { phase } from './telemetry/telemetry.ts'
-import { errorMessage } from './utils/errors.ts'
+import { errorMessage, UserError } from './utils/errors.ts'
 
 /** A local setlist or song with changes that are not in Drive */
 export interface UnsyncedChange {
@@ -93,14 +93,17 @@ export interface SyncManagerOptions {
 /**
  * Thrown by resetLocalFromDrive when local records have changes not in Drive.
  */
-export class UnsyncedChangesError extends Error {
+export class UnsyncedChangesError extends UserError {
   unsynced: UnsyncedChange[]
 
   constructor(unsynced: UnsyncedChange[]) {
     const shown = unsynced.slice(0, 5).map(u => `${u.type} ${u.label || u.id}`)
-    const more = unsynced.length > 5 ? ` and ${unsynced.length - 5} more` : ''
     super(
-      `${unsynced.length} local change(s) aren't in Drive yet, so nothing was reset: ${shown.join(', ')}${more}`
+      t(unsynced.length > 5 ? 'unsynced-error-more' : 'unsynced-error', {
+        count: unsynced.length,
+        shown: shown.join(', '),
+        more: unsynced.length - 5,
+      })
     )
     this.name = 'UnsyncedChangesError'
     this.unsynced = unsynced
@@ -122,7 +125,7 @@ export function folderGoneMessage(folder: { name?: string } | null, otherApp: bo
  * Thrown when the Drive folder this space was linked to is gone (deleted, or not visible to this
  * Google account or app) or in the trash. Nothing was changed; startOver() is the way on.
  */
-export class DriveFolderGoneError extends Error {
+export class DriveFolderGoneError extends UserError {
   reason: 'missing' | 'trashed'
 
   constructor(folder: Pick<RootInfo, 'name'> | null) {
@@ -137,7 +140,7 @@ export class DriveFolderGoneError extends Error {
  * other space's folder is there (a Personal space renamed in an earlier version, seen from a new
  * device). Nothing was changed: adoptFolder() uses it, declineAdoption() makes a new one as usual.
  */
-export class AdoptFolderError extends Error {
+export class AdoptFolderError extends UserError {
   folder: { ref: string; name: string }
 
   constructor(folder: { ref: string; name: string }) {
@@ -174,15 +177,11 @@ function remember(key: string, value: string): void {
  * space now syncs with (e.g. it was renamed before folders were linked).
  * Syncing would re-upload them all as duplicates, so sync stops instead.
  */
-export class SpaceFolderMismatchError extends Error {
+export class SpaceFolderMismatchError extends UserError {
   count: number
 
   constructor(count: number, folderName: string) {
-    super(
-      `${count} setlist(s)/song(s) on this device are stored in a different Google Drive ` +
-        `folder than "${folderName}", the one this space now syncs with. ` +
-        `Nothing was synced, to avoid uploading them again as duplicates.`
-    )
+    super(t('folder-mismatch-error', { count, folder: folderName }))
     this.name = 'SpaceFolderMismatchError'
     this.count = count
   }
@@ -978,7 +977,7 @@ export class SyncManager {
       progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
       await this.buildDriveInventory(run)
       if (!run.inventory) {
-        throw new Error("Couldn't list your Drive files, so nothing was changed. Try again.")
+        throw new UserError(t('sync-list-failed'))
       }
 
       if (!discardLocal) {
@@ -1016,9 +1015,7 @@ export class SyncManager {
   async resetFromFolderByName(progressCallback: ProgressCallback | null = null): Promise<void> {
     const folder = await this.storage.findRootByName(this.spaceName)
     if (!folder || folder.trashed) {
-      throw new Error(
-        `There is no Google Drive folder called "${this.spaceName}" that this app can see, so nothing was changed. Sync it from the device that has the data first.`
-      )
+      throw new UserError(t('sync-no-folder', { name: this.spaceName }))
     }
     const before = await this.folderLink.get()
     await this.folderLink.set(folder.ref)

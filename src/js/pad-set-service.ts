@@ -5,6 +5,8 @@ import { listSpaces } from './space.ts'
 import { driveStorage } from './storage/browser-drive.ts'
 import { isTeamMember, storageFor } from './storage/space-storage.ts'
 import type { PadStorage } from './storage/types.ts'
+import { t } from './text.ts'
+import { UserError } from './utils/errors.ts'
 import { readZip, type ZipArchive } from './utils/zip.ts'
 
 /**
@@ -112,9 +114,7 @@ async function sourceOf(spaceId: string | null | undefined): Promise<PadSource> 
   const sources = await padSources()
   const source = sources.find(each => each.spaceId === spaceId)
   if (!source) {
-    throw new Error(
-      'That pad set’s space is not available: pad sets are kept in a space’s folder in Google Drive'
-    )
+    throw new UserError(t('pads-space-unavailable'))
   }
   return source
 }
@@ -201,12 +201,12 @@ export async function uploadPadSet(
   spaceId?: string | null
 ): Promise<PadSet> {
   if (!zipFile) {
-    throw new Error('Please select a pad set ZIP file.')
+    throw new UserError(t('pads-no-file'))
   }
 
   const normalizedName = (padSetName || derivePadSetName(zipFile.name)).trim()
   if (!normalizedName) {
-    throw new Error('Please provide a pad set name.')
+    throw new UserError(t('pads-no-name'))
   }
 
   const padFiles = await extractPadFiles(await readZip(zipFile))
@@ -214,7 +214,7 @@ export async function uploadPadSet(
   // Validate key coverage
   const missingKeys = PAD_FILE_KEYS.filter(key => !padFiles.has(key))
   if (missingKeys.length > 0) {
-    throw new Error(`Missing keys in pad set: ${missingKeys.join(', ')}`)
+    throw new UserError(t('pads-missing-keys', { keys: missingKeys.join(', ') }))
   }
 
   const source = await sourceOf(spaceId)
@@ -271,7 +271,7 @@ export async function readPadSetAudio(padSet: PadSet): Promise<Map<string, Array
 export async function selectPadSet(padSetId: string): Promise<PadSet> {
   const padSets = await listPadSets()
   const padSet = padSets.find(set => set.id === padSetId)
-  if (!padSet) throw new Error('That pad set is no longer in Google Drive.')
+  if (!padSet) throw new UserError(t('pads-gone'))
 
   await ensurePadSetMetadata(padSet)
 
@@ -308,7 +308,7 @@ export async function ensurePadKeyCached(padSet: PadSet, key: string): Promise<v
     const metadata = await ensurePadSetMetadata(padSet)
     const entry: PadFile | undefined = metadata[normalizedKey]
     if (!entry) {
-      throw new Error(`Pad set "${padSet.name}" is missing key: ${normalizedKey}`)
+      throw new UserError(t('pads-set-missing-key', { name: padSet.name, key: normalizedKey }))
     }
 
     const { storage } = await sourceOf(padSet.spaceId)
@@ -458,7 +458,9 @@ async function ensurePadSetMetadata(padSet: PadSet): Promise<Record<string, PadF
 
   const missingKeys = PAD_FILE_KEYS.filter(key => !fileMap[key])
   if (missingKeys.length > 0) {
-    throw new Error(`Pad set "${padSet.name}" is missing files for: ${missingKeys.join(', ')}`)
+    throw new UserError(
+      t('pads-set-missing-files', { name: padSet.name, keys: missingKeys.join(', ') })
+    )
   }
 
   const entry: PadSetMetadata = {
@@ -504,7 +506,7 @@ async function extractPadFiles(zip: ZipArchive): Promise<Map<string, Uint8Array<
     if (!entry.fileName || entry.fileName.endsWith('/')) continue
     if (!entry.fileName.toLowerCase().endsWith('.mp3')) continue
     if (entry.flags & 0x01) {
-      throw new Error('Encrypted ZIP archives are not supported.')
+      throw new UserError(t('pads-encrypted'))
     }
 
     const key = normalizePadKey(extractPadKeyFromFilename(entry.fileName))

@@ -17,6 +17,7 @@
  * An import adds what the space lacks and skips what it has (charts by content, setlists by id),
  * so running it twice adds nothing; it deletes nothing.
  */
+
 import type { Person, ScoreRecord, Setlist, SongRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { adoptLegacyLeader } from './leaders.ts'
@@ -27,6 +28,8 @@ import { scoreRecord } from './score-record.ts'
 import { type TransferReport, type TransferSource, transferSpace } from './space-transfer.ts'
 import { personContent } from './sync/person-hash.ts'
 import { setlistContent } from './sync/setlist-hash.ts'
+import { t } from './text.ts'
+import { UserError } from './utils/errors.ts'
 import { hashText } from './utils/hash.ts'
 import { readZip, writeZip, type ZipFile } from './utils/zip.ts'
 
@@ -248,12 +251,12 @@ export async function readExport(file: Blob): Promise<SpaceExport> {
   try {
     zip = await readZip(file)
   } catch {
-    throw new Error('That file is not a Chordless export: it is not a ZIP file')
+    throw new UserError(t('export-not-zip'))
   }
   const byName = new Map(zip.entries.map(entry => [entry.fileName, entry]))
   const text = async (name: string) => {
     const entry = byName.get(name)
-    if (!entry) throw new Error(`That file is not a Chordless export: ${name} is missing`)
+    if (!entry) throw new UserError(t('export-entry-missing', { name }))
     return new TextDecoder().decode(await zip.read(entry))
   }
 
@@ -261,12 +264,13 @@ export async function readExport(file: Blob): Promise<SpaceExport> {
   try {
     manifest = JSON.parse(await text('manifest.json'))
   } catch (error) {
-    if ((error as Error).message.includes('missing')) throw error
-    throw new Error('That file is not a Chordless export: its manifest cannot be read')
+    // (a file the export lacks is said as it is: what is in the file, but not JSON, is another thing)
+    if (error instanceof UserError) throw error
+    throw new UserError(t('export-bad-manifest'))
   }
-  if (manifest.format !== EXPORT_FORMAT) throw new Error('That file is not a Chordless export')
+  if (manifest.format !== EXPORT_FORMAT) throw new UserError(t('export-not-export'))
   if (manifest.version > EXPORT_VERSION) {
-    throw new Error('That export was made by a newer Chordless: update the app to import it')
+    throw new UserError(t('export-too-new'))
   }
 
   const chordpro = new Map<string, string>()

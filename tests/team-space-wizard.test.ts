@@ -248,7 +248,8 @@ describe('team-space-wizard', () => {
       throw new Error('The folder picker is not set up on this server')
     }
     button('Choose a different folder').click()
-    await until(() => text().includes('not set up'), 'says why')
+    await until(() => text().includes("Couldn't choose the folder."), 'says what failed')
+    expect(text()).to.not.contain('not set up')
     expect(text()).to.contain('Church Drive')
   })
 
@@ -274,8 +275,10 @@ describe('team-space-wizard', () => {
     await open(undefined, false)
     await until(() => page.shadowRoot?.querySelector('#name'), 'the form')
     button('Choose a folder').click()
-    await until(() => page.shadowRoot?.querySelector('.error'), 'says why')
-    expect(text()).to.contain('not set up')
+    await until(() => page.shadowRoot?.querySelector('.error'), 'says what failed')
+    // (that the server has no key is for whoever runs it, not for the person choosing a folder)
+    expect(text()).to.contain("Couldn't choose the folder.")
+    expect(text()).to.not.contain('not set up')
   })
 
   it('keeps the folder it had when they cancel choosing another', async () => {

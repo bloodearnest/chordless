@@ -2,7 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { saveAccountName } from '../js/account-info.ts'
 import { t } from '../js/text.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { whatToSay } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles, fieldStyles } from './shared-styles.ts'
@@ -60,7 +60,7 @@ export class NamePrompt extends LitElement {
       await saveAccountName(input.value)
       this.remove()
     } catch (error) {
-      this._error = errorMessage(error)
+      this._error = whatToSay(error, t('name-save-failed'))
     } finally {
       this._busy = false
     }

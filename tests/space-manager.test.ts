@@ -310,8 +310,9 @@ describe('space-manager', () => {
       try {
         must(el.shadowRoot?.querySelector<HTMLButtonElement>('#delete')).click()
         await answer(el, 'Delete from this device?', true)
-        await waitUntil(() => text(el).includes('disk full'))
-        expect(text(el)).to.contain('Failed to delete it: disk full')
+        await waitUntil(() => text(el).includes('Failed to delete it'))
+        expect(text(el)).to.contain('Failed to delete it: Something went wrong')
+        expect(text(el)).to.not.contain('disk full')
         expect(gone).to.equal(0)
       } finally {
         proto.deleteSpace = real

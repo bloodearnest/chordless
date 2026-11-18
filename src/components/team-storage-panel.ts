@@ -3,7 +3,7 @@ import type { Space } from '../js/data-types.ts'
 import { type TeamCredential, teamApi } from '../js/team-client.ts'
 import { returnToOwnSignIn } from '../js/team-spaces.ts'
 import { t } from '../js/text.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { whatToSay } from '../js/utils/errors.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 
 /**
@@ -73,7 +73,7 @@ export class TeamStoragePanel extends LitElement {
     try {
       this._credential = await teamApi.credential(this._ownedTeam as string)
     } catch (error) {
-      this._error = errorMessage(error)
+      this._error = whatToSay(error, t('storage-load-failed'))
     }
   }
 
@@ -96,7 +96,7 @@ export class TeamStoragePanel extends LitElement {
     try {
       await work(this._ownedTeam as string)
     } catch (error) {
-      this._error = errorMessage(error)
+      this._error = whatToSay(error, t('storage-switch-failed'))
     } finally {
       this._busy = false
     }

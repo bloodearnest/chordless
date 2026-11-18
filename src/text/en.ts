@@ -1880,4 +1880,66 @@ share-bad-key-text = The link looks cut short or changed. Ask for it again, or s
 share-unreachable = Can't reach the setlist
 share-unreachable-text = Connect to the internet and open the link again. After that it works without a connection.
 share-offline = You're offline
+
+## When something could not be done (what a person is told when the reason is not for them)
+
+# Where an error was written for developers, a person is told what could not be done, in words: the error is kept for the reports.
+error-something = Something went wrong
+
+people-failed = Couldn't make that change to the people.
+de-delete-failed = Couldn't delete it.
+join-sign-in-failed = Couldn't sign in.
+join-failed = Couldn't join the team space.
+wizard-connect-failed = Couldn't connect to Google.
+wizard-folder-failed = Couldn't choose the folder.
+wizard-create-failed = Couldn't make the team space.
+drive-sync-reset-failed = Couldn't reset from Google Drive.
+drive-sync-start-over-failed = Couldn't start over in Google Drive.
+drive-sync-replace-failed = Couldn't replace this device's copy.
+licence-load-failed = Couldn't read the licence number.
+licence-save-failed = Couldn't save the licence number.
+name-save-failed = Couldn't save your name.
+storage-load-failed = Couldn't check how this Team's files are reached.
+storage-switch-failed = Couldn't switch how this Team's files are reached.
+membership-failed = Couldn't make that change to the Team.
+pads-select-failed = Couldn't use that pad set.
+pads-upload-failed = Failed to upload pad set.
+pads-select-zip = Please select a ZIP file to upload.
+export-read-failed = Couldn't read that file.
+
+
+## Errors that are written for the person who reads them (thrown as a UserError)
+
+pads-space-unavailable = That pad set’s space is not available: pad sets are kept in a space’s folder in Google Drive
+pads-no-file = Please select a pad set ZIP file.
+pads-no-name = Please provide a pad set name.
+# { $keys } is the notes a pad set lacks a sound for ("D, F#").
+pads-missing-keys = Missing keys in pad set: { $keys }
+pads-gone = That pad set is no longer in Google Drive.
+pads-encrypted = Encrypted ZIP archives are not supported.
+
+team-needs-name = A team space needs a name
+team-sign-in-first = Sign in with Google first
+de-error-admin = Only an admin can delete a Team everywhere
+
+export-not-zip = That file is not a Chordless export: it is not a ZIP file
+# { $name } is the file the export lacks.
+export-entry-missing = That file is not a Chordless export: { $name } is missing
+export-bad-manifest = That file is not a Chordless export: its manifest cannot be read
+export-not-export = That file is not a Chordless export
+export-too-new = That export was made by a newer Chordless: update the app to import it
+
+# A reset that was stopped: { $count } changes, the first of them in { $shown } ("song Amazing Grace, setlist 12 Oct").
+unsynced-error = { $count } local change(s) aren't in Drive yet, so nothing was reset: { $shown }
+# The same, when there are more than are named: { $more } of them.
+unsynced-error-more = { $count } local change(s) aren't in Drive yet, so nothing was reset: { $shown } and { $more } more
+# { $count } songs and setlists are in another folder than { $folder }.
+folder-mismatch-error = { $count } setlist(s)/song(s) on this device are stored in a different Google Drive folder than "{ $folder }", the one this space now syncs with. Nothing was synced, to avoid uploading them again as duplicates.
+sync-list-failed = Couldn't list your Drive files, so nothing was changed. Try again.
+# { $name } is the folder the space looks for.
+sync-no-folder = There is no Google Drive folder called "{ $name }" that this app can see, so nothing was changed. Sync it from the device that has the data first.
+
+pads-set-missing-key = Pad set "{ $name }" is missing key: { $key }
+pads-set-missing-files = Pad set "{ $name }" is missing files for: { $keys }
+join-sync-failed = Couldn't get the team's songs and setlists.
 `

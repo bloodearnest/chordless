@@ -8,6 +8,7 @@
  * Either way the space may be the one in use: it is not a reason to refuse. Another space is made
  * the one in use, or none (Personal is made again the next time the app needs one).
  */
+
 import type { Space } from './data-types.ts'
 import { trashFile } from './drive-api.ts'
 import { forgetSync } from './last-sync.ts'
@@ -16,6 +17,8 @@ import { storageFor } from './storage/space-storage.ts'
 import { teamApi } from './team-client.ts'
 import { declineTeam } from './team-memberships.ts'
 import { atLeast } from './team-roles.ts'
+import { t } from './text.ts'
+import { UserError } from './utils/errors.ts'
 
 /** Whether this person may delete the space everywhere: a Team's admin or owner, or whoever has a personal space */
 export function mayDeleteEverywhere(space: Pick<Space, 'team'>): boolean {
@@ -62,7 +65,7 @@ export async function removeSpaceFromDevice(
  * @throws if the person may not, or the folder could not be trashed
  */
 export async function deleteSpaceEverywhere(space: Space): Promise<{ wasCurrent: boolean }> {
-  if (!mayDeleteEverywhere(space)) throw new Error('Only an admin can delete a Team everywhere')
+  if (!mayDeleteEverywhere(space)) throw new UserError(t('de-error-admin'))
   if (space.team) await teamApi.deleteEverything(space.team.id)
   else await trashPersonalFolder(space)
   return removeSpaceFromDevice(space)

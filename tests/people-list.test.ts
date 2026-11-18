@@ -653,7 +653,7 @@ describe('people-list', () => {
     })
 
     it('says what went wrong at the list when a revoke is refused', async () => {
-      routes[`DELETE /api/space/${TEAM}/invites/ab12`] = () => json({ error: 'Not today' }, 500)
+      routes[`DELETE /api/space/${TEAM}/invites/ab12`] = () => json({ error: 'Not today' }, 400)
       await open(await space('owner'))
       button('Revoke', rowOf('eve@example.com')).click()
       await until(() => text().includes('Not today'), 'the message')

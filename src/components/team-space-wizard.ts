@@ -31,7 +31,7 @@ import {
 } from '../js/team-spaces.ts'
 import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { errorMessage, whatToSay } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './progress-bar.ts'
@@ -201,7 +201,7 @@ export class TeamSpaceWizard extends LitElement {
       if (this._signIn === 'no-drive') await connectDrive()
       else await authorizeWithGoogle()
     } catch (error) {
-      this._message = errorMessage(error)
+      this._message = whatToSay(error, t('wizard-connect-failed'))
       return
     }
     await this._check()
@@ -212,7 +212,7 @@ export class TeamSpaceWizard extends LitElement {
     try {
       this._parent = (await this.pick()) ?? this._parent
     } catch (error) {
-      this._message = errorMessage(error)
+      this._message = whatToSay(error, t('wizard-folder-failed'))
     }
   }
 
@@ -236,7 +236,7 @@ export class TeamSpaceWizard extends LitElement {
         ccliLicence: this._licence,
       })
     } catch (error) {
-      this._message = errorMessage(error)
+      this._message = whatToSay(error, t('wizard-create-failed'))
       this._state = 'form'
       return
     }
