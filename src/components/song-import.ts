@@ -37,7 +37,7 @@ import { songSelectLink } from '../js/songselect-link.ts'
 import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { errorMessage, failedWith } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './chart-diff.ts'
@@ -405,7 +405,13 @@ export class SongImport extends LitElement {
       await this._addLibrarySongs(found)
     } catch (error) {
       console.error('[Import] Failed to read a chart:', error)
-      this._showError(t('import-chart-failed', { reason: errorMessage(error) }))
+      this._showError(
+        failedWith(
+          error,
+          t('import-chart-failed', { reason: errorMessage(error) }),
+          t('import-chart-failed-plain')
+        )
+      )
     }
   }
 
@@ -451,7 +457,9 @@ export class SongImport extends LitElement {
       this._progress = t('import-reading-song')
       void this._useDefaultSpace().then(() => this.receive(event.data.data))
     } else if (event.data?.type === 'CHORDLESS_IMPORT_FAILED') {
-      this._showError(t('import-songselect-failed', { reason: String(event.data.data?.message) }))
+      // (what the bookmarklet says went wrong is for whoever wrote it: kept for the console)
+      console.warn('[Import] SongSelect failed:', event.data.data?.message)
+      this._showError(t('import-songselect-failed-plain'))
     }
   }
 
@@ -655,7 +663,13 @@ export class SongImport extends LitElement {
       await this._applyPicks(same)
     } catch (error) {
       console.error('[Import] Failed to process song:', error)
-      this._showError(t('import-process-failed', { reason: errorMessage(error) }))
+      this._showError(
+        failedWith(
+          error,
+          t('import-process-failed', { reason: errorMessage(error) }),
+          t('import-process-failed-plain')
+        )
+      )
     }
   }
 
@@ -856,7 +870,13 @@ export class SongImport extends LitElement {
       await this._finish(`/setlist/${setlistId}`)
     } catch (error) {
       console.error('[Import] Error:', error)
-      this._showError(t('import-save-failed', { reason: errorMessage(error) }))
+      this._showError(
+        failedWith(
+          error,
+          t('import-save-failed', { reason: errorMessage(error) }),
+          t('import-save-failed-plain')
+        )
+      )
     }
   }
 
@@ -914,7 +934,13 @@ export class SongImport extends LitElement {
     } catch (error) {
       console.error('[Import] Error creating setlist:', error)
       this._newSetlistModal()?.close()
-      this._showError(t('import-setlist-failed', { reason: errorMessage(error) }))
+      this._showError(
+        failedWith(
+          error,
+          t('import-setlist-failed', { reason: errorMessage(error) }),
+          t('import-setlist-failed-plain')
+        )
+      )
       return
     }
     this._newSetlistModal()?.close()
@@ -1142,7 +1168,13 @@ export class SongImport extends LitElement {
         this._setChoice(item, item.pick, song)
       } catch (error) {
         console.error('[Import] Failed to import a duplicate:', error)
-        this._showError(t('import-song-failed', { reason: errorMessage(error) }))
+        this._showError(
+          failedWith(
+            error,
+            t('import-song-failed', { reason: errorMessage(error) }),
+            t('import-song-failed-plain')
+          )
+        )
         return
       }
     }

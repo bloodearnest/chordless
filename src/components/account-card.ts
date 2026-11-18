@@ -8,7 +8,7 @@ import {
 } from '../js/account-info.ts'
 import type { SignInState, UserInfo } from '../js/google-auth.ts'
 import { t } from '../js/text.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { errorMessage, failedWith } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './email-code-sign-in.ts'
@@ -146,7 +146,11 @@ export class AccountCard extends LitElement {
     } catch (error) {
       console.error('[AccountCard] Sign-in failed:', error)
       this._message = {
-        text: t('account-signin-failed', { reason: errorMessage(error) }),
+        text: failedWith(
+          error,
+          t('account-signin-failed', { reason: errorMessage(error) }),
+          t('account-signin-failed-plain')
+        ),
         type: 'error',
       }
     }
@@ -166,7 +170,11 @@ export class AccountCard extends LitElement {
     } catch (error) {
       console.error('[AccountCard] Connecting Google Drive failed:', error)
       this._message = {
-        text: t('account-drive-connect-failed', { reason: errorMessage(error) }),
+        text: failedWith(
+          error,
+          t('account-drive-connect-failed', { reason: errorMessage(error) }),
+          t('account-drive-connect-failed-plain')
+        ),
         type: 'error',
       }
     }
@@ -183,7 +191,11 @@ export class AccountCard extends LitElement {
     } catch (error) {
       console.error('[AccountCard] Turning the sync off failed:', error)
       this._message = {
-        text: t('account-sync-disable-failed', { reason: errorMessage(error) }),
+        text: failedWith(
+          error,
+          t('account-sync-disable-failed', { reason: errorMessage(error) }),
+          t('account-sync-disable-failed-plain')
+        ),
         type: 'error',
       }
     }
@@ -199,7 +211,11 @@ export class AccountCard extends LitElement {
     } catch (error) {
       console.error('[AccountCard] Logout failed:', error)
       this._message = {
-        text: t('account-logout-failed', { reason: errorMessage(error) }),
+        text: failedWith(
+          error,
+          t('account-logout-failed', { reason: errorMessage(error) }),
+          t('account-logout-failed-plain')
+        ),
         type: 'error',
       }
     }
@@ -217,7 +233,11 @@ export class AccountCard extends LitElement {
     } catch (error) {
       console.error('[AccountCard] Saving the name failed:', error)
       this._message = {
-        text: t('account-name-save-failed', { reason: errorMessage(error) }),
+        text: failedWith(
+          error,
+          t('account-name-save-failed', { reason: errorMessage(error) }),
+          t('account-name-save-failed-plain')
+        ),
         type: 'error',
       }
     } finally {

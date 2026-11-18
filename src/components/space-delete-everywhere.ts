@@ -8,7 +8,7 @@ import { deleteSpaceEverywhere, mayDeleteEverywhere } from '../js/space-deletion
 import type { SpaceSummary } from '../js/space-summary.ts'
 import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
-import { errorMessage, whatToSay } from '../js/utils/errors.ts'
+import { errorMessage, failedWith, whatToSay } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles } from './shared-styles.ts'
@@ -108,7 +108,11 @@ export class SpaceDeleteEverywhere extends LitElement {
     try {
       this._backup = await this.backup(this.space)
     } catch (error) {
-      this._error = t('de-backup-failed', { reason: errorMessage(error) })
+      this._error = failedWith(
+        error,
+        t('de-backup-failed', { reason: errorMessage(error) }),
+        t('de-backup-failed-plain')
+      )
     }
     this._busy = ''
   }

@@ -10,7 +10,7 @@ import { isTeamMember } from '../js/storage/space-storage.ts'
 import { AdoptFolderError } from '../js/sync-manager.ts'
 import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { errorMessage, failedWith } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles, spinnerStyles } from './shared-styles.ts'
@@ -215,7 +215,11 @@ export class SpaceCard extends LitElement {
       void this._loadSummary()
     } catch (error) {
       console.error('[SpaceCard] Sync failed:', error)
-      this._error = t('space-sync-failed', { reason: errorMessage(error) })
+      this._error = failedWith(
+        error,
+        t('space-sync-failed', { reason: errorMessage(error) }),
+        t('space-sync-failed-plain')
+      )
     } finally {
       this._syncing = false
       this._progress = ''

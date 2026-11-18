@@ -39,7 +39,7 @@ import {
 } from './auth-messages.ts'
 import { jwtClaims } from './base64url.ts'
 import { timedFetch, traced } from './telemetry/telemetry.ts'
-import { errorMessage } from './utils/errors.ts'
+import { errorMessage, UserError } from './utils/errors.ts'
 
 /** The signed-in user, as the UI shows them */
 export interface UserInfo {
@@ -296,7 +296,7 @@ export async function connectDrive(): Promise<AuthorizeResult> {
 }
 
 /** The Google account is already one of another Chordless account: it cannot also be connected to this one */
-export class GoogleInUseError extends Error {
+export class GoogleInUseError extends UserError {
   constructor() {
     super('That Google account is already used by another Chordless account')
     this.name = 'GoogleInUseError'

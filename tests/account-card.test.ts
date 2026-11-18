@@ -378,7 +378,8 @@ describe('account-card', () => {
       codeResponse = { error: 'access_denied' }
       control('enable-sync').click()
       await until(() => text().includes('Connecting Google Drive failed'), 'the failure')
-      expect(text()).to.contain('access_denied')
+      // (what Google answered is for a developer: the page says what could not be done)
+      expect(text()).to.not.contain('access_denied')
     })
 
     it('reconnects after the sign-in expired', async () => {
@@ -395,7 +396,7 @@ describe('account-card', () => {
       codeResponse = { error: 'access_denied' }
       control('sign-in').click()
       await until(() => text().includes('Signing in failed'), 'the failure to be shown')
-      expect(text()).to.contain('access_denied')
+      expect(text()).to.not.contain('access_denied')
       expect(card._state).to.equal('signed-out')
     })
 

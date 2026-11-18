@@ -31,7 +31,7 @@ import {
 } from '../js/team-spaces.ts'
 import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
-import { errorMessage, whatToSay } from '../js/utils/errors.ts'
+import { errorMessage, failedWith, whatToSay } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './progress-bar.ts'
@@ -270,7 +270,11 @@ export class TeamSpaceWizard extends LitElement {
       })
       this._saved = true
     } catch (error) {
-      this._syncError = errorMessage(error)
+      this._syncError = failedWith(
+        error,
+        t('wizard-save-failed', { reason: errorMessage(error) }),
+        t('wizard-save-failed-plain')
+      )
     }
     this._progress = null
   }
@@ -332,7 +336,11 @@ export class TeamSpaceWizard extends LitElement {
         destination.db?.close()
       }
     } catch (error) {
-      this._bringError = errorMessage(error)
+      this._bringError = failedWith(
+        error,
+        t('wizard-bring-failed', { reason: errorMessage(error) }),
+        t('wizard-bring-failed-plain')
+      )
     }
   }
 
@@ -370,14 +378,14 @@ export class TeamSpaceWizard extends LitElement {
           ${
             this._bringError
               ? html`<p class="status error" role="alert">
-                ${t('wizard-bring-failed', { reason: this._bringError })}
+                ${this._bringError}
               </p>`
               : nothing
           }
           ${
             this._syncError
               ? html`<p class="status error" role="alert">
-                ${t('wizard-save-failed', { reason: this._syncError })}
+                ${this._syncError}
               </p>`
               : nothing
           }

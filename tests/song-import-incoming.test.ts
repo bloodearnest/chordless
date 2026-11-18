@@ -179,7 +179,8 @@ describe('song-import: songs that arrive', () => {
         },
       })
       await importer._matchCharts([pdf('Broken.pdf')])
-      expect(importer._error).to.contain('Failed to read the chart: damaged')
+      expect(importer._error).to.contain('Failed to read the chart.')
+      expect(importer._error).to.not.contain('damaged')
     })
 
     it('takes songs along with the PDF', async () => {
@@ -268,7 +269,8 @@ describe('song-import: songs that arrive', () => {
       } finally {
         Object.getPrototypeOf(db).saveSetlist = real
       }
-      expect(importer._error).to.contain('Failed to create setlist: disk full')
+      expect(importer._error).to.contain('Failed to create setlist.')
+      expect(importer._error).to.not.contain('disk full')
     })
 
     it('closes the form on cancel', async () => {

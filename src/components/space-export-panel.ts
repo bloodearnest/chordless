@@ -13,7 +13,7 @@ import {
 } from '../js/space-export.ts'
 import { planReset, type ResetPlan, resetToExport } from '../js/space-restore.ts'
 import { t } from '../js/text.ts'
-import { errorMessage, whatToSay } from '../js/utils/errors.ts'
+import { errorMessage, failedWith, whatToSay } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
 
 /** The pad sets in Drive that an export could include, with their sizes */
@@ -184,7 +184,14 @@ export class SpaceExportPanel extends LitElement {
         kind: 'info',
       }
     } catch (error) {
-      this._message = { text: t('export-failed', { reason: errorMessage(error) }), kind: 'error' }
+      this._message = {
+        text: failedWith(
+          error,
+          t('export-failed', { reason: errorMessage(error) }),
+          t('export-failed-plain')
+        ),
+        kind: 'error',
+      }
     } finally {
       this._busy = false
     }
@@ -256,7 +263,14 @@ export class SpaceExportPanel extends LitElement {
         kind: 'info',
       }
     } catch (error) {
-      this._message = { text: t('import-failed', { reason: errorMessage(error) }), kind: 'error' }
+      this._message = {
+        text: failedWith(
+          error,
+          t('import-failed', { reason: errorMessage(error) }),
+          t('import-failed-plain')
+        ),
+        kind: 'error',
+      }
     } finally {
       this._busy = false
     }
@@ -272,7 +286,11 @@ export class SpaceExportPanel extends LitElement {
       this._reset = await withSource(this.space.id, db => planReset(pending.exported, db))
     } catch (error) {
       this._message = {
-        text: t('export-check-failed', { reason: errorMessage(error) }),
+        text: failedWith(
+          error,
+          t('export-check-failed', { reason: errorMessage(error) }),
+          t('export-check-failed-plain')
+        ),
         kind: 'error',
       }
     } finally {
@@ -318,7 +336,11 @@ export class SpaceExportPanel extends LitElement {
       }
     } catch (error) {
       this._message = {
-        text: t('export-reset-failed', { reason: errorMessage(error) }),
+        text: failedWith(
+          error,
+          t('export-reset-failed', { reason: errorMessage(error) }),
+          t('export-reset-failed-plain')
+        ),
         kind: 'error',
       }
     } finally {

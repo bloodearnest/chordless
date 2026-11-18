@@ -792,7 +792,10 @@ describe('song-import: corners', () => {
         const element = await importer()
         message({ type: 'CHORDLESS_IMPORT_FAILED', data: { message: 'no access' } })
         await element.updateComplete
-        expect($(element, '[role="alert"]').textContent).to.contain('no access')
+        expect($(element, '[role="alert"]').textContent).to.contain(
+          'Import from SongSelect failed.'
+        )
+        expect($(element, '[role="alert"]').textContent).to.not.contain('no access')
         expect($(element, 'textarea')).to.exist
       })
     })
@@ -865,7 +868,8 @@ describe('song-import: corners', () => {
     const element = await importer()
     await element.receive({ chordproText: chart(unique('Lost')), source: 'paste' })
     await element._addToSetlist('no-such-setlist')
-    expect(element._error).to.contain('Setlist not found')
+    expect(element._error).to.contain('Failed to save song.')
+    expect(element._error).to.not.contain('Setlist not found')
   })
 
   it('says so when a song cannot be updated', async () => {

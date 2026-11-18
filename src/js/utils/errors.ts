@@ -35,3 +35,14 @@ export function whatToSay(error: unknown, what: string): string {
   console.warn(`[Error] ${what}`, error)
   return what
 }
+
+/**
+ * What to say of a failure that has a reason ("Signing in failed: …"): the sentence with the reason where
+ * the error's words were written for the person, and `plain` ("Signing in failed.") where they were not.
+ * The error is logged then, so nothing is lost.
+ */
+export function failedWith(error: unknown, withReason: string, plain: string): string {
+  if (isForPeople(error)) return withReason
+  console.warn(`[Error] ${plain}`, error)
+  return plain
+}
