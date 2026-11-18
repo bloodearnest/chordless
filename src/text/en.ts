@@ -1464,7 +1464,6 @@ player-toggle-pads = Toggle pads on/off
 
 ## A setlist's details (the form, and what the dialog says of a setlist)
 
-action-save = Save
 action-remove = Remove
 songs-count =
     { $count ->
