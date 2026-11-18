@@ -229,6 +229,7 @@ describe('TeamStorage', () => {
     expect(await failure(() => team.ensureRoot())).to.match(/joined/)
     expect(await failure(() => team.renameRoot())).to.equal('')
     expect(await team.findRootByName()).to.equal(null)
+    expect(await team.listRoots()).to.deep.equal([])
   })
 
   it('passes on a failure to list a set’s files that is not that the set is not there', async () => {

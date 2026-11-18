@@ -845,6 +845,33 @@ describe('Drive sync: the less common turns', () => {
       expect(await many.resolveDriveFolder()).to.equal(true) // two others: not guessed
     })
 
+    it('carries on when the device cannot remember the answer', async () => {
+      const old = await rig.storage.ensureRoot('Simon’s songs', 'space-old')
+      const { sync, folderLink } = await open()
+      const { getItem, setItem } = Storage.prototype
+      Storage.prototype.getItem = () => {
+        throw new Error('blocked')
+      }
+      Storage.prototype.setItem = () => {
+        throw new Error('blocked')
+      }
+      let asked = false
+      let adopted = false
+      try {
+        await sync.resolveDriveFolder().catch(() => {
+          asked = true
+        })
+        sync.declineAdoption()
+        await sync.adoptFolder(old.ref)
+        adopted = folderLink.value === old.ref
+      } finally {
+        Storage.prototype.getItem = getItem
+        Storage.prototype.setItem = setItem
+      }
+      expect(asked).to.equal(true)
+      expect(adopted).to.equal(true)
+    })
+
     it('does not ask for a space with another name', async () => {
       await rig.storage.ensureRoot('Simon’s songs', 'space-old')
       const { sync } = await open('Choir')
