@@ -305,9 +305,6 @@ confirm-logout-heading = Log out of Google?
 confirm-logout-button = Log Out
 confirm-logout-message = This signs you out on this device only. Other devices stay signed in. Your songs and setlists stay on this device and in Drive.
 
-confirm-revoke-heading = Revoke access at Google?
-confirm-revoke-button = Revoke Access
-confirm-revoke-message = This signs you out and revokes Chordless's access to your Google Drive at Google (which needs the network). Every other device signed in with this Google account will need to connect again too. Your songs and setlists stay on this device and in Drive.
 
 confirm-share-stop-heading = Stop sharing?
 confirm-share-stop-button = Stop sharing
@@ -564,8 +561,6 @@ space-sync-sign-in-hint = Sign in on the Account and Teams page to sync.
 ## Signing in
 
 action-sign-in = Sign in with Google
-account-email-only-status = Signed in with your email address. Google is not connected, so your own spaces will not sync.
-account-connect-google = Connect Google
 account-email-signed-in = Signed in with your email address.
 account-signed-out-name = Not signed in
 account-signed-out-text = Your songs and setlists stay on this device. Signing in with Google lets you sync them, share setlists, and join a team.
@@ -699,19 +694,32 @@ account-teams-all-here = Every team you are in is on this device.
 account-teams-look-failed = Could not look for your teams: { $reason }
 account-device-heading = This device
 
-account-manage = Manage
-account-advanced = Advanced
 account-logout = Log out
-account-revoke = Revoke access on all devices
-account-test-refresh = Test token refresh
-account-backup-download = Download sign-in backup
-account-backup-import = Import sign-in backup
-account-connect-drive = Connect Google Drive
+account-name-label = Name
+account-name-none = Not set
+account-name-add = Add your name
+account-name-save-failed = Saving your name failed: { $reason }
+account-emails-label = Emails
+account-emails-none = None yet
+account-email-google = Google
+account-sync-label = Personal space sync
+account-sync-on = On, with { $email }
+account-sync-off-email = Off. Syncing your Personal space between your devices needs a Google account.
+account-sync-off-drive = Off. Google Drive is not connected.
+account-sync-disabled = Syncing is off on this device. Your Personal space stays here, and in your Google Drive.
+account-sync-disable-failed = Turning syncing off failed: { $reason }
+confirm-sync-disable-heading = Turn off syncing on this device?
+confirm-sync-disable-button = Disable
+confirm-sync-disable-message = Your Personal space stays on this device and in your Google Drive, and you stay signed in. Syncing stops here only: to remove Chordless's access to your Drive everywhere, remove it at myaccount.google.com/permissions.
+action-save = Save
+name-prompt-heading = What should we call you?
+name-prompt-text = This is the name your team sees, and the one on your own setlists. You can change it any time on the Account page.
+name-prompt-later = Not now
+action-edit = Edit
+action-enable = Enable
+action-disable = Disable
 # The name of someone whose Google account gave none.
-account-name-unknown = Signed in
 account-status-expired = Sign-in expired: reconnect to sync
-account-status-no-drive = Signed in, Google Drive not connected
-account-status-connected = Google Drive connected
 
 # What the card says after something was done. { $reason } is what went wrong.
 account-signed-in = Signed in.
@@ -722,16 +730,7 @@ account-drive-not-connected = Google Drive was not connected.
 account-drive-connect-failed = Connecting Google Drive failed: { $reason }
 account-logged-out = Logged out on this device.
 account-logout-failed = Logging out failed: { $reason }
-account-revoked = Logged out, and Chordless's access to your Drive was revoked.
-account-revoked-unreached = Logged out on this device, but Google could not be reached to revoke Chordless's access. You can remove it at myaccount.google.com/permissions
-account-revoke-failed = Revoking access failed: { $reason }
-account-backup-download-failed = Downloading the backup failed: { $reason }
-account-backup-imported = Sign-in backup imported.
-account-backup-import-failed = Importing the backup failed: { $reason }
-account-refresh-not-signed-in = Not signed in: sign in with Google first.
 # { $old } and { $new } are the times the token was due to expire before and after.
-account-refresh-works = Token refresh works: expiry { $old } → { $new }
-account-refresh-failed = Token refresh failed: { $reason }
 
 storage-heading = Storage Usage
 storage-browser-data = Browser data

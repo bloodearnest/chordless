@@ -71,6 +71,7 @@ test('the API is refused to a page from another origin, before it is routed', as
     '/session/email/verify',
     '/session/email/link',
     '/session/email/link/peek',
+    '/api/account',
     '/api/share/abc',
     '/api/config',
   ]) {
@@ -116,6 +117,14 @@ test("each session route is the Worker's: an empty request is refused by its own
   assert.equal((await send('/session/email/link', postJson('{}'))).status, 503)
   assert.equal((await send('/session/email/link/peek', postJson('{}'))).status, 503)
   assert.deepEqual(assetRequests, [])
+})
+
+test('the account is the Worker’s for GET and PUT only', async () => {
+  const { send, assetRequests } = setup()
+  assert.equal((await send('/api/account')).status, 503)
+  assert.equal((await send('/api/account', { method: 'PUT' })).status, 503)
+  await send('/api/account', { method: 'POST' })
+  assert.deepEqual(assetRequests, ['POST /api/account'])
 })
 
 test('only POST reaches the auth routes: other methods fall through to the assets', async () => {

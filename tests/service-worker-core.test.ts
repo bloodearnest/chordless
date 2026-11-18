@@ -4,7 +4,7 @@
  * worker, installed in a browser, is in service-worker.playwright.ts.
  */
 import { expect, waitUntil } from '@open-wc/testing'
-import * as AuthDB from '../src/js/auth-db.ts'
+import type * as AuthDB from '../src/js/auth-db.ts'
 import {
   startServiceWorker,
   type WorkerConfig,
@@ -288,25 +288,18 @@ describe('the service worker', () => {
       })
     })
 
-    it('keeps, gives back, exports, imports and deletes the blob', async () => {
+    it('keeps, gives back and deletes the blob', async () => {
       expect(
         (await send({ type: 'STORE_BLOB', data: { blob: 'b', metadata: { id_token: 't' } } }))
           ?.success
       ).to.equal(true)
       const got = await send({ type: 'GET_BLOB' })
       expect((got?.data as AuthDB.StoredBlob | undefined)?.blob).to.equal('b')
-      const exported = await send({ type: 'EXPORT_BLOB' })
-      const backup = exported?.backup as AuthDB.BlobBackup
-      expect(backup.blob).to.equal('b')
       expect((await send({ type: 'DELETE_BLOB' }))?.success).to.equal(true)
       expect((await send({ type: 'GET_BLOB' }))?.data).to.equal(undefined)
-      expect((await send({ type: 'IMPORT_BLOB', data: { backup } }))?.success).to.equal(true)
-      expect((await AuthDB.getBlob())?.blob).to.equal('b')
     })
 
     it('answers a message that fails with its error', async () => {
-      const reply = await send({ type: 'IMPORT_BLOB', data: { backup: { version: 9 } } })
-      expect(reply).to.include({ success: false, error: 'Invalid backup format' })
       const noData = await send({ type: 'STORE_BLOB' })
       expect(noData?.success).to.equal(false)
     })

@@ -54,8 +54,7 @@ to restore from: recovery needs either the user or the server.
   - detect an eviction: a localStorage marker ("this device has data") that is missing when the
     app opens, and /session/restore answers yes. Then show "Safari cleared this device's data:
     restoring your setlists from Google Drive" and run the existing first-sign-in sync
-    (checkFirstTimeAuth renames the Personal space to the Google name, Sync joins the existing
-    same-named Drive folder). No tap needed. If /session/restore says no (no cookie), fall back
+    (Sync joins the existing same-named Drive folder: "Personal", now that a first sign-in no longer renames it). No tap needed. If /session/restore says no (no cookie), fall back
     to asking the user to sign in again: google-auth.ts uses access_type: 'offline' with
     prompt: 'consent', so that should be issued a new refresh token (verify with a real wipe)
   - update src/privacy.html in the same change: it says Chordless uses no cookies and the

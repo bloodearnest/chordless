@@ -1,8 +1,8 @@
 import { expect } from '@open-wc/testing'
 import { type AuthMetadata, deleteBlob, type StoredUser, storeBlob } from '../src/js/auth-db.ts'
 import {
+  disableGoogleSync,
   type EmailCodeError,
-  exportBlobBackup,
   getAccessToken,
   getCurrentUserInfo,
   getIdentityToken,
@@ -11,11 +11,11 @@ import {
   isAuthenticated,
   logout,
   peekSignInLink,
-  revokeAccess,
   SignInExpiredError,
   signInWithEmail,
   signInWithLink,
   startEmailSignIn,
+  storeSignIn,
 } from '../src/js/google-auth.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
@@ -359,7 +359,7 @@ describe('google-auth', () => {
         updated_at: new Date().toISOString(),
       }
       respondTo = () => json({ success: true })
-      expect(await revokeAccess()).to.deep.equal({ revoked: true })
+      await logout()
       expect(fetches.map(each => each.url)).to.include('/session/logout')
       expect(fetches.at(-1)?.body).to.deep.equal({ refresh_token: 'r' })
       expect(worker.stored).to.equal(undefined)
@@ -512,60 +512,57 @@ describe('google-auth', () => {
       expect(fetches, 'other devices keep their sign-in').to.have.length(0)
     })
 
-    it('revokes the access: the worker forgets the blob, and Google revokes the access', async () => {
-      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) }, 'the-blob')
-      respondTo = () => json({ success: true })
-
-      expect(await revokeAccess()).to.deep.equal({ revoked: true })
-
-      expect(worker.stored).to.equal(undefined)
-      expect(fetches).to.have.length(1)
-      expect(fetches[0].url).to.equal('/session/logout')
-      expect(fetches[0].body).to.deep.equal({ blob: 'the-blob' })
-    })
-
-    it('is logged out all the same, and says the access is not revoked, when Google cannot be asked', async () => {
-      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) })
-      respondTo = () => {
-        throw new TypeError('offline')
+    it('turns the Personal space’s sync off: the blob goes, the session stays, and nobody is asked', async () => {
+      worker.stored = {
+        blob: 'the-blob',
+        metadata: {
+          access_token: 'a',
+          expires_at: inFromNow(MINUTE),
+          id_token: 'i',
+          scope: 'https://www.googleapis.com/auth/drive.file openid email',
+          session: { access_token: 's', refresh_token: 'r', expires_at: inFromNow(MINUTE) },
+          user: makeUser(),
+        },
+        updated_at: new Date().toISOString(),
       }
-      expect(await revokeAccess()).to.deep.equal({ revoked: false })
-      expect(worker.stored).to.equal(undefined)
 
-      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) })
-      respondTo = () => json({ error: 'Google did not revoke the access' }, 502)
-      expect(await revokeAccess()).to.deep.equal({ revoked: false })
-      expect(worker.stored).to.equal(undefined)
-    })
+      await disableGoogleSync()
 
-    it('asks Google for nothing when nobody is signed in', async () => {
-      expect(await revokeAccess()).to.deep.equal({ revoked: false })
-      expect(fetches).to.have.length(0)
-    })
-
-    it('says so when the worker cannot forget the blob, and stays signed in', async () => {
-      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) })
-      worker.failing.add('DELETE_BLOB')
-
-      let error: Error | null = null
-      await revokeAccess().catch(e => {
-        error = e
-      })
-
-      expect((error as Error | null)?.message).to.equal('worker failed')
+      const stored = must(worker.stored)
+      expect(stored.blob).to.equal('')
+      expect(stored.metadata.session?.refresh_token).to.equal('r')
+      expect(stored.metadata.user?.email).to.equal('ann@example.com')
+      expect(stored.metadata.scope).to.equal('')
+      expect(stored.metadata.access_token).to.equal(undefined)
       expect(await isAuthenticated()).to.equal(true)
-      expect(fetches, 'and the access is not revoked').to.have.length(0)
+      expect(await getSignInState()).to.equal('no-drive')
+      expect(fetches, 'Google is not revoked: other devices keep their sync').to.have.length(0)
     })
 
-    it('exports the blob for a backup, or says why not', async () => {
+    it('does nothing when nobody is signed in, or there is no Google to turn off', async () => {
+      await disableGoogleSync()
+      expect(worker.stored).to.equal(undefined)
+      worker.stored = {
+        blob: '',
+        metadata: {
+          scope: '',
+          session: { access_token: 's', refresh_token: 'r', expires_at: inFromNow(MINUTE) },
+        },
+        updated_at: new Date().toISOString(),
+      }
+      await disableGoogleSync()
+      expect(must(worker.stored).metadata.session?.refresh_token).to.equal('r')
+    })
+
+    it('says so when the worker cannot keep the change, and stays as it was', async () => {
+      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) }, 'the-blob')
+      worker.failing.add('STORE_BLOB')
       let error: Error | null = null
-      await exportBlobBackup().catch(e => {
+      await disableGoogleSync().catch(e => {
         error = e
       })
-      expect((error as Error | null)?.message).to.equal('No blob to export')
-
-      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) }, 'the-blob')
-      expect((await exportBlobBackup()).blob).to.equal('the-blob')
+      expect((error as Error | null)?.message).to.equal('worker failed')
+      expect(must(worker.stored).blob).to.equal('the-blob')
     })
   })
 
@@ -575,22 +572,20 @@ describe('google-auth', () => {
       expect(await getAccessToken()).to.equal('')
     })
 
-    it('says why a backup could not be made, or that it could not', async () => {
+    it('says why the worker could not keep a sign-in, or that it could not', async () => {
       const post = worker.postMessage.bind(worker)
       let reply: object = { success: false }
       worker.postMessage = ((message: { messageId: string }, [port]: MessagePort[]) =>
         port.postMessage({ messageId: message.messageId, ...reply })) as never
       const failure = async () => {
         try {
-          await exportBlobBackup()
+          await storeSignIn('b', {})
         } catch (error) {
           return (error as Error).message
         }
         return ''
       }
-      expect(await failure()).to.equal('Failed to export blob')
-      reply = { success: true }
-      expect(await failure()).to.equal('Failed to export blob')
+      expect(await failure()).to.equal('Failed to store the sign-in')
       reply = { success: false, error: 'No way' }
       expect(await failure()).to.equal('No way')
       worker.postMessage = post
@@ -643,7 +638,7 @@ describe('google-auth', () => {
         realSetTimeout(fn, ms === 10000 ? 0 : ms)) as typeof setTimeout
       let message = ''
       try {
-        await exportBlobBackup()
+        await logout()
       } catch (error) {
         message = (error as Error).message
       } finally {

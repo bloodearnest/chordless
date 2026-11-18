@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict'
 import { beforeEach, describe, test } from 'node:test'
 import * as jose from 'jose'
+import { handleAccount } from '../worker/src/account.ts'
 import { type BlobData, decryptBlob, encryptBlob } from '../worker/src/blob.ts'
 import {
   CODE_TTL_MS,
@@ -1311,5 +1312,166 @@ describe('connecting Google to an account', () => {
       googleAs({ sub: 'g-5', email: 'ann+x@example.com', email_verified: true })
     )
     assert.notEqual(await accountOfToken(e, other.session?.access_token), mine.id)
+  })
+})
+
+describe('the account', () => {
+  const NOW = new Date('2026-11-18T12:00:00.000Z')
+  const withDb = () => {
+    const { db, sql } = d1Db()
+    return { sql, e: { ...env, DB: db } satisfies Env }
+  }
+  const emailAccount = async (
+    e: Env,
+    sql: ReturnType<typeof withDb>['sql'],
+    address: string,
+    name: string | null = null
+  ) => {
+    const id = `acct-${address}`
+    const at = NOW.toISOString()
+    sql
+      .prepare('INSERT INTO accounts (account_id, created_at, name) VALUES (?, ?, ?)')
+      .run(id, at, name)
+    sql
+      .prepare(
+        "INSERT INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at) VALUES ('email', ?, ?, ?, ?, ?)"
+      )
+      .run(address, id, address, at, at)
+    return {
+      id,
+      token: await signAccessToken({ accountId: id, sessionId: 's1', email: address }, e),
+    }
+  }
+  const ask = async (e: Env, method: string, token?: string, body?: unknown) => {
+    const response = await handleAccount(
+      new Request('https://chordless.test/api/account', {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }),
+      e
+    )
+    return { status: response.status, body: (await response.json()) as Record<string, unknown> }
+  }
+
+  test('says the name and every address of the person asking, and nothing of anyone else', async () => {
+    const { e, sql } = withDb()
+    const ann = await emailAccount(e, sql, 'ann@hotmail.example', 'Ann Lee')
+    await emailAccount(e, sql, 'bob@hotmail.example', 'Bob')
+    sql
+      .prepare(
+        "INSERT INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at) VALUES ('google', 'g-1', ?, 'ann@gmail.example', ?, ?)"
+      )
+      .run(ann.id, NOW.toISOString(), NOW.toISOString())
+    const answer = await ask(e, 'GET', ann.token)
+    assert.equal(answer.status, 200)
+    assert.deepEqual(answer.body, {
+      name: 'Ann Lee',
+      emails: [
+        { email: 'ann@hotmail.example', provider: 'email' },
+        { email: 'ann@gmail.example', provider: 'google' },
+      ],
+      googleEmail: 'ann@gmail.example',
+    })
+  })
+
+  test('has no name until one is given, and no Google address until one is joined', async () => {
+    const { e, sql } = withDb()
+    const ann = await emailAccount(e, sql, 'ann@hotmail.example')
+    const answer = await ask(e, 'GET', ann.token)
+    assert.equal(answer.body.name, null)
+    assert.equal(answer.body.googleEmail, null)
+  })
+
+  test('sets the name, tidied, and says the account as it is now', async () => {
+    const { e, sql } = withDb()
+    const ann = await emailAccount(e, sql, 'ann@hotmail.example')
+    const answer = await ask(e, 'PUT', ann.token, { name: '  Ann   Lee ' })
+    assert.equal(answer.status, 200)
+    assert.equal(answer.body.name, 'Ann Lee')
+    const row = sql.prepare('SELECT name FROM accounts WHERE account_id = ?').get(ann.id)
+    assert.equal(row?.name, 'Ann Lee')
+  })
+
+  test('refuses a name that is not one: empty, too long, or not text', async () => {
+    const { e, sql } = withDb()
+    const ann = await emailAccount(e, sql, 'ann@hotmail.example', 'Ann')
+    for (const name of ['', '   ', 'x'.repeat(101), 5, null, undefined]) {
+      assert.equal((await ask(e, 'PUT', ann.token, { name })).status, 400, String(name))
+    }
+    assert.equal((await ask(e, 'GET', ann.token)).body.name, 'Ann')
+  })
+
+  test('is for a signed-in person only, and not set up without a database', async () => {
+    const { e } = withDb()
+    assert.equal((await ask(e, 'GET')).status, 401)
+    assert.equal((await ask(e, 'GET', 'garbage')).status, 401)
+    const { DB: _db, ...noDb } = e
+    assert.equal((await ask(noDb, 'GET')).status, 503)
+  })
+
+  test('is given the name Google gave at a first sign-in, which a name given later replaces and Google never does', async () => {
+    const { e } = withDb()
+    const { google } = fakeGoogle({
+      exchangeCode: async () => ({
+        refresh_token: REFRESH_TOKEN,
+        access_token: 'a',
+        expires_in: 3600,
+        scope: 'openid email',
+        id_token: 'id',
+        claims: {
+          email: 'ann@gmail.example',
+          sub: 'g-9',
+          name: 'Ann From Google',
+          email_verified: true,
+        },
+      }),
+    } as never)
+    const signIn = async () => {
+      const response = await handleOAuthCallback(
+        post('/oauth/callback', { code: 'c', redirect_uri: 'https://chordless.test' }),
+        e,
+        google
+      )
+      return ((await response.json()) as { session: { access_token: string } }).session.access_token
+    }
+    const token = await signIn()
+    assert.equal((await ask(e, 'GET', token)).body.name, 'Ann From Google')
+    await ask(e, 'PUT', token, { name: 'Annie' })
+    await signIn()
+    assert.equal(
+      (await ask(e, 'GET', token)).body.name,
+      'Annie',
+      'a later sign-in does not undo it'
+    )
+  })
+
+  test('takes Google’s name for an emailed account that has none, when Google is joined to it', async () => {
+    const { e, sql } = withDb()
+    const mine = await emailAccount(e, sql, 'ann@hotmail.example')
+    const { google } = fakeGoogle({
+      exchangeCode: async () => ({
+        refresh_token: REFRESH_TOKEN,
+        access_token: 'a',
+        expires_in: 3600,
+        scope: 'openid email',
+        id_token: 'id',
+        claims: { email: 'ann@gmail.example', sub: 'g-10', name: 'Ann G', email_verified: true },
+      }),
+    } as never)
+    await handleOAuthCallback(
+      new Request('https://chordless.test/oauth/callback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mine.token}` },
+        body: JSON.stringify({ code: 'c', redirect_uri: 'https://chordless.test' }),
+      }),
+      e,
+      google,
+      NOW
+    )
+    assert.equal((await ask(e, 'GET', mine.token)).body.name, 'Ann G')
   })
 })

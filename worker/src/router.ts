@@ -4,6 +4,7 @@
  * it runs in Node as well as in the Worker (`index.ts` passes in what only the Worker has).
  */
 
+import { ACCOUNT_PATH, handleAccount } from './account.ts'
 import {
   handleEmailLink,
   handleEmailLinkPeek,
@@ -91,6 +92,11 @@ async function route(
 
     // The page's traces, on their way to Honeycomb (docs/OBSERVABILITY.md)
     if (path === TELEMETRY_PATH) return await handleTelemetry(request, env, ctx, telemetry)
+
+    // The signed-in person's own account: their name and addresses
+    if (path === ACCOUNT_PATH && (request.method === 'GET' || request.method === 'PUT')) {
+      return await handleAccount(request, env)
+    }
 
     // Team spaces (docs/SPACES.md): making one, joining, its people, and its files
     if (isTeamPath(path)) return await handleTeamRoutes(request, env, team)

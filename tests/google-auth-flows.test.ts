@@ -6,10 +6,8 @@ import { expect, waitUntil } from '@open-wc/testing'
 import {
   authorizeWithGoogle,
   connectDrive,
-  downloadBlobBackup,
   getCurrentUserInfo,
   hasDriveAccess,
-  importBlobBackup,
   initGoogleAuth,
 } from '../src/js/google-auth.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
@@ -269,28 +267,6 @@ describe('google-auth: signing in', () => {
       }
       expect(message).to.equal('worker failed')
       expect(await getCurrentUserInfo()).to.equal(null)
-    })
-  })
-
-  describe('the backup', () => {
-    it('is imported through the worker', async () => {
-      await importBlobBackup({ version: 1, blob: 'saved', metadata: {} })
-      expect(worker.stored?.blob).to.equal('saved')
-    })
-
-    it('is downloaded as a file named by the day', async () => {
-      worker.stored = { blob: 'b', metadata: {}, updated_at: 'now' }
-      const clicked: string[] = []
-      const realClick = HTMLAnchorElement.prototype.click
-      HTMLAnchorElement.prototype.click = function () {
-        clicked.push(this.download)
-      }
-      try {
-        await downloadBlobBackup()
-      } finally {
-        HTMLAnchorElement.prototype.click = realClick
-      }
-      expect(clicked[0]).to.match(/^chordless-auth-backup-\d{4}-\d{2}-\d{2}\.json$/)
     })
   })
 

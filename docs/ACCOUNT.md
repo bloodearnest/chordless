@@ -58,22 +58,37 @@ This device
 
 ### The account card
 
-Shown first, and it can say that no one is signed in, which is a normal state ("Not signed in. Your
-songs stay on this device." and **Sign in with Google**). Signed in, it shows the name and address and
-whether Google Drive is connected: **Connect Google Drive** if the sign-in has no Drive, **Reconnect
-with Google** if it has expired. **Manage** is an inline disclosure with **Log out** (this device
-only) and **Revoke access on all devices**. Google keeps one grant per account, so revoking it ends
-every device's sign-in, and logging out must not, or one device's logout would sign out the rest with
-`invalid_grant`. Under **Advanced**, for when something is wrong: a token refresh test, and the
-sign-in backup (download, import).
+Shown first (`account-card.ts`, redesigned 2026-11-18), and it can say that no one is signed in, which is a normal state ("Not
+signed in. Your songs stay on this device." with **Sign in with Google** and **Use my email address instead**). Signed in, it has
+three rows and **Log out**:
+
+- **Name**: the name they gave, with **Edit** (or "Not set" and **Add your name**). It is kept at the Worker (`accounts.name`, migration
+  `0008`; `GET` and `PUT /api/account`, `worker/src/account.ts`), so it is the same on every device. Google's name is taken at a
+  first Google sign-in as a start and never replaces one they gave. A person signed in with no name is asked once a visit, in a
+  modal ("What should we call you?", `name-prompt.ts`, `account-name.ts`), not on the join page, where they are in the middle of
+  something: Google need not say a name, and an emailed code never does.
+- **Emails**: every address the account signs in with, the Google one marked. Read from the Worker, kept on the device
+  (`account-info.ts`) so it shows offline.
+- **Personal space sync**: **Off** with **Enable**, or **On, with the Google address** with **Disable**. Syncing the Personal space
+  between devices needs a Google account (Drive), so **Enable** is Google's whole sign-in joined to this account (for an emailed
+  sign-in), or Drive's box asked for alone (a Google sign-in that left it unticked). **Disable** (after a question) forgets Google on
+  *this device* and keeps them signed in; it revokes nothing at Google, because Google keeps one grant per account and revoking it
+  would end every other device's sync (the question says to remove the access at myaccount.google.com/permissions for that). An
+  expired Google sign-in says so, with **Reconnect with Google**. A Team never needs it: Teams sync through the Worker.
+
+**Log out** forgets the sign-in on this device (the Google blob, the session, which is ended at the Worker, and what was kept of
+the account), and nothing more. **Removed 2026-11-18:** "Revoke access on all devices" (it revoked the Google grant for every
+device, which is now what Disable does not do, and a link says how), and the **Advanced** section: the token refresh test and
+the sign-in backup (download, import), which were for fixing a sign-in and are not needed: signing in again is the fix.
 
 ### The spaces
 
 - **Cards** are in the order the spaces were added (the Personal space is always first), whichever is
   in use. The one in use says **Current**. A card says the kind (Personal, Team) and, for a Team, the
   person's role, as labels after the name; Current is flush right where it never moves. A personal
-  space's name is the account name once signed in (`first-time-auth.ts`); one still called "Personal"
-  shows just "Personal".
+  space is called "Personal", and stays so (decided 2026-11-18: it was renamed to the person's name at a first sign-in,
+  an idea from before Teams; now "Personal" and "Team" say what each is). A Personal space someone's name was given to
+  before then keeps it.
 - **A card's lines:** how much the space holds (estimated: IndexedDB reports usage for the whole
   origin only, so a space's size is its records, setlist JSON and chart text, as the team wizard's
   "Bring across" step counts them), a Team's **CCLI licence number** if it has one

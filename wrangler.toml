@@ -89,7 +89,7 @@ binding = "ASSETS"
 # Paths the worker handles before static assets. API routes must be listed:
 # otherwise the SPA fallback answers them (POST -> 405) and the worker never runs.
 # /dev is listed so the worker can hide the dev-only pages in production.
-run_worker_first = ["/oauth/*", "/session/*", "/api/config", "/api/otlp/*", "/api/share/*", "/api/space/*", "/api/spaces", "/api/spaces/*", "/s/*", "/dev", "/dev/*"]
+run_worker_first = ["/oauth/*", "/session/*", "/api/account", "/api/config", "/api/otlp/*", "/api/share/*", "/api/space/*", "/api/spaces", "/api/spaces/*", "/s/*", "/dev", "/dev/*"]
 
 # One Durable Object per team space (worker/src/team-room.ts): the space's live channel
 # (docs/LIVE_SYNC.md), WebSockets that carry one word, "changed". It keeps no storage: the space itself

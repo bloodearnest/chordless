@@ -5,6 +5,7 @@
  * `google` is the calls to Google, which a test replaces.
  */
 
+import { cleanName } from './account.ts'
 import { type BlobData, decryptBlob, encryptBlob, UnreadableBlob } from './blob.ts'
 import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
@@ -37,7 +38,7 @@ async function bearerAccount(request: Request, env: Env, now: Date): Promise<str
  */
 async function accountOfGoogle(
   db: D1Db,
-  who: { sub: string; email: string; verified: boolean },
+  who: { sub: string; email: string; verified: boolean; name?: string },
   linkTo: string | undefined,
   now: Date
 ): Promise<string> {
@@ -69,10 +70,18 @@ async function accountOfGoogle(
       .bind(who.sub, account, email, at, at)
       .run()
   }
-  return (
+  const accountId =
     account ??
     ((await accountOf(db, { provider: 'google', sub: who.sub, email }, true, now)) as string)
-  )
+  // (the name Google gave is the name they have until they give another: it never replaces one they gave)
+  const name = cleanName(who.name)
+  if (name) {
+    await db
+      .prepare('UPDATE accounts SET name = ? WHERE account_id = ? AND name IS NULL')
+      .bind(name, accountId)
+      .run()
+  }
+  return accountId
 }
 
 /**
@@ -83,7 +92,7 @@ async function accountOfGoogle(
  */
 async function startSession(
   env: Env,
-  who: { sub: string; email: string; verified: boolean },
+  who: { sub: string; email: string; verified: boolean; name?: string },
   now: Date,
   linkTo?: string
 ): Promise<SessionTokens | undefined> {
@@ -205,7 +214,12 @@ export function handleOAuthCallback(
 
     const session = await startSession(
       env,
-      { sub: sub as string, email: email ?? '', verified: payload.email_verified === true },
+      {
+        sub: sub as string,
+        email: email ?? '',
+        verified: payload.email_verified === true,
+        name: typeof payload.name === 'string' ? payload.name : undefined,
+      },
       now,
       await bearerAccount(request, env, now)
     )
