@@ -161,6 +161,23 @@ tf stack *args:
 deploy: predeploy
     npm run deploy
 
+# Serve a branch (a worktree is made if it has none) at the machine's tailnet address, one at a time, to try it
+# from a phone (docs/PREVIEWS.md)
+branch-preview branch:
+    scripts/preview.sh start {{branch}}
+
+# Stop serving the preview
+branch-preview-stop:
+    scripts/preview.sh stop
+
+# What the preview is serving, and where
+branch-preview-status:
+    scripts/preview.sh status
+
+# Seed the preview's database from this machine's dev one (.wrangler/state); --force replaces an existing one
+branch-preview-snapshot *args:
+    scripts/preview.sh snapshot {{args}}
+
 # Keep the same URL: browser data (IndexedDB, sign-in) is tied to that origin.
 # Expose local server via Tailscale Funnel on https://<machine>.<tailnet>.ts.net (port 443)
 funnel:

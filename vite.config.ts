@@ -72,7 +72,8 @@ export default defineConfig(({ command, isPreview }) => {
     server: {
       port: Number(process.env.CHORDLESS_PORT) || 8787,
       strictPort: true,
-      allowedHosts: ['casey.tail030f3.ts.net'],
+      // CHORDLESS_ALLOWED_HOSTS (comma-separated): the name `just preview` serves under, if not this one
+      allowedHosts: process.env.CHORDLESS_ALLOWED_HOSTS?.split(',') ?? ['casey.tail030f3.ts.net'],
       // The paths the Worker answers before the static files (wrangler.toml's run_worker_first).
       // The Host is kept, so that the Worker sees the origin the page has and its cross-origin check agrees.
       // (/s/ and /dev stay here: the Worker would serve the unbuilt files, where this server transforms them.)

@@ -39,6 +39,8 @@ names every secret `wrangler.toml` lists.
 2. The dev OAuth client needs `http://localhost:8787` (and `http://127.0.0.1:8787`) as authorized JavaScript
    origins, and the consent screen in Testing mode with the test accounts as test users. (By hand: the
    Terraform provider cannot manage them.)
+   `just branch-preview` (`docs/PREVIEWS.md`) serves from the machine's `https://<machine>.<tailnet>.ts.net`, which must
+   be another authorized JavaScript origin of this client, and one of the Picker key's allowed referrers.
 3. Use a browser profile of its own for development: a profile signed in to prod holds blobs the dev
    Worker cannot read and links to real folders.
 
