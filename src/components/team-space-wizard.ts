@@ -365,7 +365,7 @@ export class TeamSpaceWizard extends LitElement {
         return this._renderForm()
       case 'created':
         return html`
-          <h2>${t('wizard-ready', { name: this._created?.name ?? '' })}</h2>
+          <h2>${t('wizard-ready', { name: this._createdName })}</h2>
           <p>${t('wizard-ready-text')} ${this._reportText()}</p>
           ${
             this._bringError
@@ -394,22 +394,27 @@ export class TeamSpaceWizard extends LitElement {
             .leaders=${this._leaders}
           ></team-invite-step>
           <div class="actions">
-            <button class="btn primary" @click=${this._open}>${t('wizard-open', { name: this._created?.name ?? '' })}</button>
+            <button class="btn primary" @click=${this._open}>${t('wizard-open', { name: this._createdName })}</button>
           </div>
         `
     }
   }
 
   /** What was brought across, in a sentence */
+  /** The name of the space just made (the page shows it only once there is one) */
+  get _createdName(): string {
+    return (this._created as Space).name
+  }
+
   _reportText(): string {
     const report = this._report
     if (!report) return ''
-    if (report.songsAdded && report.setlistsAdded) {
-      return t('wizard-came-both', { songs: report.songsAdded, setlists: report.setlistsAdded })
-    }
-    if (report.songsAdded) return t('wizard-came-songs', { count: report.songsAdded })
-    if (report.setlistsAdded) return t('wizard-came-setlists', { count: report.setlistsAdded })
-    return t('wizard-came-nothing')
+    const parts: string[] = []
+    if (report.songsAdded) parts.push(t('wizard-came-songs', { count: report.songsAdded }))
+    if (report.setlistsAdded) parts.push(t('wizard-came-setlists', { count: report.setlistsAdded }))
+    return parts.length
+      ? t('wizard-came', { list: new Intl.ListFormat('en').format(parts) })
+      : t('wizard-came-nothing')
   }
 
   _renderBring() {
