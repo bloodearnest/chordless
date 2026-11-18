@@ -19,7 +19,7 @@ test('a guitarist tunes down for a setlist, in edit mode, and the chords move up
   await enterEditMode(page)
   await expect(tuning).toHaveText('Standard (E)')
   await tuning.click()
-  await page.getByRole('option', { name: /E♭ standard (-1)/ }).click()
+  await page.getByRole('option', { name: /E♭ standard \(-1\)/ }).click()
   await expect(tuning).toHaveText('E♭ standard (-1)')
   // (out of edit mode it is still shown, as it is not standard, and cannot be changed)
   await page.locator('#app-header').getByRole('button', { name: 'Toggle edit mode' }).click()
