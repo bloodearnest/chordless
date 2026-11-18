@@ -5,25 +5,28 @@ import { transposeKeyName } from '../src/js/transpose.ts'
 import { normalizeTuning, shapesFor, TUNINGS, tuningLabel } from '../src/js/tuning.ts'
 
 describe('tuning', () => {
-  test('is standard, a half step down or a whole step down, and standard for anything else', () => {
+  test('is standard or down one to five semitones, and standard for anything else', () => {
     assert.deepEqual(
       TUNINGS.map(each => each.semitones),
-      [0, 1, 2]
+      [0, 1, 2, 3, 4, 5]
     )
     assert.equal(normalizeTuning(1), 1)
     assert.equal(normalizeTuning('2'), 2)
-    assert.equal(normalizeTuning(3), 0)
+    assert.equal(normalizeTuning(5), 5)
     assert.equal(normalizeTuning(-1), 0)
+    assert.equal(normalizeTuning(6), 0)
+    assert.equal(normalizeTuning(1.5), 0)
     assert.equal(normalizeTuning('nope'), 0)
     assert.equal(normalizeTuning(null), 0)
     assert.equal(normalizeTuning(undefined), 0)
   })
 
   test('is named in words', () => {
-    assert.equal(tuningLabel(0), 'Standard')
-    assert.equal(tuningLabel(1), 'Half step down')
-    assert.equal(tuningLabel(2), 'Whole step down')
-    assert.equal(tuningLabel('x'), 'Standard')
+    assert.equal(tuningLabel(0), 'Standard (E)')
+    assert.equal(tuningLabel(1), 'E♭ standard (-1)')
+    assert.equal(tuningLabel(2), 'D standard (-2)')
+    assert.equal(tuningLabel(5), 'B standard (-5)')
+    assert.equal(tuningLabel('x'), 'Standard (E)')
   })
 
   test('moves the chords up by the tuning and down by the capo, as one capo and the key to spell by', () => {

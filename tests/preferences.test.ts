@@ -224,7 +224,7 @@ describe('preferences', () => {
   })
 
   describe('the guitar tuning', () => {
-    it('is standard until one is chosen, kept as 0, 1 or 2, and said on window', async () => {
+    it('is standard until one is chosen, kept as 0 to 5, and said on window', async () => {
       const preferences = await fresh()
       expect(preferences.getTuningPreference()).to.equal(0)
       const events = heard<InstanceType<Preferences['TuningPreferenceEvent']>>(
@@ -235,6 +235,8 @@ describe('preferences', () => {
       expect(localStorage.getItem('tuning')).to.equal('1')
       expect(preferences.getTuningPreference()).to.equal(1)
       preferences.setTuningPreference(5)
+      expect(preferences.getTuningPreference()).to.equal(5)
+      preferences.setTuningPreference(6)
       expect(preferences.getTuningPreference()).to.equal(0)
       localStorage.setItem('tuning', 'nonsense')
       expect(preferences.getTuningPreference()).to.equal(0)

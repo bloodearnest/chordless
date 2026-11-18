@@ -1,45 +1,40 @@
 /**
- * How a guitar is tuned (docs/PERSONAL_LAYER.md, "How I play it"): standard, or down a half or a whole
- * step. A guitar tuned down plays its shapes higher than the song's key says, by that many semitones,
+ * How a guitar is tuned (docs/PERSONAL_LAYER.md, "How I play it"): standard, or down by up to five semitones
+ * (E♭ standard to B standard). A guitar tuned down plays its shapes higher than the song's key says, by that many semitones,
  * so the chords shown move up with it. The capo moves them the other way, per song, after it. A device
  * default, and one for a setlist that wins over it; on the device and never synced.
  */
 
 import { t } from './text.ts'
 
-/** How far down the guitar is tuned: 0 standard, 1 a half step, 2 a whole step */
-export type Tuning = 0 | 1 | 2
+/** How far down the guitar is tuned, in semitones: 0 standard (E), 1 E♭, 2 D, 3 D♭, 4 C, 5 B */
+export type Tuning = 0 | 1 | 2 | 3 | 4 | 5
 
 export interface TuningOption {
   semitones: Tuning
   label: string
 }
 
-export const TUNINGS: readonly TuningOption[] = [
-  {
-    semitones: 0,
-    get label() {
-      return t('tuning-standard')
-    },
-  },
-  {
-    semitones: 1,
-    get label() {
-      return t('tuning-half-step')
-    },
-  },
-  {
-    semitones: 2,
-    get label() {
-      return t('tuning-whole-step')
-    },
-  },
-]
+const LABELS = [
+  'tuning-standard',
+  'tuning-eb',
+  'tuning-d',
+  'tuning-db',
+  'tuning-c',
+  'tuning-b',
+] as const
 
-/** A tuning from whatever was stored: one of the three, and standard for anything else */
+export const TUNINGS: readonly TuningOption[] = LABELS.map((name, semitones) => ({
+  semitones: semitones as Tuning,
+  get label() {
+    return t(name)
+  },
+}))
+
+/** A tuning from whatever was stored: one of the six, and standard for anything else */
 export function normalizeTuning(value: unknown): Tuning {
   const semitones = Number(value)
-  return semitones === 1 || semitones === 2 ? semitones : 0
+  return Number.isInteger(semitones) && semitones >= 1 && semitones <= 5 ? (semitones as Tuning) : 0
 }
 
 export const tuningLabel = (value: unknown): string => TUNINGS[normalizeTuning(value)].label

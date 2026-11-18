@@ -791,9 +791,12 @@ pitch-bb = B♭ (trumpet, clarinet, tenor sax)
 pitch-eb = E♭ (alto or baritone sax)
 pitch-f = F (horn)
 
-tuning-standard = Standard
-tuning-half-step = Half step down
-tuning-whole-step = Whole step down
+tuning-standard = Standard (E)
+tuning-eb = E♭ standard (-1)
+tuning-d = D standard (-2)
+tuning-db = D♭ standard (-3)
+tuning-c = C standard (-4)
+tuning-b = B standard (-5)
 
 pref-chords-heading = Chords
 pref-nashville = Nashville numbers instead of letter names
