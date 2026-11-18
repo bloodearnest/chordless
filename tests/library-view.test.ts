@@ -525,6 +525,9 @@ describe('the library view, with a song open', function () {
 
       await open()
 
+      // (the sections are drawn, and then the ones it saved are put back: the page is waited for to say so,
+      // as it is the saved state this test is about, not how soon it is applied)
+      await until(() => section(1)?.hideMode === 'chords', 'the saved sections to be shown')
       expect(section(0).hideMode).to.equal('none')
       expect(section(1).hideMode).to.equal('chords')
     })
