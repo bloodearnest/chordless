@@ -90,15 +90,16 @@ The migration is by area. Done: the toasts (`toast(...)` and the buttons on them
 about a lost Drive folder, and the questions asked before something is changed (the confirmation
 dialogs, and `app-modal`'s own Confirm and Cancel), what the pages say while they load, when they have
 nothing to show and when they could not (`status-…`), the signed-out card, and the lead sheet and pad
-messages. The Account and Teams page and a space's page (the cards, the manager, the Drive panel, storage), and
+messages. The Help page (`help-<page>-<section>-<item>-…`: the shape and the pictures stay in
+`js/help-content.ts`, and each page there is a function, so an edit shows the next time it is opened), the
+Account and Teams page and a space's page (the cards, the manager, the Drive panel, storage), and
 what a role is called (`role-…`) and how long ago a sync was (`sync-time-…`), Preferences (what you play, instrument
 pitch, tuning, chords, screen, the highlight colour, fonts, theme and text size), About, the menu and the media
 player's settings. Where a list of options has its words in a module (`PLAYS`, `PITCHES`, `TUNINGS`,
 `FONT_CHOICES`, `TINT_PRESETS`), each `label` is a getter that asks for its message, so that an edit in the
 dev editor shows at once. Still in the code: the other
 dialogs and panels, the sync's progress messages
-(`js/sync/`), labels, the Help
-page (`js/help-content.ts`), the text `describeSetlistChange` makes, and the Worker's emails.
+(`js/sync/`), labels, the text `describeSetlistChange` makes, and the Worker's emails.
 
 New messages go in the catalogue, not in a template. Keep what only the developer needs (an error's
 text, a version number) in a toast's `details` or the console, not in the message.
