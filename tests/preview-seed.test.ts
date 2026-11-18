@@ -69,6 +69,8 @@ describe('Starting a branch preview from an export', () => {
     const page = () =>
       Promise.resolve(new Response('<html>', { headers: { 'Content-Type': 'text/html' } }))
     expect(await seedFromPreview(page)).to.equal(null)
+    // (and the real request, to a server that is not a preview's)
+    expect(await seedFromPreview()).to.equal(null)
     const failing = () => Promise.reject(new Error('offline'))
     expect(await seedFromPreview(failing)).to.equal(null)
   })
