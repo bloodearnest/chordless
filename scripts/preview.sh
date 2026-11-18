@@ -76,6 +76,11 @@ case "${1:-}" in
       echo "'just branch-preview-snapshot' first). Carrying on." >&2
       mkdir -p "$state"
     fi
+    # Something else (a `just serve`) on the port would answer the check below, and be served as the branch
+    if curl -s -o /dev/null --max-time 2 "http://localhost:$port/"; then
+      echo "Port $port is already in use (a 'just serve' running?): stop it, then run this again." >&2
+      exit 1
+    fi
     dir=$(worktree_for "$branch")
     cd "$dir"
     [[ -d node_modules ]] || npm ci
@@ -91,8 +96,8 @@ case "${1:-}" in
     echo $! >"$pidfile"
     echo "$branch" >"$branchfile"
     for _ in $(seq 1 60); do
-      curl -sf -o /dev/null "http://localhost:$port/" && break
       running || { echo "The server did not start; see $log" >&2; exit 1; }
+      curl -sf -o /dev/null "http://localhost:$port/" && break
       sleep 1
     done
     tailscale serve --bg --https=443 "http://localhost:$port" >/dev/null
