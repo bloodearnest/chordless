@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { bookmarkletUrl } from '../js/songselect-bookmarklet.ts'
+import { t } from '../js/text.ts'
 
 /**
  * BookmarkletInstaller Component
@@ -115,20 +116,20 @@ export class BookmarkletInstaller extends LitElement {
   override render() {
     return html`
       <p>
-        <a class="link" href=${this._url} @click=${this._onLinkClick} title="Drag me to your bookmarks bar"
-          >🎵 Import to Chordless</a
+        <a class="link" href=${this._url} @click=${this._onLinkClick} title=${t('bookmarklet-drag')}
+          >${t('bookmarklet-name')}</a
         >
       </p>
       <slot></slot>
-      <textarea ${ref(this._code)} readonly aria-label="Bookmarklet code" .value=${this._url}></textarea>
+      <textarea ${ref(this._code)} readonly aria-label=${t('bookmarklet-code-label')} .value=${this._url}></textarea>
       <div class="copy-row">
-        <button class="copy" @click=${this._copy}>📋 Copy Code</button>
+        <button class="copy" @click=${this._copy}>${t('bookmarklet-copy')}</button>
         <span class="hint" role="status">
           ${
             this._copyState === 'copied'
-              ? "✅ Copied. Paste it as the new bookmark's URL."
+              ? t('bookmarklet-copied')
               : this._copyState === 'failed'
-                ? 'Copying was blocked: the code is selected, copy it from there.'
+                ? t('bookmarklet-copy-failed')
                 : ''
           }
         </span>

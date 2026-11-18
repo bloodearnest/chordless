@@ -1062,4 +1062,161 @@ why-install-screen = <strong>The whole screen for the song.</strong> No address 
 why-install-feel = <strong>Feels like any other app you use.</strong> It has its own icon, opens in its own window, and shows up in your app switcher.
 why-install-ios = On an iPhone or iPad the installed app keeps its own data, separate from Safari's, so you sign in again in it.
 why-install-not-needed = Chordless works offline, checks for updates and can keep the screen awake in a browser tab too. Installing isn't needed for those.
+
+
+## Importing songs from SongSelect (the bookmarklet, and how to install it)
+
+# <strong> is the question that starts it.
+ss-touch-tip = <strong>On a phone or tablet?</strong> The bookmarklet works best on a computer. Instead, download the song's ChordPro file from SongSelect, then choose it with "Import ChordPro Files" above.
+ss-lead = Import songs from SongSelect directly into your Chordless library with one click using this bookmarklet.
+ss-install-heading = Install Bookmarklet
+ss-drag = <strong>Drag this button to your bookmarks bar:</strong>
+ss-alt-heading = Alternative Method
+# The two forms of a sentence: one for a computer, one for a phone or tablet.
+ss-alt-text-desktop = If dragging doesn't work, you can create the bookmark yourself:
+ss-alt-text-touch = You can create the bookmark yourself:
+ss-alt-step-1-desktop = Create a new bookmark (Ctrl+D or Cmd+D)
+ss-alt-step-1-touch = Create a new bookmark of any page, then edit it
+ss-alt-step-2 = Name it "🎵 Import to Chordless"
+ss-alt-step-3 = Copy the code below and paste it as the URL
+ss-desktop-heading = Desktop Installation
+# <strong> is what to do and <code> a key to press.
+ss-desktop-1 = <strong>Show your bookmarks bar:</strong> Press <code>Ctrl+Shift+B</code> (Windows) or <code>Cmd+Shift+B</code> (Mac)
+ss-desktop-2 = <strong>Drag the purple button above</strong> to your bookmarks bar
+ss-desktop-3 = Navigate to a song page on SongSelect
+ss-desktop-4 = Click the bookmark
+ss-mobile-heading = Mobile Installation
+ss-mobile-1 = The easiest way on a phone or tablet is to download the song's ChordPro file from SongSelect, then choose it with "Import ChordPro Files" above.
+ss-mobile-2 = To use the bookmarklet anyway, bookmark any page, then edit the bookmark and paste the code from the "Alternative Method" above as its URL. On Android, run it by typing the bookmark's name in the address bar and tapping it.
+ss-mobile-3 = On iPhone and iPad, songs it imports in Safari don't reach Chordless installed on the home screen, which keeps its own separate storage.
+ss-how-heading = How It Works
+ss-how-1 = Navigate to a song on SongSelect
+ss-how-2 = Click the bookmarklet
+ss-how-3 = It opens Chordless's Import Songs page, and downloads the song's ChordPro file from SongSelect using your login
+ss-how-4 = It sends the song to Chordless, which saves it to your library
+ss-how-5 = Choose a setlist to add it to, or just keep it in the library
+
+bookmarklet-name = 🎵 Import to Chordless
+bookmarklet-drag = Drag me to your bookmarks bar
+bookmarklet-code-label = Bookmarklet code
+bookmarklet-copy = 📋 Copy Code
+bookmarklet-copied = ✅ Copied. Paste it as the new bookmark's URL.
+bookmarklet-copy-failed = Copying was blocked: the code is selected, copy it from there.
+
+
+## Importing songs (the page for files, pasted text and the bookmarklet, and what it says of each song)
+
+import-waiting = Waiting for SongSelect…
+import-reading-pdf = Reading the PDF…
+import-reading-song = Reading the song…
+import-reading-leadsheet = Reading the lead sheet…
+# What a song that came as shared text or pasted text is called, where a list of what was not imported names it.
+import-name-shared = Shared text
+import-name-pasted = Pasted text
+
+# { $reason } is what went wrong.
+import-chart-failed = Failed to read the chart: { $reason }
+import-songselect-failed = Import from SongSelect failed: { $reason }
+# { $skipped } is a list of what was left out, and why.
+import-none = No songs to import. { $skipped }
+import-process-failed = Failed to process song: { $reason }
+import-save-failed = Failed to save song: { $reason }
+import-setlist-failed = Failed to create setlist: { $reason }
+import-song-failed = Failed to import the song: { $reason }
+import-skipped = Not imported: { $skipped }
+
+# A chart from an email or a PDF that has no song in the library to go with. <strong> is the title it has.
+import-unmatched = Not in your library: <strong>{ $title }</strong>
+# The button that takes a song of the library in its place. { $title } is the song.
+import-use = Use { $title }
+import-find = Find it on SongSelect ↗
+
+import-already-updated = This song was already in your library, as the same song. It has been updated.
+import-already-identical = An identical version of this song is already in your library, nothing to import.
+# Added to the sentence above, with a space.
+import-already-source = Its source is now recorded as SongSelect.
+
+# The melody's range. { $notes } is "C4–G5", { $key } the key of the chart.
+import-range = Melody range { $notes } in { $key }.
+import-range-by-hand = Melody range { $notes } in { $key }, set by you.
+import-range-lead-sheet = Melody range { $notes } in { $key }, from the lead sheet.
+# { $signature } is the key the lead sheet is in.
+import-range-other-key = The lead sheet is in another key than the chart ({ $signature }; the chart is in { $key }), so its range was not used.
+import-range-no-melody = The lead sheet had no melody to read, so there is no range.
+import-range-unreadable = The lead sheet could not be read, so there is no range.
+import-range-none = No lead sheet came with this song, so there is no range.
+import-melody-not-saved = The lead sheet could not be saved, so the song has only its range.
+import-melody-kept = The lead sheet is kept with the song.
+
+import-range-set = Set the range yourself
+import-range-lowest = Lowest note
+import-range-highest = Highest note
+import-range-save = Save the range
+import-range-note = In { $key }, as written: men sing it an octave down.
+import-range-wrong = The lowest note is above the highest.
+
+import-how-read = How the lead sheet was read
+# { $bars } bars and { $notes } sung notes were read.
+import-read =
+    { $bars ->
+        [one] 1 bar
+       *[other] { $bars } bars
+    }: { $notes ->
+        [one] 1 sung note
+       *[other] { $notes } sung notes
+    } read.
+# The same, with what was left out in { $left } (a list: "2 small instrumental notes and 1 note with no lyric").
+import-read-left-out =
+    { $bars ->
+        [one] 1 bar
+       *[other] { $bars } bars
+    }: { $notes ->
+        [one] 1 sung note
+       *[other] { $notes } sung notes
+    } read, and left out { $left }.
+import-left-instrumental =
+    { $count ->
+        [one] 1 small instrumental note
+       *[other] { $count } small instrumental notes
+    }
+import-left-unsung =
+    { $count ->
+        [one] 1 note with no lyric
+       *[other] { $count } notes with no lyric
+    }
+import-read-key = Key signature: { $signature }. The chart is in { $key }.
+import-read-lowest = Lowest note { $note }: bar { $bar }.
+import-read-highest = Highest note { $note }: bar { $bar }.
+
+# The heading once songs have come in: { $title } for one, { $count } for several.
+import-done-one = ✅ { $title }
+import-done-many = ✅ { $count } songs
+import-progress = Importing { $n } of { $total }…
+import-show-songs = Show the { $count } songs
+
+import-into = Import into
+# { $space } is the name of a Team.
+import-space-team = { $space } (Team)
+
+import-manual = Import a file or paste instead
+import-files = Import ChordPro Files
+import-files-text = ChordPro files, each with its lead sheet PDF if you have one
+import-paste = Paste ChordPro
+import-button = Import
+import-email = Import a Setlist from an Email
+import-email-text = Forward a leader's email to Chordless
+import-songselect = Import from SongSelect (CCLI) with a bookmarklet
+
+import-add-to-setlist = Add to Setlist
+import-add = Add
+setlist-create-heading = Create New Setlist
+import-create-add-one = Create & Add Song
+import-create-add-many = Create & Add Songs
+import-fresh-one = Start a fresh setlist with this song
+import-fresh-many = Start a fresh setlist with these songs
+import-save-library = Save to Library Only
+import-no-setlist = Don't add to any setlist
+import-go-library = Go to the Library
+import-nothing-one = Nothing to save: it is in the library
+import-nothing-many = Nothing to save: they are all in the library
 `

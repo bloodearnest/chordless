@@ -24,6 +24,7 @@ import {
 import { type SongDetails, songDetailsToChordpro } from '../js/lyrics-chordpro.ts'
 import { ChordProParser } from '../js/parser.ts'
 import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../js/people.ts'
+import { rich } from '../js/rich-text.ts'
 import {
   createSong,
   findExistingSong,
@@ -220,7 +221,7 @@ export class SongImport extends LitElement {
     this._newSetlistModalRef = createRef()
     this._state = 'pick'
     this._error = ''
-    this._progress = 'Waiting for SongSelect…'
+    this._progress = t('import-waiting')
     this._busy = false
     // (a song with no range starts at a comfortable octave: D4 to D5)
     this._low = 62
@@ -312,7 +313,7 @@ export class SongImport extends LitElement {
     try {
       const songs = await this._songsFromFiles(incoming.files.filter(file => !isPdf(file)))
       if (incoming.text.trim()) {
-        songs.push({ name: 'Shared text', chordproText: incoming.text, source: 'share' })
+        songs.push({ name: t('import-name-shared'), chordproText: incoming.text, source: 'share' })
       }
       // (a PDF of a song that came with it is its lead sheet; the others are charts to match)
       const charts = await this._pairLeadSheets(songs, pdfs)
@@ -326,7 +327,7 @@ export class SongImport extends LitElement {
   /** Say so while PDFs are read: it takes a moment */
   _startReading(pdfs: File[]): void {
     this._busy = pdfs.length > 0
-    this._progress = 'Reading the PDF…'
+    this._progress = t('import-reading-pdf')
   }
 
   /**
@@ -404,7 +405,7 @@ export class SongImport extends LitElement {
       await this._addLibrarySongs(found)
     } catch (error) {
       console.error('[Import] Failed to read a chart:', error)
-      this._showError(`Failed to read the chart: ${errorMessage(error)}`)
+      this._showError(t('import-chart-failed', { reason: errorMessage(error) }))
     }
   }
 
@@ -433,12 +434,12 @@ export class SongImport extends LitElement {
     return this._unmatched.map(
       chart => html`
         <div class="status unmatched">
-          <p>Not in your library: <strong>${chart.title}</strong></p>
+          <p>${rich('import-unmatched', { title: chart.title }, { strong: words => html`<strong>${words}</strong>` })}</p>
           ${chart.candidates.map(
             candidate =>
-              html`<button class="btn" @click=${() => this._useCandidate(chart, candidate)}>Use ${candidate.title}</button>`
+              html`<button class="btn" @click=${() => this._useCandidate(chart, candidate)}>${t('import-use', { title: candidate.title })}</button>`
           )}
-          <p><a href=${chart.link} target="_blank" rel="noopener">Find it on SongSelect ↗</a></p>
+          <p><a href=${chart.link} target="_blank" rel="noopener">${t('import-find')}</a></p>
         </div>
       `
     )
@@ -447,10 +448,10 @@ export class SongImport extends LitElement {
   _onMessage(event: MessageEvent): void {
     if (event.origin !== SONGSELECT_ORIGIN) return
     if (event.data?.type === 'CHORDLESS_IMPORT') {
-      this._progress = 'Reading the song…'
+      this._progress = t('import-reading-song')
       void this._useDefaultSpace().then(() => this.receive(event.data.data))
     } else if (event.data?.type === 'CHORDLESS_IMPORT_FAILED') {
-      this._showError(`Import from SongSelect failed: ${event.data.data?.message}`)
+      this._showError(t('import-songselect-failed', { reason: String(event.data.data?.message) }))
     }
   }
 
@@ -526,7 +527,7 @@ export class SongImport extends LitElement {
 
   _importPasted(): void {
     const chordproText = this._paste.value?.value ?? ''
-    this.receiveAll([{ name: 'Pasted text', chordproText, source: 'paste' }])
+    this.receiveAll([{ name: t('import-name-pasted'), chordproText, source: 'paste' }])
   }
 
   /**
@@ -636,7 +637,7 @@ export class SongImport extends LitElement {
       }
       this._skipped = skipped
       if (!imports.length) {
-        this._showError(`No songs to import. ${skipped.join(', ')}`)
+        this._showError(t('import-none', { skipped: skipped.join(', ') }))
         return
       }
       this._imports = imports
@@ -654,14 +655,14 @@ export class SongImport extends LitElement {
       await this._applyPicks(same)
     } catch (error) {
       console.error('[Import] Failed to process song:', error)
-      this._showError(`Failed to process song: ${errorMessage(error)}`)
+      this._showError(t('import-process-failed', { reason: errorMessage(error) }))
     }
   }
 
   /** The chart with its melody's range in it, from the song's lead sheet, and the melody to keep (lead-sheet.ts) */
   _chartWithRange(chordproText: string, leadSheet: unknown): Promise<LeadSheetRead> {
     return chartWithLeadSheet(chordproText, leadSheet, async pdf => {
-      this._progress = 'Reading the lead sheet…'
+      this._progress = t('import-reading-leadsheet')
       return (await this.loadMelodyPdfReader()).readScorePdf(pdf)
     })
   }
@@ -674,10 +675,10 @@ export class SongImport extends LitElement {
   /** A song already in the library, and the same chart: nothing is asked, so it says so */
   _renderAlreadyThere(item: ImportItem) {
     if (item.auto && item.choice === 'update') {
-      return html`<p class="already">This song was already in your library, as the same song. It has been updated.</p>`
+      return html`<p class="already">${t('import-already-updated')}</p>`
     }
     return item.isDuplicate && item.comparison?.verdict === 'identical'
-      ? html`<p class="already">An identical version of this song is already in your library, nothing to import.${item.sourceSet ? ' Its source is now recorded as SongSelect.' : ''}</p>`
+      ? html`<p class="already">${t('import-already-identical')}${item.sourceSet ? ` ${t('import-already-source')}` : ''}</p>`
       : ''
   }
 
@@ -689,20 +690,25 @@ export class SongImport extends LitElement {
     let text = ''
     if (range && key) {
       const notes = `${noteName(range.low, key)}–${noteName(range.high, key)}`
-      const from = item.rangeSetByHand
-        ? ', set by you'
-        : item.leadSheet === 'read'
-          ? ', from the lead sheet'
-          : ''
-      text = `Melody range ${notes} in ${key}${from}.`
+      text = t(
+        item.rangeSetByHand
+          ? 'import-range-by-hand'
+          : item.leadSheet === 'read'
+            ? 'import-range-lead-sheet'
+            : 'import-range',
+        { notes, key }
+      )
     } else if (item.leadSheet === 'other-key' && melody) {
-      text = `The lead sheet is in another key than the chart (${describeSignature(melody.keySignature)}; the chart is in ${key}), so its range was not used.`
+      text = t('import-range-other-key', {
+        signature: describeSignature(melody.keySignature),
+        key: String(key),
+      })
     } else if (item.leadSheet === 'no-melody') {
-      text = 'The lead sheet had no melody to read, so there is no range.'
+      text = t('import-range-no-melody')
     } else if (item.leadSheet === 'unreadable') {
-      text = 'The lead sheet could not be read, so there is no range.'
+      text = t('import-range-unreadable')
     } else if (item.source === 'songselect') {
-      text = 'No lead sheet came with this song, so there is no range.'
+      text = t('import-range-none')
     }
     const settable = !range && key && this._canSetRange(item)
     const kept = this._melodyKept(item)
@@ -712,10 +718,10 @@ export class SongImport extends LitElement {
   /** What the page says of the lead sheet's whole melody: kept with the song, or why it is not (docs/LEAD_SHEETS.md) */
   _melodyKept(item: ImportItem): string {
     if (item.melodySaved === false) {
-      return 'The lead sheet could not be saved, so the song has only its range.'
+      return t('import-melody-not-saved')
     }
     if (item.notes) {
-      return 'The lead sheet is kept with the song.'
+      return t('import-melody-kept')
     }
     // (a range read from the lead sheet always comes with its notes)
     return ''
@@ -745,21 +751,21 @@ export class SongImport extends LitElement {
     const wrong = this._low > this._high
     return html`
       <details class="range-set">
-        <summary>Set the range yourself</summary>
+        <summary>${t('import-range-set')}</summary>
         <div class="range-editor">
-          ${picker('Lowest note', this._low, midi => (this._low = midi))}
-          ${picker('Highest note', this._high, midi => (this._high = midi))}
+          ${picker(t('import-range-lowest'), this._low, midi => (this._low = midi))}
+          ${picker(t('import-range-highest'), this._high, midi => (this._high = midi))}
           <button
             class="btn"
             type="button"
             ?disabled=${wrong}
             @click=${() => this._setRange(item, key)}
           >
-            Save the range
+            ${t('import-range-save')}
           </button>
         </div>
-        <div>In ${key}, as written: men sing it an octave down.</div>
-        ${wrong ? html`<div class="range-error" role="alert">The lowest note is above the highest.</div>` : ''}
+        <div>${t('import-range-note', { key })}</div>
+        ${wrong ? html`<div class="range-error" role="alert">${t('import-range-wrong')}</div>` : ''}
       </details>
     `
   }
@@ -786,22 +792,28 @@ export class SongImport extends LitElement {
 
   /** What was read from a lead sheet, and where its lowest and highest notes are, to check it by */
   _renderHowRead(melody: MelodyRead, key: string) {
-    const many = (count: number, thing: string, plural = `${thing}s`) =>
-      `${count} ${count === 1 ? thing : plural}`
     const leftOut = [
-      melody.instrumental && many(melody.instrumental, 'small instrumental note'),
-      melody.unsung && `${many(melody.unsung, 'note')} with no lyric`,
+      melody.instrumental && t('import-left-instrumental', { count: melody.instrumental }),
+      melody.unsung && t('import-left-unsung', { count: melody.unsung }),
     ].filter(Boolean)
     return html`
       <details class="range-how">
-        <summary>How the lead sheet was read</summary>
+        <summary>${t('import-how-read')}</summary>
         <ul>
           <li>
-            ${many(melody.bars, 'bar')}: ${many(melody.notes, 'sung note')} read${leftOut.length ? `, and left out ${leftOut.join(' and ')}` : ''}.
+            ${
+              leftOut.length
+                ? t('import-read-left-out', {
+                    bars: melody.bars,
+                    notes: melody.notes,
+                    left: new Intl.ListFormat('en').format(leftOut as string[]),
+                  })
+                : t('import-read', { bars: melody.bars, notes: melody.notes })
+            }
           </li>
-          <li>Key signature: ${describeSignature(melody.keySignature)}. The chart is in ${key}.</li>
-          <li>Lowest note ${noteName(melody.low, key)}: bar ${melody.lowAt}.</li>
-          <li>Highest note ${noteName(melody.high, key)}: bar ${melody.highAt}.</li>
+          <li>${t('import-read-key', { signature: describeSignature(melody.keySignature), key })}</li>
+          <li>${t('import-read-lowest', { note: noteName(melody.low, key), bar: melody.lowAt })}</li>
+          <li>${t('import-read-highest', { note: noteName(melody.high, key), bar: melody.highAt })}</li>
         </ul>
       </details>
     `
@@ -844,7 +856,7 @@ export class SongImport extends LitElement {
       await this._finish(`/setlist/${setlistId}`)
     } catch (error) {
       console.error('[Import] Error:', error)
-      this._showError(`Failed to save song: ${errorMessage(error)}`)
+      this._showError(t('import-save-failed', { reason: errorMessage(error) }))
     }
   }
 
@@ -902,7 +914,7 @@ export class SongImport extends LitElement {
     } catch (error) {
       console.error('[Import] Error creating setlist:', error)
       this._newSetlistModal()?.close()
-      this._showError(`Failed to create setlist: ${errorMessage(error)}`)
+      this._showError(t('import-setlist-failed', { reason: errorMessage(error) }))
       return
     }
     this._newSetlistModal()?.close()
@@ -930,17 +942,17 @@ export class SongImport extends LitElement {
     const several = this._imports.length > 1
     const unresolved = this._imports.filter(item => isUnresolved(item))
     return html`
-      <h2>✅ ${several ? `${this._imports.length} songs` : this._imports[0].song.title}</h2>
+      <h2>${several ? t('import-done-many', { count: this._imports.length }) : t('import-done-one', { title: this._imports[0].song.title })}</h2>
       ${this._applying ? html`<p class="status" role="status">${this._applying}</p>` : ''}
       ${several ? this._renderSongList() : unresolved.length ? '' : this._renderAlreadyThere(this._imports[0])}
       ${several ? '' : unresolved.length ? '' : this._renderRange(this._imports[0])}
       ${
         this._skipped.length
-          ? html`<p class="status error">Not imported: ${this._skipped.join(', ')}</p>`
+          ? html`<p class="status error">${t('import-skipped', { skipped: this._skipped.join(', ') })}</p>`
           : ''
       }
       ${unresolved.length ? renderDuplicates(unresolved, this._imports.length, this._duplicateActions) : this._renderChoices()}
-      <app-modal ${ref(this._newSetlistModalRef)} heading="Create New Setlist">
+      <app-modal ${ref(this._newSetlistModalRef)} heading=${t('setlist-create-heading')}>
         ${
           this._newSetlist
             ? html`
@@ -949,7 +961,7 @@ export class SongImport extends LitElement {
                 .people=${this._people}
                 .meId=${this._meId}
                 .askWho=${this._askWho}
-                submit-label=${several ? 'Create & Add Songs' : 'Create & Add Song'}
+                submit-label=${several ? t('import-create-add-many') : t('import-create-add-one')}
                 auto-type
                 @setlist-details-form:identify=${this._identify}
                 @setlist-details-form:save=${this._createSetlist}
@@ -967,7 +979,7 @@ export class SongImport extends LitElement {
     if (this._spaces.length < 2) return ''
     return html`
       <label class="space-picker">
-        Import into
+        ${t('import-into')}
         <select
           class="space"
           .value=${this._spaceId}
@@ -977,7 +989,7 @@ export class SongImport extends LitElement {
           ${this._spaces.map(
             space => html`
               <option value=${space.id} ?selected=${space.id === this._spaceId}>
-                ${space.name}${space.team ? ' (Team)' : ''}
+                ${space.team ? t('import-space-team', { space: space.name }) : space.name}
               </option>
             `
           )}
@@ -997,7 +1009,7 @@ export class SongImport extends LitElement {
         <span class="spinner" aria-hidden="true"></span>
         <p>${this._progress}</p>
         <button class="btn manual" @click=${() => (this._manual = true)}>
-          Import a file or paste instead
+          ${t('import-manual')}
         </button>
       </div>
     `
@@ -1016,29 +1028,29 @@ export class SongImport extends LitElement {
         <label class="choice files">
           <span class="icon">📂</span>
           <span class="content">
-            <span class="title">Import ChordPro Files</span>
-            <span class="subtitle">ChordPro files, each with its lead sheet PDF if you have one</span>
+            <span class="title">${t('import-files')}</span>
+            <span class="subtitle">${t('import-files-text')}</span>
           </span>
           <input type="file" multiple @change=${this._onFilesChosen} />
         </label>
         <div class="choice paste">
           <div class="icon">📝</div>
           <div class="content">
-            <label class="title" for="paste">Paste ChordPro</label>
+            <label class="title" for="paste">${t('import-paste')}</label>
             <textarea id="paste" ${ref(this._paste)} rows="6" placeholder="{title: Amazing Grace}"></textarea>
-            <button class="btn primary add" @click=${this._importPasted}>Import</button>
+            <button class="btn primary add" @click=${this._importPasted}>${t('import-button')}</button>
           </div>
         </div>
         <a class="choice" href="/import-setlist">
           <span class="icon">✉️</span>
           <span class="content">
-            <span class="title">Import a Setlist from an Email</span>
-            <span class="subtitle">Forward a leader's email to Chordless</span>
+            <span class="title">${t('import-email')}</span>
+            <span class="subtitle">${t('import-email-text')}</span>
           </span>
         </a>
       </div>
       <details class="songselect">
-        <summary>Import from SongSelect (CCLI) with a bookmarklet</summary>
+        <summary>${t('import-songselect')}</summary>
         <songselect-help></songselect-help>
       </details>
     `
@@ -1066,7 +1078,7 @@ export class SongImport extends LitElement {
     return html`
       <p class="songs-summary">${summary}</p>
       <details class="songs-detail">
-        <summary>Show the ${this._imports.length} songs</summary>
+        <summary>${t('import-show-songs', { count: this._imports.length })}</summary>
         ${list}
       </details>
     `
@@ -1108,7 +1120,8 @@ export class SongImport extends LitElement {
     )
     for (const [index, item] of todo.entries()) {
       // (a long list takes a while: it says how far it has got)
-      if (todo.length > 1) this._applying = `Importing ${index + 1} of ${todo.length}…`
+      if (todo.length > 1)
+        this._applying = t('import-progress', { n: index + 1, total: todo.length })
       const incoming = { importSource: item.source ?? '', importUser: item.importUser }
       const label = item.label?.trim() || undefined
       const db = this._database()
@@ -1129,7 +1142,7 @@ export class SongImport extends LitElement {
         this._setChoice(item, item.pick, song)
       } catch (error) {
         console.error('[Import] Failed to import a duplicate:', error)
-        this._showError(`Failed to import the song: ${errorMessage(error)}`)
+        this._showError(t('import-song-failed', { reason: errorMessage(error) }))
         return
       }
     }
@@ -1151,7 +1164,7 @@ export class SongImport extends LitElement {
               <div class="choice add-to-setlist">
                 <div class="icon">📋</div>
                 <div class="content">
-                  <label class="title" for="setlist">Add to Setlist</label>
+                  <label class="title" for="setlist">${t('import-add-to-setlist')}</label>
                   <div class="setlist-picker">
                     <select id="setlist" ${ref(this._setlistSelect)}>
                       ${this._setlists.map(setlist => {
@@ -1161,7 +1174,7 @@ export class SongImport extends LitElement {
                         </option>`
                       })}
                     </select>
-                    <button class="btn primary add" @click=${this._addToChosenSetlist}>Add</button>
+                    <button class="btn primary add" @click=${this._addToChosenSetlist}>${t('import-add')}</button>
                   </div>
                 </div>
               </div>
@@ -1171,21 +1184,21 @@ export class SongImport extends LitElement {
         <button class="choice new-setlist" @click=${this._openNewSetlist}>
           <span class="icon">➕</span>
           <span class="content">
-            <span class="title">Create New Setlist</span>
+            <span class="title">${t('setlist-create-heading')}</span>
             <span class="subtitle">
-              Start a fresh setlist with ${this._imports.length > 1 ? 'these songs' : 'this song'}
+              ${t(this._imports.length > 1 ? 'import-fresh-many' : 'import-fresh-one')}
             </span>
           </span>
         </button>
         <button class="choice library-only" @click=${this._libraryOnly}>
           <span class="icon">${nothingToKeep ? '📚' : '💾'}</span>
           <span class="content">
-            <span class="title">${nothingToKeep ? 'Go to the Library' : 'Save to Library Only'}</span>
+            <span class="title">${nothingToKeep ? t('import-go-library') : t('import-save-library')}</span>
             <span class="subtitle">
               ${
                 nothingToKeep
-                  ? `Nothing to save: ${this._imports.length > 1 ? 'they are all' : 'it is'} in the library`
-                  : "Don't add to any setlist"
+                  ? t(this._imports.length > 1 ? 'import-nothing-many' : 'import-nothing-one')
+                  : t('import-no-setlist')
               }
             </span>
           </span>

@@ -95,7 +95,7 @@ messages. The Help page (`help-<page>-<section>-<item>-…`: the shape and the p
 Account and Teams page and a space's page (the cards, the manager, the Drive panel, storage), and
 what a role is called (`role-…`) and how long ago a sync was (`sync-time-…`), Preferences (what you play, instrument
 pitch, tuning, chords, screen, the highlight colour, fonts, theme and text size), About, the menu and the media
-player's settings, and the first time (the first-use questions, the welcome card, and why to install). Where a list of options has its words in a module (`PLAYS`, `PITCHES`, `TUNINGS`,
+player's settings, and the first time (the first-use questions, the welcome card, and why to install), and importing songs (the page, the SongSelect bookmarklet and its help, and what is said of each song's melody range). Where a list of options has its words in a module (`PLAYS`, `PITCHES`, `TUNINGS`,
 `FONT_CHOICES`, `TINT_PRESETS`), each `label` is a getter that asks for its message, so that an edit in the
 dev editor shows at once. Still in the code: the other
 dialogs and panels, the sync's progress messages
