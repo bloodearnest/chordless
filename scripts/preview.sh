@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Try a branch from a phone: `just branch-preview <branch>` (docs/PREVIEWS.md).
 #
-# Serves the branch's dev server (`npm run dev`, port 8787) and puts it on the tailnet at the machine's
+# Serves the branch's dev server (`npm run dev`, on a port of its own) and puts it on the tailnet at the machine's
 # own https://<machine>.<tailnet>.ts.net with `tailscale serve`. One preview at a time, always on the
 # same origin, so the browser's data and sign-in carry over from one branch to the next. The local
 # database (the register of teams: accounts, a test Team) is one shared copy in .preview/state,
@@ -13,7 +13,9 @@
 #   preview.sh snapshot         seed .preview/state from this machine's dev database (.wrangler/state)
 set -euo pipefail
 
-port=8787
+# Not 8787, so that a `just serve` can run beside it: Google sees only the tailnet name's origin
+# (https://<machine>.<tailnet>.ts.net, port 443), never this port. (8791 and 8792 are the e2e tests'.)
+port=${CHORDLESS_PREVIEW_PORT:-8790}
 
 # The primary checkout, wherever this is run from (a worktree has its own top level)
 common=$(git rev-parse --path-format=absolute --git-common-dir)
@@ -78,7 +80,7 @@ case "${1:-}" in
     fi
     # Something else (a `just serve`) on the port would answer the check below, and be served as the branch
     if curl -s -o /dev/null --max-time 2 "http://localhost:$port/"; then
-      echo "Port $port is already in use (a 'just serve' running?): stop it, then run this again." >&2
+      echo "Port $port is already in use: stop what is using it, or set CHORDLESS_PREVIEW_PORT, then run this again." >&2
       exit 1
     fi
     dir=$(worktree_for "$branch")
@@ -94,7 +96,7 @@ case "${1:-}" in
     # The export the preview starts from (an empty Personal space imports it), if there is one
     seed=()
     [[ -f "$root/test-export.zip" ]] && seed=(CHORDLESS_SEED_ZIP="$root/test-export.zip")
-    env "${seed[@]}" CHORDLESS_PORT=$port CHORDLESS_ALLOWED_HOSTS="$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//')" \
+    env "${seed[@]}" CHORDLESS_PORT="$port" CHORDLESS_ALLOWED_HOSTS="$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//')" \
       setsid npm run dev >"$log" 2>&1 &
     echo $! >"$pidfile"
     echo "$branch" >"$branchfile"

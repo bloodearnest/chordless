@@ -128,8 +128,8 @@ When the user wants to try a branch on a phone or tablet, serve it (`docs/PREVIE
 
 - Push the branch (or have it checked out in a worktree), then `just branch-preview <branch>`; it prints the
   `https://<machine>.<tailnet>.ts.net` address. `just branch-preview-status` and `just branch-preview-stop`
-  say and end it. One preview at a time, always on port 8787 and the same origin, so it stops the one before.
-- It needs port 8787 free: if the script says it is in use, a `just serve` (the user's, or yours) is running.
+  say and end it. One preview at a time, always on the same address (so it stops the one before); its port is 8790, not 8787, so a `just serve` can run beside it.
+- If the script says its port is in use, something else is on it (or an earlier preview did not stop).
   Tell the user, and do not kill a process you did not start.
 - Give the user the address, and what to look at in the branch. Sign-in is Google, each time site data is
   cleared. A Personal space with no songs imports `test-export.zip` (the primary checkout's root; git-ignored,

@@ -14,7 +14,7 @@ just branch-preview-stop
 
 It finds the branch's worktree (or makes `.claude/worktrees/preview-<branch>` from `origin/<branch>`),
 runs `npm ci` if needed, applies the branch's migrations to the local database, starts `npm run dev` on
-port 8787 and runs `tailscale serve` at `https://<machine>.<tailnet>.ts.net`. Tailnet only: not `funnel`.
+port 8790 (`CHORDLESS_PREVIEW_PORT`; `just serve` can run beside it) and runs `tailscale serve` at `https://<machine>.<tailnet>.ts.net`. Tailnet only: not `funnel`.
 
 ## One origin, one database
 
