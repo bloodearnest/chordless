@@ -122,6 +122,21 @@ Changes reach `main` only through pull requests (`docs/CI.md`): never commit to 
   removes the clean ones). A session confined to its own worktree cannot touch the primary checkout:
   say so and ask the user to run it (`! just wrap-up`).
 
+## Previewing a branch for the user (away from the computer)
+
+When the user wants to try a branch on a phone or tablet, serve it (`docs/PREVIEWS.md`):
+
+- Push the branch (or have it checked out in a worktree), then `just branch-preview <branch>`; it prints the
+  `https://<machine>.<tailnet>.ts.net` address. `just branch-preview-status` and `just branch-preview-stop`
+  say and end it. One preview at a time, always on port 8787 and the same origin, so it stops the one before.
+- It needs port 8787 free: if the script says it is in use, a `just serve` (the user's, or yours) is running.
+  Tell the user, and do not kill a process you did not start.
+- Give the user the address, and what to look at in the branch. Sign-in is Google, each time site data is
+  cleared. A Personal space with no songs imports `test-export.zip` (the primary checkout's root; git-ignored,
+  the user keeps it up to date): never commit it, upload it, or put it anywhere but that disk.
+- Leave it running when you finish (the user is testing on it); stop it only if asked. A branch that raises
+  `DB_VERSION` can break an older branch's data on that origin: say so if yours does.
+
 ## Log of what the tests catch
 
 When a test fails and the cause turns out to be a real defect in the app code (not a wrong test,
