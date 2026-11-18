@@ -11,7 +11,7 @@ import {
   initGoogleAuth,
 } from '../src/js/google-auth.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { settleSignIn, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -62,7 +62,9 @@ describe('google-auth: signing in', () => {
     }
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    // (before the stubs go: what a sign-in began in the background ends here, not in the next test)
+    await settleSignIn()
     window.fetch = realFetch
     ;(window as { google?: unknown }).google = realGoogle
     uninstall()

@@ -147,3 +147,14 @@ export function shownToast() {
 export function clearToasts() {
   document.querySelector('app-toast')?.remove()
 }
+
+/**
+ * Wait for what a sign-in leaves running in the background (the page looks for the teams the person is
+ * in, and asks for a name, with requests of their own). A test that counts requests would otherwise be
+ * given those of the test before it, on a runner slow enough for them to come late. Call it where the
+ * test file puts its stubs back, and before counting what a sign-in asked for.
+ */
+export async function settleSignIn(): Promise<void> {
+  const { signInFollowUpsDone } = await import('../src/js/google-auth.ts')
+  await signInFollowUpsDone()
+}
