@@ -48,6 +48,20 @@ describe('Starting a branch preview from an export', () => {
     expect((await destination.getAllSongs()).map(song => song.title)).to.deep.equal(['Mine'])
   })
 
+  it('imports what the server sends into the Personal space', async () => {
+    const blob = await createExport(source, 'Source')
+    const seed = () =>
+      Promise.resolve(new Response(blob, { headers: { 'Content-Type': 'application/zip' } }))
+    const result = await seedFromPreview(seed, () => Promise.resolve(destinationId))
+    expect(result?.songs).to.equal(1)
+    destination.db?.close()
+    destination = new ChordlessDB(destinationId)
+    await destination.init()
+    expect(await destination.getAllSongs()).to.have.length(1)
+    // (and a second visit finds songs there, and adds none)
+    expect(await seedFromPreview(seed, () => Promise.resolve(destinationId))).to.equal(null)
+  })
+
   it('does nothing where the server has no seed', async () => {
     const missing = () => Promise.resolve(new Response('', { status: 404 }))
     expect(await seedFromPreview(missing)).to.equal(null)
