@@ -31,7 +31,9 @@ import {
   newPerson,
   settleLeader,
 } from '../js/people.ts'
+import { rich } from '../js/rich-text.ts'
 import { isCcliNumber, songSelectLink } from '../js/songselect-link.ts'
+import { t } from '../js/text.ts'
 import { formatSetlistDate } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { SetlistDetailsSaveEvent } from './setlist-details-form.ts'
@@ -275,7 +277,7 @@ export class SetlistEmailImport extends LitElement {
     } catch (error) {
       console.error('[EmailImport] Could not read the link:', error)
       history.replaceState(history.state, '', location.pathname + location.search)
-      this._error = `Could not read that link: ${errorMessage(error)}`
+      this._error = t('email-import-link-failed', { reason: errorMessage(error) })
       this._state = 'pick'
       return true
     }
@@ -512,7 +514,7 @@ export class SetlistEmailImport extends LitElement {
       if (this.dispatchEvent(new SetlistEmailImportedEvent(url))) goTo(url)
     } catch (error) {
       console.error('[EmailImport] Could not create the setlist:', error)
-      this._error = `Could not create the setlist: ${errorMessage(error)}`
+      this._error = t('email-import-create-failed', { reason: errorMessage(error) })
       this._state = 'review'
     }
   }
@@ -523,18 +525,13 @@ export class SetlistEmailImport extends LitElement {
 
   _renderPick() {
     return html`
-      <h2>Import a setlist from an email</h2>
+      <h2>${t('email-import-heading')}</h2>
       <p>
-        Forward the email a worship leader sent, with the songs attached as PDFs, to
-        <a href="mailto:${IMPORT_ADDRESS}">${IMPORT_ADDRESS}</a>. Chordless replies with a link:
-        open it and the songs, keys, date and leader are shown here for you to check.
+        ${rich('email-import-text', { address: IMPORT_ADDRESS }, { mail: words => html`<a href="mailto:${IMPORT_ADDRESS}">${words}</a>` })}
       </p>
-      <p>
-        The email and its charts are not kept, and the charts are not imported: a song your library
-        does not have is fetched from SongSelect.
-      </p>
+      <p>${t('email-import-privacy')}</p>
       ${this._error ? html`<p class="status error" role="alert">❌ ${this._error}</p>` : nothing}
-      ${this._state === 'reading' ? html`<p class="status" role="status">Reading the email…</p>` : nothing}
+      ${this._state === 'reading' ? html`<p class="status" role="status">${t('email-import-reading')}</p>` : nothing}
     `
   }
 
@@ -544,14 +541,14 @@ export class SetlistEmailImport extends LitElement {
     const included = [...this._rows, ...this._unlisted].filter(row => row.include).length
     const updating = this._updating()
     return html`
-      <h2>${email.name || 'Setlist from an email'}</h2>
-      <p><button class="small" @click=${this._startAgain}>Start over</button></p>
+      <h2>${email.name || t('email-import-untitled')}</h2>
+      <p><button class="small" @click=${this._startAgain}>${t('email-import-start-over')}</button></p>
       ${this._error ? html`<p class="status error" role="alert">❌ ${this._error}</p>` : nothing}
-      ${email.dateWarning ? html`<p class="notice" role="note">${email.dateWarning}. Check the date below.</p>` : nothing}
-      ${email.date ? nothing : html`<p class="notice" role="note">The email gave no date: check the one below (the nearest Sunday).</p>`}
+      ${email.dateWarning ? html`<p class="notice" role="note">${t('email-import-date-warning', { warning: email.dateWarning })}</p>` : nothing}
+      ${email.date ? nothing : html`<p class="notice" role="note">${t('email-import-no-date')}</p>`}
       ${this._sameDate.length ? this._renderSameDate() : nothing}
       <div ?hidden=${Boolean(updating)}>
-        <h3>Setlist</h3>
+        <h3>${t('email-import-setlist')}</h3>
         ${this._renderLeaderMatch()}
         <setlist-details-form
           .setlist=${this._setlist}
@@ -561,29 +558,25 @@ export class SetlistEmailImport extends LitElement {
           @setlist-details-form:save=${this._create}
         ></setlist-details-form>
       </div>
-      <h3>Songs</h3>
-      ${email.orderFromList ? nothing : html`<p class="notice" role="note">The email had no list of songs, so they are in the order the charts were attached. Check the order.</p>`}
-      <ol class="songs" aria-label="Songs">${this._rows.map((row, i) => this._renderRow(row, i + 1))}</ol>
+      <h3>${t('email-import-songs')}</h3>
+      ${email.orderFromList ? nothing : html`<p class="notice" role="note">${t('email-import-no-list')}</p>`}
+      <ol class="songs" aria-label=${t('email-import-songs')}>${this._rows.map((row, i) => this._renderRow(row, i + 1))}</ol>
       ${this._unlisted.length ? this._renderUnlisted() : nothing}
       ${
         missing.length
           ? html`<p class="notice" role="status">
-            ${missing.length} ${missing.length === 1 ? 'song is' : 'songs are'} not in your library yet.
-            Open ${missing.length === 1 ? 'it' : 'each'} on SongSelect and import it with the
-            <a href="/import-song" target="_blank" rel="noopener">SongSelect bookmarklet</a> (when asked where to put it, keep it in the
-            library), then come back here: this page looks again when you return. Or leave
-            ${missing.length === 1 ? 'it' : 'a song'} out.
+            ${rich(missing.length === 1 ? 'email-import-missing-one' : 'email-import-missing-many', { count: missing.length }, { bookmarklet: words => html`<a href="/import-song" target="_blank" rel="noopener">${words}</a>` })}
           </p>`
           : nothing
       }
       ${updating && !missing.length ? this._renderChanges(updating) : nothing}
       <div class="create">
-        <button class="btn" @click=${() => goTo('/import-song')}>Cancel</button>
+        <button class="btn" @click=${() => goTo('/import-song')}>${t('action-cancel')}</button>
         <button
           class="btn primary"
           ?disabled=${missing.length > 0 || included === 0 || this._state === 'saving'}
           @click=${() => (updating ? this._save() : this.shadowRoot?.querySelector('setlist-details-form')?.submit())}
-        >${this._state === 'saving' ? 'Saving…' : updating ? 'Update setlist' : 'Create setlist'}</button>
+        >${this._state === 'saving' ? t('email-import-saving') : updating ? t('email-import-update') : t('email-import-create')}</button>
       </div>
     `
   }
@@ -601,18 +594,20 @@ export class SetlistEmailImport extends LitElement {
     const hasNew = isNew && !this._stored.some(each => each.id === isNew)
     const chosen = this._setlist.leaderId === isNew && hasNew ? NEW_PERSON : this._setlist.leaderId
     const learns =
-      email && chosen !== NEW_PERSON
-        ? html` ${email} is added to them, so the next email from it is matched by its address.`
-        : nothing
+      email && chosen !== NEW_PERSON ? html` ${t('email-import-learns', { email })}` : nothing
     return html`
-      <div class="notice leader-match" role="group" aria-label="Who leads">
+      <div class="notice leader-match" role="group" aria-label=${t('email-import-who-leads')}>
         <label for="leader-match">
           ${
             match.kind === 'match'
-              ? html`The email's leader, “${label}”, is <strong>${match.person.name}</strong> by name.`
+              ? rich(
+                  'email-import-leader-match',
+                  { label, person: match.person.name },
+                  { strong: words => html`<strong>${words}</strong>` }
+                )
               : match.kind === 'suggest'
-                ? html`The email's leader, “${label}”, might be one of your people. Who is it?`
-                : html`The email's leader, “${label}”, is not one of your people yet.`
+                ? t('email-import-leader-suggest', { label })
+                : t('email-import-leader-new', { label })
           }${learns}
         </label>
         <select
@@ -621,7 +616,7 @@ export class SetlistEmailImport extends LitElement {
         >
           ${
             hasNew
-              ? html`<option value=${NEW_PERSON} ?selected=${chosen === NEW_PERSON}>A new person: ${label}</option>`
+              ? html`<option value=${NEW_PERSON} ?selected=${chosen === NEW_PERSON}>${t('email-import-new-person', { label })}</option>`
               : nothing
           }
           ${this._stored.map(each => html`<option value=${each.id} ?selected=${chosen === each.id}>${each.name}</option>`)}
@@ -632,21 +627,20 @@ export class SetlistEmailImport extends LitElement {
 
   _renderSameDate() {
     return html`
-      <fieldset class="notice" role="group" aria-label="A setlist for this date">
+      <fieldset class="notice" role="group" aria-label=${t('email-import-same-date-label')}>
         <legend>
-          You already have ${this._sameDate.length === 1 ? 'a setlist' : 'setlists'} for
-          ${formatSetlistDate(this._sameDate[0].date)}
+          ${t(this._sameDate.length === 1 ? 'email-import-same-date-one' : 'email-import-same-date-many', { date: formatSetlistDate(this._sameDate[0].date) })}
         </legend>
         ${this._sameDate.map(
           have =>
             html`<label>
               <input type="radio" name="target" .checked=${this._target === have.id} @change=${() => this._chooseTarget(have.id)} />
-              Update <a href="/setlist/${have.id}" target="_blank" rel="noopener">${have.name || have.type}</a>${leaderName(this._people, have.leaderId) ? html` (${leaderName(this._people, have.leaderId)})` : nothing}
+              ${rich('email-import-update-target', { setlist: have.name || have.type }, { setlist: words => html`<a href="/setlist/${have.id}" target="_blank" rel="noopener">${words}</a>` })}${leaderName(this._people, have.leaderId) ? html` (${leaderName(this._people, have.leaderId)})` : nothing}
             </label>`
         )}
         <label>
           <input type="radio" name="target" .checked=${this._target === 'new'} @change=${() => this._chooseTarget('new')} />
-          Make a new setlist
+          ${t('email-import-new-setlist')}
         </label>
       </fieldset>
     `
@@ -660,28 +654,32 @@ export class SetlistEmailImport extends LitElement {
   /** What updating would change in the setlist, for the person to look over */
   _renderChanges(setlist: Setlist) {
     const titles = new Map(this._library.map(song => [song.id, song.title]))
-    const changes = changesTo(setlist, this._chosen(), id => titles.get(id) ?? 'A song')
+    const changes = changesTo(
+      setlist,
+      this._chosen(),
+      id => titles.get(id) ?? t('email-import-a-song')
+    )
     return html`
-      <section class="changes" aria-label="Changes to the setlist">
-        <h3>Changes to ${setlist.name || 'the setlist'}</h3>
+      <section class="changes" aria-label=${t('email-import-changes-label')}>
+        <h3>${setlist.name ? t('email-import-changes', { setlist: setlist.name }) : t('email-import-changes-unnamed')}</h3>
         ${
           hasChanges(changes)
             ? html`<ul>
-              ${changes.added.map(title => html`<li>Adds ${title}</li>`)}
+              ${changes.added.map(title => html`<li>${t('email-import-adds', { title })}</li>`)}
               ${changes.removed.map(
                 ({ songId, title }) => html`<li>
                   <label>
                     <input type="checkbox" .checked=${this._keepIds.has(songId)} @change=${(e: Event) => this._keepSong(songId, (e.target as HTMLInputElement).checked)} />
-                    Keep ${title}, which the email does not have (it is removed otherwise)
+                    ${t('email-import-keep', { title })}
                   </label>
                 </li>`
               )}
-              ${changes.keys.map(({ title, from, to }) => html`<li>${title}: key ${from ?? 'none'} → ${to}</li>`)}
-              ${changes.reordered ? html`<li>The songs are in the email’s order</li>` : nothing}
+              ${changes.keys.map(({ title, from, to }) => html`<li>${t('email-import-key-change', { title, from: from ?? t('email-import-no-key'), to })}</li>`)}
+              ${changes.reordered ? html`<li>${t('email-import-reordered')}</li>` : nothing}
             </ul>`
-            : html`<p>The email has the same songs, in the same order and keys: nothing changes.</p>`
+            : html`<p>${t('email-import-nothing')}</p>`
         }
-        <p class="hint">Its date, name, time and leader are left as they are.</p>
+        <p class="hint">${t('email-import-left-as-is')}</p>
       </section>
     `
   }
@@ -699,20 +697,20 @@ export class SetlistEmailImport extends LitElement {
       <li class="song ${row.include ? '' : 'off'}">
         <input
           type="checkbox"
-          aria-label="Include ${song.title}"
+          aria-label=${t('email-import-include', { title: song.title })}
           .checked=${row.include}
           @change=${(e: Event) => this._change(row, { include: (e.target as HTMLInputElement).checked })}
         />
         <div>
           <span class="title">${number}. ${song.title}</span>
-          ${song.listed && song.listed !== song.title ? html`<div class="listed">listed as “${song.listed}”</div>` : nothing}
-          ${song.pairedBy ? html`<div class="listed">The email attached “${song.title}” in the same key, and no other song was left: taken to be this one.</div>` : nothing}
+          ${song.listed && song.listed !== song.title ? html`<div class="listed">${t('email-import-listed-as', { listed: song.listed })}</div>` : nothing}
+          ${song.pairedBy ? html`<div class="listed">${t('email-import-paired', { title: song.title })}</div>` : nothing}
           ${this._renderMatch(row)}
           <div class="fields">
-            <label>Key
+            <label>${t('email-import-key')}
               <input type="text" class="key" .value=${row.key} @input=${(e: Event) => this._change(row, { key: (e.target as HTMLInputElement).value })} />
             </label>
-            <label class="note">Note
+            <label class="note">${t('email-import-note')}
               <input type="text" .value=${row.notes} @input=${(e: Event) => this._change(row, { notes: (e.target as HTMLInputElement).value })} />
             </label>
           </div>
@@ -725,18 +723,18 @@ export class SetlistEmailImport extends LitElement {
     const { match, song } = row
     if (match.kind === 'ccli' || match.kind === 'title') {
       const there = match.song.source
-      return html`<div class="match ok">${there ? html`✓ In “${there.label}”: it is copied into your library when you create the setlist` : html`✓ In your library`}${match.song.title === song.title ? '' : html`: ${match.song.title}`}</div>`
+      return html`<div class="match ok">${there ? t('email-import-in-space', { space: there.label }) : t('email-import-in-library')}${match.song.title === song.title ? '' : html`: ${match.song.title}`}</div>`
     }
     if (match.kind === 'possible') {
       const name = `pick-${song.title}-${song.ccli ?? ''}`
       return html`
-        <div class="match">${match.via === 'lyrics' ? 'No song has that title, but its words are in these:' : 'Is it one of these?'}</div>
-        <div class="candidates" role="radiogroup" aria-label="Which song is ${song.title}">
+        <div class="match">${t(match.via === 'lyrics' ? 'email-import-by-lyrics' : 'email-import-is-it')}</div>
+        <div class="candidates" role="radiogroup" aria-label=${t('email-import-which', { title: song.title })}>
           ${match.candidates.map(
             candidate =>
               html`<label><input type="radio" name=${name} .checked=${row.pick === candidate.uuid} @change=${() => this._change(row, { pick: candidate.uuid })} /> ${candidate.title}</label>`
           )}
-          <label><input type="radio" name=${name} .checked=${row.pick === 'new'} @change=${() => this._change(row, { pick: 'new' })} /> None of these</label>
+          <label><input type="radio" name=${name} .checked=${row.pick === 'new'} @change=${() => this._change(row, { pick: 'new' })} /> ${t('email-import-none-of-these')}</label>
         </div>
         ${row.pick === 'new' ? this._renderImport(row) : nothing}
       `
@@ -746,25 +744,25 @@ export class SetlistEmailImport extends LitElement {
 
   /** For a song that has to be imported: where to get it, or leaving it out */
   _renderImport(row: Row) {
-    if (!row.include) return html`<div class="match none">Not in your library.</div>`
+    if (!row.include) return html`<div class="match none">${t('email-import-not-in-library')}</div>`
     const { song } = row
     return html`
       <div class="match none">
-        Not in your library.
-        <a href=${songSelectLink(song)} target="_blank" rel="noopener">${isCcliNumber(song.ccli) ? 'Open it on SongSelect ↗' : 'Search SongSelect for it ↗'}</a>
-        <button class="small" @click=${() => this._change(row, { include: false })}>Leave it out</button>
+        ${t('email-import-not-in-library')}
+        <a href=${songSelectLink(song)} target="_blank" rel="noopener">${t(isCcliNumber(song.ccli) ? 'email-import-open' : 'email-import-search')}</a>
+        <button class="small" @click=${() => this._change(row, { include: false })}>${t('email-import-leave-out')}</button>
       </div>
     `
   }
 
   _renderUnlisted() {
     return html`
-      <h3>Charts attached but not in the list</h3>
-      <ul class="songs" aria-label="Songs attached but not listed">
+      <h3>${t('email-import-unlisted')}</h3>
+      <ul class="songs" aria-label=${t('email-import-unlisted-label')}>
         ${this._unlisted.map(
           row => html`
             <li class="song">
-              <input type="checkbox" aria-label="Add ${row.song.title}" .checked=${row.include}
+              <input type="checkbox" aria-label=${t('email-import-add', { title: row.song.title })} .checked=${row.include}
                 @change=${(e: Event) => this._change(row, { include: (e.target as HTMLInputElement).checked })} />
               <div>
                 <span class="title">${row.song.title}</span>
