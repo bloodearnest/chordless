@@ -1,4 +1,5 @@
 import { html } from 'lit'
+import { t } from '../text.ts'
 import '../../components/app-header.ts'
 import '../../components/team-join.ts'
 import { PageView } from './page-view.ts'
@@ -7,7 +8,7 @@ import { PageView } from './page-view.ts'
 export class JoinView extends PageView {
   override render() {
     return html`
-      <app-header heading="Join a team space"></app-header>
+      <app-header heading=${t('page-join')}></app-header>
       <team-join .route=${this.route}></team-join>
     `
   }

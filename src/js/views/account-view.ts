@@ -1,4 +1,5 @@
 import { html } from 'lit'
+import { t } from '../text.ts'
 import '../../components/account-page.ts'
 import '../../components/app-header.ts'
 import { PageView } from './page-view.ts'
@@ -7,7 +8,7 @@ import { PageView } from './page-view.ts'
 export class AccountView extends PageView {
   override render() {
     return html`
-      <app-header heading="Account and Teams"></app-header>
+      <app-header heading=${t('menu-account')}></app-header>
       <main class="home-content">
         <account-page id="account-page"></account-page>
       </main>

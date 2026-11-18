@@ -1,4 +1,6 @@
 import { html, nothing } from 'lit'
+import { rich } from '../rich-text.ts'
+import { t } from '../text.ts'
 import '../../components/app-header.ts'
 import type { ChordlessDB } from '../db.ts'
 import { takeLink } from '../incoming-link.ts'
@@ -16,28 +18,16 @@ import { setlistTemplate } from './setlist-view.ts'
 type ShareRoute = Extract<Route, { name: 'share' }>
 
 /** What to tell someone whose link can't show a setlist */
-const MESSAGES: Record<
+const messages = (): Record<
   Exclude<ShareOpening['state'], 'ready'> | 'loading',
   { heading: string; text: string }
-> = {
-  loading: { heading: 'Opening…', text: 'Getting the setlist.' },
-  ended: {
-    heading: 'This share has ended',
-    text: 'The person who sent it stopped sharing, or it has expired. Ask them for a new link if you still need it.',
-  },
-  'needs-key': {
-    heading: 'This link is incomplete',
-    text: 'The end of the link is missing, so the setlist cannot be opened. Ask for the whole link again, or scan its QR code.',
-  },
-  'bad-key': {
-    heading: "This link doesn't open the setlist",
-    text: 'The link looks cut short or changed. Ask for it again, or scan its QR code.',
-  },
-  unavailable: {
-    heading: "Can't reach the setlist",
-    text: 'Connect to the internet and open the link again. After that it works without a connection.',
-  },
-}
+> => ({
+  loading: { heading: t('share-loading'), text: t('share-loading-text') },
+  ended: { heading: t('share-ended'), text: t('share-ended-text') },
+  'needs-key': { heading: t('share-incomplete'), text: t('share-incomplete-text') },
+  'bad-key': { heading: t('share-bad-key'), text: t('share-bad-key-text') },
+  unavailable: { heading: t('share-unreachable'), text: t('share-unreachable-text') },
+})
 
 /**
  * A setlist someone shared by link (/s/<file id>#<key>): read-only, and kept on this device
@@ -142,10 +132,19 @@ export class ShareView extends PageView {
           ? html`
             <aside class="share-banner" id="share-banner">
               <span>
-                Shared with you${owner ? html` by <strong>${owner}</strong>` : nothing}. You can
-                read it here, with no account${expires ? html`, until ${formatSetlistDate(expires, 'long')}` : nothing}.
+                ${rich(
+                  owner
+                    ? expires
+                      ? 'share-banner-owner-until'
+                      : 'share-banner-owner'
+                    : expires
+                      ? 'share-banner-until'
+                      : 'share-banner',
+                  { owner: owner ?? '', until: expires ? formatSetlistDate(expires, 'long') : '' },
+                  { strong: words => html`<strong>${words}</strong>` }
+                )}
               </span>
-              <a href="/about">What is Chordless?</a>
+              <a href="/about">${t('share-what')}</a>
             </aside>
           `
           : nothing
@@ -157,10 +156,10 @@ export class ShareView extends PageView {
       opening !== 'loading' &&
       opening.state === 'unavailable' &&
       opening.offline
-        ? { ...MESSAGES.unavailable, heading: "You're offline" }
-        : MESSAGES[state as keyof typeof MESSAGES]
+        ? { ...messages().unavailable, heading: t('share-offline') }
+        : messages()[state as keyof ReturnType<typeof messages>]
     return html`
-      <app-header heading="Shared setlist"></app-header>
+      <app-header heading=${t('page-shared')}></app-header>
       <main class="home-content">
         <h2 style="margin: 2rem 1rem 1rem 1rem" id="share-status" data-state=${state}>
           ${message.heading}
@@ -169,7 +168,7 @@ export class ShareView extends PageView {
         ${
           state === 'loading'
             ? nothing
-            : html`<p style="margin: 0 1rem"><a href="/">Go to Chordless</a></p>`
+            : html`<p style="margin: 0 1rem"><a href="/">${t('share-go')}</a></p>`
         }
       </main>
     `

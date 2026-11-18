@@ -1,4 +1,5 @@
 import { css, html, LitElement, nothing } from 'lit'
+import { t } from '../js/text.ts'
 import './icon.ts'
 import { buttonStyles } from './shared-styles.ts'
 
@@ -246,7 +247,7 @@ export class AppToast extends LitElement {
           }
           ${
             this._details
-              ? html`<details><summary>Details</summary><p>${this._details}</p></details>`
+              ? html`<details><summary>${t('toast-details')}</summary><p>${this._details}</p></details>`
               : nothing
           }
         </div>
@@ -255,7 +256,7 @@ export class AppToast extends LitElement {
             ? html`<button class="btn" type="button" @click=${this._act}>${this._action.label}</button>`
             : nothing
         }
-        <button class="close" type="button" aria-label="Dismiss" @click=${this.dismiss}>
+        <button class="close" type="button" aria-label=${t('toast-dismiss')} @click=${this.dismiss}>
           <app-icon name="close" size="20"></app-icon>
         </button>
       </div>

@@ -11,6 +11,7 @@ import { sliceMeasures } from '../js/score-section.ts'
 import { withRealBookChords, withTextAccidentals } from '../js/score-svg-text.ts'
 import { transposeScore } from '../js/score-transpose.ts'
 import { reportError, traced } from '../js/telemetry/telemetry.ts'
+import { t } from '../js/text.ts'
 
 /** Whether a sheet was engraved already on this page, so the first, which starts the engraver, can be told from the rest */
 let engravedBefore = false
@@ -385,7 +386,7 @@ export class ScoreView extends LitElement {
 
   override render() {
     if (this._failed && !this._pages.length) {
-      return html`<p class="failed" role="alert">The lead sheet could not be shown for this song.</p>`
+      return html`<p class="failed" role="alert">${t('score-failed')}</p>`
     }
     // (a few measures of a section have no title or notice: the song's own sheet has them)
     const melody = this.measures ? null : this.melody

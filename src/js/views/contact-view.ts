@@ -1,4 +1,5 @@
 import { html } from 'lit'
+import { t } from '../text.ts'
 import '../../components/app-contact.ts'
 import '../../components/app-header.ts'
 import { PageView } from './page-view.ts'
@@ -7,13 +8,13 @@ import { PageView } from './page-view.ts'
 export class ContactView extends PageView {
   override render() {
     return html`
-      <app-header heading="Contact"></app-header>
+      <app-header heading=${t('footer-contact')}></app-header>
       <main class="home-content">
-        <h2 style="margin: 2rem 1rem 1rem 1rem">Contact</h2>
+        <h2 style="margin: 2rem 1rem 1rem 1rem">${t('footer-contact')}</h2>
         <app-contact id="app-contact"></app-contact>
         <p style="margin: 2rem 1rem">
-          <a href="/privacy.html" rel="external">Privacy policy</a> ·
-          <a href="/terms.html" rel="external">Terms of service</a>
+          <a href="/privacy.html" rel="external">${t('footer-privacy')}</a> ·
+          <a href="/terms.html" rel="external">${t('footer-terms')}</a>
         </p>
       </main>
     `

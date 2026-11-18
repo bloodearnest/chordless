@@ -1,4 +1,5 @@
 import { html } from 'lit'
+import { t } from '../text.ts'
 import '../../components/app-header.ts'
 import '../../components/team-space-wizard.ts'
 import { PageView } from './page-view.ts'
@@ -7,7 +8,7 @@ import { PageView } from './page-view.ts'
 export class NewTeamSpaceView extends PageView {
   override render() {
     return html`
-      <app-header heading="New team space"></app-header>
+      <app-header heading=${t('wizard-heading')}></app-header>
       <team-space-wizard></team-space-wizard>
     `
   }

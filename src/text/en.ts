@@ -1795,4 +1795,89 @@ storage-go-back = Use my Google sign-in instead
 storage-own-sign-in = This Team reaches its files with your Google sign-in, so its syncing stops if you leave or your sign-in stops working.
 storage-switch-text = If the Team’s folder is in a Google shared drive, Chordless can reach it with an account of its own instead. Add this address to the shared drive as a Content manager, then check it:
 storage-switch = Check and switch
+
+
+## The pages: their headings, the titles of the browser's tabs, and the notes round them
+
+# The title of the browser's tab for each page.
+title-setlist = Setlist - Chordless
+title-shared = Shared setlist - Chordless
+title-not-found = Not found - Chordless
+title-account = Account and Teams - Chordless
+title-preferences = Preferences - Chordless
+title-import-songs = Import Songs - Chordless
+title-space = Space - Chordless
+title-sign-in = Sign in - Chordless
+title-import-setlist = Import a Setlist - Chordless
+title-library = Song Library - Chordless
+title-about = About - Chordless
+title-contact = Contact - Chordless
+title-join = Join a team space - Chordless
+title-media = Media player - Chordless
+title-new-team = New team space - Chordless
+
+page-loading = Loading...
+page-not-found = Not found
+page-not-found-heading = Page not found
+page-not-found-link = Go to the setlists
+page-import-setlist = Import a Setlist
+page-join = Join a team space
+page-sign-in = Sign in
+page-space = Space
+page-media = Media player
+page-shared = Shared setlist
+page-load-failed = This page could not be loaded. Reload to try again.
+
+# The links along the bottom of the About, Preferences and Contact pages.
+footer-contact = Contact
+footer-privacy = Privacy policy
+footer-terms = Terms of service
+footer-licences = Open source licences
+
+about-heading = About Chordless
+about-blurb = Chordless shows the lyrics and chords of worship songs for church, as a setlist you can arrange and play from. Chords can be hidden or shown for each verse, the key can be changed, and one touch moves between songs. It works offline, and your songs are kept in your own Google Drive.
+
+home-create = Create new setlist
+home-create-submit = Create Setlist
+
+setlist-go-live = Go live
+setlist-share = Share setlist
+songs-search = Search songs by title, artist, or lyrics...
+songs-search-start = Start typing to search songs...
+
+# A song of another space, shown in the library. { $source } is that space.
+library-source-from = From { $source }: not in your library.
+library-add = Add to my library
+library-select = Select a song to view
+
+media-page-text = Pads and a click track for your setlists. These settings apply to all of them.
+score-failed = The lead sheet could not be shown for this song.
+toast-details = Details
+toast-dismiss = Dismiss
+modal-close = Close
+progress-label = Progress
+
+
+## A setlist that was shared by a link (what a person sees who opens one)
+
+share-what = What is Chordless?
+share-go = Go to Chordless
+# <strong> is who shared it, { $owner }; { $until } is the day it ends.
+share-banner = Shared with you. You can read it here, with no account.
+share-banner-owner = Shared with you by <strong>{ $owner }</strong>. You can read it here, with no account.
+share-banner-until = Shared with you. You can read it here, with no account, until { $until }.
+share-banner-owner-until = Shared with you by <strong>{ $owner }</strong>. You can read it here, with no account, until { $until }.
+
+# What it says when the link cannot show the setlist: a heading and a line under it.
+share-loading = Opening…
+share-loading-text = Getting the setlist.
+share-ended = This share has ended
+share-ended-text = The person who sent it stopped sharing, or it has expired. Ask them for a new link if you still need it.
+share-incomplete = This link is incomplete
+share-incomplete-text = The end of the link is missing, so the setlist cannot be opened. Ask for the whole link again, or scan its QR code.
+share-bad-key = This link doesn't open the setlist
+share-bad-key-text = The link looks cut short or changed. Ask for it again, or scan its QR code.
+share-unreachable = Can't reach the setlist
+share-unreachable-text = Connect to the internet and open the link again. After that it works without a connection.
+share-offline = You're offline
 `

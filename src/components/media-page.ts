@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { t } from '../js/text.ts'
 import './media-player-settings.ts'
 import { panelStyles } from './shared-styles.ts'
 
@@ -29,8 +30,8 @@ export class MediaPage extends LitElement {
     return html`
       <div class="content">
         <div class="panel">
-          <h3>Media player</h3>
-          <p>Pads and a click track for your setlists. These settings apply to all of them.</p>
+          <h3>${t('page-media')}</h3>
+          <p>${t('media-page-text')}</p>
           <media-player-settings uploads></media-player-settings>
         </div>
       </div>
