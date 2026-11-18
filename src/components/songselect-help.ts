@@ -1,4 +1,6 @@
 import { css, html, LitElement } from 'lit'
+import { rich } from '../js/rich-text.ts'
+import { t } from '../js/text.ts'
 import './bookmarklet-installer.ts'
 
 /**
@@ -102,86 +104,77 @@ export class SongSelectHelp extends LitElement {
   override render() {
     return html`
       <p class="touch-tip">
-        <strong>On a phone or tablet?</strong> The bookmarklet works best on a computer. Instead,
-        download the song's ChordPro file from SongSelect, then choose it with "Import ChordPro
-        Files" above.
+        ${rich('ss-touch-tip', undefined, { strong: words => html`<strong>${words}</strong>` })}
       </p>
       <p class="note lead">
-        Import songs from SongSelect directly into your Chordless library with one click using this
-        bookmarklet.
+        ${t('ss-lead')}
       </p>
 
       <section>
-        <h3>Install Bookmarklet</h3>
+        <h3>${t('ss-install-heading')}</h3>
         <p class="note desktop-only">
-          <strong>Drag this button to your bookmarks bar:</strong>
+          ${rich('ss-drag', undefined, { strong: words => html`<strong>${words}</strong>` })}
         </p>
         <bookmarklet-installer>
-          <h4>Alternative Method</h4>
+          <h4>${t('ss-alt-heading')}</h4>
           <p class="note">
-            <span class="desktop-only">If dragging doesn't work, you</span
-            ><span class="touch-only">You</span> can create the bookmark yourself:
+            <span class="desktop-only">${t('ss-alt-text-desktop')}</span
+            ><span class="touch-only">${t('ss-alt-text-touch')}</span>
           </p>
           <ol class="note">
             <li>
-              Create a new bookmark<span class="desktop-only"> (Ctrl+D or Cmd+D)</span
-              ><span class="touch-only"> of any page, then edit it</span>
+              <span class="desktop-only">${t('ss-alt-step-1-desktop')}</span
+              ><span class="touch-only">${t('ss-alt-step-1-touch')}</span>
             </li>
-            <li>Name it "🎵 Import to Chordless"</li>
-            <li>Copy the code below and paste it as the URL</li>
+            <li>${t('ss-alt-step-2')}</li>
+            <li>${t('ss-alt-step-3')}</li>
           </ol>
         </bookmarklet-installer>
       </section>
 
       <section>
-        <h3>Desktop Installation</h3>
+        <h3>${t('ss-desktop-heading')}</h3>
         <div class="install-step">
           <span class="step-number">1</span>
-          <strong>Show your bookmarks bar:</strong> Press <code>Ctrl+Shift+B</code> (Windows) or
-          <code>Cmd+Shift+B</code> (Mac)
+          ${rich('ss-desktop-1', undefined, { strong: words => html`<strong>${words}</strong>`, code: words => html`<code>${words}</code>` })}
         </div>
         <div class="install-step">
           <span class="step-number">2</span>
-          <strong>Drag the purple button above</strong> to your bookmarks bar
+          ${rich('ss-desktop-2', undefined, { strong: words => html`<strong>${words}</strong>` })}
         </div>
         <div class="install-step">
           <span class="step-number">3</span>
-          Navigate to a song page on SongSelect
+          ${t('ss-desktop-3')}
         </div>
         <div class="install-step">
           <span class="step-number">4</span>
-          Click the bookmark
+          ${t('ss-desktop-4')}
         </div>
       </section>
 
       <section>
-        <h3>Mobile Installation</h3>
+        <h3>${t('ss-mobile-heading')}</h3>
         <p class="note">
-          The easiest way on a phone or tablet is to download the song's ChordPro file from
-          SongSelect, then choose it with "Import ChordPro Files" above.
+          ${t('ss-mobile-1')}
         </p>
         <p class="note">
-          To use the bookmarklet anyway, bookmark any page, then edit the bookmark and paste the
-          code from the "Alternative Method" above as its URL. On Android, run it by typing the
-          bookmark's name in the address bar and tapping it.
+          ${t('ss-mobile-2')}
         </p>
         <p class="note">
-          On iPhone and iPad, songs it imports in Safari don't reach Chordless installed on the
-          home screen, which keeps its own separate storage.
+          ${t('ss-mobile-3')}
         </p>
       </section>
 
       <section>
-        <h3>How It Works</h3>
+        <h3>${t('ss-how-heading')}</h3>
         <ol class="note">
-          <li>Navigate to a song on SongSelect</li>
-          <li>Click the bookmarklet</li>
+          <li>${t('ss-how-1')}</li>
+          <li>${t('ss-how-2')}</li>
           <li>
-            It opens Chordless's Import Songs page, and downloads the song's ChordPro file from
-            SongSelect using your login
+            ${t('ss-how-3')}
           </li>
-          <li>It sends the song to Chordless, which saves it to your library</li>
-          <li>Choose a setlist to add it to, or just keep it in the library</li>
+          <li>${t('ss-how-4')}</li>
+          <li>${t('ss-how-5')}</li>
         </ol>
       </section>
     `

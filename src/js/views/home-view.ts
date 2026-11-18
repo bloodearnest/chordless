@@ -292,7 +292,7 @@ export class HomeView extends PageView {
         </div>
       </main>
 
-      <app-modal id="create-setlist-modal" heading="Create New Setlist" ${ref(this.#modal)}>
+      <app-modal id="create-setlist-modal" heading=${t('setlist-create-heading')} ${ref(this.#modal)}>
         <setlist-details-form
           id="create-setlist-form"
           submit-label="Create Setlist"
