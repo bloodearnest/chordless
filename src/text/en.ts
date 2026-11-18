@@ -1020,4 +1020,46 @@ mps-padset-choose = Choose a pad set
 mps-padset-none-yet = No pad sets yet
 mps-padset-upload = Upload a new pad set…
 mps-padset-preparing = Preparing pad set…
+
+
+## The first time (the questions on first use, the welcome card, and why to install)
+
+first-use-heading = Welcome to Chordless
+first-use-intro = Chordless is an application for managing and using setlists for bands. A few quick questions to set up some defaults for you:
+first-use-later = You can change this later in Preferences, where each setting can be set by itself.
+first-use-skip = Skip
+first-use-continue = Continue
+
+welcome-lead = Chordless shows the lyrics and chords of your worship songs, arranged into a setlist for each service. It works offline, so it is ready even when the wifi is not.
+
+welcome-samples-heading = Try it
+welcome-samples-text = Add a sample setlist of four public-domain hymns, to see how it works.
+welcome-samples-button = Add a sample setlist
+# { $reason } is what went wrong.
+welcome-sample-failed = Could not add the sample setlist: { $reason }
+
+welcome-songs-heading = Add your own songs
+welcome-songs-text = Import ChordPro files, or paste the text of a song. If your church has a CCLI licence, the SongSelect bookmarklet adds songs straight from SongSelect.
+welcome-songs-button = Import songs
+
+welcome-safe-heading = Keep them safe
+welcome-safe-text = Sign in with Google to keep your songs and setlists in your own Google Drive, and to share them between your devices.
+welcome-safe-button = Sign in and sync
+
+welcome-install-heading = Install it
+welcome-install-text = Browsers can clear the saved data of a website that has not been used for a while: Safari does after about a week. An installed app is kept, and opens full screen, so your songs are there when you need them.
+# Added after the text above, with a space, where the installed app is not the browser (it keeps its own data).
+welcome-install-separate-data = The installed app keeps its own data, separate from Safari's, so you will need to sign in again in it.
+# <strong> is the name of a button.
+welcome-install-ios = Tap the <strong>Share</strong> button in your browser, then choose <strong>Add to Home Screen</strong>.
+welcome-install-mac = In the menu bar, choose <strong>File</strong>, then <strong>Add to Dock</strong>.
+
+why-install-link = Why install?
+why-install-heading = Why install Chordless?
+# <strong> is the lead of each reason.
+why-install-stay = <strong>Your songs stay put.</strong> A browser can clear the saved data of a website it thinks is unused (Safari does after about a week). An installed app is protected from that, so your songs and setlists are still there on the day.
+why-install-screen = <strong>The whole screen for the song.</strong> No address bar or tabs getting in the way.
+why-install-feel = <strong>Feels like any other app you use.</strong> It has its own icon, opens in its own window, and shows up in your app switcher.
+why-install-ios = On an iPhone or iPad the installed app keeps its own data, separate from Safari's, so you sign in again in it.
+why-install-not-needed = Chordless works offline, checks for updates and can keep the screen awake in a browser tab too. Installing isn't needed for those.
 `

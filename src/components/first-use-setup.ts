@@ -6,6 +6,7 @@ import {
   markSetupDone,
   setMusicianType,
 } from '../js/preferences.ts'
+import { t } from '../js/text.ts'
 import { PLAYS } from '../js/what-do-you-play.ts'
 import './app-modal.ts'
 import type { AppModal } from './app-modal.ts'
@@ -119,18 +120,15 @@ export class FirstUseSetup extends LitElement {
   override render() {
     return html`
       <app-modal
-        heading="Welcome to Chordless"
+        heading=${t('first-use-heading')}
         size="medium"
         hide-close-button
         ${ref(this.#modal)}
         @app-modal:close=${this._closed}
       >
-        <p>
-          Chordless is an application for managing and using setlists for bands. A few quick
-          questions to set up some defaults for you:
-        </p>
+        <p>${t('first-use-intro')}</p>
         <fieldset>
-          <legend>What do you play?</legend>
+          <legend>${t('pref-play-heading')}</legend>
           ${FIRST_USE_PLAYS.map(
             option => html`
               <label class="choice">
@@ -148,10 +146,10 @@ export class FirstUseSetup extends LitElement {
             `
           )}
         </fieldset>
-        <p>You can change this later in Preferences, where each setting can be set by itself.</p>
+        <p>${t('first-use-later')}</p>
         <div class="actions" slot="actions">
-          <button class="btn" @click=${() => this.#modal.value?.close()}>Skip</button>
-          <button class="btn primary" @click=${() => this.#modal.value?.close()}>Continue</button>
+          <button class="btn" @click=${() => this.#modal.value?.close()}>${t('first-use-skip')}</button>
+          <button class="btn primary" @click=${() => this.#modal.value?.close()}>${t('first-use-continue')}</button>
         </div>
       </app-modal>
     `

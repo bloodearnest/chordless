@@ -6,6 +6,8 @@ import {
   promptInstall,
 } from '../js/install.ts'
 import { goTo } from '../js/navigation.ts'
+import { rich } from '../js/rich-text.ts'
+import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
 import './why-install.ts'
@@ -126,7 +128,7 @@ export class WelcomeCard extends LitElement {
       await goTo(`/setlist/${await addSampleSetlist()}`)
     } catch (error) {
       console.error('Failed to add the sample setlist:', error)
-      this._error = `Could not add the sample setlist: ${errorMessage(error)}`
+      this._error = t('welcome-sample-failed', { reason: errorMessage(error) })
     } finally {
       this._busy = false
     }
@@ -141,32 +143,23 @@ export class WelcomeCard extends LitElement {
     const mode = this._installMode
     if (mode === 'installed' || mode === 'none') return nothing
 
-    const separateData =
-      mode === 'prompt'
-        ? nothing
-        : html` The installed app keeps its own data, separate from Safari's, so you will
-            need to sign in again in it.`
+    const separateData = mode === 'prompt' ? '' : ` ${t('welcome-install-separate-data')}`
 
     return html`
       <li id="welcome-install">
-        <h3>Install it</h3>
+        <h3>${t('welcome-install-heading')}</h3>
         <p class="why">
-          Browsers can clear the saved data of a website that has not been used for a while: Safari
-          does after about a week. An installed app is kept, and opens full screen, so your songs
-          are there when you need them.${separateData}
+          ${t('welcome-install-text')}${separateData}
         </p>
         <p><why-install></why-install></p>
         ${
           mode === 'prompt'
             ? html`<div class="actions">
-                <button class="btn" @click=${this._install}>Install Chordless</button>
+                <button class="btn" @click=${this._install}>${t('about-install-button')}</button>
               </div>`
             : mode === 'ios'
-              ? html`<p>
-                  Tap the <strong>Share</strong> button in your browser, then choose
-                  <strong>Add to Home Screen</strong>.
-                </p>`
-              : html`<p>In the menu bar, choose <strong>File</strong>, then <strong>Add to Dock</strong>.</p>`
+              ? html`<p>${rich('welcome-install-ios', undefined, { strong: words => html`<strong>${words}</strong>` })}</p>`
+              : html`<p>${rich('welcome-install-mac', undefined, { strong: words => html`<strong>${words}</strong>` })}</p>`
         }
       </li>
     `
@@ -175,39 +168,30 @@ export class WelcomeCard extends LitElement {
   override render() {
     return html`
       <section class="welcome" aria-labelledby="welcome-title">
-        <h2 id="welcome-title">Welcome to Chordless</h2>
-        <p class="lead">
-          Chordless shows the lyrics and chords of your worship songs, arranged into a setlist for
-          each service. It works offline, so it is ready even when the wifi is not.
-        </p>
+        <h2 id="welcome-title">${t('first-use-heading')}</h2>
+        <p class="lead">${t('welcome-lead')}</p>
         <ol>
           <li id="welcome-samples">
-            <h3>Try it</h3>
-            <p>Add a sample setlist of four public-domain hymns, to see how it works.</p>
+            <h3>${t('welcome-samples-heading')}</h3>
+            <p>${t('welcome-samples-text')}</p>
             <div class="actions">
               <button class="btn primary" ?disabled=${this._busy} @click=${this._addSamples}>
-                Add a sample setlist
+                ${t('welcome-samples-button')}
               </button>
             </div>
             ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
           </li>
           <li id="welcome-songs">
-            <h3>Add your own songs</h3>
-            <p>
-              Import ChordPro files, or paste the text of a song. If your church has a CCLI licence,
-              the SongSelect bookmarklet adds songs straight from SongSelect.
-            </p>
+            <h3>${t('welcome-songs-heading')}</h3>
+            <p>${t('welcome-songs-text')}</p>
             <div class="actions">
-              <a class="btn" href="/import-song">Import songs</a>
+              <a class="btn" href="/import-song">${t('welcome-songs-button')}</a>
             </div>
           </li>
           <li id="welcome-sign-in">
-            <h3>Keep them safe</h3>
-            <p>
-              Sign in with Google to keep your songs and setlists in your own Google Drive, and to
-              share them between your devices.
-            </p>
-            <div class="actions"><a class="btn" href="/account">Sign in and sync</a></div>
+            <h3>${t('welcome-safe-heading')}</h3>
+            <p>${t('welcome-safe-text')}</p>
+            <div class="actions"><a class="btn" href="/account">${t('welcome-safe-button')}</a></div>
           </li>
           ${this._renderInstall()}
         </ol>

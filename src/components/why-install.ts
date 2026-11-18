@@ -1,6 +1,8 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { currentInstallMode } from '../js/install.ts'
+import { rich } from '../js/rich-text.ts'
+import { t } from '../js/text.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 
@@ -62,37 +64,23 @@ export class WhyInstall extends LitElement {
   override render() {
     return html`
       <button class="link" type="button" @click=${() => this._modal.value?.show()}>
-        Why install?
+        ${t('why-install-link')}
       </button>
-      <app-modal ${ref(this._modal)} size="medium" heading="Why install Chordless?">
+      <app-modal ${ref(this._modal)} size="medium" heading=${t('why-install-heading')}>
         <div class="why">
           <ul>
             <li>
-              <strong>Your songs stay put.</strong> A browser can clear the saved data of a website
-              it thinks is unused (Safari does after about a week). An installed app is protected
-              from that, so your songs and setlists are still there on the day.
+              ${rich('why-install-stay', undefined, { strong: words => html`<strong>${words}</strong>` })}
             </li>
             <li>
-              <strong>The whole screen for the song.</strong> No address bar or tabs getting in the
-              way.
+              ${rich('why-install-screen', undefined, { strong: words => html`<strong>${words}</strong>` })}
             </li>
             <li>
-              <strong>Feels like any other app you use.</strong> It has its own icon, opens in its
-              own window, and shows up in your app switcher.
+              ${rich('why-install-feel', undefined, { strong: words => html`<strong>${words}</strong>` })}
             </li>
           </ul>
-          ${
-            currentInstallMode() === 'ios'
-              ? html`<p>
-                On an iPhone or iPad the installed app keeps its own data, separate from Safari's,
-                so you sign in again in it.
-              </p>`
-              : nothing
-          }
-          <p>
-            Chordless works offline, checks for updates and can keep the screen awake in a browser
-            tab too. Installing isn't needed for those.
-          </p>
+          ${currentInstallMode() === 'ios' ? html`<p>${t('why-install-ios')}</p>` : nothing}
+          <p>${t('why-install-not-needed')}</p>
         </div>
       </app-modal>
     `
