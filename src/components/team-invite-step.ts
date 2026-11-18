@@ -155,19 +155,12 @@ export class TeamInviteStep extends LitElement {
   override render() {
     const chosen = this._chosen.length
     return html`
-      <h3>Invite your team</h3>
+      <h3>${t('invite-heading')}</h3>
       <p class="hint">
-        ${
-          this._entries.length
-            ? 'These people lead setlists you brought across. Tick who to invite and what they may do, or add an email address.'
-            : 'Add the email address of the Google account each person will sign in with.'
-        }
-        You get a link for each, to send yourself: it works once, for a week, and only for that account.
+        ${t(this._entries.length ? 'invite-text-leaders' : 'invite-text')}
+        ${t('invite-text-links')}
       </p>
-      <p class="hint">
-        A worship leader can edit songs and setlists, a team member can see them, and an admin can
-        also look after the people.
-      </p>
+      <p class="hint">${t('invite-roles')}</p>
       <ul>
         ${this._entries.map(
           entry => html`<li>
@@ -182,7 +175,7 @@ export class TeamInviteStep extends LitElement {
               ${entry.name !== entry.email ? html`${entry.name} <span class="email">${entry.email}</span>` : entry.email}
             </label>
             <select
-              aria-label="Role of ${entry.email}"
+              aria-label=${t('invite-role-label', { email: entry.email })}
               ?disabled=${this._busy}
               @change=${(event: Event) =>
                 this._role(entry.email, (event.target as HTMLSelectElement).value as MemberRole)}
@@ -198,33 +191,32 @@ export class TeamInviteStep extends LitElement {
       ${
         this._nameOnly.length
           ? html`<p class="hint">
-            No email address, so they can't be invited from here:
-            ${this._nameOnly.map(leader => leader.name).join(', ')}.
+            ${t('invite-name-only', { names: this._nameOnly.map(leader => leader.name).join(', ') })}
           </p>`
           : nothing
       }
       <form class="add" @submit=${this._add}>
-        <input id="extra" type="email" placeholder="name@example.com" aria-label="Another email address" required />
-        <button class="btn" type="submit" ?disabled=${this._busy}>Add</button>
+        <input id="extra" type="email" placeholder=${t('invite-email-example')} aria-label=${t('invite-another-label')} required />
+        <button class="btn" type="submit" ?disabled=${this._busy}>${t('action-add')}</button>
       </form>
       <div class="actions">
         <button class="btn primary" ?disabled=${this._busy || chosen === 0} @click=${this._send}>
-          ${this._busy ? 'Making invites…' : `Make ${chosen} invite${chosen === 1 ? '' : 's'}`}
+          ${this._busy ? t('invite-making') : t('invite-make', { count: chosen })}
         </button>
       </div>
       ${
         this._outcomes.length
-          ? html`<h3>Invites</h3>
-            <p class="hint">Each is emailed to that person. The links are shown once, in case you want to send one another way.</p>
+          ? html`<h3>${t('invite-invites-heading')}</h3>
+            <p class="hint">${t('invite-invites-text')}</p>
             <ul>
               ${this._outcomes.map(outcome =>
                 outcome.url
                   ? html`<li>
                     <span class="who">${outcome.email}</span>
                     <p class="hint">${t(outcome.emailed ? 'invite-emailed' : 'invite-not-emailed', { email: outcome.email })}</p>
-                    <input class="link" readonly .value=${outcome.url} aria-label="Invite link for ${outcome.email}" />
+                    <input class="link" readonly .value=${outcome.url} aria-label=${t('invite-link-label', { email: outcome.email })} />
                     <button class="btn" @click=${() => this._copy(outcome)}>
-                      ${this._copied === outcome.email ? '✓ Copied' : 'Copy the link'}
+                      ${this._copied === outcome.email ? t('invite-copied') : t('invite-copy')}
                     </button>
                     <invite-send
                       .teamName=${this.teamName}
@@ -234,7 +226,7 @@ export class TeamInviteStep extends LitElement {
                     ></invite-send>
                     ${
                       outcome.role === 'admin' && !isGmailAddress(outcome.email)
-                        ? html`<p class="hint">An admin invite only works with this address, and it is not a Gmail address, so the message also tells them how to make a Google account with it.</p>`
+                        ? html`<p class="hint">${t('invite-admin-not-gmail')}</p>`
                         : nothing
                     }
                   </li>`
