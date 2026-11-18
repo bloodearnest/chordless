@@ -173,6 +173,12 @@ a re-pointing of the folder.
   rename can't point sync at a different folder.
 - After a rename, sync renames the Drive folder to match, unless another folder has that name; if
   the device has nothing synced yet, it joins that existing folder instead.
+- **Adopting a differently named folder.** A Personal space on its first sync, with no folder called
+  "Personal" but exactly one other space folder in `Chordless/` (a Personal space that an earlier
+  version renamed, seen from a new device), stops with `AdoptFolderError` and the space's card asks
+  whether to use that folder. Yes links it as it is: nothing in Drive is renamed, moved or deleted, and
+  the device remembers not to rename it to match. No (remembered on the device) makes a `Personal`
+  folder as before. Two or more other folders are never guessed between.
 - If the linked folder is trashed or gone, sync stops with an explanation rather than creating a
   new one.
 - A team space never finds its folder by name (the id is issued and stored); a personal space does

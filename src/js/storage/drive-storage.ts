@@ -459,6 +459,16 @@ export function createDriveStorage(api: DriveApi): StorageBackend {
       return folder ? { ref: folder.id, name, trashed: false, canWrite: null } : null
     },
 
+    async listRoots(): Promise<RootInfo[]> {
+      const folders = await api.listSpaceFolders()
+      return folders.map(folder => ({
+        ref: folder.id,
+        name: folder.name ?? '',
+        trashed: false,
+        canWrite: null,
+      }))
+    },
+
     async ensureRoot(name: string, spaceId: string) {
       const { folderId, isNew } = await api.findOrCreateSpaceFolder(name, spaceId)
       return { ref: folderId, isNew }

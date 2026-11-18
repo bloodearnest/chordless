@@ -133,6 +133,43 @@ export class DriveFolderGoneError extends Error {
 }
 
 /**
+ * Thrown on the first sync of a Personal space that has no Drive folder of its name when exactly one
+ * other space's folder is there (a Personal space renamed in an earlier version, seen from a new
+ * device). Nothing was changed: adoptFolder() uses it, declineAdoption() makes a new one as usual.
+ */
+export class AdoptFolderError extends Error {
+  folder: { ref: string; name: string }
+
+  constructor(folder: { ref: string; name: string }) {
+    super(t('adopt-folder-error', { name: folder.name }))
+    this.name = 'AdoptFolderError'
+    this.folder = folder
+  }
+}
+
+/** This device was asked whether the Personal space should use another folder, and was told no */
+const declinedKey = (spaceId: string) => `chordless:adopt-declined:${spaceId}`
+/** The folder this device chose to use for the space although the names differ: it is not renamed */
+const adoptedKey = (spaceId: string) => `chordless:adopted-folder:${spaceId}`
+
+function remembered(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    // storage blocked: the question is asked again, which is harmless
+    return null
+  }
+}
+
+function remember(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // storage blocked: see remembered()
+  }
+}
+
+/**
  * Thrown when local records belong to a different Drive folder than the one this
  * space now syncs with (e.g. it was renamed before folders were linked).
  * Syncing would re-upload them all as duplicates, so sync stops instead.
@@ -351,17 +388,44 @@ export class SyncManager {
         throw new DriveFolderGoneError(folder)
       }
       this.rootRef = folder.ref
-      if (folder.name !== this.spaceName) {
+      if (folder.name !== this.spaceName && remembered(adoptedKey(this.spaceId)) !== folder.ref) {
         await this.followRename(folder)
       }
       return false
     }
+
+    await this.#offerFolderToAdopt()
 
     const result = await this.storage.ensureRoot(this.spaceName, this.spaceId)
     this.rootRef = result.ref
     await this.folderLink.set(result.ref)
     await this.changeToken.clear()
     return result.isNew
+  }
+
+  /**
+   * A Personal space with no folder of its name, on its first sync: if exactly one other space's folder
+   * is in the Drive, ask (AdoptFolderError) rather than make a second place for the same songs.
+   */
+  async #offerFolderToAdopt(): Promise<void> {
+    if (this.spaceName !== 'Personal') return
+    if (remembered(declinedKey(this.spaceId))) return
+    if (await this.storage.findRootByName(this.spaceName)) return
+    const others = await this.storage.listRoots()
+    if (others.length === 1) throw new AdoptFolderError(others[0])
+  }
+
+  /** Use `ref`, the folder AdoptFolderError named, for this space as it is: nothing in Drive is renamed or moved */
+  async adoptFolder(ref: string): Promise<void> {
+    remember(adoptedKey(this.spaceId), ref)
+    await this.folderLink.set(ref)
+    await this.changeToken.clear()
+    this.rootRef = ref
+  }
+
+  /** Do not use the folder AdoptFolderError named: the next sync makes a folder for the space, as before */
+  declineAdoption(): void {
+    remember(declinedKey(this.spaceId), 'yes')
   }
 
   /**

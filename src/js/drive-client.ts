@@ -531,6 +531,19 @@ export function createDriveApi({
     return result.files[0] ?? null
   }
 
+  /**
+   * The folders under Chordless/ that were made as a space's (they say so in their properties), not the trashed:
+   * the places a space with no folder of its name could use.
+   */
+  async function listSpaceFolders(): Promise<DriveFile[]> {
+    const rootFolderId = await findOrCreateRootFolder()
+    const query = `'${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    const result = await driveRequest<{ files: DriveFile[] }>(
+      `/files?q=${encodeURIComponent(query)}&spaces=drive&pageSize=100&fields=files(id,name,appProperties)`
+    )
+    return result.files.filter(file => file.appProperties?.resourceType === 'space')
+  }
+
   async function findOrCreateRootFolder(): Promise<string> {
     // Search for existing Chordless folder
     const query = `name='${ROOT_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
@@ -902,6 +915,7 @@ export function createDriveApi({
     downloadFile,
     downloadFileBinary,
     findSpaceFolderByName,
+    listSpaceFolders,
     findOrCreateRootFolder,
     findOrCreateSpaceFolder,
     downloadFileStream,

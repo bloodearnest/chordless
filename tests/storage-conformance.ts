@@ -340,6 +340,17 @@ export function describeStorage(label: string, makeHarness: () => Promise<Storag
         expect((await fresh.backend.findRootByName('Other'))?.ref).to.equal(first.ref)
       })
 
+      it('lists the roots it can see, but not one that was removed', async () => {
+        const fresh = await makeHarness()
+        const one = await fresh.backend.ensureRoot('One', 'space-1')
+        await fresh.backend.ensureRoot('Two', 'space-2')
+        const names = (await fresh.backend.listRoots()).map(root => root.name).sort()
+        expect(names).to.include.members(['One', 'Two'])
+        expect((await fresh.backend.listRoots()).find(root => root.name === 'One')?.ref).to.equal(
+          one.ref
+        )
+      })
+
       it('describes a root, and says whether it can be written', async () => {
         const info = must(await backend.inspectRoot(rootRef))
         expect(info.name).to.equal('Grace Church')

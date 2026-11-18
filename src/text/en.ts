@@ -629,6 +629,13 @@ space-not-synced = Not synced yet
 space-sync-starting = Starting…
 # { $reason } is what went wrong.
 space-sync-failed = Sync failed: { $reason }
+# { $name } is the name of a folder in the person's Google Drive.
+adopt-folder-error = There is no Drive folder called "Personal", but there is one called "{ $name }".
+adopt-folder-heading = Use the folder you already have?
+# { $name } is the name of a folder in the person's Google Drive.
+adopt-folder-message = Your Drive has one Chordless folder, "{ $name }", and none called "Personal". Is that where your Personal songs and setlists are kept? If so, Chordless will use it as it is: nothing in it is renamed, moved or deleted.
+adopt-folder-use = Use "{ $name }"
+adopt-folder-new = Make a new folder
 space-sync-sign-in = Sign in to sync
 space-sync-connect-drive = Connect Google Drive to sync
 space-sync-connect-google = Connect Google to sync this space between your devices
