@@ -14,6 +14,8 @@ interface ImportMetaEnv {
   readonly VITE_DRIVE_ROOT_FOLDER?: string
   /** 'development' for `npm run dev`, 'production' for a build */
   readonly MODE?: string
+  /** True only in the dev server: Vite drops what is behind it from a build (js/preview-seed.ts) */
+  readonly DEV?: boolean
 }
 interface ImportMeta {
   readonly env?: ImportMetaEnv
