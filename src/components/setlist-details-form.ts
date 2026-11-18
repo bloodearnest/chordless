@@ -5,6 +5,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Person, Setlist } from '../js/data-types.ts'
 import { determineSetlistType, SETLIST_TYPES } from '../js/db.ts'
 import { NEW_PERSON, resolvePerson } from '../js/leaders.ts'
+import { t } from '../js/text.ts'
 
 /** What the form collects (and a setlist keeps) */
 export interface SetlistDetails {
@@ -201,7 +202,7 @@ export class SetlistDetailsForm extends LitElement {
     this._typeField = createRef()
     this._leaderField = createRef()
     this.setlist = {}
-    this.submitLabel = 'Save'
+    this.submitLabel = t('action-save')
     this.autoType = false
     this.people = []
     this.meId = null
@@ -291,7 +292,7 @@ export class SetlistDetailsForm extends LitElement {
     return html`
       <form @submit=${this._submit}>
         <div class="form-field">
-          <label for="date">Date</label>
+          <label for="date">${t('details-date')}</label>
           <input
             type="date"
             id="date"
@@ -303,17 +304,17 @@ export class SetlistDetailsForm extends LitElement {
           />
         </div>
         <div class="form-field">
-          <label for="time">Time</label>
+          <label for="time">${t('details-time')}</label>
           <input type="time" id="time" name="time" .value=${live(s.time || '10:30')} required />
         </div>
         <div class="form-field">
-          <label for="type">Type</label>
+          <label for="type">${t('details-type')}</label>
           <select id="type" name="type" required ${ref(this._typeField)}>
             ${types.map(type => html`<option value=${type}>${type}</option>`)}
           </select>
         </div>
         <div class="form-field">
-          <label for="name">Name (optional)</label>
+          <label for="name">${t('details-name')}</label>
           <input
             type="text"
             id="name"
@@ -321,18 +322,18 @@ export class SetlistDetailsForm extends LitElement {
             name="name"
             .value=${live(s.name || '')}
             @input=${this._guessType}
-            placeholder="e.g. Youth Service, Christmas Special"
+            placeholder=${t('details-name-example')}
           />
         </div>
         <div class="form-field">
-          <label for="leader">Leader (optional)</label>
+          <label for="leader">${t('details-leader')}</label>
           <select id="leader" name="leader" ${ref(this._leaderField)} @change=${this._leaderChanged}>
-            <option value="">No leader</option>
+            <option value="">${t('details-no-leader')}</option>
             ${this._leaders.options.map(
               o =>
-                html`<option value=${o.value}>${o.person.name}${o.person.id === this.meId ? ' (you)' : ''}</option>`
+                html`<option value=${o.value}>${o.person.id === this.meId ? t('details-leader-you', { name: o.person.name }) : o.person.name}</option>`
             )}
-            <option value=${OTHER_LEADER}>Other…</option>
+            <option value=${OTHER_LEADER}>${t('details-leader-other')}</option>
           </select>
           ${
             this._otherLeader
@@ -342,8 +343,8 @@ export class SetlistDetailsForm extends LitElement {
                   id="leader-other"
                   name="leaderOther"
                   class="other-leader"
-                  aria-label="Leader's name"
-                  placeholder="Leader's name"
+                  aria-label=${t('details-leader-name')}
+                  placeholder=${t('details-leader-name')}
                   required
                 />
               `
@@ -352,11 +353,11 @@ export class SetlistDetailsForm extends LitElement {
           ${
             this.askWho
               ? html`
-                <label for="who" class="who">Which of these is you?</label>
+                <label for="who" class="who">${t('details-who')}</label>
                 <select id="who" @change=${this._identify}>
-                  <option value="">Not sure yet</option>
+                  <option value="">${t('details-who-unsure')}</option>
                   ${this._leaders.options.map(o => html`<option value=${o.value}>${o.person.name}</option>`)}
-                  <option value=${NEW_PERSON}>None of these: add me</option>
+                  <option value=${NEW_PERSON}>${t('details-who-new')}</option>
                 </select>
               `
               : ''
@@ -366,7 +367,7 @@ export class SetlistDetailsForm extends LitElement {
           this.hideActions
             ? ''
             : html`<div class="actions">
-              <button type="button" class="cancel" @click=${this._cancel}>Cancel</button>
+              <button type="button" class="cancel" @click=${this._cancel}>${t('action-cancel')}</button>
               <button type="submit" class="submit">${this.submitLabel}</button>
             </div>`
         }

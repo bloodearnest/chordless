@@ -206,7 +206,7 @@ export class SongInfoDialog extends LitElement {
 
   override render() {
     return html`
-      <app-modal ${ref(this._modal)} size="fullscreen" heading=${this._title || 'Song info'}>
+      <app-modal ${ref(this._modal)} size="fullscreen" heading=${this._title || t('song-info-heading')}>
         ${
           this._data
             ? this._renderInfo(this._data)

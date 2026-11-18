@@ -2,6 +2,7 @@ import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Person, Setlist } from '../js/data-types.ts'
 import { leaderName } from '../js/leaders.ts'
+import { t } from '../js/text.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './icon.ts'
@@ -187,12 +188,12 @@ export class SetlistInfoDialog extends LitElement {
   }
 
   override render() {
-    const heading = this._setlist ? setlistTitle(this._setlist, 'long') : 'Setlist info'
+    const heading = this._setlist ? setlistTitle(this._setlist, 'long') : t('setlist-info-heading')
     return html`
       <app-modal
         ${ref(this._modalRef)}
         size="fullscreen"
-        heading=${this._editing ? `Edit: ${heading}` : heading}
+        heading=${this._editing ? t('setlist-info-edit', { title: heading }) : heading}
         @app-modal:close=${() => {
           this._editing = false
         }}
@@ -204,7 +205,7 @@ export class SetlistInfoDialog extends LitElement {
               <button
                 slot="header-actions"
                 class="edit-button"
-                aria-label="Edit setlist details"
+                aria-label=${t('setlist-info-edit-label')}
                 @click=${() => {
                   this._editing = true
                 }}
@@ -221,7 +222,7 @@ export class SetlistInfoDialog extends LitElement {
                 .people=${this.people}
                 .meId=${this.meId}
                 .askWho=${this.askWho}
-                submit-label="Save"
+                submit-label=${t('action-save')}
                 @setlist-details-form:save=${this._save}
                 @setlist-details-form:cancel=${this._cancel}
               ></setlist-details-form>
@@ -229,13 +230,13 @@ export class SetlistInfoDialog extends LitElement {
                 this._deletable() && this.moveTargets.length > 0
                   ? html`
                     <div class="delete-setlist">
-                      <label for="move-setlist-space">Added to the wrong space?</label>
+                      <label for="move-setlist-space">${t('setlist-info-wrong-space')}</label>
                       <select id="move-setlist-space">
                         ${this.moveTargets.map(
                           space => html`<option value=${space.id}>${space.name}</option>`
                         )}
                       </select>
-                      <button class="btn" @click=${this._move}>Move to this space</button>
+                      <button class="btn" @click=${this._move}>${t('setlist-info-move')}</button>
                     </div>
                   `
                   : ''
@@ -243,7 +244,7 @@ export class SetlistInfoDialog extends LitElement {
               <div class="delete-setlist">
                 ${
                   this._deletable()
-                    ? html`<button class="btn danger" @click=${this._delete}>Delete setlist</button>`
+                    ? html`<button class="btn danger" @click=${this._delete}>${t('setlist-info-delete')}</button>`
                     : html`<p>${this.deleteBlocked}</p>`
                 }
               </div>

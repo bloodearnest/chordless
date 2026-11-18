@@ -103,20 +103,23 @@ export class SetlistInfo extends LitElement {
     return html`
       <div class="setlist-info-container">
         <div class="modal-info-grid">
-          ${this.setlist.time ? this._renderInfoItem('Time', this.setlist.time) : ''}
-          ${this.setlist.type ? this._renderInfoItem('Type', this.setlist.type) : ''}
-          ${leader ? this._renderInfoItem('Leader', leader) : ''}
-          ${this.setlist.venue ? this._renderInfoItem('Venue', this.setlist.venue) : ''}
-          ${this._renderInfoItem('Songs', `${songCount} song${songCount !== 1 ? 's' : ''}`)}
+          ${this.setlist.time ? this._renderInfoItem(t('info-time'), this.setlist.time) : ''}
+          ${this.setlist.type ? this._renderInfoItem(t('info-type'), this.setlist.type) : ''}
+          ${leader ? this._renderInfoItem(t('info-leader'), leader) : ''}
+          ${this.setlist.venue ? this._renderInfoItem(t('info-venue'), this.setlist.venue) : ''}
+          ${this._renderInfoItem(t('info-songs'), t('songs-count', { count: songCount }))}
           ${
             this.setlist.createdDate
-              ? this._renderInfoItem('Created', this._formatDateTime(this.setlist.createdDate))
+              ? this._renderInfoItem(
+                  t('info-created'),
+                  this._formatDateTime(this.setlist.createdDate)
+                )
               : ''
           }
           ${
             this.setlist.modifiedDate
               ? this._renderInfoItem(
-                  'Last Modified',
+                  t('info-modified'),
                   this._formatDateTime(this.setlist.modifiedDate)
                 )
               : ''
