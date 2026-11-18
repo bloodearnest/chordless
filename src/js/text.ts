@@ -64,5 +64,5 @@ export const TEXT_CHANGED = 'chordless-text-changed'
  */
 export function setCatalogue(source: string): void {
   bundle = bundleOf(source)
-  window.dispatchEvent(new Event(TEXT_CHANGED))
+  globalThis.dispatchEvent(new Event(TEXT_CHANGED))
 }

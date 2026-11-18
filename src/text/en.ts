@@ -1219,4 +1219,59 @@ import-no-setlist = Don't add to any setlist
 import-go-library = Go to the Library
 import-nothing-one = Nothing to save: it is in the library
 import-nothing-many = Nothing to save: they are all in the library
+
+
+## What to do with a song the library has (the choices when a song coming in is already there)
+
+# What came of each song, in the list of them (and counted: "3 new; 2 updated"). Lower case: it follows the song's name.
+import-status-new = new
+import-status-updated = updated
+import-status-original = imported as the original
+import-status-variant = imported as a variant
+import-status-not-imported = not imported
+import-status-same-song = updated: the same song as in your library
+import-status-identical = identical version already in library
+import-status-identical-source = identical version already in library, now recorded as from SongSelect
+import-status-in-library = already in library
+
+# How the chart coming in compares with the one the library has.
+import-verdict-identical = The same song.
+import-verdict-same-chart = The same words and chords, with other details.
+import-verdict-other-key = The same song in another key.
+import-verdict-different-chords = The same words, with different chords.
+import-verdict-different-words = Different words: another version or arrangement.
+
+# The headings over the two charts when they are compared.
+import-chart-library = In your library
+import-chart-importing = Importing
+
+import-pick-legend = What to do with it
+import-pick-original = Import as original song version
+import-pick-original-help = The imported song becomes the original. Your current song is kept as a variant.
+import-pick-variant = Import as variant of original
+import-pick-variant-help = Your current song stays the original. The imported song is kept as a variant.
+import-pick-update = Update current song
+import-pick-update-help = Replace your current song with the imported one, in its key. Setlists keep using it, and keep the keys they have it in.
+import-pick-skip = Do not import
+import-pick-skip-help = Keep your current song as it is.
+import-label-current = Variant name for your current song
+import-label-imported = Variant name for the imported song
+import-compare = Compare
+
+import-duplicate-one = This song already exists in your library
+# { $count } is how many of the songs coming in are already there.
+import-duplicate-many =
+    { $count ->
+        [one] 1 of these songs is already in your library
+       *[other] { $count } of these songs are already in your library
+    }
+import-bulk-label = The same choice for all of them
+import-bulk = For all of them:
+import-bulk-update = Update all { $count }
+import-bulk-skip = Do not import any
+import-bulk-apply = Import all with these choices
+
+# Where a song came from, beside it. { $user } is who imported it.
+origin-imported-by = Imported by { $user }
+origin-unknown = Importer unknown
 `
