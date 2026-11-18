@@ -15,14 +15,15 @@ export const SEED_URL = '/__preview-seed.zip'
 /** The songs and setlists added, or null where there was no seed to use or the space already had songs */
 export async function seedFromPreview(
   fetchSeed: () => Promise<Response> = () =>
-    fetch(SEED_URL, { cache: 'no-store', signal: AbortSignal.timeout(5000) })
+    fetch(SEED_URL, { cache: 'no-store', signal: AbortSignal.timeout(5000) }),
+  findPersonalSpace: () => Promise<string> = personalSpaceId
 ): Promise<{ songs: number; setlists: number } | null> {
   const response = await fetchSeed().catch(() => null)
   // (a server with no seed may answer any path with its start page: only a zip counts)
   if (!response?.ok || !response.headers.get('content-type')?.includes('zip')) return null
   const exported = await readExport(await response.blob())
 
-  const id = await personalSpaceId()
+  const id = await findPersonalSpace()
   const db = await openSpace(id)
   try {
     return await seedIfEmpty(db, exported)
@@ -41,6 +42,8 @@ export async function seedIfEmpty(
   return { songs: report.songsAdded, setlists: report.setlistsAdded }
 }
 
+/* v8 ignore start -- glue over listSpaces and ensurePersonalSpace (tests/space.test.ts); a test of it
+   would change the spaces other test files, run alongside, are using */
 /** The device's Personal space (the first without a team), made if it has none */
 async function personalSpaceId(): Promise<string> {
   let spaces = await listSpaces()
@@ -54,3 +57,4 @@ async function personalSpaceId(): Promise<string> {
   if (!personal) throw new Error('There is no Personal space to seed')
   return personal.id
 }
+/* v8 ignore stop */
