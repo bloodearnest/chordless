@@ -315,7 +315,7 @@ export class AppModal extends LitElement {
       <button
         class="modal-close ${floating ? 'floating' : ''}"
         part="close-button"
-        aria-label="Close"
+        aria-label=${t('modal-close')}
         @click=${this.close}
       >
         <app-icon name="close"></app-icon>

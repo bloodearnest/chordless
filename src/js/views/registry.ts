@@ -5,6 +5,7 @@
 
 import type { ViewEntry } from '../app-router.ts'
 import type { Route } from '../router.ts'
+import { t } from '../text.ts'
 
 /** A view entry for a custom element defined by `module` */
 function view(
@@ -26,7 +27,7 @@ export const views: Record<string, ViewEntry> = {
     ...view(
       'setlist-view',
       () => import('./setlist-view.ts'),
-      () => 'Setlist - Chordless'
+      () => t('title-setlist')
     ),
     // Moving to another setlist is a new view; moving within one is not
     sameView: (previous, next) =>
@@ -38,7 +39,7 @@ export const views: Record<string, ViewEntry> = {
     ...view(
       'share-view',
       () => import('./share-view.ts'),
-      () => 'Shared setlist - Chordless'
+      () => t('title-shared')
     ),
     sameView: (previous, next) =>
       previous.name === 'share' && next.name === 'share' && previous.fileId === next.fileId,
@@ -46,7 +47,7 @@ export const views: Record<string, ViewEntry> = {
   'not-found': view(
     'not-found-view',
     () => import('./not-found-view.ts'),
-    () => 'Not found - Chordless'
+    () => t('title-not-found')
   ),
   home: {
     ...view('home-view', () => import('./home-view.ts')),
@@ -56,61 +57,61 @@ export const views: Record<string, ViewEntry> = {
   account: view(
     'account-view',
     () => import('./account-view.ts'),
-    () => 'Account and Teams - Chordless'
+    () => t('title-account')
   ),
   preferences: view(
     'preferences-view',
     () => import('./preferences-view.ts'),
-    () => 'Preferences - Chordless'
+    () => t('title-preferences')
   ),
   'import-song': view(
     'import-song-view',
     () => import('./import-song-view.ts'),
-    () => 'Import Songs - Chordless'
+    () => t('title-import-songs')
   ),
   space: view(
     'space-view',
     () => import('./space-view.ts'),
-    () => 'Space - Chordless'
+    () => t('title-space')
   ),
   'sign-in': view(
     'sign-in-view',
     () => import('./sign-in-view.ts'),
-    () => 'Sign in - Chordless'
+    () => t('title-sign-in')
   ),
   'import-setlist': view(
     'import-setlist-view',
     () => import('./import-setlist-view.ts'),
-    () => 'Import a Setlist - Chordless'
+    () => t('title-import-setlist')
   ),
   songs: view(
     'library-view',
     () => import('./library-view.ts'),
-    () => 'Song Library - Chordless'
+    () => t('title-library')
   ),
   about: view(
     'about-view',
     () => import('./about-view.ts'),
-    () => 'About - Chordless'
+    () => t('title-about')
   ),
   contact: view(
     'contact-view',
     () => import('./contact-view.ts'),
-    () => 'Contact - Chordless'
+    () => t('title-contact')
   ),
   join: view(
     'join-view',
     () => import('./join-view.ts'),
-    () => 'Join a team space - Chordless'
+    () => t('title-join')
   ),
   media: view(
     'media-view',
     () => import('./media-view.ts'),
-    () => 'Media player - Chordless'
+    () => t('title-media')
   ),
   'new-team-space': view(
     'new-team-space-view',
     () => import('./new-team-space-view.ts'),
-    () => 'New team space - Chordless'
+    () => t('title-new-team')
   ),
 }

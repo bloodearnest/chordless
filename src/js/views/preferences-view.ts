@@ -1,4 +1,5 @@
 import { html } from 'lit'
+import { t } from '../text.ts'
 import '../../components/app-header.ts'
 import '../../components/app-preferences.ts'
 import { PageView } from './page-view.ts'
@@ -7,14 +8,14 @@ import { PageView } from './page-view.ts'
 export class PreferencesView extends PageView {
   override render() {
     return html`
-      <app-header heading="Preferences"></app-header>
+      <app-header heading=${t('menu-preferences')}></app-header>
       <main class="home-content">
-        <h2 style="margin: 2rem 1rem 1rem 1rem">Preferences</h2>
+        <h2 style="margin: 2rem 1rem 1rem 1rem">${t('menu-preferences')}</h2>
         <app-preferences id="app-preferences"></app-preferences>
         <p style="margin: 2rem 1rem">
-          <a href="/contact">Contact</a> ·
-          <a href="/privacy.html" rel="external">Privacy policy</a> ·
-          <a href="/terms.html" rel="external">Terms of service</a>
+          <a href="/contact">${t('footer-contact')}</a> ·
+          <a href="/privacy.html" rel="external">${t('footer-privacy')}</a> ·
+          <a href="/terms.html" rel="external">${t('footer-terms')}</a>
         </p>
       </main>
     `

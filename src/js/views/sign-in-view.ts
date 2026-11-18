@@ -1,4 +1,5 @@
 import { html } from 'lit'
+import { t } from '../text.ts'
 import '../../components/app-header.ts'
 import '../../components/sign-in-page.ts'
 import { PageView } from './page-view.ts'
@@ -7,7 +8,7 @@ import { PageView } from './page-view.ts'
 export class SignInView extends PageView {
   override render() {
     return html`
-      <app-header heading="Sign in"></app-header>
+      <app-header heading=${t('page-sign-in')}></app-header>
       <sign-in-page .route=${this.route}></sign-in-page>
     `
   }

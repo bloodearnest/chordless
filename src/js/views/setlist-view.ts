@@ -36,7 +36,7 @@ export function setlistTemplate({
   return html`
       <app-header
         id="app-header"
-        heading="Loading..."
+        heading=${t('page-loading')}
         ?show-edit-toggle=${editable}
         show-info-button
       >
@@ -44,8 +44,8 @@ export function setlistTemplate({
           slot="tools"
           class="live-button"
           id="live-button"
-          aria-label="Go live"
-          title="Go live"
+          aria-label=${t('setlist-go-live')}
+          title=${t('setlist-go-live')}
           aria-pressed="false"
           hidden
         >
@@ -57,8 +57,8 @@ export function setlistTemplate({
               slot="tools"
               class="share-button"
               id="share-button"
-              aria-label="Share setlist"
-              title="Share setlist"
+              aria-label=${t('setlist-share')}
+              title=${t('setlist-share')}
               hidden
             >
               <app-icon name="share" size="24"></app-icon>
@@ -110,12 +110,12 @@ export function setlistTemplate({
             type="text"
             id="add-song-search-input"
             class="song-search-input"
-            placeholder="Search songs by title, artist, or lyrics..."
+            placeholder=${t('songs-search')}
             autocomplete="off"
           />
         </div>
         <div id="add-song-results" class="song-library-list">
-          <p style="text-align: center; color: #95a5a6">Start typing to search songs...</p>
+          <p style="text-align: center; color: #95a5a6">${t('songs-search-start')}</p>
         </div>
       </app-modal>
 

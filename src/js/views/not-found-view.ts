@@ -1,4 +1,5 @@
 import { html } from 'lit'
+import { t } from '../text.ts'
 import '../../components/app-header.ts'
 import { PageView } from './page-view.ts'
 
@@ -6,10 +7,10 @@ import { PageView } from './page-view.ts'
 export class NotFoundView extends PageView {
   override render() {
     return html`
-      <app-header heading="Not found"></app-header>
+      <app-header heading=${t('page-not-found')}></app-header>
       <main class="home-content">
-        <h2 style="margin: 2rem 1rem 1rem 1rem">Page not found</h2>
-        <p style="margin: 0 1rem"><a href="/">Go to the setlists</a></p>
+        <h2 style="margin: 2rem 1rem 1rem 1rem">${t('page-not-found-heading')}</h2>
+        <p style="margin: 0 1rem"><a href="/">${t('page-not-found-link')}</a></p>
       </main>
     `
   }

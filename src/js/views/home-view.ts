@@ -260,12 +260,12 @@ export class HomeView extends PageView {
 
   override render() {
     return html`
-      <app-header id="home-app-header" heading="Setlists">
+      <app-header id="home-app-header" heading=${t('menu-setlists')}>
         <button
               slot="actions"
               class="create-setlist-button"
               id="create-setlist-button"
-              aria-label="Create new setlist"
+              aria-label=${t('home-create')}
               @click=${() => this.#openCreate()}
             >
               <app-icon name="add" size="24"></app-icon>
@@ -295,7 +295,7 @@ export class HomeView extends PageView {
       <app-modal id="create-setlist-modal" heading=${t('setlist-create-heading')} ${ref(this.#modal)}>
         <setlist-details-form
           id="create-setlist-form"
-          submit-label="Create Setlist"
+          submit-label=${t('home-create-submit')}
           auto-type
           ${ref(this.#form)}
           @setlist-details-form:identify=${this.#identify}

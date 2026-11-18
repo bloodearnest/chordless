@@ -658,7 +658,7 @@ export class LibraryView extends PageView {
           <button
             class="reset-button edit-mode-control"
             id="library-reset-button"
-            aria-label="Reset song"
+            aria-label=${t('settings-reset-label')}
             style="display: none"
             @click=${() => this.#reset()}
           >
@@ -666,7 +666,7 @@ export class LibraryView extends PageView {
           </button>
           <key-selector
             id="library-key-selector"
-            label="Key"
+            label=${t('selector-key')}
             style="display: none"
             @key-selector:change=${(event: KeyChangeEvent) => this.#changeKey(event.value)}
           ></key-selector>
@@ -684,7 +684,7 @@ export class LibraryView extends PageView {
                 type="search"
                 id="song-search"
                 class="song-search-input"
-                placeholder="Search songs by title, artist, or lyrics..."
+                placeholder=${t('songs-search')}
                 .value=${this._search}
                 @input=${(event: Event) => this.#typed((event.target as HTMLInputElement).value)}
               />
@@ -712,9 +712,9 @@ export class LibraryView extends PageView {
             ${
               this._source
                 ? html`<div class="song-source" id="library-song-source">
-                  <span>From ${this._source}: not in your library.</span>
+                  <span>${t('library-source-from', { source: this._source })}</span>
                   <button type="button" id="add-to-library" @click=${() => this.#addToLibrary()}>
-                        Add to my library
+                        ${t('library-add')}
                       </button>
                 </div>`
                 : nothing
@@ -726,7 +726,7 @@ export class LibraryView extends PageView {
               @song-section:action=${(event: SectionActionEvent) => this.#onSectionAction(event)}
               @song-section:toggle=${(event: SectionToggleEvent) => this.#onSectionToggle(event)}
             >
-              <p>Select a song to view</p>
+              <p>${t('library-select')}</p>
             </div>
           </div>
         </div>

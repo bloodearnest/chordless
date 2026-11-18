@@ -25,8 +25,10 @@
  * The current route is also provided as a Lit context (route-context.js), and
  * sent as a RouteChangeEvent.
  */
+
 import { provideRoute } from './route-context.ts'
 import { buildUrl, historyAction, isDescent, matchRoute, type Route } from './router.ts'
+import { t } from './text.ts'
 import type { ViewState } from './views/page-view.ts'
 
 /** The route changed (sent on document, after the new view is showing) */
@@ -104,7 +106,7 @@ function sessionStorageIfAvailable(): Storage | null {
 function defaultErrorView(): ShownView {
   const view = document.createElement('div')
   view.setAttribute('role', 'alert')
-  view.textContent = 'This page could not be loaded. Reload to try again.'
+  view.textContent = t('page-load-failed')
   return view
 }
 

@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { ifDefined } from 'lit/directives/if-defined.js'
+import { t } from '../js/text.ts'
 
 /**
  * A thin bar for how far something has got: `current` of `total`. With no total (or one that is
@@ -60,7 +61,7 @@ export class ProgressBar extends LitElement {
 
   constructor() {
     super()
-    this.label = 'Progress'
+    this.label = t('progress-label')
   }
 
   /** How far, 0 to 100, or null if it is not known */
