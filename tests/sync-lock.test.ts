@@ -1,4 +1,4 @@
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { withSyncLock } from '../src/js/sync-lock.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -45,6 +45,12 @@ describe('One sync at a time', () => {
     const two = withSyncLock(async () => {
       order.push('second')
     })
+    // (the first takes the lock when the browser grants it, which a busy machine does not do at once: it is
+    // waited for, and then the second is given a moment, in which it must not run)
+    await waitUntil(() => order.includes('first starts'), 'the first sync to take the lock', {
+      interval: 5,
+      timeout: 5000,
+    })
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(order).to.deep.equal(['first starts'])
     first.finish()
@@ -54,8 +60,12 @@ describe('One sync at a time', () => {
 
   it('skips a sync the app began by itself while another is running', async () => {
     const first = later()
-    const one = withSyncLock(() => first.done)
-    await new Promise(resolve => setTimeout(resolve, 20))
+    let held = false
+    const one = withSyncLock(async () => {
+      held = true
+      await first.done
+    })
+    await waitUntil(() => held, 'the first sync to take the lock', { interval: 5, timeout: 5000 })
     let ran = false
     const skipped = await withSyncLock(
       async () => {
