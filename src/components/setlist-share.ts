@@ -10,7 +10,7 @@ import { getCurrentSpace } from '../js/space.ts'
 import { createSyncManager, isSyncAvailable } from '../js/sync-manager.ts'
 import { t } from '../js/text.ts'
 import { formatSetlistDate, setlistTitle } from '../js/utils/date-utils.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { errorMessage, failedWith } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './icon.ts'
@@ -230,8 +230,12 @@ export class SetlistShare extends LitElement {
     } catch (error) {
       console.error('[Share] Failed:', error)
       this._error = navigator.onLine
-        ? `Couldn't do that: ${errorMessage(error)}`
-        : "You're offline: connect to the internet to share."
+        ? failedWith(
+            error,
+            t('share-failed', { reason: errorMessage(error) }),
+            t('share-failed-plain')
+          )
+        : t('share-offline-note')
     } finally {
       this._busy = false
     }

@@ -148,7 +148,7 @@ describe('the export panel', () => {
       const el = await mount()
       button(el, 'export-space').click()
       await waitUntil(() => text(el).includes('Exporting failed'), 'the failure')
-      expect(text(el)).to.contain('disk full')
+      expect(text(el)).to.not.contain('disk full')
     } finally {
       Object.getPrototypeOf(db).getAllSongs = real
     }
@@ -364,10 +364,7 @@ describe('the export panel', () => {
       }
       try {
         button(el, 'reset-start').click()
-        await waitUntil(
-          () => text(el).includes('Could not check the space: database closed'),
-          'the failure'
-        )
+        await waitUntil(() => text(el).includes('Could not check the space.'), 'the failure')
       } finally {
         ChordlessDB.prototype.getAllSongs = real
       }
@@ -397,7 +394,8 @@ describe('the export panel', () => {
       }
       try {
         button(el, 'reset-confirm').click()
-        await waitUntil(() => text(el).includes('Resetting failed: disk full'), 'the failure')
+        await waitUntil(() => text(el).includes('Resetting failed.'), 'the failure')
+        expect(text(el)).to.not.contain('disk full')
       } finally {
         ChordlessDB.prototype.saveChordPro = real
       }
@@ -467,7 +465,7 @@ describe('the export panel', () => {
     try {
       button(el, 'import').click()
       await waitUntil(() => text(el).includes('Importing failed'), 'the failure')
-      expect(text(el)).to.contain('disk full')
+      expect(text(el)).to.not.contain('disk full')
     } finally {
       Object.getPrototypeOf(db).saveSong = real
     }

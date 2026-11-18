@@ -254,9 +254,10 @@ describe('app-preferences', () => {
       expect((await display('off')).label).to.equal('Off')
       expect((await display('released')).label).to.equal('Let go')
       expect((await display('expired')).detail).to.contain('Let go after')
-      expect((await display('failed', { error: 'NotAllowedError' })).detail).to.contain(
-        'NotAllowedError'
-      )
+      // (what the browser said is for a developer: the device refused it, and that is what the page says)
+      const refused = (await display('failed', { error: 'NotAllowedError' })).detail
+      expect(refused).to.contain('Battery Saver')
+      expect(refused).to.not.contain('NotAllowedError')
       expect((await display('idle')).label).to.equal('Ready')
       expect((await display('something-new')).label).to.equal('Ready')
     })

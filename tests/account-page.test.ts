@@ -349,7 +349,7 @@ describe('account-page', () => {
       await signedIn(el)
       el.checkTeams = () => Promise.reject(new Error('offline'))
       must(button(el)).click()
-      await waitUntil(() => message(el).includes('Could not look for your teams: offline'))
+      await waitUntil(() => message(el).includes('Could not look for your teams.'))
       expect(button(el)?.disabled).to.equal(false)
     })
 

@@ -275,11 +275,11 @@ export class AppPreferences extends LitElement {
 
   /** What the wake lock is doing, to show: a look (see data-state), an icon, a word, and why */
   _wakeLockDisplay(): { look: WakeLockLook; icon: IconName; label: string; detail: string } {
-    const refused = (error: string) => ({
+    const refused = () => ({
       look: 'bad' as const,
       icon: 'warning' as const,
       label: t('wake-refused'),
-      detail: t('wake-refused-detail', { reason: error }),
+      detail: t('wake-refused-detail'),
     })
     switch (wakeLock.state) {
       case 'unsupported':
@@ -327,7 +327,7 @@ export class AppPreferences extends LitElement {
           detail: t('wake-expired-detail', { limit: this._limitLabel(this.keepAwakeMinutes) }),
         }
       case 'failed':
-        return refused(wakeLock.error)
+        return refused()
       default: {
         return {
           look: 'idle',

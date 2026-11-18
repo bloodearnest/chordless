@@ -610,7 +610,8 @@ describe('setlist-email-import', () => {
       } finally {
         Object.getPrototypeOf(db).saveSetlist = real
       }
-      expect(importer._error).to.contain('disk full')
+      expect(importer._error).to.contain('Could not create the setlist.')
+      expect(importer._error).to.not.contain('disk full')
       expect(importer._state).to.equal('review')
     })
 

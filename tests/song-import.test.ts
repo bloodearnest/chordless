@@ -83,7 +83,8 @@ describe('song-import', () => {
       new MessageEvent('message', { origin: 'https://songselect.ccli.com', data: failed })
     )
     await element.updateComplete
-    expect($(element, '[role="alert"]').textContent).to.contain('Download failed: 403')
+    expect($(element, '[role="alert"]').textContent).to.contain('Import from SongSelect failed.')
+    expect($(element, '[role="alert"]').textContent).to.not.contain('Download failed')
   })
 
   it('says so when the pasted text is empty', async () => {

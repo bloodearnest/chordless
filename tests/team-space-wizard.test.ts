@@ -344,12 +344,12 @@ describe('team-space-wizard', () => {
     await until(() => text().includes('Church Drive'), 'the folder is shown')
     button('Create team space').click()
     await until(() => text().includes('is ready'), 'created')
-    expect(text()).to.contain('Drive is not answering')
     expect(text()).to.contain('so the team can’t get it')
+    expect(text()).to.not.contain('Drive is not answering')
 
     syncFails = false
     button('Try again').click()
-    await until(() => !text().includes('Drive is not answering'), 'tried again')
+    await until(() => !text().includes('so the team can’t get it'), 'tried again')
     expect(text()).to.not.contain('Try again')
     expect(synced).to.have.length(2)
   })
@@ -672,13 +672,14 @@ describe('team-space-wizard', () => {
       }
       try {
         button('Create team space').click()
-        await until(() => text().includes('the disk is full'), 'says why')
+        await until(() => text().includes("Couldn't bring your songs across."), 'says what failed')
+        expect(text()).to.not.contain('the disk is full')
       } finally {
         ChordlessDB.prototype.init = real
       }
       expect((await listSpaces()).some(space => space.team)).to.equal(true)
       button('Try again').click()
-      await until(() => !text().includes('the disk is full'), 'tried again')
+      await until(() => !text().includes("Couldn't bring your songs across."), 'tried again')
       await until(() => text().includes('came across'), 'brought across')
       expect((await inTeamSpace()).songs).to.have.length(2)
     })

@@ -72,6 +72,10 @@ An error has two possible readers, and says what it says for one of them.
   `this._error = whatToSay(error, t('licence-save-failed'))`. A toast does the same with the error behind
   "Details" (`details: errorMessage(error)`).
 
+Where a message carries the reason after what failed ("Signing in failed: { $reason }"), it has two forms,
+and `failedWith(error, t('x-failed', { reason }), t('x-failed-plain'))` picks the one with the reason only
+for an error written for the person ("Signing in failed.") otherwise.
+
 So a person is never given text only a developer can use, and one who is given a reason is given it in
 words that are theirs to edit. Do not decide what to do by what an error's text says (`message.includes(…)`):
 check its type.

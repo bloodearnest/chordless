@@ -12,7 +12,7 @@ import {
   SyncOrchestrator,
 } from '../js/sync-orchestrator.ts'
 import { t } from '../js/text.ts'
-import { errorMessage, whatToSay } from '../js/utils/errors.ts'
+import { errorMessage, failedWith, whatToSay } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './progress-bar.ts'
@@ -228,7 +228,11 @@ export class DriveSyncPanel extends LitElement {
       this.syncError = whatToSay(error, t('drive-sync-reset-failed'))
       this.syncProgress = {
         stage: 'error',
-        message: t('drive-sync-failed', { reason: errorMessage(error) }),
+        message: failedWith(
+          error,
+          t('drive-sync-failed', { reason: errorMessage(error) }),
+          t('drive-sync-failed-plain')
+        ),
       }
       this.syncing = false
     }
@@ -262,7 +266,11 @@ export class DriveSyncPanel extends LitElement {
       this.syncError = whatToSay(error, t('drive-sync-start-over-failed'))
       this.syncProgress = {
         stage: 'error',
-        message: t('drive-sync-failed', { reason: errorMessage(error) }),
+        message: failedWith(
+          error,
+          t('drive-sync-failed', { reason: errorMessage(error) }),
+          t('drive-sync-failed-plain')
+        ),
       }
     }
   }
@@ -293,7 +301,11 @@ export class DriveSyncPanel extends LitElement {
       this.syncError = whatToSay(error, t('drive-sync-replace-failed'))
       this.syncProgress = {
         stage: 'error',
-        message: t('drive-sync-failed', { reason: errorMessage(error) }),
+        message: failedWith(
+          error,
+          t('drive-sync-failed', { reason: errorMessage(error) }),
+          t('drive-sync-failed-plain')
+        ),
       }
     }
   }

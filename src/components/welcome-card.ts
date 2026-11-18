@@ -8,7 +8,7 @@ import {
 import { goTo } from '../js/navigation.ts'
 import { rich } from '../js/rich-text.ts'
 import { t } from '../js/text.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { errorMessage, failedWith } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
 import './why-install.ts'
 
@@ -128,7 +128,11 @@ export class WelcomeCard extends LitElement {
       await goTo(`/setlist/${await addSampleSetlist()}`)
     } catch (error) {
       console.error('Failed to add the sample setlist:', error)
-      this._error = t('welcome-sample-failed', { reason: errorMessage(error) })
+      this._error = failedWith(
+        error,
+        t('welcome-sample-failed', { reason: errorMessage(error) }),
+        t('welcome-sample-failed-plain')
+      )
     } finally {
       this._busy = false
     }

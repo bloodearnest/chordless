@@ -8,7 +8,7 @@ import { getCurrentSpace, listSpaces } from '../js/space.ts'
 import { checkTeamMemberships, TeamSpacesAddedEvent } from '../js/team-memberships.ts'
 import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { errorMessage, failedWith } from '../js/utils/errors.ts'
 import { AccountStateEvent } from './account-card.ts'
 import './account-card.ts'
 import type { AppModal } from './app-modal.ts'
@@ -154,9 +154,11 @@ export class AccountPage extends LitElement {
         ? t('account-teams-added', { names: added.map(space => space.name).join(', ') })
         : t('account-teams-all-here')
     } catch (error) {
-      this._lookMessage = t('account-teams-look-failed', {
-        reason: error instanceof Error ? error.message : String(error),
-      })
+      this._lookMessage = failedWith(
+        error,
+        t('account-teams-look-failed', { reason: errorMessage(error) }),
+        t('account-teams-look-failed-plain')
+      )
     }
     this._looking = false
   }

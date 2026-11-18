@@ -859,8 +859,7 @@ pref-limit-hours =
 
 # What keeping the screen awake is doing: a word, and why.
 wake-refused = Refused
-# { $reason } is what the device said.
-wake-refused-detail = The device refused it ({ $reason }). Battery Saver can cause this.
+wake-refused-detail = The device refused it. Battery Saver can cause this.
 wake-unsupported = Unsupported
 wake-unsupported-detail = This browser can't keep the screen awake.
 wake-off = Off
@@ -1151,7 +1150,6 @@ import-name-pasted = Pasted text
 
 # { $reason } is what went wrong.
 import-chart-failed = Failed to read the chart: { $reason }
-import-songselect-failed = Import from SongSelect failed: { $reason }
 # { $skipped } is a list of what was left out, and why.
 import-none = No songs to import. { $skipped }
 import-process-failed = Failed to process song: { $reason }
@@ -1942,4 +1940,37 @@ sync-no-folder = There is no Google Drive folder called "{ $name }" that this ap
 pads-set-missing-key = Pad set "{ $name }" is missing key: { $key }
 pads-set-missing-files = Pad set "{ $name }" is missing files for: { $keys }
 join-sync-failed = Couldn't get the team's songs and setlists.
+
+
+## The same, when the reason is not for the person to read (it is kept for the console and the reports)
+
+account-drive-connect-failed-plain = Connecting Google Drive failed.
+account-logout-failed-plain = Logging out failed.
+account-name-save-failed-plain = Saving your name failed.
+account-signin-failed-plain = Signing in failed.
+account-sync-disable-failed-plain = Turning syncing off failed.
+de-backup-failed-plain = The backup could not be made.
+drive-sync-failed-plain = Failed.
+email-import-create-failed-plain = Could not create the setlist.
+email-import-link-failed-plain = Could not read that link.
+export-check-failed-plain = Could not check the space.
+export-failed-plain = Exporting failed.
+export-reset-failed-plain = Resetting failed.
+import-chart-failed-plain = Failed to read the chart.
+import-failed-plain = Importing failed.
+import-process-failed-plain = Failed to process song.
+import-save-failed-plain = Failed to save song.
+import-setlist-failed-plain = Failed to create setlist.
+import-song-failed-plain = Failed to import the song.
+space-sync-failed-plain = Sync failed.
+welcome-sample-failed-plain = Could not add the sample setlist.
+
+account-teams-look-failed-plain = Could not look for your teams.
+wizard-bring-failed-plain = Couldn't bring your songs across.
+wizard-save-failed-plain = Couldn’t save it to Google Drive yet, so the team can’t get it.
+import-songselect-failed-plain = Import from SongSelect failed.
+# { $reason } is what went wrong.
+share-failed = Couldn't do that: { $reason }
+share-failed-plain = Couldn't do that.
+share-offline-note = You're offline: connect to the internet to share.
 `

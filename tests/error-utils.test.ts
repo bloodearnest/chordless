@@ -1,5 +1,11 @@
 import { expect } from '@open-wc/testing'
-import { errorMessage, isForPeople, UserError, whatToSay } from '../src/js/utils/errors.ts'
+import {
+  errorMessage,
+  failedWith,
+  isForPeople,
+  UserError,
+  whatToSay,
+} from '../src/js/utils/errors.ts'
 import { transactionError } from '../src/js/utils/idb.ts'
 import { showStatusMessage } from '../src/js/utils/status-message.ts'
 import { TeamError } from '../src/js/worker-call.ts'
@@ -96,6 +102,21 @@ describe('what a person is told of an error', () => {
         'This invite is not valid'
       )
       expect(whatToSay(new TeamError('Internal Server Error', 500), 'Failed.')).to.equal('Failed.')
+    } finally {
+      restore()
+    }
+  })
+
+  it('says the reason after what failed when it was written for the person, and only what failed when not', () => {
+    const restore = quiet()
+    try {
+      const withReason = 'Importing failed: Please provide a pad set name.'
+      expect(
+        failedWith(new UserError('Please provide a pad set name.'), withReason, 'Importing failed.')
+      ).to.equal(withReason)
+      expect(
+        failedWith(new Error('disk full'), 'Importing failed: disk full', 'Importing failed.')
+      ).to.equal('Importing failed.')
     } finally {
       restore()
     }

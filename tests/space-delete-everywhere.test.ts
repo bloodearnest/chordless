@@ -212,7 +212,7 @@ describe('space-delete-everywhere', () => {
     await type(el, 'Mine')
     q<HTMLButtonElement>(el, '#make-backup').click()
     await waitUntil(() => text(el).includes('The backup could not be made'), 'the reason')
-    expect(text(el)).to.contain('The database is closed')
+    expect(text(el)).to.not.contain('The database is closed')
     expect(deleteButton(el).disabled).to.equal(true)
   })
 

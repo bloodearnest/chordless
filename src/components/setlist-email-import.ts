@@ -35,7 +35,7 @@ import { rich } from '../js/rich-text.ts'
 import { isCcliNumber, songSelectLink } from '../js/songselect-link.ts'
 import { t } from '../js/text.ts'
 import { formatSetlistDate } from '../js/utils/date-utils.ts'
-import { errorMessage } from '../js/utils/errors.ts'
+import { errorMessage, failedWith } from '../js/utils/errors.ts'
 import type { SetlistDetailsSaveEvent } from './setlist-details-form.ts'
 import './setlist-details-form.ts'
 import { buttonStyles } from './shared-styles.ts'
@@ -277,7 +277,11 @@ export class SetlistEmailImport extends LitElement {
     } catch (error) {
       console.error('[EmailImport] Could not read the link:', error)
       history.replaceState(history.state, '', location.pathname + location.search)
-      this._error = t('email-import-link-failed', { reason: errorMessage(error) })
+      this._error = failedWith(
+        error,
+        t('email-import-link-failed', { reason: errorMessage(error) }),
+        t('email-import-link-failed-plain')
+      )
       this._state = 'pick'
       return true
     }
@@ -514,7 +518,11 @@ export class SetlistEmailImport extends LitElement {
       if (this.dispatchEvent(new SetlistEmailImportedEvent(url))) goTo(url)
     } catch (error) {
       console.error('[EmailImport] Could not create the setlist:', error)
-      this._error = t('email-import-create-failed', { reason: errorMessage(error) })
+      this._error = failedWith(
+        error,
+        t('email-import-create-failed', { reason: errorMessage(error) }),
+        t('email-import-create-failed-plain')
+      )
       this._state = 'review'
     }
   }
