@@ -1358,4 +1358,71 @@ email-import-leave-out = Leave it out
 email-import-unlisted = Charts attached but not in the list
 email-import-unlisted-label = Songs attached but not listed
 email-import-add = Add { $title }
+
+
+## The header, the pickers for key, capo, instrument and tuning, and a song's settings
+
+menu-label-update = Navigation menu, update ready
+header-edit-toggle = Toggle edit mode
+header-info = Information
+
+selector-key = Key
+selector-capo = Capo
+selector-instrument = Instrument
+selector-tuning = Tuning
+selector-options = Options
+# What a setlist's or song's own choice follows when it makes none: "Same as { $follows }".
+selector-follows-device = my device
+selector-same-as = Same as { $follows }
+selector-same-as-device = Same as my device
+capo-open = Open
+# { $count } is how many frets down the capo takes the chords when the key is not known.
+capo-down = Down { $count }
+
+# How a key fits the melody's range, said by a screen reader and in the badge's tip ("too high, low").
+range-in-range = in range
+range-high = high
+range-low = low
+range-too-high = too high
+range-too-low = too low
+
+settings-label = Song settings
+settings-bpm = BPM:
+settings-bpm-down = Decrease BPM
+settings-bpm-up = Increase BPM
+settings-pads = Pads:
+settings-pad-default = Default
+# A pad set this person chose that is no longer on the device.
+settings-pad-missing = Not on this device
+settings-reset = Reset
+settings-reset-label = Reset song
+
+
+## The media player
+
+player-settings-heading = Media Player Settings
+player-status-download = DOWNLOAD
+player-status-playing = PLAYING
+player-status-stopped = STOPPED
+player-next = Next
+player-key = Key
+player-bpm = BPM
+player-time = Time
+player-on = On
+player-off = Off
+player-start = Start song
+player-start-space = Start song (Space)
+player-stop = Stop
+player-stop-escape = Stop (Escape)
+player-stop-escape-title = Stop - Press Escape
+player-expand = Expand player
+player-double-click = Double-speed click for this song
+player-settings = Settings
+player-minimize = Minimize
+player-knob-click = Click
+player-knob-pads = Pads
+player-volume-pad = Pad Volume
+player-volume-click = Click Volume
+player-toggle-click = Toggle click on/off
+player-toggle-pads = Toggle pads on/off
 `

@@ -586,7 +586,7 @@ export class AppHeader extends LitElement {
             class="nav-menu-button"
             part="nav-button"
             @click=${this._handleNavMenuClick}
-            aria-label=${this._updateReady ? 'Navigation menu, update ready' : 'Navigation menu'}
+            aria-label=${this._updateReady ? t('menu-label-update') : t('menu-label')}
           >
             <app-icon name="menu" size="24"></app-icon>
             ${this._updateReady ? html`<span class="update-dot" aria-hidden="true"></span>` : ''}
@@ -629,7 +629,7 @@ export class AppHeader extends LitElement {
                     class="icon-button edit-toggle ${this.editMode ? 'active' : ''}"
                     part="edit-toggle"
                     @click=${this._handleEditToggle}
-                    aria-label="Toggle edit mode"
+                    aria-label=${t('header-edit-toggle')}
                   >
                     <app-icon name="edit"></app-icon>
                   </button>
@@ -643,7 +643,7 @@ export class AppHeader extends LitElement {
                     class="icon-button info-button"
                     part="info-button"
                     @click=${this._handleInfoClick}
-                    aria-label="Information"
+                    aria-label=${t('header-info')}
                   >
                     <app-icon name="info-mark"></app-icon>
                   </button>

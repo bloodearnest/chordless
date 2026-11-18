@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import { ref } from 'lit/directives/ref.js'
 import { DialogPopup } from '../js/dialog-popup.ts'
+import { t } from '../js/text.ts'
 import { frameBounds } from '../js/utils/frame.ts'
 
 /** The BPM was changed with - or + */
@@ -257,11 +258,11 @@ export class SongSettingsPopover extends LitElement {
     const padSets =
       this.padSets.some(set => set.id === this.padSetId) || !this.padSetId
         ? this.padSets
-        : [...this.padSets, { id: this.padSetId, name: 'Not on this device' }]
+        : [...this.padSets, { id: this.padSetId, name: t('settings-pad-missing') }]
     return html`
-      <label class="meta-label bpm-label" for="pad-set-choice">Pads:</label>
+      <label class="meta-label bpm-label" for="pad-set-choice">${t('settings-pads')}</label>
       <select id="pad-set-choice" class="media-choice" @change=${this._handlePadSetChoice}>
-        <option value="" ?selected=${!this.padSetId}>Default</option>
+        <option value="" ?selected=${!this.padSetId}>${t('settings-pad-default')}</option>
         ${padSets.map(
           set =>
             html`<option value=${set.id} ?selected=${set.id === this.padSetId}>${set.name}</option>`
@@ -283,7 +284,7 @@ export class SongSettingsPopover extends LitElement {
         id="${this.popoverId}"
         ${ref(this._popup.ref)}
         class="settings-popover"
-        aria-label="Song settings"
+        aria-label=${t('settings-label')}
         @click=${this._popup.onClick}
         @close=${this._popup.onClose}
       >
@@ -295,12 +296,12 @@ export class SongSettingsPopover extends LitElement {
           <slot name="pitch-selector"></slot>
 
           <!-- Row 2: BPM controls -->
-          <label class="meta-label bpm-label">BPM:</label>
+          <label class="meta-label bpm-label">${t('settings-bpm')}</label>
           <button
             class="control-button"
             @click=${this._handleBPMDecrement}
             ?disabled=${!canDecrementBPM || this.bpmLocked}
-            aria-label="Decrease BPM"
+            aria-label=${t('settings-bpm-down')}
             type="button"
           >
             −
@@ -310,7 +311,7 @@ export class SongSettingsPopover extends LitElement {
             class="control-button"
             @click=${this._handleBPMIncrement}
             ?disabled=${!canIncrementBPM || this.bpmLocked}
-            aria-label="Increase BPM"
+            aria-label=${t('settings-bpm-up')}
             type="button"
           >
             +
@@ -320,8 +321,8 @@ export class SongSettingsPopover extends LitElement {
           ${this._renderMediaChoices()}
 
           <!-- Last row: Reset -->
-          <button class="reset-button" @click=${this._handleReset} aria-label="Reset song" type="button">
-            Reset
+          <button class="reset-button" @click=${this._handleReset} aria-label=${t('settings-reset-label')} type="button">
+            ${t('settings-reset')}
           </button>
         </div>
       </dialog>

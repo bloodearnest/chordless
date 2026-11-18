@@ -1,4 +1,5 @@
 import { css, html, svg } from 'lit'
+import { t } from '../js/text.ts'
 import type { RangeNote } from '../js/voice-range.ts'
 
 /**
@@ -12,7 +13,7 @@ export function rangeBadge(note: RangeNote) {
   return html`<span
     class="range-badge tone-${note.tone}"
     data-direction=${note.direction}
-    title=${note.words || 'in range'}
+    title=${note.words || t('range-in-range')}
     aria-hidden="true"
     >${icon(note)}</span
   >`
