@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 import { copyEditor } from './vite-plugins/copy-editor.ts'
 import { devManifest } from './vite-plugins/dev-manifest.ts'
 import { preloadHome } from './vite-plugins/preload-home.ts'
+import { previewSeed } from './vite-plugins/preview-seed.ts'
 import { serviceWorker } from './vite-plugins/service-worker.ts'
 
 // The floor, the same as .browserslistrc (which Vite does not read)
@@ -91,6 +92,7 @@ export default defineConfig(({ command, isPreview }) => {
       devManifest(),
       copyEditor(),
       preloadHome(),
+      previewSeed(),
       serviceWorker({ target: TARGET }),
       ...(WORKER_URL ? [] : [cloudflare({ configPath: '../wrangler.toml' })]),
     ],

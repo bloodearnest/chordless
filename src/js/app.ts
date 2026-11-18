@@ -28,6 +28,14 @@ document.addEventListener(RouteChangeEvent.type, event => {
   document.body.dataset.view = event.route.name
 })
 
+// A branch preview starts with the songs of an export, if the dev server has one (docs/PREVIEWS.md); a
+// build has none of this: Vite replaces DEV with false and drops the branch
+if (import.meta.env?.DEV) {
+  await import('./preview-seed.ts')
+    .then(({ seedFromPreview }) => seedFromPreview())
+    .catch(error => console.warn('[Preview] Could not seed from the export:', error))
+}
+
 await router.start()
 
 // The one-time question of how they read a song, on whatever page they arrive at

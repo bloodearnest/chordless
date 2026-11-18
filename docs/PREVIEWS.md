@@ -35,8 +35,12 @@ primary checkout. `.preview/` is git-ignored.
 3. The test account and Team: sign in on the preview with a dedicated test Google account and make a Team
    whose folder is in its dev Drive, or seed from a dev database that has one (`just branch-preview-snapshot`).
    The owner's token is encrypted with the Worker's key, so it cannot be written as SQL.
-4. Songs are the only data: put charts in that Team's Drive folder; sync pulls them on each sign-in.
-   They stay in Drive, never on Chordless's servers (`CLAUDE.md`, "Spaces and copyright").
+4. Songs: keep an export (Account and Teams, "Export and import") as `test-export.zip` at the top of the
+   primary checkout; it is git-ignored, and updating it is all it takes. The preview's dev server hands it
+   to the page (`vite-plugins/preview-seed.ts`), and a Personal space with no songs imports it at
+   start-up (`src/js/preview-seed.ts`), so clearing the site's data brings the songs back. Nothing else
+   is touched: not a Team, and not a space that already has songs. It is dev-server only (a build has no
+   such route or code), and the file stays on this disk. A Team's songs come from its Drive folder.
 
 Google sign-in is needed each time a browser's data is cleared; the emailed code is not (it only prints to
 the terminal in dev).

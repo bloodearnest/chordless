@@ -91,7 +91,10 @@ case "${1:-}" in
     ln -s "$state" .wrangler/state
     # The branch's own migrations (idempotent). A branch left for an older one keeps them applied
     npx wrangler d1 migrations apply DB --local --env dev >/dev/null
-    CHORDLESS_PORT=$port CHORDLESS_ALLOWED_HOSTS="$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//')" \
+    # The export the preview starts from (an empty Personal space imports it), if there is one
+    seed=()
+    [[ -f "$root/test-export.zip" ]] && seed=(CHORDLESS_SEED_ZIP="$root/test-export.zip")
+    env "${seed[@]}" CHORDLESS_PORT=$port CHORDLESS_ALLOWED_HOSTS="$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//')" \
       setsid npm run dev >"$log" 2>&1 &
     echo $! >"$pidfile"
     echo "$branch" >"$branchfile"
