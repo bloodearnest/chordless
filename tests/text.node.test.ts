@@ -33,6 +33,14 @@ test('the catalogue is valid Fluent, and the module is the file the editor reads
   assert.equal(fluentOf(MODULE), catalogue)
 })
 
+test('no message is in the catalogue twice (Fluent keeps the first and logs an error for the rest)', () => {
+  const ids = parse(catalogue, {})
+    .body.filter(entry => entry.type === 'Message' || entry.type === 'Term')
+    .map(entry => `${entry.type === 'Term' ? '-' : ''}${entry.id.name}`)
+  const twice = ids.filter((id, index) => ids.indexOf(id) !== index)
+  assert.deepEqual(twice, [])
+})
+
 test('every message the code asks for is in the catalogue', () => {
   const ids = new Set(listMessages(MODULE).map(message => message.id))
   const missing: string[] = []

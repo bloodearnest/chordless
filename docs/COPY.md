@@ -81,7 +81,7 @@ name the dev server can also be reached by.
 
 ## Checks
 
-`tests/text.node.test.ts` fails when the file is not valid Fluent, when `t('name')` names a message
+`tests/text.node.test.ts` fails when the file is not valid Fluent, when a name is in it twice (Fluent keeps the first and logs an error on every page for the rest), when `t('name')` names a message
 that is not there, and when a message is there that nothing uses.
 
 ## What is not in it yet
@@ -95,7 +95,7 @@ messages. The Help page (`help-<page>-<section>-<item>-…`: the shape and the p
 Account and Teams page and a space's page (the cards, the manager, the Drive panel, storage), and
 what a role is called (`role-…`) and how long ago a sync was (`sync-time-…`), Preferences (what you play, instrument
 pitch, tuning, chords, screen, the highlight colour, fonts, theme and text size), About, the menu and the media
-player's settings, and the first time (the first-use questions, the welcome card, and why to install), and importing songs (the page, the SongSelect bookmarklet and its help, and what is said of each song's melody range, and the choices when a song is already in the library), the header, the key, capo, instrument and tuning pickers, a song's settings and the media player, a setlist's details and a song's (the forms and dialogs, and how long ago something was), and importing a setlist from an email (what the review says, the leader matching, the changes to an existing setlist; the warning about a doubtful date is made in `js/email-setlist.ts` and still in code). Where a list of options has its words in a module (`PLAYS`, `PITCHES`, `TUNINGS`,
+player's settings, and the first time (the first-use questions, the welcome card, and why to install), and importing songs (the page, the SongSelect bookmarklet and its help, and what is said of each song's melody range, and the choices when a song is already in the library), the header, the key, capo, instrument and tuning pickers, a song's settings and the media player, a setlist's details and a song's (the forms and dialogs, and how long ago something was), deleting a Team or space everywhere, exporting and importing a space, and importing a setlist from an email (what the review says, the leader matching, the changes to an existing setlist; the warning about a doubtful date is made in `js/email-setlist.ts` and still in code). Where a list of options has its words in a module (`PLAYS`, `PITCHES`, `TUNINGS`,
 `FONT_CHOICES`, `TINT_PRESETS`), each `label` is a getter that asks for its message, so that an edit in the
 dev editor shows at once. Still in the code: the other
 dialogs and panels, the sync's progress messages

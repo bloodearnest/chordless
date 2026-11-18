@@ -12,6 +12,7 @@ import {
   type SpaceExport,
 } from '../js/space-export.ts'
 import { planReset, type ResetPlan, resetToExport } from '../js/space-restore.ts'
+import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
 
@@ -28,8 +29,6 @@ interface PendingImport {
   /** Whether to put back what the file holds of the person's own settings and annotations */
   personal: boolean
 }
-
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
 
 /** An import was added to the space: whoever shows what it holds can look again */
 export class SpaceImportedEvent extends Event {
@@ -181,11 +180,11 @@ export class SpaceExportPanel extends LitElement {
         this._includePersonal
       )
       this._message = {
-        text: `Exported as ${fileName} (${megabytes(bytes)}).`,
+        text: t('export-done', { file: fileName, size: megabytes(bytes) }),
         kind: 'info',
       }
     } catch (error) {
-      this._message = { text: `Exporting failed: ${errorMessage(error)}`, kind: 'error' }
+      this._message = { text: t('export-failed', { reason: errorMessage(error) }), kind: 'error' }
     } finally {
       this._busy = false
     }
@@ -235,19 +234,29 @@ export class SpaceExportPanel extends LitElement {
       // (the space has more in it now: whoever shows what it holds can look again)
       this.dispatchEvent(new SpaceImportedEvent())
       this._message = {
-        text:
-          `Imported into ${where}: ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +
-          `, ${report.songsSkipped} charts and ${report.setlistsSkipped} setlists were already there` +
-          (report.scoresAdded > 0 ? `; ${plural(report.scoresAdded, 'lead sheet')} added` : '') +
-          (restored && restored.setlists + restored.preferences > 0
-            ? `; your own settings and annotations put back for ${plural(restored.setlists, 'setlist')}`
-            : '') +
-          (pads.length > 0 ? `; ${pads.length} pad sets uploaded to Drive` : '') +
-          '.',
+        // (the clauses that are so, one after the other: the first, then each of the others, and a full stop)
+        text: `${[
+          t('export-imported', {
+            where,
+            songsAdded: report.songsAdded,
+            setlistsAdded: report.setlistsAdded,
+            songsSkipped: report.songsSkipped,
+            setlistsSkipped: report.setlistsSkipped,
+          }),
+          report.scoresAdded > 0
+            ? t('export-lead-sheets-added', { count: report.scoresAdded })
+            : '',
+          restored && restored.setlists + restored.preferences > 0
+            ? t('export-personal-restored', { count: restored.setlists })
+            : '',
+          pads.length > 0 ? t('export-pads-uploaded', { count: pads.length }) : '',
+        ]
+          .filter(Boolean)
+          .join('; ')}.`,
         kind: 'info',
       }
     } catch (error) {
-      this._message = { text: `Importing failed: ${errorMessage(error)}`, kind: 'error' }
+      this._message = { text: t('import-failed', { reason: errorMessage(error) }), kind: 'error' }
     } finally {
       this._busy = false
     }
@@ -262,7 +271,10 @@ export class SpaceExportPanel extends LitElement {
     try {
       this._reset = await withSource(this.space.id, db => planReset(pending.exported, db))
     } catch (error) {
-      this._message = { text: `Could not check the space: ${errorMessage(error)}`, kind: 'error' }
+      this._message = {
+        text: t('export-check-failed', { reason: errorMessage(error) }),
+        kind: 'error',
+      }
     } finally {
       this._busy = false
     }
@@ -280,19 +292,35 @@ export class SpaceExportPanel extends LitElement {
       this._reset = null
       this.dispatchEvent(new SpaceImportedEvent())
       this._message = {
-        text:
-          `Reset ${where} from the export: ${report.songsReplaced} charts and ${report.setlistsReplaced} setlists replaced` +
-          `, ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +
-          `, ${report.songsSame} charts and ${report.setlistsSame} setlists were already the same` +
-          (report.songsOnlyHere + report.setlistsOnlyHere > 0
-            ? `; ${report.songsOnlyHere} charts and ${report.setlistsOnlyHere} setlists that are not in the file were kept`
-            : '') +
-          (report.scoresAdded > 0 ? `; ${plural(report.scoresAdded, 'lead sheet')} added` : '') +
-          '. Sync sends the changes to Drive.',
+        text: `${[
+          t('export-reset-done', {
+            where,
+            songsReplaced: report.songsReplaced,
+            setlistsReplaced: report.setlistsReplaced,
+            songsAdded: report.songsAdded,
+            setlistsAdded: report.setlistsAdded,
+            songsSame: report.songsSame,
+            setlistsSame: report.setlistsSame,
+          }),
+          report.songsOnlyHere + report.setlistsOnlyHere > 0
+            ? t('export-reset-kept', {
+                songs: report.songsOnlyHere,
+                setlists: report.setlistsOnlyHere,
+              })
+            : '',
+          report.scoresAdded > 0
+            ? t('export-lead-sheets-added', { count: report.scoresAdded })
+            : '',
+        ]
+          .filter(Boolean)
+          .join('; ')}. ${t('export-reset-sync')}`,
         kind: 'info',
       }
     } catch (error) {
-      this._message = { text: `Resetting failed: ${errorMessage(error)}`, kind: 'error' }
+      this._message = {
+        text: t('export-reset-failed', { reason: errorMessage(error) }),
+        kind: 'error',
+      }
     } finally {
       this._busy = false
     }
@@ -304,34 +332,43 @@ export class SpaceExportPanel extends LitElement {
     const newer = [...plan.songsReplaced, ...plan.setlistsReplaced].filter(item => item.newerHere)
     return html`
       <fieldset>
-        <legend>Reset ${this.space.name} to this export</legend>
+        <legend>${t('export-reset-legend', { space: this.space.name })}</legend>
         <p class="meta">
-          ${plan.songsReplaced.length} charts and ${plan.setlistsReplaced.length} setlists here will be
-          replaced by the file's, and ${plan.songsAdded.length} charts and ${plan.setlistsAdded.length}
-          setlists added. ${plan.songsSame + plan.setlistsSame} are already the same.
+          ${t('export-reset-plan', {
+            songsReplaced: plan.songsReplaced.length,
+            setlistsReplaced: plan.setlistsReplaced.length,
+            songsAdded: plan.songsAdded.length,
+            setlistsAdded: plan.setlistsAdded.length,
+            same: plan.songsSame + plan.setlistsSame,
+          })}
           ${
             plan.songsOnlyHere + plan.setlistsOnlyHere > 0
-              ? html`${plan.songsOnlyHere} charts and ${plan.setlistsOnlyHere} setlists that are here
-                  and not in the file are kept: nothing is deleted.`
+              ? t('export-reset-only-here', {
+                  songs: plan.songsOnlyHere,
+                  setlists: plan.setlistsOnlyHere,
+                })
               : nothing
           }
-          They keep their place in Drive, so sync sends the changes as edits to the same files.
+          ${t('export-reset-drive')}
         </p>
         ${
           newer.length > 0
             ? html`<p class="message error" role="alert">
-                ${newer.length} changed here after the file was made, and the file's version will
-                replace it: ${newer
-                  .slice(0, 8)
-                  .map(item => item.label)
-                  .join(', ')}${newer.length > 8 ? `, and ${newer.length - 8} more` : ''}.
+                ${t(newer.length > 8 ? 'export-reset-newer-more' : 'export-reset-newer', {
+                  count: newer.length,
+                  labels: newer
+                    .slice(0, 8)
+                    .map(item => item.label)
+                    .join(', '),
+                  more: newer.length - 8,
+                })}
               </p>`
             : nothing
         }
         <div class="row">
           <div>
             <button class="btn" id="reset-backup" ?disabled=${this._busy} @click=${() => this._download()}>
-              📦 Export this space first, as a backup
+              ${t('export-first')}
             </button>
           </div>
           <div>
@@ -341,12 +378,12 @@ export class SpaceExportPanel extends LitElement {
               ?disabled=${this._busy || replaced + added === 0}
               @click=${() => this._doReset()}
             >
-              ${this._busy ? 'Resetting…' : replaced + added === 0 ? 'Nothing to change' : 'Reset'}
+              ${this._busy ? t('export-resetting') : replaced + added === 0 ? t('export-nothing') : t('export-reset-button')}
             </button>
             <button class="btn" id="reset-cancel" ?disabled=${this._busy} @click=${() => {
               this._reset = null
             }}>
-              Cancel
+              ${t('action-cancel')}
             </button>
           </div>
         </div>
@@ -360,12 +397,10 @@ export class SpaceExportPanel extends LitElement {
     const when = new Date(manifest.created).toLocaleString()
     return html`
       <fieldset>
-        <legend>Import this export into ${this.space.name}</legend>
+        <legend>${t('export-import-legend', { space: this.space.name })}</legend>
         <p class="meta">
-          Exported from ${manifest.space}, ${when}: ${songs} charts, ${setlists} setlists${
-            padSets > 0 ? html`, ${padSets} pad sets` : nothing
-          }. Import adds only what is missing and deletes nothing; “Reset from this export” also replaces
-          the charts and setlists here that differ from the file's.
+          ${t(padSets > 0 ? 'export-from-pads' : 'export-from', { space: manifest.space, when, songs, setlists, padSets })}
+          ${t('export-import-note')}
         </p>
         <div class="row">
           ${
@@ -382,8 +417,7 @@ export class SpaceExportPanel extends LitElement {
                     }
                   }}
                 />
-                Also put back the file's own settings and annotations (capo, tuning, sections shown, private
-                annotations, songs added for the person alone). What this device already keeps is left as it is.
+                ${t('export-also-personal')}
               </label>`
               : nothing
           }
@@ -399,24 +433,22 @@ export class SpaceExportPanel extends LitElement {
                     this._pending = { ...pending, pads: (event.target as HTMLInputElement).checked }
                   }}
                 />
-                Also upload its pad sets to Google Drive${
-                  this.signedIn ? '' : ' (connect with Google first)'
-                }. A pad set with the same name there is replaced.
+                ${t(this.signedIn ? 'export-also-pads' : 'export-also-pads-offline')}
               </label>`
               : nothing
           }
           <div>
             <button class="btn primary" id="import" ?disabled=${this._busy} @click=${() => this._import()}>
-              ${this._busy && !this._reset ? 'Importing…' : 'Import'}
+              ${this._busy && !this._reset ? t('export-importing') : t('import-button')}
             </button>
             <button class="btn" id="reset-start" ?disabled=${this._busy} @click=${() => this._planReset()}>
-              Reset from this export…
+              ${t('export-reset-start')}
             </button>
             <button class="btn" id="import-cancel" ?disabled=${this._busy} @click=${() => {
               this._pending = null
               this._reset = null
             }}>
-              Cancel
+              ${t('action-cancel')}
             </button>
           </div>
         </div>
@@ -438,7 +470,7 @@ export class SpaceExportPanel extends LitElement {
                   this._includePads = (event.target as HTMLInputElement).checked
                 }}
               />
-              Include my pad sets (${this._padSets.length}, about ${megabytes(this._padBytes)})
+              ${t('export-include-pads', { count: this._padSets.length, size: megabytes(this._padBytes) })}
             </label>`
             : nothing
         }
@@ -451,15 +483,14 @@ export class SpaceExportPanel extends LitElement {
               this._includePersonal = (event.target as HTMLInputElement).checked
             }}
           />
-          Include my own settings and annotations (capo, tuning, sections shown, private annotations). They
-          are private: leave this off for a file you will share.
+          ${t('export-include-personal')}
         </label>
         <div>
           <button class="btn primary" id="export-space" ?disabled=${this._busy} @click=${() => this._download()}>
-            ${this._busy && !this._pending ? 'Exporting…' : '📦 Export this space'}
+            ${this._busy && !this._pending ? t('export-exporting') : t('export-button')}
           </button>
           <button class="btn" id="choose-export" ?disabled=${this._busy} @click=${() => this.shadowRoot?.querySelector<HTMLInputElement>('input[type=file]')?.click()}>
-            📥 Import a Chordless export…
+            ${t('export-choose')}
           </button>
           <input type="file" accept=".zip,application/zip" @change=${(event: Event) => this._fileChosen(event)} />
         </div>
