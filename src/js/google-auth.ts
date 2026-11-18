@@ -251,10 +251,14 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
           if (!stored.success) throw new Error(stored.error || 'Failed to save the sign-in')
 
           // A new sign-in may be a different account, with different access to the folder
-          import('./space-access.ts').then(({ refreshSpaceAccess }) => refreshSpaceAccess())
+          followUp(
+            import('./space-access.ts').then(({ refreshSpaceAccess }) => refreshSpaceAccess())
+          )
           // ...and may be in teams this device has not set up
-          import('./team-memberships.ts').then(({ checkTeamMemberships }) =>
-            checkTeamMemberships({ force: true })
+          followUp(
+            import('./team-memberships.ts').then(({ checkTeamMemberships }) =>
+              checkTeamMemberships({ force: true })
+            )
           )
           askForName()
 
@@ -305,9 +309,28 @@ export async function isEmailOnly(): Promise<boolean> {
   return !!stored && !stored.blob
 }
 
+/**
+ * What a sign-in starts and does not wait for: looking for the teams the person is in, for what the
+ * space's folder allows them, and asking for their name. They are kept, so that whoever needs to know
+ * they are over (a test, which would otherwise take their requests for the next thing it does) can.
+ */
+const followUps = new Set<Promise<unknown>>()
+
+function followUp(work: Promise<unknown>): void {
+  const tracked: Promise<unknown> = work
+    .catch(error => console.warn('[Auth] Something started by the sign-in failed:', error))
+    .finally(() => followUps.delete(tracked))
+  followUps.add(tracked)
+}
+
+/** Settles when what the sign-in began in the background is over */
+export async function signInFollowUpsDone(): Promise<void> {
+  while (followUps.size > 0) await Promise.all([...followUps])
+}
+
 /** Ask for their name, if they have none, now they have signed in (it waits for the join page to finish) */
 function askForName(): void {
-  import('./account-name.ts').then(({ maybeAskName }) => maybeAskName())
+  followUp(import('./account-name.ts').then(({ maybeAskName }) => maybeAskName()))
 }
 
 /** Why a code was not taken (the Worker's `reason`), or that it could not be asked */
@@ -404,8 +427,11 @@ async function keepEmailSession(
   })
   if (!stored.success) throw new Error(stored.error || 'Failed to save the sign-in')
   // (the teams this person is in are looked for in the background)
-  const { checkTeamMemberships } = await import('./team-memberships.ts')
-  void checkTeamMemberships({ force: true })
+  followUp(
+    import('./team-memberships.ts').then(({ checkTeamMemberships }) =>
+      checkTeamMemberships({ force: true })
+    )
+  )
   askForName()
 }
 

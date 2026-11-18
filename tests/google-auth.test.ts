@@ -19,7 +19,7 @@ import {
 } from '../src/js/google-auth.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, settleSignIn, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -71,7 +71,9 @@ describe('google-auth', () => {
     }) as typeof fetch
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    // (before the stubs go: what a sign-in began in the background ends here, not in the next test)
+    await settleSignIn()
     window.fetch = realFetch
     uninstallWorker()
   })
@@ -285,7 +287,10 @@ describe('google-auth', () => {
           next: '/join/x/y',
         })
       expect(await signInWithLink('abcdefghijklmnopqrstuv')).to.equal('/join/x/y')
-      expect(fetches).to.deep.equal([
+      // (the sign-in's own request: it also starts, in the background, looking for the person's teams and
+      // for a name, which ask the Worker for their own things)
+      await settleSignIn()
+      expect(fetches.filter(each => each.url.startsWith('/session/'))).to.deep.equal([
         { url: '/session/email/link', body: { id: 'abcdefghijklmnopqrstuv' } },
       ])
       expect(must(worker.stored).blob).to.equal('')
