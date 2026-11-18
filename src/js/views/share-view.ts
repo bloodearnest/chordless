@@ -140,7 +140,10 @@ export class ShareView extends PageView {
                     : expires
                       ? 'share-banner-until'
                       : 'share-banner',
-                  { owner: owner ?? '', until: expires ? formatSetlistDate(expires, 'long') : '' },
+                  {
+                    owner: String(owner),
+                    until: expires ? formatSetlistDate(expires, 'long') : '',
+                  },
                   { strong: words => html`<strong>${words}</strong>` }
                 )}
               </span>
