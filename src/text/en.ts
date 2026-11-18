@@ -428,11 +428,33 @@ membership-member = You are { $role } in this Team.
 membership-stop = Stop sharing
 membership-leave = Leave this Team
 
-people-heading = People ({ $count })
+people-heading = Members ({ $count })
+people-invites-heading = Invites ({ $count })
+people-invites-none = No invites are waiting.
 people-heading-personal = People who lead setlists ({ $count })
 people-none-personal = Nobody leads a setlist here yet.
 people-hint-personal = Edit changes a person's name and addresses. Two spellings of one person are put right by merging one into the other.
 people-hint-read-personal = This space is view only, so the people cannot be changed.
+person-name-heading = Name
+person-name-aria = Name
+person-emails-heading = Email addresses
+# { $name } is a person's name.
+person-emails-aria = Email addresses of { $name }
+# { $address } is an email address.
+person-email-remove-aria = Remove { $address }
+# { $name } is a person's name.
+person-email-add-aria = Add an email address to { $name }
+person-email-add-placeholder = Add an email address
+person-email-add = Add
+person-merge-heading = Merge into another person
+person-merge-hint = For one person entered twice. Everything they lead, and their addresses, move to the person you choose, and this entry goes.
+# { $name } is a person's name.
+person-merge-aria = Merge { $name } into
+person-merge-choose = Choose a person…
+person-delete-heading = Delete
+person-delete = Delete
+person-delete-you = This is you.
+person-delete-leads = They lead setlists, so they cannot be deleted. Merge them into someone instead.
 people-search = Search people
 people-none = Nobody matches.
 people-column-name = Name
@@ -443,8 +465,6 @@ people-column-actions = Actions
 people-edit = Edit
 people-edit-aria = Edit { $name }
 people-you = you
-people-leads = leads { $count }
-people-status-member = Member
 people-status-visitor = Not a member
 people-status-invited = Invited · { $days } days left · not emailed
 people-status-invited-emailed = Invited · { $days } days left · emailed { $emailed }
@@ -655,7 +675,10 @@ sync-time-days =
 
 action-sync = Sync
 action-connect-google = Connect Google
-action-manage = Manage
+action-manage-users = Manage Users
+action-manage-data = Manage Data
+# { $name } is the name of a space.
+space-data-heading = { $name }: data
 action-make-default = Make default
 action-reconnect-google = Reconnect with Google
 

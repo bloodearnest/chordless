@@ -6,13 +6,16 @@ import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import { AccountStateEvent } from '../src/components/account-card.ts'
 import type { AccountPage } from '../src/components/account-page.ts'
 import '../src/components/account-page.ts'
-import type { SpaceCard } from '../src/components/space-card.ts'
+import type { AppModal } from '../src/components/app-modal.ts'
 import {
+  type SpaceCard,
   SpaceConnectGoogleEvent,
+  SpaceDataEvent,
   SpaceDefaultEvent,
   SpaceManageEvent,
   SpaceSyncedEvent,
 } from '../src/components/space-card.ts'
+import { SpaceGoneEvent } from '../src/components/space-manager.ts'
 import { getDefaultSpaceId, setDefaultSpaceId } from '../src/js/default-space.ts'
 import type { SignInState } from '../src/js/google-auth.ts'
 import {
@@ -240,11 +243,60 @@ describe('account-page', () => {
       expect(went).to.deep.equal([`/account/space/${first.id}`])
     })
 
-    it('has no modals: everything to do with a space is on that page', async () => {
-      await space('First')
-      const el = await page()
-      expect(el.shadowRoot?.querySelector('app-modal')).to.equal(null)
-      expect(el.shadowRoot?.querySelector('space-manager')).to.equal(null)
+    describe('its data', () => {
+      const dataModal = (el: AccountPage) =>
+        must(el.shadowRoot?.querySelector<AppModal>('app-modal'))
+
+      it('shows the space’s data in a dialogue when asked, and nothing for a space it does not know', async () => {
+        const first = await space('First')
+        const el = await page()
+        expect(el.shadowRoot?.querySelector('space-manager')).to.equal(null)
+        must(cards(el)[0]).dispatchEvent(new SpaceDataEvent('no-such-space'))
+        await el.updateComplete
+        expect(el.shadowRoot?.querySelector('space-manager')).to.equal(null)
+        must(cards(el).find(each => each.space.id === first.id)).dispatchEvent(
+          new SpaceDataEvent(first.id)
+        )
+        await waitUntil(() => dataModal(el).open, 'the dialogue')
+        expect(el.shadowRoot?.querySelector('space-manager')?.spaceId).to.equal(first.id)
+        expect(dataModal(el).heading).to.contain('First')
+      })
+
+      it('lets go of the space when the dialogue is closed', async () => {
+        const first = await space('First')
+        const el = await page()
+        must(cards(el)[0]).dispatchEvent(new SpaceDataEvent(first.id))
+        await waitUntil(() => dataModal(el).open, 'the dialogue')
+        dataModal(el).close()
+        await waitUntil(() => el._data === null, 'the space to be let go')
+        expect(el.shadowRoot?.querySelector('space-manager')).to.equal(null)
+      })
+
+      it('closes when the space is deleted, and starts afresh only if it was the one in use', async () => {
+        const first = await space('First')
+        const el = await page()
+        let shown = 0
+        el.show = () => void shown++
+        must(cards(el)[0]).dispatchEvent(new SpaceDataEvent(first.id))
+        await waitUntil(() => dataModal(el).open, 'the dialogue')
+        must(el.shadowRoot?.querySelector('space-manager')).dispatchEvent(new SpaceGoneEvent(false))
+        await waitUntil(() => !dataModal(el).open, 'the dialogue to close')
+        expect(shown).to.equal(0)
+        // (the dialogue's own close event comes a moment later: asked again straight away, it would close the new one)
+        await nothingFor(100)
+        must(cards(el)[0]).dispatchEvent(new SpaceDataEvent(first.id))
+        await waitUntil(() => dataModal(el).open, 'the dialogue again')
+        must(el.shadowRoot?.querySelector('space-manager')).dispatchEvent(new SpaceGoneEvent(true))
+        expect(shown).to.equal(1)
+      })
+
+      it('stops listening when it is taken away', async () => {
+        const el = await page()
+        el.remove()
+        el.dispatchEvent(new SpaceGoneEvent(true))
+        el.dispatchEvent(new SpaceDataEvent('x'))
+        expect(el._data).to.equal(null)
+      })
     })
   })
 

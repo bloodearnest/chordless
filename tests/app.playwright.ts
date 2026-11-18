@@ -70,7 +70,7 @@ test.describe('Themes', () => {
     await page.emulateMedia({ colorScheme: 'dark' })
     await seedSong(page)
     await page.goto('/account')
-    await page.locator('space-card').getByRole('button', { name: 'Manage' }).click()
+    await page.locator('space-card').getByRole('button', { name: 'Manage Data' }).click()
     await page.locator('space-manager').getByRole('button', { name: 'Delete…' }).click()
     const card = page
       .locator('space-manager app-modal[heading="Delete from this device?"] .modal-content')
@@ -388,7 +388,7 @@ test.describe('Account and Teams page', () => {
     await page
       .locator('space-card')
       .filter({ hasText: 'Second Org' })
-      .getByRole('button', { name: 'Manage' })
+      .getByRole('button', { name: 'Manage Users' })
       .click()
     const manage = page.locator('space-page')
     await expect(manage).toContainText('Second Org')

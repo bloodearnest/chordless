@@ -7,6 +7,7 @@ import type { AppModal } from '../src/components/app-modal.ts'
 import {
   type SpaceCard,
   SpaceConnectGoogleEvent,
+  SpaceDataEvent,
   SpaceDefaultEvent,
   SpaceManageEvent,
   SpaceSyncedEvent,
@@ -181,15 +182,20 @@ describe('space-card', () => {
     expect(asked).to.equal(space.id)
   })
 
-  it('has one Manage button, which asks the page to go to the space’s own page', async () => {
+  it('has Manage Users, which asks the page to go to the space’s own page, and Manage Data, which asks for its data', async () => {
     const el = await card('signed-out')
     const asked: string[] = []
     el.addEventListener(SpaceManageEvent.type, event =>
       asked.push((event as SpaceManageEvent).spaceId)
     )
-    expect(must(button(el, 'manage')).textContent?.trim()).to.equal('Manage')
+    const data: string[] = []
+    el.addEventListener(SpaceDataEvent.type, event => data.push((event as SpaceDataEvent).spaceId))
+    expect(must(button(el, 'manage')).textContent?.trim()).to.equal('Manage Users')
+    expect(must(button(el, 'manage-data')).textContent?.trim()).to.equal('Manage Data')
     must(button(el, 'manage')).click()
+    must(button(el, 'manage-data')).click()
     expect(asked).to.deep.equal([space.id])
+    expect(data).to.deep.equal([space.id])
     // (its data, leaders and people are all there: no button of their own here)
     expect(button(el, 'leaders')).to.equal(null)
     expect(button(el, 'users')).to.equal(null)
@@ -200,7 +206,7 @@ describe('space-card', () => {
 
   it('has no Switch button: the space tabs switch', async () => {
     const el = await card('signed-in')
-    expect(order(el)).to.deep.equal(['sync', 'manage'])
+    expect(order(el)).to.deep.equal(['sync', 'manage', 'manage-data'])
   })
 
   it('says a Team is a Team, and what the person is in it', async () => {

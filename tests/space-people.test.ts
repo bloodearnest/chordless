@@ -120,7 +120,7 @@ describe('space-people', () => {
     expect(text()).to.contain('Nobody leads a setlist here yet')
   })
 
-  it('lists the people with their addresses and how many setlists they lead', async () => {
+  it('lists the people with their addresses, and says nothing of how many setlists they lead', async () => {
     await db.savePeople([ann, tomSmith, person({ id: 'gone', name: 'Gone', deleted: true })])
     await db.saveSetlist(makeSetlist({ id: 'a', leaderId: 'ann' }))
     await db.saveSetlist(makeSetlist({ id: 'b', leaderId: 'ann' }))
@@ -128,17 +128,17 @@ describe('space-people', () => {
     expect(
       $$('.person').map(each => each.querySelector<HTMLInputElement>('.name')?.value)
     ).to.deep.equal(['Ann Lee', 'Tom Smith'])
-    expect(card('Ann Lee').textContent).to.contain('leads 2')
+    expect(card('Ann Lee').textContent).to.not.contain('leads 2')
     expect(card('Ann Lee').textContent).to.contain('ann@example.com')
-    expect(card('Tom Smith').textContent).to.contain('leads none')
+    expect(card('Tom Smith').textContent).to.not.contain('leads none')
   })
 
   it('marks the person using the app', async () => {
     await db.savePeople([ann, tomSmith])
     localStorage.setItem(`chordless:me:${spaceId}`, 'tom-smith')
     await open()
-    expect(card('Tom Smith').textContent).to.contain('you')
-    expect(card('Ann Lee').textContent).to.not.contain('you')
+    expect(card('Tom Smith').querySelector('.chip')?.textContent).to.contain('you')
+    expect(card('Ann Lee').querySelector('.chip')).to.equal(null)
   })
 
   it('knows the person using the app by the signed-in address', async () => {
@@ -226,7 +226,7 @@ describe('space-people', () => {
       await open()
       const select = card('Tom S.').querySelector<HTMLSelectElement>('select') as HTMLSelectElement
       expect([...select.options].map(o => o.text)).to.deep.equal([
-        'Merge into…',
+        'Choose a person…',
         'Ann Lee',
         'Tom Smith',
       ])
@@ -237,7 +237,7 @@ describe('space-people', () => {
       expect(must(await db.getSetlist('a')).leaderId).to.equal('tom-smith')
       expect((await stored('tom')).mergedInto).to.equal('tom-smith')
       expect($$('.person')).to.have.length(2)
-      expect(card('Tom Smith').textContent).to.contain('leads 1')
+      expect(card('Tom Smith').textContent).to.not.contain('leads 1')
     })
 
     it('leaves them as they were when the question is turned down', async () => {
@@ -261,7 +261,8 @@ describe('space-people', () => {
       await element.load()
       await element.updateComplete
       const select = card('Ann Lee').querySelector<HTMLSelectElement>('select') as HTMLSelectElement
-      select.innerHTML = '<option value="">Merge into…</option><option value="zed">Zed</option>'
+      select.innerHTML =
+        '<option value="">Choose a person…</option><option value="zed">Zed</option>'
       select.value = 'zed'
       select.dispatchEvent(new Event('change'))
       await settled()
@@ -275,12 +276,14 @@ describe('space-people', () => {
       await db.saveSetlist(makeSetlist({ id: 'a', leaderId: 'ann' }))
       await open()
       const leads = card('Ann Lee').querySelector<HTMLButtonElement>(
-        '.actions button'
+        '.btn.danger'
       ) as HTMLButtonElement
       expect(leads.disabled).to.equal(true)
-      expect(leads.title).to.equal('They lead setlists')
+      expect(card('Ann Lee').textContent).to.contain(
+        'They lead setlists, so they cannot be deleted'
+      )
 
-      card('Tom Smith').querySelector<HTMLButtonElement>('.actions button')?.click()
+      card('Tom Smith').querySelector<HTMLButtonElement>('.btn.danger')?.click()
       await answer(true)
 
       expect((await stored('tom-smith')).deleted).to.equal(true)
@@ -292,12 +295,12 @@ describe('space-people', () => {
       localStorage.setItem(`chordless:me:${spaceId}`, 'ann')
       await open()
       const me = card('Ann Lee').querySelector<HTMLButtonElement>(
-        '.actions button'
+        '.btn.danger'
       ) as HTMLButtonElement
       expect(me.disabled).to.equal(true)
-      expect(me.title).to.equal('This is you')
+      expect(card('Ann Lee').textContent).to.contain('This is you.')
 
-      card('Tom Smith').querySelector<HTMLButtonElement>('.actions button')?.click()
+      card('Tom Smith').querySelector<HTMLButtonElement>('.btn.danger')?.click()
       await answer(false)
       expect((await stored('tom-smith')).deleted).to.equal(undefined)
     })

@@ -170,7 +170,7 @@ describe('people-list', () => {
       expect(calls).to.deep.equal([])
     })
 
-    it('lists members by role, then invites, then people who only lead, with addresses, status and what each leads', async () => {
+    it('lists members by role, with people who only lead, then the invites in a table of their own', async () => {
       const shared = await space('owner')
       await withPeople(shared, [
         person('bob', 'Bob Baker', ['bob@example.com', 'bob@home.org']),
@@ -182,15 +182,18 @@ describe('people-list', () => {
         'dan@example.com',
         'Bob Baker',
         'cat@example.com',
-        'fay@example.com',
-        'eve@example.com',
         'Visiting Vic',
+        'eve@example.com',
+        'fay@example.com',
       ])
       expect(rowOf('Bob Baker').textContent).to.contain('bob@example.com')
-      expect(rowOf('Bob Baker').textContent).to.contain('+1')
+      expect(rowOf('Bob Baker').textContent).to.contain('bob@home.org')
+      expect(rowOf('Bob Baker').textContent).to.not.contain('leads')
       expect(rowOf('Bob Baker').textContent).to.contain('Worship leader')
       expect(rowOf('Visiting Vic').textContent).to.contain('Not a member')
-      expect(text()).to.contain('People (7)')
+      expect(text()).to.contain('Members (5)')
+      expect(text()).to.contain('Invites (2)')
+      expect(list.shadowRoot?.querySelectorAll('table')).to.have.length(2)
     })
 
     it('says when an invite was emailed, and that another was not, and how long each has left', async () => {
@@ -235,7 +238,7 @@ describe('people-list', () => {
       search.value = 'person 3'
       search.dispatchEvent(new Event('input'))
       await list.updateComplete
-      expect(rowsText()).to.deep.equal(['Person 3'])
+      expect(rowsText()).to.deep.equal(['Person 3', 'eve@example.com', 'fay@example.com'])
       search.value = 'zzz'
       search.dispatchEvent(new Event('input'))
       await list.updateComplete
@@ -260,11 +263,8 @@ describe('people-list', () => {
       expect(heading('Name').getAttribute('aria-sort')).to.equal('ascending')
       button('Name').click()
       await list.updateComplete
-      expect(rowsText()[0]).to.equal('fay@example.com')
+      expect(rowsText()[0]).to.equal('dan@example.com')
       expect(heading('Name').getAttribute('aria-sort')).to.equal('descending')
-      button('Status').click()
-      await list.updateComplete
-      expect(rowsText().slice(-2)).to.deep.equal(['eve@example.com', 'fay@example.com'])
       expect(heading('Role').getAttribute('aria-sort')).to.equal('none')
     })
   })
@@ -621,7 +621,7 @@ describe('people-list', () => {
       expect(document.createElement('people-list').now()).to.be.instanceOf(Date)
     })
 
-    it('says how many setlists a person leads, and who is using the app by a choice made on the device', async () => {
+    it('marks who is using the app, and says nothing of how many setlists anyone leads by a choice made on the device', async () => {
       const shared = await space('owner')
       await withPeople(shared, [
         person('bob', 'Bob Baker', ['bob@example.com']),
@@ -637,7 +637,7 @@ describe('people-list', () => {
       localStorage.setItem(`chordless:me:${shared.id}`, 'vic')
       try {
         await open(shared)
-        expect(rowOf('Bob Baker').textContent).to.contain('leads 2')
+        expect(rowOf('Bob Baker').textContent).to.not.contain('leads')
         expect(rowOf('Visiting Vic').textContent).to.contain('you')
         expect(rowOf('Bob Baker').textContent).to.not.contain('you')
       } finally {

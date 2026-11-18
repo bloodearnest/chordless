@@ -1,4 +1,4 @@
-// The people who lead a space's setlists, from Account and Teams: the "Manage" button on a
+// The people who lead a space's setlists, from Account and Teams: the "Manage Users" button on a
 // space's card opens its page, where each person is a row to edit, and two spellings of one person
 // are merged.
 import { expect, fromDB, seedSong, test } from './fixtures.ts'
@@ -22,7 +22,7 @@ test.describe('Leaders', () => {
     })
 
     await page.goto('/account')
-    await page.getByRole('button', { name: 'Manage' }).first().click()
+    await page.getByRole('button', { name: 'Manage Users' }).first().click()
     const people = page.locator('people-list')
     await expect(people.locator('tbody tr')).toHaveCount(2)
     await expect(people).toContainText('ann@example.com')
@@ -35,7 +35,7 @@ test.describe('Leaders', () => {
     // One person is left, who leads both and has the address
     await expect(people.locator('tbody tr')).toHaveCount(1)
     await expect(people.locator('tbody tr')).toContainText('Ann')
-    await expect(people.locator('tbody tr')).toContainText('leads 2')
+    await expect(people.locator('tbody tr')).not.toContainText('leads')
     await expect(people.locator('tbody tr')).toContainText('ann@example.com')
     const moved = await fromDB(page, 'getSetlist', 'by-ann-s')
     expect(moved.leaderId).toBe('ann-leader')
@@ -54,7 +54,7 @@ test.describe('Leaders', () => {
     })
 
     await page.goto('/account')
-    await page.getByRole('button', { name: 'Manage' }).first().click()
+    await page.getByRole('button', { name: 'Manage Users' }).first().click()
     const people = page.locator('people-list')
     const editor = people.locator('space-people')
 

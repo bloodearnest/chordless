@@ -103,10 +103,25 @@ export class SpacePeople extends LitElement {
         flex-direction: column;
         gap: 0.75rem;
       }
+      .part {
+        padding: 0.5rem 0;
+        border-top: 1px solid var(--panel-border, var(--tint, #ccc));
+      }
+      .part:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+      h4 {
+        margin: 0 0 0.35rem;
+        font-size: var(--font-ui-small);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        opacity: 0.75;
+      }
       .person {
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
+        gap: 0;
         padding: 0.75rem;
         border: 1px solid var(--panel-border, var(--tint, #ccc));
         border-radius: 8px;
@@ -363,70 +378,86 @@ export class SpacePeople extends LitElement {
     const role = this._roleOf(person)
     return html`
       <li class="person">
-        <div class="row">
-          <input
-            class="name"
-            aria-label="Name"
-            .value=${live(person.name)}
-            ?disabled=${!editable && !this._isSelfInTeam(person)}
-            @change=${(event: Event) => this._rename(person, event)}
-          />
-          ${isMe ? html`<span class="chip">you</span>` : nothing}
-          ${role ? html`<span class="chip role">${role}</span>` : nothing}
-          <span class="chip">${count === 0 ? 'leads none' : `leads ${count}`}</span>
-        </div>
-        <ul class="emails" aria-label="Email addresses of ${person.name}">
-          ${person.emails.map(
-            address => html`<li class="email">
-              ${address}
-              ${
-                editable
-                  ? html`<button
-                    type="button"
-                    aria-label="Remove ${address}"
-                    @click=${() => this._removeEmail(person, address)}
-                  >×</button>`
-                  : nothing
-              }
-            </li>`
-          )}
-        </ul>
-        ${
-          editable
-            ? html`
-              <form class="add" @submit=${(event: Event) => this._addEmail(person, event)}>
+        <section class="part">
+          <h4>${t('person-name-heading')}</h4>
+          <div class="row">
+            <input
+              class="name"
+              aria-label=${t('person-name-aria')}
+              .value=${live(person.name)}
+              ?disabled=${!editable && !this._isSelfInTeam(person)}
+              @change=${(event: Event) => this._rename(person, event)}
+            />
+            ${isMe ? html`<span class="chip">${t('people-you')}</span>` : nothing}
+            ${role ? html`<span class="chip role">${role}</span>` : nothing}
+          </div>
+        </section>
+        <section class="part">
+          <h4>${t('person-emails-heading')}</h4>
+          <ul class="emails" aria-label=${t('person-emails-aria', { name: person.name })}>
+            ${person.emails.map(
+              address => html`<li class="email">
+                ${address}
+                ${
+                  editable
+                    ? html`<button
+                      type="button"
+                      aria-label=${t('person-email-remove-aria', { address })}
+                      @click=${() => this._removeEmail(person, address)}
+                    >×</button>`
+                    : nothing
+                }
+              </li>`
+            )}
+          </ul>
+          ${
+            editable
+              ? html`<form class="add" @submit=${(event: Event) => this._addEmail(person, event)}>
                 <input
                   type="text"
                   name="email"
                   inputmode="email"
                   autocomplete="off"
-                  aria-label="Add an email address to ${person.name}"
-                  placeholder="Add an email address"
+                  aria-label=${t('person-email-add-aria', { name: person.name })}
+                  placeholder=${t('person-email-add-placeholder')}
                   @input=${(event: Event) => (event.target as HTMLInputElement).setCustomValidity('')}
                 />
-                <button class="btn" type="submit">Add</button>
-              </form>
-              <div class="actions">
-                ${
-                  others.length > 0
-                    ? html`<select
-                      aria-label="Merge ${person.name} into"
-                      @change=${(event: Event) => this._merge(person, event)}
-                    >
-                      <option value="">Merge into…</option>
-                      ${others.map(each => html`<option value=${each.id}>${each.name}</option>`)}
-                    </select>`
-                    : nothing
-                }
-                <button
-                  class="btn"
-                  type="button"
-                  ?disabled=${count > 0 || isMe}
-                  title=${isMe ? 'This is you' : count > 0 ? 'They lead setlists' : ''}
-                  @click=${() => this._delete(person)}
-                >Delete</button>
-              </div>
-            `
+                <button class="btn" type="submit">${t('person-email-add')}</button>
+              </form>`
+              : nothing
+          }
+        </section>
+        ${
+          editable && others.length > 0
+            ? html`<section class="part">
+              <h4>${t('person-merge-heading')}</h4>
+              <p class="hint">${t('person-merge-hint')}</p>
+              <select
+                aria-label=${t('person-merge-aria', { name: person.name })}
+                @change=${(event: Event) => this._merge(person, event)}
+              >
+                <option value="">${t('person-merge-choose')}</option>
+                ${others.map(each => html`<option value=${each.id}>${each.name}</option>`)}
+              </select>
+            </section>`
+            : nothing
+        }
+        ${
+          editable
+            ? html`<section class="part">
+              <h4>${t('person-delete-heading')}</h4>
+              <button
+                class="btn danger"
+                type="button"
+                ?disabled=${count > 0 || isMe}
+                @click=${() => this._delete(person)}
+              >${t('person-delete')}</button>
+              ${
+                isMe || count > 0
+                  ? html`<p class="hint">${t(isMe ? 'person-delete-you' : 'person-delete-leads')}</p>`
+                  : nothing
+              }
+            </section>`
             : nothing
         }
       </li>
