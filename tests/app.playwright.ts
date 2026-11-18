@@ -376,7 +376,7 @@ test.describe('Account and Teams page', () => {
     })
   })
 
-  test('works signed out: a space is managed on its own page, and deleting one asks first', {
+  test('works signed out: a space’s users are on its own page, its data in a dialogue, and deleting one asks first', {
     tag: '@logic',
   }, async ({ page }) => {
     await seedSong(page, { setlistId: 'delete-test-setlist' })
@@ -385,27 +385,29 @@ test.describe('Account and Teams page', () => {
       await createSpace('Second Org')
     })
     await page.goto('/account')
-    await page
-      .locator('space-card')
-      .filter({ hasText: 'Second Org' })
-      .getByRole('button', { name: 'Manage Users' })
-      .click()
+    const second = page.locator('space-card').filter({ hasText: 'Second Org' })
+    await second.getByRole('button', { name: 'Manage Users' }).click()
     const manage = page.locator('space-page')
     await expect(manage).toContainText('Second Org')
     await expect(page).toHaveURL(/\/account\/space\/[^/]+$/) // a page of its own, with a back button
-    const confirm = manage.locator('app-modal[heading="Delete from this device?"]')
+    await manage.getByRole('link', { name: /Account and Teams/ }).click()
+    await expect(page).toHaveURL(/\/account$/)
+
+    // Its data is a dialogue over the list
+    await second.getByRole('button', { name: 'Manage Data' }).click()
+    const data = page.locator('space-manager')
+    const confirm = data.locator('app-modal[heading="Delete from this device?"]')
 
     // Cancelling keeps it
-    await manage.getByRole('button', { name: 'Delete…' }).click()
+    await data.getByRole('button', { name: 'Delete…' }).click()
     await expect(confirm).toHaveAttribute('open', '')
     await confirm.getByRole('button', { name: 'Cancel' }).click()
     await expect(confirm).not.toHaveAttribute('open', '')
-    await expect(manage).toContainText('Second Org')
+    await expect(page.locator('space-card')).toHaveCount(2)
 
-    // Confirming deletes it, goes back to the list, and the list no longer has it
-    await manage.getByRole('button', { name: 'Delete…' }).click()
+    // Confirming deletes it, and the list no longer has it
+    await data.getByRole('button', { name: 'Delete…' }).click()
     await confirm.getByRole('button', { name: 'Delete', exact: true }).click()
-    await expect(page).toHaveURL(/\/account$/)
     await expect(page.locator('space-card')).toHaveCount(1)
     await expect(page.locator('space-card')).toContainText('Current')
   })
