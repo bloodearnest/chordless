@@ -33,7 +33,8 @@ see its logs.
 
 Browser data (IndexedDB, sign-in) belongs to the origin, so keep using the same URL.
 `just funnel` exposes the local server over Tailscale at a stable address, for testing
-on a phone or tablet.
+on a phone or tablet. `just branch-preview <branch>` serves a branch there, from its own worktree, for
+trying a pull request away from the computer (`docs/PREVIEWS.md`).
 
 ## Before you commit
 

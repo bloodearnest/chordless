@@ -9,6 +9,8 @@ certs/
 
 # Wrangler
 .wrangler/
+# `just preview`: its database, log and pid (docs/PREVIEWS.md)
+.preview/
 .dev.vars
 
 # Playwright
