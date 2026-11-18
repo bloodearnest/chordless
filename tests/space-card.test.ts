@@ -5,6 +5,7 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import {
   type SpaceCard,
+  SpaceConnectGoogleEvent,
   SpaceDefaultEvent,
   SpaceManageEvent,
   SpaceSyncedEvent,
@@ -87,6 +88,29 @@ describe('space-card', () => {
     expect(labels(el)).to.deep.equal(['Personal'])
     expect(text(el)).to.not.contain('~')
     expect(text(el)).to.match(/1 song · 1 setlist · about \d+ B/)
+  })
+
+  it('offers Connect Google, on a Personal space only, to someone signed in by email alone', async () => {
+    const own = await card('no-drive')
+    own.emailOnly = true
+    await own.updateComplete
+    expect(text(own)).to.contain('Connect Google to sync this space between your devices')
+    let asked = 0
+    own.addEventListener(SpaceConnectGoogleEvent.type, () => asked++)
+    must(button(own, 'connect-google')).click()
+    expect(asked).to.equal(1)
+    // (a Team needs no Google, and someone signed in with Google already has Drive's own line)
+    const team = await make(`Team ${crypto.randomUUID().slice(0, 8)}`, {
+      team: { id: 't-7', role: 'writer' },
+    })
+    const theirs = await card('no-drive', { space: team })
+    theirs.emailOnly = true
+    await theirs.updateComplete
+    expect(button(theirs, 'connect-google')).to.equal(null)
+    expect(text(theirs)).to.not.contain('Connect Google')
+    const withGoogle = await card('no-drive')
+    expect(text(withGoogle)).to.contain('Connect Google Drive to sync')
+    expect(button(withGoogle, 'connect-google')).to.equal(null)
   })
 
   it('shows the CCLI licence number when the space has one, and nothing when it has none', async () => {

@@ -12,7 +12,7 @@ import './install.ts'
 import { listenForLaunches } from './launch.ts'
 import { startMediaPlayer } from './media-player-loader.ts'
 import { setRouter } from './navigation.ts'
-import { SpaceChangeEvent } from './space.ts'
+import { ensurePersonalSpace, SpaceChangeEvent } from './space.ts'
 import { views } from './views/registry.ts'
 
 // The first sign-in renames the space: before anything shows its name. (A page the service worker
@@ -37,6 +37,10 @@ await router.start()
 
 // The one-time question of how they read a song, on whatever page they arrive at
 void maybeShowFirstUseSetup()
+// Someone who joined a Team and nothing else is given a Personal space now (not on the page of their first invite)
+void ensurePersonalSpace().catch(error =>
+  console.warn('[Space] Could not make a Personal space:', error)
+)
 // Optional, and not needed to show the first view, so once the page is idle (a slow device is
 // busy with the view and the service worker's first install: Safari has no requestIdleCallback)
 if ('requestIdleCallback' in window)

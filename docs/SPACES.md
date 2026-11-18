@@ -748,8 +748,11 @@ never meet a "Personal" space they did not ask for.
   (`ensureCurrentSpace`, `getCurrentSpaceFull` in `space.ts`, only when no current space is set). The
   launch path sees an invite link before any space exists, signs in and joins, so the team is
   current and Personal is never made. If the join fails (sign-in cancelled, expired code), fall back
-  to creating Personal, so there is always a space. Personal is made later if wanted (saving a song
-  with nowhere else, choosing it in a picker).
+  to creating Personal, so there is always a space. **Personal is made on a later start** (2026-11-18, `ensurePersonalSpace`
+  in `space.ts`, called by `app.ts`): a device that has spaces and none of the person's own, because they joined a Team and
+  nothing else, gets an empty one, not made current and with no tab until something is saved in it, so there is somewhere
+  private for their own sets. A device with no spaces yet is left alone (first use makes one; an invite's first contact
+  makes none). Someone who deletes their only Personal space has one again at the next start.
 - Check first what else assumes a Personal space: the sign-in rename of "Personal" to the Google
   name, the repair page, the export.
 - The Import page's "Import into" picker follows the same tabs: a space that is hidden is not

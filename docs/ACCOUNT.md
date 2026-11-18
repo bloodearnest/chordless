@@ -80,6 +80,9 @@ sign-in backup (download, import).
   (docs/CCLI.md), and how the sync stands: when it last ran, its progress
   while it runs, or what stands in the way ("Sign in to sync", "Sign-in expired: reconnect to sync",
   "Connect Google Drive to sync").
+- **Connect Google**, on a Personal card only, for someone signed in by an emailed code alone (`SpaceConnectGoogleEvent`): the
+  card says "Connect Google to sync this space between your devices" and the button does Google's whole sign-in, joined to the
+  account (docs/SPACES.md). A Team's card never says it: a Team syncs through the Worker and needs no Google.
 - **Sync** is on the card, and the card runs the sync itself (`space-sync.ts`). It is shown for any
   space once syncing can work: a sign-in with Drive, or for a Team's member a sign-in alone.
 - **Manage** goes to the space's own page (below). It is shown to every member, not only those who manage

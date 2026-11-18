@@ -4,6 +4,7 @@ import {
   createSpace,
   deleteSpace as deleteSpaceAndData,
   ensureCurrentSpace,
+  ensurePersonalSpace,
   getCurrentSpace,
   getCurrentSpaceFull,
   getSpaceByName,
@@ -63,6 +64,46 @@ describe('ensureCurrentSpace', () => {
       error = caught as Error
     }
     expect(error?.name).to.equal('ConstraintError')
+  })
+})
+
+describe('ensurePersonalSpace', () => {
+  const team = { id: 'team-1', role: 'writer' as const }
+  const space = (over: Partial<import('../src/js/data-types.ts').Space>) => ({
+    id: crypto.randomUUID(),
+    name: 'x',
+    createdDate: '2026-11-17T00:00:00Z',
+    modifiedDate: '2026-11-17T00:00:00Z',
+    ...over,
+  })
+  beforeEach(async () => {
+    for (const each of await listSpaces()) {
+      if (each.name === 'Personal') await deleteSpace(each.id)
+    }
+  })
+
+  it('leaves a device with no spaces alone: first use makes the Personal one, an invite does not', async () => {
+    await ensurePersonalSpace([])
+    expect(await getSpaceByName('Personal')).to.equal(undefined)
+  })
+
+  it('makes a Personal space, not the current one, for a device that has only Teams', async () => {
+    const before = getCurrentSpace()
+    await ensurePersonalSpace([space({ name: 'Choir', team })])
+    expect(await getSpaceByName('Personal')).to.not.equal(undefined)
+    expect(getCurrentSpace()).to.deep.equal(before)
+  })
+
+  it('makes nothing when the person has a space of their own, whatever it is called', async () => {
+    await ensurePersonalSpace([space({ name: 'Choir', team }), space({ name: 'Bea Singer' })])
+    expect(await getSpaceByName('Personal')).to.equal(undefined)
+  })
+
+  it('reads the spaces itself when not given them, and makes only one when asked twice', async () => {
+    await ensurePersonalSpace()
+    await ensurePersonalSpace([space({ name: 'Choir', team })])
+    await ensurePersonalSpace([space({ name: 'Choir', team })])
+    expect((await listSpaces()).filter(each => each.name === 'Personal').length).to.be.at.most(1)
   })
 })
 
