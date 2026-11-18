@@ -59,3 +59,5 @@ tests/fixtures/private/
 
 # Copies of the register of teams' database (just db-backup): they hold email addresses
 .backups/
+# The export `just branch-preview` is seeded from: kept up to date by hand, never committed (docs/PREVIEWS.md)
+/test-export.zip
