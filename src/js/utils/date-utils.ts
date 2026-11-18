@@ -2,6 +2,8 @@
  * Utility functions for date formatting and calculations
  */
 
+import { t } from '../text.ts'
+
 export type DateStyle = 'short' | 'long' | 'compact'
 export interface DateFormatOptions {
   locale?: string
@@ -18,24 +20,20 @@ export interface DateFormatOptions {
 export function getWeeksAgo(dateString: string, now: Date = new Date()): string {
   const days = calendarDaysBetween(parseLocalDate(dateString), now)
 
-  if (days === 0) return 'today'
-  if (days === 1) return 'yesterday'
-  if (days === -1) return 'tomorrow'
+  if (days === 0) return t('when-today')
+  if (days === 1) return t('when-yesterday')
+  if (days === -1) return t('when-tomorrow')
   if (days < 0) {
     const ahead = -days
-    if (ahead < 7) return `in ${ahead} days`
-    const weeks = Math.floor(ahead / 7)
-    return weeks === 1 ? 'in 1 week' : `in ${weeks} weeks`
+    if (ahead < 7) return t('when-days-ahead', { count: ahead })
+    return t('when-weeks-ahead', { count: Math.floor(ahead / 7) })
   }
-  if (days < 7) return `${days} days ago`
+  if (days < 7) return t('when-days-ago', { count: days })
 
   const weeks = Math.floor(days / 7)
-  if (weeks === 1) return '1 week ago'
-  if (weeks < 52) return `${weeks} weeks ago`
+  if (weeks < 52) return t('when-weeks-ago', { count: weeks })
 
-  const years = Math.floor(weeks / 52)
-  if (years === 1) return '1 year ago'
-  return `${years} years ago`
+  return t('when-years-ago', { count: Math.floor(weeks / 52) })
 }
 
 /** A Date as a local YYYY-MM-DD (toISOString would give the UTC date) */

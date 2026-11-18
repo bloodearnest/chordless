@@ -58,7 +58,11 @@ const idTokenFor = ({ sub, email }: Person) =>
     exp: Math.floor(Date.now() / 1000) + 3600,
   })}.signature`
 
-describe('a team space, end to end', () => {
+describe('a team space, end to end', function () {
+  // (each test signs in as two people, makes a team and syncs it through the fake Worker and Drive, which
+  // is more than mocha's 2 s when the whole unit run shares the machine: docs/TESTING.md, "give a test
+  // that does a lot a timeout to match")
+  this.timeout(10_000)
   let drive: ReturnType<typeof installFakeDrive>
   let auth: ReturnType<typeof installFakeAuthWorker>
   let worker: FakeAuthWorker

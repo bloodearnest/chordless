@@ -878,7 +878,7 @@ export class SetlistPage {
     const madeIt =
       !leader && Boolean(email) && normalizeEmail(setlist.createdBy) === normalizeEmail(email)
     if (!mayChangeSetlist(role, leadsIt, madeIt)) {
-      dialog.deleteBlocked = `In ${space.name}, only the leader of a setlist or an admin can delete it.`
+      dialog.deleteBlocked = t('setlist-info-delete-blocked', { space: space.name })
       return
     }
     dialog.moveTargets = spaces
@@ -1902,7 +1902,7 @@ export class SetlistPage {
       await this._database().getAllPeople(),
       this.currentSetlist?.leaderId
     )
-    return `Only ${leader ? leader.name : 'its leader'} or an admin can change this setlist.`
+    return leader ? t('setlist-only-leader', { leader: leader.name }) : t('setlist-only-its-leader')
   }
 
   /** Whether the person using the device may change this song for everyone: they control the setlist, or the song is one they added for themselves */

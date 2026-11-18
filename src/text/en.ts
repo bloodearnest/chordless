@@ -1431,4 +1431,136 @@ player-volume-pad = Pad Volume
 player-volume-click = Click Volume
 player-toggle-click = Toggle click on/off
 player-toggle-pads = Toggle pads on/off
+
+
+## A setlist's details (the form, and what the dialog says of a setlist)
+
+action-save = Save
+action-remove = Remove
+songs-count =
+    { $count ->
+        [one] { $count } song
+       *[other] { $count } songs
+    }
+
+details-date = Date
+details-time = Time
+details-type = Type
+details-name = Name (optional)
+details-name-example = e.g. Youth Service, Christmas Special
+details-leader = Leader (optional)
+details-no-leader = No leader
+# { $name } is the person who is using the app.
+details-leader-you = { $name } (you)
+details-leader-other = Other…
+details-leader-name = Leader's name
+details-who = Which of these is you?
+details-who-unsure = Not sure yet
+details-who-new = None of these: add me
+
+setlist-info-heading = Setlist info
+# { $title } is the setlist's name and date.
+setlist-info-edit = Edit: { $title }
+setlist-info-edit-label = Edit setlist details
+setlist-info-wrong-space = Added to the wrong space?
+setlist-info-move = Move to this space
+setlist-info-delete = Delete setlist
+# { $space } is the Team the setlist is in.
+setlist-info-delete-blocked = In { $space }, only the leader of a setlist or an admin can delete it.
+# { $leader } is the person who leads it.
+setlist-only-leader = Only { $leader } or an admin can change this setlist.
+setlist-only-its-leader = Only its leader or an admin can change this setlist.
+
+info-time = Time
+info-type = Type
+info-leader = Leader
+info-venue = Venue
+info-songs = Songs
+info-created = Created
+info-modified = Last Modified
+
+
+## A song's details (the dialog on a song, and how long ago it was played)
+
+song-info-heading = Song info
+song-info-artist = Artist
+song-info-key-tempo = Original Key / Tempo
+song-info-key = Key: { $key }
+song-info-key-and-tempo = Key: { $key } • { $tempo } BPM
+song-info-time-signature = Time Signature
+song-info-copyright = Copyright
+song-info-played = Times Played (Total)
+song-info-recent = Recent Plays
+
+song-info-range = Melody Range
+song-info-range-none = None yet
+song-info-range-add = Add a range
+song-info-range-edit = Edit
+# { $key } is the key the chart is in.
+song-info-range-in-key = in { $key }
+# { $notes } notes and { $semitones } semitones from the lowest to the highest.
+song-info-range-width =
+    { $notes ->
+        [one] 1 note
+       *[other] { $notes } notes
+    } wide ({ $semitones ->
+        [one] 1 semitone
+       *[other] { $semitones } semitones
+    })
+# How far the range is moved to sit in the singing range: "an octave lower", "2 octaves higher".
+song-info-octaves-lower =
+    { $count ->
+        [one] an octave
+       *[other] { $count } octaves
+    } lower
+song-info-octaves-higher =
+    { $count ->
+        [one] an octave
+       *[other] { $count } octaves
+    } higher
+# { $note } is the note, { $shown } how long it is held and { $beats } the same as a number (for "beat" and "beats").
+song-info-highest =
+    Highest { $note }: { $shown } { $beats ->
+        [one] beat
+       *[other] beats
+    }
+song-info-lowest =
+    lowest { $note }: { $shown } { $beats ->
+        [one] beat
+       *[other] beats
+    }
+
+song-info-ccli = CCLI Number
+song-info-songselect = SongSelect
+song-info-view = View on SongSelect
+
+# How long ago a date was, or how long until it: the dates of a song's plays, and of a setlist. { $count } is the number.
+when-today = today
+when-yesterday = yesterday
+when-tomorrow = tomorrow
+when-days-ahead =
+    { $count ->
+        [one] in { $count } day
+       *[other] in { $count } days
+    }
+when-weeks-ahead =
+    { $count ->
+        [one] in { $count } week
+       *[other] in { $count } weeks
+    }
+when-days-ago =
+    { $count ->
+        [one] { $count } day ago
+       *[other] { $count } days ago
+    }
+when-weeks-ago =
+    { $count ->
+        [one] { $count } week ago
+       *[other] { $count } weeks ago
+    }
+when-years-ago =
+    { $count ->
+        [one] { $count } year ago
+       *[other] { $count } years ago
+    }
 `

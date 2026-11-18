@@ -299,7 +299,7 @@ export class SongInfo extends LitElement {
               this.song.artist
                 ? html`
                   <div class="modal-info-item">
-                    <div class="modal-info-label">Artist</div>
+                    <div class="modal-info-label">${t('song-info-artist')}</div>
                     <div class="modal-info-value">${this.song.artist}</div>
                   </div>
                 `
@@ -309,11 +309,15 @@ export class SongInfo extends LitElement {
               this.song.metadata?.key
                 ? html`
                   <div class="modal-info-item">
-                    <div class="modal-info-label">Original Key / Tempo</div>
+                    <div class="modal-info-label">${t('song-info-key-tempo')}</div>
                     <div class="modal-info-value">
-                      Key:
-                      ${this.song.metadata.key}${
-                        this.song.metadata.tempo ? ` • ${this.song.metadata.tempo} BPM` : ''
+                      ${
+                        this.song.metadata.tempo
+                          ? t('song-info-key-and-tempo', {
+                              key: this.song.metadata.key,
+                              tempo: this.song.metadata.tempo,
+                            })
+                          : t('song-info-key', { key: this.song.metadata.key })
                       }
                     </div>
                   </div>
@@ -325,7 +329,7 @@ export class SongInfo extends LitElement {
               this.song.metadata?.timeSignature
                 ? html`
                   <div class="modal-info-item">
-                    <div class="modal-info-label">Time Signature</div>
+                    <div class="modal-info-label">${t('song-info-time-signature')}</div>
                     <div class="modal-info-value">${this.song.metadata.timeSignature}</div>
                   </div>
                 `
@@ -335,7 +339,7 @@ export class SongInfo extends LitElement {
               this.song.metadata?.copyright && !this._copyrightIsInTrailer()
                 ? html`
                   <div class="modal-info-item">
-                    <div class="modal-info-label">Copyright</div>
+                    <div class="modal-info-label">${t('song-info-copyright')}</div>
                     <div class="modal-info-value">${this.song.metadata.copyright}</div>
                   </div>
                 `
@@ -345,7 +349,7 @@ export class SongInfo extends LitElement {
               stats.totalAppearances > 0
                 ? html`
                   <div class="modal-info-item">
-                    <div class="modal-info-label">Times Played (Total)</div>
+                    <div class="modal-info-label">${t('song-info-played')}</div>
                     <div class="modal-info-value">${stats.totalAppearances}</div>
                   </div>
                 `
@@ -358,7 +362,7 @@ export class SongInfo extends LitElement {
             ${
               recentAppearances.length > 0
                 ? html`
-                  <div class="modal-appearances-title">Recent Plays</div>
+                  <div class="modal-appearances-title">${t('song-info-recent')}</div>
                   <div class="modal-appearances-list">
                     ${recentAppearances.map(
                       appearance => html`
@@ -401,31 +405,30 @@ export class SongInfo extends LitElement {
       return key
         ? html`
           <div class="modal-info-item">
-            <div class="modal-info-label">Melody Range</div>
+            <div class="modal-info-label">${t('song-info-range')}</div>
             <div class="modal-info-value range-line">
-              <span>None yet</span>
-              <button class="btn" type="button" @click=${() => this._editRange(range)}>Add a range</button>
+              <span>${t('song-info-range-none')}</span>
+              <button class="btn" type="button" @click=${() => this._editRange(range)}>${t('song-info-range-add')}</button>
             </div>
           </div>
         `
         : ''
     }
     const span = rangeSpan(range, key)
-    const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
     // (the range is kept as it was read, and used in the octave nearest the green, as the key picker does)
     const used = octaveNearGreen(range)
     const note = describeRange(rangeStatus(used))
     const octaves = (used.low - range.low) / 12
     return html`
       <div class="modal-info-item">
-        <div class="modal-info-label">Melody Range</div>
+        <div class="modal-info-label">${t('song-info-range')}</div>
         <div class="modal-info-value range-line">
-          <span>${noteName(range.low, key)}–${noteName(range.high, key)}${chartKey ? ` in ${chartKey}` : ''}</span>
-          ${chartKey ? html`${rangeBadge(note)}<span>${note.words || 'in range'}${octaves ? `, ${Math.abs(octaves) === 1 ? 'an octave' : `${Math.abs(octaves)} octaves`} ${octaves < 0 ? 'lower' : 'higher'}` : ''}</span>` : ''}
-          ${key ? html`<button class="btn" type="button" @click=${() => this._editRange(range)}>Edit</button>` : ''}
+          <span>${noteName(range.low, key)}–${noteName(range.high, key)}${chartKey ? ` ${t('song-info-range-in-key', { key: chartKey })}` : ''}</span>
+          ${chartKey ? html`${rangeBadge(note)}<span>${note.words || t('range-in-range')}${octaves ? `, ${t(octaves < 0 ? 'song-info-octaves-lower' : 'song-info-octaves-higher', { count: Math.abs(octaves) })}` : ''}</span>` : ''}
+          ${key ? html`<button class="btn" type="button" @click=${() => this._editRange(range)}>${t('song-info-range-edit')}</button>` : ''}
         </div>
         <div class="modal-info-value">
-          ${plural(span.notes, 'note')} wide (${plural(span.semitones, 'semitone')})
+          ${t('song-info-range-width', { notes: span.notes, semitones: span.semitones })}
         </div>
         ${this._renderExtremes(key)}
       </div>
@@ -436,11 +439,15 @@ export class SongInfo extends LitElement {
   _renderExtremes(key: string) {
     const extremes = this.melody?.extremes
     if (!extremes || !key) return ''
-    const line = (word: string, midi: number, beats: number) =>
-      `${word} ${noteName(midi, this.melody?.rangeKey || key)}: ${formatBeats(beats)} ${beats === 1 ? 'beat' : 'beats'}`
+    const line = (messageId: string, midi: number, beats: number) =>
+      t(messageId, {
+        note: noteName(midi, this.melody?.rangeKey || key),
+        shown: formatBeats(beats),
+        beats,
+      })
     return html`
       <div class="modal-info-value">
-        ${line('Highest', extremes.high, extremes.highBeats)}; ${line('lowest', extremes.low, extremes.lowBeats)}
+        ${line('song-info-highest', extremes.high, extremes.highBeats)}; ${line('song-info-lowest', extremes.low, extremes.lowBeats)}
       </div>
     `
   }
@@ -471,13 +478,13 @@ export class SongInfo extends LitElement {
     const wrong = this._low > this._high
     return html`
       <div class="modal-info-item">
-        <div class="modal-info-label">Melody Range</div>
+        <div class="modal-info-label">${t('song-info-range')}</div>
         <div class="range-editor">
-          ${picker('Lowest note', this._low, midi => (this._low = midi))}
-          ${picker('Highest note', this._high, midi => (this._high = midi))}
+          ${picker(t('import-range-lowest'), this._low, midi => (this._low = midi))}
+          ${picker(t('import-range-highest'), this._high, midi => (this._high = midi))}
         </div>
-        <div class="modal-info-value">In ${key}, as written: men sing it an octave down.</div>
-        ${wrong ? html`<div class="range-error" role="alert">The lowest note is above the highest.</div>` : ''}
+        <div class="modal-info-value">${t('import-range-note', { key })}</div>
+        ${wrong ? html`<div class="range-error" role="alert">${t('import-range-wrong')}</div>` : ''}
         <div class="range-line">
           <button
             class="btn primary"
@@ -485,12 +492,12 @@ export class SongInfo extends LitElement {
             ?disabled=${wrong}
             @click=${() => this._saveRange({ low: this._low, high: this._high }, key)}
           >
-            Save
+            ${t('action-save')}
           </button>
-          <button class="btn" type="button" @click=${() => (this._editingRange = false)}>Cancel</button>
+          <button class="btn" type="button" @click=${() => (this._editingRange = false)}>${t('action-cancel')}</button>
           ${
             range
-              ? html`<button class="btn" type="button" @click=${() => this._saveRange(null, key)}>Remove</button>`
+              ? html`<button class="btn" type="button" @click=${() => this._saveRange(null, key)}>${t('action-remove')}</button>`
               : ''
           }
         </div>
@@ -510,7 +517,7 @@ export class SongInfo extends LitElement {
     }
     const keyPlayed = appearance.playedInKey || this.song?.metadata?.key
     if (keyPlayed) {
-      metaParts.push(`Key: ${keyPlayed}`)
+      metaParts.push(t('song-info-key', { key: keyPlayed }))
     }
 
     if (metaParts.length > 0) {
@@ -546,7 +553,7 @@ export class SongInfo extends LitElement {
           ccliNumber
             ? html`
               <div class="modal-info-item">
-                <div class="modal-info-label">CCLI Number</div>
+                <div class="modal-info-label">${t('song-info-ccli')}</div>
                 <div class="modal-info-value">
                   ${ccliNumber}
                   <a
@@ -557,10 +564,10 @@ export class SongInfo extends LitElement {
                   >
                     <img
                       src="https://songselect.ccli.com/favicon.ico"
-                      alt="SongSelect"
+                      alt=${t('song-info-songselect')}
                       class="songselect-logo"
                     />
-                    View on SongSelect
+                    ${t('song-info-view')}
                   </a>
                 </div>
               </div>
