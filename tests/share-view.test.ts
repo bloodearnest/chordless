@@ -236,6 +236,21 @@ describe('the share view', () => {
       expect(banner?.textContent).to.not.contain('until')
     })
 
+    it('says who shared it with no end date, or until when with no name, when it knows only one', async () => {
+      await open(await readyOpening())
+      expect(view.querySelector('#share-banner')?.textContent).to.contain('Shared with you by')
+      expect(view.querySelector('#share-banner')?.textContent).to.not.contain('until')
+      view.remove()
+
+      const opening = await readyOpening({ expires: '2026-12-25T00:00:00Z' })
+      if (opening.state === 'ready' && opening.setlist.received)
+        opening.setlist.received.leaderName = ''
+      await open(opening)
+      const banner = view.querySelector('#share-banner')
+      expect(banner?.textContent).to.not.contain(' by ')
+      expect(banner?.textContent).to.contain('until')
+    })
+
     it('has no banner on a song', async () => {
       await open(await readyOpening(), { songIndex: 0 })
       expect(view.querySelector('#share-banner')).to.equal(null)
