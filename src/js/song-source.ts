@@ -5,6 +5,8 @@
  * whatever carried it, and where that is not known the origin is empty.
  */
 
+import { t } from './text.ts'
+
 /** The source of a chart that came from SongSelect, which is the authority on the details of its song */
 export const SONGSELECT = 'songselect'
 
@@ -25,7 +27,7 @@ export function describeOrigin(song: {
   const source = song.importSource === 'songselect' ? 'SongSelect' : song.importSource
   const date = song.importDate ? new Date(song.importDate).toLocaleDateString() : ''
   return [
-    song.importUser ? `Imported by ${song.importUser}` : 'Importer unknown',
+    song.importUser ? t('origin-imported-by', { user: song.importUser }) : t('origin-unknown'),
     date,
     source && !['file', 'paste', 'manual'].includes(source) ? source : '',
   ]

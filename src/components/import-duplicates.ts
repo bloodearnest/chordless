@@ -2,11 +2,13 @@
  * The songs of an import that the library has already (song-import.ts): how each compares with the
  * library's chart, what is suggested, and the choice of what to do with it.
  */
+
 import { html, type TemplateResult } from 'lit'
 import type { SongRecord } from '../js/data-types.ts'
 import type { KeptMelody, LeadSheetOutcome, MelodyRead } from '../js/lead-sheet.ts'
 import type { ChartComparison } from '../js/library-repair.ts'
 import { describeOrigin, SONGSELECT } from '../js/song-source.ts'
+import { t } from '../js/text.ts'
 import type { ChartLabel } from './chart-diff.ts'
 
 /**
@@ -63,17 +65,17 @@ export interface DuplicateActions {
 /** What came of a song, as the list of them says */
 export function statusOf(item: ImportItem): string {
   const status: Record<string, string> = {
-    update: 'updated',
-    'as-original': 'imported as the original',
-    'as-variant': 'imported as a variant',
-    'use-existing': 'not imported',
+    update: t('import-status-updated'),
+    'as-original': t('import-status-original'),
+    'as-variant': t('import-status-variant'),
+    'use-existing': t('import-status-not-imported'),
   }
-  if (!item.isDuplicate) return 'new'
-  if (item.auto && item.choice === 'update') return 'updated: the same song as in your library'
+  if (!item.isDuplicate) return t('import-status-new')
+  if (item.auto && item.choice === 'update') return t('import-status-same-song')
   if (item.comparison?.verdict === 'identical') {
-    return `identical version already in library${item.sourceSet ? ', now recorded as from SongSelect' : ''}`
+    return t(item.sourceSet ? 'import-status-identical-source' : 'import-status-identical')
   }
-  return (item.choice && status[item.choice]) || 'already in library'
+  return (item.choice && status[item.choice]) || t('import-status-in-library')
 }
 
 /** A song the library has, with a choice to be made for it (not one that is being updated with no question) */
@@ -114,18 +116,18 @@ function renderDuplicate(item: ImportItem, index: number, alone: boolean, on: Du
   /* v8 ignore next -- every duplicate is given its comparison when it is read */
   const verdict = comparison?.verdict ?? 'different-words'
   const sentence = {
-    identical: 'The same song.',
-    'same-chart': 'The same words and chords, with other details.',
-    'other-key': 'The same song in another key.',
-    'different-chords': 'The same words, with different chords.',
-    'different-words': 'Different words: another version or arrangement.',
+    identical: t('import-verdict-identical'),
+    'same-chart': t('import-verdict-same-chart'),
+    'other-key': t('import-verdict-other-key'),
+    'different-chords': t('import-verdict-different-chords'),
+    'different-words': t('import-verdict-different-words'),
   }[verdict]
   // (the library's chart, and the imported one)
   const charts: [string, string] = [item.existingText as string, item.chordproText]
   const labels: [ChartLabel, ChartLabel] = [
-    { heading: 'In your library', detail: describeOrigin(item.song) },
+    { heading: t('import-chart-library'), detail: describeOrigin(item.song) },
     {
-      heading: 'Importing',
+      heading: t('import-chart-importing'),
       detail: describeOrigin({
         importUser: item.importUser,
         importDate: new Date().toISOString(),
@@ -136,23 +138,23 @@ function renderDuplicate(item: ImportItem, index: number, alone: boolean, on: Du
   const options: { value: DuplicateChoice; title: string; help: string }[] = [
     {
       value: 'as-original',
-      title: 'Import as original song version',
-      help: 'The imported song becomes the original. Your current song is kept as a variant.',
+      title: t('import-pick-original'),
+      help: t('import-pick-original-help'),
     },
     {
       value: 'as-variant',
-      title: 'Import as variant of original',
-      help: 'Your current song stays the original. The imported song is kept as a variant.',
+      title: t('import-pick-variant'),
+      help: t('import-pick-variant-help'),
     },
     {
       value: 'update',
-      title: 'Update current song',
-      help: 'Replace your current song with the imported one, in its key. Setlists keep using it, and keep the keys they have it in.',
+      title: t('import-pick-update'),
+      help: t('import-pick-update-help'),
     },
     {
       value: 'use-existing',
-      title: 'Do not import',
-      help: 'Keep your current song as it is.',
+      title: t('import-pick-skip'),
+      help: t('import-pick-skip-help'),
     },
   ]
   const naming = item.pick === 'as-original' || item.pick === 'as-variant'
@@ -160,7 +162,7 @@ function renderDuplicate(item: ImportItem, index: number, alone: boolean, on: Du
     <p class="verdict">${sentence}</p>
     ${alone ? on.range(item) : ''}
     <fieldset class="picks">
-      <legend>What to do with it</legend>
+      <legend>${t('import-pick-legend')}</legend>
       ${options.map(
         ({ value, title, help }) => html`
           <label class="pick">
@@ -180,7 +182,7 @@ function renderDuplicate(item: ImportItem, index: number, alone: boolean, on: Du
       naming
         ? html`
           <label class="label-field">
-            ${item.pick === 'as-original' ? 'Variant name for your current song' : 'Variant name for the imported song'}
+            ${t(item.pick === 'as-original' ? 'import-label-current' : 'import-label-imported')}
             <input
               class="variant-label"
               type="text"
@@ -199,11 +201,11 @@ function renderDuplicate(item: ImportItem, index: number, alone: boolean, on: Du
         ?disabled=${!item.pick}
         @click=${() => on.apply([item])}
       >
-        Import
+        ${t('import-button')}
       </button>
     </div>
     <details ?open=${verdict === 'different-chords' || verdict === 'different-words'}>
-      <summary>Compare</summary>
+      <summary>${t('import-compare')}</summary>
       <chart-diff
         .charts=${charts}
         .keys=${comparison?.keys}
@@ -221,8 +223,8 @@ export function renderDuplicates(unresolved: ImportItem[], total: number, on: Du
       <strong>
         ${
           single
-            ? 'This song already exists in your library'
-            : `${unresolved.length} of these songs ${unresolved.length > 1 ? 'are' : 'is'} already in your library`
+            ? t('import-duplicate-one')
+            : t('import-duplicate-many', { count: unresolved.length })
         }
       </strong>
       ${
@@ -232,13 +234,13 @@ export function renderDuplicates(unresolved: ImportItem[], total: number, on: Du
             ${
               unresolved.length > 1
                 ? html`
-                  <div class="bulk-picks" role="group" aria-label="The same choice for all of them">
-                    <span>For all of them:</span>
+                  <div class="bulk-picks" role="group" aria-label=${t('import-bulk-label')}>
+                    <span>${t('import-bulk')}</span>
                     <button class="btn bulk-update-all" type="button" @click=${() => on.pickAll('update')}>
-                      Update all ${unresolved.length}
+                      ${t('import-bulk-update', { count: unresolved.length })}
                     </button>
                     <button class="btn bulk-skip" type="button" @click=${() => on.pickAll('use-existing')}>
-                      Do not import any
+                      ${t('import-bulk-skip')}
                     </button>
                   </div>
                 `
@@ -250,7 +252,7 @@ export function renderDuplicates(unresolved: ImportItem[], total: number, on: Du
                 ?disabled=${unresolved.some(item => !item.pick)}
                 @click=${() => on.apply(unresolved)}
               >
-                Import all with these choices
+                ${t('import-bulk-apply')}
               </button>
             </div>
           `
