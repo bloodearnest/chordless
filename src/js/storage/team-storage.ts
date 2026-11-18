@@ -331,6 +331,10 @@ export class TeamStorage implements StorageBackend {
     return null
   }
 
+  async listRoots(): Promise<RootInfo[]> {
+    return []
+  }
+
   async ensureRoot(): Promise<{ ref: string; isNew: boolean }> {
     throw new Error('A team space is joined, not made here')
   }

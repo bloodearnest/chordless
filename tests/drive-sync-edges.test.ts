@@ -5,7 +5,7 @@
  */
 import { expect } from '@open-wc/testing'
 import type { ChordProRecord, SongRecord } from '../src/js/data-types.ts'
-import type { ChordlessDB } from '../src/js/db.ts'
+import { ChordlessDB } from '../src/js/db.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
 import {
@@ -18,17 +18,24 @@ import {
 import { driveSongUuid, pullSetlists, pullSongs, titleFromFilename } from '../src/js/sync/pull.ts'
 import { pushSetlist, pushSetlists, pushSongVariant, songNeedsSync } from '../src/js/sync/push.ts'
 import {
+  AdoptFolderError,
   SpaceFolderMismatchError,
   SyncManager,
   type SyncProgress,
   UnsyncedChangesError,
 } from '../src/js/sync-manager.ts'
 import { makeSetlist, makeSong } from './builders.ts'
-import { addSong, editSong, useSyncRig } from './drive-harness.ts'
+import {
+  addSong,
+  editSong,
+  memoryChangeToken,
+  memoryFolderLink,
+  useSyncRig,
+} from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
-const { describe, it } = window
+const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
@@ -765,6 +772,83 @@ describe('Drive sync: the less common turns', () => {
       rig.storage.edit(file.ref, '{title: One}\n[G]One, changed in Drive')
       await syncDevice(phone)
       expect(must(await phone.db.getSong('song-1')).id).to.equal('title-one')
+    })
+  })
+
+  describe('a Personal space on a device that has not synced, with another space folder in Drive', () => {
+    const answers = [
+      `chordless:adopt-declined:${TEST_SPACE.id}`,
+      `chordless:adopted-folder:${TEST_SPACE.id}`,
+    ]
+    const forget = () => {
+      for (const key of answers) localStorage.removeItem(key)
+    }
+    beforeEach(forget)
+    afterEach(forget)
+
+    async function open(spaceName = 'Personal') {
+      const db = new ChordlessDB(`test-adopt-${crypto.randomUUID()}`)
+      await db.init()
+      const folderLink = memoryFolderLink()
+      const sync = await SyncManager.open(spaceName, TEST_SPACE.id, {
+        db,
+        folderLink,
+        memberCache: { async set() {}, async setReadOnly() {} } as never,
+        changeToken: memoryChangeToken(),
+        storage: rig.storage,
+      })
+      return { sync, folderLink }
+    }
+
+    it('is asked to use the one folder, and made nothing', async () => {
+      const old = await rig.storage.ensureRoot('Simon’s songs', 'space-old')
+      const { sync, folderLink } = await open()
+      let asked: AdoptFolderError | null = null
+      try {
+        await sync.resolveDriveFolder()
+      } catch (error) {
+        asked = error as AdoptFolderError
+      }
+      expect(asked).to.be.instanceOf(AdoptFolderError)
+      expect(asked?.folder.ref).to.equal(old.ref)
+      expect(asked?.folder.name).to.equal('Simon’s songs')
+      expect(folderLink.value).to.equal(null)
+      expect(rig.storage.rootNamed('Personal')).to.equal(undefined)
+    })
+
+    it('links the folder when it is adopted, and never renames it', async () => {
+      const old = await rig.storage.ensureRoot('Simon’s songs', 'space-old')
+      const { sync, folderLink } = await open()
+      await sync.adoptFolder(old.ref)
+      expect(folderLink.value).to.equal(old.ref)
+      expect(await sync.resolveDriveFolder()).to.equal(false)
+      expect(must(await rig.storage.inspectRoot(old.ref)).name).to.equal('Simon’s songs')
+    })
+
+    it('makes its own folder, and asks no more, when told no', async () => {
+      await rig.storage.ensureRoot('Simon’s songs', 'space-old')
+      const { sync, folderLink } = await open()
+      sync.declineAdoption()
+      expect(await sync.resolveDriveFolder()).to.equal(true)
+      expect(folderLink.value).to.equal(rig.storage.rootNamed('Personal')?.ref)
+    })
+
+    it('does not ask when there is a folder of its name, none other, or several others', async () => {
+      const { sync } = await open()
+      expect(await sync.resolveDriveFolder()).to.equal(true) // none at all: made
+      const { sync: again } = await open()
+      expect(await again.resolveDriveFolder()).to.equal(false) // its own found
+      await rig.storage.ensureRoot('One', 'space-1')
+      await rig.storage.ensureRoot('Two', 'space-2')
+      rig.storage.removeRoot(must(rig.storage.rootNamed('Personal')).ref)
+      const { sync: many } = await open()
+      expect(await many.resolveDriveFolder()).to.equal(true) // two others: not guessed
+    })
+
+    it('does not ask for a space with another name', async () => {
+      await rig.storage.ensureRoot('Simon’s songs', 'space-old')
+      const { sync } = await open('Choir')
+      expect(await sync.resolveDriveFolder()).to.equal(true)
     })
   })
 

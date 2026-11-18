@@ -4,7 +4,11 @@
  */
 import type { Space } from './data-types.ts'
 import { recordSync } from './last-sync.ts'
-import { type BroadcastCallback, createSyncOrchestrator } from './sync-orchestrator.ts'
+import {
+  type BroadcastCallback,
+  createSyncOrchestrator,
+  SyncOrchestrator,
+} from './sync-orchestrator.ts'
 
 /**
  * Sync the space with wherever its files are kept.
@@ -18,5 +22,21 @@ export async function syncSpaceNow(
   const orchestrator = await createSyncOrchestrator(space.name, space.id)
   // (the Sync button of a space's card)
   await orchestrator.sync(onProgress, 'manual')
+  return recordSync(space.id)
+}
+
+/**
+ * Answer an AdoptFolderError (a Personal space whose Drive folder has another name): use that
+ * folder (`ref`), or with none make the space's own, and sync.
+ * @returns when it finished (ISO time)
+ */
+export async function syncSpaceAfterAdoptionAnswer(
+  space: Space,
+  ref: string | null,
+  onProgress: BroadcastCallback | null
+): Promise<string> {
+  const orchestrator = new SyncOrchestrator(space.name, space.id)
+  if (ref) await orchestrator.adoptFolder(ref, onProgress)
+  else await orchestrator.declineAdoption(onProgress)
   return recordSync(space.id)
 }

@@ -73,6 +73,7 @@ export type StorageOp =
   | 'available'
   | 'inspectRoot'
   | 'findRootByName'
+  | 'listRoots'
   | 'ensureRoot'
   | 'renameRoot'
   | 'members'
@@ -366,6 +367,11 @@ export class MemoryStorage implements StorageBackend {
     this.enter('findRootByName', name)
     const root = this.rootNamed(name)
     return root ? this.#info(root) : null
+  }
+
+  async listRoots(): Promise<RootInfo[]> {
+    this.enter('listRoots')
+    return [...this.roots.values()].filter(root => !root.trashed).map(root => this.#info(root))
   }
 
   async ensureRoot(name: string, spaceId: string): Promise<{ ref: string; isNew: boolean }> {

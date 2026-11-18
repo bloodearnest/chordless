@@ -63,14 +63,21 @@ describe('Drive sync: spaces', () => {
       const tablet = await makeDevice('tablet', { spaceName: 'Simon Davy' })
       const theirs = await addSetlist(tablet, { name: 'From tablet' })
       await syncDevice(tablet)
-      const phone = await makeDevice('phone', { spaceName: 'Personal' })
-      await syncDevice(phone) // linked to an empty "Personal" folder
+      // (it was asked whether to use "Simon Davy" for Personal, and said no)
+      const declined = `chordless:adopt-declined:${TEST_SPACE.id}`
+      localStorage.setItem(declined, 'yes')
+      try {
+        const phone = await makeDevice('phone', { spaceName: 'Personal' })
+        await syncDevice(phone) // linked to an empty "Personal" folder
 
-      await renameSpace(phone, 'Simon Davy')
-      await syncDevice(phone)
+        await renameSpace(phone, 'Simon Davy')
+        await syncDevice(phone)
 
-      expect(must(await phone.db.getSetlist(theirs.id)).name).to.equal('From tablet')
-      expect(phone.folderLink.value).to.equal(folderOf('Simon Davy'))
+        expect(must(await phone.db.getSetlist(theirs.id)).name).to.equal('From tablet')
+        expect(phone.folderLink.value).to.equal(folderOf('Simon Davy'))
+      } finally {
+        localStorage.removeItem(declined)
+      }
     })
 
     it('stops before changing anything if records belong to another folder', async () => {

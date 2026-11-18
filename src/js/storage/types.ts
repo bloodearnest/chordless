@@ -210,6 +210,8 @@ export interface StorageBackend {
   inspectRoot(ref: string): Promise<RootInfo | null>
   /** The space's root by its name, without making anything */
   findRootByName(name: string): Promise<RootInfo | null>
+  /** Every space root the backend can see (a Drive's folders under Chordless/ that were made as a space's), not the trashed */
+  listRoots(): Promise<RootInfo[]>
   /** The space's root by name, made if there is none */
   ensureRoot(name: string, spaceId: string): Promise<{ ref: string; isNew: boolean }>
   renameRoot(ref: string, name: string): Promise<void>

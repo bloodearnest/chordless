@@ -1,14 +1,17 @@
 import { css, html, LitElement, nothing } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { formatSyncTime, lastSyncOf } from '../js/last-sync.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
-import { syncSpaceNow } from '../js/space-sync.ts'
+import { syncSpaceAfterAdoptionAnswer, syncSpaceNow } from '../js/space-sync.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
+import { AdoptFolderError } from '../js/sync-manager.ts'
 import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
 import { errorMessage } from '../js/utils/errors.ts'
+import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles, spinnerStyles } from './shared-styles.ts'
 
@@ -164,15 +167,40 @@ export class SpaceCard extends LitElement {
     return this.signIn === 'no-drive' && isTeamMember(this.space)
   }
 
+  _adoptModal = createRef<AppModal>()
+
+  /** Ask whether the folder an AdoptFolderError names should be used; true to use it */
+  async _askToAdopt(folder: { name: string }): Promise<boolean> {
+    const modal = this._adoptModal.value as AppModal
+    modal.heading = t('adopt-folder-heading')
+    modal.message = t('adopt-folder-message', { name: folder.name })
+    modal.confirmLabel = t('adopt-folder-use', { name: folder.name })
+    modal.cancelLabel = t('adopt-folder-new')
+    await this.updateComplete
+    await modal.updateComplete
+    return modal.ask()
+  }
+
   async _sync(): Promise<void> {
     if (this._syncing) return
     this._syncing = true
     this._error = ''
     this._progress = t('space-sync-starting')
+    const onProgress = (progress: { message: string }) => {
+      this._progress = progress.message
+    }
     try {
-      this._syncedAt = await syncSpaceNow(this.space, progress => {
-        this._progress = progress.message
-      })
+      try {
+        this._syncedAt = await syncSpaceNow(this.space, onProgress)
+      } catch (error) {
+        if (!(error instanceof AdoptFolderError)) throw error
+        const use = await this._askToAdopt(error.folder)
+        this._syncedAt = await syncSpaceAfterAdoptionAnswer(
+          this.space,
+          use ? error.folder.ref : null,
+          onProgress
+        )
+      }
       this.dispatchEvent(new SpaceSyncedEvent())
       void this._loadSummary()
     } catch (error) {
@@ -264,6 +292,7 @@ export class SpaceCard extends LitElement {
           }
         </div>
       </div>
+      <app-modal ${ref(this._adoptModal)} type="confirm" size="small"></app-modal>
     `
   }
 }

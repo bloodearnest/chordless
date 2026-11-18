@@ -3,6 +3,7 @@
  * is a fake Drive, and the spaces are real ones in the spaces database.
  */
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
+import type { AppModal } from '../src/components/app-modal.ts'
 import {
   type SpaceCard,
   SpaceConnectGoogleEvent,
@@ -17,6 +18,7 @@ import type { SignInState } from '../src/js/google-auth.ts'
 import { forgetSync, recordSync } from '../src/js/last-sync.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
+import { syncSpaceNow } from '../src/js/space-sync.ts'
 import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
@@ -278,6 +280,54 @@ describe('space-card', () => {
       await waitUntil(() => text(el).includes('Sync failed'), undefined, { timeout: 3000 })
       expect(text(el)).to.contain('Sync failed')
       expect(must(button(el, 'sync')).disabled).to.equal(false)
+    })
+
+    describe('a Personal space, when Drive has one other space’s folder', () => {
+      let old: Space
+      let personal: Space
+      beforeEach(async () => {
+        old = await make(`Old ${crypto.randomUUID().slice(0, 8)}`)
+        await syncSpaceNow(old, null)
+        personal = { ...space, name: 'Personal' }
+        localStorage.removeItem(`chordless:adopt-declined:${space.id}`)
+        localStorage.removeItem(`chordless:adopted-folder:${space.id}`)
+      })
+
+      async function answer(el: SpaceCard, confirm: boolean) {
+        const modal = must(el.shadowRoot?.querySelector<AppModal>('app-modal'))
+        await waitUntil(() => modal.open, 'the question', { timeout: 3000 })
+        expect(modal.message).to.contain(old.name)
+        await modal.updateComplete
+        must(
+          modal.shadowRoot?.querySelector<HTMLElement>(
+            confirm ? '.modal-btn-confirm' : '.modal-btn-cancel'
+          )
+        ).click()
+      }
+
+      it('asks whether to use that folder, and syncs into it when told yes, renaming nothing', async () => {
+        const el = await card('signed-in', { space: personal })
+        must(button(el, 'sync')).click()
+        await answer(el, true)
+        await waitUntil(() => text(el).includes('Synced Just now'), undefined, { timeout: 3000 })
+        const folders = [...drive.files.values()].filter(
+          file => file.appProperties?.resourceType === 'space'
+        )
+        expect(folders.map(folder => folder.name)).to.deep.equal([old.name])
+      })
+
+      it('makes a folder called Personal when told no', async () => {
+        const el = await card('signed-in', { space: personal })
+        must(button(el, 'sync')).click()
+        await answer(el, false)
+        await waitUntil(() => text(el).includes('Synced Just now'), undefined, { timeout: 3000 })
+        const folders = [...drive.files.values()].filter(
+          file => file.appProperties?.resourceType === 'space'
+        )
+        expect(folders.map(folder => folder.name).sort()).to.deep.equal(
+          [old.name, 'Personal'].sort()
+        )
+      })
     })
 
     it('does not start a second sync while one is going', async () => {

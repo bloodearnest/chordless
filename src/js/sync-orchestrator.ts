@@ -193,6 +193,32 @@ export class SyncOrchestrator {
   }
 
   /**
+   * Use the Drive folder an AdoptFolderError named for this space, and sync into it
+   * @param ref - the folder's id
+   * @param progressCallback - Optional callback
+   */
+  async adoptFolder(
+    ref: string,
+    progressCallback: BroadcastCallback | null = null
+  ): Promise<{ success: true }> {
+    await (await SyncManager.open(this.spaceName, this.spaceId)).adoptFolder(ref)
+    this.syncManager = null
+    return this.sync(progressCallback, 'manual')
+  }
+
+  /**
+   * Make a new folder for the space, not using the one an AdoptFolderError named, and sync into it
+   * @param progressCallback - Optional callback
+   */
+  async declineAdoption(
+    progressCallback: BroadcastCallback | null = null
+  ): Promise<{ success: true }> {
+    ;(await SyncManager.open(this.spaceName, this.spaceId)).declineAdoption()
+    this.syncManager = null
+    return this.sync(progressCallback, 'manual')
+  }
+
+  /**
    * Let go of the space's Drive folder, which is gone (DriveFolderGoneError), and sync into a new
    * one: everything on this device is uploaded again (see SyncManager.startOver). It works
    * without the old folder, which init() would not.
