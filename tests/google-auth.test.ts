@@ -536,7 +536,10 @@ describe('google-auth', () => {
       expect(stored.metadata.access_token).to.equal(undefined)
       expect(await isAuthenticated()).to.equal(true)
       expect(await getSignInState()).to.equal('no-drive')
-      expect(fetches.map(each => each.url), 'Google is not revoked: other devices keep their sync').to.deep.equal([])
+      expect(
+        fetches.map(each => each.url),
+        'Google is not revoked: other devices keep their sync'
+      ).to.deep.equal([])
     })
 
     it('does nothing when nobody is signed in, or there is no Google to turn off', async () => {
