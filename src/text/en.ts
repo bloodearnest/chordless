@@ -136,6 +136,136 @@ toast-db-updated-elsewhere = Chordless was updated in another window. Reload thi
 toast-db-other-windows = Close the other Chordless windows to finish updating.
 
 
+## Help (the page for each page of the app: Menu > Help)
+
+# The text of each page of help is these messages, by page, section and item; the pictures that go
+# with them are named in js/help-content.ts. A text may link inside the app: [Preferences](/preferences).
+
+
+### The setlist overview
+
+help-overview-title = Setlist Overview
+help-overview-intro-1 = This is your setlist: the songs for the service, in the order you will play them, each with the key it will be played in.
+help-overview-intro-2 = Tap a song to open its lyrics and chords. Once you are playing you will mostly stay on the songs, and come back here when you want to see the whole list.
+help-overview-getting-around-heading = Getting around
+help-overview-getting-around-tap-a-song-label = Tap a song
+help-overview-getting-around-tap-a-song-text = Opens its lyrics and chords.
+help-overview-getting-around-swipe-left-or-press-label = Swipe left (or press →)
+help-overview-getting-around-swipe-left-or-press-text = Goes to the first song, and on through the setlist from there.
+help-overview-getting-around-menu-label = Menu
+help-overview-getting-around-menu-text = Jump straight to any song in the setlist, or go to your other setlists, the song library and your [preferences](/preferences).
+help-overview-while-you-are-playing-heading = While you are playing
+help-overview-while-you-are-playing-go-live-label = Go live
+help-overview-while-you-are-playing-go-live-text = Tell the app you are playing from this setlist. The screen stays awake and the app goes full screen, so nothing gets in the way. It turns red while you are live; tap it again when you are done.
+help-overview-while-you-are-playing-add-song-label = Add Song
+help-overview-while-you-are-playing-add-song-text = A song that was not planned? Find it in your library and it goes on the end of the setlist. This is always available, even when you are live.
+help-overview-sharing-and-details-heading = Sharing and details
+help-overview-sharing-and-details-share-label = Share
+help-overview-sharing-and-details-share-text = Make a link that anyone can open to see this setlist, without needing to sign in.
+help-overview-sharing-and-details-information-label = Information
+help-overview-sharing-and-details-information-text = The setlist’s name, date and notes.
+help-overview-changing-the-setlist-heading = Changing the setlist
+help-overview-changing-the-setlist-intro = Moving, removing and re-keying songs are kept behind edit mode, so they cannot happen by accident while you are playing. Tap the pencil to turn it on, and again (or press Esc) to turn it off.
+help-overview-changing-the-setlist-edit-label = Edit
+help-overview-changing-the-setlist-edit-text = Turns edit mode on and off.
+help-overview-changing-the-setlist-a-song-in-edit-mode-label = A song in edit mode
+help-overview-changing-the-setlist-a-song-in-edit-mode-text = Each song gets a button to remove it, its tempo and key, and a handle to move it by.
+help-overview-changing-the-setlist-reorder-label = Reorder
+help-overview-changing-the-setlist-reorder-text = Drag a song by its handle to move it up or down the setlist.
+help-overview-changing-the-setlist-key-label = Key
+help-overview-changing-the-setlist-key-text = Choose the key a song will be played in, for this setlist.
+help-overview-changing-the-setlist-bpm-label = BPM
+help-overview-changing-the-setlist-bpm-text = Type the tempo a song will be played at, for this setlist.
+help-overview-changing-the-setlist-remove-label = Remove
+help-overview-changing-the-setlist-remove-text = Take a song out of the setlist. It asks first, and the song stays in your library.
+
+### A song in a setlist
+
+help-song-title = Setlist Song
+help-song-intro-1 = This is one song from your setlist: the lyrics, with the chords above them, in the key you will play it in.
+help-song-intro-2 = When you finish it, swipe to the next. You can show or hide the chords on each section of the song, so the page shows just what you need.
+help-song-getting-around-heading = Getting around
+help-song-getting-around-swipe-left-or-right-or-press-label = Swipe left or right (or press → and ←)
+help-song-getting-around-swipe-left-or-right-or-press-text = Goes to the next song, or the one before. Going back from the first song takes you to the overview.
+help-song-getting-around-scroll-or-press-and-label = Scroll (or press ↑ and ↓)
+help-song-getting-around-scroll-or-press-and-text = A long song carries on below the screen.
+help-song-getting-around-menu-label = Menu
+help-song-getting-around-menu-text = Jump straight to any song in the setlist, or go to the overview.
+help-song-about-this-song-heading = About this song
+help-song-about-this-song-key-capo-and-tempo-label = Key, capo and tempo
+help-song-about-this-song-key-capo-and-tempo-text = What you are playing at the top of the page: the key, and the capo, tempo and time signature when the song has them.
+help-song-about-this-song-information-label = Information
+help-song-about-this-song-information-text = More about the song, such as who wrote it.
+help-song-about-this-song-player-label = Player
+help-song-about-this-song-player-text = Play a pad or a click track in the song’s key, to help the band start together. Stop it, or expand it for its settings. It can be turned off in [Preferences](/preferences).
+help-song-edit-mode-heading = Edit mode
+help-song-edit-mode-intro = Changes to the song are kept behind edit mode, so they cannot happen by accident while you are playing. Turn it on, and the page gets two sets of controls: one for each section of the song, and one for the song as a whole. They are described next. Turn it off again to play.
+help-song-edit-mode-edit-label = Edit
+help-song-edit-mode-edit-text = Turns edit mode on and off. The Esc key turns it off too.
+help-song-edit-mode-each-section-of-the-heading = Edit mode: each section of the song
+help-song-edit-mode-each-section-of-the-intro = Every section of the song (a verse, the chorus, a bridge) gets its own controls, at the top of the section.
+help-song-edit-mode-each-section-of-the-show-label = Show
+help-song-edit-mode-each-section-of-the-show-text = Choose what that section shows: everything, just the lyrics, just the chords, or nothing at all.
+help-song-edit-mode-each-section-of-the-collapse-label = Collapse
+help-song-edit-mode-each-section-of-the-collapse-text = Fold the section up to a single line, and open it again.
+help-song-edit-mode-the-whole-song-heading = Edit mode: the whole song
+help-song-edit-mode-the-whole-song-intro = The key at the top of the page becomes a button. Tap it to open the song’s settings.
+help-song-edit-mode-the-whole-song-song-settings-label = Song settings
+help-song-edit-mode-the-whole-song-song-settings-text = This is the panel that opens. What is in it is described next.
+help-song-edit-mode-the-whole-song-key-label = Key
+help-song-edit-mode-the-whole-song-key-text = Choose the key to play in. The song’s own key is marked with a star.
+help-song-edit-mode-the-whole-song-capo-label = Capo
+help-song-edit-mode-the-whole-song-capo-text = Choose where the capo goes, with the key the chords are played in at each fret. You can change it once you have said you play guitar in [Preferences](/preferences), or turned on the capo there.
+help-song-edit-mode-the-whole-song-tempo-bpm-label = Tempo (BPM)
+help-song-edit-mode-the-whole-song-tempo-bpm-text = Slow the song down or speed it up, for the click track.
+help-song-edit-mode-the-whole-song-pads-label = Pads
+help-song-edit-mode-the-whole-song-pads-text = Choose which of your pad sets plays for this song. This is there when the player is on.
+help-song-edit-mode-the-whole-song-reset-label = Reset
+help-song-edit-mode-the-whole-song-reset-text = Put the song back as it was: its key, capo and which sections are shown. It asks first.
+help-song-edit-mode-annotations-heading = Edit mode: annotations
+help-song-edit-mode-annotations-intro = Write an annotation on the chart: how to play a part, where to drop out, how many times to repeat. It is set in handwriting, above the word it is on, or beside the name of a section. Annotations are shown when you are not editing too. An annotation belongs to this song in this setlist.
+help-song-edit-mode-annotations-press-and-hold-label = Press and hold
+help-song-edit-mode-annotations-press-and-hold-text = Press and hold a word, a chord or the name of a section to write an annotation there. (On a computer, right-click does it too.)
+help-song-edit-mode-annotations-the-annotation-label = The annotation
+help-song-edit-mode-annotations-the-annotation-text = Type the annotation. “Seen by” is just you (the usual), or everyone: an annotation for everyone goes with the setlist, so everyone who has it sees it. Only people who can edit the setlist can share an annotation with everyone.
+help-song-edit-mode-annotations-change-or-delete-an-annotation-label = Change or delete an annotation
+help-song-edit-mode-annotations-change-or-delete-an-annotation-text = Tap an annotation to change it. Delete takes it off, and you can bring it back with Undo.
+help-song-edit-mode-annotations-an-annotation-for-the-whole-song-label = An annotation for the whole song
+help-song-edit-mode-annotations-an-annotation-for-the-whole-song-text = Use “+ Annotation on the whole song” above the first section.
+
+### The song library
+
+help-library-title = Song Library
+help-library-intro-1 = Every song you can put in a setlist lives here. Search for one, tap it to read it, and use edit mode to set it up the way you like it.
+help-library-finding-a-song-heading = Finding a song
+help-library-finding-a-song-search-label = Search
+help-library-finding-a-song-search-text = Type part of a title, an artist or some of the lyrics. The search is kept in the address, so a link to it works too.
+help-library-finding-a-song-tap-a-song-label = Tap a song
+help-library-finding-a-song-tap-a-song-text = Opens it, to read its lyrics and chords.
+help-library-getting-around-heading = Getting around
+help-library-getting-around-swipe-label = Swipe
+help-library-getting-around-swipe-text = Swipe left from the list to the song, and right to come back to the list.
+help-library-getting-around-scroll-label = Scroll
+help-library-getting-around-scroll-text = Move through the list, or down a long song.
+help-library-getting-around-menu-label = Menu
+help-library-getting-around-menu-text = Your setlists, [preferences](/preferences), importing songs and the rest of the app.
+help-library-getting-around-information-label = Information
+help-library-getting-around-information-text = More about the song, such as who wrote it.
+help-library-edit-mode-heading = Edit mode
+help-library-edit-mode-intro = The pencil turns edit mode on, so you can set a song up. What you choose is saved with the song when you turn it off. Turn it on, and you can change the song’s key, and set what each section of it shows.
+help-library-edit-mode-edit-label = Edit
+help-library-edit-mode-edit-text = Turns edit mode on and off.
+help-library-edit-mode-the-key-heading = Edit mode: the key
+help-library-edit-mode-the-key-key-label = Key
+help-library-edit-mode-the-key-key-text = Change the key the song is shown in.
+help-library-edit-mode-each-section-of-the-heading = Edit mode: each section of the song
+help-library-edit-mode-each-section-of-the-intro = Every section of the song (a verse, the chorus, a bridge) gets its own controls.
+help-library-edit-mode-each-section-of-the-show-label = Show
+help-library-edit-mode-each-section-of-the-show-text = Choose what that section shows: everything, just the lyrics, just the chords, or nothing at all.
+help-library-edit-mode-each-section-of-the-collapse-label = Collapse
+help-library-edit-mode-each-section-of-the-collapse-text = Fold the section up to a single line, and open it again.
+
+
 ## Questions before something is changed
 ## (each has a heading, the message, and the label of the button that does it; Cancel is the other)
 
