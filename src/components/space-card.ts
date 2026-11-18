@@ -41,7 +41,17 @@ export class SpaceConnectGoogleEvent extends Event {
   }
 }
 
-/** A person asked to manage this space: the page goes to the space's own page */
+/** A person asked for this space's data (export, import, reset, delete): the page shows it in a dialogue */
+export class SpaceDataEvent extends Event {
+  static readonly type = 'space-card:data'
+  readonly spaceId: string
+  constructor(spaceId: string) {
+    super(SpaceDataEvent.type, { bubbles: true, composed: true })
+    this.spaceId = spaceId
+  }
+}
+
+/** A person asked to manage this space's users: the page goes to the space's own page */
 export class SpaceManageEvent extends Event {
   static readonly type = 'space-card:manage'
   readonly spaceId: string
@@ -281,7 +291,10 @@ export class SpaceCard extends LitElement {
               : nothing
           }
           <button class="btn" id="manage" @click=${() => this.dispatchEvent(new SpaceManageEvent(space.id))}>
-            ${t('action-manage')}
+            ${t('action-manage-users')}
+          </button>
+          <button class="btn" id="manage-data" @click=${() => this.dispatchEvent(new SpaceDataEvent(space.id))}>
+            ${t('action-manage-data')}
           </button>
           ${
             this.several && !this.isDefault

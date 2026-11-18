@@ -16,8 +16,8 @@ keeps the scopes apart: the account first, then one card per space, then the dev
 | `account-page.ts` | The page: the list, and the modals below |
 | `account-card.ts` | The account |
 | `space-card.ts` | One space on the list |
-| `space-page.ts` (`/account/space/<id>`, `space-view.ts`) | One space on a page of its own: the sections below, under **Manage** on its card |
-| `space-manager.ts` | **Data**: everything to do with one space's data (a section of the space page) |
+| `space-page.ts` (`/account/space/<id>`, `space-view.ts`) | One space on a page of its own: the sections below, under **Manage Users** on its card |
+| `space-manager.ts` | **Data**: everything to do with one space's data, in the dialogue of **Manage Data** on the card |
 | `space-people.ts` | **Leaders**: who leads a space's setlists (a section of the space page) |
 | `people-list.ts`, `person-rows.ts` | The one list of a space's people: a Team's members, invites and visiting leaders, or a Personal space's leaders (the first section of the space page) |
 | `team-membership-panel.ts`, `team-licence-panel.ts`, `team-storage-panel.ts` | A Team's place for the person (stop sharing, leave), its CCLI licence number and its storage (sections of the space page) |
@@ -100,7 +100,10 @@ the sign-in backup (download, import), which were for fixing a sign-in and are n
   account (docs/SPACES.md). A Team's card never says it: a Team syncs through the Worker and needs no Google.
 - **Sync** is on the card, and the card runs the sync itself (`space-sync.ts`). It is shown for any
   space once syncing can work: a sign-in with Drive, or for a Team's member a sign-in alone.
-- **Manage** goes to the space's own page (below). It is shown to every member, not only those who manage
+- **Manage Users** goes to the space's own page (below), and **Manage Data** opens a dialogue over the list with the space's
+  data (export, import, reset from Drive, delete: `space-manager.ts`). The page is only for people, the Team's own panels and
+  its licence and storage; the data is apart because it is rarely wanted and has nothing to do with who is in the Team.
+  Manage Users It is shown to every member, not only those who manage
   people, because leaving is there and any member can see who is in the Team; the controls inside follow the role.
 - **Switch** (not "Open") is the word. After a confirmation it makes that space the one in use and
   shows the home page afresh in it, without reloading the app. It is the second way to switch: the
@@ -120,7 +123,7 @@ device and not to a space.
 
 ## The space page: `/account/space/<id>`
 
-**Manage** on a card goes to a page of its own for that space (`space-page.ts`; `docs/ROUTING.md`), which replaced
+**Manage Users** on a card goes to a page of its own for that space (`space-page.ts`; `docs/ROUTING.md`), which replaced
 three modals (Data, Leaders, Users, 2026-11-17): a modal has no address, no back button and no link, and could not
 hold a list of people beside an editor for one of them. The id is this device's own for the space, so a link works only
 here; a space that is not on this device says so, with a link back.
@@ -134,13 +137,12 @@ Gateway Church  [Team] [Worship leader]
   Your place in the Team (a Team): stop sharing / leave     team-membership-panel.ts
   CCLI licence number (a Team)                              team-licence-panel.ts
   Team storage (a Team's owner)                             team-storage-panel.ts
-  Data: reset from Drive, export and import, delete         space-manager.ts
 ```
 
 It works for any space on the device, not only the one in use (nothing is switched to manage it): the first sync takes the
 space's own database, export and delete need only that, and the people and invite calls need only the team id. Every
-destructive action asks first (CLAUDE.md: friction, not prohibition). Deleting the space, or the person leaving the
-Team, goes back to the list (to the home page, afresh, if it was the one in use: `SpaceGoneEvent.wasCurrent`).
+destructive action asks first (CLAUDE.md: friction, not prohibition). Deleting the space (from Manage Data) closes its dialogue, and the person leaving the
+Team goes back to the list (to the home page, afresh, if it was the one in use: `SpaceGoneEvent.wasCurrent`).
 
 - **Google Drive** (a Team's is "Team copy"): **Reset from Google Drive** replaces this device's songs
   and setlists with Drive's, after saying what it will lose. Syncing itself is the card's. When the
@@ -190,6 +192,13 @@ nothing and is not you), each after a question. Rules are unchanged: a role acts
 the list and names themselves, and the list is built from the cached members and local people, so it shows offline (role
 changes and invites say they need a connection). **Invite someone** is a button over the list.
 
+Layout (2026-11-18): **Members and Invites are two tables**, so the search box (of the members) and **Invite someone** (of the
+invites, in its heading) no longer look like related controls. Members have name, every address (small, one under another),
+role (a person who only leads setlists says "Not a member") and **Edit**; invites have address, role, status and **Send
+again** / **Revoke**, saving width. Text and buttons are small, and nothing says how many setlists a person leads. The
+invite dialogue has the address, the role and the button on lines of their own. The person editor has four plain sections:
+**Name**, **Email addresses** (remove, and add), **Merge into another person** (with what it does) and **Delete**.
+
 As built (2026-11-17): every space's page shows `people-list.ts` as its first section, for a Team (members, invites, visiting
 leaders) and for a Personal space alike; in a Personal space it is only the people who lead setlists (no roles, status or invites,
 and view-only if the space is). Beside it a Team has `team-membership-panel.ts` (who you are in the Team, **Stop sharing** or **Leave**,
@@ -200,7 +209,7 @@ invite row's "Emailed 2 days ago" is `team_invites.emailed_at` (migration `0007`
 
 ## Deleting a space
 
-Two ways, both in the Data section of the space's page, and **both work on any space, the one in use included**: it is not a
+Two ways, both in the Manage Data dialogue of the space's card, and **both work on any space, the one in use included**: it is not a
 reason to refuse. The one in use is replaced by another (or none: Personal is made again when the app
 needs one), and the page starts again in it, as a switch does (`SpaceGoneEvent.wasCurrent`). The old
 rule "switch to another first" was about an open database connection, which the app already lets go of.

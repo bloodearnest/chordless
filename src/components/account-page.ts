@@ -1,4 +1,5 @@
 import { css, html, LitElement, nothing } from 'lit'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import { defaultSpaceOf, setDefaultSpaceId } from '../js/default-space.ts'
 import type { SignInState } from '../js/google-auth.ts'
@@ -10,20 +11,25 @@ import { toast } from '../js/toast.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { AccountStateEvent } from './account-card.ts'
 import './account-card.ts'
+import type { AppModal } from './app-modal.ts'
+import './app-modal.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 import {
   SpaceConnectGoogleEvent,
+  SpaceDataEvent,
   SpaceDefaultEvent,
   SpaceManageEvent,
   SpaceSyncedEvent,
 } from './space-card.ts'
 import './space-card.ts'
+import { SpaceGoneEvent } from './space-manager.ts'
+import './space-manager.ts'
 import './storage-summary.ts'
 
 /**
  * Account and Teams (docs/ACCOUNT.md): who is signed in, then the Personal space and the Teams on
  * this device, each with its size, when it last synced, and switch and sync; everything else for a
- * space is on its own page, under "Manage" (space-page.ts). Making a Team is
+ * space is on its own page, under "Manage Users" (space-page.ts), and its data under "Manage Data" (a dialogue). Making a Team is
  * rare, so it is under them. The device's own usage is last.
  */
 export class AccountPage extends LitElement {
@@ -33,11 +39,15 @@ export class AccountPage extends LitElement {
     _defaultId: { state: true },
     _signIn: { state: true },
     _emailOnly: { state: true },
+    _data: { state: true },
     _looking: { state: true },
     _lookMessage: { state: true },
   }
 
   declare _spaces: Space[]
+  /** The space whose data is shown, while its dialogue is open */
+  declare _data: Space | null
+  _dataModal: Ref<AppModal> = createRef()
   /** Whether it is asking which teams the person is in, and what it found */
   declare _looking: boolean
   declare _lookMessage: string
@@ -47,6 +57,8 @@ export class AccountPage extends LitElement {
   declare _signIn: SignInState | null
   /** Signed in with an emailed code alone */
   declare _emailOnly: boolean
+  /** Shows the space once it is the one in use (a test gives its own; by default the home page, afresh) */
+  show: (() => unknown) | undefined = undefined
   /** Moves on to another page (a test gives its own) */
   go: (url: string) => unknown = goTo
 
@@ -94,6 +106,7 @@ export class AccountPage extends LitElement {
     this._defaultId = null
     this._signIn = null
     this._emailOnly = false
+    this._data = null
     this._looking = false
     this._lookMessage = ''
   }
@@ -104,6 +117,8 @@ export class AccountPage extends LitElement {
     this.addEventListener(SpaceSyncedEvent.type, this._onSynced)
     this.addEventListener(SpaceDefaultEvent.type, this._onDefault)
     this.addEventListener(SpaceManageEvent.type, this._onManage)
+    this.addEventListener(SpaceDataEvent.type, this._onData)
+    this.addEventListener(SpaceGoneEvent.type, this._onGone)
     this.addEventListener(SpaceConnectGoogleEvent.type, this._onConnectGoogle)
     window.addEventListener(TeamSpacesAddedEvent.type, this._onTeamsAdded)
     void this.load()
@@ -114,6 +129,8 @@ export class AccountPage extends LitElement {
     this.removeEventListener(SpaceSyncedEvent.type, this._onSynced)
     this.removeEventListener(SpaceDefaultEvent.type, this._onDefault)
     this.removeEventListener(SpaceManageEvent.type, this._onManage)
+    this.removeEventListener(SpaceDataEvent.type, this._onData)
+    this.removeEventListener(SpaceGoneEvent.type, this._onGone)
     this.removeEventListener(SpaceConnectGoogleEvent.type, this._onConnectGoogle)
     window.removeEventListener(TeamSpacesAddedEvent.type, this._onTeamsAdded)
     super.disconnectedCallback()
@@ -177,7 +194,30 @@ export class AccountPage extends LitElement {
     await this.shadowRoot?.querySelector('account-card')?.refresh()
   }
 
-  /** Everything to do with a space is on its own page */
+  /** A space's data (export, import, reset from Drive, delete) in a dialogue over the list */
+  _onData = async (event: Event): Promise<void> => {
+    const space = this._spaces.find(each => each.id === (event as SpaceDataEvent).spaceId)
+    if (!space) return
+    this._data = space
+    await this.updateComplete
+    this._dataModal.value?.show()
+  }
+
+  _onDataClosed = (event: Event): void => {
+    // (not if it was opened again while it was closing: that is another space's)
+    if (event.target === this._dataModal.value && !this._dataModal.value.open) this._data = null
+  }
+
+  /** A space was deleted from this device: the dialogue closes, and the app starts afresh if it was in use */
+  _onGone = (event: Event): void => {
+    this._dataModal.value?.close()
+    this._data = null
+    void this.load()
+    if (!(event as SpaceGoneEvent).wasCurrent) return
+    void (this.show ? this.show() : goTo('/', { fresh: true }))
+  }
+
+  /** A space's users are on its own page */
   _onManage = (event: Event): void => {
     void this.go(`/account/space/${encodeURIComponent((event as SpaceManageEvent).spaceId)}`)
   }
@@ -228,6 +268,14 @@ export class AccountPage extends LitElement {
           <storage-summary></storage-summary>
         </div>
       </div>
+      <app-modal
+        ${ref(this._dataModal)}
+        size="large"
+        heading=${this._data ? t('space-data-heading', { name: this._data.name }) : ''}
+        @app-modal:close=${this._onDataClosed}
+      >
+        ${this._data ? html`<space-manager .spaceId=${this._data.id}></space-manager>` : nothing}
+      </app-modal>
     `
   }
 }

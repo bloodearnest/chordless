@@ -47,8 +47,8 @@ interface MadeInvite {
 
 /**
  * A Team's people, as one list (docs/ACCOUNT.md, "People: one list"): its members, the invites waiting to be used and
- * the people who lead its setlists but are not members. A table that can be sorted, with a search box once the list is
- * long, and stacked cards on a phone. **Edit** opens one person: their name and addresses (the space's `people`), and a
+ * the people who lead its setlists but are not members. Members (and people who only lead setlists) are one table that can be sorted, with a search box once it is
+ * long; the invites waiting are another, with the Invite button; both stack on a phone. **Edit** opens one person: their name and addresses (the space's `people`), and a
  * member's role and removal (the Worker's). **Invite someone** emails the invite (the Worker does) and shows its link.
  * What a role may do is the Worker's rule, and the controls follow it: a role acts only on those below it.
  */
@@ -101,29 +101,37 @@ export class PeopleList extends LitElement {
     panelStyles,
     buttonStyles,
     css`
-      :host { display: block; }
-      .bar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.75rem; }
-      .bar input[type='search'] { flex: 1; min-width: 10rem; font: inherit; padding: 0.4rem 0.6rem; }
+      :host { display: block; font-size: var(--font-ui-small); }
+      h3 { font-size: var(--font-ui); }
+      .head { display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.4rem; }
+      .head h3 { margin: 0; }
+      .head input[type='search'] { font: inherit; padding: 0.2rem 0.5rem; min-width: 10rem; }
+      .btn { padding: 0.15rem 0.6rem; font-size: var(--font-ui-small); min-height: 0; }
       table { width: 100%; border-collapse: collapse; }
-      th, td { text-align: left; padding: 0.5rem 0.5rem; vertical-align: middle; }
+      th, td { text-align: left; padding: 0.25rem 0.4rem; vertical-align: top; }
       thead th { font-size: var(--font-ui-small); border-bottom: 1px solid var(--border-color, #d5dbdb); }
       th button { all: unset; cursor: pointer; font-weight: 600; }
       th button:focus-visible { outline: 2px solid var(--focus-ring, #3498db); }
       tbody tr { border-bottom: 1px solid var(--border-color, #eee); }
       .name { font-weight: 600; overflow-wrap: anywhere; }
-      .sub { font-size: var(--font-ui-small); opacity: 0.75; overflow-wrap: anywhere; }
+      .emails { list-style: none; margin: 0; padding: 0; font-size: 0.7rem; opacity: 0.7; overflow-wrap: anywhere; line-height: 1.25; }
+      .sub { opacity: 0.75; overflow-wrap: anywhere; }
       .chip {
-        font-size: var(--font-ui-small);
-        padding: 0.1rem 0.5rem;
+        font-size: 0.7rem;
+        padding: 0 0.4rem;
         border: 1px solid var(--border-color, #d5dbdb);
         border-radius: 999px;
         white-space: nowrap;
       }
-      .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
+      .actions { display: flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
       .error { color: var(--color-danger, #e74c3c); font-weight: 600; }
-      .hint { font-size: var(--font-ui-small); opacity: 0.75; margin: 0.5rem 0 0; }
-      form.invite { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
-      form.invite input[type='email'] { flex: 1; min-width: 12rem; font: inherit; padding: 0.4rem 0.6rem; }
+      .hint { opacity: 0.75; margin: 0.4rem 0 0; }
+      .invites { margin-top: 1rem; }
+      form.invite { display: flex; flex-direction: column; gap: 0.75rem; align-items: stretch; }
+      form.invite label { display: flex; flex-direction: column; gap: 0.2rem; font-weight: 600; }
+      form.invite input[type='email'] { font: inherit; font-weight: normal; padding: 0.4rem 0.6rem; }
+      form.invite select { font-weight: normal; }
+      form.invite .btn { align-self: flex-start; padding: 0.35rem 1rem; font-size: inherit; }
       select { font: inherit; padding: 0.3rem 0.4rem; }
       .made { border: 2px solid var(--color-success, #27ae60); border-radius: 8px; padding: 0.75rem 1rem; margin-top: 1rem; }
       .made input { width: 100%; box-sizing: border-box; font: inherit; padding: 0.35rem 0.5rem; margin: 0.5rem 0; }
@@ -131,8 +139,8 @@ export class PeopleList extends LitElement {
       @media (max-width: 700px) {
         thead { display: none; }
         table, tbody, tr, td { display: block; }
-        tbody tr { padding: 0.5rem 0; }
-        td { padding: 0.15rem 0; }
+        tbody tr { padding: 0.35rem 0; }
+        td { padding: 0.1rem 0; }
         .actions { justify-content: flex-start; }
       }
     `,
@@ -417,9 +425,8 @@ export class PeopleList extends LitElement {
     }
   }
 
+  /** An invite's status: how long it has left, and when it was emailed */
   _status(row: PersonRow): string {
-    if (row.kind === 'visitor') return t('people-status-visitor')
-    if (row.kind === 'member') return t('people-status-member')
     const invite = row.invite as InviteInfo
     const days = daysLeft(invite.expiresAt, this.now())
     return t(invite.emailedAt ? 'people-status-invited-emailed' : 'people-status-invited', {
@@ -442,20 +449,34 @@ export class PeopleList extends LitElement {
     return t(this._canEdit ? 'people-hint-edit' : 'people-hint-read')
   }
 
+  /** A member's row, or a person who leads setlists and is not a member */
   _renderRow(row: PersonRow) {
     return html`<tr>
       <td>
-        <div class="name">${row.name}</div>
-        ${row.isMe ? html`<span class="chip">${t('people-you')}</span>` : nothing}
-        ${row.leads > 0 ? html`<span class="chip">${t('people-leads', { count: row.leads })}</span>` : nothing}
+        <span class="name">${row.name}</span>
+        ${row.isMe ? html` <span class="chip">${t('people-you')}</span>` : nothing}
       </td>
-      <td class="sub">${row.email}${row.more > 0 ? html` <span class="chip">+${row.more}</span>` : nothing}</td>
+      <td>${this._emails(row)}</td>
       ${
         this._isTeam
-          ? html`<td>${row.role ? sentenceCase(roleLabel(row.role)) : ''}</td>
-            <td class="sub">${this._status(row)}</td>`
+          ? html`<td>${row.role ? sentenceCase(roleLabel(row.role)) : t('people-status-visitor')}</td>`
           : nothing
       }
+      <td><div class="actions">${this._renderActions(row)}</div></td>
+    </tr>`
+  }
+
+  /** Every address, small, one under another */
+  _emails(row: PersonRow) {
+    return html`<ul class="emails">${row.emails.map(address => html`<li>${address}</li>`)}</ul>`
+  }
+
+  /** A pending invite's row */
+  _renderInviteRow(row: PersonRow) {
+    return html`<tr>
+      <td class="name">${row.email}</td>
+      <td>${sentenceCase(roleLabel(row.role as TeamRole))}</td>
+      <td class="sub">${this._status(row)}</td>
       <td><div class="actions">${this._renderActions(row)}</div></td>
     </tr>`
   }
@@ -535,13 +556,19 @@ export class PeopleList extends LitElement {
     const made = this._made
     return html`
       <form class="invite" @submit=${this._invite}>
-        <input type="email" name="email" required placeholder=${t('people-invite-email')} aria-label=${t('people-invite-email')} />
-        <select name="role" aria-label=${t('people-invite-role')}>
-          ${this._grantable().map(
-            each =>
-              html`<option value=${each} ?selected=${each === 'writer'}>${roleLabel(each)}</option>`
-          )}
-        </select>
+        <label>
+          ${t('people-invite-email')}
+          <input type="email" name="email" required />
+        </label>
+        <label>
+          ${t('people-invite-role')}
+          <select name="role">
+            ${this._grantable().map(
+              each =>
+                html`<option value=${each} ?selected=${each === 'writer'}>${roleLabel(each)}</option>`
+            )}
+          </select>
+        </label>
         <button class="btn primary" type="submit" ?disabled=${this._busy}>${t('people-invite-make')}</button>
       </form>
       <p class="hint">${t('people-invite-hint')}</p>
@@ -561,8 +588,9 @@ export class PeopleList extends LitElement {
 
   override render() {
     if (!this.space) return nothing
-    const rows = this._shown()
-    const total = this._rows().length
+    const members = this._shown().filter(each => each.kind !== 'invite')
+    const invites = this._rows().filter(each => each.kind === 'invite')
+    const total = this._rows().filter(each => each.kind !== 'invite').length
     const header = (
       key: SortKey,
       label: string
@@ -572,8 +600,8 @@ export class PeopleList extends LitElement {
     const row = this._rows().find(each => each.key === this._editing)
     return html`
       <div class="panel">
-        <h3>${t(this._isTeam ? 'people-heading' : 'people-heading-personal', { count: total })}</h3>
-        <div class="bar">
+        <div class="head">
+          <h3>${t(this._isTeam ? 'people-heading' : 'people-heading-personal', { count: total })}</h3>
           ${
             total > SEARCH_FROM
               ? html`<input
@@ -585,33 +613,52 @@ export class PeopleList extends LitElement {
                 />`
               : nothing
           }
-          ${
-            this._canManage
-              ? html`<button class="btn primary" @click=${() => this._openInvite()}>${t('people-invite')}</button>`
-              : nothing
-          }
         </div>
         ${this._error && !this._editing && !this._inviting ? html`<p class="error" role="alert">✗ ${this._error}</p>` : nothing}
         ${
           !this._loaded
             ? html`<p class="hint">${t('status-checking')}</p>`
-            : rows.length === 0
+            : members.length === 0
               ? html`<p class="hint">${t(this._isTeam || this._query ? 'people-none' : 'people-none-personal')}</p>`
-              : html`<table>
+              : html`<table aria-label=${t('people-heading', { count: total })}>
                 <thead>
                   <tr>
                     ${header('name', t('people-column-name'))}
                     <th scope="col">${t('people-column-email')}</th>
                     ${this._isTeam ? header('role', t('people-column-role')) : nothing}
-                    ${this._isTeam ? header('status', t('people-column-status')) : nothing}
                     <th scope="col"><span class="sub">${t('people-column-actions')}</span></th>
                   </tr>
                 </thead>
-                <tbody>${rows.map(each => this._renderRow(each))}</tbody>
+                <tbody>${members.map(each => this._renderRow(each))}</tbody>
               </table>`
         }
         <p class="hint">${this._hint()}</p>
       </div>
+      ${
+        this._canManage
+          ? html`<div class="panel invites">
+            <div class="head">
+              <h3>${t('people-invites-heading', { count: invites.length })}</h3>
+              <button class="btn primary" @click=${() => this._openInvite()}>${t('people-invite')}</button>
+            </div>
+            ${
+              invites.length === 0
+                ? html`<p class="hint">${t('people-invites-none')}</p>`
+                : html`<table aria-label=${t('people-invites-heading', { count: invites.length })}>
+                  <thead>
+                    <tr>
+                      <th scope="col">${t('people-column-email')}</th>
+                      <th scope="col">${t('people-column-role')}</th>
+                      <th scope="col">${t('people-column-status')}</th>
+                      <th scope="col"><span class="sub">${t('people-column-actions')}</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>${invites.map(each => this._renderInviteRow(each))}</tbody>
+                </table>`
+            }
+          </div>`
+          : nothing
+      }
       <app-modal
         ${ref(this._editor)}
         size="large"

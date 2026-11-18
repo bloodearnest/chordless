@@ -5,8 +5,6 @@ import type { Route } from '../js/router.ts'
 import { getSpaceById } from '../js/space.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
-import { SpaceGoneEvent } from './space-manager.ts'
-import './space-manager.ts'
 import './people-list.ts'
 import './team-licence-panel.ts'
 import { TeamLeftEvent, TeamSharingStoppedEvent } from './team-membership-panel.ts'
@@ -15,10 +13,9 @@ import './team-storage-panel.ts'
 
 /**
  * Everything about one space, on a page of its own (docs/ACCOUNT.md, "The space page"): /account/space/<id>. It
- * replaces the modals the Account page opened for a space (Data, Leaders and Users), which had no address and
- * could not hold a list and an editor at once. A Team's people, licence number and storage, who leads its
- * setlists, and its data (export, import, resetting from Drive, delete) are sections one under the other. The
- * panels are the ones the modals held.
+ * is for the space's users ("Manage Users" on its card): a Team's people, licence number and storage, and who leads
+ * its setlists, as sections one under the other. Its data (export, import, resetting from Drive, delete) is
+ * "Manage Data", a dialogue on the Account page.
  */
 export class SpacePage extends LitElement {
   static override properties = {
@@ -83,14 +80,6 @@ export class SpacePage extends LitElement {
     this._missing = !space
   }
 
-  /** The space was deleted from this device: back to the list, and afresh if it was the one in use */
-  _onGone = (event: Event): void => {
-    void this.go(
-      (event as SpaceGoneEvent).wasCurrent ? '/' : '/account',
-      (event as SpaceGoneEvent).wasCurrent ? { fresh: true } : undefined
-    )
-  }
-
   /** The person left the Team, which is gone from this device */
   _onLeft = (): void => {
     void this.go('/account')
@@ -103,13 +92,11 @@ export class SpacePage extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback()
-    this.addEventListener(SpaceGoneEvent.type, this._onGone)
     this.addEventListener(TeamLeftEvent.type, this._onLeft)
     this.addEventListener(TeamSharingStoppedEvent.type, this._onStopped)
   }
 
   override disconnectedCallback(): void {
-    this.removeEventListener(SpaceGoneEvent.type, this._onGone)
     this.removeEventListener(TeamLeftEvent.type, this._onLeft)
     this.removeEventListener(TeamSharingStoppedEvent.type, this._onStopped)
     super.disconnectedCallback()
@@ -141,10 +128,6 @@ export class SpacePage extends LitElement {
             <team-storage-panel .space=${space}></team-storage-panel>`
           : nothing
       }
-      <div class="panel">
-        <h3>Data</h3>
-        <space-manager .spaceId=${space.id}></space-manager>
-      </div>
     </div>`
   }
 }

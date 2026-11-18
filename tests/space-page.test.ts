@@ -4,7 +4,6 @@
  */
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import '../src/components/space-page.ts'
-import { SpaceGoneEvent } from '../src/components/space-manager.ts'
 import type { SpacePage } from '../src/components/space-page.ts'
 import { TeamLeftEvent, TeamSharingStoppedEvent } from '../src/components/team-membership-panel.ts'
 import type { Route } from '../src/js/router.ts'
@@ -58,13 +57,13 @@ describe('space-page', () => {
   }
   const text = (el: SpacePage) => (el.shadowRoot?.textContent ?? '').replace(/\s+/g, ' ')
 
-  it('shows a Personal space with who leads its setlists and its data, and no Team sections', async () => {
+  it('shows a Personal space with who leads its setlists, and no Team sections', async () => {
     const mine = await space('Band')
     const { el } = await open({ name: 'space', spaceId: mine.id })
     expect(el.shadowRoot?.querySelector('h2')?.textContent).to.contain(mine.name)
     expect(el.shadowRoot?.querySelector('a.back')?.getAttribute('href')).to.equal('/account')
     expect(el.shadowRoot?.querySelector('people-list')?.space?.id).to.equal(mine.id)
-    expect(el.shadowRoot?.querySelector('space-manager')?.spaceId).to.equal(mine.id)
+    expect(el.shadowRoot?.querySelector('space-manager')).to.equal(null) // (its data is on the Account page)
     expect(el.shadowRoot?.querySelector('team-membership-panel')).to.equal(null)
     expect(el.shadowRoot?.querySelector('team-licence-panel')).to.equal(null)
     expect(el.shadowRoot?.querySelector('team-storage-panel')).to.equal(null)
@@ -138,15 +137,6 @@ describe('space-page', () => {
     expect(text(el)).to.contain('not on this device')
   })
 
-  it('goes back to the list when the space is deleted, and starts afresh if it was the one in use', async () => {
-    const mine = await space('Band')
-    const { el, went } = await open({ name: 'space', spaceId: mine.id })
-    must(el.shadowRoot?.querySelector('space-manager')).dispatchEvent(new SpaceGoneEvent(false))
-    expect(went).to.deep.equal([{ url: '/account', fresh: false }])
-    must(el.shadowRoot?.querySelector('space-manager')).dispatchEvent(new SpaceGoneEvent(true))
-    expect(went.at(-1)).to.deep.equal({ url: '/', fresh: true })
-  })
-
   it('goes back to the list when the person leaves the Team', async () => {
     const team = await space('Choir', { id: `space-${crypto.randomUUID()}`, role: 'reader' })
     const { el, went } = await open({ name: 'space', spaceId: team.id })
@@ -158,7 +148,7 @@ describe('space-page', () => {
     const mine = await space('Band')
     const { el, went } = await open({ name: 'space', spaceId: mine.id })
     el.remove()
-    el.dispatchEvent(new SpaceGoneEvent(false))
+    el.dispatchEvent(new TeamLeftEvent())
     expect(went).to.deep.equal([])
   })
 })
