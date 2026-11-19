@@ -206,14 +206,13 @@ export async function claimAddress(
   now: Date
 ): Promise<string> {
   const address = email.toLowerCase()
-  if (!address) return accountId
   await db
     .prepare(
       'INSERT OR IGNORE INTO account_emails (email, account_id, created_at) VALUES (?, ?, ?)'
     )
     .bind(address, accountId, now.toISOString())
     .run()
-  return (await ownerOfAddress(db, address)) ?? accountId
+  return (await ownerOfAddress(db, address)) as string
 }
 
 /**
