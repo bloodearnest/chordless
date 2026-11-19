@@ -51,6 +51,8 @@ void ensurePersonalSpace().catch(error =>
 if ('requestIdleCallback' in window)
   requestIdleCallback(() => startMediaPlayer(), { timeout: 3000 })
 else setTimeout(startMediaPlayer, 1000)
+// What the device kept from the last launch (shown on About; sent when reports are on): marks this one
+import('./storage-survival.ts').then(({ launchReport }) => launchReport()).catch(() => undefined)
 // Anonymous usage reports, if they are on (docs/OBSERVABILITY.md): the SDK loads now the page is idle
 import('./telemetry/start.ts').then(({ initTelemetry }) => initTelemetry())
 // Setlists shared by link are kept only until they end (their songs stay)

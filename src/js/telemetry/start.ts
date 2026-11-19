@@ -99,6 +99,8 @@ async function start(): Promise<void> {
   window.addEventListener('pagehide', flush)
   window.addEventListener('error', event => reportError(event.error ?? event.message))
   window.addEventListener('unhandledrejection', event => reportError(event.reason))
+  // Whether what the device keeps survived to this launch (src/js/storage-survival.ts)
+  void import('./launch.ts').then(({ reportLaunch }) => reportLaunch()).catch(() => undefined)
 }
 
 /** Begin, once: now if reports are on, and when they are turned on if they are not */
