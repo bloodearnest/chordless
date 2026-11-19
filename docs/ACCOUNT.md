@@ -26,6 +26,37 @@ keeps the scopes apart: the account first, then one card per space, then the dev
 | `team-space-wizard.ts` (`/account/new`), `team-join.ts` (`/join`) | Making a Team, and joining one: docs/SPACES.md |
 | `media-page.ts` (`/media`) | The media player and the pad sets |
 
+## Google Drive (2026-11-19)
+
+Syncing the Personal space between devices needs a Google Drive, and **the Worker holds the credential for the account**, so a
+device needs only a sign-in (an emailed code, or Google) to sync, and never a second Google popup.
+
+- **Where it is:** D1 `account_drive` (migration `0010`, one row per account): the encrypted refresh-token blob (the same
+  AES-256-GCM JWE as before: `worker/src/blob.ts`, key `JWE_ENCRYPTION_KEY`), the Google address Drive is reached as (it need
+  not be one of the addresses the person signs in with), the scope and the dates. A D1 export alone has no refresh token in the
+  clear. It is a credential and not content: the copyright list in CLAUDE.md names it.
+- **Made by** a Google sign-in that was granted Drive (`/oauth/callback`, which joins the Google login to the session's account
+  and keeps the blob for it; a second one replaces the first), so **Continue with Google** enables sync with nothing more to do.
+  Someone who signed in by email connects Drive once, from the Personal space, with the same popup.
+- **Used by** `getAccessToken()` (`src/js/google-auth.ts`): it asks `POST /api/account/drive/token` with the session, the Worker
+  decrypts the blob and asks Google for an access token (an hour), and the page then talks to Drive itself, as before. The
+  Worker handles no song. `404 not_connected` is "no Drive" (state `no-drive`); `401 invalid_grant` or `invalid_blob` is
+  `SignInExpiredError`, and **Reconnect** on any one device mends it for all.
+- **Disconnect** (`DELETE /api/account/drive`, the button that was **Disable**): the Worker revokes the grant at Google and forgets
+  the blob, for every device. It stays signed in. A Team the person owns and keeps in their own Drive holds a copy of the same
+  grant (`team_credentials`), so then only the account's row is forgotten and the grant is left at Google (`revoked: false`; the
+  card says so); the Team's storage does not stop.
+- **Teams** are made from it: `POST /api/spaces` and `PUT /api/space/<id>/credential` take no blob from the page (one sent by an
+  app from before is still read) and use the account's row, `409 not_connected` if it has none.
+- **Devices from before** (a blob kept in the service worker's `auth` IndexedDB): the first `getAccessToken()` sends it to
+  `POST /api/account/drive/adopt`, which keeps it for the account if the blob's Google login is on that account (`409
+  google_in_use` otherwise, so a blob is not a way to take another's) and unless another device has connected since, and the
+  device forgets it. A failure leaves the blob, and the old `/session/refresh` carries on from it. `/oauth/callback` still sends
+  the blob, and `/session/refresh` still takes one, for apps from before that have not reloaded; both go once none do.
+- The device keeps `metadata.drive` (whether the account has Drive, as the Worker last said: `GET /api/account` has `drive:
+  {email}`), asked after a sign-in and corrected by the token route. The Account card's three kinds of state follow: signed in
+  with Drive, signed in without (`no-drive`), expired.
+
 ## The page
 
 ```
@@ -69,15 +100,10 @@ three rows and **Log out**:
   something: Google need not say a name, and an emailed code never does.
 - **Emails**: every address the account signs in with, the Google one marked. Read from the Worker, kept on the device
   (`account-info.ts`) so it shows offline.
-- **Personal space sync**: **Off** with **Enable**, or **On, with the Google address** with **Disable**. Syncing the Personal space
-  between devices needs a Google account (Drive), so **Enable** is Google's whole sign-in joined to this account (for an emailed
-  sign-in), or Drive's box asked for alone (a Google sign-in that left it unticked). **Disable** (after a question) forgets Google on
-  *this device* and keeps them signed in; it revokes nothing at Google, because Google keeps one grant per account and revoking it
-  would end every other device's sync (the question says to remove the access at myaccount.google.com/permissions for that). An
-  expired Google sign-in says so, with **Reconnect with Google**. A Team never needs it: Teams sync through the Worker.
+- **Personal space sync**: **Off** with **Enable**, or **On, with the Google address** with **Disable**: see "Google Drive" below.
 
-**Log out** forgets the sign-in on this device (the Google blob, the session, which is ended at the Worker, and what was kept of
-the account), and nothing more. **Removed 2026-11-18:** "Revoke access on all devices" (it revoked the Google grant for every
+**Log out** forgets the sign-in on this device (the session, which is ended at the Worker, and what was kept of the account),
+and nothing more: the account's Google Drive connection is the Worker's, so signing in again, on any device, carries on syncing. **Removed 2026-11-18:** "Revoke access on all devices" (it revoked the Google grant for every
 device, which is now what Disable does not do, and a link says how), and the **Advanced** section: the token refresh test and
 the sign-in backup (download, import), which were for fixing a sign-in and are not needed: signing in again is the fix.
 

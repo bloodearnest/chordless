@@ -24,7 +24,13 @@ import type { AdminContext } from './team-admin.ts'
 import type { TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'
 import { notingPadRefs, notingRefs } from './team-refs.ts'
-import { type LiveSockets, type SpaceInfo, spacesOf, TeamSpaceState } from './team-state.ts'
+import {
+  accountOf,
+  type LiveSockets,
+  type SpaceInfo,
+  spacesOf,
+  TeamSpaceState,
+} from './team-state.ts'
 import { tracedFetch, tracedStub } from './trace.ts'
 
 /** What a test replaces; the real ones are the defaults */
@@ -129,10 +135,12 @@ export function createAdminContext(env: Env, deps: TeamDeps = {}): AdminContext 
     },
     openBlob: blob => decryptBlob(blob, env),
     async accountBlob(identity) {
-      if (identity.provider !== SESSION_PROVIDER) return null
-      const row = await (env.DB as D1Db)
+      const db = env.DB as D1Db
+      const accountId = await accountOf(db, identity, false)
+      if (!accountId) return null
+      const row = await db
         .prepare('SELECT blob FROM account_drive WHERE account_id = ?')
-        .bind(identity.sub)
+        .bind(accountId)
         .first<{ blob: string }>()
       return row?.blob ?? null
     },

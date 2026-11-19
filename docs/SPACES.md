@@ -200,7 +200,7 @@ The Worker keeps no per-user state (a team's members are the team's, in D1).
   `/oauth/callback`. The Worker verifies the ID token, exchanges the code for tokens, encrypts the
   refresh token into a JWE blob (AES-256-GCM, with a `kid` for key rotation) and returns the blob,
   an access token and the user's profile.
-- **The blob** is stored by the service worker in the `auth` IndexedDB. Pages get access tokens by
+- **The blob** (until 2026-11-19: now the Worker keeps it for the account, `docs/ACCOUNT.md`, "Google Drive"; this is how devices from before still have it) is stored by the service worker in the `auth` IndexedDB. Pages get access tokens by
   messaging it.
 - **Expired access tokens:** the service worker refreshes them with `/session/refresh`. The Worker
   decrypts the blob only for that request.

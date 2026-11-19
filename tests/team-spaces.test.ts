@@ -107,11 +107,11 @@ describe('team spaces on this device', () => {
   describe('the Worker’s routes', () => {
     it('are called with the Google ID token, and the answer is what they say', async () => {
       routes['POST /api/spaces'] = () => json({ spaceId: 'space-12345678', role: 'owner' })
-      const answer = await teamApi.createSpace({ blob: 'b', rootRef: 'folder', name: 'Church' })
+      const answer = await teamApi.createSpace({ rootRef: 'folder', name: 'Church' })
       expect(answer).to.deep.equal({ spaceId: 'space-12345678', role: 'owner' })
       expect(requests[0].headers.get('Authorization')).to.equal(`Bearer ${ID_TOKEN}`)
       expect(requests[0].headers.get('Content-Type')).to.equal('application/json')
-      expect(requests[0].body).to.deep.equal({ blob: 'b', rootRef: 'folder', name: 'Church' })
+      expect(requests[0].body).to.deep.equal({ rootRef: 'folder', name: 'Church' })
     })
 
     it('send no body where there is none, and take no answer where there is none (204)', async () => {
@@ -189,7 +189,7 @@ describe('team spaces on this device', () => {
       })
       await teamApi.revokeInvite('s', 'abc')
       await teamApi.setRole('s', 'b@example.com', 'reader')
-      await teamApi.replaceCredential('s', 'new-blob')
+      await teamApi.replaceCredential('s')
       await teamApi.endSharing('s')
       expect(requests.map(request => `${request.method} ${request.path}`)).to.deep.equal([
         'GET /api/space/s/members',
@@ -274,7 +274,7 @@ describe('team spaces on this device', () => {
       const created = await createTeamSpace(`  ${name} `, 'picked-parent', drive)
       made.push(created.id)
       expect(drive.made).to.deep.equal([['picked-parent', `${name} Chordless`]])
-      expect(requests[0].body).to.deep.equal({ blob: 'the-blob', rootRef: 'new-folder', name })
+      expect(requests[0].body).to.deep.equal({ rootRef: 'new-folder', name })
       expect(created.name).to.equal(name)
       expect(created.rootRef).to.equal('new-folder')
       expect(created.team).to.deep.equal({ id: 'space-bbbb2222', role: 'owner' })

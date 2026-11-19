@@ -1573,6 +1573,9 @@ describe('a Chordless session', () => {
     )
     const made = await w.call('/api/spaces', eveSession, bare, w.env, own)
     assert.equal(made.status, 200)
+    // (a login with no account at all has no connection to borrow)
+    const nobody = { provider: 'google', sub: 'g-nobody', email: 'nobody@example.com' }
+    assert.equal((await w.call('/api/spaces', nobody, bare)).status, 409)
     // (and it is the account's own: a connection for another account is not borrowed)
     const ann2 = await sessionFor(w, ann)
     assert.equal((await w.call('/api/spaces', ann2, bare, w.env, own)).status, 409)

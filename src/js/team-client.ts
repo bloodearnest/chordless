@@ -50,8 +50,8 @@ export const teamApi = {
       '/api/spaces'
     ),
 
-  /** Share a folder you own as a team space; `blob` is the page's own sign-in */
-  createSpace: (details: { blob: string; rootRef: string; name: string; ccliLicence?: string }) =>
+  /** Share a folder you own as a team space, from the account's Google Drive connection (the Worker holds it) */
+  createSpace: (details: { rootRef: string; name: string; ccliLicence?: string }) =>
     call<{ spaceId: string; role: TeamRole }>('POST', '/api/spaces', details),
 
   /**
@@ -102,8 +102,7 @@ export const teamApi = {
   leave: (id: string) => call<void>('POST', `${space(id)}/leave`),
 
   /** The owner's new sign-in, when Google no longer honours the one the space holds */
-  replaceCredential: (id: string, blob: string) =>
-    call<void>('PUT', `${space(id)}/credential`, { blob }),
+  replaceCredential: (id: string) => call<void>('PUT', `${space(id)}/credential`, {}),
   /**
    * How the Worker reaches the space's folder: the owner's sign-in, or team-managed storage
    * (Chordless's service account), whose address is given where the server has one

@@ -28,6 +28,7 @@ import type { D1Db } from '../worker/src/d1.ts'
 import type { Env } from '../worker/src/env.ts'
 import type { IdentityProvider } from '../worker/src/identity.ts'
 import { handleRequest } from '../worker/src/router.ts'
+import { accountOf } from '../worker/src/team-state.ts'
 import { makeSetlist } from './builders.ts'
 import { browserD1 } from './d1-browser.ts'
 import { type FakeAuthWorker, installFakeAuthWorker, sessionFor } from './fake-auth-worker.ts'
@@ -73,21 +74,35 @@ describe('a team space, end to end', function () {
 
   /** Sign in as this person on this device */
   async function signInAs(person: Person, withBlob = false) {
+    if (withBlob) {
+      // (the Worker holds the owner's Google credential for the account: the device sends none)
+      const blob = await encryptBlob(
+        {
+          owner_email: person.email,
+          owner_sub: person.sub,
+          scopes: 'drive.file',
+          refresh_token: 'refresh',
+          created_at: '2026-10-22T00:00:00Z',
+          blob_id: crypto.randomUUID(),
+          kid: 'default',
+        },
+        { JWE_ENCRYPTION_KEY: KEY }
+      )
+      const accountId = await accountOf(
+        d1,
+        { provider: 'google', sub: person.sub, email: person.email },
+        true
+      )
+      await d1
+        .prepare(
+          `INSERT OR REPLACE INTO account_drive (account_id, blob, google_email, scope, created_at, updated_at)
+            VALUES (?, ?, ?, 'drive.file', 'now', 'now')`
+        )
+        .bind(accountId, blob, person.email)
+        .run()
+    }
     worker.stored = {
-      blob: withBlob
-        ? await encryptBlob(
-            {
-              owner_email: person.email,
-              owner_sub: person.sub,
-              scopes: 'drive.file',
-              refresh_token: 'refresh',
-              created_at: '2026-10-22T00:00:00Z',
-              blob_id: crypto.randomUUID(),
-              kid: 'default',
-            },
-            { JWE_ENCRYPTION_KEY: KEY }
-          )
-        : 'member-blob',
+      blob: '',
       metadata: {
         access_token: DRIVE_TOKEN,
         expires_at: new Date(Date.now() + 3600_000).toISOString(),

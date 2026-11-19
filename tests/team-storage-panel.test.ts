@@ -150,9 +150,7 @@ describe('the team storage panel', () => {
 
     button('Use my Google sign-in instead').click()
     await until(() => text().includes('Check and switch'), 'back on the owner’s sign-in')
-    expect(calls.find(call => call.key === `PUT ${CREDENTIAL}`)?.body).to.deep.equal({
-      blob: 'the-blob',
-    })
+    expect(calls.find(call => call.key === `PUT ${CREDENTIAL}`)?.body).to.deep.equal({})
   })
 
   it('asks the owner to sign in first when going back and there is no sign-in on this device', async () => {

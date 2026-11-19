@@ -1,7 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { type AuthMetadata, deleteBlob, type StoredUser, storeBlob } from '../src/js/auth-db.ts'
 import {
-  disableGoogleSync,
+  disconnectDrive,
   type EmailCodeError,
   getAccessToken,
   getCurrentUserInfo,
@@ -55,8 +55,23 @@ describe('google-auth', () => {
   let realFetch: typeof fetch
   let fetches: { url: string; body: unknown }[]
   let respondTo: (url: string) => Response | Promise<Response>
-  const signIn = (metadata: AuthMetadata, blob = 'encrypted-blob') => {
-    worker.stored = { blob, metadata, updated_at: new Date().toISOString() }
+  /**
+   * A stored sign-in: by default one as it is now (no Google blob, which the Worker holds for the account, and a session
+   * that is good); a blob makes it a device from before, which has its own.
+   */
+  const signIn = (metadata: AuthMetadata, blob = '') => {
+    const session = blob
+      ? undefined
+      : {
+          access_token: 'session-access',
+          refresh_token: 'id.r',
+          expires_at: inFromNow(30 * MINUTE),
+        }
+    worker.stored = {
+      blob,
+      metadata: { ...(session ? { session } : {}), ...metadata },
+      updated_at: new Date().toISOString(),
+    }
   }
 
   beforeEach(() => {
@@ -86,27 +101,33 @@ describe('google-auth', () => {
       expect(await getSignInState()).to.equal('signed-out')
     })
 
-    it('is signed in while the token is good, or can be refreshed', async () => {
-      signIn({ access_token: 'good', expires_at: inFromNow(30 * MINUTE) })
+    it('is signed in while the token is good, or can be had from the Worker', async () => {
+      signIn({ drive: true, access_token: 'good', expires_at: inFromNow(30 * MINUTE) })
       expect(await getSignInState()).to.equal('signed-in')
-      signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) })
+      signIn({ drive: true, access_token: 'old', expires_at: inFromNow(-MINUTE) })
       respondTo = () => json({ access_token: 'fresh', expires_in: 3600 })
       expect(await getSignInState()).to.equal('signed-in')
     })
 
-    it('is no-drive while the sign-in has no Drive scope, and signed in once it has', async () => {
-      signIn({
-        access_token: 'good',
-        expires_at: inFromNow(30 * MINUTE),
-        scope: 'openid email profile',
-      })
+    it('is no-drive while the account has no Drive connected, and signed in once it has', async () => {
+      signIn({ drive: false, access_token: 'good', expires_at: inFromNow(30 * MINUTE) })
+      respondTo = () => json({ error: 'not_connected' }, 404)
       expect(await getSignInState()).to.equal('no-drive')
-      signIn({
-        access_token: 'good',
-        expires_at: inFromNow(30 * MINUTE),
-        scope: 'https://www.googleapis.com/auth/drive.file openid email',
-      })
+      signIn({ drive: true, access_token: 'good', expires_at: inFromNow(30 * MINUTE) })
       expect(await getSignInState()).to.equal('signed-in')
+    })
+
+    it('says a device from before has Drive by the scope of its own blob, until the blob is moved', async () => {
+      signIn(
+        { scope: 'openid email profile', access_token: 'g', expires_at: inFromNow(MINUTE * 30) },
+        'a-blob'
+      )
+      expect(await hasDriveAccess()).to.equal(false)
+      signIn(
+        { scope: 'https://www.googleapis.com/auth/drive.file openid', access_token: 'g' },
+        'a-blob'
+      )
+      expect(await hasDriveAccess()).to.equal(true)
     })
 
     it('has no Drive access when the stored sign-in cannot be read', async () => {
@@ -138,16 +159,25 @@ describe('google-auth', () => {
       expect(await hasDriveAccess()).to.equal(false)
     })
 
-    it('is still expired when Google refuses a sign-in that has no Drive', async () => {
-      signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE), scope: 'openid email' })
+    it('is still expired when Google refuses a device from before whose own sign-in has no Drive', async () => {
+      signIn(
+        { access_token: 'old', expires_at: inFromNow(-MINUTE), scope: 'openid email' },
+        'a-blob'
+      )
       respondTo = () => json({ error: 'invalid_grant' }, 401)
       expect(await getSignInState()).to.equal('expired')
       respondTo = () => json({}, 500)
       expect(await getSignInState()).to.equal('no-drive')
     })
 
+    it('does not ask the Worker for a token when the account has no Drive, which cannot have expired', async () => {
+      signIn({ drive: false })
+      expect(await getSignInState()).to.equal('no-drive')
+      expect(fetches).to.have.length(0)
+    })
+
     it('is expired only when Google refuses the sign-in, or the Worker cannot read it', async () => {
-      signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) })
+      signIn({ drive: true, access_token: 'old', expires_at: inFromNow(-MINUTE) })
       respondTo = () => json({ error: 'invalid_grant' }, 401)
       expect(await getSignInState()).to.equal('expired')
       respondTo = () => json({ error: 'invalid_blob' }, 401)
@@ -228,7 +258,7 @@ describe('google-auth', () => {
     })
 
     it('fails with the Worker’s own words for any other refusal', async () => {
-      signIn({})
+      signIn({}, 'a-blob')
       respondTo = () => json({ error: 'Sessions are not set up' }, 503)
       let error: Error | null = null
       await getIdentityToken().catch(e => {
@@ -255,6 +285,27 @@ describe('google-auth', () => {
       expect(await why(new Response('oops', { status: 500 }))).to.equal('failed')
     })
 
+    it('learns that the account has Drive from another device, and is signed in with it', async () => {
+      respondTo = url =>
+        url === '/api/account'
+          ? json({
+              name: null,
+              emails: [],
+              googleEmail: null,
+              drive: { email: 'ann@gmail.example' },
+            })
+          : json({
+              access_token: 'a1',
+              refresh_token: 'id.secret',
+              expires_in: 900,
+              email: 'ann@example.com',
+            })
+      await signInWithEmail('ann@example.com', '123456')
+      await settleSignIn()
+      expect(must(worker.stored).metadata.drive).to.equal(true)
+      expect(await hasDriveAccess()).to.equal(true)
+    })
+
     it('keeps the session, with no Google blob, and is signed in without Drive', async () => {
       respondTo = () =>
         json({
@@ -270,11 +321,12 @@ describe('google-auth', () => {
       expect(stored.metadata.user?.email).to.equal('ann@example.com')
       expect(await getSignInState()).to.equal('no-drive')
       expect(await getIdentityToken()).to.equal('a1')
+      respondTo = () => json({ error: 'not_connected' }, 404)
       let error: Error | null = null
       await getAccessToken().catch(e => {
         error = e
       })
-      expect((error as Error | null)?.message).to.include('Not signed in with Google')
+      expect((error as Error | null)?.message).to.include('Google Drive is not connected')
     })
 
     it('signs in with the link, with no Google blob, and says where to go on to', async () => {
@@ -386,32 +438,30 @@ describe('google-auth', () => {
       expect(fetches).to.have.length(0)
     })
 
-    it('asks the worker for a new token, with the blob, when the old one is about to run out', async () => {
-      signIn({ access_token: 'old', expires_at: inFromNow(4 * MINUTE) }, 'the-blob')
+    it('asks the Worker for a Drive token, with the session, when the old one is about to run out', async () => {
+      signIn({ drive: true, access_token: 'old', expires_at: inFromNow(4 * MINUTE) })
       respondTo = () => json({ access_token: 'fresh', expires_in: 3600 })
 
       expect(await getAccessToken()).to.equal('fresh')
 
       expect(fetches).to.have.length(1)
-      expect(fetches[0].url).to.equal('/session/refresh')
-      expect(fetches[0].body).to.deep.equal({ blob: 'the-blob' })
+      expect(fetches[0].url).to.equal('/api/account/drive/token')
     })
 
     it('keeps the new token for next time, with its expiry, and the rest of what it knew', async () => {
-      signIn(
-        {
-          access_token: 'old',
-          expires_at: inFromNow(-MINUTE),
-          user: makeUser(),
-        },
-        'the-blob'
-      )
+      signIn({
+        drive: true,
+        access_token: 'old',
+        expires_at: inFromNow(-MINUTE),
+        user: makeUser(),
+      })
       respondTo = () => json({ access_token: 'fresh', expires_in: 3600 })
       await getAccessToken()
 
       const { blob, metadata } = must(worker.stored)
-      expect(blob).to.equal('the-blob')
+      expect(blob, 'there is no Google credential on the device').to.equal('')
       expect(metadata.access_token).to.equal('fresh')
+      expect(metadata.drive).to.equal(true)
       expect(metadata.user?.name).to.equal('Ann')
       const left = new Date(must(metadata.expires_at)).getTime() - Date.now()
       expect(left).to.be.within(59 * MINUTE, 60 * MINUTE)
@@ -419,6 +469,109 @@ describe('google-auth', () => {
       // And that token is used, with no second request
       expect(await getAccessToken()).to.equal('fresh')
       expect(fetches).to.have.length(1)
+    })
+
+    it('says Drive is not connected when the account has none, and remembers it', async () => {
+      signIn({ drive: true, access_token: 'old', expires_at: inFromNow(-MINUTE) })
+      respondTo = () => json({ error: 'not_connected' }, 404)
+      let error: Error | null = null
+      await getAccessToken().catch(e => {
+        error = e
+      })
+      expect((error as Error | null)?.message).to.equal('Google Drive is not connected')
+      expect(must(worker.stored).metadata.drive).to.equal(false)
+      // (and a token kept from before is not given for an account that has none)
+      signIn({ drive: false, access_token: 'kept', expires_at: inFromNow(30 * MINUTE) })
+      await getAccessToken().catch(() => {})
+      expect(fetches).to.have.length(2)
+    })
+
+    describe('on a device that signed in before the Worker held the credential', () => {
+      const adopted = (url: string) =>
+        url === '/api/account/drive/adopt'
+          ? json({ adopted: true })
+          : url === '/api/account'
+            ? json({
+                name: null,
+                emails: [],
+                googleEmail: null,
+                drive: { email: 'ann@example.com' },
+              })
+            : json({ access_token: 'fresh', expires_in: 3600 })
+
+      it('sends its blob to the account, once, forgets it, and carries on as any device does', async () => {
+        signIn(
+          {
+            access_token: 'old',
+            expires_at: inFromNow(-MINUTE),
+            session: { access_token: 's', refresh_token: 'r', expires_at: inFromNow(30 * MINUTE) },
+          },
+          'the-blob'
+        )
+        respondTo = adopted
+
+        expect(await getAccessToken()).to.equal('fresh')
+
+        expect(fetches.map(each => each.url)).to.deep.equal([
+          '/api/account/drive/adopt',
+          '/api/account',
+          '/api/account/drive/token',
+        ])
+        expect(fetches[0].body).to.deep.equal({ blob: 'the-blob' })
+        expect(must(worker.stored).blob).to.equal('')
+        expect(must(worker.stored).metadata.drive).to.equal(true)
+        expect(must(worker.stored).metadata.session?.refresh_token).to.equal('r')
+      })
+
+      it('forgets the blob when the account already has a connection (another device made it since)', async () => {
+        signIn({ access_token: 'g', expires_at: inFromNow(30 * MINUTE) }, 'old-blob')
+        respondTo = url =>
+          url === '/api/account/drive/adopt' ? json({ adopted: false }) : adopted(url)
+        // (a session, got from the blob: this device had none)
+        worker.stored = must(worker.stored)
+        worker.stored.metadata.session = {
+          access_token: 's',
+          refresh_token: 'r',
+          expires_at: inFromNow(30 * MINUTE),
+        }
+        await getAccessToken()
+        expect(must(worker.stored).blob).to.equal('')
+      })
+
+      it('keeps working from its own blob when the Worker cannot be reached to move it', async () => {
+        signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) }, 'the-blob')
+        must(worker.stored).metadata.session = {
+          access_token: 's',
+          refresh_token: 'r',
+          expires_at: inFromNow(30 * MINUTE),
+        }
+        respondTo = url =>
+          url === '/session/refresh'
+            ? json({ access_token: 'fresh', expires_in: 3600 })
+            : json({ error: 'down' }, 503)
+
+        expect(await getAccessToken()).to.equal('fresh')
+
+        expect(fetches.at(-1)?.url).to.equal('/session/refresh')
+        expect(fetches.at(-1)?.body).to.deep.equal({ blob: 'the-blob' })
+        expect(must(worker.stored).blob, 'to try again next time').to.equal('the-blob')
+      })
+
+      it('says the sign-in has expired when Google refuses the blob it still holds', async () => {
+        signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) }, 'the-blob')
+        must(worker.stored).metadata.session = {
+          access_token: 's',
+          refresh_token: 'r',
+          expires_at: inFromNow(30 * MINUTE),
+        }
+        respondTo = url =>
+          url === '/session/refresh' ? json({ error: 'invalid_grant' }, 401) : json({}, 503)
+        let error: unknown
+        await getAccessToken().catch(e => {
+          error = e
+        })
+        expect(error).to.be.instanceOf(SignInExpiredError)
+      })
     })
 
     it('treats a token with no expiry as expired', async () => {
@@ -459,7 +612,7 @@ describe('google-auth', () => {
       await getAccessToken().catch(e => {
         error = e
       })
-      expect((error as Error | null)?.message).to.equal('Failed to refresh access token')
+      expect((error as Error | null)?.message).to.equal('Failed to get a Google Drive access token')
     })
 
     it('has a reason of its own when the worker gives none', async () => {
@@ -469,7 +622,7 @@ describe('google-auth', () => {
       await getAccessToken().catch(e => {
         error = e
       })
-      expect((error as Error | null)?.message).to.equal('Failed to refresh access token')
+      expect((error as Error | null)?.message).to.equal('Failed to get a Google Drive access token')
     })
 
     it('fails when the device is offline, rather than giving the expired token', async () => {
@@ -517,60 +670,67 @@ describe('google-auth', () => {
       expect(fetches, 'other devices keep their sign-in').to.have.length(0)
     })
 
-    it('turns the Personal space’s sync off: the blob goes, the session stays, and nobody is asked', async () => {
+    it('disconnects Drive from the account: the Worker is told, the session stays, and Drive is no longer had', async () => {
       worker.stored = {
-        blob: 'the-blob',
+        blob: '',
         metadata: {
           access_token: 'a',
           expires_at: inFromNow(MINUTE),
           id_token: 'i',
+          drive: true,
           scope: 'https://www.googleapis.com/auth/drive.file openid email',
-          session: { access_token: 's', refresh_token: 'r', expires_at: inFromNow(MINUTE) },
+          session: { access_token: 's', refresh_token: 'r', expires_at: inFromNow(30 * MINUTE) },
           user: makeUser(),
         },
         updated_at: new Date().toISOString(),
       }
+      respondTo = url =>
+        url === '/api/account/drive'
+          ? json({ success: true, revoked: true })
+          : json({ name: null, emails: [], googleEmail: null, drive: null })
 
-      await disableGoogleSync()
+      expect(await disconnectDrive()).to.deep.equal({ revoked: true })
 
       const stored = must(worker.stored)
-      expect(stored.blob).to.equal('')
       expect(stored.metadata.session?.refresh_token).to.equal('r')
       expect(stored.metadata.user?.email).to.equal('ann@example.com')
-      expect(stored.metadata.scope).to.equal('')
       expect(stored.metadata.access_token).to.equal(undefined)
+      expect(stored.metadata.drive).to.equal(false)
       expect(await isAuthenticated()).to.equal(true)
       expect(await getSignInState()).to.equal('no-drive')
-      expect(
-        fetches.map(each => each.url),
-        'Google is not revoked: other devices keep their sync'
-      ).to.deep.equal([])
+      expect(fetches[0].url).to.equal('/api/account/drive')
     })
 
-    it('does nothing when nobody is signed in, or there is no Google to turn off', async () => {
-      await disableGoogleSync()
-      expect(worker.stored).to.equal(undefined)
+    it('says whether Google was left alone, when a Team the person owns still uses the grant', async () => {
       worker.stored = {
         blob: '',
         metadata: {
-          scope: '',
-          session: { access_token: 's', refresh_token: 'r', expires_at: inFromNow(MINUTE) },
+          drive: true,
+          session: { access_token: 's', refresh_token: 'r', expires_at: inFromNow(30 * MINUTE) },
         },
         updated_at: new Date().toISOString(),
       }
-      await disableGoogleSync()
-      expect(must(worker.stored).metadata.session?.refresh_token).to.equal('r')
+      respondTo = url =>
+        url === '/api/account/drive' ? json({ success: true, revoked: false }) : json({})
+      expect(await disconnectDrive()).to.deep.equal({ revoked: false })
     })
 
-    it('says so when the worker cannot keep the change, and stays as it was', async () => {
-      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) }, 'the-blob')
-      worker.failing.add('STORE_BLOB')
+    it('says so when Google or the Worker will not, and stays connected', async () => {
+      worker.stored = {
+        blob: '',
+        metadata: {
+          drive: true,
+          session: { access_token: 's', refresh_token: 'r', expires_at: inFromNow(30 * MINUTE) },
+        },
+        updated_at: new Date().toISOString(),
+      }
+      respondTo = () => json({ error: 'Google did not revoke the access' }, 502)
       let error: Error | null = null
-      await disableGoogleSync().catch(e => {
+      await disconnectDrive().catch(e => {
         error = e
       })
-      expect((error as Error | null)?.message).to.equal('worker failed')
-      expect(must(worker.stored).blob).to.equal('the-blob')
+      expect((error as Error | null)?.message).to.equal('Google did not revoke the access')
+      expect(must(worker.stored).metadata.drive).to.equal(true)
     })
   })
 

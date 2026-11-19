@@ -126,9 +126,8 @@ export function handleDrive(
       let data: BlobData
       try {
         data = await decryptBlob(blob, env)
-      } catch (error) {
-        if (error instanceof UnreadableBlob) throw new Refusal(401, 'invalid_blob')
-        throw error
+      } catch {
+        throw new Refusal(401, 'invalid_blob')
       }
       // (the blob is only this account's if its Google login is on this account: a blob is not a way to take another's)
       const owner = await db
@@ -160,12 +159,9 @@ export function handleDrive(
       let data: BlobData
       try {
         data = await decryptBlob(row.blob, env)
-      } catch (error) {
-        if (error instanceof UnreadableBlob) {
-          annotateRequest({ 'chordless.auth.drive_result': 'invalid_blob' })
-          return jsonResponse({ error: 'invalid_blob' }, 401)
-        }
-        throw error
+      } catch {
+        annotateRequest({ 'chordless.auth.drive_result': 'invalid_blob' })
+        return jsonResponse({ error: 'invalid_blob' }, 401)
       }
       try {
         const { access_token, expires_in } = await google.refreshAccessToken(

@@ -31,22 +31,31 @@ describe('google-auth: signing in', () => {
   const realGoogle = (window as { google?: unknown }).google
   let fetches: Array<{ url: string; body?: Record<string, unknown> }>
   let respondTo: (url: string) => Response | Promise<Response>
+  /** What the Worker says of the account (GET /api/account), which a sign-in asks after, for Drive from another device */
+  let account: { drive: { email: string } | null }
   let codeResponse: { code?: string; error?: string }
   /** What the page last asked Google for */
   let requested: CodeConfig | undefined
 
   const json = (body: object, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  const SESSION = { access_token: 'session-access', refresh_token: 'id.refresh', expires_in: 900 }
+  /** The Worker's answer to the code: a session, and the Drive access token (the credential stays at the Worker) */
+  const answer = (extra: object = {}) =>
+    json({ access_token: 'tok', expires_in: 3600, user: null, session: SESSION, ...extra })
 
   beforeEach(() => {
     const installed = installFakeAuthWorker()
     worker = installed.worker
     uninstall = installed.uninstall
     fetches = []
-    respondTo = () => json({ blob: 'b', access_token: 'tok', expires_in: 3600, user: null })
+    account = { drive: null }
+    respondTo = () => answer()
     window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       fetches.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined })
+      if (url === '/api/account')
+        return json({ name: null, emails: [], googleEmail: null, ...account })
       return respondTo(url)
     }) as typeof fetch
     codeResponse = { code: 'the-code' }
@@ -123,9 +132,8 @@ describe('google-auth: signing in', () => {
   })
 
   describe('authorizing', () => {
-    it('exchanges the code at the Worker, and keeps the blob, with the expiry and the ID token', async () => {
-      respondTo = () =>
-        json({ blob: 'blob-1', access_token: 'tok', expires_in: 3600, id_token: 'idt', user: null })
+    it('exchanges the code at the Worker, and keeps the session, with the expiry and the ID token, and no Google credential', async () => {
+      respondTo = () => answer({ blob: 'blob-1', id_token: 'idt' })
       const result = await authorizeWithGoogle()
       await waitUntil(() => fetches[0].url === '/oauth/callback')
       expect(fetches[0].url).to.equal('/oauth/callback')
@@ -133,8 +141,10 @@ describe('google-auth: signing in', () => {
         code: 'the-code',
         redirect_uri: window.location.origin,
       })
-      expect(result).to.include({ blob: 'blob-1', access_token: 'tok' })
-      expect(worker.stored?.blob).to.equal('blob-1')
+      expect(result).to.include({ access_token: 'tok' })
+      expect(result).to.not.have.property('blob')
+      expect(worker.stored?.blob, 'the Worker keeps the credential for the account').to.equal('')
+      expect(worker.stored?.metadata.session?.access_token).to.equal('session-access')
       expect(worker.stored?.metadata.id_token).to.equal('idt')
       expect(new Date(worker.stored?.metadata.expires_at ?? 0).getTime()).to.be.greaterThan(
         Date.now()
@@ -151,7 +161,7 @@ describe('google-auth: signing in', () => {
       respondTo = url =>
         url.endsWith('ann.png')
           ? new Response(new Blob(['png'], { type: 'image/png' }))
-          : json({ blob: 'b', access_token: 't', expires_in: 60, user })
+          : answer({ expires_in: 60, user })
       const result = await authorizeWithGoogle()
       expect(result.user?.name).to.equal('Ann')
       expect(worker.stored?.metadata.user?.avatarDataUrl).to.match(/^data:/)
@@ -162,7 +172,7 @@ describe('google-auth: signing in', () => {
       respondTo = url =>
         url.endsWith('ann.png')
           ? new Response('', { status: 404 })
-          : json({ blob: 'b', access_token: 't', expires_in: 60, user })
+          : answer({ expires_in: 60, user })
       const result = await authorizeWithGoogle()
       expect(result.user?.name).to.equal('Ann')
       expect(worker.stored?.metadata.user?.avatarDataUrl).to.equal(undefined)
@@ -199,13 +209,8 @@ describe('google-auth: signing in', () => {
     })
 
     const DRIVE = 'https://www.googleapis.com/auth/drive.file'
-    const without = {
-      blob: 'b',
-      access_token: 'tok',
-      expires_in: 3600,
-      scope: 'openid email profile',
-    }
-    const withDrive = { ...without, scope: `${DRIVE} openid email profile` }
+    const without = answer({ scope: 'openid email profile' })
+    const withDrive = () => answer({ scope: `${DRIVE} openid email profile` })
 
     it('asks for Drive with the sign-in, and for who they are alone when told not to', async () => {
       await authorizeWithGoogle()
@@ -217,32 +222,50 @@ describe('google-auth: signing in', () => {
     })
 
     it('keeps what Google granted, and signs in without Drive if its box was left unticked', async () => {
-      respondTo = () => json(without)
+      respondTo = () => without.clone()
       await authorizeWithGoogle()
       expect(worker.stored?.metadata.scope).to.equal('openid email profile')
       expect(await hasDriveAccess()).to.equal(false)
 
-      respondTo = () => json(withDrive)
+      respondTo = withDrive
       await authorizeWithGoogle()
       expect(await hasDriveAccess()).to.equal(true)
     })
 
+    it('learns that the account has Drive from another device, when this sign-in did not ask for it', async () => {
+      account = { drive: { email: 'ann@gmail.example' } }
+      respondTo = () => without.clone()
+      await authorizeWithGoogle({ drive: false })
+      await settleSignIn()
+      expect(await hasDriveAccess()).to.equal(true)
+    })
+
+    it('says the sign-in has no session when the Worker sends none: nothing could use it', async () => {
+      respondTo = () => json({ access_token: 't', expires_in: 60, user: null })
+      let message = ''
+      await authorizeWithGoogle().catch(error => {
+        message = error.message
+      })
+      expect(message).to.equal('Sessions are not set up on this server')
+      expect(worker.stored).to.equal(undefined)
+    })
+
     it('adds Drive to a sign-in without it: Drive alone, keeping what was granted, replacing the sign-in', async () => {
-      respondTo = () => json(without)
+      respondTo = () => without.clone()
       await authorizeWithGoogle({ drive: false })
       expect(await hasDriveAccess()).to.equal(false)
 
-      respondTo = () => json({ ...withDrive, blob: 'second-blob' })
+      respondTo = withDrive
       await connectDrive()
       expect(requested?.scope).to.equal(DRIVE)
       expect(requested?.include_granted_scopes).to.equal(true)
       expect(requested?.prompt).to.equal('consent')
-      expect(worker.stored?.blob).to.equal('second-blob')
+      expect(worker.stored?.blob).to.equal('')
       expect(await hasDriveAccess()).to.equal(true)
     })
 
     it('says so when Google or the worker refuses to add Drive, and keeps the sign-in it has', async () => {
-      respondTo = () => json(without)
+      respondTo = () => without.clone()
       await authorizeWithGoogle({ drive: false })
       codeResponse = { error: 'access_denied' }
       let message = ''
@@ -250,7 +273,9 @@ describe('google-auth: signing in', () => {
         message = error.message
       })
       expect(message).to.equal('access_denied')
-      expect(worker.stored?.blob).to.equal('b')
+      expect(worker.stored?.metadata.session?.access_token, 'still signed in').to.equal(
+        'session-access'
+      )
     })
 
     it('counts a sign-in made before the scope was kept as having Drive, and none as not', async () => {

@@ -184,10 +184,13 @@ export class AccountCard extends LitElement {
   async _disableSync(): Promise<void> {
     if (!(await this._disableModal.value?.ask())) return
     try {
-      const { disableGoogleSync } = await import('../js/google-auth.ts')
-      await disableGoogleSync()
+      const { disconnectDrive } = await import('../js/google-auth.ts')
+      const { revoked } = await disconnectDrive()
       await this.refresh()
-      this._message = { text: t('account-sync-disabled'), type: 'success' }
+      this._message = {
+        text: t(revoked ? 'account-sync-disabled' : 'account-sync-disabled-grant-kept'),
+        type: 'success',
+      }
     } catch (error) {
       console.error('[AccountCard] Turning the sync off failed:', error)
       this._message = {
