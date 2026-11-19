@@ -60,6 +60,8 @@ export interface AdminContext {
   ): Promise<{ trashed: boolean; canWrite: boolean | null } | null>
   /** The blob's contents; throws if it is not one of ours */
   openBlob(blob: string): Promise<BlobData>
+  /** The Google Drive connection of this person's account (account-drive.ts), or null if it has none: what a space is made from when the page sends no blob */
+  accountBlob(identity: Identity): Promise<string | null>
   /** The service account's address (team-managed storage), or null where it is not set up */
   serviceAccount(): string | null
   /** Why the service account cannot keep the folder's files, or null if it can (service-account.ts) */
@@ -125,6 +127,17 @@ async function checkSharing(
   return owner
 }
 
+/**
+ * The blob a space is made from, or given a new one from: the one the page sent (an app from before the account kept
+ * it), or else the account's own Google Drive connection. 409 `not_connected` if there is neither.
+ */
+async function ownerBlobFor(ctx: AdminContext, identity: Identity, sent: unknown): Promise<string> {
+  if (typeof sent === 'string') return sent
+  const blob = await ctx.accountBlob(identity)
+  if (!blob) throw new Refusal(409, 'not_connected')
+  return blob
+}
+
 /** GET /api/spaces: the spaces the person is in, with their role in each */
 export function handleListSpaces(request: Request, ctx: AdminContext): Promise<Response> {
   return answering('Team space admin', async () => {
@@ -140,11 +153,10 @@ export function handleCreateSpace(request: Request, ctx: AdminContext): Promise<
     const identity = await ctx.identify(request)
     if (!identity) return refusal('unauthenticated')
     const body = await readJson(request)
-    const { blob, rootRef } = body
+    const { rootRef } = body
     const name = typeof body.name === 'string' ? body.name.trim() : ''
-    if (typeof blob !== 'string' || typeof rootRef !== 'string' || !rootRef) {
-      throw new Refusal(400, 'A blob and a folder are needed')
-    }
+    if (typeof rootRef !== 'string' || !rootRef) throw new Refusal(400, 'A folder is needed')
+    const blob = await ownerBlobFor(ctx, identity, body.blob)
     if (!name || name.length > 200) throw new Refusal(400, 'A space needs a name')
     const ccliLicence = body.ccliLicence === undefined ? '' : licenceFrom(body.ccliLicence)
     const owner = await checkSharing(ctx, identity, blob, rootRef)
@@ -363,9 +375,9 @@ const ADMIN_ROUTES: AdminRoute[] = [
     path: /^\/credential$/,
     needs: 'owner',
     async run({ request, ctx, room, identity }) {
-      const { blob } = await readJson(request)
       const info = await room.info()
-      if (typeof blob !== 'string' || !info) throw new Refusal(400, 'A blob is needed')
+      if (!info) throw new Refusal(400, 'A space is needed')
+      const blob = await ownerBlobFor(ctx, identity, (await readJson(request)).blob)
       await checkSharing(ctx, identity, blob, info.rootRef)
       await room.setOwnerBlob(blob)
       return done()

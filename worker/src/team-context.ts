@@ -128,6 +128,14 @@ export function createAdminContext(env: Env, deps: TeamDeps = {}): AdminContext 
       return root && { trashed: root.trashed, canWrite: root.canWrite }
     },
     openBlob: blob => decryptBlob(blob, env),
+    async accountBlob(identity) {
+      if (identity.provider !== SESSION_PROVIDER) return null
+      const row = await (env.DB as D1Db)
+        .prepare('SELECT blob FROM account_drive WHERE account_id = ?')
+        .bind(identity.sub)
+        .first<{ blob: string }>()
+      return row?.blob ?? null
+    },
     serviceAccount: () => serviceAccountAddress(env),
     async checkServiceAccount(rootRef, address) {
       const token = serviceAccountToken({ env, fetch: tracedFetch(deps.tokenFetch), now })

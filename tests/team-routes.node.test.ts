@@ -1378,7 +1378,8 @@ describe('the owner’s own routes', () => {
       send('PUT', { blob: await blobFor(eve) })
     )
     assert.equal(theirs.status, 403)
-    assert.equal((await w.call(`${SPACE}/credential`, ann, send('PUT', {}))).status, 400)
+    // (no blob sent is the account's own connection, and there is none here)
+    assert.equal((await w.call(`${SPACE}/credential`, ann, send('PUT', {}))).status, 409)
   })
 
   test('is for the owner only', async () => {
@@ -1556,6 +1557,25 @@ describe('a Chordless session', () => {
       (await w.call('/api/spaces', other, body(await blobFor(eve)), w.env, own)).status,
       403
     )
+  })
+
+  test("makes a space from the account's own Drive connection when the page sends no blob, and 409s with none", async () => {
+    const w = await world()
+    const own: TeamDeps = { ...w.deps, providers: [sessionProvider(w.env)] }
+    const eveSession = await sessionFor(w, eve)
+    const bare = post({ rootRef: w.root, name: 'Eve Church' }) satisfies RequestInit
+    const none = await w.call('/api/spaces', eveSession, bare, w.env, own)
+    assert.equal(none.status, 409)
+    assert.equal((await json(none)).error, 'not_connected')
+    const accountId = (await accountOf(w.db, eve, false)) as string
+    w.all(
+      `INSERT INTO account_drive (account_id, blob, google_email, scope, created_at, updated_at) VALUES ('${accountId}', '${await blobFor(eve)}', '${eve.email}', 'x', 'now', 'now') RETURNING 1`
+    )
+    const made = await w.call('/api/spaces', eveSession, bare, w.env, own)
+    assert.equal(made.status, 200)
+    // (and it is the account's own: a connection for another account is not borrowed)
+    const ann2 = await sessionFor(w, ann)
+    assert.equal((await w.call('/api/spaces', ann2, bare, w.env, own)).status, 409)
   })
 
   test('is its own account: nothing is looked up for it', async () => {

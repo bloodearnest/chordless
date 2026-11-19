@@ -86,7 +86,19 @@ export function handleDrive(
         .prepare('SELECT blob FROM account_drive WHERE account_id = ?')
         .bind(accountId)
         .first<{ blob: string }>()
-      if (!row) return jsonResponse({ success: true })
+      if (!row) return jsonResponse({ success: true, revoked: false })
+      // A team the person owns, kept in their Drive, holds a copy of the same grant: revoking it would end the team's storage
+      const owns = await db
+        .prepare(
+          "SELECT 1 AS found FROM teams WHERE owner_account_id = ? AND credential = 'owner' AND ended_at IS NULL"
+        )
+        .bind(accountId)
+        .first()
+      if (owns) {
+        await db.prepare('DELETE FROM account_drive WHERE account_id = ?').bind(accountId).run()
+        annotateRequest({ 'chordless.auth.drive_result': 'disconnected_kept_grant' })
+        return jsonResponse({ success: true, revoked: false })
+      }
       try {
         const data = await decryptBlob(row.blob, env)
         await google.revokeToken(data.refresh_token, env)
@@ -103,7 +115,7 @@ export function handleDrive(
       }
       await db.prepare('DELETE FROM account_drive WHERE account_id = ?').bind(accountId).run()
       annotateRequest({ 'chordless.auth.drive_result': 'disconnected' })
-      return jsonResponse({ success: true })
+      return jsonResponse({ success: true, revoked: true })
     }
 
     if (request.method !== 'POST') return jsonResponse({ error: 'Not found' }, 404)
