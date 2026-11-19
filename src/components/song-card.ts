@@ -456,7 +456,7 @@ export class SongCard extends LitElement {
             <div class="line1">
               <div class="title" part="title">${this._mark(this.song.title)}</div>
               ${this._renderVariantLabel()}
-              ${this.local ? html`<span class="local-mark" title="Added on this device only">Just me</span>` : ''}
+              ${this.local ? html`<span class="local-mark" title=${t('card-local-title')}>${t('card-local')}</span>` : ''}
               ${
                 this.variant !== 'setlist' && this.song.artist
                   ? html`
@@ -478,7 +478,7 @@ export class SongCard extends LitElement {
               class="delete-button"
               part="delete-button"
               @click=${this._handleDelete}
-              aria-label="Remove song"
+              aria-label=${t('card-remove')}
             >
               <app-icon name="delete" size="18" class="delete-icon"></app-icon>
             </button>
@@ -527,7 +527,7 @@ export class SongCard extends LitElement {
     const snippet = lyricSnippet(song.parsed, search)
     if (!snippet) return ''
     return html`<div class="lyric-match" part="lyric-match">
-      <span class="match-label">Lyrics</span>${snippet.before}<mark>${snippet.match}</mark>${snippet.after}
+      <span class="match-label">${t('card-lyrics')}</span>${snippet.before}<mark>${snippet.match}</mark>${snippet.after}
     </div>`
   }
 
@@ -578,7 +578,7 @@ export class SongCard extends LitElement {
       .song as SongCardSong
 
     if (source) {
-      return html`<div class="last-played" part="last-played">From ${source.label}</div>`
+      return html`<div class="last-played" part="last-played">${t('card-from', { source: source.label })}</div>`
     }
 
     // The space the song is in (where there are several), then when it was last played
@@ -618,7 +618,7 @@ export class SongCard extends LitElement {
     return html`
       <div class="key-edit-wrapper" @click=${(e: Event) => e.stopPropagation()}>
         <key-selector
-          label="Key"
+          label=${t('selector-key')}
           .value=${currentKey ?? '-'}
           .keys=${keys}
           .originalKey=${this.song?.originalKey ?? ''}
@@ -637,7 +637,7 @@ export class SongCard extends LitElement {
     const tempo = Number(this.song?.metadata?.tempo)
     return html`
       <label class="bpm-edit" @click=${(e: Event) => e.stopPropagation()}>
-        BPM
+        ${t('player-bpm')}
         <input
           type="number"
           inputmode="numeric"

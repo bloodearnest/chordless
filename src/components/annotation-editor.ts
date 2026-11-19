@@ -2,6 +2,7 @@ import { css, html, LitElement } from 'lit'
 import { ref } from 'lit/directives/ref.js'
 import type { AnnotationKind } from '../js/annotations/store.ts'
 import { DialogPopup } from '../js/dialog-popup.ts'
+import { t } from '../js/text.ts'
 import { frameBounds } from '../js/utils/frame.ts'
 import { buttonStyles, fieldStyles } from './shared-styles.ts'
 
@@ -237,24 +238,24 @@ export class AnnotationEditor extends LitElement {
     const request = this._request
     if (!request) return html``
     const hint = !request.canShare
-      ? 'Only people who can edit the setlist can share an annotation with everyone.'
+      ? t('annotation-hint-cannot-share')
       : this._kind === 'shared'
-        ? 'Everyone who has this setlist sees it.'
+        ? t('annotation-hint-shared')
         : ''
     return html`
       <dialog
         ${ref(this.#popup.ref)}
-        aria-label="Annotation"
+        aria-label=${t('annotation-label')}
         @click=${this.#popup.onClick}
         @close=${this.#closed}
       >
-        <h2>${request.isNew ? 'New annotation' : 'Annotation'} on ${request.about}</h2>
+        <h2>${t(request.isNew ? 'annotation-heading-new' : 'annotation-heading', { about: request.about })}</h2>
         <textarea
           class="field"
           rows="3"
           maxlength="280"
-          aria-label="Annotation text"
-          placeholder="e.g. quietly, drop out, repeat 4×"
+          aria-label=${t('annotation-text-label')}
+          placeholder=${t('annotation-example')}
           .value=${this._text}
           @input=${(event: Event) => {
             this._text = (event.target as HTMLTextAreaElement).value
@@ -264,10 +265,10 @@ export class AnnotationEditor extends LitElement {
           }}
         ></textarea>
         <fieldset>
-          <legend>Seen by</legend>
+          <legend>${t('annotation-seen-by')}</legend>
           <div class="choices">
-            ${this.#radio('private', 'Just me')}
-            ${this.#radio('shared', 'Everyone', !request.canShare)}
+            ${this.#radio('private', t('annotation-seen-me'))}
+            ${this.#radio('shared', t('annotation-seen-everyone'), !request.canShare)}
           </div>
           ${hint ? html`<p class="hint">${hint}</p>` : ''}
         </fieldset>
@@ -276,11 +277,11 @@ export class AnnotationEditor extends LitElement {
             request.isNew
               ? ''
               : html`<button class="btn danger delete" @click=${() => this.#finish({ action: 'delete' })}>
-                  Delete
+                  ${t('action-delete')}
                 </button>`
           }
-          <button class="btn" @click=${() => this.#finish(null)}>Cancel</button>
-          <button class="btn primary" @click=${() => this.#save()}>Done</button>
+          <button class="btn" @click=${() => this.#finish(null)}>${t('action-cancel')}</button>
+          <button class="btn primary" @click=${() => this.#save()}>${t('action-done')}</button>
         </div>
       </dialog>
     `

@@ -203,15 +203,18 @@ export class AnnotationsController {
   /** What the annotation is on, for the editor's heading: “grace”, Chorus, the song */
   #about(event: AnnotationRequestEvent, song: RuntimeSong): string {
     const section = song.parsed.sections[event.sectionIndex]
-    if (event.place === 'song') return 'the whole song'
-    if (event.place === 'title') return section?.label ? `“${section.label}”` : 'this section'
+    if (event.place === 'song') return t('annotation-about-song')
+    if (event.place === 'title')
+      return section?.label
+        ? t('annotation-about-quoted', { text: section.label })
+        : t('annotation-about-section')
     const text = section?.lines[event.line]?.segments.map(segment => segment.lyrics).join('') ?? ''
     const word = text
       .slice(
         snapOffset(section ?? { type: 'section', label: null, lines: [] }, event.line, event.offset)
       )
       .match(/[^\s-]+/)?.[0]
-    return word ? `“${word}”` : 'this line'
+    return word ? t('annotation-about-quoted', { text: word }) : t('annotation-about-line')
   }
 
   /** Keep what changed (only the places that differ), show it, and for a deletion offer Undo */

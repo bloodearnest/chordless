@@ -5,6 +5,7 @@ import { listenForLongPress } from '../js/annotations/long-press.ts'
 import { nudgeLine } from '../js/annotations/nudge.ts'
 import type { ChartLine, ChartSegment, HideMode, ShownAnnotation } from '../js/data-types.ts'
 import type { Score } from '../js/score.ts'
+import { t } from '../js/text.ts'
 import { transposeKeyName } from '../js/transpose.ts'
 import { chordFitsOverWords, groupSegmentsIntoUnits } from '../js/utils/chart-line-units.ts'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
@@ -847,7 +848,7 @@ export class SongSection extends LitElement {
       'edit-mode-active': !!this.editMode,
     }
     const label = (this.label || '').trim()
-    const sectionLabel = label || `Section ${this.sectionIndex + 1}`
+    const sectionLabel = label || t('section-numbered', { number: this.sectionIndex + 1 })
 
     return html` <div
       ${ref(this._wrapper)}
@@ -913,14 +914,14 @@ export class SongSection extends LitElement {
       this.style.setProperty('--pill-option-count', this._hasMelody() ? '5' : '4')
     }
     return html`
-      <div class="section-controls" role="group" aria-label="Show content options">
-        <span class="hide-label">Show:</span>
+      <div class="section-controls" role="group" aria-label=${t('section-show-options')}>
+        <span class="hide-label">${t('section-show')}</span>
         <div class="hide-pill">
-          ${this._renderControlButton('show-all', 'All', showAllActive, !canShowAll)}
-          ${this._renderControlButton('show-lyrics', 'Lyrics', showLyricsActive, !canShowLyrics)}
-          ${this._renderControlButton('show-chords', 'Chords', showChordsActive, !canShowChords)}
-          ${this._hasMelody() ? this._renderControlButton('show-melody', 'Melody', melodyActive) : nothing}
-          ${this._renderControlButton('show-none', 'None', showNoneActive)}
+          ${this._renderControlButton('show-all', t('section-all'), showAllActive, !canShowAll)}
+          ${this._renderControlButton('show-lyrics', t('section-lyrics'), showLyricsActive, !canShowLyrics)}
+          ${this._renderControlButton('show-chords', t('section-chords'), showChordsActive, !canShowChords)}
+          ${this._hasMelody() ? this._renderControlButton('show-melody', t('section-melody'), melodyActive) : nothing}
+          ${this._renderControlButton('show-none', t('section-none'), showNoneActive)}
         </div>
       </div>
     `
@@ -929,7 +930,7 @@ export class SongSection extends LitElement {
   _renderControlButton(action: string, label: string, active: boolean, disabled = false) {
     // (the controls are only in a section with a label)
     const sectionLabel = this.label.trim()
-    const ariaLabel = `Show ${label} in ${sectionLabel}`
+    const ariaLabel = t('section-show-in', { what: label, section: sectionLabel })
     return html`
       <button
         class=${classMap({ active: !!active })}
@@ -951,15 +952,15 @@ export class SongSection extends LitElement {
     return html`<span
       class="melody-mark"
       role="img"
-      aria-label=${shown ? 'Showing the melody' : 'The lead sheet has the melody for this part'}
-      title=${shown ? 'Showing the melody' : 'The lead sheet has the melody for this part'}
+      aria-label=${t(shown ? 'section-melody-shown' : 'section-melody-has')}
+      title=${t(shown ? 'section-melody-shown' : 'section-melody-has')}
       ><app-icon name="music" size="18"></app-icon
     ></span>`
   }
 
   _renderCollapseToggle() {
     const isCollapsed = this.hideMode === 'collapse' || this.isCollapsed
-    const ariaLabel = isCollapsed ? 'Expand section' : 'Collapse section'
+    const ariaLabel = t(isCollapsed ? 'section-expand' : 'section-collapse')
     const classes = classMap({
       'section-collapse-toggle': true,
       active: isCollapsed,

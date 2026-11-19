@@ -235,25 +235,25 @@ export class SongVersions extends LitElement {
     return html`
       <li>
         <div>
-          <span class="label">${variant.variantLabel || 'Original'}</span>
-          ${variant.isDefault ? html`<span class="default">Default</span>` : nothing}
+          <span class="label">${variant.variantLabel || t('versions-original')}</span>
+          ${variant.isDefault ? html`<span class="default">${t('versions-default')}</span>` : nothing}
         </div>
         <div class="origin">
-          ${describeOrigin(variant)}${variant.key ? `, key ${variant.key}` : ''}
+          ${variant.key ? t('versions-origin-key', { origin: describeOrigin(variant), key: variant.key }) : describeOrigin(variant)}
         </div>
         ${
           renaming
             ? html`
               <form @submit=${(event: Event) => this._saveName(variant, event)}>
                 <label>
-                  Variant name
+                  ${t('versions-variant-name')}
                   <input name="name" type="text" .value=${variant.variantLabel || ''} />
                 </label>
                 <div class="actions">
-                  <button class="btn primary" type="submit">Save</button>
+                  <button class="btn primary" type="submit">${t('action-save')}</button>
                   <button class="btn" type="button" @click=${() => {
                     this._renaming = null
-                  }}>Cancel</button>
+                  }}>${t('action-cancel')}</button>
                 </div>
               </form>
             `
@@ -265,17 +265,17 @@ export class SongVersions extends LitElement {
                     : html`<button class="btn make-default" @click=${() =>
                         this._change('toast-version-default-failed', db =>
                           makeDefault(db, variant.uuid)
-                        )}>Make default</button>`
+                        )}>${t('action-make-default')}</button>`
                 }
                 <button class="btn rename" @click=${() => {
                   this._renaming = variant.uuid
-                }}>Rename</button>
+                }}>${t('action-rename')}</button>
                 ${
                   deleting
                     ? nothing
                     : !several && !this._mayDeleteSong
-                      ? html`<span class="origin only-admin">Only an admin can delete a song.</span>`
-                      : html`<button class="btn delete" @click=${() => this._askToDelete(variant)}>${several ? 'Delete' : 'Delete song'}</button>`
+                      ? html`<span class="origin only-admin">${t('versions-admin-only')}</span>`
+                      : html`<button class="btn delete" @click=${() => this._askToDelete(variant)}>${several ? t('versions-delete') : t('versions-delete-song')}</button>`
                 }
               </div>
             `
@@ -286,15 +286,14 @@ export class SongVersions extends LitElement {
               <div class="confirm" role="alert">
                 ${
                   several
-                    ? html`Delete this version? Setlists that use it will use
-                      ${variant.isDefault ? 'the next version' : 'the default'} instead.`
-                    : html`Delete this song?
-                      ${
-                        this._usedIn
-                          ? `It is in ${this._usedIn} ${this._usedIn === 1 ? 'setlist' : 'setlists'} and will be taken out of ${this._usedIn === 1 ? 'it' : 'them'}, so it will no longer count as played there.`
-                          : ''
-                      }
-                      It cannot be undone from here.`
+                    ? t(variant.isDefault ? 'versions-confirm-next' : 'versions-confirm-default')
+                    : [
+                        t('versions-confirm-song'),
+                        this._usedIn ? t('versions-confirm-used', { count: this._usedIn }) : '',
+                        t('versions-confirm-final'),
+                      ]
+                        .filter(Boolean)
+                        .join(' ')
                 }
                 <div class="actions">
                   <button class="btn primary confirm-delete" @click=${() =>
@@ -306,10 +305,10 @@ export class SongVersions extends LitElement {
                           'toast-song-delete-failed',
                           db => deleteOnlyVersion(db, variant.uuid).then(() => undefined),
                           true
-                        )}>${several ? 'Delete version' : 'Delete song'}</button>
+                        )}>${several ? t('versions-delete-version') : t('versions-delete-song')}</button>
                   <button class="btn" @click=${() => {
                     this._deleting = null
-                  }}>Cancel</button>
+                  }}>${t('action-cancel')}</button>
                 </div>
               </div>
             `
@@ -323,20 +322,20 @@ export class SongVersions extends LitElement {
     if (!this._variants.length) return nothing
     return html`
       <section aria-labelledby="versions-heading">
-        <h3 id="versions-heading">Versions</h3>
+        <h3 id="versions-heading">${t('versions-heading')}</h3>
         <ul>${this._variants.map(variant => this._renderVariant(variant))}</ul>
         ${
           this._others.length
             ? html`
               <details>
-                <summary>Merge another song into this one</summary>
+                <summary>${t('versions-merge')}</summary>
                 <form class="merge" @submit=${(event: Event) => this._merge(event)}>
                   <label>
-                    The song to merge in
+                    ${t('versions-merge-which')}
                     <select name="song" @change=${(event: Event) => {
                       this._mergeFrom = (event.target as HTMLSelectElement).value
                     }}>
-                      <option value="">Choose a song</option>
+                      <option value="">${t('versions-merge-choose')}</option>
                       ${this._others.map(
                         song =>
                           html`<option value=${song.id}>${song.title}${song.ccliNumber ? ` (${song.ccliNumber})` : ''}${song.variantLabel && song.variantLabel !== 'Original' ? ` — ${song.variantLabel}` : ''}</option>`
@@ -344,18 +343,15 @@ export class SongVersions extends LitElement {
                     </select>
                   </label>
                   <label>
-                    Variant name
-                    <input name="label" type="text" placeholder="Alternate" />
+                    ${t('versions-variant-name')}
+                    <input name="label" type="text" placeholder=${t('versions-label-example')} />
                   </label>
                   <label class="fill">
                     <input name="fill" type="checkbox" checked />
-                    <span>
-                      Fill in details one is missing (artist, copyright, tempo, time) from the other.
-                      Details already there are never changed.
-                    </span>
+                    <span>${t('versions-fill')}</span>
                   </label>
                   <button class="btn primary merge-button" type="submit" ?disabled=${!this._mergeFrom}>
-                    Merge as a variant
+                    ${t('versions-merge-button')}
                   </button>
                 </form>
               </details>
