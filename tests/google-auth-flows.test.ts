@@ -6,6 +6,7 @@ import { expect, waitUntil } from '@open-wc/testing'
 import {
   authorizeWithGoogle,
   connectDrive,
+  GoogleInUseError,
   getCurrentUserInfo,
   hasDriveAccess,
   initGoogleAuth,
@@ -188,6 +189,16 @@ describe('google-auth: signing in', () => {
       }
       expect(message).to.equal('access_denied')
       expect(worker.stored).to.equal(undefined)
+    })
+
+    it('says when the Google account is already another Chordless account', async () => {
+      respondTo = () => json({ error: 'google_in_use' }, 409)
+      let error: unknown
+      await authorizeWithGoogle().catch(e => {
+        error = e
+      })
+      expect(error).to.be.instanceOf(GoogleInUseError)
+      expect((error as Error).message).to.contain('already used by another Chordless account')
     })
 
     it('fails with what the Worker says, or a reason of its own', async () => {

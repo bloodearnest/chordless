@@ -17,6 +17,7 @@ import {
   SpaceSyncedEvent,
 } from '../src/components/space-card.ts'
 import { SpaceGoneEvent } from '../src/components/space-manager.ts'
+import { setAccountStorageKey } from '../src/js/account-info.ts'
 import { getDefaultSpaceId, setDefaultSpaceId } from '../src/js/default-space.ts'
 import type { SignInState } from '../src/js/google-auth.ts'
 import {
@@ -232,6 +233,28 @@ describe('account-page', () => {
         }
       } finally {
         ;(window as { google?: unknown }).google = real
+      }
+    })
+
+    it('starts from the Drive it last knew of, so the Personal card names it while the Worker is asked', async () => {
+      const key = 'chordless:account:test-account-page'
+      setAccountStorageKey(key)
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          name: null,
+          emails: [],
+          googleEmail: null,
+          drive: { email: 'kept@gmail.example' },
+        })
+      )
+      try {
+        await space('First')
+        const el = await page()
+        expect(cards(el)[0].driveEmail).to.equal('kept@gmail.example')
+      } finally {
+        localStorage.removeItem(key)
+        setAccountStorageKey('chordless:account')
       }
     })
 
