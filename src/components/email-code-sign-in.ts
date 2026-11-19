@@ -11,6 +11,16 @@ export class SignedInEvent extends Event {
   }
 }
 
+/** Whether the form is asking for the address (and not for the code), so that what sits beside it can come and go with that */
+export class StepEvent extends Event {
+  static readonly type = 'email-code:step'
+  readonly askingForAddress: boolean
+  constructor(askingForAddress: boolean) {
+    super(StepEvent.type, { bubbles: true, composed: true })
+    this.askingForAddress = askingForAddress
+  }
+}
+
 type Step = 'address' | 'sending' | 'code' | 'checking'
 
 /**
@@ -64,13 +74,7 @@ export class EmailCodeSignIn extends LitElement {
   override willUpdate(changed: Map<string, unknown>): void {
     // (the form says whether it is asking for the address, so that what sits beside it, Google, can be shown with it only)
     if (changed.has('_step')) {
-      this.dispatchEvent(
-        new CustomEvent('email-code:step', {
-          detail: this._step === 'address' || this._step === 'sending',
-          bubbles: true,
-          composed: true,
-        })
-      )
+      this.dispatchEvent(new StepEvent(this._step === 'address' || this._step === 'sending'))
     }
   }
 

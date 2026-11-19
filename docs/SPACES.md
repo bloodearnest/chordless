@@ -494,7 +494,7 @@ service account in as a second provider.
 ## Setting up and joining a team space: decisions so far (2026-10-20)
 
 Agreed with the owner of the project:
-- **Google accounts only**, for members as well as owners. Anyone can make a Google account on
+- **(Changed 2026-11-19: one sign-in screen, by email or Google, docs/ACCOUNT.md "Signing in"; the join page no longer asks about Google accounts, and the how-to-make-one page `/google-account.html` is no longer linked.)** **Google accounts only**, for members as well as owners. Anyone can make a Google account on
   their existing email address (accounts.google.com/signup, "use your existing email"), so the only
   blocker is someone who will not use Google at all; that is accepted. Share links (read-only, no
   account) cover the rest. A second identity provider (emailed link) is possible later: the team service

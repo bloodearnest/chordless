@@ -2,7 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import { authorizeWithGoogle } from '../js/google-auth.ts'
 import { t } from '../js/text.ts'
 import { errorMessage, failedWith } from '../js/utils/errors.ts'
-import { SignedInEvent } from './email-code-sign-in.ts'
+import { SignedInEvent, type StepEvent } from './email-code-sign-in.ts'
 import { buttonStyles } from './shared-styles.ts'
 import './email-code-sign-in.ts'
 
@@ -84,7 +84,7 @@ export class SignInForm extends LitElement {
       <email-code-sign-in
         .address=${this.address}
         .next=${this.next}
-        @email-code:step=${(event: CustomEvent<boolean>) => (this._onAddressStep = event.detail)}
+        @email-code:step=${(event: StepEvent) => (this._onAddressStep = event.askingForAddress)}
       ></email-code-sign-in>
       ${
         this._onAddressStep

@@ -568,7 +568,6 @@ space-sync-sign-in-hint = Sign in on the Account and Teams page to sync.
 
 ## Signing in
 
-account-email-signed-in = Signed in with your email address.
 account-signed-out-name = Not signed in
 account-signed-out-text =
     Your songs and setlists stay on this device. Signing in lets you access Team data that is shared with you.
@@ -1896,7 +1895,6 @@ error-something = Something went wrong
 
 people-failed = Couldn't make that change to the people.
 de-delete-failed = Couldn't delete it.
-join-sign-in-failed = Couldn't sign in.
 join-failed = Couldn't join the team space.
 wizard-connect-failed = Couldn't connect to Google.
 wizard-folder-failed = Couldn't choose the folder.
