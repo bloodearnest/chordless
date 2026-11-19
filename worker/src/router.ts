@@ -5,6 +5,7 @@
  */
 
 import { ACCOUNT_PATH, handleAccount } from './account.ts'
+import { DRIVE_PATH, handleDrive } from './account-drive.ts'
 import {
   handleEmailLink,
   handleEmailLinkPeek,
@@ -96,6 +97,11 @@ async function route(
     // The signed-in person's own account: their name and addresses
     if (path === ACCOUNT_PATH && (request.method === 'GET' || request.method === 'PUT')) {
       return await handleAccount(request, env)
+    }
+
+    // The account's Google Drive: a token for it, adopting a device's old blob, and disconnecting
+    if (path === DRIVE_PATH || path.startsWith(`${DRIVE_PATH}/`)) {
+      return await handleDrive(request, env, google)
     }
 
     // Team spaces (docs/SPACES.md): making one, joining, its people, and its files
