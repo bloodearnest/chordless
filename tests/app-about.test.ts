@@ -254,6 +254,36 @@ describe('app-about', () => {
     })
   })
 
+  describe('kept between launches', () => {
+    const launch = {
+      localStorage: 'kept',
+      indexedDb: 'kept',
+      launches: 3,
+      firstSeen: '2026-10-01T10:00:00.000Z',
+      previous: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+      persisted: null,
+      controlled: true,
+      caches: 1,
+    } as const
+
+    it('says what the last launch left, or that nothing was there', async () => {
+      const el = await show()
+      el._launch = launch
+      expect(el._launchStatus().state).to.equal('kept')
+      expect(el._launchStatus().detail).to.contain('Opened 3 times')
+      expect(el._launchStatus().detail).to.contain('2 hours ago')
+      el._launch = { ...launch, localStorage: 'new', indexedDb: 'new', launches: 1, previous: null }
+      expect(el._launchStatus().state).to.equal('first')
+      el._launch = { ...launch, localStorage: 'new' }
+      expect(el._launchStatus().state).to.equal('partial')
+      expect(el._launchStatus().detail).to.contain('localStorage')
+      el._launch = { ...launch, localStorage: 'unavailable', indexedDb: 'unavailable' }
+      expect(el._launchStatus().state).to.equal('unknown')
+      el._launch = null
+      expect(el._launchStatus().state).to.equal('unknown')
+    })
+  })
+
   describe('storage', () => {
     it('says whether the browser keeps it, and how much is used', async () => {
       const el = await show()

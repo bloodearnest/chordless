@@ -6,6 +6,7 @@ import {
   type InstallMode,
   promptInstall,
 } from '../js/install.ts'
+import { type LaunchReport, launchReport } from '../js/storage-survival.ts'
 import { t } from '../js/text.ts'
 import { buttonStyles, panelStyles, statusStyles } from './shared-styles.ts'
 import { renderStatus, type StatusShown } from './status-view.ts'
@@ -30,6 +31,7 @@ export class AppAbout extends LitElement {
     _running: { state: true },
     _offline: { state: true },
     _storage: { state: true },
+    _launch: { state: true },
     _now: { state: true },
   }
 
@@ -37,6 +39,7 @@ export class AppAbout extends LitElement {
   declare _running: { version: string; released: string } | null
   declare _offline: boolean | null
   declare _storage: StorageInfo | null
+  declare _launch: LaunchReport | null
   declare _now: number
 
   static override styles = [
@@ -75,6 +78,7 @@ export class AppAbout extends LitElement {
     this._running = null
     this._offline = null
     this._storage = null
+    this._launch = null
     this._now = Date.now()
   }
 
@@ -118,6 +122,7 @@ export class AppAbout extends LitElement {
       this._offline = null
     }
     await this._loadStorage()
+    this._launch = await launchReport().catch(() => null)
   }
 
   async _loadStorage(): Promise<void> {
@@ -308,6 +313,60 @@ export class AppAbout extends LitElement {
     }
   }
 
+  /** Whether what the last launch left on this device was still there (src/js/storage-survival.ts) */
+  _launchStatus(): StatusShown & { state: string } {
+    const launch = this._launch
+    const kept = launch ? [launch.localStorage, launch.indexedDb].filter(s => s === 'kept') : []
+    if (!launch || [launch.localStorage, launch.indexedDb].every(s => s === 'unavailable')) {
+      return {
+        state: 'unknown',
+        look: 'none',
+        icon: 'ban',
+        label: t('about-launch-unknown'),
+        detail: t('about-launch-unknown-detail'),
+      }
+    }
+    if (kept.length === 0) {
+      return {
+        state: 'first',
+        look: 'warn',
+        icon: 'warning',
+        label: t('about-launch-first'),
+        detail: t('about-launch-first-detail'),
+      }
+    }
+    const lost = [
+      launch.localStorage === 'new' ? t('about-launch-local') : '',
+      launch.indexedDb === 'new' ? t('about-launch-database') : '',
+    ].filter(Boolean)
+    const first = new Date(launch.firstSeen).toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+    const history = t('about-launch-kept-detail', {
+      count: launch.launches,
+      date: first,
+      ago: launch.previous ? this._ago(Date.parse(launch.previous)) : '',
+    })
+    if (lost.length > 0) {
+      return {
+        state: 'partial',
+        look: 'bad',
+        icon: 'warning',
+        label: t('about-launch-partial'),
+        detail: `${t('about-launch-partial-detail', { cleared: lost.join(', ') })} ${history}`,
+      }
+    }
+    return {
+      state: 'kept',
+      look: 'good',
+      icon: 'check',
+      label: t('about-launch-kept'),
+      detail: history,
+    }
+  }
+
   /** "Version abc123, released 12 October 2026" */
   _versionLine(): string {
     const running = this._running
@@ -366,6 +425,7 @@ export class AppAbout extends LitElement {
     const offline = this._offlineStatus()
     const install = this._installStatus()
     const storage = this._storageStatus()
+    const launch = this._launchStatus()
     return html`
       <div class="about-content">
         <div class="panel">
@@ -424,6 +484,11 @@ export class AppAbout extends LitElement {
               </div>`
               : ''
           }
+        </div>
+
+        <div class="panel">
+          <h3>${t('about-launch-heading')}</h3>
+          ${renderStatus(launch, { id: 'launch-status', state: launch.state })}
         </div>
       </div>
     `

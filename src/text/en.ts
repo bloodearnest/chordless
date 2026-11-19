@@ -949,6 +949,20 @@ about-storage-using = Using { $size }.
 about-storage-unknown = Unknown
 about-storage-unknown-detail = This browser can't say whether it will keep this app's data.
 
+about-launch-heading = Kept between launches
+about-launch-kept = Kept
+# { $count } is how many times the app has opened here, { $date } the day of the first ("3 March 2026"), { $ago } when it was last opened ("2 hours ago"; empty if not known).
+about-launch-kept-detail = Opened { $count } times on this device, since { $date }. Last opened { $ago }.
+about-launch-first = Nothing from an earlier launch
+about-launch-first-detail = This is the first time the app has opened here, or this device cleared its data since the last time. If you have used Chordless here before, tell support: it is worth knowing.
+about-launch-partial = Partly cleared
+# { $cleared } is the stores that were empty, such as "localStorage".
+about-launch-partial-detail = This device cleared { $cleared } since the last launch, and kept the rest.
+about-launch-local = localStorage
+about-launch-database = IndexedDB
+about-launch-unknown = Can't tell
+about-launch-unknown-detail = This browser would not let the app keep a note between launches.
+
 
 ## The menu
 

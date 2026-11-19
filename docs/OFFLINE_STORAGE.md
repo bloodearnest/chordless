@@ -71,3 +71,15 @@ to restore from: recovery needs either the user or the server.
     IndexedDB and localStorage with the cookie kept and sees the restore
 - either way, unsynced changes and device settings (theme, pad set) are lost: sync early and
   often (see the background sync item)
+
+## Telling whether it was cleared (built)
+
+Each launch leaves a marker (a count and two times) in localStorage and in a small IndexedDB database of
+its own, and reads the ones the last launch left (`src/js/storage-survival.ts`). The About page says
+what it found ("Kept between launches": kept, partly cleared, or nothing from an earlier launch), and
+with reports on, `chordless.storage.launch` carries it (docs/OBSERVABILITY.md). It was added for a
+Safari web app (File, Add to Dock) that opened as a first use every time. A page load is a launch, and
+the marker is the app's own: it is not in the databases it checks on, and holds nothing of the person's.
+It cannot tell a first launch from everything cleared, so a "nothing from an earlier launch" is worth
+reading with what the person says. This is the detection step of the recovery above, without the
+server side of it.
