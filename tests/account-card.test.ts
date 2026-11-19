@@ -147,7 +147,7 @@ describe('account-card', () => {
       expect(text()).to.contain('Name')
       expect(text()).to.contain('Emails')
       expect(text()).to.contain('ann@example.com')
-      expect(text()).to.contain('On, with ann@example.com')
+      expect(text()).to.contain('synced via ann@example.com')
       expect(control('disable-sync').textContent).to.contain('Disable')
       expect(card.shadowRoot?.querySelector('#sign-in')).to.equal(null)
       expect(states).to.deep.equal(['signed-in'])
@@ -207,7 +207,7 @@ describe('account-card', () => {
       signInWithGoogle()
       must(worker.stored).metadata.user = undefined
       await open()
-      expect(text()).to.contain('On, with')
+      expect(text()).to.contain('synced via')
     })
 
     it('says no one is signed in, which is fine, and offers to sign in', async () => {
@@ -225,7 +225,7 @@ describe('account-card', () => {
       signInWithGoogle(-60_000)
       await open()
       expect(text()).to.contain('Sign-in expired')
-      expect(text()).to.not.contain('On, with')
+      expect(text()).to.not.contain('synced via')
       expect(control('reconnect').textContent).to.contain('Reconnect with Google')
       expect(states).to.deep.equal(['expired'])
     })
@@ -236,7 +236,7 @@ describe('account-card', () => {
       }
       signInWithGoogle(-60_000)
       await open()
-      expect(text()).to.contain('On, with ann@example.com')
+      expect(text()).to.contain('synced via ann@example.com')
     })
 
     it('says syncing is off, with Enable, for a Google sign-in without Drive', async () => {
@@ -448,7 +448,7 @@ describe('account-card', () => {
       signInByEmail()
       await open()
       control('enable-sync').click()
-      await until(() => text().includes('On, with bea@gmail.example'), 'Google to be connected')
+      await until(() => text().includes('synced via bea@gmail.example'), 'Google to be connected')
       expect(sent).to.deep.equal([{ authorization: 'Bearer access-1' }])
       expect(must(worker.stored).blob).to.equal('new-blob')
     })
@@ -491,7 +491,7 @@ describe('account-card', () => {
       await answer(false, 'Turn off syncing')
       await nothingFor()
       expect(must(worker.stored).blob).to.equal('encrypted-blob')
-      expect(text()).to.contain('On, with')
+      expect(text()).to.contain('synced via')
     })
 
     it('says so, and stays on, when the service worker cannot keep the change', async () => {
@@ -535,7 +535,7 @@ describe('account-card', () => {
       await answer(false, 'Log out')
       await nothingFor()
       expect(worker.stored).to.not.equal(undefined)
-      expect(text()).to.contain('On, with')
+      expect(text()).to.contain('synced via')
       expect(logged).to.deep.equal([])
     })
 

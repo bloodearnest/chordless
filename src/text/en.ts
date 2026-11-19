@@ -499,7 +499,7 @@ people-hint-read = You can see who is in the Team, and change your own name.
 ## Signing in with an emailed code
 
 # The other way to sign in, for someone with no Google account: Chordless emails a code to their address.
-email-code-button = Use my email address instead
+email-code-button = Sign in with email
 email-code-heading = Sign in with your email address
 email-code-address-label = Your email address
 email-code-send = Email me a sign-in link
@@ -583,7 +583,10 @@ space-sync-sign-in-hint = Sign in on the Account and Teams page to sync.
 action-sign-in = Sign in with Google
 account-email-signed-in = Signed in with your email address.
 account-signed-out-name = Not signed in
-account-signed-out-text = Your songs and setlists stay on this device. Signing in with Google lets you sync them, share setlists, and join a team.
+account-signed-out-text =
+    Your songs and setlists stay on this device. Signing in lets you access Team data that is shared with you.
+
+    If you sign in with a Google account your personal data is synced between your devices. Otherwise, just team data is.
 
 
 ## Lead sheets, and the pads that play under a song
@@ -732,8 +735,8 @@ account-name-save-failed = Saving your name failed: { $reason }
 account-emails-label = Emails
 account-emails-none = None yet
 account-email-google = Google
-account-sync-label = Personal space sync
-account-sync-on = On, with { $email }
+account-sync-label = Personal space
+account-sync-on = synced via { $email }
 account-sync-off-email = Off. Syncing your Personal space between your devices needs a Google account.
 account-sync-off-drive = Off. Google Drive is not connected.
 account-sync-disabled = Syncing is off on this device. Your Personal space stays here, and in your Google Drive.
