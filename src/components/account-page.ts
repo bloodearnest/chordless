@@ -1,5 +1,6 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import { cachedAccount } from '../js/account-info.ts'
 import type { Space } from '../js/data-types.ts'
 import { defaultSpaceOf, setDefaultSpaceId } from '../js/default-space.ts'
 import type { SignInState } from '../js/google-auth.ts'
@@ -9,15 +10,16 @@ import { checkTeamMemberships, TeamSpacesAddedEvent } from '../js/team-membershi
 import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
 import { errorMessage, failedWith } from '../js/utils/errors.ts'
-import { AccountStateEvent } from './account-card.ts'
+import { AccountLoadedEvent, AccountStateEvent } from './account-card.ts'
 import './account-card.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 import {
-  SpaceConnectGoogleEvent,
+  SpaceConnectDriveEvent,
   SpaceDataEvent,
   SpaceDefaultEvent,
+  SpaceDisconnectDriveEvent,
   SpaceManageEvent,
   SpaceSyncedEvent,
 } from './space-card.ts'
@@ -39,6 +41,7 @@ export class AccountPage extends LitElement {
     _defaultId: { state: true },
     _signIn: { state: true },
     _emailOnly: { state: true },
+    _driveEmail: { state: true },
     _data: { state: true },
     _looking: { state: true },
     _lookMessage: { state: true },
@@ -57,6 +60,8 @@ export class AccountPage extends LitElement {
   declare _signIn: SignInState | null
   /** Signed in with an emailed code alone */
   declare _emailOnly: boolean
+  /** The Google account the account's Drive is connected as, if it is */
+  declare _driveEmail: string | null
   /** Shows the space once it is the one in use (a test gives its own; by default the home page, afresh) */
   show: (() => unknown) | undefined = undefined
   /** Moves on to another page (a test gives its own) */
@@ -106,6 +111,7 @@ export class AccountPage extends LitElement {
     this._defaultId = null
     this._signIn = null
     this._emailOnly = false
+    this._driveEmail = cachedAccount()?.drive?.email ?? null
     this._data = null
     this._looking = false
     this._lookMessage = ''
@@ -119,7 +125,9 @@ export class AccountPage extends LitElement {
     this.addEventListener(SpaceManageEvent.type, this._onManage)
     this.addEventListener(SpaceDataEvent.type, this._onData)
     this.addEventListener(SpaceGoneEvent.type, this._onGone)
-    this.addEventListener(SpaceConnectGoogleEvent.type, this._onConnectGoogle)
+    this.addEventListener(SpaceConnectDriveEvent.type, this._onConnectDrive)
+    this.addEventListener(SpaceDisconnectDriveEvent.type, this._onDisconnectDrive)
+    this.addEventListener(AccountLoadedEvent.type, this._onLoaded)
     window.addEventListener(TeamSpacesAddedEvent.type, this._onTeamsAdded)
     void this.load()
   }
@@ -131,7 +139,9 @@ export class AccountPage extends LitElement {
     this.removeEventListener(SpaceManageEvent.type, this._onManage)
     this.removeEventListener(SpaceDataEvent.type, this._onData)
     this.removeEventListener(SpaceGoneEvent.type, this._onGone)
-    this.removeEventListener(SpaceConnectGoogleEvent.type, this._onConnectGoogle)
+    this.removeEventListener(SpaceConnectDriveEvent.type, this._onConnectDrive)
+    this.removeEventListener(SpaceDisconnectDriveEvent.type, this._onDisconnectDrive)
+    this.removeEventListener(AccountLoadedEvent.type, this._onLoaded)
     window.removeEventListener(TeamSpacesAddedEvent.type, this._onTeamsAdded)
     super.disconnectedCallback()
   }
@@ -179,19 +189,45 @@ export class AccountPage extends LitElement {
     this._defaultId = id
   }
 
-  /** Connects Google to the account (a test gives its own) */
-  connectGoogle: () => Promise<unknown> = async () => {
-    const { authorizeWithGoogle } = await import('../js/google-auth.ts')
-    return authorizeWithGoogle()
+  _onLoaded = (event: Event): void => {
+    this._driveEmail = (event as AccountLoadedEvent).account.drive?.email ?? null
   }
 
-  /** A Personal space's card asked to sync it between devices: Google is connected, and the sign-in read again */
-  _onConnectGoogle = async (): Promise<void> => {
+  /**
+   * Connects Google Drive to the account (a test gives its own): Google's whole sign-in for an account with no Google login
+   * yet (it joins the account, whatever its address), Drive's box asked for alone for one that has (so it cannot be left unticked)
+   */
+  connectDrive: (emailOnly: boolean) => Promise<unknown> = async emailOnly => {
+    const google = await import('../js/google-auth.ts')
+    return emailOnly ? google.authorizeWithGoogle() : google.connectDrive()
+  }
+
+  /** A Personal space's card asked to connect (or reconnect) Drive, to sync between devices: then the sign-in is read again */
+  _onConnectDrive = async (): Promise<void> => {
     try {
-      await this.connectGoogle()
+      await this.connectDrive(this._emailOnly)
     } catch (error) {
-      console.error('[AccountPage] Connecting Google failed:', error)
-      toast(t('toast-connect-google-failed'), { kind: 'error', details: errorMessage(error) })
+      console.error('[AccountPage] Connecting Google Drive failed:', error)
+      toast(t('toast-connect-drive-failed'), { kind: 'error', details: errorMessage(error) })
+    }
+    await this.shadowRoot?.querySelector('account-card')?.refresh()
+  }
+
+  /** Disconnects Drive from the account (a test gives its own) */
+  disconnectDrive: () => Promise<{ revoked: boolean }> = async () =>
+    (await import('../js/google-auth.ts')).disconnectDrive()
+
+  _disconnectModal: Ref<AppModal> = createRef()
+
+  /** A Personal space's card asked to disconnect Drive: after a question, it goes for every device, and they stay signed in */
+  _onDisconnectDrive = async (): Promise<void> => {
+    if (!(await this._disconnectModal.value?.ask())) return
+    try {
+      const { revoked } = await this.disconnectDrive()
+      toast(t(revoked ? 'toast-drive-disconnected' : 'toast-drive-disconnected-kept'))
+    } catch (error) {
+      console.error('[AccountPage] Disconnecting Google Drive failed:', error)
+      toast(t('toast-drive-disconnect-failed'), { kind: 'error', details: errorMessage(error) })
     }
     await this.shadowRoot?.querySelector('account-card')?.refresh()
   }
@@ -246,7 +282,7 @@ export class AccountPage extends LitElement {
             space => html`<space-card
               .space=${space}
               .signIn=${this._signIn}
-              ?emailOnly=${this._emailOnly}
+              .driveEmail=${this._driveEmail}
               ?current=${space.id === this._currentId}
               ?isDefault=${space.id === this._defaultId}
               ?several=${this._spaces.length > 1}
@@ -278,6 +314,14 @@ export class AccountPage extends LitElement {
       >
         ${this._data ? html`<space-manager .spaceId=${this._data.id}></space-manager>` : nothing}
       </app-modal>
+      <app-modal
+        ${ref(this._disconnectModal)}
+        type="confirm"
+        size="small"
+        heading=${t('confirm-drive-disconnect-heading')}
+        confirm-label=${t('confirm-drive-disconnect-button')}
+        message=${t('confirm-drive-disconnect-message')}
+      ></app-modal>
     `
   }
 }

@@ -27,6 +27,16 @@ export class AccountStateEvent extends Event {
   }
 }
 
+/** What the Worker says of the account has been read (or read again): its Drive is a Personal space card's line */
+export class AccountLoadedEvent extends Event {
+  static readonly type = 'account-card:loaded'
+  readonly account: AccountInfo
+  constructor(account: AccountInfo) {
+    super(AccountLoadedEvent.type, { bubbles: true, composed: true })
+    this.account = account
+  }
+}
+
 /** The result of the last step */
 interface Message {
   text: string
@@ -64,7 +74,6 @@ export class AccountCard extends LitElement {
   declare _busy: boolean
 
   _logoutModal: Ref<AppModal> = createRef()
-  _disableModal: Ref<AppModal> = createRef()
 
   static override styles = [
     panelStyles,
@@ -117,7 +126,10 @@ export class AccountCard extends LitElement {
     // (what the Worker says is newer than what was kept: shown when it comes, and kept for offline)
     if (state !== 'signed-out') {
       const fresh = await loadAccount()
-      if (fresh) this._account = fresh
+      if (fresh) {
+        this._account = fresh
+        this.dispatchEvent(new AccountLoadedEvent(fresh))
+      }
     }
   }
 
@@ -128,74 +140,6 @@ export class AccountCard extends LitElement {
       this._state === 'no-drive'
         ? { text: t('account-signed-in-no-drive'), type: 'success' }
         : { text: t('account-signed-in'), type: 'success' }
-  }
-
-  /** Google's whole sign-in: to sign in, to reconnect, and to turn the Personal space's sync on for an emailed sign-in */
-  async _signIn(): Promise<void> {
-    this._message = null
-    try {
-      const { authorizeWithGoogle } = await import('../js/google-auth.ts')
-      await authorizeWithGoogle()
-      await this._signedInHere()
-    } catch (error) {
-      console.error('[AccountCard] Sign-in failed:', error)
-      this._message = {
-        text: failedWith(
-          error,
-          t('account-signin-failed', { reason: errorMessage(error) }),
-          t('account-signin-failed-plain')
-        ),
-        type: 'error',
-      }
-    }
-  }
-
-  /** Add Google Drive to a Google sign-in that has none: Google is asked for that alone */
-  async _connectDrive(): Promise<void> {
-    this._message = null
-    try {
-      const { connectDrive } = await import('../js/google-auth.ts')
-      await connectDrive()
-      await this.refresh()
-      this._message =
-        this._state === 'no-drive'
-          ? { text: t('account-drive-not-connected'), type: 'error' }
-          : { text: t('account-drive-connected'), type: 'success' }
-    } catch (error) {
-      console.error('[AccountCard] Connecting Google Drive failed:', error)
-      this._message = {
-        text: failedWith(
-          error,
-          t('account-drive-connect-failed', { reason: errorMessage(error) }),
-          t('account-drive-connect-failed-plain')
-        ),
-        type: 'error',
-      }
-    }
-  }
-
-  /** Turn the Personal space's sync off on this device, after a question: they stay signed in */
-  async _disableSync(): Promise<void> {
-    if (!(await this._disableModal.value?.ask())) return
-    try {
-      const { disconnectDrive } = await import('../js/google-auth.ts')
-      const { revoked } = await disconnectDrive()
-      await this.refresh()
-      this._message = {
-        text: t(revoked ? 'account-sync-disabled' : 'account-sync-disabled-grant-kept'),
-        type: 'success',
-      }
-    } catch (error) {
-      console.error('[AccountCard] Turning the sync off failed:', error)
-      this._message = {
-        text: failedWith(
-          error,
-          t('account-sync-disable-failed', { reason: errorMessage(error) }),
-          t('account-sync-disable-failed-plain')
-        ),
-        type: 'error',
-      }
-    }
   }
 
   async _logout(): Promise<void> {
@@ -278,14 +222,6 @@ export class AccountCard extends LitElement {
         confirm-label=${t('confirm-logout-button')}
         message=${t('confirm-logout-message')}
       ></app-modal>
-      <app-modal
-        ${ref(this._disableModal)}
-        type="confirm"
-        size="small"
-        heading=${t('confirm-sync-disable-heading')}
-        confirm-label=${t('confirm-sync-disable-button')}
-        message=${t('confirm-sync-disable-message')}
-      ></app-modal>
     `
   }
 
@@ -298,8 +234,6 @@ export class AccountCard extends LitElement {
         <dd>${this._renderName()}</dd>
         <dt>${t('account-emails-label')}</dt>
         <dd>${this._renderEmails()}</dd>
-        <dt>${t('account-sync-label')}</dt>
-        <dd>${this._renderSync(state)}</dd>
       </dl>
       <div class="actions">
         <button class="btn" id="logout" @click=${this._logout}>${t('account-logout')}</button>
@@ -351,35 +285,9 @@ export class AccountCard extends LitElement {
       ${emails.map(
         each => html`<li>
           <span class="value">${each.email}</span>
-          ${each.provider === 'google' ? html`<span class="chip">${t('account-email-google')}</span>` : nothing}
         </li>`
       )}
     </ul>`
-  }
-
-  /** Whether the Personal space syncs, and the one button that changes it */
-  _renderSync(state: SignInState) {
-    if (state === 'expired') {
-      return html`
-        <span class="problem" role="alert">${t('account-status-expired')}</span>
-        <button class="btn primary" id="reconnect" @click=${this._signIn}>${t('action-reconnect-google')}</button>
-      `
-    }
-    if (state === 'signed-in') {
-      return html`
-        <span class="value">${t('account-sync-on', { email: this._user?.email ?? '' })}</span>
-        <button class="btn" id="disable-sync" @click=${this._disableSync}>${t('action-disable')}</button>
-      `
-    }
-    // (signed in with no Drive: by an emailed code alone, or by Google without Drive's box ticked)
-    return html`
-      <span class="sub">${t(this._emailOnly ? 'account-sync-off-email' : 'account-sync-off-drive')}</span>
-      <button
-        class="btn primary"
-        id="enable-sync"
-        @click=${this._emailOnly ? this._signIn : this._connectDrive}
-      >${t('action-enable')}</button>
-    `
   }
 }
 customElements.define('account-card', AccountCard)

@@ -6,9 +6,10 @@ import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import {
   type SpaceCard,
-  SpaceConnectGoogleEvent,
+  SpaceConnectDriveEvent,
   SpaceDataEvent,
   SpaceDefaultEvent,
+  SpaceDisconnectDriveEvent,
   SpaceManageEvent,
   SpaceSyncedEvent,
 } from '../src/components/space-card.ts'
@@ -93,27 +94,48 @@ describe('space-card', () => {
     expect(text(el)).to.match(/1 song · 1 setlist · about \d+ B/)
   })
 
-  it('offers Connect Google, on a Personal space only, to someone signed in by email alone', async () => {
+  it('offers Connect Google Drive on a Personal space with none, and Reconnect when it has expired', async () => {
     const own = await card('no-drive')
-    own.emailOnly = true
-    await own.updateComplete
-    expect(text(own)).to.contain('Connect Google to sync this space between your devices')
+    expect(text(own)).to.contain('Google Drive is not connected')
     let asked = 0
-    own.addEventListener(SpaceConnectGoogleEvent.type, () => asked++)
-    must(button(own, 'connect-google')).click()
+    own.addEventListener(SpaceConnectDriveEvent.type, () => asked++)
+    must(button(own, 'connect-drive')).click()
     expect(asked).to.equal(1)
-    // (a Team needs no Google, and someone signed in with Google already has Drive's own line)
+    expect(button(own, 'sync')).to.equal(null)
+
+    const expired = await card('expired')
+    expect(text(expired)).to.contain('Google Drive needs reconnecting')
+    expired.addEventListener(SpaceConnectDriveEvent.type, () => asked++)
+    must(button(expired, 'reconnect-drive')).click()
+    expect(asked).to.equal(2)
+    expect(button(expired, 'connect-drive')).to.equal(null)
+  })
+
+  it('shows which Google Drive a Personal space syncs through, with a way to disconnect it', async () => {
+    const own = await card('signed-in')
+    expect(button(own, 'disconnect-drive')).to.not.equal(null)
+    expect(own.shadowRoot?.querySelector('#drive-line')).to.equal(null)
+    own.driveEmail = 'ann@gmail.example'
+    await own.updateComplete
+    expect(text(own)).to.contain('Google Drive: ann@gmail.example')
+    let asked = 0
+    own.addEventListener(SpaceDisconnectDriveEvent.type, () => asked++)
+    must(button(own, 'disconnect-drive')).click()
+    expect(asked).to.equal(1)
+  })
+
+  it('says nothing of Google Drive on a Team, which syncs through the Worker', async () => {
     const team = await make(`Team ${crypto.randomUUID().slice(0, 8)}`, {
       team: { id: 't-7', role: 'writer' },
     })
-    const theirs = await card('no-drive', { space: team })
-    theirs.emailOnly = true
-    await theirs.updateComplete
-    expect(button(theirs, 'connect-google')).to.equal(null)
-    expect(text(theirs)).to.not.contain('Connect Google')
-    const withGoogle = await card('no-drive')
-    expect(text(withGoogle)).to.contain('Connect Google Drive to sync')
-    expect(button(withGoogle, 'connect-google')).to.equal(null)
+    for (const state of ['no-drive', 'signed-in'] as const) {
+      const theirs = await card(state, { space: team })
+      theirs.driveEmail = 'ann@gmail.example'
+      await theirs.updateComplete
+      expect(button(theirs, 'connect-drive')).to.equal(null)
+      expect(button(theirs, 'disconnect-drive')).to.equal(null)
+      expect(text(theirs)).to.not.contain('Google Drive')
+    }
   })
 
   it('shows the CCLI licence number when the space has one, and nothing when it has none', async () => {
@@ -206,7 +228,7 @@ describe('space-card', () => {
 
   it('has no Switch button: the space tabs switch', async () => {
     const el = await card('signed-in')
-    expect(order(el)).to.deep.equal(['sync', 'manage', 'manage-data'])
+    expect(order(el)).to.deep.equal(['sync', 'manage', 'manage-data', 'disconnect-drive'])
   })
 
   it('says a Team is a Team, and what the person is in it', async () => {
@@ -238,8 +260,8 @@ describe('space-card', () => {
   describe('the line about syncing', () => {
     it('says what stands in the way', async () => {
       expect(text(await card('signed-out'))).to.contain('Sign in to sync')
-      expect(text(await card('expired'))).to.contain('Sign-in expired: reconnect to sync')
-      expect(text(await card('no-drive'))).to.contain('Connect Google Drive to sync')
+      expect(text(await card('expired'))).to.contain('Google Drive needs reconnecting to sync')
+      expect(text(await card('no-drive'))).to.contain('Google Drive is not connected')
       expect(text(await card(null))).to.not.contain('sync')
     })
 

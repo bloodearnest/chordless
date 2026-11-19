@@ -159,20 +159,20 @@ describe('account-card', () => {
   })
 
   describe('what it shows', () => {
-    it('says the name, the addresses, and that the Personal space syncs, with the Google address, and tells the page', async () => {
+    it('says the name and the addresses, and tells the page how they are signed in', async () => {
       signInWithGoogle()
       await open()
       await until(() => text().includes('Ann Singer'), 'the name')
       expect(text()).to.contain('Name')
       expect(text()).to.contain('Emails')
       expect(text()).to.contain('ann@example.com')
-      expect(text()).to.contain('synced via ann@example.com')
-      expect(control('disable-sync').textContent).to.contain('Disable')
-      expect(card.shadowRoot?.querySelector('#sign-in')).to.equal(null)
+      expect(text()).to.not.contain('synced via')
+      expect(card.shadowRoot?.querySelector('sign-in-form')).to.equal(null)
+      expect(control('logout')).to.exist
       expect(states).to.deep.equal(['signed-in'])
     })
 
-    it('lists every address the account has, marking the Google one', async () => {
+    it('lists every address the account has, none marked as a separate login', async () => {
       account = {
         name: 'Ann Singer',
         emails: [
@@ -187,7 +187,7 @@ describe('account-card', () => {
       const items = Array.from(card.shadowRoot?.querySelectorAll('ul.emails li') ?? []).map(each =>
         (each.textContent ?? '').replace(/\s+/g, ' ').trim()
       )
-      expect(items).to.deep.equal(['ann@hotmail.example', 'ann@example.com Google'])
+      expect(items).to.deep.equal(['ann@hotmail.example', 'ann@example.com'])
     })
 
     it('shows what it kept when the Worker cannot be reached, and the address of the sign-in when it kept nothing', async () => {
@@ -221,14 +221,6 @@ describe('account-card', () => {
       expect(card.shadowRoot?.querySelector('.chip')).to.equal(null)
     })
 
-    it('says syncing is on even when the sign-in kept no profile to name the Google account', async () => {
-      account = null
-      signInWithGoogle()
-      must(worker.stored).metadata.user = undefined
-      await open()
-      expect(text()).to.contain('synced via')
-    })
-
     it('says no one is signed in, which is fine, and offers to sign in', async () => {
       await open()
       expect(text()).to.contain('Not signed in')
@@ -239,48 +231,28 @@ describe('account-card', () => {
       expect(states).to.deep.equal(['signed-out'])
     })
 
-    it('says the sign-in has expired, with a way to reconnect, when Google no longer honours it', async () => {
+    it('tells the page the Google Drive connection has expired, and shows the account all the same', async () => {
       routes['/api/account/drive/token'] = () =>
         Response.json({ error: 'invalid_grant' }, { status: 401 })
       signInWithGoogle(-60_000)
       await open()
-      expect(text()).to.contain('Sign-in expired')
-      expect(text()).to.not.contain('synced via')
-      expect(control('reconnect').textContent).to.contain('Reconnect with Google')
+      expect(text()).to.contain('Ann Singer')
       expect(states).to.deep.equal(['expired'])
     })
 
-    it('stays on when the refresh fails for another reason, such as no network', async () => {
+    it('stays signed in when the Drive token cannot be had for another reason, such as no network', async () => {
       routes['/api/account/drive/token'] = () => {
         throw new TypeError('Failed to fetch')
       }
       signInWithGoogle(-60_000)
       await open()
-      expect(text()).to.contain('synced via ann@example.com')
+      expect(states).to.deep.equal(['signed-in'])
     })
 
-    it('says syncing is off, with Enable, for a Google sign-in without Drive', async () => {
+    it('tells the page the account has no Drive, however they signed in', async () => {
       signInWithGoogle(30 * 60 * 1000, 'openid email profile')
       await open()
-      expect(text()).to.contain('Google Drive is not connected')
-      expect(control('enable-sync').textContent).to.contain('Enable')
-      expect(card.shadowRoot?.querySelector('#disable-sync')).to.equal(null)
       expect(states).to.deep.equal(['no-drive'])
-    })
-
-    it('says syncing is off, with Enable, for an emailed sign-in, which needs a Google account', async () => {
-      account = {
-        name: 'Ann Singer',
-        emails: [{ email: 'ann@example.com', provider: 'email' }],
-        googleEmail: null,
-      }
-      signInByEmail()
-      await open()
-      expect(text()).to.contain('needs a Google account')
-      expect(control('enable-sync').textContent).to.contain('Enable')
-      expect(card.shadowRoot?.querySelector('#revoke')).to.equal(null)
-      expect(card.shadowRoot?.querySelector('#test-refresh')).to.equal(null)
-      expect(card.shadowRoot?.querySelector('details')).to.equal(null)
     })
   })
 
@@ -381,43 +353,12 @@ describe('account-card', () => {
       expect(states).to.deep.equal(['signed-out', 'signed-in'])
     })
 
-    it('signs in when the Drive box was left unticked, says so, and can enable Drive', async () => {
+    it('signs in when the Drive box was left unticked, and says so', async () => {
       await open()
       exchange = signedIn('openid email profile')
       googleButton().click()
       await until(() => text().includes('Drive was not connected'), 'the sign-in to finish')
-      expect(text()).to.contain('Google Drive is not connected')
-
-      exchange = signedIn(DRIVE)
-      control('enable-sync').click()
-      await until(() => text().includes('Google Drive connected.'), 'Drive to be connected')
-      expect(card.shadowRoot?.querySelector('#enable-sync')).to.equal(null)
-    })
-
-    it('says so when Drive is still not connected after asking for it, and when asking fails', async () => {
-      await open()
-      exchange = signedIn('openid email profile')
-      googleButton().click()
-      await until(() => card._state === 'no-drive', 'the sign-in to finish')
-
-      control('enable-sync').click()
-      await until(() => text().includes('Google Drive was not connected.'), 'the answer')
-
-      codeResponse = { error: 'access_denied' }
-      control('enable-sync').click()
-      await until(() => text().includes('Connecting Google Drive failed'), 'the failure')
-      // (what Google answered is for a developer: the page says what could not be done)
-      expect(text()).to.not.contain('access_denied')
-    })
-
-    it('reconnects after the sign-in expired', async () => {
-      routes['/api/account/drive/token'] = () =>
-        Response.json({ error: 'invalid_grant' }, { status: 401 })
-      signInWithGoogle(-60_000)
-      await open()
-      control('reconnect').click()
-      await until(() => text().includes('Signed in.'), 'the sign-in to finish')
-      expect(card._state).to.equal('signed-in')
+      expect(card._state).to.equal('no-drive')
     })
 
     it('says so when Google refuses', async () => {
@@ -443,119 +384,6 @@ describe('account-card', () => {
       await until(() => text().includes('Signed in.'), 'the message')
       expect(card.shadowRoot?.querySelector('sign-in-form')).to.equal(null)
       expect(states.at(-1)).to.equal('no-drive')
-    })
-  })
-
-  describe('enabling the sync for an emailed sign-in', () => {
-    let sent: { authorization: string | null }[]
-    let callback: () => Response
-    beforeEach(() => {
-      sent = []
-      callback = () => {
-        drive = true
-        return Response.json({
-          blob: 'new-blob',
-          access_token: 'tok',
-          expires_in: 3600,
-          scope: DRIVE,
-          user: { name: 'Bea Singer', email: 'bea@gmail.example', picture: null },
-          session: { access_token: 'access-2', refresh_token: 'id.secret', expires_in: 900 },
-        })
-      }
-      routes['/oauth/callback'] = (_url, init) => {
-        sent.push({ authorization: new Headers(init?.headers).get('Authorization') })
-        return callback()
-      }
-      ;(window as { google?: unknown }).google = {
-        accounts: {
-          oauth2: {
-            initCodeClient: (config: { callback: (response: object) => void }) => ({
-              requestCode: () => config.callback({ code: 'the-code' }),
-            }),
-          },
-        },
-      }
-    })
-
-    it('adds Google to the account they are signed in to, by showing the session', async () => {
-      account = {
-        name: 'Ann Singer',
-        emails: [{ email: 'ann@example.com', provider: 'email' }],
-        googleEmail: null,
-      }
-      signInByEmail()
-      await open()
-      control('enable-sync').click()
-      await until(() => text().includes('synced via bea@gmail.example'), 'Google to be connected')
-      expect(sent).to.deep.equal([{ authorization: 'Bearer access-1' }])
-      expect(must(worker.stored).blob, 'the Worker keeps the credential').to.equal('')
-      expect(must(worker.stored).metadata.drive).to.equal(true)
-    })
-
-    it('says when that Google account is already another Chordless account', async () => {
-      account = {
-        name: 'Ann Singer',
-        emails: [{ email: 'ann@example.com', provider: 'email' }],
-        googleEmail: null,
-      }
-      signInByEmail()
-      callback = () => Response.json({ error: 'google_in_use' }, { status: 409 })
-      await open()
-      control('enable-sync').click()
-      await until(() => text().includes('already used by another Chordless account'), 'the message')
-      expect(must(worker.stored).blob).to.equal('')
-    })
-  })
-
-  describe('disabling the sync', () => {
-    it('asks first, then disconnects Drive from the account, keeping them signed in', async () => {
-      signInWithGoogle()
-      await open()
-      control('disable-sync').click()
-      await answer(true, 'Turn off syncing')
-      await until(() => text().includes('Google Drive is disconnected.'), 'the message')
-      expect(drive, 'the Worker forgot it, for every device').to.equal(false)
-      expect(must(worker.stored).metadata.session?.refresh_token).to.equal(
-        'session-id.refresh-secret'
-      )
-      expect(card._state).to.equal('no-drive')
-      expect(control('enable-sync')).to.exist
-    })
-
-    it('says when Google was left alone, because a Team the person owns still uses the grant', async () => {
-      routes['/api/account/drive'] = (_url, init) => {
-        if (init?.method !== 'DELETE') return undefined
-        drive = false
-        return Response.json({ success: true, revoked: false })
-      }
-      signInWithGoogle()
-      await open()
-      control('disable-sync').click()
-      await answer(true, 'Turn off syncing')
-      await until(() => text().includes('left in place'), 'the message')
-    })
-
-    it('does nothing when it is not confirmed', async () => {
-      signInWithGoogle()
-      await open()
-      control('disable-sync').click()
-      await answer(false, 'Turn off syncing')
-      await nothingFor()
-      expect(drive).to.equal(true)
-      expect(text()).to.contain('synced via')
-    })
-
-    it('says so, and stays on, when the Worker cannot do it', async () => {
-      routes['/api/account/drive'] = (_url, init) =>
-        init?.method === 'DELETE'
-          ? Response.json({ error: 'Google did not revoke the access' }, { status: 502 })
-          : undefined
-      signInWithGoogle()
-      await open()
-      control('disable-sync').click()
-      await answer(true, 'Turn off syncing')
-      await until(() => text().includes('Turning syncing off failed'), 'the failure')
-      expect(card._state).to.equal('signed-in')
     })
   })
 
@@ -589,7 +417,7 @@ describe('account-card', () => {
       await answer(false, 'Log out')
       await nothingFor()
       expect(worker.stored).to.not.equal(undefined)
-      expect(text()).to.contain('synced via')
+      expect(text()).to.contain('Ann Singer')
       expect(logged).to.deep.equal([])
     })
 

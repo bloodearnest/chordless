@@ -22,7 +22,10 @@ action-open-account = Open Account and Teams
 ## Setlists
 
 # A setlist could not be deleted.
-toast-connect-google-failed = Couldn't connect Google.
+toast-connect-drive-failed = Couldn't connect Google Drive.
+toast-drive-disconnected = Google Drive is disconnected.
+toast-drive-disconnected-kept = Google Drive is disconnected from your account. A Team you own is still kept in your Drive, so Google's access for Chordless was left in place.
+toast-drive-disconnect-failed = Couldn't disconnect Google Drive.
 toast-setlist-delete-failed = Couldn't delete the setlist.
 
 # A setlist was deleted; the message offers Undo. { $title } is its name.
@@ -641,8 +644,15 @@ adopt-folder-message = Your Drive has one Chordless folder, "{ $name }", and non
 adopt-folder-use = Use "{ $name }"
 adopt-folder-new = Make a new folder
 space-sync-sign-in = Sign in to sync
-space-sync-connect-drive = Connect Google Drive to sync
-space-sync-connect-google = Connect Google to sync this space between your devices
+space-drive-off = Google Drive is not connected, so this space does not sync between your devices.
+space-drive-reconnect = Google Drive needs reconnecting to sync.
+space-drive-on = Google Drive: { $email }
+action-connect-drive = Connect Google Drive
+action-reconnect-drive = Reconnect Google Drive
+action-disconnect-drive = Disconnect Google Drive
+confirm-drive-disconnect-heading = Disconnect Google Drive?
+confirm-drive-disconnect-button = Disconnect
+confirm-drive-disconnect-message = Your Personal space stays on your devices and in your Google Drive, and you stay signed in. Syncing stops on all of your devices until you connect Google Drive again.
 
 # How long ago a sync was, for "Synced { $when }" and "Last synced: { $when }". { $count } is the number.
 sync-time-now = Just now
@@ -663,13 +673,11 @@ sync-time-days =
     }
 
 action-sync = Sync
-action-connect-google = Connect Google
 action-manage-users = Manage Users
 action-manage-data = Manage Data
 # { $name } is the name of a space.
 space-data-heading = { $name }: data
 action-make-default = Make default
-action-reconnect-google = Reconnect with Google
 
 # A page for a space that is not on this device (an old link, say).
 space-missing = This device has no such Personal space or Team. It may have been deleted.
@@ -720,24 +728,11 @@ account-name-add = Add your name
 account-name-save-failed = Saving your name failed: { $reason }
 account-emails-label = Emails
 account-emails-none = None yet
-account-email-google = Google
-account-sync-label = Personal space
-account-sync-on = synced via { $email }
-account-sync-off-email = Off. Syncing your Personal space between your devices needs a Google account.
-account-sync-off-drive = Off. Google Drive is not connected.
-account-sync-disabled = Google Drive is disconnected. Your Personal space stays on your devices and in your Google Drive.
-account-sync-disabled-grant-kept = Google Drive is disconnected from your account. Your Personal space stays on your devices and in your Google Drive. A Team you own is still kept in your Drive, so Google's access for Chordless was left in place.
-account-sync-disable-failed = Turning syncing off failed: { $reason }
-confirm-sync-disable-heading = Turn off syncing on this device?
-confirm-sync-disable-button = Disable
-confirm-sync-disable-message = Your Personal space stays on your devices and in your Google Drive, and you stay signed in. Syncing stops on all of your devices until you connect Google Drive again.
 action-save = Save
 name-prompt-heading = What should we call you?
 name-prompt-text = This is the name your team sees, and the one on your own setlists. You can change it any time on the Account page.
 name-prompt-later = Not now
 action-edit = Edit
-action-enable = Enable
-action-disable = Disable
 # The name of someone whose Google account gave none.
 account-status-expired = Sign-in expired: reconnect to sync
 
@@ -745,9 +740,6 @@ account-status-expired = Sign-in expired: reconnect to sync
 account-signed-in = Signed in.
 account-signed-in-no-drive = Signed in. Google Drive was not connected, so your own spaces will not sync yet.
 account-signin-failed = Signing in failed: { $reason }
-account-drive-connected = Google Drive connected.
-account-drive-not-connected = Google Drive was not connected.
-account-drive-connect-failed = Connecting Google Drive failed: { $reason }
 account-logged-out = Logged out on this device.
 account-logout-failed = Logging out failed: { $reason }
 # { $old } and { $new } are the times the token was due to expire before and after.
@@ -1952,11 +1944,9 @@ join-sync-failed = Couldn't get the team's songs and setlists.
 
 ## The same, when the reason is not for the person to read (it is kept for the console and the reports)
 
-account-drive-connect-failed-plain = Connecting Google Drive failed.
 account-logout-failed-plain = Logging out failed.
 account-name-save-failed-plain = Saving your name failed.
 account-signin-failed-plain = Signing in failed.
-account-sync-disable-failed-plain = Turning syncing off failed.
 de-backup-failed-plain = The backup could not be made.
 drive-sync-failed-plain = Failed.
 email-import-create-failed-plain = Could not create the setlist.

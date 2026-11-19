@@ -33,11 +33,19 @@ export class SpaceDefaultEvent extends Event {
   }
 }
 
-/** A person asked to connect Google, to sync a Personal space between their devices: the page does it */
-export class SpaceConnectGoogleEvent extends Event {
-  static readonly type = 'space-card:connect-google'
+/** A person asked to connect (or reconnect) Google Drive, to sync a Personal space between their devices: the page does it */
+export class SpaceConnectDriveEvent extends Event {
+  static readonly type = 'space-card:connect-drive'
   constructor() {
-    super(SpaceConnectGoogleEvent.type, { bubbles: true, composed: true })
+    super(SpaceConnectDriveEvent.type, { bubbles: true, composed: true })
+  }
+}
+
+/** A person asked to disconnect Google Drive from the account, for every device: the page asks first, and does it */
+export class SpaceDisconnectDriveEvent extends Event {
+  static readonly type = 'space-card:disconnect-drive'
+  constructor() {
+    super(SpaceDisconnectDriveEvent.type, { bubbles: true, composed: true })
   }
 }
 
@@ -74,7 +82,7 @@ export class SpaceCard extends LitElement {
     isDefault: { type: Boolean },
     several: { type: Boolean },
     signIn: { attribute: false },
-    emailOnly: { type: Boolean },
+    driveEmail: { attribute: false },
     _summary: { state: true },
     _syncing: { state: true },
     _progress: { state: true },
@@ -91,8 +99,8 @@ export class SpaceCard extends LitElement {
   declare several: boolean
   /** How the person is signed in, or null while that is not known yet */
   declare signIn: SignInState | null
-  /** Signed in with an emailed code alone: a Personal space needs Google to sync between devices */
-  declare emailOnly: boolean
+  /** The Google account the account's Drive is connected as, when it is (a Personal space syncs through it) */
+  declare driveEmail: string | null
   declare _summary: SpaceSummary | null
   declare _syncing: boolean
   declare _progress: string
@@ -150,7 +158,7 @@ export class SpaceCard extends LitElement {
     super()
     this.current = false
     this.signIn = null
-    this.emailOnly = false
+    this.driveEmail = null
     this._summary = null
     this._syncing = false
     this._progress = ''
@@ -169,6 +177,11 @@ export class SpaceCard extends LitElement {
     const id = this.space.id
     const summary = await summaryOf(id)
     if (id === this.space.id) this._summary = summary
+  }
+
+  /** A Personal space syncs through the account's Google Drive; a Team's through the Worker */
+  get _isPersonal(): boolean {
+    return !this.space.team
   }
 
   /** Whether syncing can be done now: a team's member needs only a sign-in, everyone else Drive too */
@@ -234,11 +247,9 @@ export class SpaceCard extends LitElement {
       case 'signed-out':
         return t('space-sync-sign-in')
       case 'expired':
-        return t('account-status-expired')
+        return t(this._isPersonal ? 'space-drive-reconnect' : 'account-status-expired')
       case 'no-drive':
-        if (!isTeamMember(this.space)) {
-          return t(this.emailOnly ? 'space-sync-connect-google' : 'space-sync-connect-drive')
-        }
+        if (this._isPersonal) return t('space-drive-off')
         break
     }
     return this._syncedAt
@@ -279,6 +290,11 @@ export class SpaceCard extends LitElement {
               : this._error || this._syncLine()
           }
         </p>
+        ${
+          this._isPersonal && this.signIn === 'signed-in' && this.driveEmail
+            ? html`<p class="line" id="drive-line">${t('space-drive-on', { email: this.driveEmail })}</p>`
+            : nothing
+        }
         <div class="actions">
           ${
             this._canSync
@@ -288,9 +304,16 @@ export class SpaceCard extends LitElement {
               : nothing
           }
           ${
-            this.emailOnly && !space.team && this.signIn === 'no-drive'
-              ? html`<button class="btn primary" id="connect-google" @click=${() => this.dispatchEvent(new SpaceConnectGoogleEvent())}>
-                  ${t('action-connect-google')}
+            this._isPersonal && this.signIn === 'no-drive'
+              ? html`<button class="btn primary" id="connect-drive" @click=${() => this.dispatchEvent(new SpaceConnectDriveEvent())}>
+                  ${t('action-connect-drive')}
+                </button>`
+              : nothing
+          }
+          ${
+            this._isPersonal && this.signIn === 'expired'
+              ? html`<button class="btn primary" id="reconnect-drive" @click=${() => this.dispatchEvent(new SpaceConnectDriveEvent())}>
+                  ${t('action-reconnect-drive')}
                 </button>`
               : nothing
           }
@@ -305,6 +328,13 @@ export class SpaceCard extends LitElement {
               ? html`<button class="btn" id="make-default" @click=${() => this.dispatchEvent(new SpaceDefaultEvent(space.id))}>
                 ${t('action-make-default')}
               </button>`
+              : nothing
+          }
+          ${
+            this._isPersonal && this.signIn === 'signed-in'
+              ? html`<button class="btn" id="disconnect-drive" @click=${() => this.dispatchEvent(new SpaceDisconnectDriveEvent())}>
+                  ${t('action-disconnect-drive')}
+                </button>`
               : nothing
           }
         </div>
