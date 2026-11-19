@@ -375,8 +375,7 @@ const ADMIN_ROUTES: AdminRoute[] = [
     path: /^\/credential$/,
     needs: 'owner',
     async run({ request, ctx, room, identity }) {
-      const info = await room.info()
-      if (!info) throw new Refusal(400, 'A space is needed')
+      const info = (await room.info()) as SpaceInfo
       const blob = await ownerBlobFor(ctx, identity, (await readJson(request)).blob)
       await checkSharing(ctx, identity, blob, info.rootRef)
       await room.setOwnerBlob(blob)

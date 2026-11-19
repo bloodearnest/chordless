@@ -29,6 +29,8 @@ describe('account-card', () => {
   /** What the Worker says of the account (null: it cannot be reached), and what was sent to it */
   let account: AccountInfo | null
   let puts: unknown[]
+  /** Whether the account has Drive connected at the Worker (which holds the Google credential for every device) */
+  let drive: boolean
   let routes: Record<string, (input: string, init?: RequestInit) => Response | undefined>
   const realFetch = window.fetch
   const realGoogle = (window as { google?: unknown }).google
@@ -52,9 +54,11 @@ describe('account-card', () => {
 
   /** Signed in with Google (with Drive, unless a scope without it is given), with a session as well */
   function signInWithGoogle(expiresInMs = 30 * 60 * 1000, scope = DRIVE) {
+    drive = scope.includes('drive.file')
     worker.stored = {
-      blob: 'encrypted-blob',
+      blob: '',
       metadata: {
+        drive,
         access_token: 'token',
         expires_at: new Date(Date.now() + expiresInMs).toISOString(),
         scope,
@@ -110,7 +114,18 @@ describe('account-card', () => {
       googleEmail: 'ann@example.com',
     }
     puts = []
-    routes = {}
+    drive = false
+    routes = {
+      '/api/account/drive/token': () =>
+        drive
+          ? Response.json({ access_token: 'drive-token', expires_in: 3600 })
+          : Response.json({ error: 'not_connected' }, { status: 404 }),
+      '/api/account/drive': (_url, init) => {
+        if (init?.method !== 'DELETE') return undefined
+        drive = false
+        return Response.json({ success: true, revoked: true })
+      },
+    }
     localStorage.removeItem(KEY)
     window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
@@ -125,7 +140,7 @@ describe('account-card', () => {
             return Response.json({ error: 'A name is needed' }, { status: 400 })
           account = { ...account, name: body.name }
         }
-        return Response.json(account)
+        return Response.json({ ...account, drive: drive ? { email: 'ann@example.com' } : null })
       }
       return realFetch(input, init)
     }) as typeof fetch
@@ -221,7 +236,8 @@ describe('account-card', () => {
     })
 
     it('says the sign-in has expired, with a way to reconnect, when Google no longer honours it', async () => {
-      routes['/session/refresh'] = () => Response.json({ error: 'invalid_grant' }, { status: 401 })
+      routes['/api/account/drive/token'] = () =>
+        Response.json({ error: 'invalid_grant' }, { status: 401 })
       signInWithGoogle(-60_000)
       await open()
       expect(text()).to.contain('Sign-in expired')
@@ -231,7 +247,7 @@ describe('account-card', () => {
     })
 
     it('stays on when the refresh fails for another reason, such as no network', async () => {
-      routes['/session/refresh'] = () => {
+      routes['/api/account/drive/token'] = () => {
         throw new TypeError('Failed to fetch')
       }
       signInWithGoogle(-60_000)
@@ -249,6 +265,11 @@ describe('account-card', () => {
     })
 
     it('says syncing is off, with Enable, for an emailed sign-in, which needs a Google account', async () => {
+      account = {
+        name: 'Ann Singer',
+        emails: [{ email: 'ann@example.com', provider: 'email' }],
+        googleEmail: null,
+      }
       signInByEmail()
       await open()
       expect(text()).to.contain('needs a Google account')
@@ -315,8 +336,10 @@ describe('account-card', () => {
     let codeResponse: { code?: string; error?: string }
     let exchange: () => Response
 
-    const signedIn = (scope: string) => () =>
-      Response.json({
+    const signedIn = (scope: string) => () => {
+      // (the Worker keeps the credential for the account when Drive was granted)
+      drive = scope.includes('drive.file')
+      return Response.json({
         blob: 'new-blob',
         access_token: 'tok',
         expires_in: 3600,
@@ -324,6 +347,7 @@ describe('account-card', () => {
         user: { name: 'Bea Singer', email: 'bea@example.com', picture: null },
         session: { access_token: 'access-2', refresh_token: 'id.secret', expires_in: 900 },
       })
+    }
 
     beforeEach(() => {
       codeResponse = { code: 'the-code' }
@@ -383,7 +407,8 @@ describe('account-card', () => {
     })
 
     it('reconnects after the sign-in expired', async () => {
-      routes['/session/refresh'] = () => Response.json({ error: 'invalid_grant' }, { status: 401 })
+      routes['/api/account/drive/token'] = () =>
+        Response.json({ error: 'invalid_grant' }, { status: 401 })
       signInWithGoogle(-60_000)
       await open()
       control('reconnect').click()
@@ -420,8 +445,9 @@ describe('account-card', () => {
     let callback: () => Response
     beforeEach(() => {
       sent = []
-      callback = () =>
-        Response.json({
+      callback = () => {
+        drive = true
+        return Response.json({
           blob: 'new-blob',
           access_token: 'tok',
           expires_in: 3600,
@@ -429,6 +455,7 @@ describe('account-card', () => {
           user: { name: 'Bea Singer', email: 'bea@gmail.example', picture: null },
           session: { access_token: 'access-2', refresh_token: 'id.secret', expires_in: 900 },
         })
+      }
       routes['/oauth/callback'] = (_url, init) => {
         sent.push({ authorization: new Headers(init?.headers).get('Authorization') })
         return callback()
@@ -445,15 +472,26 @@ describe('account-card', () => {
     })
 
     it('adds Google to the account they are signed in to, by showing the session', async () => {
+      account = {
+        name: 'Ann Singer',
+        emails: [{ email: 'ann@example.com', provider: 'email' }],
+        googleEmail: null,
+      }
       signInByEmail()
       await open()
       control('enable-sync').click()
       await until(() => text().includes('synced via bea@gmail.example'), 'Google to be connected')
       expect(sent).to.deep.equal([{ authorization: 'Bearer access-1' }])
-      expect(must(worker.stored).blob).to.equal('new-blob')
+      expect(must(worker.stored).blob, 'the Worker keeps the credential').to.equal('')
+      expect(must(worker.stored).metadata.drive).to.equal(true)
     })
 
     it('says when that Google account is already another Chordless account', async () => {
+      account = {
+        name: 'Ann Singer',
+        emails: [{ email: 'ann@example.com', provider: 'email' }],
+        googleEmail: null,
+      }
       signInByEmail()
       callback = () => Response.json({ error: 'google_in_use' }, { status: 409 })
       await open()
@@ -464,24 +502,31 @@ describe('account-card', () => {
   })
 
   describe('disabling the sync', () => {
-    it('asks first, then forgets Google on this device, keeping them signed in and revoking nothing', async () => {
-      const fetched: string[] = []
-      routes['/session/logout'] = url => {
-        fetched.push(url)
-        return new Response('{}')
-      }
+    it('asks first, then disconnects Drive from the account, keeping them signed in', async () => {
       signInWithGoogle()
       await open()
       control('disable-sync').click()
       await answer(true, 'Turn off syncing')
-      await until(() => text().includes('Syncing is off on this device'), 'the message')
-      expect(must(worker.stored).blob).to.equal('')
+      await until(() => text().includes('Google Drive is disconnected.'), 'the message')
+      expect(drive, 'the Worker forgot it, for every device').to.equal(false)
       expect(must(worker.stored).metadata.session?.refresh_token).to.equal(
         'session-id.refresh-secret'
       )
       expect(card._state).to.equal('no-drive')
       expect(control('enable-sync')).to.exist
-      expect(fetched, 'Google is not revoked: other devices keep their sync').to.deep.equal([])
+    })
+
+    it('says when Google was left alone, because a Team the person owns still uses the grant', async () => {
+      routes['/api/account/drive'] = (_url, init) => {
+        if (init?.method !== 'DELETE') return undefined
+        drive = false
+        return Response.json({ success: true, revoked: false })
+      }
+      signInWithGoogle()
+      await open()
+      control('disable-sync').click()
+      await answer(true, 'Turn off syncing')
+      await until(() => text().includes('left in place'), 'the message')
     })
 
     it('does nothing when it is not confirmed', async () => {
@@ -490,14 +535,17 @@ describe('account-card', () => {
       control('disable-sync').click()
       await answer(false, 'Turn off syncing')
       await nothingFor()
-      expect(must(worker.stored).blob).to.equal('encrypted-blob')
+      expect(drive).to.equal(true)
       expect(text()).to.contain('synced via')
     })
 
-    it('says so, and stays on, when the service worker cannot keep the change', async () => {
+    it('says so, and stays on, when the Worker cannot do it', async () => {
+      routes['/api/account/drive'] = (_url, init) =>
+        init?.method === 'DELETE'
+          ? Response.json({ error: 'Google did not revoke the access' }, { status: 502 })
+          : undefined
       signInWithGoogle()
       await open()
-      worker.failing.add('STORE_BLOB')
       control('disable-sync').click()
       await answer(true, 'Turn off syncing')
       await until(() => text().includes('Turning syncing off failed'), 'the failure')

@@ -29,7 +29,7 @@
  * allowing direct browser-to-Drive API calls for better performance and offline support.
  */
 
-import { forgetAccount } from './account-info.ts'
+import { cachedAccount, forgetAccount, loadAccount } from './account-info.ts'
 import type { AuthMetadata, StoredBlob, StoredSession, StoredUser } from './auth-db.ts'
 import {
   type AuthMessageData,
@@ -112,7 +112,7 @@ export async function getCurrentUserInfo(): Promise<UserInfo | null> {
       }
     }
 
-    if (shouldPersist && blobData?.blob) {
+    if (shouldPersist && blobData) {
       const updatedMetadata = {
         ...metadata,
         user,
@@ -161,7 +161,6 @@ export function initGoogleAuth(): Promise<void> {
 
 /** What the worker sends back once it has exchanged the authorization code */
 export interface AuthorizeResult {
-  blob: string
   access_token: string
   expires_in: number
   user: StoredUser | null
@@ -217,8 +216,9 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
             throw new Error(error.error || 'Failed to exchange code for tokens')
           }
 
+          // (the Worker has kept the Google credential for the account; the `blob` it also sends is for the apps
+          // from before that, and is not kept here)
           const {
-            blob,
             access_token,
             expires_in,
             id_token,
@@ -229,10 +229,13 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
 
           const normalizedUser = user ? await buildStoredUserProfile(user).catch(() => user) : null
 
+          if (!newSession) throw new Error('Sessions are not set up on this server')
           const metadata: AuthMetadata = {
             access_token,
             expires_at: new Date(Date.now() + expires_in * 1000).toISOString(),
             user: normalizedUser,
+            session: sessionFrom(newSession),
+            drive: typeof scope === 'string' ? scope.includes(DRIVE_SCOPE) : undefined,
           }
 
           if (id_token) {
@@ -241,12 +244,11 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
           if (typeof scope === 'string') {
             metadata.scope = scope
           }
-          if (newSession) metadata.session = sessionFrom(newSession)
 
-          // Store blob in Service Worker: with no blob kept the user is not signed in, whatever
+          // Keep the sign-in in the Service Worker: with none kept the user is not signed in, whatever
           // the page was told
           const stored = await sendToServiceWorker('STORE_BLOB', {
-            blob,
+            blob: '',
             metadata,
           })
           if (!stored.success) throw new Error(stored.error || 'Failed to save the sign-in')
@@ -263,7 +265,8 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
           )
           askForName()
 
-          resolve({ blob, access_token, expires_in, user: normalizedUser || user })
+          followUp(learnDrive())
+          resolve({ access_token, expires_in, user: normalizedUser || user })
         } catch (error) {
           reject(error)
         }
@@ -304,10 +307,16 @@ export class GoogleInUseError extends UserError {
   }
 }
 
-/** Whether the sign-in is an emailed code's alone: a session, and no Google blob (so no Drive) */
+/**
+ * Whether the account has no Google login (it signs in by an emailed code alone), so that Google has to be joined to it before
+ * Drive can be connected. What the Worker says of the account, as last read; where that cannot be had (offline), what this
+ * device kept of the sign-in: an emailed one keeps no ID token and no Google id for the person.
+ */
 export async function isEmailOnly(): Promise<boolean> {
+  const info = cachedAccount() ?? (await loadAccount())
+  if (info) return info.googleEmail === null
   const stored = await getStoredBlob()
-  return !!stored && !stored.blob
+  return !!stored && !stored.blob && !stored.metadata.id_token && !stored.metadata.user?.sub
 }
 
 /**
@@ -427,7 +436,8 @@ async function keepEmailSession(
     },
   })
   if (!stored.success) throw new Error(stored.error || 'Failed to save the sign-in')
-  // (the teams this person is in are looked for in the background)
+  // (whether the account has Drive from another device, and the teams this person is in, are looked for in the background)
+  followUp(learnDrive())
   followUp(
     import('./team-memberships.ts').then(({ checkTeamMemberships }) =>
       checkTeamMemberships({ force: true })
@@ -437,18 +447,36 @@ async function keepEmailSession(
 }
 
 /**
- * Whether the stored sign-in includes Drive (not if there is none). One made before the scope was
- * kept did, as signing in without Drive was not possible then.
+ * Whether the account has Google Drive connected (not if signed out). What the Worker last said (`learnDrive`); a device from
+ * before the Worker kept the credential has its own blob, whose scope says, until it is adopted (`adoptLocalBlob`).
  */
 export async function hasDriveAccess(): Promise<boolean> {
   try {
     const stored = (await sendToServiceWorker('GET_BLOB')).data
     if (!stored) return false
-    const { scope } = stored.metadata
-    return scope === undefined || scope.includes(DRIVE_SCOPE)
+    const { drive, scope } = stored.metadata
+    if (drive !== undefined) return drive
+    return !!stored.blob && (scope === undefined || scope.includes(DRIVE_SCOPE))
   } catch (error) {
     console.error('[Auth] Error checking for Drive access:', error)
     return false
+  }
+}
+
+/**
+ * Ask the Worker whether the account has Drive connected (it may have, from another device), and keep the answer. A failed
+ * ask (offline, say) changes nothing: what was kept stands.
+ */
+async function learnDrive(): Promise<void> {
+  const info = await loadAccount()
+  if (info) await setDrive(!!info.drive)
+}
+
+/** Keep whether the account has Drive, on what is stored now (not what was read before: another step may have changed it) */
+async function setDrive(drive: boolean): Promise<void> {
+  const latest = await getStoredBlob()
+  if (latest && latest.metadata.drive !== drive) {
+    await storeSignIn(latest.blob, { ...latest.metadata, drive })
   }
 }
 
@@ -474,6 +502,8 @@ export type SignInState = 'signed-out' | 'signed-in' | 'no-drive' | 'expired'
 export async function getSignInState(): Promise<SignInState> {
   if (!(await isAuthenticated())) return 'signed-out'
   const state = (await hasDriveAccess()) ? 'signed-in' : 'no-drive'
+  // (an account with no Drive has no credential that could have expired, unless this device still holds its own blob)
+  if (state === 'no-drive' && !(await getStoredBlob())?.blob) return state
   try {
     await getAccessToken()
     return state
@@ -496,11 +526,12 @@ export async function isAuthenticated(): Promise<boolean> {
 }
 
 /**
- * Get a valid access token for calling Google Drive API directly.
- * Automatically refreshes if expired.
+ * Get a valid access token for calling Google Drive API directly. The Worker holds the account's Google credential
+ * (docs/ACCOUNT.md, "Google Drive") and makes the token for whichever device is signed in; one that is kept is used until
+ * it is about to end.
  *
  * @returns Valid access token
- * @throws If not authenticated or refresh fails
+ * @throws If not signed in, if the account has no Drive, or `SignInExpiredError` if Google no longer honours the connection
  */
 export async function getAccessToken(): Promise<string> {
   const response = await sendToServiceWorker('GET_BLOB')
@@ -509,19 +540,88 @@ export async function getAccessToken(): Promise<string> {
     throw new Error('Not authenticated - please authorize first')
   }
 
-  const { blob, metadata } = response.data
-  // (signed in with an emailed code: no Google, so nothing to renew)
-  if (!blob) throw new Error('Not signed in with Google')
+  let { blob, metadata } = response.data
+  // (a device from before: its blob goes to the account, once)
+  if (blob && (await adoptLocalBlob(blob)))
+    ({ blob, metadata } = (await getStoredBlob()) ?? response.data)
   const expiresAt = new Date(metadata.expires_at ?? 0)
-  const now = new Date()
 
-  if (expiresAt.getTime() - now.getTime() > TOKEN_EXPIRY_BUFFER_MS) {
+  if (metadata.drive !== false && expiresAt.getTime() - Date.now() > TOKEN_EXPIRY_BUFFER_MS) {
     // Token still valid
     return metadata.access_token ?? ''
   }
 
-  // Token expired or about to expire, refresh it
-  return (await refreshTokens(blob, metadata)).access_token
+  // (still its own blob, if the Worker could not take it: as it was)
+  if (blob) return (await refreshTokens(blob, metadata)).access_token
+  return (await driveTokenFromWorker()).access_token
+}
+
+/**
+ * A new Drive access token, made by the Worker from the account's credential, and kept. 404 means the account has none
+ * (nothing is thrown that says so but an Error, as for a sign-in with no Drive); Google refusing is `SignInExpiredError`.
+ */
+function driveTokenFromWorker(): Promise<AuthMetadata & { access_token: string }> {
+  return traced('chordless.auth.refresh', {}, async span => {
+    const send = timedFetch('worker', undefined, () => span)
+    const response = await send(`${AUTH_PROXY_URL}/api/account/drive/token`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${await getIdentityToken()}` },
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      if (response.status === 404 && error.error === 'not_connected') {
+        await setDrive(false)
+        throw new Error('Google Drive is not connected')
+      }
+      const refused = error.error === 'invalid_grant' || error.error === 'invalid_blob'
+      if (response.status === 401 && refused) {
+        span.setAttribute('chordless.auth.refused', error.error)
+        throw new SignInExpiredError(error.error)
+      }
+      throw new Error(error.error || 'Failed to get a Google Drive access token')
+    }
+    const { access_token, expires_in } = await response.json()
+    // (kept on what is stored now: a new token must not undo what another step stored)
+    const latest = await getStoredBlob()
+    if (!latest) throw new Error('Not authenticated - please authorize first')
+    const metadata: AuthMetadata & { access_token: string } = {
+      ...latest.metadata,
+      access_token,
+      expires_at: new Date(Date.now() + expires_in * 1000).toISOString(),
+      drive: true,
+    }
+    await storeSignIn(latest.blob, metadata)
+    return metadata
+  })
+}
+
+/**
+ * A device that signed in before the Worker kept the Google credential has its own blob: it is sent to the account (which keeps
+ * it unless another device has connected since) and forgotten here, once. Resolves to whether this device no longer holds one;
+ * a failure (offline, say) leaves the blob and the device as it was, to try again.
+ */
+async function adoptLocalBlob(blob: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${AUTH_PROXY_URL}/api/account/drive/adopt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${await getIdentityToken()}`,
+      },
+      body: JSON.stringify({ blob }),
+    })
+    if (!response.ok) return false
+    const latest = await getStoredBlob()
+    if (!latest) return false
+    const { adopted } = await response.json()
+    // (not adopted: the account has a connection already, or this blob had no Drive: either way this copy is not needed)
+    await storeSignIn('', { ...latest.metadata, ...(adopted ? { drive: true } : {}) })
+    await learnDrive()
+    return true
+  } catch (error) {
+    console.warn('[Auth] The Google sign-in was not moved to the account:', error)
+    return false
+  }
 }
 
 /**
@@ -741,9 +841,8 @@ export async function storeSignIn(blob: string, metadata: AuthMetadata): Promise
 }
 
 /**
- * Logout: forget the sign-in on this device (the blob in the service worker), and nothing more.
- * Google keeps one grant for the account and this app, so revoking the refresh token to end this
- * device's sign-in would end every other device's too (their next refresh is `invalid_grant`): it is not done.
+ * Logout: forget the sign-in on this device, and end its session at the Worker. The account's Google Drive connection
+ * stays with the account (it is the Worker's, not this device's), so signing in again anywhere carries on syncing.
  */
 export async function logout(): Promise<void> {
   forgetAccount()
@@ -765,20 +864,24 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * Turn Personal-space sync off on this device: the Google sign-in (the blob, and so Drive) is forgotten, and the Chordless
- * session stays, so they are still signed in, as by email alone. Nothing is revoked at Google: Google keeps one grant for the
- * account and this app, so revoking it would end every other device's sync too (their next refresh is `invalid_grant`).
- * That is done at myaccount.google.com/permissions, and the Account page says so.
+ * Disconnect Google Drive from the account, for every device it is signed in on: the Worker revokes the grant at Google and
+ * forgets the credential (it only forgets it while a Team the person owns is kept in their Drive, which uses the same grant;
+ * the answer says which). They stay signed in, and the Personal space stays on their devices and in their Drive.
  */
-export async function disableGoogleSync(): Promise<void> {
-  const stored = await getStoredBlob()
-  if (!stored?.blob) return
-  const { access_token: _access, expires_at: _expires, id_token: _id, ...kept } = stored.metadata
-  const response = await sendToServiceWorker('STORE_BLOB', {
-    blob: '',
-    metadata: { ...kept, scope: '' },
+export async function disconnectDrive(): Promise<{ revoked: boolean }> {
+  const response = await fetch(`${AUTH_PROXY_URL}/api/account/drive`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${await getIdentityToken()}` },
   })
-  if (!response.success) throw new Error(response.error || 'Failed to turn the sync off')
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(body.error || 'Failed to disconnect Google Drive')
+  const latest = await getStoredBlob()
+  if (latest) {
+    const { access_token: _access, expires_at: _expires, id_token: _id, ...kept } = latest.metadata
+    await storeSignIn('', { ...kept, scope: '', drive: false })
+  }
+  await loadAccount()
+  return { revoked: body.revoked === true }
 }
 
 /**

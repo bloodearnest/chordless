@@ -13,6 +13,8 @@ export interface AccountInfo {
   emails: { email: string; provider: string }[]
   /** The address of the Google account joined to the account, if one is */
   googleEmail: string | null
+  /** The Google Drive connected to the account, which any device signed in to it syncs through; null if none */
+  drive?: { email: string } | null
 }
 
 let key = 'chordless:account'

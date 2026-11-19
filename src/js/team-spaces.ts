@@ -8,7 +8,7 @@
 import { cleanLicence } from './ccli-licence.ts'
 import type { Person, Setlist, Space } from './data-types.ts'
 import { ChordlessDB } from './db.ts'
-import { getStoredBlob } from './google-auth.ts'
+import { isAuthenticated } from './google-auth.ts'
 import { resolvePerson } from './leaders.ts'
 import { createSpace, deleteSpace, getSpaceById, listSpaces, updateSpace } from './space.ts'
 import { storageFor } from './storage/space-storage.ts'
@@ -49,14 +49,12 @@ async function makeTeamSpace(
 ): Promise<Space> {
   const teamName = name.trim()
   if (!teamName) throw new UserError(t('team-needs-name'))
-  const stored = await getStoredBlob()
-  if (!stored) throw new UserError(t('team-sign-in-first'))
+  if (!(await isAuthenticated())) throw new UserError(t('team-sign-in-first'))
 
   const ccliLicence = cleanLicence(options.ccliLicence)
   const rootRef = await folders.createTeamFolder(parentId, teamFolderName(teamName))
   // (the Worker keeps the number with the team; this device keeps a copy to show)
   const { spaceId, role } = await teamApi.createSpace({
-    blob: stored.blob,
     rootRef,
     name: teamName,
     ...(ccliLicence ? { ccliLicence } : {}),
@@ -227,9 +225,8 @@ export function inviteSendLinks(
  * storage (or when Google no longer honours the sign-in the space holds): they are its owner
  */
 export async function returnToOwnSignIn(teamId: string): Promise<void> {
-  const stored = await getStoredBlob()
-  if (!stored) throw new UserError(t('team-sign-in-first'))
-  await teamApi.replaceCredential(teamId, stored.blob)
+  if (!(await isAuthenticated())) throw new UserError(t('team-sign-in-first'))
+  await teamApi.replaceCredential(teamId)
 }
 
 /** Stop sharing a space of this person's: the Worker forgets it, and it is theirs alone again */

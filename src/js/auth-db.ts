@@ -39,6 +39,11 @@ export interface AuthMetadata {
   id_token?: string
   /** What Google granted at the last sign-in; absent for a sign-in made before this was kept */
   scope?: string
+  /**
+   * Whether the account has Google Drive connected (the Worker holds its credential: docs/ACCOUNT.md, "Google Drive"). Absent
+   * until it has been asked, and for a device from before: its blob and `scope` say, until the blob is adopted.
+   */
+  drive?: boolean
 }
 
 /** The encrypted token blob, as stored (the single record 'current') */

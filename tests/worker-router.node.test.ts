@@ -72,6 +72,7 @@ test('the API is refused to a page from another origin, before it is routed', as
     '/session/email/link',
     '/session/email/link/peek',
     '/api/account',
+    '/api/account/drive/token',
     '/api/share/abc',
     '/api/config',
   ]) {
@@ -125,6 +126,13 @@ test('the account is the Worker’s for GET and PUT only', async () => {
   assert.equal((await send('/api/account', { method: 'PUT' })).status, 503)
   await send('/api/account', { method: 'POST' })
   assert.deepEqual(assetRequests, ['POST /api/account'])
+})
+
+test('the account’s Google Drive is the Worker’s, under /api/account/drive', async () => {
+  const { send, assetRequests } = setup()
+  assert.equal((await send('/api/account/drive/token', postJson('{}'))).status, 503)
+  assert.equal((await send('/api/account/drive', { method: 'DELETE' })).status, 503)
+  assert.deepEqual(assetRequests, [])
 })
 
 test('only POST reaches the auth routes: other methods fall through to the assets', async () => {

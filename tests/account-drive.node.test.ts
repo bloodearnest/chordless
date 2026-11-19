@@ -140,6 +140,23 @@ describe('a sign-in with Drive', () => {
     assert.deepEqual((await json(info)).drive, { email: 'ann@gmail.example' })
   })
 
+  test('keeps the connection of a Google account that gave no address, with none shown', async () => {
+    const { env, sql } = setup()
+    const token = await account(env, sql)
+    const { google } = fakeGoogle({
+      exchangeCode: async () => ({
+        refresh_token: REFRESH_TOKEN,
+        access_token: 'a',
+        expires_in: 3600,
+        scope: `openid ${DRIVE_SCOPE}`,
+        id_token: 'id-token',
+        claims: { sub: 'g-1', email_verified: false },
+      }),
+    } as never)
+    await connect(env, google, token)
+    assert.equal(sql.prepare('SELECT google_email FROM account_drive').get()?.google_email, '')
+  })
+
   test('keeps nothing when Drive was not granted (its box left unticked)', async () => {
     const { env, sql } = setup()
     const token = await account(env, sql)
@@ -215,6 +232,27 @@ describe('POST /api/account/drive/token', () => {
     assert.equal((await json(response)).error, 'invalid_blob')
   })
 
+  test('does not take another failure of Google for an expired connection (it is left to be a server error)', async () => {
+    const { env, sql } = setup()
+    const token = await account(env, sql)
+    await connect(env, fakeGoogle().google, token)
+    const { google } = fakeGoogle({
+      refreshAccessToken: async () => {
+        throw new Error('Google is down')
+      },
+    } as never)
+    const response = await handleDrive(
+      new Request(`https://chordless.test${DRIVE_PATH}/token`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      env,
+      google,
+      NOW
+    ).catch(() => null)
+    assert.ok(!response || response.status >= 500)
+  })
+
   test('needs a session', async () => {
     const { env } = setup()
     const response = await call(env, fakeGoogle().google, 'POST', `${DRIVE_PATH}/token`)
@@ -285,6 +323,24 @@ describe('POST /api/account/drive/adopt', () => {
     })
     assert.deepEqual(await json(response), { adopted: false })
     assert.equal(sql.prepare('SELECT count(*) AS n FROM account_drive').get()?.n, 0)
+  })
+
+  test('adopts a blob that names no address, and refuses one that names no Google login at all', async () => {
+    const { env, sql } = setup()
+    const token = await account(env, sql)
+    sql
+      .prepare(
+        "INSERT INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at) VALUES ('google', 'g-1', 'acct-1', 'ann@gmail.example', 'now', 'now')"
+      )
+      .run()
+    const nameless = await encryptBlob(blobOf({ owner_email: undefined }), env)
+    await call(env, fakeGoogle().google, 'POST', `${DRIVE_PATH}/adopt`, token, { blob: nameless })
+    assert.equal(sql.prepare('SELECT google_email FROM account_drive').get()?.google_email, '')
+    const stranger = await encryptBlob(blobOf({ owner_sub: undefined }), env)
+    const refused = await call(env, fakeGoogle().google, 'POST', `${DRIVE_PATH}/adopt`, token, {
+      blob: stranger,
+    })
+    assert.equal(refused.status, 409)
   })
 
   test('refuses a blob it cannot read (401 invalid_blob) and a request with none (400)', async () => {

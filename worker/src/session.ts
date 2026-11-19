@@ -233,7 +233,7 @@ export function handleOAuthCallback(
       await keepDrive(
         env.DB,
         started.accountId,
-        { blob, email: email ?? '', scope: scope ?? '' },
+        { blob, email: email ?? '', scope: scope as string },
         now
       )
       annotateRequest({ 'chordless.auth.drive_result': 'connected' })

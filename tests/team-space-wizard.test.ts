@@ -200,7 +200,7 @@ describe('team-space-wizard', () => {
     await until(() => text().includes('is ready'), 'created')
     expect(madeFolders).to.deep.equal([['picked', `${name} Chordless`]])
     const post = must(requests.find(request => request.key === 'POST /api/spaces'))
-    expect(post.body).to.deep.equal({ blob: 'blob', rootRef: 'new-folder', name })
+    expect(post.body).to.deep.equal({ rootRef: 'new-folder', name })
     const made = must((await listSpaces()).find(space => space.name === name))
     expect(made.team).to.deep.equal({ id: 'space-dddd4444', role: 'owner' })
 

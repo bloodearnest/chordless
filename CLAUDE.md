@@ -74,7 +74,7 @@ persisting or caching it: no KV, R2, D1, Durable Object or Cache API entry may h
 content. They hold only accounts (a person's name, their logins and the addresses they are known by), their sessions (a hash of each refresh token), sign-in codes (hashes, for ten minutes), membership, roles, invites, the ids of the Drive files in a team's tree, a
 team's CCLI licence number and the log of who changed it (a record CCLI may ask for), the register of
 teams in D1 that outlives them (name, owner's email, dates: `docs/SPACES.md`; the members and the rest
-go when sharing ends), the owner's encrypted token blob (or that a space uses Chordless's
+go when sharing ends), an account's encrypted Google Drive token blob (one per account, so that any device it signs in on can sync: `docs/ACCOUNT.md`, "Google Drive"), the owner's encrypted token blob for a team (or that a space uses Chordless's
 service account instead), checksums, and, for
 the live channel (`docs/LIVE_SYNC.md`), the hash of the secret a share's sender proved. The channel's
 sockets carry one word, "changed", never a setlist, chart or key: the content moves by the sync, as ever.
