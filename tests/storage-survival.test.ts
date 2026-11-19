@@ -3,8 +3,11 @@
  * check that was made for a Safari web app that was reported to open as a first use every time.
  */
 import { expect } from '@open-wc/testing'
-import { checkLaunch, type SurvivalEnvironment } from '../src/js/storage-survival.ts'
-import { launchAttributes } from '../src/js/telemetry/launch.ts'
+import { trace } from '@opentelemetry/api'
+import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace'
+import { setTelemetryPreference } from '../src/js/preferences.ts'
+import { checkLaunch, launchReport, type SurvivalEnvironment } from '../src/js/storage-survival.ts'
+import { launchAttributes, reportLaunch } from '../src/js/telemetry/launch.ts'
 import { deleteDatabase } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -153,5 +156,115 @@ describe('the launch report as a span', () => {
     for (const name of ['previous_s', 'persisted', 'caches', 'signed_in_record']) {
       expect(attributes).to.not.have.property(`chordless.storage.${name}`)
     }
+  })
+})
+
+/** An IndexedDB that goes wrong in one way, to see that each is taken for a store that cannot be used */
+function brokenFactory(fault: string): IDBFactory {
+  return {
+    open() {
+      if (fault === 'throws') throw new Error('no databases')
+      const request = {
+        result: {
+          createObjectStore: () => undefined,
+          close: () => undefined,
+          transaction: () => {
+            if (fault === 'transaction') throw new Error('closing')
+            const tx: Record<string, unknown> = {
+              objectStore: () => ({
+                get: () => {
+                  const get: Record<string, unknown> = {}
+                  queueMicrotask(() => {
+                    if (fault === 'get') (get.onerror as () => void)?.()
+                    else (get.onsuccess as () => void)?.()
+                  })
+                  return get
+                },
+                put: () => {
+                  queueMicrotask(() => {
+                    if (fault === 'abort') (tx.onabort as () => void)?.()
+                    else (tx.onerror as () => void)?.()
+                  })
+                },
+              }),
+            }
+            return tx
+          },
+        },
+      } as Record<string, unknown>
+      queueMicrotask(() => {
+        if (fault === 'error') (request.onerror as () => void)?.()
+        else if (fault === 'blocked') (request.onblocked as () => void)?.()
+        else {
+          ;(request.onupgradeneeded as () => void)?.()
+          ;(request.onsuccess as () => void)?.()
+        }
+      })
+      return request
+    },
+  } as unknown as IDBFactory
+}
+
+describe('a database that goes wrong', () => {
+  for (const fault of ['throws', 'error', 'blocked', 'transaction', 'get']) {
+    it(`is called unavailable when it ${fault}`, async () => {
+      const report = await checkLaunch({
+        storage: fakeStorage(),
+        indexedDB: brokenFactory(fault),
+        now: () => new Date(),
+        persisted: async () => null,
+        controlled: () => false,
+        cacheCount: async () => null,
+      })
+      expect(report.indexedDb).to.equal('unavailable')
+      expect(report.localStorage).to.equal('new')
+    })
+  }
+
+  for (const fault of ['write', 'abort']) {
+    it(`does not stop the launch when a marker cannot be written (${fault})`, async () => {
+      // (a read that finds nothing, then a write that fails)
+      const report = await checkLaunch({
+        storage: fakeStorage(),
+        indexedDB: brokenFactory(fault),
+        now: () => new Date(),
+        persisted: async () => null,
+        controlled: () => false,
+        cacheCount: async () => null,
+      })
+      expect(report.indexedDb).to.equal('new')
+    })
+  }
+})
+
+describe('the launch of this page', () => {
+  const exporter = new InMemorySpanExporter()
+  beforeEach(async () => {
+    localStorage.clear()
+    await deleteDatabase('chordless-launch')
+    setTelemetryPreference(true)
+    trace.disable()
+    trace.setGlobalTracerProvider(
+      new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] })
+    )
+    exporter.reset()
+  })
+  afterEach(async () => {
+    trace.disable()
+    localStorage.clear()
+    await deleteDatabase('chordless-launch')
+  })
+
+  it('is checked once however many ask, and reported as a span', async () => {
+    const first = launchReport()
+    expect(launchReport()).to.equal(first)
+    const report = await first
+    expect(report.launches).to.be.at.least(1)
+    await reportLaunch()
+    const [span] = exporter
+      .getFinishedSpans()
+      .filter(finished => finished.name === 'chordless.storage.launch')
+    expect(span.attributes['chordless.storage.launches']).to.equal(report.launches)
+    expect(span.attributes).to.have.property('chordless.storage.signed_in_record')
   })
 })

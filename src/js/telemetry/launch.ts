@@ -12,9 +12,11 @@ import { recordSpan } from './telemetry.ts'
 async function signedInRecord(): Promise<boolean | null> {
   try {
     return (await getBlob()) !== undefined
+    /* v8 ignore start -- a database that will not open: the test browser's does */
   } catch {
     return null
   }
+  /* v8 ignore stop */
 }
 
 /** The span's attributes for a launch: only counts, times and yes or no (never anything of the person's) */

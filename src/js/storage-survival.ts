@@ -158,6 +158,7 @@ export interface SurvivalEnvironment {
   cacheCount: () => Promise<number | null>
 }
 
+/* v8 ignore start -- the browser's own answers: a test gives its own (`SurvivalEnvironment`) */
 const here = (): SurvivalEnvironment => ({
   storage: (() => {
     try {
@@ -184,6 +185,7 @@ const here = (): SurvivalEnvironment => ({
     }
   },
 })
+/* v8 ignore stop */
 
 const survival = (marker: Marker | null | undefined): Survival =>
   marker === undefined ? 'unavailable' : marker === null ? 'new' : 'kept'

@@ -277,6 +277,10 @@ describe('app-about', () => {
       el._launch = { ...launch, localStorage: 'new' }
       expect(el._launchStatus().state).to.equal('partial')
       expect(el._launchStatus().detail).to.contain('localStorage')
+      el._launch = { ...launch, indexedDb: 'new', previous: null }
+      expect(el._launchStatus().detail).to.contain('IndexedDB')
+      el._launch = { ...launch, previous: null }
+      expect(el._launchStatus().state).to.equal('kept')
       el._launch = { ...launch, localStorage: 'unavailable', indexedDb: 'unavailable' }
       expect(el._launchStatus().state).to.equal('unknown')
       el._launch = null
