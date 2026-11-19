@@ -96,7 +96,7 @@ export class LibraryView extends PageView {
   constructor() {
     super()
     this._search = ''
-    this._heading = 'Song Library'
+    this._heading = t('menu-library')
     this._source = ''
     this._leftOut = loadLeftOut()
     // Songs, their charts or the setlists using them were written (by the page, a sync, another
@@ -360,7 +360,7 @@ export class LibraryView extends PageView {
     this.#openUuid = null
     this.#scrollTo(this.#libraryList.value)
     this.#showSongControls(false)
-    this._heading = 'Song Library'
+    this._heading = t('menu-library')
     this.#setEditMode(false)
     this.#song = null
     this.#melodyOn = false

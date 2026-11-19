@@ -233,7 +233,7 @@ export class SpaceManager extends LitElement {
           <h3>${t('space-delete-heading')}</h3>
           <p>
             ${t(space.team ? 'space-delete-text-team' : 'space-delete-text')}
-            ${this._current ? 'It is the one you are in: you will be taken to another.' : ''}
+            ${this._current ? t('space-delete-current') : ''}
           </p>
           <button class="btn danger" id="delete" @click=${this._delete}>${t('space-delete-button')}</button>
           ${this._error ? html`<p class="error" role="alert">${t('space-delete-failed', { reason: this._error })}</p>` : nothing}

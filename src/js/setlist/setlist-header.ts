@@ -24,6 +24,7 @@ import { listPadSets } from '../pad-set-service.ts'
 import { buildUrl, type Route } from '../router.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
 import { syncsBack } from '../space.ts'
+import { t } from '../text.ts'
 import { getAvailableKeys, transposeKeyName } from '../transpose.ts'
 import type { Tuning } from '../tuning.ts'
 import { normalizeCapo } from '../utils/capo.ts'
@@ -285,7 +286,7 @@ export class SetlistHeader {
     if (!button) return
     const live = getLive()
     const here = isLiveSetlist(live, buildUrl(this.host._routeFor(-1)))
-    const label = here ? 'Leave live' : live ? 'Take over live here' : 'Go live'
+    const label = t(here ? 'live-leave' : live ? 'live-take-over' : 'setlist-go-live')
     button.classList.toggle('live', here)
     button.setAttribute('aria-pressed', String(here))
     button.setAttribute('aria-label', label)

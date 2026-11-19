@@ -153,7 +153,7 @@ describe('the setlist page: header, menu and keys', () => {
       await rig.page.renderSetlist('no-such')
       const message = () =>
         ($('.song-container status-message') as unknown as { message: string }).message
-      expect(message()).to.equal('Setlist not found.')
+      expect(message()).to.equal('That setlist is not on this device.')
       const real = Object.getPrototypeOf(rig.db).getSetlist
       Object.getPrototypeOf(rig.db).getSetlist = () => Promise.reject(new Error('unreadable'))
       try {

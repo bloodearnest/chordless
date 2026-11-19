@@ -6,6 +6,8 @@
  * makes the team folder inside it.
  */
 import { getAccessToken } from './google-auth.ts'
+import { t } from './text.ts'
+import { UserError } from './utils/errors.ts'
 
 /**
  * The browser key for the Picker (Terraform: `google_apikeys_key.team`, "Team Key") comes from the
@@ -69,7 +71,7 @@ function loadScript(win: PickerWindow): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const fail = (script: HTMLScriptElement) => {
       script.remove() // so trying again loads it afresh
-      reject(new Error("Couldn't load Google's folder picker. Are you offline?"))
+      reject(new UserError(t('picker-offline')))
     }
     let script = document.querySelector<HTMLScriptElement>(`script[src="${GAPI_URL}"]`)
     const added = !script
@@ -90,7 +92,7 @@ async function loadPicker(): Promise<PickerApi> {
   const win = window as PickerWindow
   await loadScript(win)
   return new Promise<PickerApi>((resolve, reject) => {
-    const fail = () => reject(new Error("Couldn't load Google's folder picker. Are you offline?"))
+    const fail = () => reject(new UserError(t('picker-offline')))
     win.gapi?.load('picker', {
       callback: () => {
         const picker = win.google?.picker
@@ -107,9 +109,7 @@ async function loadPicker(): Promise<PickerApi> {
  * Resolves with the folder, or null if they cancelled.
  * @throws if the Picker could not be loaded, or the key is not set
  */
-export async function pickFolder(
-  title = 'Choose where to keep the team space'
-): Promise<PickedFolder | null> {
+export async function pickFolder(title = t('picker-team-title')): Promise<PickedFolder | null> {
   const [picker, token, key] = await Promise.all([loadPicker(), getAccessToken(), pickerApiKey()])
 
   const view = new picker.DocsView(picker.ViewId.FOLDERS)

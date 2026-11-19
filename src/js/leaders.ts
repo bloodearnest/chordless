@@ -4,6 +4,7 @@
  * other imports than types, so the database's upgrade can use it.
  */
 import type { Person, Setlist } from './data-types.ts'
+import { t } from './text.ts'
 
 /** What a setlist said of its leader before leaders were people */
 export interface LegacyLeader {
@@ -195,13 +196,12 @@ export function resolveLeader(
 /** Why an email cannot be added to a person (null if it can): not an address, theirs already, or another's */
 export function emailProblem(people: Person[], person: Person, email: string): string | null {
   const address = normalizeEmail(email)
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address))
-    return 'That does not look like an email address.'
-  if (person.emails.includes(address)) return 'They have that address already.'
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) return t('leader-email-invalid')
+  if (person.emails.includes(address)) return t('leader-email-theirs')
   const owner = people.find(
     each => isLive(each) && each.id !== person.id && each.emails.includes(address)
   )
-  return owner ? `${owner.name} has that address already: merge them to join the two.` : null
+  return owner ? t('leader-email-other', { name: owner.name }) : null
 }
 
 /** The person with a new name (trimmed), or unchanged if it is empty or the same */

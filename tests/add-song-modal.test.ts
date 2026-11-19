@@ -204,7 +204,7 @@ describe('AddSongModal', () => {
       await choose(elsewhere({ chordpro: undefined }))
       expect(picked).to.have.length(0)
       expect(results().querySelector('status-message').state).to.equal('error')
-      expect(results().querySelector('status-message').message).to.equal('Could not add the song.')
+      expect(results().querySelector('status-message').message).to.equal("Couldn't add the song.")
     })
   })
 })

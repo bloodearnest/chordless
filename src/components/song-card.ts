@@ -600,10 +600,10 @@ export class SongCard extends LitElement {
       parts.push(getWeeksAgo(lastUsageInfo.date))
     } else if (lastUsedAt) {
       // Fallback to old lastUsedAt field
-      parts.push(`Last played ${getWeeksAgo(lastUsedAt)}`)
+      parts.push(t('card-last-played', { when: getWeeksAgo(lastUsedAt) }))
     } else if (playedInOtherVersion) {
       // (it has not been played, and the song has: so it is said, not left to look as if it had)
-      parts.push('Not played in this version')
+      parts.push(t('card-not-played-here'))
     }
 
     return parts.length

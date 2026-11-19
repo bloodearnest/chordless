@@ -1,5 +1,6 @@
 import { css, html, nothing } from 'lit'
 import type { ShownAnnotation } from '../js/data-types.ts'
+import { t } from '../js/text.ts'
 
 /** The look of an annotation on a chart, for a component's shadow styles (docs/ANNOTATIONS.md): handwriting, pencil or ink */
 export const annotationStyles = css`
@@ -40,7 +41,7 @@ export function renderAnnotations(annotations: ShownAnnotation[] | undefined, or
       html`<span
         class="annotation ${annotation.shared ? 'shared' : ''} ${orphan ? 'orphan' : ''}"
         data-annotation-id=${annotation.id}
-        title=${annotation.shared ? 'Shared with everyone' : 'Just you'}
+        title=${t(annotation.shared ? 'annotation-shared-title' : 'annotation-private-title')}
         >${annotation.text}</span
       >`
   )

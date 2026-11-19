@@ -449,7 +449,7 @@ export class SetlistPage {
         console.error('[ERROR] Setlist not found in IndexedDB:', setlistId)
         const container = this.root.querySelector<HTMLElement>('.song-container')
         showStatusMessage(container, {
-          message: 'Setlist not found.',
+          message: t('setlist-not-found'),
           state: 'error',
         })
         return
