@@ -301,6 +301,16 @@ describe('the setlist page: annotations', () => {
     expect(await heading({ place: 'song' })).to.contain('the whole song')
     expect(await heading({ place: 'text', line: 0, offset: 0 })).to.contain('“Amazing”')
     expect(await heading({ place: 'text', line: 9, offset: 0 })).to.contain('this line')
+
+    // (a section with no name is "this section")
+    const first = must(rig.page.songs[0]).parsed.sections[0]
+    const name = first.label
+    first.label = null
+    try {
+      expect(await heading({ place: 'title' })).to.contain('this section')
+    } finally {
+      first.label = name
+    }
   })
 
   it('draws every annotation, shared and the user’s own', async () => {
