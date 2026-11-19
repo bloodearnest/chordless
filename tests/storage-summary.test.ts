@@ -45,10 +45,10 @@ describe('storage-summary', () => {
       const el = bare()
       el._loadStats = async () => stats()
       document.body.append(el)
-      const text = await shown(el, 'Browser data')
-      expect(text).to.contain('Browser data 2.0 KB')
-      expect(text).to.contain('App Cache 3.0 MB')
-      expect(text).to.contain('Media Cache 1.5 KB')
+      const text = await shown(el, 'Song and setlist data')
+      expect(text).to.contain('Song and setlist data 2.0 KB')
+      expect(text).to.contain('Application code 3.0 MB')
+      expect(text).to.contain('Media Data (e.g. Pads) 1.5 KB')
       el.remove()
     })
 
@@ -56,7 +56,9 @@ describe('storage-summary', () => {
       const el = bare()
       el._loadStats = async () => stats({ appCacheBytes: null, mediaCacheBytes: null })
       document.body.append(el)
-      expect(await shown(el, 'App Cache')).to.contain('App Cache – Media Cache –')
+      expect(await shown(el, 'Application code')).to.contain(
+        'Application code – Media Data (e.g. Pads) –'
+      )
       el.remove()
     })
 
@@ -81,7 +83,7 @@ describe('storage-summary', () => {
 
     it('reads the browser when it is not told otherwise', async () => {
       const el = await fixture<StorageSummary>(html`<storage-summary></storage-summary>`)
-      expect(await shown(el, 'Browser data')).to.contain('Browser data')
+      expect(await shown(el, 'Song and setlist data')).to.contain('Song and setlist data')
     })
   })
 
