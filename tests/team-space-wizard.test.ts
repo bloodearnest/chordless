@@ -269,6 +269,24 @@ describe('team-space-wizard', () => {
     expect(page.shadowRoot?.querySelector('#name')).to.equal(null)
   })
 
+  it('asks Google’s whole sign-in, to join the account, of someone who signed in by email alone', async () => {
+    await open(null)
+    // (an emailed sign-in: a session, no Google blob, ID token or Google id)
+    worker.stored = {
+      blob: '',
+      metadata: { session: sessionFor(idToken()), user: { ...user, sub: null } },
+      updated_at: new Date().toISOString(),
+    }
+    page.remove()
+    await open(null)
+    await until(() => text().includes('Connect Google Drive'), 'asks to connect Drive')
+    button('Connect Google Drive').click()
+    await until(() => page.shadowRoot?.querySelector('#name'), 'the form')
+    expect(asked).to.have.length(1)
+    expect(asked[0]).to.contain(DRIVE)
+    expect(asked[0]).to.contain('openid')
+  })
+
   it('says why connecting Drive did not work, and offers it again', async () => {
     codeResponse = { error: 'access_denied' }
     await open('openid email profile')
