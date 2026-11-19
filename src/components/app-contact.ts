@@ -9,6 +9,7 @@ import {
 } from '../js/contact.ts'
 import { deviceDetails } from '../js/telemetry/device.ts'
 import { supportId } from '../js/telemetry/ids.ts'
+import { t } from '../js/text.ts'
 import { buttonStyles, fieldStyles, panelStyles } from './shared-styles.ts'
 
 const SUBJECT = 'Chordless'
@@ -139,12 +140,9 @@ export class AppContact extends LitElement {
     return html`
       <div class="contact-content">
         <div class="panel">
-          <h3>Tell us</h3>
-          <p>
-            A problem, a song that does not look right, or an idea. This starts an email to
-            ${CONTACT_ADDRESS}, which you send yourself: Chordless keeps no messages.
-          </p>
-          <label for="contact-message">Your message</label>
+          <h3>${t('contact-tell-heading')}</h3>
+          <p>${t('contact-tell-text', { address: CONTACT_ADDRESS })}</p>
+          <label for="contact-message">${t('contact-message')}</label>
           <textarea
             id="contact-message"
             class="field"
@@ -154,18 +152,15 @@ export class AppContact extends LitElement {
         </div>
 
         <div class="panel">
-          <h3>What goes with it</h3>
-          <p>
-            So we do not have to ask. It is added under your message, and says nothing about your
-            songs.
-          </p>
+          <h3>${t('contact-details-heading')}</h3>
+          <p>${t('contact-details-text')}</p>
           <pre id="contact-details">${details}</pre>
           <div class="actions">
             <a id="contact-send" class="btn primary" href=${link} target="_blank" rel="noopener">
-              Write the email
+              ${t('contact-write')}
             </a>
             <button type="button" id="contact-copy" class="btn" @click=${this._copyDetails}>
-              ${this._copied ? 'Copied' : 'Copy the details'}
+              ${this._copied ? t('storage-copied') : t('contact-copy')}
             </button>
           </div>
         </div>

@@ -187,21 +187,21 @@ export class PadSetUpload extends LitElement {
     return html`
       <form @submit=${this._handleUpload}>
         <div>
-          <label for="padset-name">Pad set name</label>
+          <label for="padset-name">${t('padup-name')}</label>
           <input
             id="padset-name"
             class="field"
             type="text"
             .value=${this._padSetName}
             @input=${this._handleNameInput}
-            placeholder="e.g. Warm Pads - Churchfront"
+            placeholder=${t('padup-name-example')}
           />
         </div>
 
         ${
           this._destinations.length > 1
             ? html`<div>
-                <label for="padset-destination">Save to</label>
+                <label for="padset-destination">${t('padup-save-to')}</label>
                 <select
                   id="padset-destination"
                   class="field"
@@ -215,13 +215,13 @@ export class PadSetUpload extends LitElement {
                       value=${each.spaceId}
                       .selected=${each.spaceId === this._destination}
                     >
-                      ${each.team ? `${each.name} (Team)` : each.name}
+                      ${each.team ? t('import-space-team', { space: each.name }) : each.name}
                     </option>`
                   )}
                 </select>
                 ${
                   this._destinations.find(each => each.spaceId === this._destination)?.team
-                    ? html`<div class="meta">Everyone in the team can use it</div>`
+                    ? html`<div class="meta">${t('padup-team')}</div>`
                     : nothing
                 }
               </div>`
@@ -229,7 +229,7 @@ export class PadSetUpload extends LitElement {
         }
 
         <div>
-          <label for="padset-file-input">Zip file of the pads</label>
+          <label for="padset-file-input">${t('padup-file')}</label>
           <input
             id="padset-file-input"
             ${ref(this._fileInput)}
@@ -239,7 +239,7 @@ export class PadSetUpload extends LitElement {
             @change=${this._handleFileChange}
             ?disabled=${this._uploading}
           />
-          ${this._fileName ? html`<div class="meta">Selected: ${this._fileName}</div>` : ''}
+          ${this._fileName ? html`<div class="meta">${t('padup-selected', { name: this._fileName })}</div>` : ''}
         </div>
 
         ${this._error ? html`<div class="status-message error">${this._error}</div>` : ''}
@@ -247,7 +247,7 @@ export class PadSetUpload extends LitElement {
         ${
           this._uploading
             ? html`<progress
-              aria-label="Uploading pad set"
+              aria-label=${t('padup-uploading-label')}
               max=${this._progress?.total ?? 1}
               value=${ifDefined(this._progress?.done)}
             ></progress>`
@@ -260,7 +260,7 @@ export class PadSetUpload extends LitElement {
             class="btn primary"
             ?disabled=${this._uploading || !this._selectedFile}
           >
-            ${this._uploading ? 'Uploading…' : 'Upload pad set'}
+            ${this._uploading ? t('padup-uploading') : t('padup-upload')}
           </button>
         </div>
       </form>

@@ -201,13 +201,10 @@ export function inviteMessage(
   email: string,
   inviteUrl: string
 ): string {
-  const intro = `You are invited to join ${teamName} on Chordless as ${roleWithArticle(role)}.`
-  const end = `Sign in with the Google account ${email}; the link works once, for a week.`
-  if (isGmailAddress(email)) return `${intro} ${end}`
-  if (role !== 'admin') {
-    return `${intro} Open the link and sign in with any Google account you use: it does not have to be ${email}. If you have none, the page shows how to make one. The link works once, for a week.`
-  }
-  return `${intro} Before you open the link, ${email} must be a Google account, so if it is not one yet, make it one first (you need no Gmail). The steps, with pictures:\n${googleAccountGuideUrl(inviteUrl)}\n\nThen ${end.charAt(0).toLowerCase()}${end.slice(1)}`
+  const intro = t('invite-message-intro', { team: teamName, role: roleWithArticle(role) })
+  if (isGmailAddress(email)) return `${intro} ${t('invite-message-gmail', { email })}`
+  if (role !== 'admin') return `${intro} ${t('invite-message-any', { email })}`
+  return `${intro} ${t('invite-message-admin', { email, guide: googleAccountGuideUrl(inviteUrl) })}`
 }
 
 /** The ways to hand an invite on where the browser has no share sheet: WhatsApp, and Gmail's compose window (a mailto: link does nothing on a desktop with no mail app) */
@@ -218,7 +215,7 @@ export function inviteSendLinks(
   url: string
 ): { whatsapp: string; gmail: string } {
   const message = inviteMessage(teamName, role, email, url)
-  const subject = `Join ${teamName} on Chordless`
+  const subject = t('invite-subject', { team: teamName })
   return {
     whatsapp: `https://wa.me/?text=${encodeURIComponent(`${message}\n\n${url}`)}`,
     gmail: `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${message}\n\n${url}\n`)}`,
