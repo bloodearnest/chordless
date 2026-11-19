@@ -238,7 +238,7 @@ describe('the join page', () => {
 
   it('offers an emailed code to someone with no Google account, and then offers to join as who they signed in as', async () => {
     await open(LINK, false)
-    await say('Use my email address instead')
+    await say('Sign in with email')
     await until(() => text().includes('Sign in with your email address'), 'the email sign-in')
     const form = must(page.shadowRoot?.querySelector('email-code-sign-in')) as unknown as {
       address: string
@@ -270,7 +270,7 @@ describe('the join page', () => {
         throw new Error('offline')
       }
     })
-    await say('Use my email address instead')
+    await say('Sign in with email')
     await until(() => text().includes('Sign in with your email address'), 'the email sign-in')
     button('Back').click()
     await until(() => !text().includes('Sign in with your email address'), 'to leave it')
