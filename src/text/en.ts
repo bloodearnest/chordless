@@ -1973,4 +1973,80 @@ import-songselect-failed-plain = Import from SongSelect failed.
 share-failed = Couldn't do that: { $reason }
 share-failed-plain = Couldn't do that.
 share-offline-note = You're offline: connect to the internet to share.
+
+
+## Songs and charts: a song's versions, a song on a card, annotations and a section's controls
+
+action-rename = Rename
+action-delete = Delete
+action-done = Done
+
+versions-heading = Versions
+versions-original = Original
+versions-default = Default
+# { $origin } is who made the version and when ("Imported by Jo, 3/10/2026"), { $key } its key.
+versions-origin-key = { $origin }, key { $key }
+versions-variant-name = Variant name
+versions-label-example = Alternate
+versions-admin-only = Only an admin can delete a song.
+versions-delete = Delete
+versions-delete-song = Delete song
+versions-delete-version = Delete version
+versions-confirm-next = Delete this version? Setlists that use it will use the next version instead.
+versions-confirm-default = Delete this version? Setlists that use it will use the default instead.
+# The question to delete the only version of a song: this, then the sentence about setlists if it is in any, then the last, with a space between.
+versions-confirm-song = Delete this song?
+versions-confirm-used =
+    { $count ->
+        [one] It is in 1 setlist and will be taken out of it, so it will no longer count as played there.
+       *[other] It is in { $count } setlists and will be taken out of them, so it will no longer count as played there.
+    }
+versions-confirm-final = It cannot be undone from here.
+versions-merge = Merge another song into this one
+versions-merge-which = The song to merge in
+versions-merge-choose = Choose a song
+versions-fill = Fill in details one is missing (artist, copyright, tempo, time) from the other. Details already there are never changed.
+versions-merge-button = Merge as a variant
+
+card-local = Just me
+card-local-title = Added on this device only
+card-remove = Remove song
+card-lyrics = Lyrics
+# { $source } is the setlist the song was last played in.
+card-from = From { $source }
+
+# What an annotation is about ("on “grace”", "on this line"), and its form.
+annotation-label = Annotation
+annotation-heading-new = New annotation on { $about }
+annotation-heading = Annotation on { $about }
+annotation-text-label = Annotation text
+annotation-example = e.g. quietly, drop out, repeat 4×
+annotation-seen-by = Seen by
+annotation-seen-me = Just me
+annotation-seen-everyone = Everyone
+annotation-hint-cannot-share = Only people who can edit the setlist can share an annotation with everyone.
+annotation-hint-shared = Everyone who has this setlist sees it.
+annotation-about-song = the whole song
+annotation-about-section = this section
+annotation-about-line = this line
+# { $text } is the word or the section's name.
+annotation-about-quoted = “{ $text }”
+
+diff-label = Songs to compare
+
+# A section of a song: its name when it has none, and the buttons that show what it holds.
+section-numbered = Section { $number }
+section-show-options = Show content options
+section-show = Show:
+section-all = All
+section-lyrics = Lyrics
+section-chords = Chords
+section-melody = Melody
+section-none = None
+# { $what } is one of the five above, { $section } the section's name.
+section-show-in = Show { $what } in { $section }
+section-melody-shown = Showing the melody
+section-melody-has = The lead sheet has the melody for this part
+section-expand = Expand section
+section-collapse = Collapse section
 `

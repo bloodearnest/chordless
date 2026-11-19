@@ -1,6 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import type { ParsedChart } from '../js/data-types.ts'
 import { ChordProParser } from '../js/parser.ts'
+import { t } from '../js/text.ts'
 import './song-display.ts'
 
 /** Who and when a chart came from, to say beside its tab */
@@ -82,7 +83,7 @@ export class ChartDiff extends LitElement {
     const side = this._side
     const keys = this.keys ?? [null, null]
     return html`
-      <div role="tablist" aria-label="Songs to compare" @keydown=${this._keydown}>
+      <div role="tablist" aria-label=${t('diff-label')} @keydown=${this._keydown}>
         ${([0, 1] as const).map(
           n => html`
             <button
