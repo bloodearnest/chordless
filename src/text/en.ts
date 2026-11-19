@@ -2136,4 +2136,47 @@ padup-selected = Selected: { $name }
 padup-uploading-label = Uploading pad set
 padup-uploading = Uploading…
 padup-upload = Upload pad set
+
+
+## Joining a Team with an invite link (the rest of the page), a space's people, the tabs, the library's filter and a space's page
+
+join-signed-in = You are signed in.
+# <who> is the address they are signed in with.
+join-signed-in-as = You are signed in as <who>{ $email }</who>.
+join-adds = Joining adds the team's songs and setlists to this device, and keeps them in step with the team's.
+join-button = Join the team space
+join-different-account = Use a different account
+join-bad-link = This link doesn't work
+join-bad-link-text = It is missing part of the invite, which can happen if it was cut short. Ask the person who sent it to send it again.
+join-invalid = This invite doesn't work
+join-joining = Joining…
+join-getting = Getting the team's songs and setlists…
+join-getting-label = Getting the team's songs and setlists
+# { $name } is the Team, { $role } what they are in it ("a worship leader").
+join-joined = You have joined { $name }
+join-joined-text = The space is on this device, and you are in it as { $role }.
+join-not-synced = The team's songs and setlists have not come across yet. Open the space and sync to try again.
+join-synced = The team's songs and setlists are here.
+join-failed-heading = Couldn't join
+# When the Worker says the invite was for another Google account. { $email } is the one they are signed in with.
+join-wrong-account-not = This invite was sent to a different Google account, not { $email }. Sign in with the address it was sent to.
+join-wrong-account = This invite was sent to a different Google account. Sign in with the address it was sent to.
+
+people-reading = Reading…
+people-not-here = This space is not on this device.
+people-person-label = Person
+people-people-label = People
+people-leaders-text = The people who lead this space's setlists. Two spellings of one person are put right by merging one into the other.
+# Added after the sentence above, with a space, for someone who may not change them.
+people-leaders-read-only = Only worship leaders can change them, and you can change your own name.
+people-nobody = Nobody leads a setlist here yet.
+
+tabs-label = Where songs and setlists are kept
+tabs-more = More
+
+filter-label = Spaces to search
+filter-spaces = Spaces:
+
+space-back = ← Account and Teams
+space-page-missing = That space is not on this device.
 `
