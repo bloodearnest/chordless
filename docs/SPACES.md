@@ -202,7 +202,7 @@ The Worker keeps no per-user state (a team's members are the team's, in D1).
   an access token and the user's profile.
 - **The blob** (until 2026-11-19: now the Worker keeps it for the account, `docs/ACCOUNT.md`, "Google Drive"; this is how devices from before still have it) is stored by the service worker in the `auth` IndexedDB. Pages get access tokens by
   messaging it.
-- **Expired access tokens:** the service worker refreshes them with `/session/refresh`. The Worker
+- **Expired access tokens:** the page asks `/api/account/drive/token` (until 2026-11-19 the service worker refreshed them with `/session/refresh`, with the blob). The Worker
   decrypts the blob only for that request.
 - **Expired sign-in:** when Google answers `invalid_grant` to a refresh (the refresh token expired
   or was revoked; it dies after 7 days if it was made while the consent screen was "Testing"), the Worker answers
@@ -230,7 +230,7 @@ The Worker keeps no per-user state (a team's members are the team's, in D1).
   (`/session/logout` with the refresh token) or by revoking it. The Worker side is
   `worker/src/session-tokens.ts` and `identity.ts` (`sessionProvider`): an `Identity` from a session is
   `{provider: 'chordless', sub: <account id>, email}`, and `accountOf` returns it as it is. Google stays the
-  proof at sign-in and the **storage credential** (the blob and `/session/refresh` give Drive's access token):
+  proof at sign-in and the **storage credential** (the account's blob, at the Worker, gives Drive's access token: `/api/account/drive/token`):
   Google's ID token is no longer a bearer, and a request carrying one is answered `401` with the reason "Chordless has been updated: reload this page to carry on" (`UPDATE_REQUIRED`, in words because the app that shows it is the old one)
   (an app from before sessions: it has to reload to update; nothing local is blocked). There was no period of
   accepting both. Where the Worker has no database or `SESSION_SIGNING_KEY` (a development one without them)
@@ -300,7 +300,7 @@ The Worker keeps no per-user state (a team's members are the team's, in D1).
    ```
 2. **About every hour** (built):
    ```
-   page ── blob ──► /session/refresh (Worker)
+   page ── session ──► /api/account/drive/token (Worker)
                       │ opens the blob, asks Google for a new access token
    page ◄── new access token + new ID token
    ```
@@ -501,7 +501,7 @@ Agreed with the owner of the project:
   takes an identity provider's ID token through `IdentityProvider` and keys members by provider and
   `sub`, so another provider is another `IdentityProvider`.
 - **A member signs in as everyone does** (`initCodeClient` popup). The Worker verifies the ID token
-  and the page then sends Google's ID token to the team service, renewed in `/session/refresh`. A member needs only
+  and the page then sends Google's ID token to the team service, renewed in `/session/token`. A member needs only
   `openid email profile`: all their Drive traffic for the team space goes through the Worker, so
   an unticked Drive box affects only their personal space.
 - **Pad sets** of a team space are in its folder, and the Worker streams them to members ("Pads in
@@ -535,40 +535,23 @@ Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
   probing Google's sign-in to find out is not something Chordless does, so the page asks. It tells whoever
   holds the code the invited address, which is the person the code is a secret for; wrong-shaped codes
   make no query, and a sender is limited (`INVITE_LOOKUP`, docs/SECURITY.md).
-  **The join page is a wizard** (`team-join.ts`, `join-device.ts`; 2026-11-16, after two invitees on Hotmail
-  addresses could not get through the old page). It welcomes ("You are invited to join Grace Church as a team
-  member") and then, by what the lookup says and the device: an **Android** phone has a Google account, so it is
-  told to sign in with the one on the phone (it need not be the invited address); an invite to a **Gmail or
-  Workspace** address says to sign in with that address; an **admin** invite says it needs exactly that address, and
-  shows no way to join as another; anything else (iOS, a laptop) is asked "Do you already have a Google account?",
-  and **No** leads to making one (a new Gmail address is the easy way; the picture guide `/google-account.html`
-  is for keeping their own address). The answer is kept on the device for the invite, because they leave for
-  Google and come back, often to a reloaded tab. A page opened **inside another app's browser** (Facebook,
+  **The join page** (`team-join.ts`, `join-device.ts`; changed 2026-11-19, after sign-in became one screen: docs/ACCOUNT.md,
+  "Signing in") welcomes ("You are invited to join Grace Church as a team member") and shows the sign-in form (email and
+  Continue, or Continue with Google) with the invite's address filled in; an **admin** invite says it needs exactly that address,
+  and shows no way to join as another. It no longer asks whether the person has a Google account, and never helps make one
+  (an address that can receive an email is enough, so the how-to-make-one page, `google-account.html`, its pictures and
+  `just google-account-images` are gone). A page opened **inside another app's browser** (Facebook,
   Instagram, an Android WebView: Google does not sign anyone in there) is first told to open it in the real one,
-  with a copy-link button. Signed in with another address than the invite's, a team member or worship leader is
-  told so and joins. Without the lookup (offline, or too many tries) the welcome has no details and the rest works.
+  with a copy-link button (an emailed code works there, so they may carry on). Signed in with another address than the invite's, a
+  team member or worship leader is told so and joins; **Use a different account** logs out first. Without the lookup (offline, or
+  too many tries) the welcome has no details and the rest works.
   Where people stop is a span (`chordless.join`, docs/OBSERVABILITY.md). Untested on a real iPhone or Mac until the
   owner tries it: the telemetry is how it is learned. The link to hand
   out is the page's, `/join/<space id>/<code>` (built; links sent before 2026-11-16 have them in the fragment, `/join#<space id>.<code>`, which the page still reads, and invites last a week), and is handed on from the
   admin's own account by the share sheet, WhatsApp or Gmail (`invite-send.ts`).
-  The message for a team member or worship leader says to open the link and sign in with any Google account
-  (the page helps make one). For an **admin** invited at an address that may not be a Google account, it says,
-  **first**, to make that address one *before* opening the link (the page the link opens asks them to sign in
-  at once), and links `/google-account.html`
-  (`googleAccountGuideUrl`, on the invite's own site). That page is static, like `privacy.html`: no app and no
-  service worker, so that it opens the same from WhatsApp, Gmail or anywhere. It walks the steps with
-  pictures of Google's own sign-up (`public/google-account/`, kept out of the offline cache): name,
-  birthday and gender, then "Use your existing email" (the small link under an offer of a new Gmail
-  address, which is what trips people), the address, the emailed code, a password. The join page links to it too, and
-  both say what to do if Google will not take the address: ask the admin to invite a Gmail address.
-  The pictures are retaken by hand when Google changes its pages: `just google-account-images`
-  (not in CI; it submits only an invented name and birthday, and types an invented address it never
-  sends; the code and password steps need a real mailbox, so they have none). Whether an address is
-  a Google account cannot be known (a Workspace domain or an address made a Google account looks like
-  any other, and probing Google's sign-in is not something Chordless does), so only `gmail.com` and
-  `googlemail.com` leave the text out, and nothing is ever refused for it. The invite carries no name:
-  on joining, the person named by the address alone (a placeholder) is renamed to the Google account's
-  name by `getSpacePeople`; a name someone gave is kept.
+  The message handed on with the link (`inviteMessage`) says to open it and sign in with an email address or a Google account (an
+  admin invite: with its address); `invite-email.ts` says the same. The invite carries no name: on joining, the person named by
+  the address alone (a placeholder) is renamed to the account's name by `getSpacePeople`; a name someone gave is kept.
 - **Chordless emails the invite itself** (changed 2026-11-17; before, it did not: decided 2026-11-11, because anyone with
   a team could point it at any address, and mail from a new domain lands in spam). It can now, from
   `invites@mail.chordless.app` (the sign-in codes' Email Sending subdomain), and the person who makes an invite no longer has to

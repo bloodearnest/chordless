@@ -84,7 +84,7 @@ describe('space-delete-everywhere', () => {
   it('needs Drive to be reached: a sign-in with Drive, or for a Team a sign-in alone', async () => {
     const signedOut = await make(space('Mine'), { signIn: 'signed-out' })
     expect(q<HTMLButtonElement>(signedOut.el, '#delete-everywhere').disabled).to.equal(true)
-    expect(text(signedOut.el)).to.contain('Sign in with Google')
+    expect(text(signedOut.el)).to.contain('Connect Google Drive')
     const noDrive = await make(space('Mine'), { signIn: 'no-drive' })
     expect(q<HTMLButtonElement>(noDrive.el, '#delete-everywhere').disabled).to.equal(true)
     const team = await make(space('Church', 'admin'), { signIn: 'no-drive' })

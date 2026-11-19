@@ -96,8 +96,8 @@ test('worker API: /api/spaces and /api/spaces/join are the Worker’s, and want 
   }
 })
 
-test('worker API: /session/refresh route exists', async () => {
-  const resp = await worker.fetch('/session/refresh', {
+test('worker API: /session/token route exists', async () => {
+  const resp = await worker.fetch('/session/token', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({}),
@@ -117,7 +117,7 @@ test('worker source is not served as JavaScript', async () => {
 })
 
 test('the API sends no CORS headers', async () => {
-  const resp = await worker.fetch('/session/refresh', { method: 'POST', body: '{}' })
+  const resp = await worker.fetch('/session/token', { method: 'POST', body: '{}' })
   assert.equal(resp.headers.get('access-control-allow-origin'), null)
 })
 

@@ -160,19 +160,33 @@ export function handleDrive(
       try {
         data = await decryptBlob(row.blob, env)
       } catch {
-        annotateRequest({ 'chordless.auth.drive_result': 'invalid_blob' })
+        annotateRequest({ 'chordless.auth.refresh_result': 'invalid_blob' })
         return jsonResponse({ error: 'invalid_blob' }, 401)
       }
+      // (how old the connection is, so that a refusal tells a week-old one from a year-old one)
+      const connectedAt = Date.parse(data.created_at)
+      annotateRequest({
+        'chordless.auth.blob_age_days': Number.isNaN(connectedAt)
+          ? -1
+          : Math.floor((now.getTime() - connectedAt) / 86_400_000),
+        'chordless.auth.blob_kid': data.kid,
+      })
       try {
         const { access_token, expires_in } = await google.refreshAccessToken(
           data.refresh_token,
           env
         )
-        annotateRequest({ 'chordless.auth.drive_result': 'ok' })
+        annotateRequest({ 'chordless.auth.refresh_result': 'ok' })
         return jsonResponse({ access_token, expires_in })
       } catch (error) {
         if ((error as { error?: string }).error === 'invalid_grant') {
-          annotateRequest({ 'chordless.auth.drive_result': 'invalid_grant' })
+          // (Google's own words, "Token has been expired or revoked." or "Bad Request": no token in them)
+          annotateRequest({
+            'chordless.auth.refresh_result': 'invalid_grant',
+            'chordless.auth.google_description': (
+              (error as { error_description?: string }).error_description ?? message(error)
+            ).slice(0, 200),
+          })
           return jsonResponse(
             { error: 'invalid_grant', message: 'Google sign-in expired or was revoked' },
             401

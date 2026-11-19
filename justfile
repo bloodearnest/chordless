@@ -190,12 +190,6 @@ funnel:
 help-images:
     npx playwright test --config=playwright.help-images.config.ts
 
-# Retake the pictures of Google's sign-up that the page for making a Google account shows
-# (public/google-account/, src/google-account.html). By hand when Google changes its pages, never in CI:
-# it goes to Google's real sign-up pages (and submits only an invented name and birthday). Commit what changes
-google-account-images:
-    node scripts/google-account-images.ts
-
 # The real-Drive suite (docs/DRIVE_TESTS.md): random histories of several devices syncing through a
 # real Google Drive folder, to find what the in-memory fake cannot. Not part of `just test`. Needs
 # the test account's credentials in .drive-test.env. Which histories: DRIVE_SEEDS=1-5 DRIVE_STEPS=30

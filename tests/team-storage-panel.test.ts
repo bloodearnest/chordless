@@ -115,14 +115,14 @@ describe('the team storage panel', () => {
       json({ kind: 'service-account', serviceAccount: ADDRESS })
     await open(teamSpace('owner'))
     await until(() => text().includes(ADDRESS), 'the address')
-    expect(text()).to.contain('with your Google sign-in')
+    expect(text()).to.contain('with your Google Drive')
     expect(text()).to.contain('Content manager')
     await expect(panel).to.be.accessible(A11Y)
 
     button('Check and switch').click()
     await until(() => text().includes('Chordless’s own account'), 'the switch')
     expect(calls.map(call => call.key)).to.include(`POST ${CREDENTIAL}/service-account`)
-    expect(text()).to.contain('Use my Google sign-in instead')
+    expect(text()).to.contain('Use my Google Drive instead')
   })
 
   it('says why the Worker would not switch, and stays on the owner’s sign-in', async () => {
@@ -148,7 +148,7 @@ describe('the team storage panel', () => {
     await open(teamSpace('owner'))
     await until(() => text().includes('Chordless’s own account'), 'how it is reached')
 
-    button('Use my Google sign-in instead').click()
+    button('Use my Google Drive instead').click()
     await until(() => text().includes('Check and switch'), 'back on the owner’s sign-in')
     expect(calls.find(call => call.key === `PUT ${CREDENTIAL}`)?.body).to.deep.equal({})
   })
@@ -158,9 +158,9 @@ describe('the team storage panel', () => {
     await open(teamSpace('owner'))
     await until(() => text().includes('Chordless’s own account'), 'how it is reached')
     worker.stored = undefined
-    button('Use my Google sign-in instead').click()
+    button('Use my Google Drive instead').click()
     await until(() => panel.shadowRoot?.querySelector('[role="alert"]'), 'the reason')
-    expect(text()).to.contain('Sign in with Google first')
+    expect(text()).to.contain('Sign in first')
     expect(calls.some(call => call.key === `PUT ${CREDENTIAL}`)).to.equal(false)
   })
 

@@ -1,6 +1,6 @@
 /**
- * The sign-in and session routes: exchanging an authorization code for an encrypted token blob,
- * refreshing an access token from it, and revoking it at sign-out.
+ * The sign-in and session routes: exchanging an authorization code for Google's tokens (kept for the account as an encrypted
+ * blob), the Chordless session, and ending it at sign-out.
  * Each takes the request and returns the response, so they run in Node as well as in the Worker;
  * `google` is the calls to Google, which a test replaces.
  */
@@ -11,7 +11,7 @@ import { type BlobData, decryptBlob, encryptBlob, UnreadableBlob } from './blob.
 import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
 import { type GoogleApi, realGoogle } from './google-auth.ts'
-import { jsonResponse, message, Refusal, readJson, refusing } from './http.ts'
+import { jsonResponse, Refusal, readJson, refusing } from './http.ts'
 import {
   issueSession,
   revokeSession,
@@ -132,7 +132,8 @@ async function openBlob(body: Record<string, unknown>, env: Env): Promise<BlobDa
 /**
  * POST /oauth/callback
  *
- * Exchange authorization code for tokens, encrypt refresh token into JWE blob.
+ * Exchange authorization code for tokens, encrypt the refresh token into a JWE blob, and keep it for the account
+ * (docs/ACCOUNT.md, "Google Drive"): it is never sent to the page.
  *
  * Request body:
  * {
@@ -141,7 +142,6 @@ async function openBlob(body: Record<string, unknown>, env: Env): Promise<BlobDa
  *
  * Response:
  * {
- *   blob: string,           // JWE-encrypted token blob
  *   access_token: string,   // Short-lived access token
  *   expires_in: number,     // Access token TTL (seconds)
  *   id_token: string,       // Google's ID token (who signed in)
@@ -240,7 +240,6 @@ export function handleOAuthCallback(
     }
 
     return jsonResponse({
-      blob,
       access_token,
       expires_in,
       id_token,
@@ -248,94 +247,6 @@ export function handleOAuthCallback(
       user,
       ...(session ? { session } : {}),
     })
-  })
-}
-
-/**
- * POST /session/refresh
- *
- * Refresh access token using encrypted blob.
- * Client calls this when their access token expires.
- *
- * The encrypted blob itself proves ownership (only the authorized user has it),
- * so ID token verification is optional for this endpoint.
- *
- * Request body:
- * {
- *   blob: string,              // Encrypted token blob
- *   id_token: string (optional) // ID token for extra verification (not required)
- * }
- *
- * Response:
- * {
- *   access_token: string,   // New short-lived access token
- *   expires_in: number,     // Access token TTL (seconds)
- *   id_token?: string       // A new ID token, if Google sent one: what the team space API takes
- * }
- */
-export function handleTokenRefresh(
-  request: Request,
-  env: Env,
-  google: GoogleApi = realGoogle
-): Promise<Response> {
-  return refusing(async () => {
-    const body = await readJson(request)
-    const blobData = await openBlob(body, env)
-    // (how old the sign-in is, so that a refusal tells a week-old sign-in from a year-old one)
-    const signedInAt = Date.parse(blobData.created_at)
-    annotateRequest({
-      'chordless.auth.blob_age_days': Number.isNaN(signedInAt)
-        ? -1
-        : Math.floor((Date.now() - signedInAt) / 86_400_000),
-      'chordless.auth.blob_kid': blobData.kid,
-    })
-
-    // Optional: Verify ID token if provided (extra security layer)
-    const idToken = textField(body, 'id_token')
-    if (idToken) {
-      try {
-        const payload = await google.verifyIdToken(idToken, env)
-        // Verify ownership matches ID token
-        if (blobData.owner_email !== payload.email || blobData.owner_sub !== payload.sub) {
-          return jsonResponse({ error: 'Token mismatch: blob owner does not match ID token' }, 403)
-        }
-      } catch (error) {
-        // If ID token verification fails, continue without it (blob is still valid proof)
-        console.warn('ID token verification failed, proceeding with blob only:', message(error))
-      }
-    }
-
-    try {
-      const { access_token, expires_in, id_token } = await google.refreshAccessToken(
-        blobData.refresh_token,
-        env
-      )
-      annotateRequest({ 'chordless.auth.refresh_result': 'ok' })
-      return jsonResponse({
-        access_token,
-        expires_in,
-        // (Google sends a new ID token with a refresh when it was asked for `openid`)
-        ...(id_token ? { id_token } : {}),
-      })
-    } catch (error) {
-      // Google no longer honours the refresh token (it expired, e.g. the consent screen is still
-      // in "Testing", or the access was revoked): the user has to sign in again, which is
-      // expected and not a server error
-      if ((error as { error?: string }).error === 'invalid_grant') {
-        // (Google's own words, "Token has been expired or revoked." or "Bad Request": no token in them)
-        annotateRequest({
-          'chordless.auth.refresh_result': 'invalid_grant',
-          'chordless.auth.google_description': (
-            (error as { error_description?: string }).error_description ?? message(error)
-          ).slice(0, 200),
-        })
-        return jsonResponse(
-          { error: 'invalid_grant', message: 'Google sign-in expired or was revoked' },
-          401
-        )
-      }
-      throw error
-    }
   })
 }
 
@@ -402,38 +313,16 @@ export function handleSessionUpgrade(
 /**
  * POST /session/logout
  *
- * Revoke the refresh token in the blob at Google, so signing out ends Chordless's access to the
- * Drive and does not only forget it on this device. The blob proves ownership, as for a refresh.
- * Other devices signed in with the same Google account may need to sign in again.
+ * End the session whose refresh token this is, so that signing out ends it here and not only on the device. It touches nothing at
+ * Google: the account's Google Drive connection is the account's (docs/ACCOUNT.md, "Google Drive"), kept until it is disconnected.
  *
- * Request body: { blob: string, refresh_token?: string }: the session's refresh token, if the device has
- *   one, is revoked too, so that the session ends here and not only on the device
- * Response: { success: true }, or 502 if Google could not be asked or refused
+ * Request body: { refresh_token: string }
+ * Response: { success: true }
  */
-export function handleSessionLogout(
-  request: Request,
-  env: Env,
-  google: GoogleApi = realGoogle
-): Promise<Response> {
+export function handleSessionLogout(request: Request, env: Env): Promise<Response> {
   return refusing(async () => {
-    const body = await readJson(request)
-    const refreshToken = textField(body, 'refresh_token')
+    const refreshToken = textField(await readJson(request), 'refresh_token')
     if (refreshToken && env.DB) await revokeSession(env.DB, refreshToken)
-    // (a device that only ends its session, and keeps Google's access for the others: no blob)
-    if (refreshToken && !textField(body, 'blob')) return jsonResponse({ success: true })
-    const blobData = await openBlob(body, env)
-
-    try {
-      await google.revokeToken(blobData.refresh_token, env)
-    } catch (error) {
-      // (Google says invalid_token for one that is already revoked: that is what was wanted)
-      if ((error as { error?: string }).error !== 'invalid_token') {
-        return jsonResponse(
-          { error: 'Google did not revoke the access', details: message(error) },
-          502
-        )
-      }
-    }
     return jsonResponse({ success: true })
   })
 }

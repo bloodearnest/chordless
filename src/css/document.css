@@ -69,15 +69,3 @@ body {
   margin-top: 0;
 }
 
-/* The how-to page (google-account.html): numbered steps, each with a picture of Google's page */
-.doc .steps > li {
-  margin-top: 1.5em;
-}
-
-.doc .shot {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  border: 1px solid var(--border-color, currentColor);
-  border-radius: 0.5em;
-}

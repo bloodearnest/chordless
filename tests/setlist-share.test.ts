@@ -145,7 +145,7 @@ describe('setlist-share', () => {
     )
     await new Promise(resolve => setTimeout(resolve, 50))
     await el.updateComplete
-    expect(text(el)).to.include('Sign in with Google')
+    expect(text(el)).to.include('Connect Google Drive')
   })
 
   describe('making, updating and stopping a share', () => {

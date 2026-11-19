@@ -167,10 +167,16 @@ describe('team-space-wizard', () => {
     if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
+  /** The sign-in form the wizard shows to someone signed out, and Continue with Google on it */
+  const form = () => must(page.shadowRoot?.querySelector('sign-in-form'))
+  const googleButton = () =>
+    must(form().shadowRoot?.querySelector<HTMLButtonElement>('button.google'))
+
   it('asks to sign in with Drive first, then shows the form', async () => {
     await open(null)
-    await until(() => text().includes('Sign in with Google'), 'asks to sign in')
-    button('Sign in with Google').click()
+    await until(() => page.shadowRoot?.querySelector('sign-in-form'), 'asks to sign in')
+    expect(text()).to.contain('needs to be signed in')
+    googleButton().click()
     await until(() => page.shadowRoot?.querySelector('#name'), 'the form')
     expect(asked).to.have.length(1)
     expect(asked[0]).to.contain(DRIVE)
@@ -256,10 +262,20 @@ describe('team-space-wizard', () => {
   it('says why signing in did not work, and offers it again', async () => {
     codeResponse = { error: 'access_denied' }
     await open(null)
-    await until(() => text().includes('Sign in with Google'), 'asks to sign in')
-    button('Sign in with Google').click()
+    await until(() => page.shadowRoot?.querySelector('sign-in-form'), 'asks to sign in')
+    googleButton().click()
+    await until(() => form().shadowRoot?.querySelector('[role="alert"]'), 'says why')
+    expect(googleButton()).to.exist
+    expect(page.shadowRoot?.querySelector('#name')).to.equal(null)
+  })
+
+  it('says why connecting Drive did not work, and offers it again', async () => {
+    codeResponse = { error: 'access_denied' }
+    await open('openid email profile')
+    await until(() => text().includes('Connect Google Drive'), 'asks to connect Drive')
+    button('Connect Google Drive').click()
     await until(() => page.shadowRoot?.querySelector('.error'), 'says why')
-    expect(text()).to.contain('Sign in with Google')
+    expect(text()).to.contain('Connect Google Drive')
     expect(page.shadowRoot?.querySelector('#name')).to.equal(null)
   })
 

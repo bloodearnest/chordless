@@ -69,7 +69,7 @@ team ids kept in synced data, and the live-update latency.
 | Worker request | Cloudflare's native export | |
 | Errors | `toast()` errors, `window` `error` and `unhandledrejection`, the sync catch | an `exception` event on the active span, plus `chordless.error`; class and message only |
 
-The Worker's span for `/session/refresh` says why a sign-in was refused, and how old it was, so
+The Worker's span for `/api/account/drive/token` (until 2026-11-19, `/session/refresh`) says why Google's access was refused, and how old the connection was, so
 "why did this sign-in expire?" is a query: `chordless.auth.refresh_result` (`ok`, `invalid_grant`,
 `invalid_blob`), `chordless.auth.google_description` (Google's own words, e.g. "Token has been expired
 or revoked."), `chordless.auth.blob_age_days` (since the person signed in) and `chordless.auth.blob_kid`.
@@ -173,7 +173,7 @@ the small collector: authentication and abuse limits, redaction, forwarding.
 Checked in Honeycomb on 2026-10-27. The Worker's traces are in a dataset named `chordless` (the
 service name; `cloudflare-workers-observability` holds only the destination's test event). A request is a
 root `GET` or `POST` span, with an outbound `fetch` child where the Worker called out (the Google token
-exchange is a child of `/session/refresh`). Error statuses are traced too, but Cloudflare's own
+exchange is a child of `/api/account/drive/token`). Error statuses are traced too, but Cloudflare's own
 `status_code` stays unset for a 4xx and `cloudflare.outcome` is `ok` when the Worker ran: **failure is
 `http.response.status_code`**, so Worker triggers and SLOs filter on that (`>= 500`).
 
@@ -206,7 +206,7 @@ the sync's span. A call by any other code is a trace of its own. At most 200 cal
 that they are made as if the sync were not reported, and the totals on the sync's span count them all.
 
 **The Worker's spans do not join.** Cloudflare's native export ignores an incoming `traceparent`: the
-Worker's `/session/refresh` span is a root in a trace of its own (checked 2026-10-28). So the page's
+Worker's `/api/account/drive/token` span is a root in a trace of its own (checked 2026-10-28). So the page's
 call span carries the response's `cf-ray` as `cloudflare.ray_id`, the same value as on the Worker's span
 (in the `chordless` dataset): find one from the other by the ray id. The `traceparent` header is still
 sent, in case Cloudflare honours it one day. There is no setting for it (checked 2026-10-28: the
