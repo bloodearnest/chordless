@@ -307,11 +307,27 @@ describe('DELETE /api/account/drive', () => {
     await connect(env, fakeGoogle().google, token)
     const { google, calls } = fakeGoogle()
     const response = await call(env, google, 'DELETE', DRIVE_PATH, token)
-    assert.deepEqual(await json(response), { success: true })
+    assert.deepEqual(await json(response), { success: true, revoked: true })
     assert.deepEqual(calls, [{ name: 'revoke', args: [REFRESH_TOKEN] }])
     assert.equal(sql.prepare('SELECT count(*) AS n FROM account_drive').get()?.n, 0)
     const after = await call(env, google, 'POST', `${DRIVE_PATH}/token`, token)
     assert.equal(after.status, 404)
+  })
+
+  test('forgets the connection but leaves the grant when the account owns a team kept in its Drive', async () => {
+    const { env, sql } = setup()
+    const token = await account(env, sql)
+    await connect(env, fakeGoogle().google, token)
+    sql
+      .prepare(
+        "INSERT INTO teams (space_id, name, owner_email, owner_account_id, created_at, updated_at) VALUES ('t1', 'T', 'a@b.example', 'acct-1', 'now', 'now')"
+      )
+      .run()
+    const { google, calls } = fakeGoogle()
+    const response = await call(env, google, 'DELETE', DRIVE_PATH, token)
+    assert.deepEqual(await json(response), { success: true, revoked: false })
+    assert.deepEqual(calls, [], 'the team still uses the grant')
+    assert.equal(sql.prepare('SELECT count(*) AS n FROM account_drive').get()?.n, 0)
   })
 
   test('forgets a grant Google already revoked, and one that cannot be read', async () => {
