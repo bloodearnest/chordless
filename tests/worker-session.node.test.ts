@@ -1236,6 +1236,9 @@ describe('connecting Google to an account', () => {
         "INSERT INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at) VALUES ('email', ?, ?, ?, ?, ?)"
       )
       .run(address, id, address, at, at)
+    sql
+      .prepare('INSERT INTO account_emails (email, account_id, created_at) VALUES (?, ?, ?)')
+      .run(address, id, at)
     return {
       id,
       token: await signAccessToken({ accountId: id, sessionId: 's1', email: address }, e, NOW),

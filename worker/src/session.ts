@@ -18,7 +18,7 @@ import {
   type SessionTokens,
   verifyAccessToken,
 } from './session-tokens.ts'
-import { accountOf } from './team-state.ts'
+import { accountOf, claimAddress } from './team-state.ts'
 import { annotateRequest } from './trace.ts'
 
 /** The account behind the session a request carries as its bearer, if it carries a good one */
@@ -51,28 +51,27 @@ async function accountOfGoogle(
   if (existing && linkTo && existing.account_id !== linkTo) {
     throw new Refusal(409, 'google_in_use')
   }
-  let account = linkTo
-  if (!account && !existing && who.verified) {
-    const mailbox = await db
-      .prepare(
-        "SELECT account_id FROM account_identities WHERE provider = 'email' AND email = ? ORDER BY created_at LIMIT 1"
-      )
-      .bind(email)
-      .first<{ account_id: string }>()
-    account = mailbox?.account_id
-  }
-  if (account && !existing) {
+  if (linkTo && !existing) {
     await db
       .prepare(
         `INSERT OR IGNORE INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at)
           VALUES ('google', ?, ?, ?, ?, ?)`
       )
-      .bind(who.sub, account, email, at, at)
+      .bind(who.sub, linkTo, email, at, at)
       .run()
   }
+  // (a login that is new joins the account that owns its address, if Google verified the address: the same
+  // mailbox is the same person. One that is not verified makes its own, and claims nothing)
   const accountId =
-    account ??
-    ((await accountOf(db, { provider: 'google', sub: who.sub, email }, true, now)) as string)
+    linkTo ??
+    ((await accountOf(
+      db,
+      { provider: 'google', sub: who.sub, email },
+      true,
+      now,
+      who.verified
+    )) as string)
+  if (linkTo && who.verified) await claimAddress(db, accountId, email, now)
   // (the name Google gave is the name they have until they give another: it never replaces one they gave)
   const name = cleanName(who.name)
   if (name) {

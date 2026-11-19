@@ -33,17 +33,28 @@ export async function accountInfo(env: Env, accountId: string): Promise<AccountI
     .prepare('SELECT name FROM accounts WHERE account_id = ?')
     .bind(accountId)
     .first<{ name: string | null }>()
-  const { results } = await db
+  // (the addresses the account owns; and a login's own, if another account has its address, so it still shows)
+  const { results: owned } = await db
+    .prepare('SELECT email FROM account_emails WHERE account_id = ? ORDER BY created_at, email')
+    .bind(accountId)
+    .all<{ email: string }>()
+  const { results: logins } = await db
     .prepare(
       'SELECT provider, email FROM account_identities WHERE account_id = ? ORDER BY created_at, provider'
     )
     .bind(accountId)
     .all<{ provider: string; email: string }>()
-  const emails = results.filter(row => row.email)
+  const googleEmail = logins.find(row => row.provider === 'google')?.email || null
+  const addresses = [
+    ...new Set([...owned.map(row => row.email), ...logins.map(row => row.email)]),
+  ].filter(Boolean)
   return {
     name: account?.name ?? null,
-    emails: emails.map(row => ({ email: row.email, provider: row.provider })),
-    googleEmail: emails.find(row => row.provider === 'google')?.email ?? null,
+    emails: addresses.map(email => ({
+      email,
+      provider: email === googleEmail ? 'google' : 'email',
+    })),
+    googleEmail,
   }
 }
 

@@ -39,7 +39,8 @@ Durable Object, so it can be asked across teams and outlives them. `teams` has a
 its id, name, owner (account and email), its Drive folder, which credential it uses, its licence
 number, when it was made, and when sharing ended (the row stays). A member is an **account**
 (`accounts`, `account_identities`, 0003): a person's Chordless account, which holds the logins they sign in
-with (a provider and its id for them: today Google's) and the addresses they are known by, so that one
+with (a provider and its id for them: today Google's) and the addresses they are known by (`account_emails`, 0009: an address
+belongs to one account), so that one
 person on two logins is one member, and a later sign-in with Microsoft, Apple or an emailed link is another
 login of the same account, not a new kind of member. No password is ever kept. `team_members` (the
 member's key, the account, the primary email, role, since) and `team_member_emails` (the addresses *this team*
