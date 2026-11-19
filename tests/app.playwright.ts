@@ -368,7 +368,7 @@ test.describe('Account and Teams page', () => {
 
       await page
         .locator('account-card')
-        .getByRole('button', { name: 'Sign in with Google' })
+        .getByRole('button', { name: 'Continue with Google' })
         .click()
       await expect(page.locator('account-card').getByRole('alert')).toContainText(
         'Signing in failed'

@@ -36,6 +36,10 @@ describe('account-card', () => {
   const realGoogle = (window as { google?: unknown }).google
 
   const text = () => (card.shadowRoot?.textContent ?? '').replace(/\s+/g, ' ')
+  /** The sign-in form of a card that is signed out, and Continue with Google on it */
+  const signInForm = () => must(card.shadowRoot?.querySelector('sign-in-form'))
+  const googleButton = () =>
+    must(signInForm().shadowRoot?.querySelector<HTMLButtonElement>('button.google'))
   const control = (id: string) => must(card.shadowRoot?.querySelector<HTMLButtonElement>(`#${id}`))
 
   async function until(condition: () => unknown, what: string) {
@@ -229,7 +233,7 @@ describe('account-card', () => {
       await open()
       expect(text()).to.contain('Not signed in')
       expect(text()).to.contain('stay on this device')
-      expect(control('sign-in').textContent).to.contain('Sign in with Google')
+      expect(googleButton().textContent).to.contain('Continue with Google')
       expect(card.shadowRoot?.querySelector('#logout')).to.equal(null)
       expect(card.shadowRoot?.querySelector('dl')).to.equal(null)
       expect(states).to.deep.equal(['signed-out'])
@@ -371,7 +375,7 @@ describe('account-card', () => {
         googleEmail: 'bea@example.com',
       }
       await open()
-      control('sign-in').click()
+      googleButton().click()
       await until(() => text().includes('Bea Singer'), 'the sign-in to finish')
       expect(text()).to.contain('Signed in.')
       expect(states).to.deep.equal(['signed-out', 'signed-in'])
@@ -380,7 +384,7 @@ describe('account-card', () => {
     it('signs in when the Drive box was left unticked, says so, and can enable Drive', async () => {
       await open()
       exchange = signedIn('openid email profile')
-      control('sign-in').click()
+      googleButton().click()
       await until(() => text().includes('Drive was not connected'), 'the sign-in to finish')
       expect(text()).to.contain('Google Drive is not connected')
 
@@ -393,7 +397,7 @@ describe('account-card', () => {
     it('says so when Drive is still not connected after asking for it, and when asking fails', async () => {
       await open()
       exchange = signedIn('openid email profile')
-      control('sign-in').click()
+      googleButton().click()
       await until(() => card._state === 'no-drive', 'the sign-in to finish')
 
       control('enable-sync').click()
@@ -419,23 +423,25 @@ describe('account-card', () => {
     it('says so when Google refuses', async () => {
       await open()
       codeResponse = { error: 'access_denied' }
-      control('sign-in').click()
-      await until(() => text().includes('Signing in failed'), 'the failure to be shown')
-      expect(text()).to.not.contain('access_denied')
+      googleButton().click()
+      await until(
+        () => (signInForm().shadowRoot?.textContent ?? '').includes('Signing in failed'),
+        'the failure to be shown'
+      )
+      expect(signInForm().shadowRoot?.textContent).to.not.contain('access_denied')
       expect(card._state).to.equal('signed-out')
     })
 
-    it('offers an emailed code beside Google, and signs in when the code is right', async () => {
+    it('offers an emailed code on the same form as Google, and signs in when the code is right', async () => {
       await open()
-      expect(card.shadowRoot?.querySelector('email-code-sign-in')).to.equal(null)
-      control('sign-in-email').click()
-      await until(() => card.shadowRoot?.querySelector('email-code-sign-in'), 'the form')
+      expect(signInForm().shadowRoot?.querySelector('email-code-sign-in')).to.exist
+      expect(googleButton()).to.exist
       signInByEmail()
-      card.shadowRoot
-        ?.querySelector('email-code-sign-in')
-        ?.dispatchEvent(new Event('email-code:signed-in', { bubbles: true, composed: true }))
-      await until(() => text().includes('Signed in with your email address.'), 'the message')
-      expect(card.shadowRoot?.querySelector('email-code-sign-in')).to.equal(null)
+      signInForm().dispatchEvent(
+        new Event('email-code:signed-in', { bubbles: true, composed: true })
+      )
+      await until(() => text().includes('Signed in.'), 'the message')
+      expect(card.shadowRoot?.querySelector('sign-in-form')).to.equal(null)
       expect(states.at(-1)).to.equal('no-drive')
     })
   })

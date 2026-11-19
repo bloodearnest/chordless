@@ -11,7 +11,7 @@ import { t } from '../js/text.ts'
 import { errorMessage, failedWith } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
-import './email-code-sign-in.ts'
+import './sign-in-form.ts'
 import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.ts'
 
 /** Who is signed in now, or what is wrong with the sign-in */
@@ -48,7 +48,6 @@ export class AccountCard extends LitElement {
     _account: { state: true },
     _message: { state: true },
     _emailOnly: { state: true },
-    _emailForm: { state: true },
     _editingName: { state: true },
     _busy: { state: true },
   }
@@ -61,8 +60,6 @@ export class AccountCard extends LitElement {
   declare _message: Message | null
   /** Signed in with an emailed code alone: no Google, so no Drive */
   declare _emailOnly: boolean
-  /** The form for an emailed code is open */
-  declare _emailForm: boolean
   declare _editingName: boolean
   declare _busy: boolean
 
@@ -98,7 +95,6 @@ export class AccountCard extends LitElement {
     this._account = null
     this._message = null
     this._emailOnly = false
-    this._emailForm = false
     this._editingName = false
     this._busy = false
   }
@@ -114,7 +110,6 @@ export class AccountCard extends LitElement {
     const { getSignInState, getCurrentUserInfo, isEmailOnly } = await import('../js/google-auth.ts')
     const state = await getSignInState()
     this._emailOnly = state !== 'signed-out' && (await isEmailOnly())
-    if (state !== 'signed-out') this._emailForm = false
     this._user = state === 'signed-out' ? null : await getCurrentUserInfo()
     this._account = state === 'signed-out' ? null : cachedAccount()
     this._state = state
@@ -126,10 +121,13 @@ export class AccountCard extends LitElement {
     }
   }
 
-  /** They signed in with an emailed code: look again, and say so */
-  async _emailSignedIn(): Promise<void> {
+  /** They signed in (by a code or Google, on the form): look again, and say so */
+  async _signedInHere(): Promise<void> {
     await this.refresh()
-    this._message = { text: t('account-email-signed-in'), type: 'success' }
+    this._message =
+      this._state === 'no-drive'
+        ? { text: t('account-signed-in-no-drive'), type: 'success' }
+        : { text: t('account-signed-in'), type: 'success' }
   }
 
   /** Google's whole sign-in: to sign in, to reconnect, and to turn the Personal space's sync on for an emailed sign-in */
@@ -319,15 +317,7 @@ export class AccountCard extends LitElement {
         <strong>${t('account-signed-out-name')}</strong>
         <span class="sub">${t('account-signed-out-text')}</span>
       </p>
-      <div class="actions">
-        <button class="btn primary" id="sign-in" @click=${this._signIn}>${t('action-sign-in')}</button>
-        <button class="btn" id="sign-in-email" @click=${() => (this._emailForm = true)}>${t('email-code-button')}</button>
-      </div>
-      ${
-        this._emailForm
-          ? html`<email-code-sign-in @email-code:signed-in=${this._emailSignedIn}></email-code-sign-in>`
-          : nothing
-      }
+      <sign-in-form @email-code:signed-in=${this._signedInHere}></sign-in-form>
     `
   }
 

@@ -61,6 +61,19 @@ export class EmailCodeSignIn extends LitElement {
     `,
   ]
 
+  override willUpdate(changed: Map<string, unknown>): void {
+    // (the form says whether it is asking for the address, so that what sits beside it, Google, can be shown with it only)
+    if (changed.has('_step')) {
+      this.dispatchEvent(
+        new CustomEvent('email-code:step', {
+          detail: this._step === 'address' || this._step === 'sending',
+          bubbles: true,
+          composed: true,
+        })
+      )
+    }
+  }
+
   _explain(error: unknown, fallback: string): string {
     if (!(error instanceof EmailCodeError)) return t(fallback)
     switch (error.reason) {

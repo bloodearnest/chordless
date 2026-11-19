@@ -1,9 +1,9 @@
 import { css, html, LitElement, nothing } from 'lit'
 import type { Space, TeamLink } from '../js/data-types.ts'
 import {
-  authorizeWithGoogle,
   getCurrentUserInfo,
   getSignInState,
+  logout,
   SignInExpiredError,
 } from '../js/google-auth.ts'
 import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
@@ -15,16 +15,11 @@ import { setCurrentSpace, switchSpace } from '../js/space.ts'
 import { storageFor } from '../js/storage/space-storage.ts'
 import type { ProgressCallback, SyncProgress } from '../js/sync-manager.ts'
 import { type InviteLookup, teamApi } from '../js/team-client.ts'
-import {
-  googleAccountGuideUrl,
-  joinSpace,
-  roleWithArticle,
-  syncTeamSpace,
-} from '../js/team-spaces.ts'
+import { joinSpace, roleWithArticle, syncTeamSpace } from '../js/team-spaces.ts'
 import { t } from '../js/text.ts'
 import { whatToSay } from '../js/utils/errors.ts'
 import { TeamError } from '../js/worker-call.ts'
-import './email-code-sign-in.ts'
+import './sign-in-form.ts'
 import './progress-bar.ts'
 import { buttonStyles } from './shared-styles.ts'
 
@@ -33,8 +28,6 @@ type State =
   | 'not-valid'
   | 'checking'
   | 'sign-in'
-  | 'make-account'
-  | 'email-code'
   | 'ready'
   | 'joining'
   | 'syncing'
@@ -45,26 +38,6 @@ type State =
 export function parseInvite(fragment: string): { teamId: string; code: string } | null {
   const match = /^#?([A-Za-z0-9_-]{8,64})\.([A-Za-z0-9_-]{16,64})$/.exec(fragment)
   return match ? { teamId: match[1], code: match[2] } : null
-}
-
-/** Where an answer to "do you have a Google account?" is kept for an invite, as they leave to make one and come back */
-const answerKey = (teamId: string) => `chordless:join-has-google:${teamId}`
-
-function readAnswer(teamId: string): 'yes' | 'no' | null {
-  try {
-    const answer = localStorage.getItem(answerKey(teamId))
-    return answer === 'yes' || answer === 'no' ? answer : null
-  } catch {
-    return null
-  }
-}
-
-function keepAnswer(teamId: string, answer: 'yes' | 'no'): void {
-  try {
-    localStorage.setItem(answerKey(teamId), answer)
-  } catch {
-    // (not kept: they are asked again)
-  }
 }
 
 /**
@@ -87,7 +60,6 @@ export class TeamJoin extends LitElement {
     _syncError: { state: true },
     _progress: { state: true },
     _info: { state: true },
-    _answer: { state: true },
     _continueHere: { state: true },
     _copied: { state: true },
     route: { attribute: false },
@@ -106,8 +78,6 @@ export class TeamJoin extends LitElement {
   declare _progress: SyncProgress | null
   /** What the invite is for, as the Worker says; undefined where it could not be asked */
   declare _info: InviteLookup | undefined
-  /** Whether they said they have a Google account, kept for the invite while they go and make one */
-  declare _answer: 'yes' | 'no' | null
   /** They chose to carry on inside another app's browser */
   declare _continueHere: boolean
   declare _copied: boolean
@@ -157,7 +127,6 @@ export class TeamJoin extends LitElement {
     this._syncError = ''
     this._progress = null
     this._info = undefined
-    this._answer = null
     this._continueHere = false
     this._copied = false
   }
@@ -243,7 +212,6 @@ export class TeamJoin extends LitElement {
   async _start(): Promise<void> {
     const invite = this._invite as { teamId: string; code: string }
     this._state = 'checking'
-    this._answer = readAnswer(invite.teamId)
     try {
       const info = await this.lookupInvite(invite.teamId, invite.code)
       if (!info) {
@@ -268,30 +236,12 @@ export class TeamJoin extends LitElement {
     this._state = 'checking'
     const state = await getSignInState()
     if (state === 'signed-out' || state === 'expired') {
-      // (an expired sign-in was one they made: they have a Google account, so they are not asked)
-      if (state === 'expired') this._answer = 'yes'
       this._state = 'sign-in'
       return
     }
     this._email = (await getCurrentUserInfo())?.email ?? null
     this._trail.note({ 'chordless.join.signed_in_as_invited': this._asInvited() })
     this._state = 'ready'
-  }
-
-  /** What they know about having a Google account, and so what to ask: yes, no, or nothing said (a phone has one) */
-  _hasGoogle(): 'assumed' | 'yes' | 'no' | 'unknown' {
-    const info = this._info
-    if (info?.role === 'admin' || info?.google === 'gmail' || info?.google === 'workspace') {
-      return 'assumed'
-    }
-    if (this.device.os === 'android') return 'assumed'
-    return this._answer ?? 'unknown'
-  }
-
-  _answerHasGoogle(answer: 'yes' | 'no'): void {
-    this._answer = answer
-    keepAnswer((this._invite as { teamId: string }).teamId, answer)
-    this._state = answer === 'yes' ? 'sign-in' : 'make-account'
   }
 
   async _copyLink(): Promise<void> {
@@ -303,20 +253,16 @@ export class TeamJoin extends LitElement {
     }
   }
 
-  /** Sign in with Google for who they are alone, then look again */
-  async _signIn(): Promise<void> {
-    this._trail.note({ 'chordless.join.has_google_answer': this._hasGoogle() })
-    try {
-      await authorizeWithGoogle({ drive: false })
-    } catch (error) {
-      this._trail.note({
-        /* v8 ignore next -- authorizeWithGoogle throws Errors; the fallback is for anything else thrown */
-        'chordless.join.sign_in_error': error instanceof Error ? error.name : 'unknown',
-      })
-      this._message = whatToSay(error, t('join-sign-in-failed'))
-      this._state = 'failed'
-      return
-    }
+  /** Sign in as someone else: this sign-in is left (signing in over it would only add a login to the same account) */
+  async _differentAccount(): Promise<void> {
+    await logout()
+    this._email = null
+    this._state = 'sign-in'
+  }
+
+  /** They signed in (by a code or Google): look again */
+  async _signedIn(): Promise<void> {
+    this._trail.note({ 'chordless.join.method': 'signed_in' })
     await this._check()
   }
 
@@ -335,7 +281,6 @@ export class TeamJoin extends LitElement {
       this._role = roleWithArticle((joined.team as TeamLink).role)
     } catch (error) {
       this._message = this._explain(error, t('join-failed'))
-      if (error instanceof SignInExpiredError) this._answer = 'yes'
       this._state = error instanceof SignInExpiredError ? 'sign-in' : 'failed'
       return
     }
@@ -402,103 +347,15 @@ export class TeamJoin extends LitElement {
       `
     }
     const email = info?.email ?? ''
-    const known = this._hasGoogle()
-    // (one who said they need an account is asked again: they may have made one since)
-    const question = known === 'unknown' || known === 'no'
-    let guidance: string
-    if (info?.role === 'admin') guidance = t('join-admin-exact', { email })
-    else if (info?.google === 'gmail' || info?.google === 'workspace') {
-      guidance = t('join-sign-in-invited', { email })
-    } else if (this.device.os === 'android') {
-      guidance = info ? t('join-sign-in-android', { email }) : t('join-sign-in-any-nameless')
-    } else {
-      guidance = info ? t('join-sign-in-any', { email }) : t('join-sign-in-any-nameless')
-    }
     return html`
       <h2>${heading}</h2>
-      ${
-        question
-          ? html`
-              <p>${t('join-has-google-question')}</p>
-              <div class="actions">
-                <button class="btn primary" @click=${() => this._answerHasGoogle('yes')}>
-                  ${t('join-has-google-yes')}
-                </button>
-                <button class="btn" @click=${() => this._answerHasGoogle('no')}>
-                  ${t('join-has-google-no')}
-                </button>
-                <button class="btn" @click=${() => (this._state = 'email-code')}>
-                  ${t('email-code-button')}
-                </button>
-              </div>
-            `
-          : html`
-              <p>${guidance}</p>
-              ${this._message ? html`<p class="status error" role="alert">${this._message}</p>` : nothing}
-              <div class="actions">
-                <button class="btn primary" @click=${this._signIn}>🔑 ${t('join-sign-in-button')}</button>
-                <button class="btn" @click=${() => (this._state = 'email-code')}>
-                  ${t('email-code-button')}
-                </button>
-                ${
-                  known === 'yes'
-                    ? html`<button class="btn" @click=${() => this._answerHasGoogle('no')}>
-                        ${t('join-has-google-no')}
-                      </button>`
-                    : nothing
-                }
-              </div>
-            `
-      }
-    `
-  }
-
-  /** Signing in with an emailed code, which needs no Google account: the invite's address to start from */
-  _renderEmailCode() {
-    return html`
-      <h2>${t('email-code-heading')}</h2>
-      <email-code-sign-in
-        .address=${this._info?.email ?? ''}
+      <p>${info?.role === 'admin' ? t('join-admin-exact', { email }) : t('join-sign-in-intro')}</p>
+      ${this._message ? html`<p class="status error" role="alert">${this._message}</p>` : nothing}
+      <sign-in-form
+        .address=${email}
         .next=${window.location.pathname + window.location.search}
-        @email-code:signed-in=${this._emailSignedIn}
-      ></email-code-sign-in>
-      <div class="actions">
-        <button class="btn" @click=${() => (this._state = 'sign-in')}>${t('join-make-back')}</button>
-      </div>
-    `
-  }
-
-  async _emailSignedIn(): Promise<void> {
-    this._trail.note({ 'chordless.join.method': 'email' })
-    await this._check()
-  }
-
-  /** For someone with no Google account: the easy way, and the way that keeps their own address */
-  _renderMakeAccount() {
-    const email = this._info?.email
-    return html`
-      <h2>${t('join-make-heading')}</h2>
-      <p>${t('join-make-easiest')}</p>
-      <p>
-        <a href="https://accounts.google.com/signup" target="_blank" rel="noopener">${t('join-make-open-signup')}</a>
-      </p>
-      ${
-        email
-          ? html`<p class="hint">
-              ${t('join-make-existing', { email })}
-              <a href=${googleAccountGuideUrl(window.location.origin)}>${t('join-make-guide-link')}</a>
-            </p>`
-          : nothing
-      }
-      <div class="actions">
-        <button class="btn" @click=${() => (this._state = 'email-code')}>
-          ${t('email-code-button')}
-        </button>
-        <button class="btn primary" @click=${() => this._answerHasGoogle('yes')}>
-          ${t('join-make-done')}
-        </button>
-        <button class="btn" @click=${() => (this._state = 'sign-in')}>${t('join-make-back')}</button>
-      </div>
+        @email-code:signed-in=${this._signedIn}
+      ></sign-in-form>
     `
   }
 
@@ -534,7 +391,7 @@ export class TeamJoin extends LitElement {
             ? nothing
             : html`<button class="btn primary" @click=${this._join}>${t('join-button')}</button>`
         }
-        <button class="btn ${locked ? 'primary' : ''}" @click=${this._signIn}>${t('join-different-account')}</button>
+        <button class="btn ${locked ? 'primary' : ''}" @click=${this._differentAccount}>${t('join-different-account')}</button>
       </div>
     `
   }
@@ -560,10 +417,6 @@ export class TeamJoin extends LitElement {
         `
       case 'sign-in':
         return this._renderSignIn()
-      case 'make-account':
-        return this._renderMakeAccount()
-      case 'email-code':
-        return this._renderEmailCode()
       case 'ready':
         return this._renderReady()
       case 'joining':
@@ -603,7 +456,7 @@ export class TeamJoin extends LitElement {
           }
           <div class="actions">
             <button class="btn primary" @click=${this._check}>${t('action-try-again')}</button>
-            <button class="btn" @click=${this._signIn}>${t('join-different-account')}</button>
+            <button class="btn" @click=${this._differentAccount}>${t('join-different-account')}</button>
           </div>
         `
     }

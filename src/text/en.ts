@@ -384,35 +384,21 @@ join-welcome-unknown = You have been invited to join a team on Chordless.
 
 # Above the sign-in button when the invite was sent to a Gmail or Google Workspace address, which is then the
 # account to use. { $email } is that address.
-join-sign-in-invited = Sign in with the Google account { $email }. Chordless asks only who you are: it gets no access to your Google Drive.
 
 # For an invite that makes someone an admin: it only works with the address it was sent to. { $email } is that address.
-join-admin-exact = This invite makes you an admin, so it can only be used with the address it was sent to: { $email }. Sign in with the Google account that has that address.
+join-sign-in-intro = Sign in to join. Chordless asks only who you are.
+join-admin-exact = This invite makes you an admin, so it can only be used with the address it was sent to: { $email }. Sign in with that address.
 
 # Above the sign-in button on an Android phone, which has a Google account on it. { $email } is the address the invite was sent to.
-join-sign-in-android = Sign in with the Google account on this phone. It does not have to be { $email }. Chordless asks only who you are: it gets no access to your Google Drive.
 
 # Above the sign-in button for someone who has said they have a Google account. { $email } is the address the invite was sent to.
-join-sign-in-any = Sign in with the Google account you use. It does not have to be { $email }. Chordless asks only who you are: it gets no access to your Google Drive.
 
 # The same, when the address the invite was sent to is not known.
-join-sign-in-any-nameless = Sign in with the Google account you use. Chordless asks only who you are: it gets no access to your Google Drive.
 
-join-sign-in-button = Sign in with Google
 
 # The question for someone who may not have a Google account, on a device that does not say.
-join-has-google-question = Do you already have a Google account? It can be a Gmail address, or any other address that someone has made a Google account with.
-join-has-google-yes = Yes, sign in
-join-has-google-no = No, I need one
 
-join-make-heading = Make a Google account
-join-make-easiest = The easiest way is a new Gmail address. It takes a few minutes, and you can use it with Chordless straight away.
-join-make-open-signup = Make a Gmail address
 # { $email } is the address the invite was sent to.
-join-make-existing = Or make a Google account with the address you already have, { $email }. This is fiddlier: Google offers a new Gmail address first, and the link to use your own is small.
-join-make-guide-link = Show me how, step by step
-join-make-done = I have made one: sign in
-join-make-back = Back
 
 ## Inviting people
 
@@ -499,10 +485,12 @@ people-hint-read = You can see who is in the Team, and change your own name.
 ## Signing in with an emailed code
 
 # The other way to sign in, for someone with no Google account: Chordless emails a code to their address.
-email-code-button = Sign in with email
-email-code-heading = Sign in with your email address
-email-code-address-label = Your email address
-email-code-send = Email me a sign-in link
+sign-in-or = or
+sign-in-google = Continue with Google
+sign-in-google-note = Google also turns on syncing your Personal space between your devices, with your Google Drive.
+email-code-heading = Sign in
+email-code-address-label = Email
+email-code-send = Continue
 email-code-sending = Sending…
 email-code-sent = We have emailed { $email } a link and a 6-digit code. Open the link on this device, or enter the code here. It can take a minute, and it may be in your spam folder.
 email-code-label = The 6-digit code
@@ -525,7 +513,7 @@ email-link-app = I use the installed app: show me the code
 email-link-code-intro = Enter this code in Chordless to sign in as { $email }.
 email-link-copied = The code is copied.
 email-link-copy-by-hand = Copy the code by hand.
-email-link-code-steps = Open Chordless from your Home Screen, go back to where you were signing in, choose "Use my email address instead" and then "I already have a code", and enter your address and this code. It works once, so do not also sign in in this browser.
+email-link-code-steps = Open Chordless from your Home Screen, go back to where you were signing in, choose "I already have a code", and enter your address and this code. It works once, so do not also sign in in this browser.
 email-link-failed = That link has been used or has run out. Ask for a new one.
 email-link-none = To sign in, enter your email address and we will email you a link and a code.
 email-code-error-failed = Signing in did not work. Try again in a moment.
@@ -580,7 +568,6 @@ space-sync-sign-in-hint = Sign in on the Account and Teams page to sync.
 
 ## Signing in
 
-action-sign-in = Sign in with Google
 account-email-signed-in = Signed in with your email address.
 account-signed-out-name = Not signed in
 account-signed-out-text =
@@ -1789,7 +1776,6 @@ invite-invites-text = Each is emailed to that person. The links are shown once, 
 invite-link-label = Invite link for { $email }
 invite-copy = Copy the link
 invite-copied = ✓ Copied
-invite-admin-not-gmail = An admin invite only works with this address, and it is not a Gmail address, so the message also tells them how to make a Google account with it.
 action-add = Add
 
 
@@ -2118,13 +2104,9 @@ invite-send = Send…
 invite-subject = Join { $team } on Chordless
 # { $team } is the Team, { $role } the role with its article ("a worship leader").
 invite-message-intro = You are invited to join { $team } on Chordless as { $role }.
-# For an address that is a Gmail address: it is the account to use.
-invite-message-gmail = Sign in with the Google account { $email }; the link works once, for a week.
-invite-message-any = Open the link and sign in with any Google account you use: it does not have to be { $email }. If you have none, the page shows how to make one. The link works once, for a week.
-# For an admin, whose invite only works with its address: { $guide } is the page that shows how to make a Google account with it.
-invite-message-admin =
-    Before you open the link, { $email } must be a Google account, so if it is not one yet, make it one first (you need no Gmail). The steps, with pictures:
-    { $guide }
+invite-message-open = Open the link and sign in with your email address or a Google account: it does not have to be { $email }. The link works once, for a week.
+# For an admin, whose invite only works with its address
+invite-message-admin = Open the link and sign in with { $email }: this invite only works with that address. The link works once, for a week.
 
     Then sign in with the Google account { $email }; the link works once, for a week.
 

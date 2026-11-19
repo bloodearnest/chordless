@@ -56,8 +56,8 @@ export function inviteEmail({ origin, spaceId, teamName, role, to, by, code }: I
     link,
     '',
     role === 'admin'
-      ? `An admin invite only works with this address, ${to}: sign in with a Google account that is ${to}, or with a code Chordless emails to ${to}.`
-      : `Sign in with any Google account you use, or with a code Chordless emails to you: it does not have to be ${to}.`,
+      ? `An admin invite only works with this address, ${to}: sign in with it, by a code Chordless emails to ${to} or with a Google account that has it.`
+      : `Sign in with your email address or a Google account: it does not have to be ${to}.`,
     '',
     'The link works once, for a week. If you do not know who this is, ignore it: nothing happens unless the link is opened.',
     '',

@@ -31,7 +31,7 @@ export class InviteSend extends LitElement {
     try {
       await navigator.share({
         title: `Join ${this.teamName} on Chordless`,
-        text: inviteMessage(this.teamName, this.role, this.email, this.url),
+        text: inviteMessage(this.teamName, this.role, this.email),
         url: this.url,
       })
     } catch {

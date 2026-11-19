@@ -2,7 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import type { TeamLink } from '../js/data-types.ts'
 import { teamApi } from '../js/team-client.ts'
 import { MEMBER_ROLES, type MemberRole } from '../js/team-roles.ts'
-import { inviteLink, isGmailAddress, type Leader, roleLabel } from '../js/team-spaces.ts'
+import { inviteLink, type Leader, roleLabel } from '../js/team-spaces.ts'
 import { t } from '../js/text.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import './invite-send.ts'
@@ -224,11 +224,6 @@ export class TeamInviteStep extends LitElement {
                       .email=${outcome.email}
                       .url=${outcome.url}
                     ></invite-send>
-                    ${
-                      outcome.role === 'admin' && !isGmailAddress(outcome.email)
-                        ? html`<p class="hint">${t('invite-admin-not-gmail')}</p>`
-                        : nothing
-                    }
                   </li>`
                   : html`<li class="error" role="alert">${outcome.email}: ${outcome.error}</li>`
               )}

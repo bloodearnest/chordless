@@ -5,7 +5,7 @@ import { goTo } from '../js/navigation.ts'
 import type { Route } from '../js/router.ts'
 import { t } from '../js/text.ts'
 import { buttonStyles } from './shared-styles.ts'
-import './email-code-sign-in.ts'
+import './sign-in-form.ts'
 
 type State = 'form' | 'working' | 'failed' | 'choose' | 'code'
 
@@ -129,12 +129,12 @@ export class SignInPage extends LitElement {
       case 'failed':
         return html`
           <p class="error" role="alert">${t('email-link-failed')}</p>
-          <email-code-sign-in @email-code:signed-in=${this._signedIn}></email-code-sign-in>
+          <sign-in-form @email-code:signed-in=${this._signedIn}></sign-in-form>
         `
       default:
         return html`
           <p>${t('email-link-none')}</p>
-          <email-code-sign-in @email-code:signed-in=${this._signedIn}></email-code-sign-in>
+          <sign-in-form @email-code:signed-in=${this._signedIn}></sign-in-form>
         `
     }
   }
