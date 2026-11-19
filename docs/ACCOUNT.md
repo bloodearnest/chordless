@@ -77,8 +77,8 @@ device needs only a sign-in (an emailed code, or Google) to sync, and never a se
   device forgets it. A failure leaves the blob, and the old `/session/refresh` carries on from it. `/oauth/callback` still sends
   the blob, and `/session/refresh` still takes one, for apps from before that have not reloaded; both go once none do.
 - The device keeps `metadata.drive` (whether the account has Drive, as the Worker last said: `GET /api/account` has `drive:
-  {email}`), asked after a sign-in and corrected by the token route. The Account card's three kinds of state follow: signed in
-  with Drive, signed in without (`no-drive`), expired.
+  {email}`), asked after a sign-in and corrected by the token route. The Personal card's three kinds of state follow: connected,
+  not connected (`no-drive`), expired.
 
 ## The page
 
@@ -86,15 +86,17 @@ device needs only a sign-in (an emailed code, or Google) to sync, and never a se
 Account and Teams
 
 +- Account ----------------------------------------------+
-| Bea Singer - bea@example.com                           |
-| Google Drive connected                      [Manage]   |
+| Name    Bea Singer                          [Edit]     |
+| Emails  bea@example.com                                |
+|                                             [Log out]  |
 +--------------------------------------------------------+
 
 Personal and Team Spaces
-+- Bea Singer [Personal]                        Current -+
++- Personal                                     Current -+
 | 31 songs · 6 setlists · about 190 KB                    |
 | Synced 5 min ago                                        |
-| [Sync] [Manage]                                         |
+| Google Drive: bea@gmail.example                         |
+| [Sync] [Manage] [Disconnect Google Drive]               |
 +--------------------------------------------------------+
 +- Gateway Church [Team] [owner]                          +
 | 212 songs · 48 setlists · about 1.4 MB                  |
@@ -113,21 +115,19 @@ This device
 ### The account card
 
 Shown first (`account-card.ts`, redesigned 2026-11-18), and it can say that no one is signed in, which is a normal state ("Not
-signed in. Your songs stay on this device." with **Sign in with Google** and **Use my email address instead**). Signed in, it has
-three rows and **Log out**:
+signed in. Your songs stay on this device." above the one sign-in form: "Signing in", above). Signed in, it has two rows and
+**Log out**; it says nothing of Google or of syncing, which belong to the Personal space (2026-11-19):
 
 - **Name**: the name they gave, with **Edit** (or "Not set" and **Add your name**). It is kept at the Worker (`accounts.name`, migration
   `0008`; `GET` and `PUT /api/account`, `worker/src/account.ts`), so it is the same on every device. Google's name is taken at a
   first Google sign-in as a start and never replaces one they gave. A person signed in with no name is asked once a visit, in a
   modal ("What should we call you?", `name-prompt.ts`, `account-name.ts`), not on the join page, where they are in the middle of
   something: Google need not say a name, and an emailed code never does.
-- **Emails**: every address the account signs in with, the Google one marked. Read from the Worker, kept on the device
+- **Emails**: every address the account signs in with, none marked as a separate login. Read from the Worker, kept on the device
   (`account-info.ts`) so it shows offline.
-- **Personal space sync**: **Off** with **Enable**, or **On, with the Google address** with **Disable**: see "Google Drive" below.
 
 **Log out** forgets the sign-in on this device (the session, which is ended at the Worker, and what was kept of the account),
-and nothing more: the account's Google Drive connection is the Worker's, so signing in again, on any device, carries on syncing. **Removed 2026-11-18:** "Revoke access on all devices" (it revoked the Google grant for every
-device, which is now what Disable does not do, and a link says how), and the **Advanced** section: the token refresh test and
+and nothing more: the account's Google Drive connection is the Worker's, so signing in again, on any device, carries on syncing. **Removed 2026-11-18:** "Revoke access on all devices" (which is now what **Disconnect Google Drive** does), and the **Advanced** section: the token refresh test and
 the sign-in backup (download, import), which were for fixing a sign-in and are not needed: signing in again is the fix.
 
 ### The spaces
@@ -142,11 +142,15 @@ the sign-in backup (download, import), which were for fixing a sign-in and are n
   origin only, so a space's size is its records, setlist JSON and chart text, as the team wizard's
   "Bring across" step counts them), a Team's **CCLI licence number** if it has one
   (docs/CCLI.md), and how the sync stands: when it last ran, its progress
-  while it runs, or what stands in the way ("Sign in to sync", "Sign-in expired: reconnect to sync",
-  "Connect Google Drive to sync").
-- **Connect Google**, on a Personal card only, for someone signed in by an emailed code alone (`SpaceConnectGoogleEvent`): the
-  card says "Connect Google to sync this space between your devices" and the button does Google's whole sign-in, joined to the
-  account (docs/SPACES.md). A Team's card never says it: a Team syncs through the Worker and needs no Google.
+  while it runs, or what stands in the way ("Sign in to sync").
+- **Google Drive**, on a Personal card only (2026-11-19: it was the Account card's Enable, Disable and Reconnect, and a Connect
+  Google button; a Team's card never has it, since a Team syncs through the Worker): "Google Drive: bea@gmail.example" with
+  **Disconnect Google Drive** while it is connected (`SpaceDisconnectDriveEvent`; the page asks first, and it goes for every
+  device); "Google Drive is not connected, so this space does not sync between your devices." with **Connect Google Drive**
+  when it is not; "Google Drive needs reconnecting to sync." with **Reconnect Google Drive** when Google no longer honours it
+  (`SpaceConnectDriveEvent`). Connecting is Google's whole sign-in for an account with no Google login yet (it joins the
+  account, whatever its address) and Drive's box asked for alone for one that has (so it cannot be left unticked); either way
+  the page (`account-page.ts`) does it, and says what went wrong in a toast.
 - **Sync** is on the card, and the card runs the sync itself (`space-sync.ts`). It is shown for any
   space once syncing can work: a sign-in with Drive, or for a Team's member a sign-in alone.
 - **Manage Users** goes to the space's own page (below), and **Manage Data** opens a dialogue over the list with the space's
