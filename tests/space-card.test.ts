@@ -124,6 +124,15 @@ describe('space-card', () => {
     expect(asked).to.equal(1)
   })
 
+  it('says a Team’s expired sign-in as it always did, not as a Drive that needs reconnecting', async () => {
+    const team = await make(`Team ${crypto.randomUUID().slice(0, 8)}`, {
+      team: { id: 't-8', role: 'writer' },
+    })
+    const el = await card('expired', { space: team })
+    expect(text(el)).to.contain('Sign-in expired: reconnect to sync')
+    expect(button(el, 'reconnect-drive')).to.equal(null)
+  })
+
   it('says nothing of Google Drive on a Team, which syncs through the Worker', async () => {
     const team = await make(`Team ${crypto.randomUUID().slice(0, 8)}`, {
       team: { id: 't-7', role: 'writer' },
