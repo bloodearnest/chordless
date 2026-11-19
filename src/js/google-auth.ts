@@ -39,6 +39,7 @@ import {
 } from './auth-messages.ts'
 import { jwtClaims } from './base64url.ts'
 import { timedFetch, traced } from './telemetry/telemetry.ts'
+import { t } from './text.ts'
 import { errorMessage, UserError } from './utils/errors.ts'
 
 /** The signed-in user, as the UI shows them */
@@ -152,7 +153,7 @@ export function initGoogleAuth(): Promise<void> {
     script.onload = () => resolve()
     script.onerror = () => {
       script.remove() // so trying again loads it afresh
-      reject(new Error("Couldn't load Google sign-in. Are you offline?"))
+      reject(new UserError(t('google-script-offline')))
     }
     document.head.appendChild(script)
   })
@@ -298,7 +299,7 @@ export async function connectDrive(): Promise<AuthorizeResult> {
 /** The Google account is already one of another Chordless account: it cannot also be connected to this one */
 export class GoogleInUseError extends UserError {
   constructor() {
-    super('That Google account is already used by another Chordless account')
+    super(t('google-in-use'))
     this.name = 'GoogleInUseError'
   }
 }
@@ -456,7 +457,7 @@ export class SignInExpiredError extends Error {
   /** What the Worker said: Google refused the token, or the Worker could not read the blob */
   readonly reason: 'invalid_grant' | 'invalid_blob'
   constructor(reason: 'invalid_grant' | 'invalid_blob' = 'invalid_grant') {
-    super('Your Google sign-in has expired: connect with Google again')
+    super(t('google-sign-in-expired'))
     this.name = 'SignInExpiredError'
     this.reason = reason
   }

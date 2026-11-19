@@ -2179,4 +2179,23 @@ filter-spaces = Spaces:
 
 space-back = ← Account and Teams
 space-page-missing = That space is not on this device.
+
+live-leave = Leave live
+live-take-over = Take over live here
+annotation-shared-title = Shared with everyone
+annotation-private-title = Just you
+card-last-played = Last played { $when }
+card-not-played-here = Not played in this version
+leader-email-invalid = That does not look like an email address.
+leader-email-theirs = They have that address already.
+leader-email-other = { $name } has that address already: merge them to join the two.
+add-song-load-failed = Couldn't load the songs. Please try again.
+add-song-add-failed = Couldn't add the song.
+google-script-offline = Couldn't load Google sign-in. Are you offline?
+google-in-use = That Google account is already used by another Chordless account.
+google-sign-in-expired = Your Google sign-in has expired. Connect with Google again.
+picker-offline = Couldn't load Google's folder picker. Are you offline?
+picker-team-title = Choose where to keep the Team's songs
+setlist-not-found = That setlist is not on this device.
+space-delete-current = It is the one you are in, so you will be taken to another.
 `

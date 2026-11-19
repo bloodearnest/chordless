@@ -120,9 +120,11 @@ pitch, tuning, chords, screen, the highlight colour, fonts, theme and text size)
 player's settings, and the first time (the first-use questions, the welcome card, and why to install), and importing songs (the page, the SongSelect bookmarklet and its help, and what is said of each song's melody range, and the choices when a song is already in the library), the header, the key, capo, instrument and tuning pickers, a song's settings and the media player, a setlist's details and a song's (the forms and dialogs, and how long ago something was), teams and spaces (the whole of the join page, a space's people and page, the tabs, and the library's filter), sharing and contact (sharing a setlist by link or as a list of songs, and what is sent with each; the invitation message to a Team; Contact; the usage reports; uploading pad sounds), songs and charts (a song's versions and the question to delete one, a song on a card, annotations, and the buttons that show what a section holds), the pages (their headings, the titles of the browser's tabs, the links at the bottom, the shared setlist's notes), making a Team (the wizard, inviting people, its CCLI licence number and where its files are reached from), deleting a Team or space everywhere, exporting and importing a space, and importing a setlist from an email (what the review says, the leader matching, the changes to an existing setlist; the warning about a doubtful date is made in `js/email-setlist.ts` and still in code). Where a list of options has its words in a module (`PLAYS`, `PITCHES`, `TUNINGS`,
 `FONT_CHOICES`, `TINT_PRESETS`), each `label` is a getter that asks for its message, so that an edit in the
 dev editor shows at once. Errors follow the policy above in the places that print them whole (the Team wizard, the panels of a
-Team, the Drive sync panel, the pad sets, the export panel). Still in the code: the other
-dialogs and panels, the sync's progress messages
-(`js/sync/`), labels, the text `describeSetlistChange` makes, and the Worker's emails.
+Team, the Drive sync panel, the pad sets, the export panel), and the last odd sentences (the live button, who an
+annotation is shared with, the leader's email checks, the Google sign-in and folder picker errors) are in the catalogue.
+Still in the code, on purpose: the sync's progress messages (`js/sync/`, the engine's own log), the text
+`describeSetlistChange` makes, the SongSelect bookmarklet (it runs in SongSelect's page), errors only a developer reads,
+the support details in Contact, and the Worker's emails.
 
 New messages go in the catalogue, not in a template. Keep what only the developer needs (an error's
 text, a version number) in a toast's `details` or the console, not in the message.

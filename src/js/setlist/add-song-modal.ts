@@ -103,7 +103,7 @@ export class AddSongModal {
     } catch (error) {
       console.error('[Add Song Modal] Error loading songs:', error)
       showStatusMessage(results, {
-        message: 'Error loading songs. Please try again.',
+        message: t('add-song-load-failed'),
         state: 'error',
       })
       modal.show()
@@ -120,8 +120,7 @@ export class AddSongModal {
     } catch (error) {
       console.error('[Add Song Modal] Could not add the song to the library:', error)
       const results = this.#results
-      if (results)
-        showStatusMessage(results, { message: 'Could not add the song.', state: 'error' })
+      if (results) showStatusMessage(results, { message: t('add-song-add-failed'), state: 'error' })
     }
   }
 
