@@ -303,7 +303,7 @@ confirm-setlist-move-message-drive = Moves { $title } from { $from } to { $to }.
 
 confirm-logout-heading = Log out of Google?
 confirm-logout-button = Log Out
-confirm-logout-message = This signs you out on this device only. Other devices stay signed in. Your songs and setlists stay on this device and in Drive.
+confirm-logout-message = This signs you out on this device only. Other devices stay signed in. Your songs stay on this device, and in any Team space.
 
 
 confirm-share-stop-heading = Stop sharing?
@@ -447,7 +447,7 @@ person-email-add-aria = Add an email address to { $name }
 person-email-add-placeholder = Add an email address
 person-email-add = Add
 person-merge-heading = Merge into another person
-person-merge-hint = For one person entered twice. Everything they lead, and their addresses, move to the person you choose, and this entry goes.
+person-merge-hint = In case of duplicate identities, you can merge two together. This will merge their emails and any setslist they own into the same account
 # { $name } is a person's name.
 person-merge-aria = Merge { $name } into
 person-merge-choose = Choose a person…
@@ -689,12 +689,12 @@ space-missing = This device has no such Personal space or Team. It may have been
 space-copy-team-heading = Team copy
 space-copy-drive-heading = Google Drive
 space-copy-team-text = Replace this device's songs and setlists with the Team's copy. Sync is on the space's card.
-space-copy-drive-text = Replace this device's songs and setlists with the copy in Google Drive. Sync is on the space's card.
+space-copy-drive-text = Replace this device's songs and setlists with the copy stored on Google Drive.
 # <connect> is a link to the Account and Teams page.
 space-drive-not-connected = You are signed in, but Google Drive is not connected, so this space is not syncing. <connect>Connect Google Drive</connect> on the Account and Teams page.
 
 space-export-heading = Export and import
-space-export-text = Export this space's songs and setlists as a zip file, and import an export into it, on this device or another: it needs no Google account, and an import only adds what is missing.
+space-export-text = Export this space's songs and setlists as a zip file. This can be used as a backup, or imported into another device if you do not not have sync enabled. On import, it will only add what is missing.
 space-export-text-team = Export this Team's songs and setlists as a zip file, and import an export into it, on this device or another: it needs no Google account, and an import only adds what is missing.
 
 space-delete-heading = Delete from this device
@@ -711,7 +711,7 @@ space-delete-everywhere-text-team = Delete this Team from this device <em>and</e
 
 ## The Account and Teams page
 
-account-heading = Account
+account-heading = Chordless Account
 account-spaces-heading = Personal and Team Spaces
 account-join-hint = To join a Team, open the invite link its admin sent you.
 account-create-team = Create a new Team
@@ -763,11 +763,11 @@ account-logout-failed = Logging out failed: { $reason }
 # { $old } and { $new } are the times the token was due to expire before and after.
 
 storage-heading = Storage Usage
-storage-browser-data = Browser data
-storage-app-cache = App Cache
-storage-media-cache = Media Cache
+storage-browser-data = Song and setlist data
+storage-app-cache = Application code
+storage-media-cache = Media Data (e.g. Pads)
 storage-unreadable = Unable to read local storage details.
-storage-footnote = Data on this device only. Each team's size is on its own card.
+storage-footnote = Data stored on this device only.
 
 
 ## Syncing a space with Google Drive (the panel on a space's page)
@@ -796,8 +796,8 @@ pref-behaviour-heading = Behaviour and options
 pref-accessibility-heading = Accessibility
 
 pref-play-heading = What do you play?
-pref-play-text = What each song shows when you open it, and which controls you get. Only you see it.
-pref-lyrics-only = Start each song with only the lyrics
+pref-play-text = What each song shows when you open it, and which controls you get.
+pref-lyrics-only = By default show only the lyrics
 pref-show-capo = Show the capo and tuning controls
 pref-show-pitch = Show the instrument pitch controls
 pref-my-instrument = My instrument
@@ -807,7 +807,7 @@ pref-tuning-text = Each setlist can have its own tuning: choose it on the setlis
 
 # The choices of "What do you play?" (and the first-use setup): the choice and a line under it.
 play-singer = I sing, or play drums
-play-singer-description = Lyrics only to start, with no chord controls
+play-singer-description = Lyrics only by default start, and no key controls
 play-guitarist = I play guitar
 play-guitarist-description = Chords and lyrics, with capo and tuning controls
 play-transposing = I play a B♭, E♭ or F instrument
@@ -834,7 +834,7 @@ pref-chords-heading = Chords
 pref-nashville = Nashville numbers instead of letter names
 pref-unicode = Unicode accidentals (♯/♭)
 pref-leadsheets-heading = Lead sheets
-pref-real-book = Real Book style: handwritten notation and chords (-7, ø7, °)
+pref-real-book = Real Book style: handwritten notation and chords conventions (-7, ø7, °)
 pref-moving-heading = Moving between songs
 pref-scroll-top = Start each song at its top (off: find it where you left it)
 
@@ -1233,7 +1233,10 @@ import-space-team = { $space } (Team)
 
 import-manual = Import a file or paste instead
 import-files = Import ChordPro Files
-import-files-text = ChordPro files, each with its lead sheet PDF if you have one
+import-files-text =
+    Select one or more ChordPro files
+
+    If they are SongSelect chordpro files, please also also download and import the matching lead sheet PDF, which will provide the melody and enable showing the leadsheet.
 import-paste = Paste ChordPro
 import-button = Import
 import-email = Import a Setlist from an Email
@@ -1313,8 +1316,11 @@ origin-unknown = Importer unknown
 
 email-import-heading = Import a setlist from an email
 # <mail> is the address to forward to, as a link. { $address } is that address.
-email-import-text = Forward the email a worship leader sent, with the songs attached as PDFs, to <mail>{ $address }</mail>. Chordless replies with a link: open it and the songs, keys, date and leader are shown here for you to check.
-email-import-privacy = The email and its charts are not kept, and the charts are not imported: a song your library does not have is fetched from SongSelect.
+email-import-text =
+    Forward the email a worship leader sent, with the songs attached as PDFs, to <mail>{ $address }</mail>. Chordless will read the email and PDFs, attempt to determine the songs. 
+
+    It will reply to your email with a link. When you open it, it will show a proposed setlist for you to check and import.
+email-import-privacy = Chordless doesn't import the PDFs from the email, just uses them to identify the songs. If you do not have the song imported, you will need to import it properly. The email and its charts are not kept.
 email-import-reading = Reading the email…
 # { $reason } is what went wrong.
 email-import-link-failed = Could not read that link: { $reason }
@@ -1526,7 +1532,7 @@ song-info-range-edit = Edit
 song-info-range-in-key = in { $key }
 # { $notes } notes and { $semitones } semitones from the lowest to the highest.
 song-info-range-width =
-    { $notes ->
+    Vocal range:{ $notes ->
         [one] 1 note
        *[other] { $notes } notes
     } wide ({ $semitones ->
@@ -2070,7 +2076,7 @@ share-sign-in = Sign in with Google on the <account>Account and Teams page</acco
 share-link-text = Make a link to this setlist for people outside your Chordless space, whether or not they use Chordless.
 share-link-point-1 = They need no account or install, and can keep it on their phone.
 share-link-point-2 = They can read it, but not change it.
-share-link-point-3 = It updates when you change the setlist, and ends two weeks after its date.
+share-link-point-3 = It updates when you change the setlist, and is deleted two weeks after the setlist date.
 share-link-point-4 = Anyone with the link can open it. You can stop sharing at any time.
 share-create = Create share link
 share-making = Making link…
