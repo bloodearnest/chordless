@@ -87,7 +87,7 @@ test('the Worker answers its own paths with the problems, and leaves the page’
   const logged: string[] = []
   console.error = (message: string) => logged.push(message)
   try {
-    for (const path of ['/oauth/callback', '/session/refresh', '/api/config', '/s/abc']) {
+    for (const path of ['/oauth/callback', '/session/token', '/api/config', '/s/abc']) {
       const response = misconfigured(new Request(`https://x.test${path}`), bad)
       assert.equal(response?.status, 500, path)
       const body = (await response?.json()) as { error: string; problems: string[] }

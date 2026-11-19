@@ -159,12 +159,12 @@ describe('google-auth', () => {
       expect(await hasDriveAccess()).to.equal(false)
     })
 
-    it('is still expired when Google refuses a device from before whose own sign-in has no Drive', async () => {
+    it('is expired for a device from before whose blob the Worker can no longer read, and still without Drive otherwise', async () => {
       signIn(
         { access_token: 'old', expires_at: inFromNow(-MINUTE), scope: 'openid email' },
         'a-blob'
       )
-      respondTo = () => json({ error: 'invalid_grant' }, 401)
+      respondTo = () => json({ error: 'invalid_blob' }, 401)
       expect(await getSignInState()).to.equal('expired')
       respondTo = () => json({}, 500)
       expect(await getSignInState()).to.equal('no-drive')
@@ -538,34 +538,51 @@ describe('google-auth', () => {
         expect(must(worker.stored).blob).to.equal('')
       })
 
-      it('keeps working from its own blob when the Worker cannot be reached to move it', async () => {
-        signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) }, 'the-blob')
+      const withSession = () => {
         must(worker.stored).metadata.session = {
           access_token: 's',
           refresh_token: 'r',
           expires_at: inFromNow(30 * MINUTE),
         }
-        respondTo = url =>
-          url === '/session/refresh'
-            ? json({ access_token: 'fresh', expires_in: 3600 })
-            : json({ error: 'down' }, 503)
+      }
 
-        expect(await getAccessToken()).to.equal('fresh')
-
-        expect(fetches.at(-1)?.url).to.equal('/session/refresh')
-        expect(fetches.at(-1)?.body).to.deep.equal({ blob: 'the-blob' })
-        expect(must(worker.stored).blob, 'to try again next time').to.equal('the-blob')
+      it('keeps its blob, to send next time, when the Worker cannot be reached to move it', async () => {
+        signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) }, 'the-blob')
+        withSession()
+        window.fetch = (async () => {
+          throw new TypeError('Failed to fetch')
+        }) as typeof fetch
+        let failed = false
+        await getAccessToken().catch(() => {
+          failed = true
+        })
+        expect(failed).to.equal(true)
+        expect(must(worker.stored).blob).to.equal('the-blob')
       })
 
-      it('says the sign-in has expired when Google refuses the blob it still holds', async () => {
+      it('keeps its blob, and says why, when the Worker refuses to take it', async () => {
         signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) }, 'the-blob')
-        must(worker.stored).metadata.session = {
-          access_token: 's',
-          refresh_token: 'r',
-          expires_at: inFromNow(30 * MINUTE),
-        }
-        respondTo = url =>
-          url === '/session/refresh' ? json({ error: 'invalid_grant' }, 401) : json({}, 503)
+        withSession()
+        respondTo = () => json({ error: 'google_in_use' }, 409)
+        let error: Error | null = null
+        await getAccessToken().catch(e => {
+          error = e
+        })
+        expect((error as Error | null)?.message).to.equal('google_in_use')
+        respondTo = () => new Response('<html>', { status: 502 })
+        await getAccessToken().catch(e => {
+          error = e
+        })
+        expect((error as Error | null)?.message).to.equal(
+          'Failed to move the Google sign-in to the account'
+        )
+        expect(must(worker.stored).blob).to.equal('the-blob')
+      })
+
+      it('says the sign-in has expired when the Worker can no longer read the blob it still holds', async () => {
+        signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) }, 'the-blob')
+        withSession()
+        respondTo = () => json({ error: 'invalid_blob' }, 401)
         let error: unknown
         await getAccessToken().catch(e => {
           error = e
@@ -581,7 +598,7 @@ describe('google-auth', () => {
     })
 
     it("fails with the worker's reason when it refuses, and keeps what was stored", async () => {
-      signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) }, 'the-blob')
+      signIn({ drive: true, access_token: 'old', expires_at: inFromNow(-MINUTE) })
       const before = JSON.stringify(worker.stored)
       respondTo = () => json({ error: 'invalid_grant' }, 401)
 

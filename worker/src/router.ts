@@ -20,7 +20,6 @@ import {
   handleSessionLogout,
   handleSessionToken,
   handleSessionUpgrade,
-  handleTokenRefresh,
 } from './session.ts'
 import { handleShareDownload, type ShareCache, shareFileId } from './share.ts'
 import { handleShareLive, shareLiveId } from './share-live.ts'
@@ -56,11 +55,6 @@ async function route(
       return await handleOAuthCallback(request, env, google)
     }
 
-    // Token refresh endpoint
-    if (path === '/session/refresh' && request.method === 'POST') {
-      return await handleTokenRefresh(request, env, google)
-    }
-
     // A Chordless session: the next tokens for a refresh token, and a first one for a blob from before
     if (path === '/session/token' && request.method === 'POST') {
       return await handleSessionToken(request, env)
@@ -81,9 +75,9 @@ async function route(
       return await handleSessionUpgrade(request, env)
     }
 
-    // Signing out: the refresh token is revoked at Google
+    // Signing out: the session ends
     if (path === '/session/logout' && request.method === 'POST') {
-      return await handleSessionLogout(request, env, google)
+      return await handleSessionLogout(request, env)
     }
 
     // What the page needs that is set on the server (not secret: see Env)

@@ -71,7 +71,7 @@ dependencies, so they could run in the service worker too (planned below).
 
 **Auth:** the service worker holds the session (a JWE blob from the worker). Pages
 get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
-`/session/refresh` when expired. `drive-api.ts` lets the token source be replaced (`drive-client.ts` makes a Drive client for any source: the Worker makes one per team space)
+`/api/account/drive/token` when expired. `drive-api.ts` lets the token source be replaced (`drive-client.ts` makes a Drive client for any source: the Worker makes one per team space)
 (`setAccessTokenProvider`), which tests use and a service-worker sync will need.
 
 ### A full sync (`SyncManager.sync()`)

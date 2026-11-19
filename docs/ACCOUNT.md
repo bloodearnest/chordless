@@ -74,8 +74,11 @@ device needs only a sign-in (an emailed code, or Google) to sync, and never a se
 - **Devices from before** (a blob kept in the service worker's `auth` IndexedDB): the first `getAccessToken()` sends it to
   `POST /api/account/drive/adopt`, which keeps it for the account if the blob's Google login is on that account (`409
   google_in_use` otherwise, so a blob is not a way to take another's) and unless another device has connected since, and the
-  device forgets it. A failure leaves the blob, and the old `/session/refresh` carries on from it. `/oauth/callback` still sends
-  the blob, and `/session/refresh` still takes one, for apps from before that have not reloaded; both go once none do.
+  device forgets it. A failure (offline, say) leaves the blob to be sent next time. **Removed 2026-11-19:** `/oauth/callback` sending the blob to the
+  page, `/session/refresh` (a blob in, an access token out) and the client's fallback to it, and the blob variant of
+  `/session/logout` (signing out only ends the session; the Drive connection is disconnected on its own). An app from before that
+  has not reloaded since asks a route that is gone: it reloads, and signs in again if it must. `/session/upgrade` (a blob in, a
+  session out) and `adopt` stay for as long as a device might still hold a blob.
 - The device keeps `metadata.drive` (whether the account has Drive, as the Worker last said: `GET /api/account` has `drive:
   {email}`), asked after a sign-in and corrected by the token route. The Personal card's three kinds of state follow: connected,
   not connected (`no-drive`), expired.

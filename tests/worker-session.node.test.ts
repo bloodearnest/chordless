@@ -25,7 +25,6 @@ import {
   handleSessionLogout,
   handleSessionToken,
   handleSessionUpgrade,
-  handleTokenRefresh,
 } from '../worker/src/session.ts'
 import {
   revokeSession,
@@ -223,12 +222,11 @@ describe('POST /oauth/callback', () => {
     const body = await bodyOf(response)
     assert.equal(response.status, 200)
     assert.equal(body.scope, 'openid email profile')
-    assert.ok(body.blob, 'a blob to renew the ID token from')
-    const data = await decryptBlob(String(body.blob), env)
-    assert.equal(data.scopes, 'openid email profile')
+    assert.ok(!('blob' in body), 'the page is sent no Google credential')
   })
 
-  test('keeps no scopes when Google names none, rather than failing', async () => {
+  test('keeps no Drive connection when Google names no scopes, rather than failing', async () => {
+    const { db, sql } = d1Db()
     const { google } = fakeGoogle({
       exchangeCode: (async () => ({
         refresh_token: 'r',
@@ -239,11 +237,11 @@ describe('POST /oauth/callback', () => {
     })
     const response = await handleOAuthCallback(
       post('/oauth/callback', { code: 'c', redirect_uri: 'https://app.example' }),
-      env,
+      { ...env, DB: db },
       google
     )
     assert.equal(response.status, 200)
-    assert.equal((await decryptBlob(String((await bodyOf(response)).blob), env)).scopes, '')
+    assert.equal(sql.prepare('SELECT count(*) AS n FROM account_drive').get()?.n, 0)
   })
 
   test('says Drive was granted when it was', async () => {
@@ -299,14 +297,21 @@ describe('POST /oauth/callback', () => {
   describe('when it works', () => {
     let body: Record<string, unknown>
     let response: Response
+    let sql: ReturnType<typeof d1Db>['sql']
+    let e: Env
+
+    const callback = (over: Env) =>
+      handleOAuthCallback(
+        post('/oauth/callback', { code: 'c', redirect_uri: 'https://app.example' }),
+        over,
+        fakeGoogle().google
+      )
 
     beforeEach(async () => {
-      const { google } = fakeGoogle()
-      response = await handleOAuthCallback(
-        post('/oauth/callback', { code: 'c', redirect_uri: 'https://app.example' }),
-        env,
-        google
-      )
+      const made = d1Db()
+      sql = made.sql
+      e = { ...env, DB: made.db }
+      response = await callback(e)
       body = await bodyOf(response)
     })
 
@@ -325,9 +330,12 @@ describe('POST /oauth/callback', () => {
       })
     })
 
-    test('keeps the refresh token in the blob, which only the Worker can read', async () => {
+    test('keeps the refresh token for the account in a blob only the Worker can read, and sends it to no one', async () => {
       assert.ok(!JSON.stringify(body).includes(REFRESH_TOKEN), 'the refresh token is not sent')
-      const data = await decryptBlob(String(body.blob), env)
+      assert.ok(!('blob' in body), 'nor the blob')
+      const row = sql.prepare('SELECT blob FROM account_drive').get() as { blob: string }
+      assert.ok(!row.blob.includes(REFRESH_TOKEN))
+      const data = await decryptBlob(row.blob, env)
       assert.equal(data.refresh_token, REFRESH_TOKEN)
       assert.equal(data.owner_email, 'ann@example.com')
       assert.equal(data.owner_sub, 'sub-1')
@@ -336,207 +344,55 @@ describe('POST /oauth/callback', () => {
     })
 
     test('makes a different blob each time', async () => {
-      const { google } = fakeGoogle()
-      const again = await bodyOf(
-        await handleOAuthCallback(
-          post('/oauth/callback', { code: 'c', redirect_uri: 'https://app.example' }),
-          env,
-          google
-        )
-      )
-      assert.notEqual(again.blob, body.blob)
+      const first = sql.prepare('SELECT blob FROM account_drive').get() as { blob: string }
+      await callback(e)
+      const again = sql.prepare('SELECT blob FROM account_drive').get() as { blob: string }
+      assert.notEqual(again.blob, first.blob)
       assert.notEqual(
-        (await decryptBlob(String(again.blob), env)).blob_id,
-        (await decryptBlob(String(body.blob), env)).blob_id
+        (await decryptBlob(again.blob, env)).blob_id,
+        (await decryptBlob(first.blob, env)).blob_id
       )
-    })
-  })
-})
-
-describe('POST /session/refresh', () => {
-  test('wants a blob', async () => {
-    const { google } = fakeGoogle()
-    const response = await handleTokenRefresh(post('/session/refresh', {}), env, google)
-    assert.equal(response.status, 400)
-    assert.equal((await bodyOf(response)).error, 'Missing blob')
-  })
-
-  test('gives a new access token for the refresh token in the blob, and nothing more', async () => {
-    const { google, calls } = fakeGoogle()
-    const blob = await encryptBlob(blobData(), env)
-    const response = await handleTokenRefresh(post('/session/refresh', { blob }), env, google)
-
-    assert.equal(response.status, 200)
-    assert.deepEqual(await bodyOf(response), { access_token: 'access-2', expires_in: 1800 })
-    assert.deepEqual(
-      calls.map(c => c.name),
-      ['refreshAccessToken']
-    )
-    assert.equal(calls[0].args[0], REFRESH_TOKEN)
-  })
-
-  test('passes on the new ID token when Google sends one with the refresh', async () => {
-    const { google } = fakeGoogle({
-      refreshAccessToken: (async () => ({
-        access_token: 'access-2',
-        expires_in: 1800,
-        id_token: 'id-token-2',
-      })) as unknown as GoogleApi['refreshAccessToken'],
-    })
-    const blob = await encryptBlob(blobData(), env)
-    const response = await handleTokenRefresh(post('/session/refresh', { blob }), env, google)
-
-    assert.deepEqual(await bodyOf(response), {
-      access_token: 'access-2',
-      expires_in: 1800,
-      id_token: 'id-token-2',
-    })
-  })
-
-  test('answers 401 invalid_blob for a blob that is not ours (sign in again), and asks Google nothing', async () => {
-    const { google, calls } = fakeGoogle()
-    const other = await encryptBlob(blobData(), { JWE_ENCRYPTION_KEY: randomKey() })
-    for (const blob of [other, 'garbage']) {
-      const response = await handleTokenRefresh(post('/session/refresh', { blob }), env, google)
-      assert.equal(response.status, 401)
-      assert.equal((await bodyOf(response)).error, 'invalid_blob')
-    }
-    assert.equal(calls.length, 0)
-  })
-
-  test('refuses a body that is not JSON with a 400', async () => {
-    const request = new Request('https://chordless.test/session/refresh', {
-      method: 'POST',
-      body: 'this is not json',
-    })
-    assert.equal((await handleTokenRefresh(request, env, fakeGoogle().google)).status, 400)
-  })
-
-  test('passes an error from Google on, for the router to report', async () => {
-    const { google } = fakeGoogle({
-      refreshAccessToken: (async () => {
-        throw new Error('invalid_grant')
-      }) as unknown as GoogleApi['refreshAccessToken'],
-    })
-    const blob = await encryptBlob(blobData(), env)
-    await assert.rejects(
-      handleTokenRefresh(post('/session/refresh', { blob }), env, google),
-      /invalid_grant/
-    )
-  })
-
-  test('answers 401 invalid_grant, not a server error, when Google no longer honours the token', async () => {
-    const { google } = fakeGoogle({
-      refreshAccessToken: (async () => {
-        throw Object.assign(new Error('Token has been expired or revoked.'), {
-          error: 'invalid_grant',
-        })
-      }) as unknown as GoogleApi['refreshAccessToken'],
-    })
-    const blob = await encryptBlob(blobData(), env)
-    const response = await handleTokenRefresh(post('/session/refresh', { blob }), env, google)
-    assert.equal(response.status, 401)
-    assert.equal((await bodyOf(response)).error, 'invalid_grant')
-  })
-
-  describe('with an ID token as well', () => {
-    test('is refused when the blob belongs to someone else', async () => {
-      const { google, calls } = fakeGoogle({
-        verifyIdToken: (async () => ({
-          email: 'someone@example.com',
-          sub: 'sub-2',
-        })) as unknown as GoogleApi['verifyIdToken'],
-      })
-      const blob = await encryptBlob(blobData(), env)
-      const response = await handleTokenRefresh(
-        post('/session/refresh', { blob, id_token: 'token' }),
-        env,
-        google
-      )
-      assert.equal(response.status, 403)
-      assert.match(String((await bodyOf(response)).error), /Token mismatch/)
-      assert.ok(!calls.some(c => c.name === 'refreshAccessToken'), 'no access token was made')
-    })
-
-    test('is accepted when it matches', async () => {
-      const { google } = fakeGoogle()
-      const blob = await encryptBlob(blobData(), env)
-      const response = await handleTokenRefresh(
-        post('/session/refresh', { blob, id_token: 'token' }),
-        env,
-        google
-      )
-      assert.equal(response.status, 200)
-    })
-
-    test('is not needed: the blob alone proves who it is, so an ID token that does not check out is skipped', async () => {
-      const { google } = fakeGoogle({
-        verifyIdToken: (async () => {
-          throw new Error('expired')
-        }) as unknown as GoogleApi['verifyIdToken'],
-      })
-      const warn = console.warn
-      console.warn = () => {}
-      try {
-        const blob = await encryptBlob(blobData(), env)
-        const response = await handleTokenRefresh(
-          post('/session/refresh', { blob, id_token: 'old' }),
-          env,
-          google
-        )
-        assert.equal(response.status, 200)
-      } finally {
-        console.warn = warn
-      }
     })
   })
 })
 
 describe('POST /session/logout', () => {
-  const logout = async (body: Record<string, unknown>, google = fakeGoogle().google) =>
-    handleSessionLogout(post('/session/logout', body), env, google)
-
-  test('revokes the refresh token in the blob at Google', async () => {
+  test('ends the session whose refresh token it is, and touches nothing at Google', async () => {
+    const { db, sql } = d1Db()
+    const e = { ...env, DB: db } satisfies Env
+    const session = await (
+      await handleOAuthCallback(
+        post('/oauth/callback', { code: 'c', redirect_uri: 'https://chordless.test' }),
+        e,
+        fakeGoogle().google
+      )
+    ).json()
+    const { refresh_token } = (session as { session: { refresh_token: string } }).session
     const { google, calls } = fakeGoogle()
-    const blob = await encryptBlob(blobData(), env)
 
-    const response = await logout({ blob }, google)
+    const response = await handleSessionLogout(post('/session/logout', { refresh_token }), e)
 
     assert.equal(response.status, 200)
     assert.deepEqual(await bodyOf(response), { success: true })
-    const revoked = calls.filter(call => call.name === 'revokeToken')
-    assert.equal(revoked.length, 1)
-    assert.equal(revoked[0].args[0], REFRESH_TOKEN)
+    assert.equal(calls.length, 0)
+    const ended = await handleSessionToken(post('/session/token', { refresh_token }), e)
+    assert.equal(ended.status, 401, 'the session is over')
+    assert.equal(
+      sql.prepare('SELECT count(*) AS n FROM account_drive').get()?.n,
+      1,
+      'Drive stays connected'
+    )
+    void google
   })
 
-  test('wants a blob, and a real one', async () => {
-    const { google, calls } = fakeGoogle()
-    assert.equal((await logout({}, google)).status, 400)
-    assert.equal((await logout({ blob: 'not-a-blob' }, google)).status, 401)
-    assert.equal(calls.length, 0, 'nothing was asked of Google')
-  })
-
-  test('is done when Google says the token is already revoked', async () => {
-    const { google } = fakeGoogle({
-      revokeToken: async () => {
-        throw Object.assign(new Error('invalid_token'), { error: 'invalid_token' })
-      },
-    })
-    const response = await logout({ blob: await encryptBlob(blobData(), env) }, google)
-    assert.equal(response.status, 200)
-  })
-
-  test('says so when Google cannot be asked, or refuses', async () => {
-    const { google } = fakeGoogle({
-      revokeToken: async () => {
-        throw new TypeError('network down')
-      },
-    })
-    const response = await logout({ blob: await encryptBlob(blobData(), env) }, google)
-    assert.equal(response.status, 502)
-    const body = await bodyOf(response)
-    assert.equal(body.error, 'Google did not revoke the access')
-    assert.ok(!JSON.stringify(body).includes(REFRESH_TOKEN))
+  test('is done for a request with no refresh token, or none that is good, and with no database', async () => {
+    assert.equal((await handleSessionLogout(post('/session/logout', {}), env)).status, 200)
+    const { db } = d1Db()
+    const e = { ...env, DB: db } satisfies Env
+    assert.equal(
+      (await handleSessionLogout(post('/session/logout', { refresh_token: 'no.such' }), e)).status,
+      200
+    )
   })
 })
 
@@ -696,8 +552,7 @@ describe('a Chordless session', () => {
     assert.equal(row.revoked_at, later(2000).toISOString())
     const out = await handleSessionLogout(
       post('/session/logout', { refresh_token: start.refresh_token }),
-      e,
-      fakeGoogle().google
+      e
     )
     assert.equal(out.status, 200, 'a device with no blob can end its session')
   })
@@ -751,15 +606,13 @@ describe('a Chordless session', () => {
 
   test('ends at sign-out, for the device that signed out', async () => {
     const { env: e } = withDb()
-    const { google } = fakeGoogle()
     const blob = await encryptBlob(blobData(), e)
     const start = (await bodyOf(
       await handleSessionUpgrade(post('/session/upgrade', { blob }), e, NOW)
     )) as Tokens
     const out = await handleSessionLogout(
-      post('/session/logout', { blob, refresh_token: start.refresh_token }),
-      e,
-      google
+      post('/session/logout', { refresh_token: start.refresh_token }),
+      e
     )
     assert.equal(out.status, 200)
     assert.equal((await tokenFor(e, start.refresh_token, later(1000))).status, 401)

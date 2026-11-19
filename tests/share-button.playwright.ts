@@ -20,7 +20,7 @@ test.describe('The share button', () => {
     await expect(button).not.toHaveClass(/shared/)
 
     await button.click()
-    await expect(page.locator('setlist-share')).toContainText('Sign in with Google')
+    await expect(page.locator('setlist-share')).toContainText('Connect Google Drive')
     await page.keyboard.press('Escape')
 
     await page.keyboard.press('ArrowRight')

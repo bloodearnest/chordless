@@ -628,7 +628,7 @@ describe('the join page', () => {
       },
       updated_at: new Date().toISOString(),
     }
-    routes['POST /session/refresh'] = () =>
+    routes['POST /api/account/drive/token'] = () =>
       Response.json({ error: 'invalid_grant' }, { status: 401 })
     await open(LINK, false)
     await until(() => text().includes('Sign in to join'), 'the sign-in')

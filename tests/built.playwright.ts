@@ -126,7 +126,7 @@ test('the privacy, terms, licences and Google account pages are styled under the
   page.on('console', message => {
     if (/Refused to/.test(message.text())) refused.push(message.text())
   })
-  for (const path of ['/privacy.html', '/terms.html', '/licences.html', '/google-account.html']) {
+  for (const path of ['/privacy.html', '/terms.html', '/licences.html']) {
     await page.goto(path)
     await expect(page.locator('.doc h1'), path).toBeVisible()
     // The app's own theme reached it: the header's colour, not the browser's default (transparent)

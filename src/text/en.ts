@@ -99,7 +99,7 @@ toast-space-fetch-failed = Couldn't get { $space }'s songs and setlists.
 
 ## Google sign-in and Drive
 
-toast-signin-expired = Your Google sign-in has expired, so your changes are not syncing.
+toast-signin-expired = Google Drive needs reconnecting, so your changes are not syncing.
 
 # Behind "Details" on the message above, when this device has never synced.
 toast-signin-expired-details = Reconnect with Google to carry on. Changes made here are kept on this device and will be sent then.
@@ -125,7 +125,7 @@ folder-gone-missing = This space's Google Drive folder can't be found: it was de
 ## The data on this device
 
 toast-db-too-old = The data on this device is from an old version of Chordless.
-toast-db-too-old-details = It is too old to be upgraded here, and has been left as it is. Sign in with Google to bring your songs and setlists back from Drive.
+toast-db-too-old-details = It is too old to be upgraded here, and has been left as it is. Sign in, and connect Google Drive, to bring your songs and setlists back from Drive.
 
 toast-db-restoring = Chordless is bringing your songs and setlists back from Drive.
 
@@ -1073,7 +1073,7 @@ welcome-songs-text = Import ChordPro files, or paste the text of a song. If your
 welcome-songs-button = Import songs
 
 welcome-safe-heading = Keep them safe
-welcome-safe-text = Sign in with Google to keep your songs and setlists in your own Google Drive, and to share them between your devices.
+welcome-safe-text = Sign in to keep your songs and setlists in your own Google Drive, and to share them between your devices.
 welcome-safe-button = Sign in and sync
 
 welcome-install-heading = Install it
@@ -1597,7 +1597,7 @@ when-years-ago =
 
 de-only-admin = Only an admin can delete a Team everywhere.
 de-button = Delete everywhere…
-de-sign-in = Sign in with Google to reach its folder in Drive.
+de-sign-in = Connect Google Drive to reach its folder.
 # { $space } is the name of the space.
 de-heading = Delete "{ $space }" everywhere?
 de-what-team = This ends sharing for everyone in the Team, and deletes it from Google Drive.
@@ -1690,9 +1690,8 @@ export-reset-sync = Sync sends the changes to Drive.
 ## Making a Team (the page that makes a Team space, and what it asks)
 
 wizard-heading = New team space
-wizard-sign-in-text = A team space keeps its songs and setlists in a folder in your Google Drive, so Chordless needs access to Drive to make it.
+wizard-sign-in-text = A team space keeps its songs and setlists in a folder in your Google Drive, so Chordless needs to be signed in and to have Google Drive connected to make it.
 wizard-connect-drive = 📁 Connect Google Drive
-wizard-sign-in = 🔑 Sign in with Google
 wizard-intro = A new space for your team, separate from your personal space. Everyone you invite keeps its songs and setlists in step.
 wizard-name = Team name
 wizard-name-example = St Mary's Music
@@ -1789,9 +1788,9 @@ licence-cleared = cleared it (was { $from })
 storage-team-heading = Team storage
 storage-copy = Copy
 storage-copied = Copied
-storage-service-account = This Team reaches its files with Chordless’s own account, a Content manager of your shared drive, so it does not depend on your Google sign-in, which is not kept for it.
-storage-go-back = Use my Google sign-in instead
-storage-own-sign-in = This Team reaches its files with your Google sign-in, so its syncing stops if you leave or your sign-in stops working.
+storage-service-account = This Team reaches its files with Chordless’s own account, a Content manager of your shared drive, so it does not depend on your Google Drive connection.
+storage-go-back = Use my Google Drive instead
+storage-own-sign-in = This Team reaches its files with your Google Drive, so its syncing stops if you leave or your Google Drive connection stops working.
 storage-switch-text = If the Team’s folder is in a Google shared drive, Chordless can reach it with an account of its own instead. Add this address to the shared drive as a Content manager, then check it:
 storage-switch = Check and switch
 
@@ -1917,7 +1916,7 @@ pads-gone = That pad set is no longer in Google Drive.
 pads-encrypted = Encrypted ZIP archives are not supported.
 
 team-needs-name = A team space needs a name
-team-sign-in-first = Sign in with Google first
+team-sign-in-first = Sign in first
 de-error-admin = Only an admin can delete a Team everywhere
 
 export-not-zip = That file is not a Chordless export: it is not a ZIP file
@@ -2064,7 +2063,7 @@ share-list-label = Song list
 share-list-copy = Copy song list
 share-list-email = Email song list
 # <account> is a link to the Account and Teams page.
-share-sign-in = Sign in with Google on the <account>Account and Teams page</account> to share this setlist by link.
+share-sign-in = Connect Google Drive on the <account>Account and Teams page</account> to share this setlist by link.
 share-link-text = Make a link to this setlist for people outside your Chordless space, whether or not they use Chordless.
 share-link-point-1 = They need no account or install, and can keep it on their phone.
 share-link-point-2 = They can read it, but not change it.
@@ -2187,7 +2186,7 @@ add-song-load-failed = Couldn't load the songs. Please try again.
 add-song-add-failed = Couldn't add the song.
 google-script-offline = Couldn't load Google sign-in. Are you offline?
 google-in-use = That Google account is already used by another Chordless account.
-google-sign-in-expired = Your Google sign-in has expired. Connect with Google again.
+google-sign-in-expired = Chordless's access to your Google Drive has expired. Reconnect Google Drive.
 picker-offline = Couldn't load Google's folder picker. Are you offline?
 picker-team-title = Choose where to keep the Team's songs
 setlist-not-found = That setlist is not on this device.

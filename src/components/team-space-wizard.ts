@@ -9,6 +9,7 @@ import {
   connectDrive,
   getCurrentUserInfo,
   getSignInState,
+  isEmailOnly,
   type SignInState,
 } from '../js/google-auth.ts'
 import { withSource } from '../js/other-songs.ts'
@@ -35,6 +36,7 @@ import { errorMessage, failedWith, whatToSay } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './progress-bar.ts'
+import './sign-in-form.ts'
 import { buttonStyles } from './shared-styles.ts'
 import './team-invite-step.ts'
 
@@ -77,6 +79,8 @@ export class TeamSpaceWizard extends LitElement {
   declare _message: string
   declare _created: Space | null
   declare _signIn: SignInState
+  /** Signed in with an emailed code alone, so Google has to be joined to the account to reach Drive */
+  declare _emailOnly: boolean
   /** The spaces on this device that songs and setlists can be brought from */
   declare _sources: Space[]
   declare _sourceId: string
@@ -142,6 +146,7 @@ export class TeamSpaceWizard extends LitElement {
     this._message = ''
     this._created = null
     this._signIn = 'signed-out'
+    this._emailOnly = false
     this._sources = []
     this._sourceId = ''
     this._contents = null
@@ -164,6 +169,7 @@ export class TeamSpaceWizard extends LitElement {
   /** Whether they are signed in with Drive: the folder is made with their own access */
   async _check(): Promise<void> {
     this._signIn = await getSignInState()
+    this._emailOnly = this._signIn !== 'signed-out' && (await isEmailOnly())
     this._state = this._signIn === 'signed-in' ? 'form' : 'sign-in'
     if (this._state === 'form' && this._sources.length === 0) await this._findSources()
   }
@@ -198,8 +204,9 @@ export class TeamSpaceWizard extends LitElement {
   async _connect(): Promise<void> {
     this._message = ''
     try {
-      if (this._signIn === 'no-drive') await connectDrive()
-      else await authorizeWithGoogle()
+      // (Drive's box asked for alone for an account with a Google login, so it cannot be left unticked; otherwise Google joins the account)
+      if (this._emailOnly) await authorizeWithGoogle()
+      else await connectDrive()
     } catch (error) {
       this._message = whatToSay(error, t('wizard-connect-failed'))
       return
@@ -362,11 +369,13 @@ export class TeamSpaceWizard extends LitElement {
           <h2>${t('wizard-heading')}</h2>
           <p>${t('wizard-sign-in-text')}</p>
           ${this._message ? html`<p class="status error" role="alert">${this._message}</p>` : nothing}
-          <div class="actions">
-            <button class="btn primary" @click=${this._connect}>
-              ${this._signIn === 'no-drive' ? t('wizard-connect-drive') : t('wizard-sign-in')}
-            </button>
-          </div>
+          ${
+            this._signIn === 'signed-out'
+              ? html`<sign-in-form @email-code:signed-in=${this._check}></sign-in-form>`
+              : html`<div class="actions">
+                  <button class="btn primary" @click=${this._connect}>${t('wizard-connect-drive')}</button>
+                </div>`
+          }
         `
       case 'form':
       case 'creating':

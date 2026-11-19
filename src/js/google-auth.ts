@@ -6,13 +6,14 @@
  *
  * ## OAuth Authorization Flow
  *
- * 1. User clicks "Authorize with Google"
+ * 1. User clicks "Continue with Google" (the sign-in form) or "Connect Google Drive"
  * 2. GSI OAuth code client opens popup with scopes: drive.file, openid, email, profile
  * 3. User authorizes, popup returns authorization code
  * 4. POST code to auth proxy /oauth/callback
- * 5. Auth proxy exchanges code for tokens (including ID token) and encrypts refresh token
- * 6. Receive encrypted JWE blob containing refresh token + short-lived access token
- * 7. Store blob + metadata in Service Worker IndexedDB
+ * 5. Auth proxy exchanges code for tokens (including ID token), joins the Google login to the person's account, issues a
+ *    Chordless session, and keeps the refresh token for the account, encrypted (D1 `account_drive`: docs/ACCOUNT.md,
+ *    "Google Drive"); the page is sent the session and a short-lived Drive access token, and never the refresh token
+ * 6. Store the session + metadata in Service Worker IndexedDB
  *
  * ## Direct Drive API Access
  *
@@ -20,13 +21,13 @@
  * When the access token expires:
  *
  * 1. Client detects token expiry (checked with 5 minute buffer)
- * 2. Client calls auth proxy /session/refresh with encrypted blob + ID token
- * 3. Auth proxy decrypts blob, uses refresh token to get new access token
+ * 2. Client calls POST /api/account/drive/token with its session
+ * 3. Auth proxy decrypts the account's blob, uses the refresh token to get a new access token
  * 4. Client stores new access token in Service Worker
  * 5. Client retries Drive API call with new token
  *
- * This keeps the sensitive refresh token server-side (encrypted in the blob) while
- * allowing direct browser-to-Drive API calls for better performance and offline support.
+ * So a new device needs only a sign-in (email or Google) to sync, and the sensitive refresh token stays server-side while the
+ * browser makes direct Drive API calls for better performance and offline support.
  */
 
 import { cachedAccount, forgetAccount, loadAccount } from './account-info.ts'
@@ -540,10 +541,12 @@ export async function getAccessToken(): Promise<string> {
     throw new Error('Not authenticated - please authorize first')
   }
 
-  let { blob, metadata } = response.data
+  let { metadata } = response.data
   // (a device from before: its blob goes to the account, once)
-  if (blob && (await adoptLocalBlob(blob)))
-    ({ blob, metadata } = (await getStoredBlob()) ?? response.data)
+  if (response.data.blob) {
+    await adoptLocalBlob(response.data.blob)
+    metadata = (await getStoredBlob())?.metadata ?? metadata
+  }
   const expiresAt = new Date(metadata.expires_at ?? 0)
 
   if (metadata.drive !== false && expiresAt.getTime() - Date.now() > TOKEN_EXPIRY_BUFFER_MS) {
@@ -551,8 +554,6 @@ export async function getAccessToken(): Promise<string> {
     return metadata.access_token ?? ''
   }
 
-  // (still its own blob, if the Worker could not take it: as it was)
-  if (blob) return (await refreshTokens(blob, metadata)).access_token
   return (await driveTokenFromWorker()).access_token
 }
 
@@ -597,31 +598,32 @@ function driveTokenFromWorker(): Promise<AuthMetadata & { access_token: string }
 
 /**
  * A device that signed in before the Worker kept the Google credential has its own blob: it is sent to the account (which keeps
- * it unless another device has connected since) and forgotten here, once. Resolves to whether this device no longer holds one;
- * a failure (offline, say) leaves the blob and the device as it was, to try again.
+ * it unless another device has connected since) and forgotten here, once. It throws when that cannot be done (offline, say), and
+ * the blob stays to be sent next time: `SignInExpiredError` if the Worker can no longer read it, since Google has to be
+ * connected again.
  */
-async function adoptLocalBlob(blob: string): Promise<boolean> {
-  try {
-    const response = await fetch(`${AUTH_PROXY_URL}/api/account/drive/adopt`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${await getIdentityToken()}`,
-      },
-      body: JSON.stringify({ blob }),
-    })
-    if (!response.ok) return false
-    const latest = await getStoredBlob()
-    if (!latest) return false
-    const { adopted } = await response.json()
-    // (not adopted: the account has a connection already, or this blob had no Drive: either way this copy is not needed)
-    await storeSignIn('', { ...latest.metadata, ...(adopted ? { drive: true } : {}) })
-    await learnDrive()
-    return true
-  } catch (error) {
-    console.warn('[Auth] The Google sign-in was not moved to the account:', error)
-    return false
+async function adoptLocalBlob(blob: string): Promise<void> {
+  const response = await fetch(`${AUTH_PROXY_URL}/api/account/drive/adopt`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${await getIdentityToken()}`,
+    },
+    body: JSON.stringify({ blob }),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    if (response.status === 401 && error.error === 'invalid_blob') {
+      throw new SignInExpiredError('invalid_blob')
+    }
+    throw new Error(error.error || 'Failed to move the Google sign-in to the account')
   }
+  const latest = await getStoredBlob()
+  if (!latest) throw new Error('Not authenticated - please authorize first')
+  const { adopted } = await response.json()
+  // (not adopted: the account has a connection already, or this blob had no Drive: either way this copy is not needed)
+  await storeSignIn('', { ...latest.metadata, ...(adopted ? { drive: true } : {}) })
+  await learnDrive()
 }
 
 /**
@@ -703,76 +705,6 @@ async function renewSession(stored: StoredBlob): Promise<StoredSession> {
 
 /** A token this close to its end is replaced before it is used */
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000
-
-/**
- * Refresh the access token (and the ID token) using the encrypted blob.
- * Internal function - users should call getAccessToken() or getIdentityToken() instead.
- *
- * The encrypted blob itself proves ownership, so no ID token is required.
- * Auth proxy decrypts the blob and uses the refresh token to get a new access token.
- *
- * @param blob - Encrypted JWE blob containing refresh token
- * @returns The stored metadata, with the new tokens
- */
-function refreshTokens(
-  blob: string,
-  existingMetadata: AuthMetadata
-): Promise<AuthMetadata & { access_token: string }> {
-  // (a span of its own, for how long the Worker takes and whether a sign-in has expired)
-  return traced('chordless.auth.refresh', {}, async span => {
-    try {
-      return await requestNewTokens(
-        blob,
-        existingMetadata,
-        // (the request is a child of this span, and sends its traceparent: the Worker's is its child)
-        timedFetch('worker', undefined, () => span)
-      )
-    } catch (error) {
-      // (which refusal, so that a sign-in that expired is told from one the Worker cannot read)
-      if (error instanceof SignInExpiredError)
-        span.setAttribute('chordless.auth.refused', error.reason)
-      throw error
-    }
-  })
-}
-
-async function requestNewTokens(
-  blob: string,
-  existingMetadata: AuthMetadata,
-  send: typeof fetch
-): Promise<AuthMetadata & { access_token: string }> {
-  // Call auth proxy to refresh (no ID token needed - blob proves ownership)
-  const response = await send(`${AUTH_PROXY_URL}/session/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ blob }),
-  })
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}))
-    // (Google no longer honours the sign-in, or the Worker cannot read the blob: sign in again)
-    const refused = error.error === 'invalid_grant' || error.error === 'invalid_blob'
-    if (response.status === 401 && refused) throw new SignInExpiredError(error.error)
-    throw new Error(error.error || 'Failed to refresh access token')
-  }
-
-  const { access_token, expires_in, id_token } = await response.json()
-
-  const updatedMetadata: AuthMetadata & { access_token: string } = {
-    ...existingMetadata,
-    access_token,
-    expires_at: new Date(Date.now() + expires_in * 1000).toISOString(),
-  }
-  if (id_token) updatedMetadata.id_token = id_token
-
-  // Update stored metadata in Service Worker
-  await sendToServiceWorker('STORE_BLOB', {
-    blob,
-    metadata: updatedMetadata,
-  })
-
-  return updatedMetadata
-}
 
 async function buildStoredUserProfile(user: StoredUser): Promise<StoredUser> {
   // (only for a user with a picture)

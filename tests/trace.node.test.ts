@@ -5,11 +5,12 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { handleDrive } from '../worker/src/account-drive.ts'
 import { encryptBlob } from '../worker/src/blob.ts'
 import type { Env } from '../worker/src/env.ts'
 import type { GoogleApi } from '../worker/src/google-auth.ts'
 import { handleRequest } from '../worker/src/router.ts'
-import { handleTokenRefresh } from '../worker/src/session.ts'
+import { signAccessToken } from '../worker/src/session-tokens.ts'
 import type { ShareCache } from '../worker/src/share.ts'
 import type { TelemetryDeps } from '../worker/src/telemetry.ts'
 import {
@@ -19,6 +20,7 @@ import {
   tracedStub,
   withWorkerSpan,
 } from '../worker/src/trace.ts'
+import { d1Db } from './d1-db.ts'
 
 const ORIGIN = 'https://chordless.test'
 const TRACE = 'a'.repeat(32)
@@ -168,7 +170,7 @@ test('a sender over the limit gets its answer and no span', async () => {
 })
 
 test('the route is the path with its ids replaced', () => {
-  assert.equal(routeOf('/session/refresh'), '/session/refresh')
+  assert.equal(routeOf('/session/token'), '/session/token')
   assert.equal(
     routeOf('/api/spaces/3f2504e0-4f89-41d3-9a0c-0305e82c3301/files'),
     '/api/spaces/:id/files'
@@ -400,13 +402,30 @@ test('the port is the scheme’s when the address names none', async () => {
 
 const refreshSpan = async (google: Partial<GoogleApi>, blob: (key: string) => Promise<string>) => {
   const key = btoa('k'.repeat(32))
-  const env = { JWE_ENCRYPTION_KEY: key, GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 's' } as Env
+  const { db, sql } = d1Db()
+  const env = {
+    JWE_ENCRYPTION_KEY: key,
+    SESSION_SIGNING_KEY: key,
+    GOOGLE_CLIENT_ID: 'id',
+    GOOGLE_CLIENT_SECRET: 's',
+    DB: db,
+  } as Env
+  sql.prepare("INSERT INTO accounts (account_id, created_at) VALUES ('a1', 'now')").run()
+  sql
+    .prepare(
+      "INSERT INTO account_drive (account_id, blob, google_email, scope, created_at, updated_at) VALUES ('a1', ?, 'ann@example.com', 'x', 'now', 'now')"
+    )
+    .run(await blob(key))
+  const token = await signAccessToken(
+    { accountId: 'a1', sessionId: 's1', email: 'ann@example.com' },
+    env
+  )
   const { spans } = await traceCalls(async () => {
-    const request = new Request(`${ORIGIN}/session/refresh`, {
+    const request = new Request(`${ORIGIN}/api/account/drive/token`, {
       method: 'POST',
-      body: JSON.stringify({ blob: await blob(key) }),
+      headers: { Authorization: `Bearer ${token}` },
     })
-    return handleTokenRefresh(request, env, google as GoogleApi)
+    return handleDrive(request, env, google as GoogleApi)
   })
   return attributes(spans.find(s => s.name === 'chordless.worker.handle') as Record<string, any>)
 }

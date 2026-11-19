@@ -63,7 +63,6 @@ test('the API is refused to a page from another origin, before it is routed', as
   const { send, assetRequests } = setup()
   for (const path of [
     '/oauth/callback',
-    '/session/refresh',
     '/session/logout',
     '/session/token',
     '/session/upgrade',
@@ -99,20 +98,17 @@ test('the API answers the app itself, and tools that send neither header', async
 })
 
 test('the API sends no CORS headers', async () => {
-  const response = await setup().send('/session/refresh', postJson('{}'))
+  const response = await setup().send('/session/token', postJson('{}'))
   assert.equal(response.headers.get('access-control-allow-origin'), null)
 })
 
 test("each session route is the Worker's: an empty request is refused by its own handler", async () => {
   const { send, assetRequests } = setup()
-  for (const path of [
-    '/session/refresh',
-    '/session/logout',
-    '/session/token',
-    '/session/upgrade',
-  ]) {
+  for (const path of ['/session/token', '/session/upgrade']) {
     assert.equal((await send(path, postJson('{}'))).status, 400, path)
   }
+  // (signing out with nothing to end is done)
+  assert.equal((await send('/session/logout', postJson('{}'))).status, 200)
   assert.equal((await send('/session/email/start', postJson('{}'))).status, 400)
   assert.equal((await send('/session/email/verify', postJson('{}'))).status, 401)
   assert.equal((await send('/session/email/link', postJson('{}'))).status, 503)
@@ -138,7 +134,7 @@ test('the account’s Google Drive is the Worker’s, under /api/account/drive',
 test('only POST reaches the auth routes: other methods fall through to the assets', async () => {
   const { send, assetRequests } = setup()
   await send('/oauth/callback')
-  await send('/session/refresh', { method: 'PUT' })
+  await send('/session/logout', { method: 'PUT' })
   await send('/session/token')
   await send('/session/upgrade')
   await send('/session/email/start')
@@ -147,7 +143,7 @@ test('only POST reaches the auth routes: other methods fall through to the asset
   await send('/session/email/link/peek')
   assert.deepEqual(assetRequests, [
     'GET /oauth/callback',
-    'PUT /session/refresh',
+    'PUT /session/logout',
     'GET /session/token',
     'GET /session/upgrade',
     'GET /session/email/start',
@@ -163,7 +159,7 @@ test('a route that throws is a JSON 500 with the reason, not a crash', async () 
   try {
     // (a key that cannot be used is the server's fault: not the person's, as a bad blob is)
     const response = await setup({ JWE_ENCRYPTION_KEY: 'not base64!' }).send(
-      '/session/refresh',
+      '/session/upgrade',
       postJson('{"blob":"x.y.z.w.v"}')
     )
     assert.equal(response.status, 500)
