@@ -447,7 +447,7 @@ person-email-add-aria = Add an email address to { $name }
 person-email-add-placeholder = Add an email address
 person-email-add = Add
 person-merge-heading = Merge into another person
-person-merge-hint = In case of duplicate identities, you can merge two together. This will merge their emails and any setslist they own into the same account
+person-merge-hint = In case of duplicate identities, you can merge two together. This will merge their emails and any setlist they own into the same account
 # { $name } is a person's name.
 person-merge-aria = Merge { $name } into
 person-merge-choose = Choose a person…
@@ -694,7 +694,7 @@ space-copy-drive-text = Replace this device's songs and setlists with the copy s
 space-drive-not-connected = You are signed in, but Google Drive is not connected, so this space is not syncing. <connect>Connect Google Drive</connect> on the Account and Teams page.
 
 space-export-heading = Export and import
-space-export-text = Export this space's songs and setlists as a zip file. This can be used as a backup, or imported into another device if you do not not have sync enabled. On import, it will only add what is missing.
+space-export-text = Export this space's songs and setlists as a zip file. This can be used as a backup, or imported into another device if you do not have sync enabled. On import, it will only add what is missing.
 space-export-text-team = Export this Team's songs and setlists as a zip file, and import an export into it, on this device or another: it needs no Google account, and an import only adds what is missing.
 
 space-delete-heading = Delete from this device
@@ -807,7 +807,7 @@ pref-tuning-text = Each setlist can have its own tuning: choose it on the setlis
 
 # The choices of "What do you play?" (and the first-use setup): the choice and a line under it.
 play-singer = I sing, or play drums
-play-singer-description = Lyrics only by default start, and no key controls
+play-singer-description = Lyrics only by default, and no key controls
 play-guitarist = I play guitar
 play-guitarist-description = Chords and lyrics, with capo and tuning controls
 play-transposing = I play a B♭, E♭ or F instrument
@@ -1236,7 +1236,7 @@ import-files = Import ChordPro Files
 import-files-text =
     Select one or more ChordPro files
 
-    If they are SongSelect chordpro files, please also also download and import the matching lead sheet PDF, which will provide the melody and enable showing the leadsheet.
+    If they are SongSelect chordpro files, please also download and import the matching lead sheet PDF, which will provide the melody and enable showing the leadsheet.
 import-paste = Paste ChordPro
 import-button = Import
 import-email = Import a Setlist from an Email
@@ -1317,7 +1317,7 @@ origin-unknown = Importer unknown
 email-import-heading = Import a setlist from an email
 # <mail> is the address to forward to, as a link. { $address } is that address.
 email-import-text =
-    Forward the email a worship leader sent, with the songs attached as PDFs, to <mail>{ $address }</mail>. Chordless will read the email and PDFs, attempt to determine the songs. 
+    Forward the email a worship leader sent, with the songs attached as PDFs, to <mail>{ $address }</mail>. Chordless will read the email and PDFs, attempt to determine the songs.
 
     It will reply to your email with a link. When you open it, it will show a proposed setlist for you to check and import.
 email-import-privacy = Chordless doesn't import the PDFs from the email, just uses them to identify the songs. If you do not have the song imported, you will need to import it properly. The email and its charts are not kept.
@@ -1532,7 +1532,7 @@ song-info-range-edit = Edit
 song-info-range-in-key = in { $key }
 # { $notes } notes and { $semitones } semitones from the lowest to the highest.
 song-info-range-width =
-    Vocal range:{ $notes ->
+    Vocal range: { $notes ->
         [one] 1 note
        *[other] { $notes } notes
     } wide ({ $semitones ->
