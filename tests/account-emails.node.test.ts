@@ -108,6 +108,38 @@ describe('an address belongs to one account', () => {
   })
 })
 
+test('two first sign-ins at once on one address leave one account, and the loser leaves no orphan', async () => {
+  const { db, sql } = world()
+  // (another login claims the address between this one finding it free and making its account)
+  const racing = {
+    prepare: db.prepare.bind(db),
+    batch: async (statements: Parameters<typeof db.batch>[0]) => {
+      sql
+        .prepare('INSERT INTO accounts (account_id, created_at) VALUES (?, ?)')
+        .run('rival', NOW.toISOString())
+      sql
+        .prepare('INSERT INTO account_emails (email, account_id, created_at) VALUES (?, ?, ?)')
+        .run('ann@example.com', 'rival', NOW.toISOString())
+      return db.batch(statements)
+    },
+  } as unknown as typeof db
+  const account = await accountOf(
+    racing,
+    { provider: 'google', sub: 'g1', email: 'ann@example.com' },
+    true,
+    NOW
+  )
+  assert.equal(account, 'rival')
+  assert.deepEqual(
+    sql
+      .prepare('SELECT account_id FROM account_identities WHERE sub = ?')
+      .all('g1')
+      .map(row => ({ ...row })),
+    [{ account_id: 'rival' }]
+  )
+  assert.equal((sql.prepare('SELECT COUNT(*) AS n FROM accounts').get() as { n: number }).n, 1)
+})
+
 describe('the migration', () => {
   test('claims each address for the oldest login that has it', () => {
     const { sql } = world()
