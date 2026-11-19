@@ -539,6 +539,11 @@ export class TeamJoin extends LitElement {
     `
   }
 
+  /** The name of the Team just joined (the page shows it only once there is one) */
+  get _joinedName(): string {
+    return (this._joined as Space).name
+  }
+
   _renderState() {
     switch (this._state) {
       case 'bad-link':
@@ -576,7 +581,7 @@ export class TeamJoin extends LitElement {
         `
       case 'joined':
         return html`
-          <h2>${t('join-joined', { name: this._joined?.name ?? '' })}</h2>
+          <h2>${t('join-joined', { name: this._joinedName })}</h2>
           <p>
             ${t('join-joined-text', { role: this._role })}
             ${t(this._syncError ? 'join-not-synced' : 'join-synced')}
@@ -584,7 +589,7 @@ export class TeamJoin extends LitElement {
           ${this._syncError ? html`<p class="status error" role="alert">${this._syncError}</p>` : nothing}
           <div class="actions">
             ${this._syncError ? html`<button class="btn" @click=${this._sync}>${t('action-try-again')}</button>` : nothing}
-            <button class="btn primary" @click=${this._open}>${t('wizard-open', { name: this._joined?.name ?? '' })}</button>
+            <button class="btn primary" @click=${this._open}>${t('wizard-open', { name: this._joinedName })}</button>
           </div>
         `
       case 'failed':
