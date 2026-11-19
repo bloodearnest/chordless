@@ -116,7 +116,7 @@ describe('song-info', () => {
       const info = await show({
         song: song({ metadata: {}, parsed: { metadata: { x_chordless_range: 'D4-E5' } } }),
       })
-      expect(text(info)).to.contain('D4–E5 9 notes wide (14 semitones)')
+      expect(text(info)).to.contain('D4–E5 Vocal range: 9 notes wide (14 semitones)')
       expect(badges(info)).to.have.length(0)
     })
 
