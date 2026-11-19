@@ -51,13 +51,19 @@ worktree_for() {
   local branch=$1 dir
   dir=$(git worktree list --porcelain | awk -v b="refs/heads/$branch" '
     /^worktree / { wt = substr($0, 10) } $0 == "branch " b { print wt; exit }')
-  if [[ -n "$dir" ]]; then
+  # The primary checkout holds the developer's own dev database (.wrangler/state) and secrets: a preview
+  # never runs in it, so a branch checked out there (main) is served from a detached worktree of its own
+  if [[ -n "$dir" && "$dir" != "$root" ]]; then
     echo "$dir"
     return
   fi
   dir="$root/.claude/worktrees/preview-${branch//\//-}"
   git fetch --quiet origin "$branch" >&2
-  if git show-ref --verify --quiet "refs/heads/$branch"; then
+  if [[ -d "$dir" ]]; then
+    git -C "$dir" checkout --quiet --detach "origin/$branch" >&2
+  elif [[ -n "$(git worktree list --porcelain | awk -v b="refs/heads/$branch" '$0 == "branch " b')" ]]; then
+    git worktree add --quiet --detach "$dir" "origin/$branch" >&2
+  elif git show-ref --verify --quiet "refs/heads/$branch"; then
     git worktree add --quiet "$dir" "$branch" >&2
   else
     git worktree add --quiet -b "$branch" "$dir" "origin/$branch" >&2
