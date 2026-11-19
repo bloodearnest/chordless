@@ -26,6 +26,29 @@ keeps the scopes apart: the account first, then one card per space, then the dev
 | `team-space-wizard.ts` (`/account/new`), `team-join.ts` (`/join`) | Making a Team, and joining one: docs/SPACES.md |
 | `media-page.ts` (`/media`) | The media player and the pad sets |
 
+## Signing in (2026-11-19)
+
+There is one way in, and it is the form of a regular web app: `sign-in-form.ts`.
+
+```
+Email              [ you@example.com ]
+[ Continue ]                        (we email a link and a six-digit code)
+-------------------- or --------------------
+[ Continue with Google ]            (also syncs your Personal space, with your Google Drive)
+```
+
+Both are the same Chordless account. Google is another way to prove who you are (an address Google has verified joins the
+account of an emailed sign-in with the same address: docs/SPACES.md), not a second login, and a Google sign-in asks for Drive
+in the same window, so syncing is simply on afterwards ("Google Drive", below). The form is used by the Account page (signed
+out), the page a sign-in link lands on (`/sign-in/<id>`) and the page an invite opens (`/join`, with the invite's address filled
+in). The join page no longer asks whether the person has a Google account, and an invite no longer says to make one: any
+address that can receive an email will do. An **admin** invite still only works with the address it was sent to. A person
+signed in as the wrong address chooses **Use a different account**, which logs out first (signing in over a session only adds a
+login to the same account).
+
+Not done yet: the other pages that ask for Google by themselves (making a Team, sharing a setlist, deleting everywhere) have their
+own Google buttons, since they need Drive, not only a sign-in.
+
 ## Google Drive (2026-11-19)
 
 Syncing the Personal space between devices needs a Google Drive, and **the Worker holds the credential for the account**, so a
