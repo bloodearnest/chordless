@@ -136,11 +136,7 @@ export class AccountCard extends LitElement {
     try {
       const { authorizeWithGoogle } = await import('../js/google-auth.ts')
       await authorizeWithGoogle()
-      await this.refresh()
-      this._message =
-        this._state === 'no-drive'
-          ? { text: t('account-signed-in-no-drive'), type: 'success' }
-          : { text: t('account-signed-in'), type: 'success' }
+      await this._signedInHere()
     } catch (error) {
       console.error('[AccountCard] Sign-in failed:', error)
       this._message = {
