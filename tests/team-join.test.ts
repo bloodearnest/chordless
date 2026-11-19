@@ -618,12 +618,13 @@ describe('the join page', () => {
 
   it('asks an expired sign-in to be made again', async () => {
     worker.stored = {
-      blob: 'blob',
+      blob: '',
       metadata: {
         access_token: 'token',
         expires_at: new Date(Date.now() - 3600_000).toISOString(),
         id_token: idToken(-60),
-        scope: 'openid email profile',
+        drive: true,
+        session: sessionFor(idToken()),
         user,
       },
       updated_at: new Date().toISOString(),

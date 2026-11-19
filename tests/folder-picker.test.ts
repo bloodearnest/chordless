@@ -27,11 +27,11 @@ describe('pickFolder', () => {
   beforeEach(() => {
     ;({ worker, uninstall: uninstallWorker } = installFakeAuthWorker())
     worker.stored = {
-      blob: 'blob',
+      blob: '',
       metadata: {
         access_token: 'the-token',
         expires_at: new Date(Date.now() + 3600_000).toISOString(),
-        scope: 'https://www.googleapis.com/auth/drive.file openid email profile',
+        drive: true,
       },
       updated_at: new Date().toISOString(),
     }
