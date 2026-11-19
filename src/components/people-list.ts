@@ -138,10 +138,18 @@ export class PeopleList extends LitElement {
       .section { margin: 1rem 0; }
       @media (max-width: 700px) {
         thead { display: none; }
-        table, tbody, tr, td { display: block; }
-        tbody tr { padding: 0.35rem 0; }
-        td { padding: 0.1rem 0; }
-        .actions { justify-content: flex-start; }
+        table, tbody { display: block; }
+        /* A row is a card: the cells (name, addresses, role or status) stack on the left, the buttons sit beside them, top right */
+        tbody tr {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          column-gap: 0.75rem;
+          padding: 0.5rem 0;
+        }
+        td { grid-column: 1; padding: 0.05rem 0; min-width: 0; }
+        td:last-child { grid-column: 2; grid-row: 1 / span 3; align-self: start; }
+        td:empty { display: none; }
+        .actions { justify-content: flex-end; flex-wrap: nowrap; }
       }
     `,
   ]
