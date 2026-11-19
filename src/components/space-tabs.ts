@@ -4,6 +4,7 @@ import { goTo } from '../js/navigation.ts'
 import { SHARED_DB_ID } from '../js/share-receiver.ts'
 import { getCurrentSpace, switchSpace } from '../js/space.ts'
 import { loadSpaceTabs, noteTabUsed, type SpaceTab, splitTabs } from '../js/space-tabs.ts'
+import { t } from '../js/text.ts'
 
 /**
  * The places the person's songs and setlists are kept, as tabs under the header (docs/SPACES.md,
@@ -111,12 +112,12 @@ export class SpaceTabs extends LitElement {
     if (this._tabs.length < 2) return nothing
     const { shown, more } = splitTabs(this._tabs, this._currentId)
     return html`
-      <div role="tablist" aria-label="Where songs and setlists are kept" @keydown=${this._keydown}>
+      <div role="tablist" aria-label=${t('tabs-label')} @keydown=${this._keydown}>
         ${shown.map(tab => this._renderTab(tab))}
         ${
           more.length
-            ? html`<select aria-label="More" @change=${this._chooseMore}>
-                <option value="" selected>More</option>
+            ? html`<select aria-label=${t('tabs-more')} @change=${this._chooseMore}>
+                <option value="" selected>${t('tabs-more')}</option>
                 ${more.map(tab => html`<option value=${tab.id}>${tab.name}${tab.kind ? ` (${tab.kind})` : ''}</option>`)}
               </select>`
             : nothing

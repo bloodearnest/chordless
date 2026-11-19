@@ -4,6 +4,7 @@ import { goTo } from '../js/navigation.ts'
 import type { Route } from '../js/router.ts'
 import { getSpaceById } from '../js/space.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
+import { t } from '../js/text.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 import './people-list.ts'
 import './team-licence-panel.ts'
@@ -106,15 +107,15 @@ export class SpacePage extends LitElement {
     const space = this._space
     if (this._missing) {
       return html`<div class="content">
-        <a class="back" href="/account">← Account and Teams</a>
-        <p role="alert">That space is not on this device.</p>
+        <a class="back" href="/account">${t('space-back')}</a>
+        <p role="alert">${t('space-page-missing')}</p>
       </div>`
     }
     if (!space) return nothing
     const kind = spaceKind(space)
     const role = spaceRole(space)
     return html`<div class="content">
-      <a class="back" href="/account">← Account and Teams</a>
+      <a class="back" href="/account">${t('space-back')}</a>
       <h2>
         ${space.name}
         ${kind ? html`<span class="label">${kind}</span>` : nothing}

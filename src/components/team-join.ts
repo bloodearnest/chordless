@@ -9,6 +9,7 @@ import {
 import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
 import { type JoinDevice, joinDevice } from '../js/join-device.ts'
 import { JoinTrail } from '../js/join-telemetry.ts'
+import { rich } from '../js/rich-text.ts'
 import { matchRoute, type Route } from '../js/router.ts'
 import { setCurrentSpace, switchSpace } from '../js/space.ts'
 import { storageFor } from '../js/storage/space-storage.ts'
@@ -360,9 +361,9 @@ export class TeamJoin extends LitElement {
   /** What to tell them of a refusal */
   _explain(error: unknown, what: string): string {
     if (error instanceof TeamError && error.status === 403) {
-      return `This invite was sent to a different Google account${
-        this._email ? `, not ${this._email}` : ''
-      }. Sign in with the address it was sent to.`
+      return this._email
+        ? t('join-wrong-account-not', { email: this._email })
+        : t('join-wrong-account')
     }
     if (error instanceof TeamError && error.status === 404) {
       return t('join-not-valid')
@@ -507,11 +508,18 @@ export class TeamJoin extends LitElement {
     const other = this._info && this._email && !this._asInvited() ? this._info : null
     const locked = other?.role === 'admin'
     return html`
-      <h2>Join a team space</h2>
+      <h2>${t('page-join')}</h2>
       <p>
-        You are signed in${this._email ? html` as <span class="who">${this._email}</span>` : nothing}.
-        Joining adds the team's songs and setlists to this device, and keeps them in step with the
-        team's.
+        ${
+          this._email
+            ? rich(
+                'join-signed-in-as',
+                { email: this._email },
+                { who: words => html`<span class="who">${words}</span>` }
+              )
+            : t('join-signed-in')
+        }
+        ${t('join-adds')}
       </p>
       ${
         other && locked
@@ -524,9 +532,9 @@ export class TeamJoin extends LitElement {
         ${
           locked
             ? nothing
-            : html`<button class="btn primary" @click=${this._join}>Join the team space</button>`
+            : html`<button class="btn primary" @click=${this._join}>${t('join-button')}</button>`
         }
-        <button class="btn ${locked ? 'primary' : ''}" @click=${this._signIn}>Use a different account</button>
+        <button class="btn ${locked ? 'primary' : ''}" @click=${this._signIn}>${t('join-different-account')}</button>
       </div>
     `
   }
@@ -535,17 +543,14 @@ export class TeamJoin extends LitElement {
     switch (this._state) {
       case 'bad-link':
         return html`
-          <h2>This link doesn't work</h2>
-          <p class="status error" role="alert">
-            It is missing part of the invite, which can happen if it was cut short. Ask the person who
-            sent it to send it again.
-          </p>
+          <h2>${t('join-bad-link')}</h2>
+          <p class="status error" role="alert">${t('join-bad-link-text')}</p>
         `
       case 'checking':
         return html`<p class="status" role="status">${t('status-checking')}</p>`
       case 'not-valid':
         return html`
-          <h2>This invite doesn't work</h2>
+          <h2>${t('join-invalid')}</h2>
           <p class="status error" role="alert">${t('join-not-valid')}</p>
         `
       case 'sign-in':
@@ -557,38 +562,34 @@ export class TeamJoin extends LitElement {
       case 'ready':
         return this._renderReady()
       case 'joining':
-        return html`<p class="status" role="status">Joining…</p>`
+        return html`<p class="status" role="status">${t('join-joining')}</p>`
       case 'syncing':
         return html`
           <p class="status" role="status">
-            ${this._progress?.message ?? "Getting the team's songs and setlists…"}
+            ${this._progress?.message ?? t('join-getting')}
           </p>
           <progress-bar
-            label="Getting the team's songs and setlists"
+            label=${t('join-getting-label')}
             .current=${this._progress?.current}
             .total=${this._progress?.total}
           ></progress-bar>
         `
       case 'joined':
         return html`
-          <h2>You have joined ${this._joined?.name}</h2>
+          <h2>${t('join-joined', { name: this._joined?.name ?? '' })}</h2>
           <p>
-            The space is on this device, and you are in it as ${this._role}.
-            ${
-              this._syncError
-                ? "The team's songs and setlists have not come across yet. Open the space and sync to try again."
-                : "The team's songs and setlists are here."
-            }
+            ${t('join-joined-text', { role: this._role })}
+            ${t(this._syncError ? 'join-not-synced' : 'join-synced')}
           </p>
           ${this._syncError ? html`<p class="status error" role="alert">${this._syncError}</p>` : nothing}
           <div class="actions">
-            ${this._syncError ? html`<button class="btn" @click=${this._sync}>Try again</button>` : nothing}
-            <button class="btn primary" @click=${this._open}>Open ${this._joined?.name}</button>
+            ${this._syncError ? html`<button class="btn" @click=${this._sync}>${t('action-try-again')}</button>` : nothing}
+            <button class="btn primary" @click=${this._open}>${t('wizard-open', { name: this._joined?.name ?? '' })}</button>
           </div>
         `
       case 'failed':
         return html`
-          <h2>Couldn't join</h2>
+          <h2>${t('join-failed-heading')}</h2>
           <p class="status error" role="alert">${this._message}</p>
           ${
             this._info?.role === 'admin'
@@ -596,8 +597,8 @@ export class TeamJoin extends LitElement {
               : nothing
           }
           <div class="actions">
-            <button class="btn primary" @click=${this._check}>Try again</button>
-            <button class="btn" @click=${this._signIn}>Use a different account</button>
+            <button class="btn primary" @click=${this._check}>${t('action-try-again')}</button>
+            <button class="btn" @click=${this._signIn}>${t('join-different-account')}</button>
           </div>
         `
     }

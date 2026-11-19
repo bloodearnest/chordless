@@ -1,5 +1,6 @@
 import { css, html, LitElement, nothing } from 'lit'
 import type { LibraryPlace } from '../js/library-spaces.ts'
+import { t } from '../js/text.ts'
 
 /** The places left out of the library list changed */
 export class LeftOutChangeEvent extends Event {
@@ -81,8 +82,8 @@ export class LibrarySpaceFilter extends LitElement {
   override render() {
     if (this.places.length < 2) return nothing
     return html`
-      <div class="bar" role="group" aria-label="Spaces to search">
-        <span class="label">Spaces:</span>
+      <div class="bar" role="group" aria-label=${t('filter-label')}>
+        <span class="label">${t('filter-spaces')}</span>
         ${this.places.map(
           place => html`<button
             type="button"

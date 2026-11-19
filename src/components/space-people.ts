@@ -465,28 +465,28 @@ export class SpacePeople extends LitElement {
   }
 
   override render() {
-    if (!this._loaded) return html`<div class="content"><p class="hint">Reading…</p></div>`
+    if (!this._loaded)
+      return html`<div class="content"><p class="hint">${t('people-reading')}</p></div>`
     if (!this._space) {
-      return html`<div class="content"><p class="hint">This space is not on this device.</p></div>`
+      return html`<div class="content"><p class="hint">${t('people-not-here')}</p></div>`
     }
     if (this.only) {
       const person = this._people.find(each => each.id === this.only)
       return html`
-        <ul class="people" aria-label="Person">${person ? this._renderPerson(person) : nothing}</ul>
+        <ul class="people" aria-label=${t('people-person-label')}>${person ? this._renderPerson(person) : nothing}</ul>
         <app-modal ${ref(this._confirm)} type="confirm" size="small"></app-modal>
       `
     }
     return html`
       <div class="content">
         <p class="hint">
-          The people who lead this space's setlists. Two spellings of one person are put right by
-          merging one into the other.
-          ${this._canEdit ? nothing : ' Only worship leaders can change them, and you can change your own name.'}
+          ${t('people-leaders-text')}
+          ${this._canEdit ? nothing : t('people-leaders-read-only')}
         </p>
         ${
           this._people.length === 0
-            ? html`<p class="hint">Nobody leads a setlist here yet.</p>`
-            : html`<ul class="people" aria-label="People">${this._people.map(each => this._renderPerson(each))}</ul>`
+            ? html`<p class="hint">${t('people-nobody')}</p>`
+            : html`<ul class="people" aria-label=${t('people-people-label')}>${this._people.map(each => this._renderPerson(each))}</ul>`
         }
       </div>
       <app-modal ${ref(this._confirm)} type="confirm" size="small"></app-modal>
