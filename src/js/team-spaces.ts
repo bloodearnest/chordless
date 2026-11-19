@@ -170,39 +170,13 @@ export function inviteLink(origin: string, teamId: string, code: string): string
 }
 
 /**
- * The page that shows how to make a Google account with an address from somewhere else, step by
- * step with pictures (src/google-account.html: a static page, no app and no service worker, so that
- * it opens the same from a message in WhatsApp or Gmail). On the same site as the invite's link.
- */
-export function googleAccountGuideUrl(inviteUrl: string): string {
-  return new URL('/google-account.html', inviteUrl).href
-}
-
-/**
- * Whether an address is certainly a Google account's: Gmail's. Any other might be one too (a Google
- * Workspace domain, or an address made a Google account), and nothing public says; so this is
- * only for leaving out the how-to-make-one text, never for refusing an invite.
- */
-export function isGmailAddress(email: string): boolean {
-  return /@(gmail|googlemail)\.com$/i.test(email.trim())
-}
-
-/**
  * What to say with an invite's link, to the person it is for. The address it was sent to is a label for a
- * team member or a worship leader: they sign in with any Google account, and the page they open helps
- * them make one. An **admin** invite only works with its address, so for one that may not be a Google
- * account yet, the message says to make it one *before* opening the link, and where to see how.
+ * team member or a worship leader: they sign in with their email address or any Google account. An **admin**
+ * invite only works with its address.
  */
-export function inviteMessage(
-  teamName: string,
-  role: TeamRole,
-  email: string,
-  inviteUrl: string
-): string {
+export function inviteMessage(teamName: string, role: TeamRole, email: string): string {
   const intro = t('invite-message-intro', { team: teamName, role: roleWithArticle(role) })
-  if (isGmailAddress(email)) return `${intro} ${t('invite-message-gmail', { email })}`
-  if (role !== 'admin') return `${intro} ${t('invite-message-any', { email })}`
-  return `${intro} ${t('invite-message-admin', { email, guide: googleAccountGuideUrl(inviteUrl) })}`
+  return `${intro} ${t(role === 'admin' ? 'invite-message-admin' : 'invite-message-open', { email })}`
 }
 
 /** The ways to hand an invite on where the browser has no share sheet: WhatsApp, and Gmail's compose window (a mailto: link does nothing on a desktop with no mail app) */
@@ -212,7 +186,7 @@ export function inviteSendLinks(
   email: string,
   url: string
 ): { whatsapp: string; gmail: string } {
-  const message = inviteMessage(teamName, role, email, url)
+  const message = inviteMessage(teamName, role, email)
   const subject = t('invite-subject', { team: teamName })
   return {
     whatsapp: `https://wa.me/?text=${encodeURIComponent(`${message}\n\n${url}`)}`,

@@ -73,14 +73,14 @@ describe('sign-in-page', () => {
       },
     })
     await waitUntil(() => text().includes('has been used or has run out'), 'the message')
-    expect(page.shadowRoot?.querySelector('email-code-sign-in')).to.exist
+    expect(page.shadowRoot?.querySelector('sign-in-form')).to.exist
   })
 
   it('is the form to ask for a link when there is none, and goes home once signed in', async () => {
     const { page, went, text } = await open(undefined)
     expect(text()).to.contain('enter your email address')
     page.shadowRoot
-      ?.querySelector('email-code-sign-in')
+      ?.querySelector('sign-in-form')
       ?.dispatchEvent(new Event('email-code:signed-in', { bubbles: true, composed: true }))
     expect(went).to.deep.equal(['/'])
   })
