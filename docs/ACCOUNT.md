@@ -235,6 +235,7 @@ holds about an account, by table (migrations/):
 |---|---|---|
 | `accounts` | the account's id and date | delete the row |
 | `account_identities` | each login (`google` sub, `email` address) and its address | delete the account's rows |
+| `account_emails` | each address the account owns (0009): the primary key is the address, so **one account to an address** | delete the account's rows |
 | `sessions` | refresh-token hashes, address | delete the account's rows (signs out every device) |
 | `team_members`, `team_member_emails` | membership in teams, and the addresses a team knows them by | delete the account's rows (they leave every team) |
 | `teams` | an **owner's** team (`owner_account_id`, `owner_email`) | **first** end sharing or hand the team on: a team with no owner cannot be looked after. Then the team's own rows go with it (docs/SPACES.md, "Deleting a space") |

@@ -430,6 +430,7 @@ test('keeps nothing but the space, its members, its refs, the blob, which creden
     .filter(name => name !== 'sqlite_sequence')
     .filter(name => (sql.prepare(`SELECT COUNT(*) AS n FROM ${name}`).get() as { n: number }).n > 0)
   assert.deepEqual(tables.sort(), [
+    'account_emails',
     'account_identities',
     'accounts',
     'team_credentials',

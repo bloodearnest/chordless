@@ -185,17 +185,53 @@ function newAccountId(): string {
     .join('')
 }
 
+/** The account that owns an address (docs/ACCOUNT.md: one account to an address), if any does */
+export async function ownerOfAddress(db: D1Db, email: string): Promise<string | null> {
+  const row = await db
+    .prepare('SELECT account_id FROM account_emails WHERE email = ?')
+    .bind(email.toLowerCase())
+    .first<{ account_id: string }>()
+  return row?.account_id ?? null
+}
+
+/**
+ * Make an address the account's, unless another account has it already. Returns the account that has it:
+ * the argument if the claim held (or it was theirs already), another if it was taken. The address must have
+ * been vouched for (verified by its provider, or proved by a code).
+ */
+export async function claimAddress(
+  db: D1Db,
+  accountId: string,
+  email: string,
+  now: Date
+): Promise<string> {
+  const address = email.toLowerCase()
+  if (!address) return accountId
+  await db
+    .prepare(
+      'INSERT OR IGNORE INTO account_emails (email, account_id, created_at) VALUES (?, ?, ?)'
+    )
+    .bind(address, accountId, now.toISOString())
+    .run()
+  return (await ownerOfAddress(db, address)) ?? accountId
+}
+
 /**
  * The account a login belongs to. With `create`, one is made (with the login) the first time a team
  * operation sees it (making a space, joining one), never by a bare request; the login's email and
  * `last_seen_at` are refreshed. Without it, null for a login nothing has made an account for. An
  * identity from a Chordless session already is the account (its `sub`): nothing to look up.
+ *
+ * With `claim` (the default: an `Identity`'s address is verified), the login's address is made the account's, and a
+ * new login whose address another account owns joins that account instead of making one (the same mailbox is the
+ * same person; an address belongs to one account).
  */
 export async function accountOf(
   db: D1Db,
   identity: Identity,
   create: boolean,
-  now: Date = new Date()
+  now: Date = new Date(),
+  claim = true
 ): Promise<string | null> {
   if (identity.provider === SESSION_PROVIDER) return identity.sub
   const find = () =>
@@ -205,34 +241,55 @@ export async function accountOf(
       .first<{ account_id: string }>()
   const found = await find()
   const at = now.toISOString()
+  const email = identity.email.toLowerCase()
   if (found) {
     if (create) {
       await db
         .prepare(
           'UPDATE account_identities SET email = ?, last_seen_at = ? WHERE provider = ? AND sub = ?'
         )
-        .bind(identity.email.toLowerCase(), at, identity.provider, identity.sub)
+        .bind(email, at, identity.provider, identity.sub)
         .run()
+      // (a changed address is added to the account unless another has it: nothing is merged here)
+      if (claim) await claimAddress(db, found.account_id, email, now)
     }
     return found.account_id
   }
   if (!create) return null
-  const made = newAccountId()
-  await db.batch([
-    db.prepare('INSERT INTO accounts (account_id, created_at) VALUES (?, ?)').bind(made, at),
+  const insertLogin = (accountId: string) =>
     db
       .prepare(
         `INSERT OR IGNORE INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at)
           VALUES (?, ?, ?, ?, ?, ?)`
       )
-      .bind(identity.provider, identity.sub, made, identity.email.toLowerCase(), at, at),
+      .bind(identity.provider, identity.sub, accountId, email, at, at)
+  const owner = claim ? await ownerOfAddress(db, email) : null
+  if (owner) {
+    await insertLogin(owner).run()
+    return ((await find()) as { account_id: string }).account_id
+  }
+  const made = newAccountId()
+  await db.batch([
+    db.prepare('INSERT INTO accounts (account_id, created_at) VALUES (?, ?)').bind(made, at),
+    insertLogin(made),
   ])
   const winner = ((await find()) as { account_id: string }).account_id
   // (two requests made the login's account at once: the one that lost leaves no orphan)
   if (winner !== made) {
     await db.prepare('DELETE FROM accounts WHERE account_id = ?').bind(made).run()
+    return winner
   }
-  return winner
+  if (!claim) return made
+  // (the address is claimed after the account is made: if a login of another account got it first, in that
+  // moment, this brand new account has nothing else yet, so its login moves to the account that has it)
+  const holder = await claimAddress(db, made, email, now)
+  if (holder === made) return made
+  await db
+    .prepare('UPDATE account_identities SET account_id = ? WHERE provider = ? AND sub = ?')
+    .bind(holder, identity.provider, identity.sub)
+    .run()
+  await db.prepare('DELETE FROM accounts WHERE account_id = ?').bind(made).run()
+  return holder
 }
 
 /** A team space the signed-in person is in, as they are told of it on a device that does not have it yet */

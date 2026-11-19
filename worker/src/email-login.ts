@@ -194,33 +194,14 @@ export function handleEmailStart(
   })
 }
 
-/** The account of a proved address: its own login's, or the Google login's of the same address, or a new one */
+/** The account of a proved address: the one that owns it, else a new one that now does (`accountOf`) */
 export async function accountOfMailbox(db: D1Db, address: string, now: Date): Promise<string> {
-  const own = await accountOf(db, { provider: EMAIL_PROVIDER, sub: address, email: address }, false)
-  if (own) return own
-  const google = await db
-    .prepare(
-      "SELECT account_id FROM account_identities WHERE provider = 'google' AND email = ? ORDER BY created_at LIMIT 1"
-    )
-    .bind(address)
-    .first<{ account_id: string }>()
-  if (!google) {
-    return (await accountOf(
-      db,
-      { provider: EMAIL_PROVIDER, sub: address, email: address },
-      true,
-      now
-    )) as string
-  }
-  const at = now.toISOString()
-  await db
-    .prepare(
-      `INSERT OR IGNORE INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at)
-        VALUES (?, ?, ?, ?, ?, ?)`
-    )
-    .bind(EMAIL_PROVIDER, address, google.account_id, address, at, at)
-    .run()
-  return google.account_id
+  return (await accountOf(
+    db,
+    { provider: EMAIL_PROVIDER, sub: address, email: address },
+    true,
+    now
+  )) as string
 }
 
 /**
