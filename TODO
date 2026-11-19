@@ -258,6 +258,8 @@ ccli import
   ("fairly empty to start", "May also be in E")
 
 sharing
+- share a setlist with the Team, not only anonymously: the share button's modal should offer a link for the
+  team (members sign in) as well as the anonymous link
 - share links: built (docs/SHARING.md): create/update/stop from a share button in the overview header (a modal with the link and QR code),
   QR code, sync keeps them current and ends them, /s/<id> opens one read-only and offline.
   Tried on several devices, with no account and offline (2026-10-16). Not tried against a
@@ -305,3 +307,19 @@ library
 - The info icon is an i-in-a-circle inside a second circle. Want one circle only: either just an `i` inside our current border circle, or the icon without the border.
 - Shared with me (docs/SHARING.md, "Shared with me"): built the database, the home page group, and tidying (expiry, and dropping a setlist once the user has it in a space). Search across all databases (library page and add-song modal, tagged "From …") and "Add to my library" (a copy into the current space) are built. Still to do: deleting received songs by hand; warnings on space delete/Reset from Drive. Links are shorter (128-bit key + 6-character setlist code that sends space members straight to their own setlist).
 - server-sent invite emails: decided against for now (docs/SPACES.md, "Invites are for an email address"); the share sheet / WhatsApp / Gmail buttons cover it. Revisit if links get lost, after rate limits
+
+song screen and import (raised 2026-11-19)
+- song info: show only the last 3 times we played the song, not all of them
+- per-Team setting: an email address for the media team; the setlist's "Song List" option is replaced by
+  emailing the song list to it
+- the song's edit drop down: replace "Reset" with "Reset lyrics only", "Reset chords only" and "Reset both".
+  Maybe a fourth, lead sheet, later (undecided: the icon's quick access is liked; only if the header
+  needs the room). Split the drop down visually into three groups: key / tuning / capo / tempo, then
+  display options, then pads at the bottom. Hide the pads group when media play is not enabled
+- dyslexia colours: choose them separately for chords and for annotations. Move the colour choice behind a
+  modal so both can reuse it
+- annotations: only one on a whole song. Once there is one, hide its + button (they edit that one)
+- importing a song into a setlist: "Add to setlist" should let the user choose the key to add it in,
+  instead of always the original key
+- importing an export: show a confirmation screen first, where each song, setlist, pad set and preference
+  can be selected or deselected before anything is imported
