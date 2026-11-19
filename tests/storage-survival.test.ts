@@ -108,6 +108,12 @@ describe('checking what a launch kept', () => {
     expect(report.launches).to.equal(1)
   })
 
+  it('says a store is unavailable where the browser has none', async () => {
+    const report = await launch({ storage: null })
+    expect(report.localStorage).to.equal('unavailable')
+    expect(report.indexedDb).to.equal('new')
+  })
+
   it('reports what the browser says of persistence, the service worker and the caches', async () => {
     const report = await launch({ persisted: async () => null, cacheCount: async () => null })
     expect(report.persisted).to.equal(null)
