@@ -1378,6 +1378,7 @@ describe('the account', () => {
         { email: 'ann@gmail.example', provider: 'google' },
       ],
       googleEmail: 'ann@gmail.example',
+      drive: null,
     })
   })
 

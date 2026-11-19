@@ -2,6 +2,7 @@
  * The signed-in person's own account (docs/ACCOUNT.md, "The account"): the name they gave, and every address they sign in
  * with. `GET /api/account` says them; `PUT /api/account {name}` sets the name. Both need a Chordless session.
  */
+import { type DriveInfo, driveInfo } from './account-drive.ts'
 import type { Env } from './env.ts'
 import { jsonResponse, Refusal, readJson, refusing } from './http.ts'
 import { authenticate, SESSION_PROVIDER, sessionProvider } from './identity.ts'
@@ -18,6 +19,8 @@ export interface AccountInfo {
   emails: { email: string; provider: string }[]
   /** The address of the Google account joined to this account, if one is: what syncs their Personal space */
   googleEmail: string | null
+  /** The Google Drive the account syncs its Personal space with (any device that signs in uses it), or null if none */
+  drive: DriveInfo | null
 }
 
 async function whoIs(request: Request, env: Env): Promise<string> {
@@ -55,6 +58,7 @@ export async function accountInfo(env: Env, accountId: string): Promise<AccountI
       provider: email === googleEmail ? 'google' : 'email',
     })),
     googleEmail,
+    drive: await driveInfo(db, accountId),
   }
 }
 

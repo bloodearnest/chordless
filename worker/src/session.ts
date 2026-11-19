@@ -6,6 +6,7 @@
  */
 
 import { cleanName } from './account.ts'
+import { grantsDrive, keepDrive } from './account-drive.ts'
 import { type BlobData, decryptBlob, encryptBlob, UnreadableBlob } from './blob.ts'
 import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
@@ -94,10 +95,13 @@ async function startSession(
   who: { sub: string; email: string; verified: boolean; name?: string },
   now: Date,
   linkTo?: string
-): Promise<SessionTokens | undefined> {
+): Promise<{ session: SessionTokens; accountId: string } | undefined> {
   if (!env.DB || !env.SESSION_SIGNING_KEY) return undefined
   const accountId = await accountOfGoogle(env.DB, who, linkTo, now)
-  return issueSession(env.DB, env, { accountId, email: who.email }, now)
+  return {
+    session: await issueSession(env.DB, env, { accountId, email: who.email }, now),
+    accountId,
+  }
 }
 
 /** A text field of a request's body, or undefined if it is missing, empty or not text */
@@ -211,7 +215,7 @@ export function handleOAuthCallback(
       sub: payload.sub || null,
     }
 
-    const session = await startSession(
+    const started = await startSession(
       env,
       {
         sub: sub as string,
@@ -222,7 +226,18 @@ export function handleOAuthCallback(
       now,
       await bearerAccount(request, env, now)
     )
+    const session = started?.session
     annotateRequest({ 'chordless.auth.session_result': session ? 'issued' : 'unavailable' })
+    // A sign-in with Drive is the account's Drive connection, kept here for every device it signs in on
+    if (started && env.DB && grantsDrive(scope)) {
+      await keepDrive(
+        env.DB,
+        started.accountId,
+        { blob, email: email ?? '', scope: scope ?? '' },
+        now
+      )
+      annotateRequest({ 'chordless.auth.drive_result': 'connected' })
+    }
 
     return jsonResponse({
       blob,
@@ -374,13 +389,13 @@ export function handleSessionUpgrade(
   return refusing(async () => {
     const blobData = await openBlob(await readJson(request), env)
     sessionsOf(env)
-    const session = await startSession(
+    const started = await startSession(
       env,
       { sub: blobData.owner_sub as string, email: blobData.owner_email as string, verified: false },
       now
     )
     annotateRequest({ 'chordless.auth.session_result': 'upgraded' })
-    return jsonResponse(session)
+    return jsonResponse(started?.session)
   })
 }
 
