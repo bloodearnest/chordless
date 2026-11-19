@@ -554,6 +554,16 @@ describe('the join page', () => {
     expect(requested).to.not.include('POST /api/spaces/join')
   })
 
+  it('reminds an admin invite is for its address when the join is refused', async () => {
+    inviteFor({ role: 'admin', email: 'bea@example.com' })
+    routes['POST /api/spaces/join'] = () => Response.json({ error: 'busy' }, { status: 500 })
+    await open()
+    await until(() => text().includes('Join the team space'), 'the offer')
+    button('Join the team space').click()
+    await until(() => text().includes("Couldn't join"), 'the failure')
+    expect(text()).to.contain('can only be used with the address it was sent to: bea@example.com')
+  })
+
   it('lets someone join an admin invite with the address it was sent to', async () => {
     inviteFor({ role: 'admin', email: 'BEA@Example.com' })
     await open()
