@@ -1,6 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import type { TeamRole } from '../js/team-roles.ts'
 import { inviteMessage, inviteSendLinks } from '../js/team-spaces.ts'
+import { t } from '../js/text.ts'
 import { buttonStyles } from './shared-styles.ts'
 
 /**
@@ -41,12 +42,12 @@ export class InviteSend extends LitElement {
   override render() {
     if (!this.url) return nothing
     if (typeof navigator.share === 'function') {
-      return html`<button class="btn" @click=${this._share}>Send…</button>`
+      return html`<button class="btn" @click=${this._share}>${t('invite-send')}</button>`
     }
     const { whatsapp, gmail } = inviteSendLinks(this.teamName, this.role, this.email, this.url)
     return html`
-      <a class="btn" href=${whatsapp} target="_blank" rel="noopener">WhatsApp</a>
-      <a class="btn" href=${gmail} target="_blank" rel="noopener">Email (Gmail)</a>
+      <a class="btn" href=${whatsapp} target="_blank" rel="noopener">${t('share-whatsapp')}</a>
+      <a class="btn" href=${gmail} target="_blank" rel="noopener">${t('share-gmail')}</a>
     `
   }
 }

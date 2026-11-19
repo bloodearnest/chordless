@@ -2049,4 +2049,91 @@ section-melody-shown = Showing the melody
 section-melody-has = The lead sheet has the melody for this part
 section-expand = Expand section
 section-collapse = Collapse section
+
+
+## Sharing a setlist (a link, or the list of its songs), and what is sent with them
+
+# { $title } is the setlist's name and date.
+share-subject = Setlist: { $title }
+share-message = Chordless setlist: { $title }. It opens in your browser, no login needed.
+# { $url } is where the app is.
+share-signature = Sent from Chordless: { $url }
+share-heading = Share this setlist
+share-mode-link = Link / QR
+share-mode-list = Song list
+share-list-text = The details and songs as text, with CCLI numbers, to paste into a message.
+share-list-label = Song list
+share-list-copy = Copy song list
+share-list-email = Email song list
+# <account> is a link to the Account and Teams page.
+share-sign-in = Sign in with Google on the <account>Account and Teams page</account> to share this setlist by link.
+share-link-text = Make a link to this setlist for people outside your Chordless space, whether or not they use Chordless.
+share-link-point-1 = They need no account or install, and can keep it on their phone.
+share-link-point-2 = They can read it, but not change it.
+share-link-point-3 = It updates when you change the setlist, and ends two weeks after its date.
+share-link-point-4 = Anyone with the link can open it. You can stop sharing at any time.
+share-create = Create share link
+share-making = Making link…
+share-link-label = Share link
+share-copy-link = Copy link
+share-to = Share to…
+share-whatsapp = WhatsApp
+share-gmail = Email (Gmail)
+share-qr = QR code for the share link
+# { $date } is the day after which the link stops working.
+share-ends = Ends after { $date }. It updates by itself when you sync; "Update now" does it straight away.
+share-update = Update now
+share-working = Working…
+
+# The first lines of the song list a person pastes into a message.
+songlist-heading = Songs for { $date }
+songlist-leader = Worship Leader: { $leader }
+
+# What is said with an invitation to a Team, by the share sheet, WhatsApp or email.
+invite-send = Send…
+invite-subject = Join { $team } on Chordless
+# { $team } is the Team, { $role } the role with its article ("a worship leader").
+invite-message-intro = You are invited to join { $team } on Chordless as { $role }.
+# For an address that is a Gmail address: it is the account to use.
+invite-message-gmail = Sign in with the Google account { $email }; the link works once, for a week.
+invite-message-any = Open the link and sign in with any Google account you use: it does not have to be { $email }. If you have none, the page shows how to make one. The link works once, for a week.
+# For an admin, whose invite only works with its address: { $guide } is the page that shows how to make a Google account with it.
+invite-message-admin =
+    Before you open the link, { $email } must be a Google account, so if it is not one yet, make it one first (you need no Gmail). The steps, with pictures:
+    { $guide }
+
+    Then sign in with the Google account { $email }; the link works once, for a week.
+
+
+## Contact, and the usage reports
+
+contact-tell-heading = Tell us
+# { $address } is the address the email goes to.
+contact-tell-text = A problem, a song that does not look right, or an idea. This starts an email to { $address }, which you send yourself: Chordless keeps no messages.
+contact-message = Your message
+contact-details-heading = What goes with it
+contact-details-text = So we do not have to ask. It is added under your message, and says nothing about your songs.
+contact-write = Write the email
+contact-copy = Copy the details
+
+usage-toggle = Send anonymous usage reports from this device
+# <code> is the number. { $id } is the support ID.
+usage-support-id = Support ID: <code>{ $id }</code>
+usage-reset = Reset
+# <contact> is a link to the Contact page.
+usage-text = If you ask for help, this is how your reports are found. Reset makes a new one. <contact>Contact us</contact> adds it for you.
+
+
+## Uploading a set of pad sounds
+
+padup-name = Pad set name
+padup-name-example = e.g. Warm Pads - Churchfront
+padup-save-to = Save to
+padup-team = Everyone in the team can use it
+padup-file = Zip file of the pads
+# { $name } is the file chosen.
+padup-selected = Selected: { $name }
+padup-uploading-label = Uploading pad set
+padup-uploading = Uploading…
+padup-upload = Upload pad set
 `

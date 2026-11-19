@@ -4,7 +4,9 @@ import {
   setTelemetryPreference,
   TelemetryPreferenceEvent,
 } from '../js/preferences.ts'
+import { rich } from '../js/rich-text.ts'
 import { resetDeviceId, supportId } from '../js/telemetry/ids.ts'
+import { t } from '../js/text.ts'
 
 /**
  * The switch for the anonymous usage reports (docs/OBSERVABILITY.md), and the support id that finds a
@@ -110,20 +112,19 @@ export class UsageReportsSetting extends LitElement {
           ?checked=${this.telemetry}
           @change=${this._onTelemetryToggle}
         />
-        <span>Send anonymous usage reports from this device</span>
+        <span>${t('usage-toggle')}</span>
       </label>
       ${
         this.supportId
           ? html`<p class="support-id">
-              Support ID: <code id="support-id">${this.supportId}</code>
-              <button type="button" id="copy-support-id" @click=${this._copySupportId}>Copy</button>
+              ${rich('usage-support-id', { id: this.supportId }, { code: words => html`<code id="support-id">${words}</code>` })}
+              <button type="button" id="copy-support-id" @click=${this._copySupportId}>${t('storage-copy')}</button>
               <button type="button" id="reset-support-id" @click=${this._resetSupportId}>
-                Reset
+                ${t('usage-reset')}
               </button>
             </p>
             <p>
-              If you ask for help, this is how your reports are found. Reset makes a new one.
-              <a href="/contact">Contact us</a> adds it for you.
+              ${rich('usage-text', undefined, { contact: words => html`<a href="/contact">${words}</a>` })}
             </p>`
           : ''
       }

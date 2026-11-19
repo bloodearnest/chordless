@@ -5,6 +5,7 @@
  */
 
 import { isCcliNumber, songSelectLink } from '../songselect-link.ts'
+import { t } from '../text.ts'
 import { parseLocalDate } from '../utils/date-utils.ts'
 
 /** The setlist details that head the text */
@@ -45,8 +46,8 @@ export function ccliOf(song: ListedSong): string {
 /** The heading lines: "Songs for <date>" and the leader */
 export function setlistHeadingLines(setlist: ListedSetlist): string[] {
   const lines: string[] = []
-  if (setlist.date) lines.push(`Songs for ${ukDate(setlist.date)}`)
-  if (setlist.leader) lines.push(`Worship Leader: ${setlist.leader}`)
+  if (setlist.date) lines.push(t('songlist-heading', { date: ukDate(setlist.date) }))
+  if (setlist.leader) lines.push(t('songlist-leader', { leader: setlist.leader }))
   return lines
 }
 

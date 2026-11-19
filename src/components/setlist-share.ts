@@ -3,6 +3,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import qrcode from 'qrcode-generator'
 import type { Setlist } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
+import { rich } from '../js/rich-text.ts'
 import { type ListedSong, songListHtml, songListText } from '../js/setlist/song-list-text.ts'
 import { shareUrl } from '../js/share-crypto.ts'
 import { createShare, refreshShare, stopShare } from '../js/share-manager.ts'
@@ -332,7 +333,7 @@ export class SetlistShare extends LitElement {
       { date: setlist.date, leader: this.leader },
       { title: false, links: true }
     )
-    return `${list}\n\n--\nSent from Chordless: ${APP_URL}\n`
+    return `${list}\n\n--\n${t('share-signature', { url: APP_URL })}\n`
   }
 
   /**
@@ -383,7 +384,7 @@ export class SetlistShare extends LitElement {
   get _message() {
     const setlist = this.setlist
     if (!setlist?.share) return ''
-    return `Chordless setlist: ${setlistTitle(setlist)}. It opens in your browser, no login needed.`
+    return t('share-message', { title: setlistTitle(setlist) })
   }
 
   /** Where to send people when there is no share sheet (Chrome on Linux has none) */
@@ -393,7 +394,7 @@ export class SetlistShare extends LitElement {
 
   /** Gmail's compose window: a mailto: link does nothing on a desktop with no mail app set up */
   get _gmail() {
-    const subject = `Setlist: ${this.setlist ? setlistTitle(this.setlist) : ''}`
+    const subject = t('share-subject', { title: this.setlist ? setlistTitle(this.setlist) : '' })
     const body = `${this._message}\n\n${this._url}\n`
     return `https://mail.google.com/mail/?view=cm&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
   }
@@ -402,7 +403,7 @@ export class SetlistShare extends LitElement {
   async _send() {
     try {
       await navigator.share({
-        title: `Setlist: ${this.setlist ? setlistTitle(this.setlist) : ''}`,
+        title: t('share-subject', { title: this.setlist ? setlistTitle(this.setlist) : '' }),
         text: this._message,
         url: this._url,
       })
@@ -422,7 +423,7 @@ export class SetlistShare extends LitElement {
     const setlist = this.setlist
     if (!setlist) return nothing
     return html`
-      <app-modal ${ref(this._dialog)} size="large" heading="Share this setlist">
+      <app-modal ${ref(this._dialog)} size="large" heading=${t('share-heading')}>
         ${this.linkable ? this._renderModes() : nothing}
         <div class="panels">
           ${
@@ -462,7 +463,7 @@ export class SetlistShare extends LitElement {
       >${label}</button>
     `
     return html`<div class="modes" style="padding: 1rem 1rem 0">
-      ${button('link', 'Link / QR')} ${button('list', 'Song list')}
+      ${button('link', t('share-mode-link'))} ${button('list', t('share-mode-list'))}
     </div>`
   }
 
@@ -470,15 +471,15 @@ export class SetlistShare extends LitElement {
   _renderList(setlist: Setlist) {
     return html`
       <section>
-        <p>The details and songs as text, with CCLI numbers, to paste into a message.</p>
-        <textarea readonly aria-label="Song list" .value=${this._songListText(setlist)}></textarea>
+        <p>${t('share-list-text')}</p>
+        <textarea readonly aria-label=${t('share-list-label')} .value=${this._songListText(setlist)}></textarea>
         <div class="actions center">
           <button class="btn primary" id="copy-song-list" @click=${() => this._copyList(setlist)}>
             <app-icon name=${this._copied ? 'check' : 'copy'} size="18"></app-icon>
-            ${this._copied ? 'Copied' : 'Copy song list'}
+            ${this._copied ? t('storage-copied') : t('share-list-copy')}
           </button>
           <a class="btn" id="email-song-list" href=${this._listEmail(setlist)} target="_blank" rel="noopener">
-            Email song list
+            ${t('share-list-email')}
           </a>
         </div>
       </section>
@@ -491,8 +492,7 @@ export class SetlistShare extends LitElement {
       return html`
         <section>
           <p class="note">
-            Sign in with Google on the <a href="/account">Account and Teams page</a> to share this setlist by
-            link.
+            ${rich('share-sign-in', undefined, { account: words => html`<a href="/account">${words}</a>` })}
           </p>
         </section>
       `
@@ -507,19 +507,16 @@ export class SetlistShare extends LitElement {
 
   _renderNotShared() {
     return html`
-      <p>
-        Make a link to this setlist for people outside your Chordless space, whether or not
-        they use Chordless.
-      </p>
+      <p>${t('share-link-text')}</p>
       <ul>
-        <li>They need no account or install, and can keep it on their phone.</li>
-        <li>They can read it, but not change it.</li>
-        <li>It updates when you change the setlist, and ends two weeks after its date.</li>
-        <li>Anyone with the link can open it. You can stop sharing at any time.</li>
+        <li>${t('share-link-point-1')}</li>
+        <li>${t('share-link-point-2')}</li>
+        <li>${t('share-link-point-3')}</li>
+        <li>${t('share-link-point-4')}</li>
       </ul>
       <div class="actions center">
         <button class="btn primary" ?disabled=${this._busy} @click=${this._create}>
-          ${this._busy ? 'Making link…' : 'Create share link'}
+          ${this._busy ? t('share-making') : t('share-create')}
         </button>
       </div>
     `
@@ -528,31 +525,30 @@ export class SetlistShare extends LitElement {
   _renderShared(expires: string) {
     return html`
       <div class="link">
-        <input readonly aria-label="Share link" .value=${this._url} @focus=${(e: FocusEvent) => (e.target as HTMLInputElement).select()} />
-        <button class="btn icon-button" aria-label="Copy link" @click=${this._copy}>
+        <input readonly aria-label=${t('share-link-label')} .value=${this._url} @focus=${(e: FocusEvent) => (e.target as HTMLInputElement).select()} />
+        <button class="btn icon-button" aria-label=${t('share-copy-link')} @click=${this._copy}>
           <app-icon name=${this._copied ? 'check' : 'copy'} size="20"></app-icon>
         </button>
       </div>
       <div class="actions center">
         ${
           typeof navigator.share === 'function'
-            ? html`<button class="btn primary" id="share-to" @click=${this._send}>Share to…</button>`
+            ? html`<button class="btn primary" id="share-to" @click=${this._send}>${t('share-to')}</button>`
             : html`
-              <a class="btn primary" id="share-whatsapp" href=${this._whatsapp} target="_blank" rel="noopener">WhatsApp</a>
-              <a class="btn" id="share-gmail" href=${this._gmail} target="_blank" rel="noopener">Email (Gmail)</a>
+              <a class="btn primary" id="share-whatsapp" href=${this._whatsapp} target="_blank" rel="noopener">${t('share-whatsapp')}</a>
+              <a class="btn" id="share-gmail" href=${this._gmail} target="_blank" rel="noopener">${t('share-gmail')}</a>
             `
         }
       </div>
-      <img src=${qrDataUrl(this._url)} alt="QR code for the share link" />
+      <img src=${qrDataUrl(this._url)} alt=${t('share-qr')} />
       <p class="note">
-        Ends after ${formatSetlistDate(expires, 'long')}. It updates by itself when you sync; "Update
-        now" does it straight away.
+        ${t('share-ends', { date: formatSetlistDate(expires, 'long') })}
       </p>
       <div class="actions center">
         <button class="btn" ?disabled=${this._busy} @click=${this._update}>
-          ${this._busy ? 'Working…' : 'Update now'}
+          ${this._busy ? t('share-working') : t('share-update')}
         </button>
-        <button class="btn danger" ?disabled=${this._busy} @click=${this._stop}>Stop sharing</button>
+        <button class="btn danger" ?disabled=${this._busy} @click=${this._stop}>${t('confirm-share-stop-button')}</button>
       </div>
     `
   }
