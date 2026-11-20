@@ -115,8 +115,10 @@ Changes reach `main` only through pull requests (`docs/CI.md`): never commit to 
   another agent may be working in the same checkout: inside the repository, in
   `.claude/worktrees/<topic>` (git-ignored; what `claude --worktree` makes), not next to it.
 - Commit as you go, one logical step per commit; keep other people's uncommitted work out of them.
-- Before asking for review: rebase on `origin/main`, run `just ci` (the checks CI runs, on Linux), and
-  `git push --force-with-lease`. Open the pull request with `gh pr create`, ready for review (a draft only for a spike).
+- Before asking for review: run `just ci` (the checks CI runs, on Linux), and push the branch.
+  Stacked PRs target the branch below them; merge from the bottom up without rebasing merely because
+  a lower PR landed. Rebase only when changes or conflicts require it, then rerun checks.
+  Open the pull request with `gh pr create`, ready for review (a draft only for a spike).
 - **Read the result of every check; never throw it away.** Do not send a check's output to `/dev/null`
   or run it and look only at the next one: a suite's failure then goes unseen and reaches CI (a removed
   component left two unused messages, which the node tests catch, and the node tests had been run with
@@ -125,7 +127,7 @@ Changes reach `main` only through pull requests (`docs/CI.md`): never commit to 
   `just coverage-check` after a full run of both, and Playwright. If `just ci` cannot run to the end here
   (the dependency audit needs the network and `node_modules`), run the rest by hand: that is no reason
   to skip any of them. Say a check passes only when its result was seen to; when one was not run, say so.
-- Never merge your own pull request. They are merged with "Rebase and merge": no merge commits.
+- Never merge your own pull request. They are merged with "Create a merge commit": no rebase or squash.
 - At the end of a session, `just wrap-up`: it fast-forwards the primary checkout's `main` to
   `origin/main` and lists the worktrees and branches whose pull request has merged (`--prune`
   removes the clean ones). A session confined to its own worktree cannot touch the primary checkout:
@@ -163,9 +165,8 @@ before moving on:
   see which tests cost more than they catch.
 - Don't log an expected failure (a test written first), or a failure whose cause is not diagnosed
   yet. Breaking the source on purpose to check a test (a mutation check) is not a catch.
-- `fix` is the number of the PR the fix is in (`"#42"`), not a sha: GitHub's "Rebase and merge"
-  gives a PR's commits new shas on `main`. Older entries have shas. Fill in an `uncommitted` entry
-  once the PR is open.
+- `fix` is the number of the PR the fix is in (`"#42"`), not a sha. Older entries have shas from when
+  GitHub's "Rebase and merge" rewrote commits on `main`. Fill in an `uncommitted` entry once the PR is open.
 
 `just test` also records counts, run times and coverage in `docs/stats.jsonl` (one line per commit,
 by `scripts/stats.ts`), so the history of both is in the repo.
