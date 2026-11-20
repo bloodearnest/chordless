@@ -5,7 +5,7 @@ import type { Space } from '../js/data-types.ts'
 import { defaultSpaceOf, setDefaultSpaceId } from '../js/default-space.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { goTo } from '../js/navigation.ts'
-import { getCurrentSpace, listSpaces } from '../js/space.ts'
+import { listSpaces } from '../js/space.ts'
 import { checkTeamMemberships, TeamSpacesAddedEvent } from '../js/team-memberships.ts'
 import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
@@ -37,7 +37,6 @@ import './storage-summary.ts'
 export class AccountPage extends LitElement {
   static override properties = {
     _spaces: { state: true },
-    _currentId: { state: true },
     _defaultId: { state: true },
     _signIn: { state: true },
     _emailOnly: { state: true },
@@ -54,7 +53,6 @@ export class AccountPage extends LitElement {
   /** Whether it is asking which teams the person is in, and what it found */
   declare _looking: boolean
   declare _lookMessage: string
-  declare _currentId: string | null
   /** The default space (docs/SPACES.md, "Presenting spaces") */
   declare _defaultId: string | null
   declare _signIn: SignInState | null
@@ -107,7 +105,6 @@ export class AccountPage extends LitElement {
   constructor() {
     super()
     this._spaces = []
-    this._currentId = null
     this._defaultId = null
     this._signIn = null
     this._emailOnly = false
@@ -267,7 +264,6 @@ export class AccountPage extends LitElement {
   async load(): Promise<void> {
     const spaces = await listSpaces()
     spaces.sort((a, b) => a.createdDate.localeCompare(b.createdDate) || a.id.localeCompare(b.id))
-    this._currentId = getCurrentSpace().id
     this._defaultId = defaultSpaceOf(spaces)?.id ?? null
     this._spaces = spaces
   }
@@ -283,7 +279,6 @@ export class AccountPage extends LitElement {
               .space=${space}
               .signIn=${this._signIn}
               .driveEmail=${this._driveEmail}
-              ?current=${space.id === this._currentId}
               ?isDefault=${space.id === this._defaultId}
               ?several=${this._spaces.length > 1}
             ></space-card>`

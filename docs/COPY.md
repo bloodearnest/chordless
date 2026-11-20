@@ -35,7 +35,7 @@ songs-count = { $count ->
 - **A message is a whole sentence, or the sentences that go together.** Never a fragment that code
   joins to another in the middle of a sentence (the order of words differs between languages, and a
   writer cannot see the whole). Where whole sentences come and go (the question to delete a space has
-  one more sentence when it is the one you are in), one message for each, joined with a space in code;
+  one more sentence when it is a Team the person is a member of), one message for each, joined with a space in code;
   where a clause does (", and its file goes to the Drive trash"), the message in its two forms.
   A number in a sentence, singular or plural, is a selector in the message.
 

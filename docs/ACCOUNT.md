@@ -136,8 +136,8 @@ the sign-in backup (download, import), which were for fixing a sign-in and are n
 ### The spaces
 
 - **Cards** are in the order the spaces were added (the Personal space is always first), whichever is
-  in use. The one in use says **Current**. A card says the kind (Personal, Team) and, for a Team, the
-  person's role, as labels after the name; Current is flush right where it never moves. A personal
+  in use (no card is marked "Current": the app shows every space at once, 2026-11-20). A card says the
+  kind (Personal, Team) and, for a Team, the person's role, as labels after the name. A personal
   space is called "Personal", and stays so (decided 2026-11-18: it was renamed to the person's name at a first sign-in,
   an idea from before Teams; now "Personal" and "Team" say what each is). A Personal space someone's name was given to
   before then keeps it.
@@ -161,9 +161,10 @@ the sign-in backup (download, import), which were for fixing a sign-in and are n
   its licence and storage; the data is apart because it is rarely wanted and has nothing to do with who is in the Team.
   Manage Users It is shown to every member, not only those who manage
   people, because leaving is there and any member can see who is in the Team; the controls inside follow the role.
-- **Switch** (not "Open") is the word. After a confirmation it makes that space the one in use and
-  shows the home page afresh in it, without reloading the app. The tabs that were the main way to
-  switch are gone (2026-11-20, docs/SPACES.md, "Space tabs"): the Setlists and Library pages show every space.
+- **There is no Switch** (removed 2026-11-20): the Setlists and Library pages show every space, and
+  a setlist or song opens in its own space (docs/SPACES.md, "Space tabs"). Creating or joining a Team
+  still makes it the space in use afterwards, because sync follows the space in use until it syncs every
+  space (docs/CENTRAL_STORAGE.md, phase 0).
 - **Signed out disables nothing that works without an account.** The Personal space, export, import
   and deleting from the device all work. Sync is not offered, and **Delete everywhere** is disabled
   (it needs Drive); a card's line says "Sign in to sync".

@@ -4,7 +4,7 @@ import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { loadMediaSettings } from '../js/media-settings.ts'
 import { rich } from '../js/rich-text.ts'
-import { getCurrentSpace, getSpaceById } from '../js/space.ts'
+import { getSpaceById } from '../js/space.ts'
 import { removeSpaceFromDevice } from '../js/space-deletion.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
@@ -87,7 +87,6 @@ export class SpaceManager extends LitElement {
         opacity: 0.85;
       }
       .meta { font-size: var(--font-ui-small); opacity: 0.75; margin: 0; }
-      .badge { font-weight: 600; color: var(--color-primary, #2477ad); font-size: var(--font-ui-small); }
       .danger-zone {
         border-color: color-mix(in srgb, var(--color-danger, #e74c3c) 40%, transparent);
       }
@@ -124,10 +123,6 @@ export class SpaceManager extends LitElement {
     this._summary = space ? await summaryOf(space.id) : null
   }
 
-  get _current(): boolean {
-    return this._space?.id === getCurrentSpace().id
-  }
-
   /** Whether syncing can be done now: a team's member needs only a sign-in, everyone else Drive too */
   get _canSync(): boolean {
     if (this._signIn === 'signed-in') return true
@@ -144,7 +139,6 @@ export class SpaceManager extends LitElement {
     // (a sentence for each thing that is so, and the last one always)
     modal.message = [
       t('confirm-space-delete-message', { space: space.name }),
-      this._current ? t('confirm-space-delete-current') : '',
       isTeamMember(space) ? t('confirm-space-delete-team') : '',
       t('confirm-space-delete-final'),
     ]
@@ -183,7 +177,6 @@ export class SpaceManager extends LitElement {
           ${kind ? html`<span class="chip">${kind}</span>` : nothing}
           ${role ? html`<span class="chip">${role}</span>` : nothing}
           <span class="spacer"></span>
-          ${this._current ? html`<span class="badge">${t('space-current')}</span>` : nothing}
         </div>
         ${
           summary
@@ -233,7 +226,6 @@ export class SpaceManager extends LitElement {
           <h3>${t('space-delete-heading')}</h3>
           <p>
             ${t(space.team ? 'space-delete-text-team' : 'space-delete-text')}
-            ${this._current ? t('space-delete-current') : ''}
           </p>
           <button class="btn danger" id="delete" @click=${this._delete}>${t('space-delete-button')}</button>
           ${this._error ? html`<p class="error" role="alert">${t('space-delete-failed', { reason: this._error })}</p>` : nothing}

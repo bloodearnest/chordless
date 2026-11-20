@@ -321,7 +321,7 @@ test.describe('Account and Teams page', () => {
   }) => {
     await seedSong(page, { setlistId: 'summary-setlist' })
     await page.goto('/account')
-    const card = page.locator('space-card').filter({ hasText: 'Current' })
+    const card = page.locator('space-card').first()
     await expect(card).toContainText('1 song')
     await expect(card).toContainText('1 setlist')
     await expect(card).toContainText('about')
@@ -409,7 +409,6 @@ test.describe('Account and Teams page', () => {
     await data.getByRole('button', { name: 'Delete…' }).click()
     await confirm.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(page.locator('space-card')).toHaveCount(1)
-    await expect(page.locator('space-card')).toContainText('Current')
   })
 })
 

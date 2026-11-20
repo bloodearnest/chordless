@@ -78,7 +78,6 @@ export class SpaceManageEvent extends Event {
 export class SpaceCard extends LitElement {
   static override properties = {
     space: { attribute: false },
-    current: { type: Boolean },
     isDefault: { type: Boolean },
     several: { type: Boolean },
     signIn: { attribute: false },
@@ -92,7 +91,6 @@ export class SpaceCard extends LitElement {
 
   declare space: Space
   /** Whether this is the space in use */
-  declare current: boolean
   /** Whether this is the default space, which is the first tab and where imports from outside go */
   declare isDefault: boolean
   /** Whether the device has more than one space: with one there is no default to choose */
@@ -124,9 +122,6 @@ export class SpaceCard extends LitElement {
         gap: 0.5rem;
         color: var(--text-color, #1a1a1a);
       }
-      .card.current {
-        border-color: var(--color-primary, #2477ad);
-      }
       .head {
         display: flex;
         align-items: center;
@@ -141,22 +136,14 @@ export class SpaceCard extends LitElement {
         border-radius: 999px;
         opacity: 0.85;
       }
-      .badge {
-        margin-left: auto;
-        font-size: var(--font-ui-small);
-        font-weight: 600;
-        color: var(--color-primary, #2477ad);
-      }
       .line { font-size: var(--font-ui-small); opacity: 0.8; margin: 0; }
       .line.error { color: var(--color-danger, #e74c3c); opacity: 1; }
       .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
-      .switch { margin-left: auto; }
     `,
   ]
 
   constructor() {
     super()
-    this.current = false
     this.signIn = null
     this.driveEmail = null
     this._summary = null
@@ -263,13 +250,12 @@ export class SpaceCard extends LitElement {
     const role = spaceRole(space)
     const summary = this._summary
     return html`
-      <div class="card ${this.current ? 'current' : ''}">
+      <div class="card">
         <div class="head">
           <span class="title">${space.name}</span>
           ${kind ? html`<span class="chip">${kind}</span>` : nothing}
           ${role ? html`<span class="chip">${role}</span>` : nothing}
           ${this.several && this.isDefault ? html`<span class="chip default">${t('space-default')}</span>` : nothing}
-          ${this.current ? html`<span class="badge">${t('space-current')}</span>` : nothing}
         </div>
         <p class="line">
           ${

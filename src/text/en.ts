@@ -333,7 +333,6 @@ confirm-space-delete-button = Delete
 # next two when they are so, then the last. { $space } is the space.
 confirm-space-delete-message = Delete "{ $space }" from this device? Its songs and setlists here are deleted, and anything not yet synced to Google Drive is lost. Its folder in Google Drive is not touched.
 # (when it is the space the person is in)
-confirm-space-delete-current = It is the one you are in: you will be taken to another.
 # (when it is a Team the person is a member of)
 confirm-space-delete-team = You stay in the Team: to get it back on this device, ask for a new invite link.
 confirm-space-delete-final = This can't be undone.
@@ -616,7 +615,6 @@ space-kind-team = Team
 space-kind-personal = Personal
 space-role-view-only = View only
 space-default = Default
-space-current = Current
 # { $licence } is the CCLI licence number of the Team.
 space-ccli = CCLI licence { $licence }
 
@@ -2190,5 +2188,4 @@ google-sign-in-expired = Chordless's access to your Google Drive has expired. Re
 picker-offline = Couldn't load Google's folder picker. Are you offline?
 picker-team-title = Choose where to keep the Team's songs
 setlist-not-found = That setlist is not on this device.
-space-delete-current = It is the one you are in, so you will be taken to another.
 `
