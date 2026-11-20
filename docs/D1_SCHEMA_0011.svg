@@ -1,0 +1,358 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1820" height="1485" viewBox="0 0 1820 1485" font-family="Helvetica, Arial, sans-serif"><rect width="1820" height="1485" fill="#fafbfc"/>
+<text x="170" y="34" font-size="21" font-weight="700" fill="#1b2733">Chordless D1 schema after 0011_schema_cleanup.sql: columns, foreign keys, indexes and checks</text>
+<text x="170" y="52" font-size="12" fill="#5d6b78">Generated from the migrated database. Every table is STRICT; “WITHOUT ROWID” where marked. ? = nullable. → is a foreign key, with its ON DELETE rule.</text>
+<path d="M170,695.5 C106,695.5 106,120.5 170,120.5" fill="none" stroke="#2e8b57" stroke-width="1.5" opacity="0.85"/>
+<circle cx="170" cy="120.5" r="3.2" fill="#2e8b57"/>
+<text x="110" y="405.0" font-size="9.5" fill="#2e8b57" text-anchor="middle" paint-order="stroke" stroke="#fafbfc" stroke-width="3">cascade</text>
+<path d="M170,507.5 C90,507.5 90,120.5 170,120.5" fill="none" stroke="#2e8b57" stroke-width="1.5" opacity="0.85"/>
+<circle cx="170" cy="120.5" r="3.2" fill="#2e8b57"/>
+<text x="94" y="311.0" font-size="9.5" fill="#2e8b57" text-anchor="middle" paint-order="stroke" stroke="#fafbfc" stroke-width="3">cascade</text>
+<path d="M170,285.5 C74,285.5 74,120.5 170,120.5" fill="none" stroke="#2e8b57" stroke-width="1.5" opacity="0.85"/>
+<circle cx="170" cy="120.5" r="3.2" fill="#2e8b57"/>
+<text x="78" y="200.0" font-size="9.5" fill="#2e8b57" text-anchor="middle" paint-order="stroke" stroke="#fafbfc" stroke-width="3">cascade</text>
+<path d="M170,894.5 C58,894.5 58,120.5 170,120.5" fill="none" stroke="#2e8b57" stroke-width="1.5" opacity="0.85"/>
+<circle cx="170" cy="120.5" r="3.2" fill="#2e8b57"/>
+<text x="62" y="504.5" font-size="9.5" fill="#2e8b57" text-anchor="middle" paint-order="stroke" stroke="#fafbfc" stroke-width="3">cascade</text>
+<path d="M1250,234.5 C1210.0,234.5 1210.0,120.5 1170,120.5" fill="none" stroke="#2e8b57" stroke-width="1.5" opacity="0.85"/>
+<circle cx="1170" cy="120.5" r="3.2" fill="#2e8b57"/>
+<text x="1210.0" y="174.5" font-size="9.5" fill="#2e8b57" text-anchor="middle" paint-order="stroke" stroke="#fafbfc" stroke-width="3">cascade</text>
+<path d="M1250,365.5 C1210.0,365.5 1210.0,120.5 1170,120.5" fill="none" stroke="#2e8b57" stroke-width="1.5" opacity="0.85"/>
+<circle cx="1170" cy="120.5" r="3.2" fill="#2e8b57"/>
+<text x="1210.0" y="240.0" font-size="9.5" fill="#2e8b57" text-anchor="middle" paint-order="stroke" stroke="#fafbfc" stroke-width="3">cascade</text>
+<path d="M700,836.5 C636,836.5 636,120.5 700,120.5" fill="none" stroke="#2e8b57" stroke-width="1.5" opacity="0.85"/>
+<circle cx="700" cy="120.5" r="3.2" fill="#2e8b57"/>
+<text x="640" y="475.5" font-size="9.5" fill="#2e8b57" text-anchor="middle" paint-order="stroke" stroke="#fafbfc" stroke-width="3">cascade</text>
+<path d="M700,597.5 C670.0,597.5 670.0,120.5 640,120.5" fill="none" stroke="#2e8b57" stroke-width="1.5" opacity="0.85"/>
+<circle cx="640" cy="120.5" r="3.2" fill="#2e8b57"/>
+<text x="670.0" y="356.0" font-size="9.5" fill="#2e8b57" text-anchor="middle" paint-order="stroke" stroke="#fafbfc" stroke-width="3">cascade</text>
+<path d="M700,580.5 C620,580.5 620,120.5 700,120.5" fill="none" stroke="#2e8b57" stroke-width="1.5" opacity="0.85"/>
+<circle cx="700" cy="120.5" r="3.2" fill="#2e8b57"/>
+<text x="624" y="347.5" font-size="9.5" fill="#2e8b57" text-anchor="middle" paint-order="stroke" stroke="#fafbfc" stroke-width="3">cascade</text>
+<path d="M1250,120.5 C1210.0,120.5 1210.0,120.5 1170,120.5" fill="none" stroke="#2e8b57" stroke-width="1.5" opacity="0.85"/>
+<circle cx="1170" cy="120.5" r="3.2" fill="#2e8b57"/>
+<text x="1210.0" y="117.5" font-size="9.5" fill="#2e8b57" text-anchor="middle" paint-order="stroke" stroke="#fafbfc" stroke-width="3">cascade</text>
+<path d="M700,154.5 C670.0,154.5 670.0,120.5 640,120.5" fill="none" stroke="#d98a1c" stroke-width="1.5" opacity="0.85"/>
+<circle cx="640" cy="120.5" r="3.2" fill="#d98a1c"/>
+<text x="670.0" y="134.5" font-size="9.5" fill="#d98a1c" text-anchor="middle" paint-order="stroke" stroke="#fafbfc" stroke-width="3">set null</text>
+<rect x="170" y="659" width="470" height="136" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M170,687 V665 a6,6 0 0 1 6,-6 H634 a6,6 0 0 1 6,6 V687 Z" fill="#5b7083"/>
+<text x="180" y="678" font-size="14" font-weight="700" fill="#fff">account_drive</text>
+<text x="630" y="678" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT · WITHOUT ROWID</text>
+<text x="178" y="700" font-size="9.5" font-weight="700" fill="#3f6fb0">PK FK</text>
+<text x="216" y="700" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">account_id</text>
+<text x="630" y="700" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT → accounts</text>
+<text x="178" y="717" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="717" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">blob</text>
+<text x="630" y="717" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="734" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="734" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">google_email</text>
+<text x="630" y="734" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="751" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="751" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">scope</text>
+<text x="630" y="751" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="768" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="768" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">created_at</text>
+<text x="630" y="768" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="785" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="785" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">updated_at</text>
+<text x="630" y="785" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<rect x="170" y="454" width="470" height="159" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M170,482 V460 a6,6 0 0 1 6,-6 H634 a6,6 0 0 1 6,6 V482 Z" fill="#5b7083"/>
+<text x="180" y="473" font-size="14" font-weight="700" fill="#fff">account_emails</text>
+<text x="630" y="473" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT · WITHOUT ROWID</text>
+<text x="178" y="495" font-size="9.5" font-weight="700" fill="#3f6fb0">PK</text>
+<text x="216" y="495" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">email</text>
+<text x="630" y="495" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="512" font-size="9.5" font-weight="700" fill="#3f6fb0">FK</text>
+<text x="216" y="512" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">account_id</text>
+<text x="630" y="512" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT → accounts</text>
+<text x="178" y="529" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="529" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">created_at</text>
+<text x="630" y="529" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<line x1="178" y1="537" x2="632" y2="537" stroke="#e3e8ed"/>
+<text x="178" y="550" font-size="9.5" font-weight="700" fill="#c0392b">CHECK</text>
+<text x="216" y="567" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#7a2a22">email = lower(email)</text>
+<line x1="178" y1="573" x2="632" y2="573" stroke="#e3e8ed"/>
+<text x="178" y="586" font-size="9.5" font-weight="700" fill="#7e57c2">INDEX</text>
+<text x="216" y="599" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">account_emails_account (account_id)</text>
+<rect x="170" y="215" width="470" height="193" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M170,243 V221 a6,6 0 0 1 6,-6 H634 a6,6 0 0 1 6,6 V243 Z" fill="#5b7083"/>
+<text x="180" y="234" font-size="14" font-weight="700" fill="#fff">account_identities</text>
+<text x="630" y="234" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT · WITHOUT ROWID</text>
+<text x="178" y="256" font-size="9.5" font-weight="700" fill="#3f6fb0">PK</text>
+<text x="216" y="256" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">provider</text>
+<text x="630" y="256" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="273" font-size="9.5" font-weight="700" fill="#3f6fb0">PK</text>
+<text x="216" y="273" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">sub</text>
+<text x="630" y="273" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="290" font-size="9.5" font-weight="700" fill="#3f6fb0">FK</text>
+<text x="216" y="290" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">account_id</text>
+<text x="630" y="290" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT → accounts</text>
+<text x="178" y="307" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="307" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">email</text>
+<text x="630" y="307" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="324" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="324" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">created_at</text>
+<text x="630" y="324" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="341" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="341" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">last_seen_at</text>
+<text x="630" y="341" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<line x1="178" y1="351" x2="632" y2="351" stroke="#e3e8ed"/>
+<text x="178" y="364" font-size="9.5" font-weight="700" fill="#7e57c2">INDEX</text>
+<text x="216" y="377" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">account_identities_account (account_id)</text>
+<text x="216" y="394" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">account_identities_email (email)</text>
+<rect x="170" y="84" width="470" height="85" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M170,112 V90 a6,6 0 0 1 6,-6 H634 a6,6 0 0 1 6,6 V112 Z" fill="#5b7083"/>
+<text x="180" y="103" font-size="14" font-weight="700" fill="#fff">accounts</text>
+<text x="630" y="103" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT · WITHOUT ROWID</text>
+<text x="178" y="125" font-size="9.5" font-weight="700" fill="#3f6fb0">PK</text>
+<text x="216" y="125" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">account_id</text>
+<text x="630" y="125" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="142" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="142" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">name?</text>
+<text x="630" y="142" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="159" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="159" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">created_at</text>
+<text x="630" y="159" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<rect x="170" y="1148" width="470" height="261" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M170,1176 V1154 a6,6 0 0 1 6,-6 H634 a6,6 0 0 1 6,6 V1176 Z" fill="#5b7083"/>
+<text x="180" y="1167" font-size="14" font-weight="700" fill="#fff">login_codes</text>
+<text x="630" y="1167" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT · WITHOUT ROWID</text>
+<text x="178" y="1189" font-size="9.5" font-weight="700" fill="#3f6fb0">PK</text>
+<text x="216" y="1189" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">address_hash</text>
+<text x="630" y="1189" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="1206" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1206" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">code_hash</text>
+<text x="630" y="1206" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="1223" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1223" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">created_at</text>
+<text x="630" y="1223" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="1240" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1240" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">expires_at</text>
+<text x="630" y="1240" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="1257" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1257" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">attempts</text>
+<text x="630" y="1257" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">INTEGER  = 0</text>
+<text x="178" y="1274" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1274" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">window_start</text>
+<text x="630" y="1274" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="1291" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1291" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">sent</text>
+<text x="630" y="1291" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">INTEGER  = 1</text>
+<text x="178" y="1308" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1308" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">link_hash?</text>
+<text x="630" y="1308" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="1325" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1325" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">address?</text>
+<text x="630" y="1325" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="1342" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1342" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">code?</text>
+<text x="630" y="1342" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="1359" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1359" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">next?</text>
+<text x="630" y="1359" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<line x1="178" y1="1369" x2="632" y2="1369" stroke="#e3e8ed"/>
+<text x="178" y="1382" font-size="9.5" font-weight="700" fill="#7e57c2">INDEX</text>
+<text x="216" y="1395" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">login_codes_link (link_hash)</text>
+<text x="178" y="1423" font-size="10" fill="#6b7885" font-style="italic">standalone: no foreign keys</text>
+<rect x="170" y="841" width="470" height="261" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M170,869 V847 a6,6 0 0 1 6,-6 H634 a6,6 0 0 1 6,6 V869 Z" fill="#5b7083"/>
+<text x="180" y="860" font-size="14" font-weight="700" fill="#fff">sessions</text>
+<text x="630" y="860" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT · WITHOUT ROWID</text>
+<text x="178" y="882" font-size="9.5" font-weight="700" fill="#3f6fb0">PK</text>
+<text x="216" y="882" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">session_id</text>
+<text x="630" y="882" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="899" font-size="9.5" font-weight="700" fill="#3f6fb0">FK</text>
+<text x="216" y="899" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">account_id</text>
+<text x="630" y="899" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT → accounts</text>
+<text x="178" y="916" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="916" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">email</text>
+<text x="630" y="916" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="933" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="933" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">token_hash</text>
+<text x="630" y="933" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="950" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="950" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">previous_hash?</text>
+<text x="630" y="950" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="967" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="967" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">rotated_at?</text>
+<text x="630" y="967" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="984" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="984" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">created_at</text>
+<text x="630" y="984" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="1001" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1001" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">last_used_at</text>
+<text x="630" y="1001" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="1018" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1018" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">expires_at</text>
+<text x="630" y="1018" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="178" y="1035" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="216" y="1035" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">revoked_at?</text>
+<text x="630" y="1035" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<line x1="178" y1="1045" x2="632" y2="1045" stroke="#e3e8ed"/>
+<text x="178" y="1058" font-size="9.5" font-weight="700" fill="#7e57c2">INDEX</text>
+<text x="216" y="1071" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">sessions_account (account_id)</text>
+<text x="216" y="1088" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">sessions_expires (expires_at)</text>
+<rect x="1250" y="198" width="470" height="68" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M1250,226 V204 a6,6 0 0 1 6,-6 H1714 a6,6 0 0 1 6,6 V226 Z" fill="#5b7083"/>
+<text x="1260" y="217" font-size="14" font-weight="700" fill="#fff">team_credentials</text>
+<text x="1710" y="217" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT</text>
+<text x="1258" y="239" font-size="9.5" font-weight="700" fill="#3f6fb0">PK FK</text>
+<text x="1296" y="239" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">space_id</text>
+<text x="1710" y="239" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT → teams</text>
+<text x="1258" y="256" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="1296" y="256" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">blob</text>
+<text x="1710" y="256" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<rect x="1250" y="312" width="470" height="176" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M1250,340 V318 a6,6 0 0 1 6,-6 H1714 a6,6 0 0 1 6,6 V340 Z" fill="#5b7083"/>
+<text x="1260" y="331" font-size="14" font-weight="700" fill="#fff">team_events</text>
+<text x="1710" y="331" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT</text>
+<text x="1258" y="353" font-size="9.5" font-weight="700" fill="#3f6fb0">PK</text>
+<text x="1296" y="353" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">id</text>
+<text x="1710" y="353" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">INTEGER</text>
+<text x="1258" y="370" font-size="9.5" font-weight="700" fill="#3f6fb0">FK</text>
+<text x="1296" y="370" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">space_id</text>
+<text x="1710" y="370" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT → teams</text>
+<text x="1258" y="387" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="1296" y="387" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">created_at</text>
+<text x="1710" y="387" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="1258" y="404" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="1296" y="404" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">kind</text>
+<text x="1710" y="404" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="1258" y="421" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="1296" y="421" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">by_email?</text>
+<text x="1710" y="421" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="1258" y="438" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="1296" y="438" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">detail?</text>
+<text x="1710" y="438" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<line x1="1258" y1="448" x2="1712" y2="448" stroke="#e3e8ed"/>
+<text x="1258" y="461" font-size="9.5" font-weight="700" fill="#7e57c2">INDEX</text>
+<text x="1296" y="474" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">team_events_space (space_id, id)</text>
+<rect x="700" y="800" width="470" height="261" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M700,828 V806 a6,6 0 0 1 6,-6 H1164 a6,6 0 0 1 6,6 V828 Z" fill="#5b7083"/>
+<text x="710" y="819" font-size="14" font-weight="700" fill="#fff">team_invites</text>
+<text x="1160" y="819" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT · WITHOUT ROWID</text>
+<text x="708" y="841" font-size="9.5" font-weight="700" fill="#3f6fb0">PK FK</text>
+<text x="746" y="841" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">space_id</text>
+<text x="1160" y="841" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT → teams</text>
+<text x="708" y="858" font-size="9.5" font-weight="700" fill="#3f6fb0">PK</text>
+<text x="746" y="858" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">id</text>
+<text x="1160" y="858" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="875" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="875" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">email</text>
+<text x="1160" y="875" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="892" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="892" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">role</text>
+<text x="1160" y="892" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="909" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="909" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">created_by</text>
+<text x="1160" y="909" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="926" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="926" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">created_at</text>
+<text x="1160" y="926" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="943" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="943" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">expires_at</text>
+<text x="1160" y="943" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="960" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="960" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">emailed_at?</text>
+<text x="1160" y="960" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<line x1="708" y1="968" x2="1162" y2="968" stroke="#e3e8ed"/>
+<text x="708" y="981" font-size="9.5" font-weight="700" fill="#c0392b">CHECK</text>
+<text x="746" y="998" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#7a2a22">email = lower(email)</text>
+<text x="746" y="1015" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#7a2a22">role IN (&#x27;admin&#x27;, &#x27;writer&#x27;, &#x27;reader&#x27;)</text>
+<line x1="708" y1="1021" x2="1162" y2="1021" stroke="#e3e8ed"/>
+<text x="708" y="1034" font-size="9.5" font-weight="700" fill="#7e57c2">INDEX</text>
+<text x="746" y="1047" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">team_invites_email (email, created_at)</text>
+<rect x="700" y="544" width="470" height="210" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M700,572 V550 a6,6 0 0 1 6,-6 H1164 a6,6 0 0 1 6,6 V572 Z" fill="#5b7083"/>
+<text x="710" y="563" font-size="14" font-weight="700" fill="#fff">team_members</text>
+<text x="1160" y="563" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT · WITHOUT ROWID</text>
+<text x="708" y="585" font-size="9.5" font-weight="700" fill="#3f6fb0">PK FK</text>
+<text x="746" y="585" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">space_id</text>
+<text x="1160" y="585" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT → teams</text>
+<text x="708" y="602" font-size="9.5" font-weight="700" fill="#3f6fb0">PK FK</text>
+<text x="746" y="602" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">account_id</text>
+<text x="1160" y="602" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT → accounts</text>
+<text x="708" y="619" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="619" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">role</text>
+<text x="1160" y="619" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="636" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="636" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">invited_as?</text>
+<text x="1160" y="636" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="653" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="653" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">joined_at</text>
+<text x="1160" y="653" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<line x1="708" y1="661" x2="1162" y2="661" stroke="#e3e8ed"/>
+<text x="708" y="674" font-size="9.5" font-weight="700" fill="#c0392b">CHECK</text>
+<text x="746" y="691" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#7a2a22">role IN (&#x27;admin&#x27;, &#x27;writer&#x27;, &#x27;reader&#x27;)</text>
+<text x="746" y="708" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#7a2a22">invited_as IS NULL OR invited_as = lower(invited_as)</text>
+<line x1="708" y1="714" x2="1162" y2="714" stroke="#e3e8ed"/>
+<text x="708" y="727" font-size="9.5" font-weight="700" fill="#7e57c2">INDEX</text>
+<text x="746" y="740" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">team_members_account (account_id)</text>
+<rect x="1250" y="84" width="470" height="68" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M1250,112 V90 a6,6 0 0 1 6,-6 H1714 a6,6 0 0 1 6,6 V112 Z" fill="#5b7083"/>
+<text x="1260" y="103" font-size="14" font-weight="700" fill="#fff">team_refs</text>
+<text x="1710" y="103" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT · WITHOUT ROWID</text>
+<text x="1258" y="125" font-size="9.5" font-weight="700" fill="#3f6fb0">PK FK</text>
+<text x="1296" y="125" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">space_id</text>
+<text x="1710" y="125" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT → teams</text>
+<text x="1258" y="142" font-size="9.5" font-weight="700" fill="#3f6fb0">PK</text>
+<text x="1296" y="142" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">ref</text>
+<text x="1710" y="142" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<rect x="700" y="84" width="470" height="414" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M700,112 V90 a6,6 0 0 1 6,-6 H1164 a6,6 0 0 1 6,6 V112 Z" fill="#5b7083"/>
+<text x="710" y="103" font-size="14" font-weight="700" fill="#fff">teams</text>
+<text x="1160" y="103" font-size="10" fill="#dfe7ee" text-anchor="end">STRICT</text>
+<text x="708" y="125" font-size="9.5" font-weight="700" fill="#3f6fb0">PK</text>
+<text x="746" y="125" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">space_id</text>
+<text x="1160" y="125" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="142" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="142" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">name</text>
+<text x="1160" y="142" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="159" font-size="9.5" font-weight="700" fill="#3f6fb0">FK</text>
+<text x="746" y="159" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">owner_account_id?</text>
+<text x="1160" y="159" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT → accounts</text>
+<text x="708" y="176" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="176" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">owner_email</text>
+<text x="1160" y="176" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="193" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="193" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">owner_provider</text>
+<text x="1160" y="193" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="210" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="210" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">owner_sub</text>
+<text x="1160" y="210" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="227" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="227" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">ccli_licence?</text>
+<text x="1160" y="227" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="244" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="244" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">root_ref?</text>
+<text x="1160" y="244" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="261" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="261" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">credential</text>
+<text x="1160" y="261" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT  = &#x27;owner&#x27;</text>
+<text x="708" y="278" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="278" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">created_at</text>
+<text x="1160" y="278" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="295" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="295" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">updated_at</text>
+<text x="1160" y="295" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<text x="708" y="312" font-size="9.5" font-weight="700" fill="#3f6fb0"></text>
+<text x="746" y="312" font-size="11.5" font-family="Menlo, Consolas, monospace" fill="#1b2733">ended_at?</text>
+<text x="1160" y="312" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#6b7885" text-anchor="end">TEXT</text>
+<line x1="708" y1="320" x2="1162" y2="320" stroke="#e3e8ed"/>
+<text x="708" y="333" font-size="9.5" font-weight="700" fill="#c0392b">CHECK</text>
+<text x="746" y="350" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#7a2a22">owner_email = lower(owner_email)</text>
+<text x="746" y="367" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#7a2a22">owner_provider &lt;&gt; &#x27;&#x27;</text>
+<text x="746" y="384" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#7a2a22">owner_sub &lt;&gt; &#x27;&#x27;</text>
+<text x="746" y="401" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#7a2a22">credential IN (&#x27;owner&#x27;, &#x27;service-account&#x27;)</text>
+<text x="746" y="418" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#7a2a22">ended_at IS NOT NULL OR owner_account_id IS NOT NULL</text>
+<line x1="708" y1="424" x2="1162" y2="424" stroke="#e3e8ed"/>
+<text x="708" y="437" font-size="9.5" font-weight="700" fill="#7e57c2">INDEX</text>
+<text x="746" y="450" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">teams_ccli_licence (ccli_licence)</text>
+<text x="746" y="467" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">teams_owner_account (owner_account_id)</text>
+<text x="746" y="484" font-size="10.5" font-family="Menlo, Consolas, monospace" fill="#4a3a78">teams_owner_email (owner_email)</text>
+<text x="900" y="1445" font-size="11" fill="#333">on delete:</text>
+<line x1="970" y1="1441" x2="995" y2="1441" stroke="#2e8b57" stroke-width="2.5"/><text x="1000" y="1445" font-size="11" fill="#333">cascade</text>
+<line x1="1100" y1="1441" x2="1125" y2="1441" stroke="#d98a1c" stroke-width="2.5"/><text x="1130" y="1445" font-size="11" fill="#333">set null</text>
+<line x1="1230" y1="1441" x2="1255" y2="1441" stroke="#c0392b" stroke-width="2.5"/><text x="1260" y="1445" font-size="11" fill="#333">no action (restrict)</text>
+</svg>
