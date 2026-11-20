@@ -4,6 +4,9 @@ What changes when the shape of stored data does: the database on a device (Index
 They are different problems. The database of a device changes only when that device's app does; Drive is
 shared by devices on different builds at the same time.
 
+The rules for what a table looks like (`STRICT`, foreign keys, ids, `WITHOUT ROWID`, `CHECK`s) are in
+[SCHEMA_RULES.md](SCHEMA_RULES.md); this file is how a change of shape is rolled out.
+
 ## The database on a device
 
 One IndexedDB database per space (named by the space's id), opened by `ChordlessDB.init()` in `src/js/db.ts`.
@@ -92,6 +95,16 @@ Roll forward only, as everywhere: a change is a new file, never an edit of one t
 must only add (a column with a default, a table, an index), because the Worker that was running
 before the deploy keeps running on it for a moment, and again after a rollback. The tests run the files
 as they stand against SQLite (`tests/register-db.ts`).
+
+**The exception: a rebuild (0011).** A migration may only add, except when a schema has to be put right in a
+way SQLite cannot do in place (foreign keys, `NOT NULL`, `CHECK`s and dropped columns can only be added by making
+the table again). `0011_schema_cleanup.sql` does that: every table is rebuilt under a `_v2` name with its foreign
+keys, copied parents first, the old ones dropped, the new ones renamed. It is **not** safe for the Worker before it to
+run on it, and the Worker after it cannot run before it, so it is deployed once, deliberately: `just db-backup` first,
+the read-only checks of docs/SCHEMA_AUDIT.md section 6 against production, and not on a Sunday. D1 runs a migration
+as one transaction and undoes it if any statement fails (tried on a local D1), and this one is written to fail
+rather than guess (`tests/schema-cleanup.node.test.ts`). Merging the pull request that carries it is what applies it, as
+for any migration, so it is merged when the owner is ready for that.
 
 **Expand, then contract.** Because a migration may only add, a change of shape is two steps: the first
 migration adds the new tables and columns and fills them from the old (`0003_accounts.sql` made accounts
