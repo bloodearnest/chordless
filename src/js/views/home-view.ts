@@ -32,7 +32,7 @@ import { leaderName } from '../leaders.ts'
 import { goTo } from '../navigation.ts'
 import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
-import { listSpaces } from '../space.ts'
+import { ensureCurrentSpace, listSpaces } from '../space.ts'
 import { SyncStatusEvent } from '../sync-status.ts'
 import { t } from '../text.ts'
 import { toast } from '../toast.ts'
@@ -136,6 +136,8 @@ export class HomeView extends PageView {
         return { groups: [], shared: sharedGroup(await listSharedWithMe().catch(() => [])) }
       }
       // Every space's setlists at once: no space is switched to (docs/CENTRAL_STORAGE.md, phase 0)
+      // (a device's first visit makes its Personal space, as opening the current one used to)
+      await ensureCurrentSpace()
       const spaces = await listSpaces()
       const entries = await listAllSetlists(spaces)
       const people = new Map(
