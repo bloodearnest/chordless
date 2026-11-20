@@ -2,6 +2,7 @@
  * The shapes of the data Chordless parses and stores. docs/DATA_MODEL.md describes them in
  * prose; these are what the code checks against. Types only: nothing here exists at runtime.
  */
+import type { SpaceOp, SpaceSong } from './space-data-types.ts'
 import type { TeamRole } from './team-roles.ts'
 
 // ==================== A parsed chart (ChordProParser) ====================
@@ -88,6 +89,10 @@ export interface SongFileProps {
 
 /** A song variant: the 'songs' store (metadata only; the chart is in the chordpro store) */
 export interface SongRecord {
+  /** D1 revision; absent/null until the record has synced with D1 */
+  version?: number | null
+  /** The CCLI licence the chart was imported under, when known */
+  licence?: string | null
   uuid: string
   /** The deterministic id: ccli-<number>, or title-<normalised title> */
   id: string
@@ -264,6 +269,9 @@ export type SharedChartAnnotation = ChartAnnotation & { body: { kind: 'text'; te
 
 /** A song in a setlist: a reference, with this setlist's key and tempo for it */
 export interface SetlistEntry {
+  /** Kept even when this device has no chart */
+  title?: string
+  ccli?: string | null
   order: number
   songId: string
   songUuid: string
@@ -318,6 +326,7 @@ export interface ReceivedShare {
 }
 
 export interface Setlist {
+  version?: number | null
   id: string
   /** YYYY-MM-DD */
   date: string
@@ -415,6 +424,7 @@ export interface Space {
  * the same human in two spaces is two records.
  */
 export interface Person {
+  version?: number | null
   /** A uuid, never changed */
   id: string
   name: string
@@ -535,3 +545,14 @@ export interface DriveFileWrite {
 }
 
 export type DriveContent = string | Blob | ArrayBuffer | Uint8Array
+
+/** The space's song index, independent of whether this device has the chart. */
+export type SongIndexRecord = Omit<SpaceSong, 'version'> & { version: number | null }
+
+/** A queued D1 edit. The base is retained for the three-way merge on a conflict. */
+export interface SpaceOutboxRecord {
+  /** Monotonic ULID, so replay follows the order edits were made */
+  id: string
+  change: SpaceOp
+  base: unknown
+}

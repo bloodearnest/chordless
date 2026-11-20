@@ -413,9 +413,11 @@ export class LibraryView extends PageView {
     const content = this.#content.value as HTMLElement
     // (a song shown as its lead sheet keeps it through being drawn again: its lyrics are not seen meanwhile)
     const sheet = this.#melodyOn ? shownSheet(content) : null
-    await SongViewManager.renderSongView(parsed, content, { songIndex: 0, sheet })
+    // Load state before exposing interactive sections: initialization must not overwrite a
+    // section change made while the database is opening.
     const db = await this.#dbFor(song)
     const model = createLibrarySongModel(song, db, db.spaceId)
+    await SongViewManager.renderSongView(parsed, content, { songIndex: 0, sheet })
     SongViewManager.initializeSongSections(content, model, { editMode: this.#editMode })
     // (a song the library holds of another space has none of its melodies here, so none is shown)
     await this.#applyMelody()

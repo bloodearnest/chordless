@@ -458,7 +458,7 @@ export class SetlistPage {
   async renderSetlist(setlistId: string, songIndex = -1, keepSongId?: string) {
     try {
       // Load setlist from IndexedDB
-      const setlist = await this._database().getSetlist(setlistId)
+      const setlist = await this._database().getSetlist(setlistId, { refreshMetadata: true })
       // (the view can be left while this loads: back, back. A page that is gone shows nothing)
       if (this._disposed) return
 

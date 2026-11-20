@@ -140,10 +140,12 @@ describe('ChordlessDB stores tempos as numbers', () => {
     db = new ChordlessDB(`TEST-${uniqueName()}`)
     await db.init()
 
-    const saved = await db.saveSong({ uuid: 'a', id: 'a', tempo: '72', originalTempo: '150 (1/8)' })
+    const saved = await db.saveSong(
+      makeSong({ uuid: 'a', id: 'a', tempo: '72', originalTempo: '150 (1/8)' })
+    )
     expect([saved.tempo, saved.originalTempo]).to.deep.equal([72, 150])
     expect((await db.getSong('a')).tempo).to.equal(72)
-    await db.saveSongsBatch([{ uuid: 'b', id: 'b', tempo: '96', originalTempo: null }])
+    await db.saveSongsBatch([makeSong({ uuid: 'b', id: 'b', tempo: '96', originalTempo: null })])
     expect((await db.getSong('b')).tempo).to.equal(96)
     expect((await db.getSong('b')).originalTempo).to.equal(null)
 

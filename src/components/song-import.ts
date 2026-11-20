@@ -262,8 +262,10 @@ export class SongImport extends LitElement {
   async _loadSpaces(): Promise<void> {
     this._spaces = await listSpaces()
     if (this._spaceId) return
-    const target = importTargetOf(await listSpaces())
-    this._spaceId = target?.id ?? (await ensureCurrentSpace()).id
+    const target = importTargetOf(this._spaces)
+    const spaceId = target?.id ?? (await ensureCurrentSpace()).id
+    // A choice made while the fallback space was loading wins over initialization.
+    if (!this._spaceId) this._spaceId = spaceId
   }
 
   /**

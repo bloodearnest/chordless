@@ -3,7 +3,7 @@
  * happened as attributes, and nothing at all when reports are off. The SDK that sends them is not
  * loaded here: spans go to an in-memory exporter.
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { context, propagation, ROOT_CONTEXT, SpanKind, trace } from '@opentelemetry/api'
 import type { FetchInstrumentation } from '@opentelemetry/browser-instrumentation/experimental/fetch'
 import { W3CTraceContextPropagator } from '@opentelemetry/core'
@@ -422,6 +422,7 @@ describe('what every span gets as it starts', () => {
     // (a span of its own, outside a sync, has none of it)
     exporter.reset()
     await timedFetch('drive')(DRIVE)
+    await waitUntil(() => finished().length > 0, 'the fetch span to be exported')
     expect(finished()[0].attributes).to.not.have.property('chordless.sync.trigger')
     // (the processor is the provider's: these are what it does when asked)
     await stampSpans.forceFlush()
