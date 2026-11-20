@@ -131,9 +131,7 @@ ${['G', 'A', 'B', 'D']
   .join('\n')}
 </measure></part></score-partwise>`
 
-test('an instrumental part shows the notes of the lead sheet, and can be switched back to its chords', async ({
-  page,
-}) => {
+test('an instrumental part shows chords by default, and melody when chosen', async ({ page }) => {
   const consoleErrors: string[] = []
   page.on('console', message => {
     if (message.type() === 'error') consoleErrors.push(message.text())
@@ -156,33 +154,37 @@ test('an instrumental part shows the notes of the lead sheet, and can be switche
   await page.reload()
 
   const intro = page.locator('song-section[data-label="Intro"]')
-  // the part with no words shows the notes of the sheet, by default
-  await expect(intro.locator('score-view .notehead')).toHaveCount(4)
   const sung = page.locator('song-section[data-label="Verse 1"]')
-  await expect(sung.locator('score-view')).toHaveCount(0)
-
-  // (the options are in edit mode) the sung part has no Melody option, the instrumental one has
-  const header = page.locator('#app-header')
   await enterEditMode(page)
-  await expect(intro.getByRole('button', { name: 'Show Melody in Intro' })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  )
+  const melody = intro.getByRole('button', { name: 'Show Melody in Intro' })
+  const chords = intro.getByRole('button', { name: 'Show Chords in Intro' })
+  const introChord = intro.locator('chord-display').first()
+  await expect(melody).toHaveAttribute('aria-pressed', 'false')
+  await expect(chords).toHaveAttribute('aria-pressed', 'true')
+  await expect(introChord).toBeVisible()
+  await expect(intro.locator('score-view')).toHaveCount(0)
   await expect(sung.getByRole('button', { name: 'Show Chords in Verse 1' })).toBeVisible()
   await expect(sung.getByRole('button', { name: /Show Melody/ })).toHaveCount(0)
 
-  // back to the chords, and it stays so through a reload
-  await intro.getByRole('button', { name: 'Show Chords in Intro' }).click()
+  const setLyricsOnly = (on: boolean) =>
+    page.evaluate(async on => {
+      const { setLyricsOnlyPreference } = await import('/js/preferences.ts')
+      setLyricsOnlyPreference(on)
+    }, on)
+  await setLyricsOnly(true)
+  await expect(introChord).toBeHidden()
   await expect(intro.locator('score-view')).toHaveCount(0)
-  await expect(intro.locator('chord-display').first()).toBeVisible()
-  await header.getByRole('button', { name: 'Toggle edit mode' }).click()
-  await page.reload()
-  await expect(intro.locator('chord-display').first()).toBeVisible()
-  await expect(intro.locator('score-view')).toHaveCount(0)
+  await setLyricsOnly(false)
+  await expect(introChord).toBeVisible()
 
-  await enterEditMode(page)
-  await intro.getByRole('button', { name: 'Show Melody in Intro' }).click()
+  await melody.click()
   await expect(intro.locator('score-view .notehead')).toHaveCount(4)
+  await page.reload()
+  await expect(intro.locator('score-view .notehead')).toHaveCount(4)
+  await enterEditMode(page)
+  await chords.click()
+  await expect(introChord).toBeVisible()
+  await expect(intro.locator('score-view')).toHaveCount(0)
 
   expect(consoleErrors.filter(text => /Content Security Policy|wasm/i.test(text))).toEqual([])
 })

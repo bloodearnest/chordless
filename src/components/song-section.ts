@@ -703,11 +703,9 @@ export class SongSection extends LitElement {
 
   /**
    * Get the recommended hideMode based on content analysis
-   * @returns Recommended hideMode: 'melody' (show the notes), 'lyrics' (show chords only), 'chords' (show lyrics only), or 'none' (show all)
+   * @returns Recommended hideMode: 'lyrics' (show chords only), 'chords' (show lyrics only), or 'none' (show all)
    */
-  getRecommendedHideMode(): 'lyrics' | 'chords' | 'melody' | 'none' {
-    // (the notes, where the sheet has them for a part with no words)
-    if (!this._hasAnyLyrics && this._hasMelody()) return 'melody'
+  getRecommendedHideMode(): 'lyrics' | 'chords' | 'none' {
     if (!this._hasAnyLyrics && this._hasAnyChords) {
       // Only chords, show chords only
       return 'lyrics'

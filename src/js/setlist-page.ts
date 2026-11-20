@@ -1795,11 +1795,7 @@ export class SetlistPage {
     const content = this.root.querySelector<HTMLElement>(`#song-${index} .song-content`)
     if (!song || !content) return
     const melody = await this.melodyOf(song)
-    // (the parts of the song that have notes in the sheet can show them: which is a part's default if it has no words)
-    if (attachCues(content, melody)) {
-      await content.querySelector<SongDisplay>('song-display')?.updateComplete
-      this.sections.applyAll(content)
-    }
+    attachCues(content, melody)
     const found = this._melodyOn.has(index) ? melody : null
     // (a song with no melody stays in its lyrics)
     if (!found) this._melodyOn.delete(index)

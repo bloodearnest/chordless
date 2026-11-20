@@ -259,13 +259,11 @@ choice in the part's Show options (All, Lyrics, Chords, **Lead sheet**, None; th
   key the song is shown in, by `<score-view>`, which takes the whole lead sheet and the `measures` to show. The
   notes are moved before they are cut, so a few measures are in the octave the whole sheet chose. The chords
   are the sheet's own, written as `<harmony>` as ever. The notice is on the song's own sheet, not repeated.
-- **The default.** A part with no words and notes in the sheet shows them (`getRecommendedHideMode`), unless
-  the preference is words only (the part then collapses, as for chords only). A chart with no stored lead
-  sheet is as it was. The library's song page has the option but not the default: it keeps no defaults.
+- **The default.** Instrumental parts show their chords. In a setlist, the lyrics-only preference
+  collapses a chords-only part. Choose Melody in the part's Show options to see its notes.
 - **Where it is wired.** `attachCues` (`score-shown.ts`) gives `<song-display>` its `cues` and so each
   `<song-section>` its `melody` and `melodyMeasures`; it runs where the song's sheet is asked for (the
-  setlist's `applyMelodyMode`, the library's `#applyMelody`), and the setlist works the sections' states out again
-  once it has.
+  setlist's `applyMelodyMode`, the library's `#applyMelody`).
 - **Seen in the chart.** A part the sheet has notes for has a music note by its title (in every mode: dimmed, and lit
   while the notes are what is shown), so a player can tell there is a lead sheet to switch to; the switch itself is in the
   Show options in edit mode. The sheet of a part fades into the page on all four sides, by a short 0.4rem (a mask, so a light sheet
