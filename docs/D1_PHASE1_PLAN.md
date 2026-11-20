@@ -183,7 +183,8 @@ explains the refusal and offers an explicit retry. Further snapshots merge share
 these retained local edits, so a reader's key change does not freeze the rest of a setlist.
 
 `space-data-runtime.ts` starts delivery from committed edits and routes live “changed” messages
-to the snapshot sync. Polling remains current-space scoped until step 5; explicit edits/manual
+to the snapshot sync. A combined sync attempts both metadata and content even if either fails,
+then reports the failure; neither backend prevents the other from running. Polling remains current-space scoped until step 5; explicit edits/manual
 syncs can name their own space. Indexed songs without charts appear with their title, key and CCLI
 number and a “Get this song” link; pad-set metadata is read from D1 for a moved Team. The reader's
 self-name route accepts the D1 response without expecting a Drive file. Nothing switches a Team's
