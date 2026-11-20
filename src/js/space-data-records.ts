@@ -123,7 +123,12 @@ export function localRecord(
         tempo: song.tempo,
         notes: song.notes,
         spaceDataExtra: song.extra,
-        annotations: song.annotations as SetlistEntry['annotations'],
+        annotations:
+          song.annotations.length > 0 ||
+          old?.songs.find(entry => !entry.local && entry.songId === song.songId)?.annotations !==
+            undefined
+            ? (song.annotations as SetlistEntry['annotations'])
+            : undefined,
         order,
       })
     )

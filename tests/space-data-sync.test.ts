@@ -11,7 +11,7 @@ import { mergeSpaceRecord } from '../src/js/space-data-merge.ts'
 import { type SpaceRecord, sharedRecord } from '../src/js/space-data-records.ts'
 import { SpaceDataStore } from '../src/js/space-data-store.ts'
 import type { SpaceData, SpaceOp, SpaceOpResult, SpaceSetlist } from '../src/js/space-data-types.ts'
-import { makeEntry, makeLocalState, makeSetlist, makeSong } from './builders.ts'
+import { makeAnnotation, makeEntry, makeLocalState, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
 import { deleteDatabase } from './test-helpers.ts'
 
@@ -955,5 +955,41 @@ describe('a Team first opened offline', () => {
       db.db?.close()
       await deleteSpace(space.id)
     }
+  })
+})
+
+describe('acknowledgements in a live chart', () => {
+  it('does not turn sync bookkeeping into a visible content change', async () => {
+    const { setlistContentHash, setlistContent } = await import('../src/js/sync/setlist-hash.ts')
+    const { db, store } = await ready(snapshot([remote()]))
+    await db.updateSetlist('setlist-1', row => {
+      row.songs = [makeEntry({ title: 'Known', ccli: null })]
+    })
+    const before = must(await db.getSetlist('setlist-1'))
+    const hash = setlistContentHash(before)
+    const pending = (await store.pending())[0]
+    await store.settle(pending, { status: 'ok', version: 2 })
+    const after = must(await db.getSetlist('setlist-1'))
+    expect(after.version).to.equal(2)
+    expect(setlistContentHash(after)).to.equal(hash)
+    expect(setlistContent(after)).not.to.have.property('spaceDataBody')
+    expect(setlistContent(after).songs[0]).not.to.have.property('spaceDataExtra')
+  })
+})
+
+describe('shared annotations and private sync metadata', () => {
+  it('applies annotations and their removal while excluding retained metadata from content', async () => {
+    const annotation = makeAnnotation('repeat')
+    const row = remote({
+      songs: [{ ...entry('song-1'), annotations: [annotation], extra: { future: true } }],
+    })
+    const { db, store } = await ready(snapshot([row]))
+    const annotated = must(await db.getSetlist('setlist-1'))
+    expect(annotated.songs[0].annotations).to.deep.equal([annotation])
+    const { setlistContent } = await import('../src/js/sync/setlist-hash.ts')
+    expect(setlistContent(annotated).songs[0]).not.to.have.property('spaceDataExtra')
+    expect(annotated.songs[0].spaceDataExtra).to.deep.equal({ future: true })
+    await store.apply(snapshot([{ ...row, version: 2, songs: [{ ...entry('song-1') }] }]), 'etag-2')
+    expect(must(await db.getSetlist('setlist-1')).songs[0].annotations).to.deep.equal([])
   })
 })
