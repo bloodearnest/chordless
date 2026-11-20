@@ -1,6 +1,6 @@
 # Build plan: phase 1 of storage in D1 (Teams)
 
-**Status (2026-11-20): steps 0 and 1 are built, merged and applied in production (migrations `0011`, `0012`; `0013` merged in #278, applied by its deploy). Step 2a (ULIDs, people included) is built (#281). Step 2b (device schema and metadata) is built (#285). Step 2c (device sync) is implemented on the current branch; 2d onward is not built. No Team is switched to D1 until the owner runs the move.** Written against the design in
+**Status (2026-11-20): steps 0 and 1 are built, merged and applied in production (migrations `0011`, `0012`; `0013` merged in #278, applied by its deploy). Step 2a (ULIDs, people included) is built (#281). Step 2b (device schema and metadata) is built (#285). Step 2c (device sync) is implemented in #289; 2d onward is not built. No Team is switched to D1 until the owner runs the move.** Written against the design in
 [CENTRAL_STORAGE.md](CENTRAL_STORAGE.md) (an old name: it is only "central" because the app began distributed) as updated on `codex/beta-stable-release-design` (song index
 in D1, preferences later). The Beta and Stable release channels are only a plan, so this one does not wait
 for them. The schema it ends in is drawn in [D1_SCHEMA.md](D1_SCHEMA.md).
