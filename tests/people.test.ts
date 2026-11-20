@@ -1,9 +1,10 @@
 import { expect } from '@open-wc/testing'
 import type { Person } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
-import { NEW_PERSON } from '../src/js/leaders.ts'
+import { duplicatesOf, NEW_PERSON } from '../src/js/leaders.ts'
 import {
   chosenMeId,
+  dedupePeople,
   deletePerson,
   getSignedInUser,
   getSpacePeople,
@@ -16,6 +17,7 @@ import {
 } from '../src/js/people.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
+import { isUlid, ulid } from '../src/js/ulid.ts'
 import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
@@ -31,15 +33,81 @@ const person = (over: Partial<Person> & { id: string; name: string }): Person =>
 
 describe('newPerson', () => {
   it('is named by the name, or by the address when it has none, and is nobody for neither', () => {
-    expect(newPerson({ name: ' Nat ', email: 'NAT@example.com' }, NOW)).to.deep.equal({
-      id: newPerson({ email: 'nat@example.com' })?.id,
+    const made = newPerson({ name: ' Nat ', email: 'NAT@example.com' }, NOW)
+    expect(made).to.deep.equal({
+      id: made?.id,
       name: 'Nat',
       emails: ['nat@example.com'],
       modifiedDate: NOW,
     })
+    expect(isUlid(made?.id ?? '')).to.equal(true)
     expect(newPerson({ email: 'nat@example.com' })?.name).to.equal('nat@example.com')
     expect(newPerson({ name: 'Visiting Vic' })?.emails).to.deep.equal([])
     expect(newPerson({})).to.equal(null)
+  })
+})
+
+describe('an address taken off a person', () => {
+  it('can be given to someone else without making them the person it was taken from', () => {
+    const ann = personFor([], { name: 'Ann', email: 'ann@example.com' }, NOW)?.person as Person
+    // (Ann takes the address off her record, and it is later wanted for another person)
+    const other = personFor(
+      [{ ...ann, emails: [] }],
+      { name: 'A Different Ann', email: 'ann@example.com' },
+      NOW
+    )
+    expect(other?.person.name).to.equal('A Different Ann')
+    expect(other?.person.id).to.not.equal(ann.id)
+  })
+
+  it('is no one’s id: two people made for one address at once are two people, which `dedupePeople` joins', () => {
+    expect(newPerson({ email: 'twin@example.com' }, NOW)?.id).to.not.equal(
+      newPerson({ email: 'twin@example.com' }, NOW)?.id
+    )
+  })
+})
+
+describe('duplicatesOf', () => {
+  const early = ulid(Date.now() + 5_000_000)
+  const late = ulid(Date.now() + 6_000_000)
+
+  it('keeps the person made before ULIDs, else the first made, and joins the rest into them', () => {
+    const legacy = person({
+      id: '3f2a9c10-7b1e-4d55-9a6c-0e8f12345678',
+      name: 'Ann',
+      emails: ['ann@example.com'],
+    })
+    const one = person({ id: early, name: 'Ann S', emails: ['ANN@example.com'] })
+    const two = person({ id: late, name: 'Ann S', emails: ['ann@example.com'] })
+    expect(duplicatesOf([two, one, legacy])).to.deep.equal([
+      { from: early, into: legacy.id },
+      { from: late, into: legacy.id },
+    ])
+    expect(duplicatesOf([two, one])).to.deep.equal([{ from: late, into: early }])
+    // (the same answer whatever order the people are in: that is how devices agree)
+    expect(duplicatesOf([one, two])).to.deep.equal(duplicatesOf([two, one]))
+  })
+
+  it('joins people through others they share an address with', () => {
+    const a = person({ id: 'a-person', name: 'A', emails: ['x@example.com'] })
+    const b = person({ id: 'b-person', name: 'B', emails: ['x@example.com', 'y@example.com'] })
+    const c = person({ id: 'c-person', name: 'C', emails: ['y@example.com'] })
+    expect(duplicatesOf([c, b, a])).to.deep.equal([
+      { from: 'b-person', into: 'a-person' },
+      { from: 'c-person', into: 'a-person' },
+    ])
+  })
+
+  it('leaves alone people with no address in common, people with none, and those merged or deleted', () => {
+    const people = [
+      person({ id: 'a', name: 'A', emails: ['a@example.com'] }),
+      person({ id: 'b', name: 'B', emails: ['b@example.com'] }),
+      person({ id: 'c', name: 'Same', emails: [] }),
+      person({ id: 'd', name: 'Same', emails: [] }),
+      person({ id: 'e', name: 'E', emails: ['a@example.com'], mergedInto: 'a' }),
+      person({ id: 'f', name: 'F', emails: ['b@example.com'], deleted: true }),
+    ]
+    expect(duplicatesOf(people)).to.deep.equal([])
   })
 })
 
@@ -122,13 +190,14 @@ describe('personFor', () => {
     expect(made?.changed).to.deep.equal([])
   })
 
-  it('makes a person, with the id the same leader always gets', () => {
+  it('makes a person with an id of its own, and finds that person again by the address, in any case', () => {
     const one = personFor([], { name: 'New Nat', email: 'nat@example.com' }, NOW)
-    const two = personFor([], { name: 'Nat', email: 'NAT@example.com' }, NOW)
     expect(one?.person.name).to.equal('New Nat')
     expect(one?.person.emails).to.deep.equal(['nat@example.com'])
     expect(one?.changed).to.deep.equal([one?.person])
-    expect(two?.person.id).to.equal(one?.person.id)
+    const again = personFor([one?.person as Person], { name: 'Nat', email: 'NAT@example.com' }, NOW)
+    expect(again?.person.id).to.equal(one?.person.id)
+    expect(again?.changed).to.deep.equal([])
     expect(personFor([], { email: 'nat@example.com' })?.person.name).to.equal('nat@example.com')
   })
 })
@@ -174,6 +243,38 @@ describe('the signed-in user and the space’s people', () => {
     await spaces.updateSpace(spaceId, { members })
     spaces.db?.close()
   }
+
+  it('joins two people made for one member before the devices synced, and the setlists the extra one led', async () => {
+    const first = person({
+      id: ulid(Date.now() + 7_000_000),
+      name: 'Ben',
+      emails: ['ben@example.com'],
+    })
+    const second = person({
+      id: ulid(Date.now() + 8_000_000),
+      name: 'Ben',
+      emails: ['ben@example.com'],
+    })
+    await db.savePeople([second, first])
+    await db.saveSetlist(makeSetlist({ id: 'led-by-second', leaderId: second.id }))
+    expect(await dedupePeople(db)).to.equal(1)
+    const stored = await db.getAllPeople()
+    expect(stored.find(each => each.id === second.id)?.mergedInto).to.equal(first.id)
+    expect(stored.find(each => each.id === first.id)?.mergedInto).to.equal(undefined)
+    expect((await db.getSetlist('led-by-second'))?.leaderId).to.equal(first.id)
+    expect(await dedupePeople(db), 'nothing left to join').to.equal(0)
+  })
+
+  it('does not make a second person for a member two devices both made, when it is asked for the people', async () => {
+    await withMembers([{ email: 'ben@example.com', name: 'Ben' }])
+    signIn({ name: 'Ann Singer', email: 'ann@example.com' })
+    await db.savePeople([
+      person({ id: ulid(Date.now() + 9_000_000), name: 'Ben', emails: ['ben@example.com'] }),
+      person({ id: ulid(Date.now() + 9_100_000), name: 'Ben', emails: ['ben@example.com'] }),
+    ])
+    const { people } = await getSpacePeople(db)
+    expect(people.filter(each => each.emails.includes('ben@example.com'))).to.have.length(1)
+  })
 
   it('is nobody when not signed in, or signed in with no address', async () => {
     expect(await getSignedInUser()).to.equal(null)

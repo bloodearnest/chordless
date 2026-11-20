@@ -9,9 +9,10 @@
 
 import type { Person, ScoreRecord, Setlist, SetlistEntry, SongRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
-import { findPerson, idFromKey, normalizeEmail, resolvePerson } from './leaders.ts'
+import { findPerson, resolvePerson } from './leaders.ts'
 import { scoreRecord } from './score-record.ts'
 import { addChart } from './song-utils.ts'
+import { ulid } from './ulid.ts'
 
 /**
  * - copy: new setlist ids
@@ -181,9 +182,8 @@ async function leaderMapper(source: TransferSource, destination: ChordlessDB) {
         .find(Boolean) ?? findPerson([...destinationPeople, ...made], { name: person.name })
     let id = there?.id
     if (!id) {
-      const email = normalizeEmail(person.emails[0])
       const created: Person = {
-        id: idFromKey(email ? `email:${email}` : `name:${person.name.toLowerCase()}`),
+        id: ulid(),
         name: person.name,
         emails: person.emails,
         modifiedDate: new Date().toISOString(),
@@ -243,7 +243,7 @@ export async function transferSetlists(
     }
     const made = forDestination(
       setlist,
-      mode === 'copy' ? crypto.randomUUID() : setlist.id,
+      mode === 'copy' ? ulid() : setlist.id,
       songs,
       leaders(setlist.leaderId)
     )

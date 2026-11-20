@@ -3,6 +3,7 @@
 // Each space then has its own ChordlessDB with songs, setlists, etc.
 
 import type { Space } from './data-types.ts'
+import { ulid } from './ulid.ts'
 import { requestResult, transactionError } from './utils/idb.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
 
@@ -159,7 +160,7 @@ export class SpaceDB {
    */
   async createSpace(name: string): Promise<Space> {
     const space: Space = {
-      id: crypto.randomUUID(),
+      id: ulid(),
       name: name,
       createdDate: new Date().toISOString(),
       modifiedDate: new Date().toISOString(),

@@ -5,6 +5,7 @@
  */
 import type { Person, Setlist } from './data-types.ts'
 import { t } from './text.ts'
+import { isUlid } from './ulid.ts'
 
 /** What a setlist said of its leader before leaders were people */
 export interface LegacyLeader {
@@ -251,6 +252,42 @@ export function mergePlan(
     .filter(each => each.mergedInto === from.id)
     .map(each => ({ ...each, mergedInto: into.id, modifiedDate: now }))
   return [joined, absorbed, ...earlier]
+}
+
+/**
+ * The people to join because they share an address, as `{ from, into }` merges: people are put together if they have an
+ * address in common, directly or through others (A and B share one, B and C another: all three). Of a group the person kept
+ * is the one made before people had ULIDs, else the first made (a ULID sorts by when it was), else the lowest id: whichever
+ * device works it out gets the same answer. A person merged into another, or deleted, is not one of them.
+ */
+export function duplicatesOf(people: Person[]): { from: string; into: string }[] {
+  const live = people.filter(isLive)
+  const group = new Map<string, string>()
+  const root = (id: string): string => {
+    let at = id
+    while (group.get(at) !== at) at = group.get(at) as string
+    return at
+  }
+  for (const person of live) group.set(person.id, person.id)
+  const owner = new Map<string, string>()
+  for (const person of live) {
+    for (const email of person.emails.map(normalizeEmail)) {
+      const seen = owner.get(email)
+      if (seen === undefined) owner.set(email, person.id)
+      else group.set(root(person.id), root(seen))
+    }
+  }
+  const groups = new Map<string, Person[]>()
+  for (const person of live)
+    groups.set(root(person.id), [...(groups.get(root(person.id)) ?? []), person])
+  const kept = (a: Person, b: Person) =>
+    Number(isUlid(a.id)) - Number(isUlid(b.id)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  return [...groups.values()]
+    .filter(members => members.length > 1)
+    .flatMap(members => {
+      const [keeper, ...others] = [...members].sort(kept)
+      return others.map(other => ({ from: other.id, into: (keeper as Person).id }))
+    })
 }
 
 /** How many setlists each person leads (a leader merged into another counts for the other) */

@@ -23,6 +23,7 @@ import type { Setlist, SongRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import type { SpaceExport } from './space-export.ts'
 import { setlistContent, setlistContentHash } from './sync/setlist-hash.ts'
+import { ulid } from './ulid.ts'
 
 /** The fields of a chart's record that an export keeps, and a reset compares and replaces */
 const SONG_CONTENT_FIELDS = [
@@ -190,7 +191,7 @@ export async function resetToExport(exported: SpaceExport, db: ChordlessDB): Pro
     const content = exported.chordpro.get(there.chordproFileId)
     if (content === undefined) continue
     // (the chart keeps the id it has here; a new song gets one of its own: the file's is a path)
-    const chordproFileId = here?.chordproFileId ?? `chordpro-${crypto.randomUUID()}`
+    const chordproFileId = here?.chordproFileId ?? `chordpro-${ulid()}`
     const chart = here ? await db.getChordPro(chordproFileId) : undefined
     await db.saveChordPro({
       id: chordproFileId,

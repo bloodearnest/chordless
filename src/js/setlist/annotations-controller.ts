@@ -21,6 +21,7 @@ import {
 import type { ChartAnnotation, Setlist, SharedChartAnnotation } from '../data-types.ts'
 import { t } from '../text.ts'
 import { toast } from '../toast.ts'
+import { ulid } from '../ulid.ts'
 import { errorMessage } from '../utils/errors.ts'
 import { loadSetlistAnnotations, type SongRef, saveSetlistAnnotations } from './local-state.ts'
 import type { RuntimeSong } from './runtime-songs.ts'
@@ -149,7 +150,7 @@ export class AnnotationsController {
       ? allAnnotations(sources).find(({ annotation }) => annotation.id === event.annotationId)
       : undefined
     const annotation: ChartAnnotation = existing?.annotation ?? {
-      id: crypto.randomUUID(),
+      id: ulid(),
       anchor: this.#anchorFor(event, song),
       body: { kind: 'text', text: '' },
       modified: new Date().toISOString(),
