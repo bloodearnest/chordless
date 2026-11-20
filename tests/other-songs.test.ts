@@ -2,6 +2,7 @@ import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import {
   addToLibrary,
+  getSharedSongs,
   getSongFromAnywhere,
   getSongsElsewhere,
   withSongsFromElsewhere,
@@ -57,6 +58,19 @@ describe('Songs from the other databases', () => {
     )
   })
 
+  it('lists the songs received in shared setlists alone, marked as from Shared with me', async () => {
+    await addChart(library, ALPHA, ADD)
+    await addChart(shared, BETA, ADD)
+    const songs = await getSharedSongs()
+    expect(songs.map(song => song.title)).to.deep.equal(['Beta'])
+    expect(songs[0].source).to.deep.equal({ dbId: SHARED_DB_ID, label: 'Shared with me' })
+  })
+
+  it('lists no shared songs where nothing was ever shared', async () => {
+    await deleteDatabase(SHARED_DB_ID)
+    expect(await getSharedSongs()).to.deep.equal([])
+  })
+
   it('searches the library and the others together, the library winning for a song it has', async () => {
     await addChart(library, ALPHA, ADD)
     await addChart(shared, ALPHA_EDITED, ADD)
@@ -77,6 +91,8 @@ describe('Songs from the other databases', () => {
     const own = await getLibrarySongs(library)
     expect(withSpaceName(own, 2, 'Gateway').map(song => song.spaceName)).to.deep.equal(['Gateway'])
     expect(withSpaceName(own, 1, 'Gateway').map(song => song.spaceName)).to.deep.equal([undefined])
+    // (the space's id is always kept: the library opens a song in its own space)
+    expect(withSpaceName(own, 1, 'Gateway', 'g1').map(song => song.spaceId)).to.deep.equal(['g1'])
   })
 
   it('finds a song by uuid in the library, else in another database', async () => {

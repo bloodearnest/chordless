@@ -15,7 +15,7 @@ import '../../components/setlist-details-form.ts'
 import type { SetlistGroup, SetlistRow } from '../../components/setlist-group.ts'
 import '../../components/setlist-group.ts'
 import '../../components/status-message.ts'
-import { listAllSetlists } from '../all-spaces.ts'
+import { listAllSetlists, withSpace } from '../all-spaces.ts'
 import type { Person, Setlist, Space } from '../data-types.ts'
 import { watchData } from '../data-watcher.ts'
 import {
@@ -95,6 +95,9 @@ export function groupSetlistsByYear(
     }))
 }
 
+/** The leader a new setlist starts with: the person using the app, if they are one of the space's people */
+const leaderOf = (me: Person | null | undefined): string => me?.id || ''
+
 /** The setlists received by link, as one group for <setlist-group>: they open at their link */
 export function sharedGroup(setlists: Setlist[]): SetlistYear[] {
   if (setlists.length === 0) return []
@@ -143,7 +146,7 @@ export class HomeView extends PageView {
       const people = new Map(
         await Promise.all(
           spaces.map(
-            async space => [space.id, await (await openSpace(space.id)).getAllPeople()] as const
+            async space => [space.id, await withSpace(space.id, db => db.getAllPeople())] as const
           )
         )
       )
@@ -187,11 +190,36 @@ export class HomeView extends PageView {
     super.disconnectedCallback()
   }
 
-  /** The database a new setlist goes to: the default space's (or the first one that can be written to) */
+  /** The spaces a new setlist can go to (the ones that can be written to), when there is a choice */
+  #targets: Space[] = []
+  /** The one chosen in the create form; none is the default space (or the first that can be written to) */
+  #targetId = ''
+
+  /** The database a new setlist goes to */
   async #targetDB(): Promise<ChordlessDB> {
-    const target = importTargetOf(await listSpaces())
+    const spaces = await listSpaces()
+    const chosen = spaces.find(space => space.id === this.#targetId)
+    const target = chosen ?? importTargetOf(spaces)
     /* v8 ignore next -- a device always has a space: the home page makes the first */
     return target ? openSpace(target.id) : getCurrentDB()
+  }
+
+  /** The create form is opening: which spaces it can go to, starting at the default */
+  async #loadTargets(): Promise<void> {
+    const spaces = (await listSpaces()).filter(
+      space => !space.readOnly && space.team?.role !== 'reader'
+    )
+    this.#targets = spaces.length > 1 ? spaces : []
+    this.#targetId = this.#targets.length ? (importTargetOf(spaces)?.id ?? '') : ''
+    this.requestUpdate()
+  }
+
+  /** The person chose another space for the new setlist: its people are the ones to pick a leader from */
+  async #chooseTarget(spaceId: string): Promise<void> {
+    this.#targetId = spaceId
+    const form = this.#form.value as SetlistDetailsForm
+    const me = await this.#fillPeople(form)
+    form.setlist = { ...form.setlist, leaderId: leaderOf(me) }
   }
 
   /** Give the form the people there are now, and who is using the app among them */
@@ -213,6 +241,7 @@ export class HomeView extends PageView {
 
   async #openCreate(): Promise<void> {
     const form = this.#form.value as SetlistDetailsForm
+    await this.#loadTargets()
     const me = await this.#fillPeople(form)
     const date = toLocalDateString(getNextSunday())
     // Defaults: next Sunday, a Sunday morning service, led by you
@@ -221,7 +250,7 @@ export class HomeView extends PageView {
       time: '10:30',
       type: determineSetlistType(date, ''),
       name: '',
-      leaderId: me?.id || '',
+      leaderId: leaderOf(me),
     }
     this.#modal.value?.show()
   }
@@ -325,6 +354,25 @@ export class HomeView extends PageView {
       </main>
 
       <app-modal id="create-setlist-modal" heading=${t('setlist-create-heading')} ${ref(this.#modal)}>
+        ${
+          this.#targets.length
+            ? html`<label class="create-space">
+                ${t('home-create-into')}
+                <select
+                  id="create-setlist-space"
+                  .value=${this.#targetId}
+                  @change=${(event: Event) => this.#chooseTarget((event.target as HTMLSelectElement).value)}
+                >
+                  ${this.#targets.map(
+                    space =>
+                      html`<option value=${space.id} ?selected=${space.id === this.#targetId}>
+                        ${space.team ? t('import-space-team', { space: space.name }) : space.name}
+                      </option>`
+                  )}
+                </select>
+              </label>`
+            : ''
+        }
         <setlist-details-form
           id="create-setlist-form"
           submit-label=${t('home-create-submit')}

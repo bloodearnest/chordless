@@ -1,9 +1,10 @@
 /** Setlists across spaces (all-spaces.ts): listed with their space, and found by id alone */
 import { expect } from '@open-wc/testing'
-import { findSetlistSpace, listAllSetlists } from '../src/js/all-spaces.ts'
-import type { Setlist, Space } from '../src/js/data-types.ts'
+import { findSetlistSpace, findSong, listAllSetlists } from '../src/js/all-spaces.ts'
+import type { ChordProRecord, Setlist, SongRecord, Space } from '../src/js/data-types.ts'
 import { createSetlist, openSpace } from '../src/js/db.ts'
 import { setDefaultSpaceId } from '../src/js/default-space.ts'
+import { addChart } from '../src/js/song-utils.ts'
 import { createSpace, deleteSpace } from '../src/js/space.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -35,26 +36,45 @@ describe('Setlists across spaces', () => {
     ])
   })
 
+  it('finds the space of a setlist from its id alone', async () => {
+    expect((await findSetlistSpace(inA, [a, b]))?.id).to.equal(a.id)
+    expect((await findSetlistSpace(inB, [a, b]))?.id).to.equal(b.id)
+    expect(await findSetlistSpace('nope', [a, b])).to.equal(undefined)
+  })
+
   it('reads the spaces of the device when not given them', async () => {
     const all = await listAllSetlists()
     expect(all.map(entry => entry.setlist.id)).to.include.members([inA, inB])
     expect((await findSetlistSpace(inB))?.id).to.equal(b.id)
   })
 
-  it('takes the default space’s copy of a setlist that two spaces have', async () => {
+  it('takes the default space’s copy of a setlist or song that two spaces have', async () => {
     const copy = { ...(await (await openSpace(a.id)).getSetlist(inA)) } as Setlist
     await (await openSpace(b.id)).saveSetlist(copy)
+    const add = { variantLabel: 'Test', importSource: 'test', makeDefault: 'first' } as const
+    const first = await addChart(await openSpace(a.id), '{title: Twice}\n{key: G}\n[G]Line', add)
+    const song = await (await openSpace(a.id)).getSong(first.uuid)
+    await (await openSpace(b.id)).saveSong(song as SongRecord)
+    const chart = await (await openSpace(a.id)).getChordPro(song?.chordproFileId as string)
+    await (await openSpace(b.id)).saveChordPro(chart as ChordProRecord)
+
     setDefaultSpaceId(b.id)
     try {
       expect((await findSetlistSpace(inA, [a, b]))?.id).to.equal(b.id)
+      expect((await findSong(first.uuid, [a, b]))?.space.id).to.equal(b.id)
+      setDefaultSpaceId(a.id)
+      expect((await findSong(first.uuid, [a, b]))?.space.id).to.equal(a.id)
     } finally {
       setDefaultSpaceId(null)
     }
   })
 
-  it('finds the space of a setlist from its id alone', async () => {
-    expect((await findSetlistSpace(inA, [a, b]))?.id).to.equal(a.id)
-    expect((await findSetlistSpace(inB, [a, b]))?.id).to.equal(b.id)
-    expect(await findSetlistSpace('nope', [a, b])).to.equal(undefined)
+  it('finds a song by uuid in whichever space has it', async () => {
+    const add = { variantLabel: 'Test', importSource: 'test', makeDefault: 'first' } as const
+    const mine = await addChart(await openSpace(a.id), '{title: In A Song}\n{key: G}\n[G]Line', add)
+    const found = await findSong(mine.uuid, [a, b])
+    expect(found?.space.id).to.equal(a.id)
+    expect(found?.song.title).to.equal('In A Song')
+    expect(await findSong('nobody', [a, b])).to.equal(undefined)
   })
 })

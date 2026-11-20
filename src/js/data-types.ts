@@ -477,7 +477,9 @@ export interface SongWithContent {
   parsed: ParsedChart
   /** Set when the song is from another database than the space's (see other-songs.ts) */
   source?: SongSource
-  /** The space a song of the library is in, set where the device has more than one */
+  /** The space a song of the library is in (not set on a song of "Shared with me") */
+  spaceId?: string
+  /** That space's name, set where the device has more than one */
   spaceName?: string
   /** How many variants the song has, set by getLibrarySongs when it lists every variant */
   variantCount?: number

@@ -68,6 +68,21 @@ export async function getSongsElsewhere(currentDbId: string): Promise<SongWithCo
   return [...found.values()]
 }
 
+/** The songs received in shared setlists, marked as from "Shared with me" (none where there are no shared setlists) */
+export async function getSharedSongs(): Promise<SongWithContent[]> {
+  const source: SongSource = { dbId: SHARED_DB_ID, label: SHARED_LABEL }
+  try {
+    if (!(await databaseExists(SHARED_DB_ID))) return []
+    const songs = await withSource(SHARED_DB_ID, db => getLibrarySongs(db))
+    return songs.map(song => ({ ...song, source }))
+  } catch (error) {
+    /* v8 ignore start -- the library works without them (the same as getSongsElsewhere's) */
+    console.error('[Songs] Could not read the songs shared with this device:', error)
+    return []
+  }
+}
+/* v8 ignore stop */
+
 /**
  * The songs of a space marked with its name, where the device has more than one space (with one,
  * saying which each is in is noise): the library lists them with songs of other spaces
@@ -75,9 +90,14 @@ export async function getSongsElsewhere(currentDbId: string): Promise<SongWithCo
 export function withSpaceName(
   songs: SongWithContent[],
   spaceCount: number,
-  spaceName: string
+  spaceName: string,
+  spaceId?: string
 ): SongWithContent[] {
-  return spaceCount > 1 ? songs.map(song => ({ ...song, spaceName })) : songs
+  return songs.map(song => ({
+    ...song,
+    ...(spaceId ? { spaceId } : {}),
+    ...(spaceCount > 1 ? { spaceName } : {}),
+  }))
 }
 
 /**

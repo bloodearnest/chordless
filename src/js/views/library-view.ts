@@ -22,7 +22,6 @@ import '../../components/key-selector.ts'
 import type { LeftOutChangeEvent } from '../../components/library-space-filter.ts'
 import '../../components/library-space-filter.ts'
 import '../../components/song-card.ts'
-import '../../components/space-tabs.ts'
 import '../../components/song-display.ts'
 import type { SongInfoDialog, SongRangeChangedEvent } from '../../components/song-info-dialog.ts'
 import type { SongVersionsChangedEvent } from '../../components/song-versions.ts'
@@ -36,15 +35,17 @@ import type {
 } from '../../components/song-section.ts'
 import '../../components/song-section.ts'
 import '../../components/status-message.ts'
+import { findSong, withSpace } from '../all-spaces.ts'
 import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../data-types.ts'
 import { watchData } from '../data-watcher.ts'
-import { getCurrentDB } from '../db.ts'
+import { type ChordlessDB, getCurrentDB, openSpace } from '../db.ts'
+import { importTargetOf } from '../default-space.ts'
 import { filterByPlace, loadLeftOut, placesOf, saveLeftOut } from '../library-spaces.ts'
 import { goTo } from '../navigation.ts'
 import {
   addToLibrary,
+  getSharedSongs,
   getSongFromAnywhere,
-  getSongsElsewhere,
   withSongsFromElsewhere,
   withSpaceName,
 } from '../other-songs.ts'
@@ -56,7 +57,7 @@ import { createLibrarySongModel } from '../song-model-factory.ts'
 import { setSongUserPref } from '../song-user-prefs.ts'
 import { getLibrarySongs } from '../song-utils.ts'
 import * as SongViewManager from '../song-view-manager.ts'
-import { getCurrentSpace, listSpaces } from '../space.ts'
+import { listSpaces } from '../space.ts'
 import { getAvailableKeys, transposeKeyName, transposeSong } from '../transpose.ts'
 import { filterSongs, warmSearch } from '../utils/song-filter.ts'
 import { PageView, type ViewState } from './page-view.ts'
@@ -110,17 +111,47 @@ export class LibraryView extends PageView {
    */
   #songs = new Task(this, {
     task: async () => {
-      const db = await getCurrentDB()
-      const own = await getLibrarySongs(db, { withLastUsage: true, allVariants: true })
-      const songs = withSongsFromElsewhere(
-        withSpaceName(own, (await listSpaces()).length, getCurrentSpace().name),
-        await getSongsElsewhere(db.dbName)
-      )
+      // Every space's songs, each in its own space; what was received in shared setlists comes after,
+      // for the ones no space has
+      const spaces = await listSpaces()
+      const own = (
+        await Promise.all(
+          spaces.map(async space =>
+            withSpaceName(
+              await withSpace(space.id, db =>
+                getLibrarySongs(db, { withLastUsage: true, allVariants: true })
+              ),
+              spaces.length,
+              space.name,
+              space.id
+            )
+          )
+        )
+      ).flat()
+      const songs = withSongsFromElsewhere(own, await getSharedSongs())
+      this.#spaceNames = new Map(spaces.map(space => [space.id, space.name]))
       warmSearch(songs)
       return songs
     },
     args: () => [],
   })
+
+  /** The names of the spaces, for the filter bar (kept as the list is loaded) */
+  #spaceNames: ReadonlyMap<string, string> = new Map()
+
+  /**
+   * The database a song is in: its own space's. A song received in a shared setlist is in none:
+   * it is the default space's library that adds it (the library it is copied into)
+   */
+  async #dbFor(song: SongWithContent): Promise<ChordlessDB> {
+    return song.spaceId && !song.source ? openSpace(song.spaceId) : this.#libraryDB()
+  }
+
+  /** The default space's database (or the first one that can be written to) */
+  async #libraryDB(): Promise<ChordlessDB> {
+    const target = importTargetOf(await listSpaces())
+    return target ? openSpace(target.id) : getCurrentDB()
+  }
 
   // ==================== Lifecycle ====================
 
@@ -177,7 +208,10 @@ export class LibraryView extends PageView {
     const header = this.querySelector<AppHeader>('#library-app-header')
     const content = this.#content.value?.querySelector<HTMLElement>('.song-content')
     if (!song || !header) return
-    const found = scoreWithKey(await (await getCurrentDB()).getScore(song.uuid), song.originalKey)
+    const found = scoreWithKey(
+      await (await this.#dbFor(song)).getScore(song.uuid),
+      song.originalKey
+    )
     // (the song may have changed while this was read)
     if (this.#song !== song) return
     if (this.#content.value) attachCues(this.#content.value, found)
@@ -267,7 +301,10 @@ export class LibraryView extends PageView {
     }
     this.#openUuid = uuid
     try {
-      const song = await getSongFromAnywhere(uuid, await getCurrentDB())
+      const inSpace = await findSong(uuid)
+      const song = inSpace
+        ? { ...inSpace.song, spaceId: inSpace.space.id }
+        : await getSongFromAnywhere(uuid, await this.#libraryDB())
       if (sync !== this.#syncing) return
       await this.#viewSong(song)
     } catch (error) {
@@ -379,7 +416,7 @@ export class LibraryView extends PageView {
     // (a song shown as its lead sheet keeps it through being drawn again: its lyrics are not seen meanwhile)
     const sheet = this.#melodyOn ? shownSheet(content) : null
     await SongViewManager.renderSongView(parsed, content, { songIndex: 0, sheet })
-    const db = await getCurrentDB()
+    const db = await this.#dbFor(song)
     const model = createLibrarySongModel(song, db, db.spaceId)
     SongViewManager.initializeSongSections(content, model, { editMode: this.#editMode })
     // (a song the library holds of another space has none of its melodies here, so none is shown)
@@ -427,7 +464,7 @@ export class LibraryView extends PageView {
   async #saveSong(): Promise<void> {
     if (!this.#song) return
     try {
-      const db = await getCurrentDB()
+      const db = await this.#dbFor(this.#song)
       const model = createLibrarySongModel(this.#song, db, db.spaceId)
 
       if (this.#key && this.#key !== model.getKey()) {
@@ -469,7 +506,7 @@ export class LibraryView extends PageView {
     const song = this.#song as SongWithContent
     const metadata = this.#parsed?.metadata
     keySelector.showRangeOf(metadata, metadata?.key as string, async () =>
-      (await getCurrentDB()).getScore(song.uuid)
+      (await this.#dbFor(song)).getScore(song.uuid)
     )
     // The key is saved with the song, which a user who can only read can't change
     keySelector.editMode = this.#editMode
@@ -570,7 +607,7 @@ export class LibraryView extends PageView {
 
     // Back to the key it was imported in. Drawing the song starts its
     // sections from what is saved, so forget that first: they start as the defaults
-    const db = await getCurrentDB()
+    const db = await this.#dbFor(this.#song)
     setSongUserPref(this.#song.id, db.spaceId, 'sectionDefaults', undefined)
     const originalKey = this.#song.originalKey || this.#parsed.metadata.key
     await this.#renderInKey(originalKey || undefined)
@@ -583,7 +620,7 @@ export class LibraryView extends PageView {
     // (the button is there only for a song from another database)
     const song = this.#song as SongWithContent
     try {
-      const added = await addToLibrary(song, await getCurrentDB())
+      const added = await addToLibrary(song, await this.#libraryDB())
       await goTo(buildUrl({ name: 'songs', songUuid: added.uuid }), { replace: true })
     } catch (error) {
       console.error('Could not add the song to the library:', error)
@@ -608,7 +645,7 @@ export class LibraryView extends PageView {
   async #showInfo(): Promise<void> {
     if (!this.#parsed || !this.#song || this.#song.source) return
     const dialog = this.#infoDialog.value as SongInfoDialog
-    dialog.db = await getCurrentDB()
+    dialog.db = await this.#dbFor(this.#song)
     await dialog.show(this.#song.id, { title: this.#parsed.metadata.title })
   }
 
@@ -627,17 +664,16 @@ export class LibraryView extends PageView {
         detail=${t('status-library-empty-detail')}
       ></status-message>`
     }
-    const { id, name } = getCurrentSpace()
-    const here = { id: id as string, label: name }
+    const names = this.#spaceNames
     return html`<library-space-filter
-        .places=${placesOf(songs, here)}
+        .places=${placesOf(songs, names)}
         .leftOut=${this._leftOut}
         @library-space-filter:change=${(event: LeftOutChangeEvent) => this.#leftOutChanged(event)}
       ></library-space-filter>
       <song-list
       variant="library"
       empty-message=${t('status-songs-no-match')}
-      .songs=${filterSongs(filterByPlace(songs, this._leftOut, here), this._search)}
+      .songs=${filterSongs(filterByPlace(songs, this._leftOut, names), this._search)}
       .search=${this._search}
       @song-list:select=${(event: SongSelectEvent) => event.song && this.#openSong(event.song)}
     ></song-list>`
@@ -673,7 +709,6 @@ export class LibraryView extends PageView {
           <div class="song-meta-compact" id="library-song-meta-header" style="display: none"></div>
         </div>
       </app-header>
-      <space-tabs></space-tabs>
 
       <main class="songs-main">
         <div class="songs-content-container" id="songs-content-container">
