@@ -200,15 +200,13 @@ describe('space-manager', () => {
   })
 
   describe('the space in use', () => {
-    it('is marked as current, and can be deleted: it says another is taken, and the page is told', async () => {
+    it('can be deleted when it is the one in use: another is taken, and the page is told', async () => {
       const mine = await space('Mine')
       const other = await space('Other')
       await setCurrentSpace(mine.id, mine.name)
       const el = await page(mine.id)
-      expect(text(el)).to.contain('Current')
       const button = must(el.shadowRoot?.querySelector<HTMLButtonElement>('#delete'))
       expect(button.disabled).to.equal(false)
-      expect(text(el)).to.contain('you will be taken to another')
 
       let wasCurrent: boolean | undefined
       el.addEventListener(SpaceGoneEvent.type, event => {
@@ -216,7 +214,7 @@ describe('space-manager', () => {
       })
       button.click()
       const modal = await answer(el, 'Delete from this device?', true)
-      expect(modal.message).to.contain('It is the one you are in')
+      expect(modal.message).to.not.contain('It is the one you are in')
       await waitUntil(() => wasCurrent !== undefined)
       expect(wasCurrent).to.equal(true)
       expect(await getSpaceById(mine.id)).to.equal(undefined)

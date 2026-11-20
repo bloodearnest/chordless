@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import { ChordlessDB } from '../js/db.ts'
+import { defaultSpaceOf } from '../js/default-space.ts'
 import { driveApi } from '../js/drive-api.ts'
 import { type PickedFolder, pickFolder } from '../js/folder-picker.ts'
 import {
@@ -13,7 +14,7 @@ import {
   type SignInState,
 } from '../js/google-auth.ts'
 import { withSource } from '../js/other-songs.ts'
-import { getCurrentSpace, listSpaces, switchSpace } from '../js/space.ts'
+import { listSpaces, switchSpace } from '../js/space.ts'
 import {
   type Bring,
   bringAcross,
@@ -174,11 +175,12 @@ export class TeamSpaceWizard extends LitElement {
     if (this._state === 'form' && this._sources.length === 0) await this._findSources()
   }
 
-  /** The spaces of this device that hold something to bring, the one in use first */
+  /** The spaces of this device that hold something to bring, the default first */
   async _findSources(): Promise<void> {
-    const current = getCurrentSpace().id
-    const spaces = (await listSpaces()).filter(space => !isTeamMember(space))
-    spaces.sort((a, b) => Number(b.id === current) - Number(a.id === current))
+    const all = await listSpaces()
+    const preferred = defaultSpaceOf(all)?.id
+    const spaces = all.filter(space => !isTeamMember(space))
+    spaces.sort((a, b) => Number(b.id === preferred) - Number(a.id === preferred))
     const counted = new Map<string, Contents>()
     const withSomething: Space[] = []
     for (const space of spaces) {

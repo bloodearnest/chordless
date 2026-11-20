@@ -89,20 +89,17 @@ describe('account-page', () => {
     expect(el.shadowRoot?.textContent).to.contain('invite link')
   })
 
-  it('keeps the spaces in the order they were added, whichever is in use, and marks only that one', async () => {
+  it('keeps the spaces in the order they were added, whichever is in use', async () => {
     const first = await space('First')
     await nextTimestamp()
     const second = await space('Second')
     const order = () => cards(el).map(card => card.space.id)
     await setCurrentSpace(first.id, first.name)
     const el = await page()
-    const mine = order().filter(id => id === first.id || id === second.id)
-    expect(mine).to.deep.equal([first.id, second.id])
-    expect(
-      cards(el)
-        .filter(card => card.current)
-        .map(card => card.space.id)
-    ).to.deep.equal([first.id])
+    expect(order().filter(id => id === first.id || id === second.id)).to.deep.equal([
+      first.id,
+      second.id,
+    ])
 
     await setCurrentSpace(second.id, second.name)
     await el.load()
@@ -111,11 +108,6 @@ describe('account-page', () => {
       first.id,
       second.id,
     ])
-    expect(
-      cards(el)
-        .filter(card => card.current)
-        .map(card => card.space.id)
-    ).to.deep.equal([second.id])
   })
 
   it('hands the sign-in on to the cards', async () => {

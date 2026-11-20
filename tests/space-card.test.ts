@@ -155,11 +155,11 @@ describe('space-card', () => {
     expect(text(await card('signed-out', { space: licensed }))).to.contain('CCLI licence 471102')
   })
 
-  it('puts the labels after the name on the left, and Current flush right, whatever the labels', async () => {
+  it('puts the labels after the name on the left', async () => {
     const team = await make(`Team ${crypto.randomUUID().slice(0, 8)}`, {
       team: { id: 't-9', role: 'writer' },
     })
-    const el = await card('signed-in', { space: team, current: true })
+    const el = await card('signed-in', { space: team })
     const box = (selector: string) =>
       must(el.shadowRoot?.querySelector(selector)).getBoundingClientRect()
     const chips = Array.from(el.shadowRoot?.querySelectorAll('.chip') ?? []).map(chip =>
@@ -169,14 +169,6 @@ describe('space-card', () => {
     expect(chips).to.have.length(2)
     expect(chips[0].left).to.be.greaterThan(title.right - 1)
     expect(chips[1].left).to.be.greaterThan(chips[0].right - 1)
-    expect(Math.round(box('.badge').right)).to.equal(Math.round(box('.head').right))
-    // (the same place when there are no labels)
-    const plain = await card('signed-in', { current: true })
-    expect(
-      Math.round(must(plain.shadowRoot?.querySelector('.badge')).getBoundingClientRect().right)
-    ).to.equal(
-      Math.round(must(plain.shadowRoot?.querySelector('.head')).getBoundingClientRect().right)
-    )
   })
 
   it('labels nothing for a personal space that is still called Personal', async () => {
@@ -247,13 +239,6 @@ describe('space-card', () => {
     const el = await card('signed-in', { space: team })
     expect(el.shadowRoot?.querySelector('.title')?.textContent).to.equal(team.name)
     expect(labels(el)).to.deep.equal(['Team', 'Worship leader'])
-  })
-
-  it('marks the space in use', async () => {
-    const current = await card('signed-out', { current: true })
-    expect(text(current)).to.contain('Current')
-    const other = await card('signed-out')
-    expect(text(other)).to.not.contain('Current')
   })
 
   it('says one song and one setlist in the singular, and a changed space is counted again', async () => {
