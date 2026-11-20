@@ -30,6 +30,9 @@ __pycache__/
 .idea/
 coverage/
 
+# Local test failure notes
+/docs/test-catches.jsonl
+
 # Vite build output
 dist/
 .cloudflare-token
