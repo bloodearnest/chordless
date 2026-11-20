@@ -617,7 +617,7 @@ export class AppHeader extends LitElement {
                     aria-pressed=${this.melodyMode ? 'true' : 'false'}
                     ?disabled=${this.melodyUnavailable}
                   >
-                    <app-icon name="music"></app-icon>
+                    <app-icon name="treble-clef"></app-icon>
                   </button>
                 `
                 : ''

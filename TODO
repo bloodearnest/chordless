@@ -55,6 +55,7 @@ preferences
   large box and a big tap target on the whole row)
 
 song edit UI
+- use a treble clef, rather than musical notes, for the lead sheet button so it reads as a score
 - the click sound: choose it (a later change; the downbeat emphasis and the double click are done)
 - pads on/off and the click on/off for this song (the pad set is in the edit box and the double click is a 2× button on the player: both in song-user-prefs.ts, kept on this device)
 - on first render, the key/capo drop downs render to the left for split second, then move to the right place
@@ -93,6 +94,7 @@ browser support (the reasoning and the floor are in docs/BUILD.md, "The browser 
   scripts cannot even parse (an iPhone on 18.0.1 was reported, which is above the floor: check it works)
 
 navigation
+- on the setlist home page, show today and future setlists together, then past setlists collapsed by year
 - When the supported browsers all have the Navigation API (Safari/iOS 26.2, Chrome 102; the floor
   is Safari/iOS 17 now, and Firefox, from 147, is not targeted), rewrite AppRouter on it and delete the code the platform then does: link interception,
   popstate, history entry keys and the view state in sessionStorage (use the entry's state), and

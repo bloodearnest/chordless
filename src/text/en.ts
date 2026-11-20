@@ -1838,6 +1838,8 @@ about-blurb = Chordless shows the lyrics and chords of worship songs for church,
 home-create = Create new setlist
 home-create-submit = Create Setlist
 home-create-into = Create in
+home-current-upcoming = Current and upcoming
+home-history = Past setlists
 
 setlist-go-live = Go live
 setlist-share = Share setlist
