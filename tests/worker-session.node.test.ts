@@ -1032,6 +1032,33 @@ describe('signing in with an emailed code', () => {
     assert.equal((await w.verify('nope', '123456')).status, 401)
   })
 
+  test('refuses a code used by another request between the lookup and the use', async () => {
+    const w = world()
+    await w.start('ann@example.com')
+    const racing = {
+      ...w.e,
+      DB: {
+        ...w.e.DB,
+        batch: w.e.DB.batch.bind(w.e.DB),
+        prepare(sql: string) {
+          if (sql.startsWith('DELETE FROM login_codes WHERE address_hash = ? AND code_hash = ?')) {
+            w.sql.exec('DELETE FROM login_codes')
+          }
+          return w.e.DB.prepare(sql)
+        },
+      },
+    }
+    const answer = await handleEmailVerify(
+      post('/session/email/verify', { address: 'ann@example.com', code: w.codeSent() }),
+      racing,
+      NOW
+    )
+    assert.equal(answer.status, 401)
+    assert.deepEqual(await bodyOf(answer), { error: 'invalid_code', reason: 'expired' })
+    assert.equal(w.sql.prepare('SELECT * FROM accounts').all().length, 0)
+    assert.equal(w.sql.prepare('SELECT * FROM sessions').all().length, 0)
+  })
+
   test('lets one of two requests with the right code in, at the same moment', async () => {
     const w = world()
     await w.start('ann@example.com')

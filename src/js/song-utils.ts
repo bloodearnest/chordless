@@ -20,6 +20,7 @@ import { getCurrentDB, normalizeTitle } from './db.ts'
 import { keyOfChart } from './library-repair.ts'
 import { ChordProParser } from './parser.ts'
 import { songSource } from './song-source.ts'
+import { ulid } from './ulid.ts'
 import { hashText } from './utils/hash.ts'
 import type { NoteRange } from './voice-range.ts'
 
@@ -292,7 +293,7 @@ export async function findExistingSong(
 
 /** Store a chart's text as a new chordpro file; its id */
 async function saveNewChordPro(db: ChordlessDB, content: string, contentHash: string) {
-  const id = `chordpro-${crypto.randomUUID()}`
+  const id = `chordpro-${ulid()}`
   const now = new Date().toISOString()
   await db.saveChordPro({ id, content, contentHash, createdDate: now, modifiedDate: now })
   return id
@@ -323,7 +324,7 @@ export function chartIdentity(
     ? `ccli-${ccliNumber}`
     : named
       ? `title-${titleNormalized}`
-      : `song-${crypto.randomUUID()}`
+      : `song-${ulid()}`
   return { ccliNumber, title, titleNormalized, id: fallback.id || derivedId }
 }
 
@@ -356,7 +357,7 @@ async function insertSong(
   const chordproFileId = await saveNewChordPro(db, chordpro, contentHash)
   const now = new Date().toISOString()
   return db.saveSong({
-    uuid: crypto.randomUUID(),
+    uuid: ulid(),
     id: identity.id,
     ...placement,
     chordproFileId,

@@ -22,6 +22,7 @@ import {
   setlistCode,
   shareUrl,
 } from '../src/js/share-crypto.ts'
+import { ulid } from '../src/js/ulid.ts'
 
 const setlist = {
   date: '2026-10-11',
@@ -267,6 +268,28 @@ test('links hold the file id, then the key and the setlist code after the #, and
 test('a link that is not a URL at all is not a share link', () => {
   assert.equal(parseShareUrl('http://['), null)
   assert.equal(parseShareUrl('/not-a-share'), null)
+})
+
+test('a setlist made since ULIDs has a code too, from the random end of its id, and matches only itself', () => {
+  const made = ulid()
+  const code = setlistCode(made)
+  assert.match(code, /^[\w-]{6}$/)
+  assert.equal(matchesSetlistCode(code, made), true)
+  assert.equal(matchesSetlistCode(code, ulid()), false, 'another made at once has another code')
+  const key = generateShareKey()
+  assert.deepEqual(
+    parseShareUrl(shareUrl('https://chordless.app', 'file-id-1234567890', key, made)),
+    {
+      fileId: 'file-id-1234567890',
+      key,
+      code,
+    }
+  )
+  // (a uuid's code is what it was: links already given out still find their setlist)
+  assert.equal(
+    setlistCode('3f2a9c10-7b1e-4d55-9a6c-0e8f12345678'),
+    toBase64Url(Uint8Array.from([0x3f, 0x2a, 0x9c, 0x10]))
+  )
 })
 
 test('an id that is not a UUID has no setlist code, and so matches nothing', () => {

@@ -1,6 +1,6 @@
 # Build plan: phase 1 of storage in D1 (Teams)
 
-**Status: plan, nothing built (2026-11-20).** Written against the design in
+**Status (2026-11-20): steps 0 and 1 are built, merged and applied in production (migrations `0011`, `0012`; `0013` merged in #278, applied by its deploy). Step 2a (ULIDs, people included) is in review (#281); the rest of step 2 onward is not built, and nothing reads or writes the new tables from a device yet.** Written against the design in
 [CENTRAL_STORAGE.md](CENTRAL_STORAGE.md) (an old name: it is only "central" because the app began distributed) as updated on `codex/beta-stable-release-design` (song index
 in D1, preferences later). The Beta and Stable release channels are only a plan, so this one does not wait
 for them. The schema it ends in is drawn in [D1_SCHEMA.md](D1_SCHEMA.md).
@@ -85,13 +85,24 @@ random tail of a ULID or links from new setlists lose it. The ids made by `crypt
 (`db.ts`, `song-utils.ts`, `space-db.ts`, `space-transfer.ts`, `annotations-controller.ts`, the Worker's
 `newSpaceId`) change to it, one place at a time, in step 2.
 
+**Built (2026-11-20, step 2a).** `src/js/ulid.ts` (monotonic within a millisecond, steady if the clock steps back) and the places that made
+record ids now use it: a setlist, a song's `uuid` and its fallback `songId`, a chart's file id, a copied setlist, an annotation,
+a personal space, and the Worker's team space id, and a new person (an id made from an address would be taken by whoever
+next has it, once it is removed from the first person). Two devices that each make the person for one address make two, and
+`dedupePeople` joins them on the shared address, the same way on every device (the id that is not a ULID, else the earliest, is
+kept; the setlists they led follow). Only the conversion of a legacy record keeps its derived id (`personFromLegacy`), so
+devices converting apart agree. Telemetry, message and tab ids are not records and stay
+uuids. Two places read the shape of an id and were fixed: `setlistCode()` (a ULID has a code from its random end) and the
+file names in a space export and a person's Drive file, which took the first eight characters of an id (the time, for a ULID)
+and now use `shortId()`.
+
 ## Steps
 
 Each is its own pull request, in this order (step 0 first), and each passes the whole of `just ci` alone (Biome, `tsc -b`,
 knip, node tests, browser unit tests, coverage-check, Playwright). Each ships by the ordinary merge;
 nothing is turned on for a team until step 4.
 
-**0. Clean up the existing schema first (decided with the owner, 2026-11-20).**
+**0. Clean up the existing schema first (decided with the owner, 2026-11-20). Built and applied (2026-11-20, #275).**
 [SCHEMA_AUDIT.md](SCHEMA_AUDIT.md) found no foreign keys on any of the 13 tables, team members keyed by a login
 instead of an account, nullable columns that should be required, empty-string sentinels, no `CHECK`s and a few
 missing indexes. One migration (`0011_schema_cleanup.sql`) rebuilds the tables with proper keys, `NOT NULL`,
@@ -99,7 +110,7 @@ missing indexes. One migration (`0011_schema_cleanup.sql`) rebuilds the tables w
 production's data and run by the owner with a backup taken. Nothing below starts until it is merged. The tables
 in the steps after it are written the same way, so the new migration is `0012_space_data.sql`.
 
-**1. The tables and the space-data API on the Worker (no client change). Built (2026-11-20).**
+**1. The tables and the space-data API on the Worker (no client change). Built and applied (2026-11-20, #277, #278).**
 Migration `0012_space_data.sql`: the five typed tables of [D1_SCHEMA.md](D1_SCHEMA.md) (`space_songs`,
 `space_setlists`, `space_setlist_songs`, `space_people`, `space_pad_sets`), the unique setlist id, and
 `teams.storage` (`'drive'` by default, `'d1'` once moved: only for the move, deleted afterwards). `worker/src/space-data.ts` with the routes
@@ -118,21 +129,24 @@ above, the role checks and the ETag, and the types both sides share (`src/js/spa
 - **A team that has not moved** (`teams.storage = 'drive'`) is told `409 not_moved`; its files API goes on as it was.
 - **The batch** (`POST /batch`) applies up to 100 changes one at a time, each with its own answer
   (`ok | conflict | missing | forbidden | invalid`).
-Tests (`tests/space-data.node.test.ts`, through the router with real tokens): all of the above, 40 cases.
+Tests (`tests/space-data.node.test.ts`, through the router with real tokens): all of the above, 44 cases.
 
-**2. The device's side of it, ids and entry fields.**
+**2. The device's side of it, ids and entry fields.** In four parts, each its own pull request:
+**2a (ULIDs; built, #281):** new ids are ULIDs (a new person too), people who share an address are joined on every device
+(`dedupePeople`), and the code that read an id's shape is fixed. **2b:** the database version bump (below). **2c:** `space-data.ts`
+and the sync. **2d:** the Drive engine skips the moved collections. The whole of it:
 `src/js/space-data.ts` (`space-sync.ts` is taken, by the Account page's Sync button): snapshot apply, the outbox, the 409 merge, the live "changed" trigger. A
 database version bump (see [MIGRATIONS.md](MIGRATIONS.md): roll forward only) adds the outbox store,
 `version` on these records, a song-index record (uuid, `songId`, title, CCLI number, default key,
 `isDefault`, `variantOf`, the licence it came in under, content hash, `fileRef`) written when a song is added,
 changed or removed and read on a device whose song file is not there ("Get this song"), and `title` and
-`ccli` on a setlist entry, filled when it is made and refreshed when the song is opened. `ulid.ts` and the
-`setlistCode()` fix. The Drive engine learns to skip `setlists` and `people` for a space the Worker says has
+`ccli` on a setlist entry, filled when it is made and refreshed when the song is opened. (`ulid.ts` and the
+`setlistCode()` fix are 2a.) The Drive engine learns to skip `setlists` and `people` for a space the Worker says has
 moved (`GET /root` gains the flag). Nothing uses it yet, so behaviour is unchanged.
 
 **3. Seeding.**
 The owner runs the move by hand (a button on the Account page only an owner sees, or a script): from the
-owner's device, which has the complete local copy, push the space's setlists, people and index through the
+owner's device, which has the complete local copy, push the space's setlists, people (after `dedupePeople`, so a person two devices made twice is one) and index through the
 API, then set `teams.storage` to `'d1'`. Other devices read the snapshot on their next sync. Tests: a
 Drive-only space seeded; the index from a song whose file is absent; a second device reading it all; an
 offline edit that meets a 409 on reconnect.

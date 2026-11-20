@@ -7,8 +7,8 @@ import type { Person } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { getCurrentUserInfo } from './google-auth.ts'
 import {
+  duplicatesOf,
   findPerson,
-  idFromKey,
   isLive,
   leaderCounts,
   mergePlan,
@@ -17,6 +17,7 @@ import {
   resolvePerson,
 } from './leaders.ts'
 import { getCurrentSpaceFull } from './space.ts'
+import { ulid } from './ulid.ts'
 
 /** The signed-in Google account, or null if not signed in */
 export async function getSignedInUser(): Promise<{ email: string; name: string } | null> {
@@ -92,7 +93,9 @@ export function newPerson(
   const name = (who.name ?? '').trim()
   if (!email && !name) return null
   return {
-    id: idFromKey(email ? `email:${email}` : `name:${name.toLowerCase()}`),
+    // (an id of its own, not one made from the address: an address can be taken off a person and given to another. Two devices
+    // that each make the same person make two, which `dedupePeople` joins on their shared address)
+    id: ulid(),
     name: name || email,
     emails: email ? [email] : [],
     modifiedDate: now,
@@ -140,6 +143,8 @@ export async function chooseMe(db: ChordlessDB, personId: string): Promise<void>
 export async function getSpacePeople(
   db: ChordlessDB
 ): Promise<{ people: Person[]; me: Person | null; askWho: boolean }> {
+  // (two devices that each made the person for a member before they synced made two: they are joined first)
+  await dedupePeople(db)
   const [user, space] = await Promise.all([getSignedInUser(), getCurrentSpaceFull()])
   let people = await db.getAllPeople()
   const changed = new Map<string, Person>()
@@ -229,6 +234,20 @@ export async function mergePersonInto(
     })
   }
   return true
+}
+
+/**
+ * Join the people who share an address into one (a person made twice, by two devices that had not synced): the setlists the
+ * others led are led by the one kept, as in a merge by hand. Which is kept is the same on every device (`duplicatesOf`), so
+ * devices that do this at once agree. Resolves with how many were joined.
+ */
+export async function dedupePeople(db: ChordlessDB): Promise<number> {
+  let joined = 0
+  // (each merge is planned from the people as they are then: a person merged into one that was itself merged follows it)
+  for (const { from, into } of duplicatesOf(await db.getAllPeople())) {
+    if (await mergePersonInto(db, from, into)) joined++
+  }
+  return joined
 }
 
 /**

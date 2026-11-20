@@ -655,8 +655,9 @@ They sync as setlists do, with these differences:
   the leader's name) is made from the people as they now are.
 - **Conflicts:** a person changed on two devices keeps the emails of both and the name of the one saved
   later (`mergedPerson`), and the merge is sent by the next push.
-- **Identity:** a person made for an email or name (`idFromKey`) has the same id on every device, so
-  two devices that made the same person each find the other's file and keep one. A person with no file
+- **Identity:** a person has a ULID of its own. Two devices that each made the person for one address
+  make two; `dedupePeople` joins people who share an address, the same way on every device. (A person
+  converted from a legacy record keeps the id made from its address.) A person with no file
   of its own waits for a pull while the storage has a file for its id.
 - **Deletion:** a pull never deletes a person. One whose file is gone is sent again. A person deleted
   in the app is marked `deleted` (as a merged one is marked `mergedInto`) and the mark syncs like any
