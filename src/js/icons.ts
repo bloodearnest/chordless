@@ -8,9 +8,10 @@
  * Lucide Contributors 2022.
  *
  * The keys are Chordless's names; the comment after each names its source icon.
- * The treble clef is from Tabler Icons (MIT, copyright 2020-2026 Paweł Kuna):
- * https://github.com/tabler/tabler-icons (licence: public/licences/tabler-mit.txt).
+ * The treble clef and staff are engraved by Verovio with Petaluma (SIL OFL 1.1).
  */
+
+import { leadSheetIcon } from './lead-sheet-icon.ts'
 
 export const icons = {
   // Media controls
@@ -61,8 +62,7 @@ export const icons = {
     '<path d="M8 2v4" /><path d="M16 2v4" /><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M3 10h18" />', // calendar
   music:
     '<path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />', // music
-  'treble-clef':
-    '<path d="M16 12a4.16 4.16 0 0 1-5.62 3.89A3.78 3.78 0 0 1 8 12.5a3.42 3.42 0 0 1 2.34-3.38l3.79-1.42A2.89 2.89 0 0 0 16 5a2 2 0 1 0-4 0v14a2 2 0 1 1-4 0" />', // Tabler clef
+  'treble-clef': leadSheetIcon,
   bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />', // bookmark
   layers:
     '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" /><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" /><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />', // layers
