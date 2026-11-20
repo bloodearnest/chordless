@@ -175,6 +175,14 @@ terraform). CI installs mise itself from its release, checked against the SHA-25
 `scripts/ci/install-mise.sh` (`scripts/ci/setup-tools.sh`), and each job installs only the tools it
 uses. The end-to-end jobs write a `.dev.vars` of made-up values (`scripts/ci/fake-dev-vars.sh`).
 
+mise fetches those tools (and looks up their versions) from GitHub's API, and an anonymous call is 60 an hour for
+the runner's IP address, shared with whoever else is on it. That ran out on 2026-11-20: a Deploy failed at `npm ci` and
+the Terraform lint failed, both with `403 API rate limit exceeded` from mise. So each workflow that uses mise sets
+`MISE_GITHUB_TOKEN: ${{ github.token }}` in its `env:` (`ci.yml`, `deploy.yml`, `terraform.yml`, `advisories.yml`). The
+job's own token authenticates the call and needs no permission to read public releases, so the `permissions:` stay as
+they were; the name is mise's own, so nothing else (`gh`, `git`) starts using it. A workflow that calls another (deploy
+calls ci) needs it in both. A new workflow that runs mise needs it too.
+
 ## Caches
 
 `.github/actions/setup` restores, and `.github/actions/save-cache` saves:

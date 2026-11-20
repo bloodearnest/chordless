@@ -43,6 +43,12 @@ on:
 
 permissions: {}
 
+env:
+  # mise downloads its tools from GitHub, and an anonymous call is 60 an hour for the runner's address, shared with
+  # whoever else is on it: it ran out on 2026-11-20 and failed a deploy. The workflow's own token is enough to be
+  # authenticated (it needs no permission to read public releases); only mise reads this name (docs/CI.md)
+  MISE_GITHUB_TOKEN: ${{ github.token }}
+
 # One at a time, and none cancelled: a deploy must not be cut short. (Another run waiting is replaced
 # by a newer one, which is the one to deploy; deploy's guard below skips a run that is not the newest.)
 concurrency:

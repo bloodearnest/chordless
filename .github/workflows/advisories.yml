@@ -11,6 +11,12 @@ on:
 
 permissions: {}
 
+env:
+  # mise downloads its tools from GitHub, and an anonymous call is 60 an hour for the runner's address, shared with
+  # whoever else is on it: it ran out on 2026-11-20 and failed a deploy. The workflow's own token is enough to be
+  # authenticated (it needs no permission to read public releases); only mise reads this name (docs/CI.md)
+  MISE_GITHUB_TOKEN: ${{ github.token }}
+
 jobs:
   advisories:
     name: Advisories
