@@ -3,8 +3,9 @@
  * welcome card offers a new user to try. The charts are static files (public/samples/) fetched
  * when asked for, so nothing is loaded up front.
  */
+import { openDefaultSpace } from './all-spaces.ts'
 import type { SetlistEntry } from './data-types.ts'
-import { createSetlist, getCurrentDB } from './db.ts'
+import { createSetlist } from './db.ts'
 import { createSong, findExistingSong } from './song-utils.ts'
 
 /** What public/samples/index.json holds */
@@ -35,7 +36,7 @@ function titleOf(chart: string): string | null {
  */
 export async function addSampleSetlist(): Promise<string> {
   const index: SampleIndex = JSON.parse(await fetchText('/samples/index.json'))
-  const db = await getCurrentDB()
+  const db = await openDefaultSpace()
 
   const entries: SetlistEntry[] = []
   for (const file of index.songs) {

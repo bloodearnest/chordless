@@ -1,8 +1,9 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { ifDefined } from 'lit/directives/if-defined.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import { defaultSpaceOf } from '../js/default-space.ts'
 import { derivePadSetName, listPadDestinations, uploadPadSet } from '../js/pad-set-service.ts'
-import { getCurrentSpace } from '../js/space.ts'
+import { listSpaces } from '../js/space.ts'
 import { t } from '../js/text.ts'
 import { whatToSay } from '../js/utils/errors.ts'
 import { buttonStyles, fieldStyles } from './shared-styles.ts'
@@ -116,10 +117,13 @@ export class PadSetUpload extends LitElement {
   }
 
   async _loadDestinations(): Promise<void> {
-    this._destinations = await listPadDestinations()
-    const current = getCurrentSpace().id
-    this._destination = this._destinations.some(each => each.spaceId === current)
-      ? current
+    // (read together, so the choice is never shown without where it starts)
+    const [destinations, spaces] = await Promise.all([listPadDestinations(), listSpaces()])
+    this._destinations = destinations
+    // (the default space, as a new setlist and an import start there)
+    const preferred = defaultSpaceOf(spaces)?.id
+    this._destination = this._destinations.some(each => each.spaceId === preferred)
+      ? (preferred as string)
       : (this._destinations[0]?.spaceId ?? null)
   }
 

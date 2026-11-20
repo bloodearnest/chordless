@@ -4,7 +4,7 @@ import '../src/components/song-versions.ts'
 import type { SongRecord } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import { hashText } from '../src/js/song-utils.ts'
-import { createSpace, deleteSpace, setCurrentSpace, updateSpace } from '../src/js/space.ts'
+import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
 import {
@@ -377,23 +377,24 @@ describe('song-versions', () => {
 
   describe('in a Team', () => {
     let spaceId: string
-    let before: string | null
 
     beforeEach(async () => {
-      before = localStorage.getItem('current-space-id')
+      // (the song's own space decides what the person may do with it, not the one the app is in)
       const space = await createSpace(`Team ${crypto.randomUUID().slice(0, 8)}`)
       spaceId = space.id
+      must(db.db).close()
+      await deleteDatabase(dbName)
+      dbName = spaceId
+      db = new ChordlessDB(spaceId)
+      await db.init()
     })
 
     afterEach(async () => {
-      if (before) await setCurrentSpace(before)
-      else localStorage.removeItem('current-space-id')
       await deleteSpace(spaceId)
     })
 
     const asRole = async (role: 'owner' | 'admin' | 'writer' | 'reader') => {
       await updateSpace(spaceId, { team: { id: 't1', role } })
-      await setCurrentSpace(spaceId)
     }
 
     it('leaves deleting a song to an admin, but not deleting one of its versions', async () => {

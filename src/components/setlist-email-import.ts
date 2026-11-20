@@ -1,6 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
+import { openDefaultSpace } from '../js/all-spaces.ts'
 import type { Person, Setlist, SongWithContent } from '../js/data-types.ts'
-import { type ChordlessDB, determineSetlistType, getCurrentDB } from '../js/db.ts'
+import { type ChordlessDB, determineSetlistType } from '../js/db.ts'
 import { decodeImport, IMPORT_ADDRESS } from '../js/email-link.ts'
 import { type ImportedSetlist, type ImportedSong, nearestSunday } from '../js/email-setlist.ts'
 import { type LibrarySong, matchLibrary, type SongMatch } from '../js/import-plan.ts'
@@ -326,7 +327,7 @@ export class SetlistEmailImport extends LitElement {
 
   /** Show an email for review, with what the person had decided about it, if they had */
   async _review(email: ImportedSetlist, rows?: Decisions[], unlisted?: Decisions[]): Promise<void> {
-    const db = await getCurrentDB()
+    const db = await openDefaultSpace()
     this._db = db
     this._elsewhere = await getSongsElsewhere(db.dbName)
     this._library = await libraryForMatching(db, this._lyrics, this._elsewhere)

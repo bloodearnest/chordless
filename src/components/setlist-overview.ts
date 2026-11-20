@@ -91,6 +91,7 @@ export class SetlistOverview extends LitElement {
     songs: { type: Array, attribute: false },
     editMode: { type: Boolean, attribute: 'edit-mode' },
     controls: { type: Boolean },
+    spaceId: { type: String, attribute: 'space-id' },
     showTuning: { type: Boolean, attribute: 'show-tuning' },
     tuning: { attribute: false },
     deviceTuning: { type: Number, attribute: 'device-tuning' },
@@ -103,6 +104,8 @@ export class SetlistOverview extends LitElement {
   declare editMode: boolean
   /** Whether the person using the device controls the setlist: others can change only the songs they added for themselves */
   declare controls: boolean
+  /** The space the setlist is in: where a song's melody is read from */
+  declare spaceId: string
   /**
    * Whether the guitar's tuning for this setlist can be shown (the capo and tuning controls are on):
    * it is, always in edit mode, and out of it only when it is not standard
@@ -121,6 +124,7 @@ export class SetlistOverview extends LitElement {
     super()
     this.songs = []
     this.editMode = false
+    this.spaceId = ''
     this.controls = true
     this.showTuning = false
     this.tuning = null
@@ -180,6 +184,7 @@ export class SetlistOverview extends LitElement {
                 variant="setlist"
                 .editMode=${this.editMode && (this.controls || Boolean(local))}
                 .local=${Boolean(local)}
+                .spaceId=${this.spaceId}
                 @song-card:click=${() => this._handleSongClick(index)}
                 @song-card:delete=${() => this._handleSongDelete(index)}
                 @song-card:key-change=${(e: SongCardKeyChangeEvent) => this._handleSongKeyChange(index, e.key)}

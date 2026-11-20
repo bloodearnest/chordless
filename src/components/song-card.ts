@@ -121,6 +121,7 @@ export class SongCard extends LitElement {
     variant: { type: String, reflect: true },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
     local: { type: Boolean },
+    spaceId: { type: String, attribute: 'space-id' },
     search: { type: String },
     _melody: { state: true },
   }
@@ -130,6 +131,8 @@ export class SongCard extends LitElement {
   declare editMode: boolean
   /** A song this device added to the setlist for itself alone: marked as such */
   declare local: boolean
+  /** The space the song is in, where the card is of a setlist's song: its melody is read there */
+  declare spaceId: string
   /** The library search the song matched: its matches are marked, and a lyrics match is quoted */
   declare search: string
   /** The range of the song's melody, worked out when the key picker is shown (edit mode in a setlist) */
@@ -418,6 +421,7 @@ export class SongCard extends LitElement {
     this.variant = 'library'
     this.editMode = false
     this.local = false
+    this.spaceId = ''
     this.search = ''
     this._melody = null
   }
@@ -434,8 +438,9 @@ export class SongCard extends LitElement {
       this._melody = null
       return
     }
-    const { getCurrentDB } = await import('../js/db.ts')
-    const record = await (await getCurrentDB()).getScore(uuid)
+    const { getCurrentDB, openSpace } = await import('../js/db.ts')
+    const db = this.spaceId ? await openSpace(this.spaceId) : await getCurrentDB()
+    const record = await db.getScore(uuid)
     // (the card may have been given another song while this was read)
     if (this.song === song) this._melody = songMelody(song?.parsed?.metadata, record)
   }

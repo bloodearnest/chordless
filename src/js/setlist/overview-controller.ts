@@ -26,6 +26,8 @@ export interface OverviewHost {
   readonly songs: RuntimeSong[]
   /** Whether the person using the device controls the setlist (and so may reorder it) */
   readonly _controls: boolean
+  /** The space the setlist is in */
+  spaceId(): string
   readonly sections: { applyAll(): void }
   /** Show a song (or the overview, -1) */
   navigateTo(index: number): void
@@ -67,6 +69,7 @@ export class OverviewController {
     component.songs = songs
     component.editMode = this.editMode
     component.controls = this.host._controls
+    component.spaceId = this.host.spaceId()
     this.attach(component)
     return component
   }

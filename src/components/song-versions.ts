@@ -12,7 +12,7 @@ import {
   setlistsUsing,
   variantsOf,
 } from '../js/song-versions.ts'
-import { getCurrentSpaceFull } from '../js/space.ts'
+import { getSpaceById } from '../js/space.ts'
 import { mayDeleteSong } from '../js/team-roles.ts'
 import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
@@ -169,7 +169,7 @@ export class SongVersions extends LitElement {
     try {
       const db = await this._database()
       this._variants = await variantsOf(db, this.songId)
-      this._mayDeleteSong = mayDeleteSong((await getCurrentSpaceFull()).team?.role ?? null)
+      this._mayDeleteSong = mayDeleteSong((await getSpaceById(db.spaceId))?.team?.role ?? null)
       const songs = new Map<string, SongRecord>()
       for (const record of await db.getAllSongs()) {
         if (record.id === this.songId) continue

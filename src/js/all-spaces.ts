@@ -5,9 +5,9 @@
  */
 import type { Setlist, SongWithContent, Space } from './data-types.ts'
 import { type ChordlessDB, openSpace } from './db.ts'
-import { defaultSpaceOf } from './default-space.ts'
+import { defaultSpaceOf, importTargetOf } from './default-space.ts'
 import { getSongWithContent } from './song-utils.ts'
-import { listSpaces } from './space.ts'
+import { ensureCurrentSpace, listSpaces } from './space.ts'
 
 /** Run something with a space's database open, and let go of it after (many spaces are read in turn) */
 export async function withSpace<T>(
@@ -72,4 +72,14 @@ export async function findSong(uuid: string, spaces?: Space[]): Promise<SpaceSon
   }
   const chosen = found.length > 1 ? defaultSpaceOf(found.map(entry => entry.space)) : undefined
   return found.find(entry => entry.space.id === chosen?.id) ?? found[0]
+}
+
+/**
+ * The database new things go to when no space was asked for: the default space's (or the first one
+ * that can be written to). A device with no space gets its first made.
+ */
+export async function openDefaultSpace(): Promise<ChordlessDB> {
+  const target = importTargetOf(await listSpaces())
+  /* v8 ignore next 2 -- a device with no space at all: the tests always have some */
+  return openSpace((target ?? (await ensureCurrentSpace())).id)
 }

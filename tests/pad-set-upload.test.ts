@@ -6,9 +6,10 @@
 import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/pad-set-upload.ts'
 import { type PadSetUpload, PadSetUploadedEvent } from '../src/components/pad-set-upload.ts'
+import { setDefaultSpaceId } from '../src/js/default-space.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import { listPadSets, setPadSources } from '../src/js/pad-set-service.ts'
-import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
+import { createSpace, deleteSpace } from '../src/js/space.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { MemoryStorage, PERSONAL_PADS, padSources } from './memory-storage.ts'
 import { must } from './must.ts'
@@ -55,6 +56,8 @@ describe('the pad set upload', () => {
     form.addEventListener(PadSetUploadedEvent.type, () => uploaded++)
     document.body.append(form)
     await form.updateComplete
+    // (where it saves to is read when it is shown: a person cannot press Upload before it is)
+    await waitUntil(() => form._destination, 'the destination to be read')
   }
 
   beforeEach(() => {
@@ -205,13 +208,12 @@ describe('the pad set upload', () => {
 
     const destination = () => root().querySelector<HTMLSelectElement>('#padset-destination')
 
-    it('starts at the team space the app is in', async () => {
-      const before = getCurrentSpace()
+    it('starts at the default space', async () => {
       const space = await createSpace(`Pads ${crypto.randomUUID().slice(0, 8)}`)
       setPadSources(
         padSources(storage, [{ spaceId: space.id, name: 'Here', storage: storage.pads }])
       )
-      await setCurrentSpace(space.id, space.name)
+      setDefaultSpaceId(space.id)
       try {
         await show()
         await waitUntil(() => destination(), 'the Save to choice')
@@ -219,16 +221,16 @@ describe('the pad set upload', () => {
         expect(form._destination).to.equal(space.id)
         form.remove()
 
-        // (in a space that has nowhere for pads yet, it starts at the first place there is)
+        // (with a default that has nowhere for pads yet, it starts at the first place there is)
         const own = await createSpace(`Own ${crypto.randomUUID().slice(0, 8)}`)
-        await setCurrentSpace(own.id, own.name)
+        setDefaultSpaceId(own.id)
         await show()
         await waitUntil(() => destination(), 'the Save to choice')
         expect(form._destination).to.equal(PERSONAL_PADS)
         await deleteSpace(own.id)
       } finally {
+        setDefaultSpaceId(null)
         await deleteSpace(space.id)
-        if (before.id) await setCurrentSpace(before.id, before.name)
       }
     })
 
