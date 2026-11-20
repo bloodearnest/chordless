@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1340" height="1010" viewBox="0 0 1340 1010" font-family="Helvetica, Arial, sans-serif">
-<rect width="1340" height="1010" fill="#fafbfc"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1340" height="1040" viewBox="0 0 1340 1040" font-family="Helvetica, Arial, sans-serif">
+<rect width="1340" height="1040" fill="#fafbfc"/>
 <text x="30" y="30" font-size="20" font-weight="700" fill="#1b2733">Chordless D1 schema: the proposed final shape</text>
 <rect x="760" y="14" width="14" height="14" rx="3" fill="#5b7083"/><text x="780" y="26" font-size="12" fill="#333">exists today</text>
 <rect x="880" y="14" width="14" height="14" rx="3" fill="#2e8b57"/><text x="900" y="26" font-size="12" fill="#333">phase 1</text>
@@ -22,13 +22,13 @@
 <path d="M32,629.0 H50" stroke="#8a97a3" stroke-width="1.4"/><circle cx="50" cy="629.0" r="3" fill="#8a97a3"/>
 <path d="M32,735.0 H50" stroke="#8a97a3" stroke-width="1.4"/><circle cx="50" cy="735.0" r="3" fill="#8a97a3"/>
 <text x="28" y="67.0" font-size="10" fill="#5d6b78" text-anchor="end">1:n</text>
-<path d="M500,191.0 H482 V861.0" fill="none" stroke="#8a97a3" stroke-width="1.4"/>
+<path d="M500,191.0 H482 V877.0" fill="none" stroke="#8a97a3" stroke-width="1.4"/>
 <path d="M482,387.0 H500" stroke="#8a97a3" stroke-width="1.4"/><circle cx="500" cy="387.0" r="3" fill="#8a97a3"/>
-<path d="M482,493.0 H500" stroke="#8a97a3" stroke-width="1.4"/><circle cx="500" cy="493.0" r="3" fill="#8a97a3"/>
-<path d="M482,589.0 H500" stroke="#8a97a3" stroke-width="1.4"/><circle cx="500" cy="589.0" r="3" fill="#8a97a3"/>
-<path d="M482,695.0 H500" stroke="#8a97a3" stroke-width="1.4"/><circle cx="500" cy="695.0" r="3" fill="#8a97a3"/>
-<path d="M482,775.0 H500" stroke="#8a97a3" stroke-width="1.4"/><circle cx="500" cy="775.0" r="3" fill="#8a97a3"/>
-<path d="M482,861.0 H500" stroke="#8a97a3" stroke-width="1.4"/><circle cx="500" cy="861.0" r="3" fill="#8a97a3"/>
+<path d="M482,509.0 H500" stroke="#8a97a3" stroke-width="1.4"/><circle cx="500" cy="509.0" r="3" fill="#8a97a3"/>
+<path d="M482,605.0 H500" stroke="#8a97a3" stroke-width="1.4"/><circle cx="500" cy="605.0" r="3" fill="#8a97a3"/>
+<path d="M482,711.0 H500" stroke="#8a97a3" stroke-width="1.4"/><circle cx="500" cy="711.0" r="3" fill="#8a97a3"/>
+<path d="M482,791.0 H500" stroke="#8a97a3" stroke-width="1.4"/><circle cx="500" cy="791.0" r="3" fill="#8a97a3"/>
+<path d="M482,877.0 H500" stroke="#8a97a3" stroke-width="1.4"/><circle cx="500" cy="877.0" r="3" fill="#8a97a3"/>
 <text x="478" y="183.0" font-size="10" fill="#5d6b78" text-anchor="end">1:n</text>
 <path d="M830,191.0 C870,191.0 884,45.0 924,75.0" fill="none" stroke="#8a97a3" stroke-width="1.4"/>
 <path d="M830,75.0 C870,75.0 884,45.0 924,75.0" fill="none" stroke="#8a97a3" stroke-width="1.4"/>
@@ -101,61 +101,63 @@
 <text x="508" y="117" font-size="10" font-weight="700" fill="#7e57c2">FK</text>
 <text x="548" y="117" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">owner_account_id</text>
 <text x="512" y="134" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">name, created_at, ended_at</text>
-<rect x="500" y="176" width="330" height="155" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<rect x="500" y="176" width="330" height="172" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
 <path d="M500,202 V182 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V202 Z" fill="#5b7083"/>
 <text x="510" y="194" font-size="13" font-weight="700" fill="#fff">teams</text>
 <text x="508" y="216" font-size="10" font-weight="700" fill="#5b7083">PK</text>
 <text x="548" y="216" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id</text>
 <text x="508" y="233" font-size="10" font-weight="700" fill="#5b7083">FK</text>
-<text x="548" y="233" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">owner_account_id</text>
+<text x="548" y="233" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">owner_account_id (NOT NULL)</text>
 <text x="512" y="250" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">name, owner_email</text>
 <text x="512" y="267" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">ccli_licence</text>
 <text x="512" y="284" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">root_ref (the Drive folder of songs)</text>
-<text x="512" y="301" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">credential, owner_provider, owner_sub</text>
-<text x="512" y="318" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">created_at, updated_at, ended_at</text>
-<rect x="500" y="372" width="330" height="87" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<text x="512" y="301" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">credential (owner | service-account)</text>
+<text x="512" y="318" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">owner_provider, owner_sub (audit Q2)</text>
+<text x="512" y="335" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">created_at, updated_at, ended_at</text>
+<rect x="500" y="372" width="330" height="104" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
 <path d="M500,398 V378 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V398 Z" fill="#5b7083"/>
 <text x="510" y="390" font-size="13" font-weight="700" fill="#fff">team_members</text>
-<text x="508" y="412" font-size="10" font-weight="700" fill="#5b7083">PK</text>
-<text x="548" y="412" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id, identity</text>
-<text x="508" y="429" font-size="10" font-weight="700" fill="#5b7083">FK</text>
-<text x="548" y="429" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">account_id</text>
-<text x="512" y="446" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">email, role, since</text>
-<rect x="500" y="478" width="330" height="87" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
-<path d="M500,504 V484 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V504 Z" fill="#5b7083"/>
-<text x="510" y="496" font-size="13" font-weight="700" fill="#fff">team_member_emails</text>
-<text x="508" y="518" font-size="10" font-weight="700" fill="#5b7083">PK</text>
-<text x="548" y="518" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id, email</text>
-<text x="508" y="535" font-size="10" font-weight="700" fill="#5b7083">FK</text>
-<text x="548" y="535" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">account_id</text>
-<text x="512" y="552" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">source</text>
-<rect x="500" y="574" width="330" height="87" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
-<path d="M500,600 V580 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V600 Z" fill="#5b7083"/>
-<text x="510" y="592" font-size="13" font-weight="700" fill="#fff">team_invites</text>
-<text x="508" y="614" font-size="10" font-weight="700" fill="#5b7083">PK</text>
-<text x="548" y="614" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id, id</text>
-<text x="512" y="631" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">email, role, created_by</text>
-<text x="512" y="648" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">created_at, expires_at, emailed_at</text>
-<rect x="500" y="680" width="330" height="70" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
-<path d="M500,706 V686 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V706 Z" fill="#5b7083"/>
-<text x="510" y="698" font-size="13" font-weight="700" fill="#fff">team_refs</text>
-<text x="508" y="720" font-size="10" font-weight="700" fill="#5b7083">PK</text>
-<text x="548" y="720" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id, ref</text>
-<text x="512" y="737" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">(Drive files of the team tree)</text>
-<rect x="500" y="760" width="330" height="70" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
-<path d="M500,786 V766 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V786 Z" fill="#5b7083"/>
-<text x="510" y="778" font-size="13" font-weight="700" fill="#fff">team_credentials</text>
-<text x="508" y="800" font-size="10" font-weight="700" fill="#5b7083">PK/FK</text>
-<text x="548" y="800" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id</text>
-<text x="512" y="817" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">blob (encrypted)</text>
-<rect x="500" y="846" width="330" height="87" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
-<path d="M500,872 V852 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V872 Z" fill="#5b7083"/>
-<text x="510" y="864" font-size="13" font-weight="700" fill="#fff">team_events</text>
-<text x="508" y="886" font-size="10" font-weight="700" fill="#5b7083">PK</text>
-<text x="548" y="886" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">id</text>
-<text x="508" y="903" font-size="10" font-weight="700" fill="#5b7083">FK</text>
-<text x="548" y="903" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id</text>
-<text x="512" y="920" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">at, kind, by_email, detail</text>
+<text x="508" y="412" font-size="10" font-weight="700" fill="#5b7083">PK/FK</text>
+<text x="548" y="412" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id → teams</text>
+<text x="508" y="429" font-size="10" font-weight="700" fill="#5b7083">PK/FK</text>
+<text x="548" y="429" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">account_id → accounts</text>
+<text x="512" y="446" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">role (admin | writer | reader)</text>
+<text x="512" y="463" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">joined_at</text>
+<rect x="500" y="494" width="330" height="87" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M500,520 V500 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V520 Z" fill="#5b7083"/>
+<text x="510" y="512" font-size="13" font-weight="700" fill="#fff">team_member_emails</text>
+<text x="508" y="534" font-size="10" font-weight="700" fill="#5b7083">PK</text>
+<text x="548" y="534" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id, email</text>
+<text x="508" y="551" font-size="10" font-weight="700" fill="#5b7083">FK</text>
+<text x="548" y="551" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">account_id</text>
+<text x="512" y="568" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">source  (likely dropped: SCHEMA_AUDIT.md)</text>
+<rect x="500" y="590" width="330" height="87" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M500,616 V596 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V616 Z" fill="#5b7083"/>
+<text x="510" y="608" font-size="13" font-weight="700" fill="#fff">team_invites</text>
+<text x="508" y="630" font-size="10" font-weight="700" fill="#5b7083">PK</text>
+<text x="548" y="630" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id, id</text>
+<text x="512" y="647" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">email, role, created_by</text>
+<text x="512" y="664" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">created_at, expires_at, emailed_at</text>
+<rect x="500" y="696" width="330" height="70" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M500,722 V702 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V722 Z" fill="#5b7083"/>
+<text x="510" y="714" font-size="13" font-weight="700" fill="#fff">team_refs</text>
+<text x="508" y="736" font-size="10" font-weight="700" fill="#5b7083">PK</text>
+<text x="548" y="736" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id, ref</text>
+<text x="512" y="753" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">(Drive files of the team tree)</text>
+<rect x="500" y="776" width="330" height="70" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M500,802 V782 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V802 Z" fill="#5b7083"/>
+<text x="510" y="794" font-size="13" font-weight="700" fill="#fff">team_credentials</text>
+<text x="508" y="816" font-size="10" font-weight="700" fill="#5b7083">PK/FK</text>
+<text x="548" y="816" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id</text>
+<text x="512" y="833" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">blob (encrypted)</text>
+<rect x="500" y="862" width="330" height="87" rx="6" fill="#fff" stroke="#3f4f5f" stroke-width="1.6"/>
+<path d="M500,888 V868 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V888 Z" fill="#5b7083"/>
+<text x="510" y="880" font-size="13" font-weight="700" fill="#fff">team_events</text>
+<text x="508" y="902" font-size="10" font-weight="700" fill="#5b7083">PK</text>
+<text x="548" y="902" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">id</text>
+<text x="508" y="919" font-size="10" font-weight="700" fill="#5b7083">FK</text>
+<text x="548" y="919" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id</text>
+<text x="512" y="936" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">at, kind, by_email, detail</text>
 <rect x="950" y="60" width="330" height="155" rx="6" fill="#fff" stroke="#1f6a40" stroke-width="1.6"/>
 <path d="M950,86 V66 a6,6 0 0 1 6,-6 H1274 a6,6 0 0 1 6,6 V86 Z" fill="#2e8b57"/>
 <text x="960" y="78" font-size="13" font-weight="700" fill="#fff">space_songs</text>
@@ -212,10 +214,10 @@
 <text x="962" y="850" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">  private notes, songs added by me)</text>
 <text x="962" y="867" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">version, modified_at</text>
 <text x="50" y="880" font-size="11" fill="#5d6b78" font-style="italic">Every new id is a ULID (time-ordered); existing uuids stay.</text>
-<text x="50" y="896" font-size="11" fill="#5d6b78" font-style="italic">No change feed and no tombstones: a space’s central data is</text>
+<text x="50" y="896" font-size="11" fill="#5d6b78" font-style="italic">No change feed and no tombstones: a space’s data is</text>
 <text x="50" y="912" font-size="11" fill="#5d6b78" font-style="italic">read whole; version only guards a write that was out of date.</text>
-<text x="50" y="934" font-size="11" fill="#5d6b78" font-style="italic">Foreign keys inside a row (team_members.account_id and the</text>
-<text x="50" y="950" font-size="11" fill="#5d6b78" font-style="italic">like) point at accounts and are not drawn.</text>
+<text x="50" y="934" font-size="11" fill="#5d6b78" font-style="italic">Foreign keys (→) are real constraints after the clean-up</text>
+<text x="50" y="950" font-size="11" fill="#5d6b78" font-style="italic">(SCHEMA_AUDIT.md); most are written in the rows, not drawn.</text>
 <text x="50" y="972" font-size="11" fill="#5d6b78" font-style="italic">Never in D1: ChordPro, MusicXML, lyrics, chords, pad audio,</text>
-<text x="50" y="988" font-size="11" fill="#5d6b78" font-style="italic">share ciphertext. login_codes (hashed sign-in codes) is left out.</text>
+<text x="50" y="988" font-size="11" fill="#5d6b78" font-style="italic">share ciphertext. login_codes is left out (SCHEMA_AUDIT.md).</text>
 </svg>
