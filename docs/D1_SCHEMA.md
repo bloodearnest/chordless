@@ -10,11 +10,10 @@ Choices worth reviewing:
 
 - **One table per kind of record**, each with a `space_id`: `space_songs` (the index, no chords or lyrics),
   `space_setlists`, `space_setlist_songs` (a setlist's entries as rows), `space_people` and `space_pad_sets`.
-  Real columns mean D1 can be queried (the CCLI usage report is a join) and foreign keys can be used. The
-  sync design does not shape the data; the Worker maps between the two (D1_PHASE1_PLAN.md, decision 1).
-- **No counter and no per-team tables.** Every row carries a `change_id`, a ULID set on each write. It is both
-  the revision and the change feed's position, and a pull re-reads a few seconds back, which the engine
-  tolerates, so two Workers that commit out of order lose nothing.
+  Real columns mean D1 can be queried (the CCLI usage report is a join) and foreign keys can be used.
+- **No change feed and no tombstones.** A space's central data is read whole, in one query per table
+  (D1_PHASE1_PLAN.md, "The central sync"), so a deleted row is just absent. `version` is only there so a
+  write based on an out-of-date row is refused (409); `modified_at` is for people, the ETag and reports.
 - **ULIDs for all new ids**; existing uuids stay as they are. The primary keys lead with `space_id`, so rows
   cluster by space either way.
 - **`space_id` is a team's or a personal space's.** A polymorphic key, which SQLite does not enforce; the
@@ -27,4 +26,4 @@ Choices worth reviewing:
   overwrite each other; hardware settings hang off `account_devices`. **Overlays are per setlist**
   (`setlist_overlays`), and only the owning account can read or write its rows, in a Team too.
 - **`teams.root_ref` and `team_refs` stay**, for the Drive folder that still holds songs and pads. The
-  proposed `teams.storage_v2` is only for the move and is not in the final shape.
+  proposed `teams.central` is only for the move and is not in the final shape.

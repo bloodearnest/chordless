@@ -92,7 +92,7 @@
 <text x="62" y="777" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">scope: account | device | song</text>
 <text x="62" y="794" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">scope_id: - | device_id | song id</text>
 <text x="62" y="811" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">value (JSON), version</text>
-<text x="62" y="828" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">modified_at, deleted_at</text>
+<text x="62" y="828" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">modified_at</text>
 <rect x="500" y="60" width="330" height="87" rx="6" fill="#fff" stroke="#5a3d94" stroke-width="1.6"/>
 <path d="M500,86 V66 a6,6 0 0 1 6,-6 H824 a6,6 0 0 1 6,6 V86 Z" fill="#7e57c2"/>
 <text x="510" y="78" font-size="13" font-weight="700" fill="#fff">personal_spaces</text>
@@ -166,7 +166,7 @@
 <text x="962" y="151" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">licence (the CCLI licence it came in under)</text>
 <text x="962" y="168" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">is_default, variant_of</text>
 <text x="962" y="185" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">content_hash, file_ref (the Drive file)</text>
-<text x="962" y="202" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">change_id (ULID), deleted_at</text>
+<text x="962" y="202" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">version, modified_at</text>
 <rect x="950" y="250" width="330" height="138" rx="6" fill="#fff" stroke="#1f6a40" stroke-width="1.6"/>
 <path d="M950,276 V256 a6,6 0 0 1 6,-6 H1274 a6,6 0 0 1 6,6 V276 Z" fill="#2e8b57"/>
 <text x="960" y="268" font-size="13" font-weight="700" fill="#fff">space_setlists</text>
@@ -176,8 +176,8 @@
 <text x="998" y="307" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">setlist_id (unique across spaces)</text>
 <text x="962" y="324" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">date, time, type, name, leader_id</text>
 <text x="962" y="341" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">body (JSON: share, annotations, ...)</text>
-<text x="962" y="358" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">created_by, created_at, modified_at</text>
-<text x="962" y="375" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">change_id (ULID), deleted_at</text>
+<text x="962" y="358" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">created_by, created_at</text>
+<text x="962" y="375" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">version, modified_at</text>
 <rect x="950" y="418" width="330" height="87" rx="6" fill="#fff" stroke="#1f6a40" stroke-width="1.6"/>
 <path d="M950,444 V424 a6,6 0 0 1 6,-6 H1274 a6,6 0 0 1 6,6 V444 Z" fill="#2e8b57"/>
 <text x="960" y="436" font-size="13" font-weight="700" fill="#fff">space_setlist_songs</text>
@@ -191,14 +191,14 @@
 <text x="958" y="578" font-size="10" font-weight="700" fill="#2e8b57">PK</text>
 <text x="998" y="578" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id, person_id</text>
 <text x="962" y="595" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">name, emails (JSON), merged_into</text>
-<text x="962" y="612" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">change_id (ULID), deleted_at</text>
+<text x="962" y="612" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">version, modified_at</text>
 <rect x="950" y="640" width="330" height="87" rx="6" fill="#fff" stroke="#176a79" stroke-width="1.6"/>
 <path d="M950,666 V646 a6,6 0 0 1 6,-6 H1274 a6,6 0 0 1 6,6 V666 Z" fill="#1f8fa3"/>
 <text x="960" y="658" font-size="13" font-weight="700" fill="#fff">space_pad_sets</text>
 <text x="958" y="680" font-size="10" font-weight="700" fill="#1f8fa3">PK</text>
 <text x="998" y="680" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">space_id, pad_set_id</text>
-<text x="962" y="697" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">name, modified_at</text>
-<text x="962" y="714" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">change_id (ULID), deleted_at</text>
+<text x="962" y="697" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">name</text>
+<text x="962" y="714" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">version, modified_at</text>
 <rect x="950" y="742" width="330" height="138" rx="6" fill="#fff" stroke="#176a79" stroke-width="1.6"/>
 <path d="M950,768 V748 a6,6 0 0 1 6,-6 H1274 a6,6 0 0 1 6,6 V768 Z" fill="#1f8fa3"/>
 <text x="960" y="760" font-size="13" font-weight="700" fill="#fff">setlist_overlays</text>
@@ -210,10 +210,10 @@
 <text x="998" y="816" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">setlist_id → space_setlists</text>
 <text x="962" y="833" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">body (capo, tuning, pitch, sections,</text>
 <text x="962" y="850" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">  private notes, songs added by me)</text>
-<text x="962" y="867" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">version, modified_at, deleted_at</text>
+<text x="962" y="867" font-size="11.5" fill="#1b2733" font-family="Menlo, Consolas, monospace">version, modified_at</text>
 <text x="50" y="880" font-size="11" fill="#5d6b78" font-style="italic">Every new id is a ULID (time-ordered); existing uuids stay.</text>
-<text x="50" y="896" font-size="11" fill="#5d6b78" font-style="italic">change_id is a ULID set on each write: the change feed</text>
-<text x="50" y="912" font-size="11" fill="#5d6b78" font-style="italic">is "rows after my cursor".</text>
+<text x="50" y="896" font-size="11" fill="#5d6b78" font-style="italic">No change feed and no tombstones: a space’s central data is</text>
+<text x="50" y="912" font-size="11" fill="#5d6b78" font-style="italic">read whole; version only guards a write that was out of date.</text>
 <text x="50" y="934" font-size="11" fill="#5d6b78" font-style="italic">Foreign keys inside a row (team_members.account_id and the</text>
 <text x="50" y="950" font-size="11" fill="#5d6b78" font-style="italic">like) point at accounts and are not drawn.</text>
 <text x="50" y="972" font-size="11" fill="#5d6b78" font-style="italic">Never in D1: ChordPro, MusicXML, lyrics, chords, pad audio,</text>
