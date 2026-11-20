@@ -158,21 +158,22 @@ briefly in read-only mode or accepted downtime (a few seconds, two teams). Take 
 
 ## 6. Before it is run on production
 
-Against the real database (read-only queries, run by the owner with `wrangler d1 execute --remote`):
+Run `scripts/schema-preflight.sql` against the real database (read-only; it is for the schema **before** `0011`):
 
-```sql
-PRAGMA table_list;                                              -- all strict = 1?
-SELECT count(*) FROM team_members WHERE account_id IS NULL;    -- should be 0
-SELECT count(*) FROM teams WHERE owner_account_id IS NULL;     -- should be 0
-SELECT count(*) FROM teams WHERE root_ref = '' OR owner_sub = '';  -- unlinked teams
-SELECT role, count(*) FROM team_members GROUP BY role;         -- anything but admin / writer / reader?
-SELECT role, count(*) FROM team_invites GROUP BY role;
-SELECT kind, count(*) FROM team_events GROUP BY kind;
-SELECT credential, count(*) FROM teams GROUP BY credential;
-SELECT count(*) FROM team_members m LEFT JOIN accounts a USING (account_id) WHERE a.account_id IS NULL;  -- orphans
+```
+npx wrangler d1 execute chordless-teams --remote --file scripts/schema-preflight.sql
 ```
 
-then a rehearsal of the migration on a copy of the exported data (`just db-backup` makes the dump).
+It answers with a row for each thing `0011` would stop on (`wanted` is `0`): a member whose account cannot be found, two logins of
+one account in one team, an empty owner login, a live team with no owner account, a role or a credential that is
+not one of the closed sets, an address not in lower case, and every row that would break a new foreign key (a login, an
+address, a Drive connection, a member or a team's own rows that point at what is gone). Rows marked `info` are what the
+migration drops or changes, and how much there is. A non-zero is not damage (the migration refuses the row and is undone
+whole): it is what to put right first, or to decide about. D1 allows only five terms in a compound `SELECT`, so the
+file is several statements, each answered on its own. Tried on a local D1: clean on the old schema, and a planted
+row of each kind is caught.
+
+Then a rehearsal of the migration on a copy of the exported data (`just db-backup` makes the dump).
 
 ## 7. Decisions (the owner, 2026-11-20)
 
