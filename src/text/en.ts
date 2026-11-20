@@ -2165,9 +2165,6 @@ people-leaders-text = The people who lead this space's setlists. Two spellings o
 people-leaders-read-only = Only worship leaders can change them, and you can change your own name.
 people-nobody = Nobody leads a setlist here yet.
 
-tabs-label = Where songs and setlists are kept
-tabs-more = More
-
 filter-label = Spaces to search
 filter-spaces = Spaces:
 
