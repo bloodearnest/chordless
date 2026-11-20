@@ -497,10 +497,7 @@ export class TeamSpaceState implements TeamSpaceApi {
     const info = await this.info()
     if (!info) throw new Error('No such space')
     const accountId = (await accountOf(this.#db, identity, true, this.#now())) as string
-    if (
-      identityKey(info.owner) === identityKey(identity) ||
-      (await this.#ownerAccount()) === accountId
-    ) {
+    if (identityKey(info.owner) === identityKey(identity) || (await this.#isOwner(accountId))) {
       throw new Error('The owner is not a member: their role cannot be changed')
     }
     // (an address another account has is theirs: it is not taken by the label of an invite)
@@ -533,12 +530,14 @@ export class TeamSpaceState implements TeamSpaceApi {
     return Boolean(row && row.account_id !== accountId)
   }
 
-  /** The account that owns this space (none once it has ended and the account has gone) */
-  async #ownerAccount(): Promise<string | null> {
-    const row = await this.#sql('SELECT owner_account_id FROM teams WHERE space_id = ?').first<{
-      owner_account_id: string | null
-    }>()
-    return row?.owner_account_id ?? null
+  /** Whether this account owns this space */
+  async #isOwner(accountId: string): Promise<boolean> {
+    return Boolean(
+      await this.#sql(
+        'SELECT 1 AS found FROM teams WHERE space_id = ? AND owner_account_id = ?',
+        accountId
+      ).first()
+    )
   }
 
   /** Forget a member */
