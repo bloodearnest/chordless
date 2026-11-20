@@ -80,7 +80,7 @@ queries (SPACES.md) and stay.
 **G. Documentation that no longer matches the table.** CLAUDE.md says sign-in codes are "hashes, for ten
 minutes". Since migration 0006 `login_codes` also keeps the **address and the code readable for up to three
 days** (its comment says so and why). **Decided (the owner): keep the design and reword the rule.** CLAUDE.md now says so (and ACCOUNT.md and SECURITY.md
-already did). No schema change.
+already did). The *table* is still tidied (C): see section 8.
 
 **Fine as it is.** `STRICT` throughout; `WITHOUT ROWID` on the keyed tables; every timestamp is one UTC ISO-8601
 string (`strftime('%Y-%m-%dT%H:%M:%fZ')` in SQL, `toISOString()` in code: the same format); the `account_identities`
@@ -103,7 +103,9 @@ account_drive       (account_id PK → accounts CASCADE, blob, google_email, sco
 sessions            (session_id PK, account_id → accounts CASCADE, email, token_hash, previous_hash NULL,
                     rotated_at NULL, created_at, last_used_at, expires_at, revoked_at NULL,
                     INDEX (account_id), INDEX (expires_at))
-login_codes         as it is (G: a decision, not a schema change)
+login_codes         (address_hash PK, code_hash, created_at, expires_at, attempts CHECK (>= 0),
+                    window_start, sent CHECK (>= 1), link_hash UNIQUE, address CHECK (= lower),
+                    code, next NULL)    -- the four columns 0006 added are required but `next`
 
 teams               (space_id PK, name, owner_account_id → accounts RESTRICT, owner_email CHECK (= lower),
                     ccli_licence NULL, root_ref NULL, credential CHECK IN ('owner','service-account')
@@ -208,3 +210,8 @@ The rules it followed are now in [SCHEMA_RULES.md](SCHEMA_RULES.md). Differences
 - **Deploy order** (`.github/workflows/deploy.yml`): the Worker is deployed, then the migration applied, with a
   Time Travel bookmark noted between: for a few seconds the new Worker runs on the old schema. Merging the pull
   request is what runs it.
+- **`login_codes` is rebuilt too** (it was first left alone: that was a mistake). Every request for a code sets `link_hash`,
+  `address` and `code`, so they are `NOT NULL`, `link_hash` is `UNIQUE` (a link names one row; the old plain index is
+  replaced), the address is `CHECK`ed lower-case as the code makes it, and the counters cannot go negative. Only
+  `next` stays optional. A row from before 0006 (no link, no address) is dropped in the copy: it ran out days ago
+  (a code lasts three days) and could not be used.

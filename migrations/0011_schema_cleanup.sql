@@ -10,7 +10,7 @@
 -- How: each table is rebuilt under a temporary name (`x_v2`) with its foreign keys pointing at the other `_v2`
 -- tables, parents are copied before children, the old tables are dropped (nothing references them: they had no
 -- foreign keys), and each `_v2` is renamed, which makes SQLite rewrite the references to the final names. Tried
--- on a local D1 before this was written. `login_codes` is not rebuilt: nothing to change.
+-- on a local D1 before this was written.
 --
 -- Timestamps stay one format by convention, UTC ISO 8601 with a Z (`2026-11-20T09:30:00.000Z`, from toISOString()
 -- and strftime alike); they are not CHECKed.
@@ -19,6 +19,23 @@ PRAGMA defer_foreign_keys = on;
 
 -- ---------------------------------------------------------------------------------------------------------
 -- The new tables
+
+-- Emailed sign-in codes and links (migrations 0005, 0006). The link, the address and the code are set by every
+-- request for a code, so they are required; only `next` (the page to go on to) is optional. The address and the code
+-- are kept readable until used or run out, three days at most (docs/SECURITY.md). Nothing refers to it.
+CREATE TABLE login_codes_v2 (
+  address_hash TEXT PRIMARY KEY,
+  code_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  window_start TEXT NOT NULL,
+  sent INTEGER NOT NULL DEFAULT 1 CHECK (sent >= 1),
+  link_hash TEXT NOT NULL UNIQUE,
+  address TEXT NOT NULL CHECK (address = lower(address)),
+  code TEXT NOT NULL,
+  next TEXT
+) STRICT, WITHOUT ROWID;
 
 CREATE TABLE accounts_v2 (
   account_id TEXT PRIMARY KEY,
@@ -133,6 +150,13 @@ CREATE TABLE team_events_v2 (
 -- ---------------------------------------------------------------------------------------------------------
 -- Copy, parents first. A row that breaks a constraint stops the migration, which is undone as a whole.
 
+-- (a row from before 0006 has no link or address: it ran out days ago, and could not be used)
+INSERT INTO login_codes_v2 (address_hash, code_hash, created_at, expires_at, attempts, window_start, sent,
+                            link_hash, address, code, next)
+  SELECT address_hash, code_hash, created_at, expires_at, attempts, window_start, sent,
+         link_hash, address, code, next
+  FROM login_codes WHERE link_hash IS NOT NULL AND address IS NOT NULL AND code IS NOT NULL;
+
 INSERT INTO accounts_v2 (account_id, name, created_at)
   SELECT account_id, name, created_at FROM accounts;
 
@@ -183,6 +207,7 @@ INSERT INTO team_events_v2 (id, space_id, created_at, kind, by_email, detail)
 -- ---------------------------------------------------------------------------------------------------------
 -- Replace the old tables (their indexes go with them)
 
+DROP TABLE login_codes;
 DROP TABLE team_member_emails;
 DROP TABLE team_events;
 DROP TABLE team_credentials;
@@ -196,6 +221,7 @@ DROP TABLE account_emails;
 DROP TABLE account_identities;
 DROP TABLE accounts;
 
+ALTER TABLE login_codes_v2 RENAME TO login_codes;
 ALTER TABLE accounts_v2 RENAME TO accounts;
 ALTER TABLE account_identities_v2 RENAME TO account_identities;
 ALTER TABLE account_emails_v2 RENAME TO account_emails;
