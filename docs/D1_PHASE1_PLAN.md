@@ -104,9 +104,10 @@ Migration `0012_space_data.sql`: the five typed tables of [D1_SCHEMA.md](D1_SCHE
 `space_setlists`, `space_setlist_songs`, `space_people`, `space_pad_sets`), the unique setlist id, and
 `teams.storage` (`'drive'` by default, `'d1'` once moved: only for the move, deleted afterwards). `worker/src/space-data.ts` with the routes
 above, the role checks and the ETag, and the types both sides share (`src/js/space-data-types.ts`). As built:
-- **A write is one batch that undoes itself.** A change made from `baseVersion` starts with a statement that is an
-  error unless the record is at that version (`json('{')` is malformed JSON, so SQLite refuses it), then the update; D1 undoes a
-  batch if a statement fails, so two writes a moment apart cannot both pass. A create that finds the id taken, in this space
+- **The table refuses a stale write, and the batch undoes itself.** A trigger on each table (`0013_space_data_versions.sql`: `RAISE(ABORT,
+  'stale_version')`) refuses an update whose `version` is not the old one plus one, so a change made from a version the row
+  has left aborts, and D1 undoes the whole batch (a setlist's songs included). A write names the version it expects plus one;
+  the rule is in the schema, so no code path can forget it. A create that finds the id taken, in this space
   or another, is a 409 (another space's record is never shown: `current` is null). A change to a record that has since been
   deleted is a 404 `missing`.
 - **Roles are the Drive-backed API's:** a reader reads; a writer changes setlists, songs and people; a writer deletes a

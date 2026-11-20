@@ -440,6 +440,7 @@ async function currentOf(
     .prepare(`SELECT * FROM ${table} WHERE space_id = ? AND ${column} = ?`)
     .bind(spaceId, recordId)
     .first<SongRow & PersonRow & PadSetRow>()
+  /* v8 ignore next -- a song, person or pad set is made in a space that has it: only a setlist's id is shared between spaces */
   if (!row) return null
   return kind === 'song' ? songOf(row) : kind === 'person' ? personOf(row) : padSetOf(row)
 }
@@ -481,31 +482,17 @@ async function leadsSetlist(
 // ---------------------------------------------------------------------------------------------------------
 // Writing
 
-/** What a failed batch means: a write made from an out-of-date record, or one that made what is there */
-function whyFailed(error: unknown): 'version' | 'exists' | null {
-  const message = String(error)
-  if (/malformed JSON/i.test(message)) return 'version'
-  if (/UNIQUE constraint failed|PRIMARY KEY|PRIMARY/i.test(message)) return 'exists'
-  return null
-}
-
 /**
- * A statement that is an error unless the record is at this version: first in a batch, it undoes the batch for a
- * write made from an out-of-date record (`json('{')` is malformed, so SQLite refuses it)
+ * What a failed batch means. The tables refuse a version that is not the next one (`stale_version`, raised by the
+ * trigger of migrations/0012_space_data.sql): a write made from an out-of-date record. `exists` is a record made twice,
+ * or an id another space has; `foreign` a record whose parent is not there (a setlist's songs, written to one that is gone).
  */
-function atVersion(
-  db: D1Db,
-  table: string,
-  column: string,
-  spaceId: string,
-  recordId: string,
-  version: number
-): D1Statement {
-  return db
-    .prepare(
-      `SELECT CASE WHEN (SELECT version FROM ${table} WHERE space_id = ? AND ${column} = ?) = ? THEN 1 ELSE json('{') END AS ok`
-    )
-    .bind(spaceId, recordId, version)
+function whyFailed(error: unknown): 'version' | 'exists' | 'foreign' | null {
+  const message = String(error)
+  if (/stale_version/.test(message)) return 'version'
+  if (/UNIQUE constraint failed|PRIMARY KEY/i.test(message)) return 'exists'
+  if (/FOREIGN KEY constraint failed/i.test(message)) return 'foreign'
+  return null
 }
 
 function entryStatements(db: D1Db, setlistId: string, songs: SpaceSetlistSong[]): D1Statement[] {
@@ -567,14 +554,13 @@ function writeStatements(
       ]
     }
     return [
-      atVersion(db, 'space_setlists', 'setlist_id', spaceId, recordId, base),
       db
         .prepare(
           `UPDATE space_setlists SET date = ?, time = ?, type = ?, name = ?, leader_id = ?, created_by = ?,
-              created_at = ?, body = ?, version = version + 1, modified_at = ?
+              created_at = ?, body = ?, version = ?, modified_at = ?
             WHERE space_id = ? AND setlist_id = ?`
         )
-        .bind(...columns, at, spaceId, recordId),
+        .bind(...columns, base + 1, at, spaceId, recordId),
       db.prepare('DELETE FROM space_setlist_songs WHERE setlist_id = ?').bind(recordId),
       ...entryStatements(db, recordId, s.songs),
     ]
@@ -604,14 +590,13 @@ function writeStatements(
             .bind(spaceId, recordId, ...values, at),
         ]
       : [
-          atVersion(db, 'space_songs', 'song_uuid', spaceId, recordId, base),
           db
             .prepare(
               `UPDATE space_songs SET song_id = ?, title = ?, ccli = ?, song_key = ?, licence = ?, is_default = ?,
-                  variant_of = ?, variant_label = ?, content_hash = ?, file_ref = ?, version = version + 1, modified_at = ?
+                  variant_of = ?, variant_label = ?, content_hash = ?, file_ref = ?, version = ?, modified_at = ?
                 WHERE space_id = ? AND song_uuid = ?`
             )
-            .bind(...values, at, spaceId, recordId),
+            .bind(...values, base + 1, at, spaceId, recordId),
         ]
   }
   if (kind === 'person') {
@@ -627,13 +612,12 @@ function writeStatements(
             .bind(spaceId, recordId, ...values, at),
         ]
       : [
-          atVersion(db, 'space_people', 'person_id', spaceId, recordId, base),
           db
             .prepare(
-              `UPDATE space_people SET name = ?, emails = ?, team_member = ?, merged_into = ?, version = version + 1,
+              `UPDATE space_people SET name = ?, emails = ?, team_member = ?, merged_into = ?, version = ?,
                   modified_at = ? WHERE space_id = ? AND person_id = ?`
             )
-            .bind(...values, at, spaceId, recordId),
+            .bind(...values, base + 1, at, spaceId, recordId),
         ]
   }
   const pad = parsePadSet(record, recordId)
@@ -646,12 +630,11 @@ function writeStatements(
           .bind(spaceId, recordId, pad.name, at),
       ]
     : [
-        atVersion(db, 'space_pad_sets', 'pad_set_id', spaceId, recordId, base),
         db
           .prepare(
-            'UPDATE space_pad_sets SET name = ?, version = version + 1, modified_at = ? WHERE space_id = ? AND pad_set_id = ?'
+            'UPDATE space_pad_sets SET name = ?, version = ?, modified_at = ? WHERE space_id = ? AND pad_set_id = ?'
           )
-          .bind(pad.name, at, spaceId, recordId),
+          .bind(pad.name, base + 1, at, spaceId, recordId),
       ]
 }
 
@@ -721,7 +704,14 @@ export async function applyOp(
     }
     const statements: D1Statement[] = []
     if (typeof base === 'number') {
-      statements.push(atVersion(db, TABLE[kind], COLUMN[kind], spaceId, recordId, base))
+      // (naming the next version is the check: the table refuses it, and with it the delete, if the record has moved on)
+      statements.push(
+        db
+          .prepare(
+            `UPDATE ${TABLE[kind]} SET version = ? WHERE space_id = ? AND ${COLUMN[kind]} = ?`
+          )
+          .bind(base + 1, spaceId, recordId)
+      )
     }
     statements.push(
       db
@@ -732,9 +722,7 @@ export async function applyOp(
       await db.batch(statements)
     } catch (error) {
       if (whyFailed(error) !== 'version') throw error
-      const current = await currentOf(db, spaceId, kind, recordId)
-      // (what the change would have done is done: the record is gone)
-      return current === null ? { status: 'ok', version: 0 } : { status: 'conflict', current }
+      return { status: 'conflict', current: await currentOf(db, spaceId, kind, recordId) }
     }
     return { status: 'ok', version: 0 }
   }
@@ -747,18 +735,19 @@ export async function applyOp(
   try {
     statements = writeStatements(db, spaceId, kind, op.record, recordId, base, at)
   } catch (error) {
-    /* v8 ignore start -- an Invalid is bad input and is tested through the routes; anything else is a bug, left to be the 502 */
+    /* v8 ignore next 3 -- an Invalid is bad input, tested through the routes; anything else is a bug, left to be the 502 */
     if (error instanceof Invalid) return { status: 'invalid', error: error.message }
     throw error
   }
-  /* v8 ignore stop */
   try {
-    await db.batch(statements)
+    const results = await db.batch(statements)
+    // (a change of a record that is not there changes no row: it was deleted since the writer saw it)
+    if (base !== null && results[0].meta.changes === 0) return { status: 'missing' }
   } catch (error) {
     const why = whyFailed(error)
     if (!why) throw error
     const current = await currentOf(db, spaceId, kind, recordId)
-    if (why === 'version' && current === null) return { status: 'missing' }
+    if (current === null && why !== 'exists') return { status: 'missing' }
     // (a record of another space with this id is not shown: `current` is null, and the id is taken)
     return { status: 'conflict', current }
   }

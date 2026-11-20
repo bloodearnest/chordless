@@ -38,4 +38,5 @@ Choices worth reviewing:
 (`KEY` is an SQL word); `space_setlist_songs` also has `extra`, the rest of an entry kept as it came; `space_people`
 has `team_member`; `space_songs` has `variant_label` (a version list shows it); the JSON columns are `CHECK`ed to be
 the kind of JSON they hold; there is no `space_seq` (no change feed). `teams` gains `storage` (`'drive'` or `'d1'`), which
-exists only for the move.
+exists only for the move. `0013_space_data_versions.sql` adds a trigger to each of the four tables that refuses an update
+whose `version` is not the old one plus one (`stale_version`): that is how a write made from an out-of-date record is refused.
