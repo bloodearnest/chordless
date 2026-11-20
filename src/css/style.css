@@ -1623,14 +1623,16 @@ body.edit-mode .key-selector:focus {
 /* Which space a new setlist goes to (the home page's create form, when there is a choice) */
 .create-space {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 0.75rem;
   margin-bottom: 1rem;
   font-size: var(--font-ui-small);
 }
 
 .create-space select {
-  flex: 1;
+  min-width: 0;
+  width: 100%;
   padding: 0.4rem 0.6rem;
   font: inherit;
   border: 2px solid var(--border-light, #ecf0f1);

@@ -141,7 +141,9 @@ export class SetlistDetailsForm extends LitElement {
     input,
     select {
       box-sizing: border-box;
+      min-width: 0;
       width: 100%;
+      max-width: 100%;
       padding: 0.75rem;
       border: 2px solid var(--border-light, #e0e0e0);
       border-radius: 6px;
@@ -150,6 +152,12 @@ export class SetlistDetailsForm extends LitElement {
       background-color: var(--bg-tertiary, white);
       color: var(--text-color);
       transition: border-color 0.2s ease;
+    }
+
+    /* Safari's native date/time controls otherwise keep their intrinsic width. */
+    input[type='date'],
+    input[type='time'] {
+      appearance: none;
     }
 
 
