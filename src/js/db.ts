@@ -15,6 +15,7 @@ import { PERSON_SYNC_FIELDS } from './sync/person-hash.ts'
 import { setAmbient } from './telemetry/context.ts'
 import { recordSpan } from './telemetry/telemetry.ts'
 import { t } from './text.ts'
+import { ulid } from './ulid.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
 import { requestResult, transactionDone } from './utils/idb.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
@@ -1351,7 +1352,7 @@ export function createSetlist({
   const dateString = typeof setlistDate === 'string' ? setlistDate : toLocalDateString(setlistDate)
 
   return {
-    id: crypto.randomUUID(),
+    id: ulid(),
     date: dateString,
     time: time || '10:30',
     type: type || determineSetlistType(dateString, name),

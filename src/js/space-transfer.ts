@@ -12,6 +12,7 @@ import type { ChordlessDB } from './db.ts'
 import { findPerson, idFromKey, normalizeEmail, resolvePerson } from './leaders.ts'
 import { scoreRecord } from './score-record.ts'
 import { addChart } from './song-utils.ts'
+import { ulid } from './ulid.ts'
 
 /**
  * - copy: new setlist ids
@@ -243,7 +244,7 @@ export async function transferSetlists(
     }
     const made = forDestination(
       setlist,
-      mode === 'copy' ? crypto.randomUUID() : setlist.id,
+      mode === 'copy' ? ulid() : setlist.id,
       songs,
       leaders(setlist.leaderId)
     )

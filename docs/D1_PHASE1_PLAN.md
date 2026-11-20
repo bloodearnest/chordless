@@ -85,6 +85,14 @@ random tail of a ULID or links from new setlists lose it. The ids made by `crypt
 (`db.ts`, `song-utils.ts`, `space-db.ts`, `space-transfer.ts`, `annotations-controller.ts`, the Worker's
 `newSpaceId`) change to it, one place at a time, in step 2.
 
+**Built (2026-11-20, step 2a).** `src/js/ulid.ts` (monotonic within a millisecond, steady if the clock steps back) and the places that made
+record ids now use it: a setlist, a song's `uuid` and its fallback `songId`, a chart's file id, a copied setlist, an annotation,
+a personal space, and the Worker's team space id. Person ids are not random: they are made from the person's address
+(`idFromKey`), so two devices agree on one person, and stay so. Telemetry, message and tab ids are not records and stay
+uuids. Two places read the shape of an id and were fixed: `setlistCode()` (a ULID has a code from its random end) and the
+file names in a space export and a person's Drive file, which took the first eight characters of an id (the time, for a ULID)
+and now use `shortId()`.
+
 ## Steps
 
 Each is its own pull request, in this order (step 0 first), and each passes the whole of `just ci` alone (Biome, `tsc -b`,

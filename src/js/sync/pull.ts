@@ -16,6 +16,7 @@ import { songSource } from '../song-source.ts'
 import { chartFields, chartIdentity } from '../song-utils.ts'
 import type { StoredFile } from '../storage/types.ts'
 import { tally } from '../telemetry/telemetry.ts'
+import { ulid } from '../ulid.ts'
 import { hashText } from '../utils/hash.ts'
 import {
   driveMarkers,
@@ -513,7 +514,7 @@ async function downloadSong(
     console.warn(`[DriveSync] ⚠️ Conflict for song ${songUuid}, keeping Drive version`)
   }
 
-  const chordproFileId = localSong?.chordproFileId || `chordpro-${crypto.randomUUID()}`
+  const chordproFileId = localSong?.chordproFileId || `chordpro-${ulid()}`
 
   const parsed = run.parser.parse(chordproContent)
   const { metadata } = parsed

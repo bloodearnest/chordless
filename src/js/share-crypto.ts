@@ -9,6 +9,7 @@
 
 import { fromBase64Url, toBase64Url } from './base64url.ts'
 import { parseShareBundle, type ShareBundle } from './share-bundle.ts'
+import { ulidTail32 } from './ulid.ts'
 
 const IV_BYTES = 12
 const KEY_BYTES = 16
@@ -90,11 +91,15 @@ export async function decryptBundle(key: string, file: Bytes): Promise<ShareBund
 }
 
 /**
- * A short code for a setlist id (a UUID): its first 32 bits, 6 base64url characters. A link
- * carries it so that someone who has the setlist in their space is taken to that
- * instead (see matchesSetlistCode). Empty for an id that isn't a UUID.
+ * A short code for a setlist id: 32 bits of it, 6 base64url characters. A link carries it so that someone who has the
+ * setlist in their space is taken to that instead (see matchesSetlistCode). Of a UUID (the ids made until 2026-11-20) it
+ * is the first 32 bits; of a ULID (every id made since) 32 of its random bits (`ulidTail32`). Empty for an id that is
+ * neither.
  */
 export function setlistCode(setlistId: string): string {
+  // (a ULID first: its first characters are its time, which the ids made in the same minute share)
+  const tail = ulidTail32(setlistId)
+  if (tail) return toBase64Url(tail)
   const hex = /^[0-9a-f]{8}/i.exec(setlistId.replace(/-/g, ''))?.[0]
   if (!hex) return ''
   // (eight hex digits: four pairs)

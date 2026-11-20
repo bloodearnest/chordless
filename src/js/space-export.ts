@@ -29,6 +29,7 @@ import { type TransferReport, type TransferSource, transferSpace } from './space
 import { personContent } from './sync/person-hash.ts'
 import { setlistContent } from './sync/setlist-hash.ts'
 import { t } from './text.ts'
+import { shortId } from './ulid.ts'
 import { UserError } from './utils/errors.ts'
 import { hashText } from './utils/hash.ts'
 import { readZip, writeZip, type ZipFile } from './utils/zip.ts'
@@ -110,8 +111,6 @@ function slug(text: string): string {
     .slice(0, 40)
   return cleaned || 'untitled'
 }
-
-const shortId = (id: string) => id.replace(/[^A-Za-z0-9]/g, '').slice(0, 8)
 
 /** A pad set to put in an export: its name and its audio by key */
 export interface ExportPadSet {

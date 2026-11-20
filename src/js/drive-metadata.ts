@@ -20,6 +20,7 @@ import type {
 import { ChordProParser } from './parser.ts'
 import { songSource } from './song-source.ts'
 import type { FileInput } from './storage/types.ts'
+import { shortId } from './ulid.ts'
 
 /** The name, type and appProperties a Drive file is created or updated with */
 export interface DriveFileMetadata {
@@ -98,8 +99,7 @@ export function setlistFilename(
  */
 export function personFilename(person: Pick<Person, 'id' | 'name'>): string {
   const name = slug(person.name, { collapseDashes: true })
-  const id = person.id.replace(/-/g, '').slice(0, 8)
-  return `${name ? `${name}-` : ''}${id}.json`
+  return `${name ? `${name}-` : ''}${shortId(person.id)}.json`
 }
 
 /** Metadata for a person's file (docs/IDENTITIES.md) */

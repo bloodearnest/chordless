@@ -7,6 +7,7 @@
  */
 
 import { createDriveApi } from '../../src/js/drive-client.ts'
+import { ulid } from '../../src/js/ulid.ts'
 import { decryptBlob } from './blob.ts'
 import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
@@ -161,7 +162,7 @@ export function createAdminContext(env: Env, deps: TeamDeps = {}): AdminContext 
         .first()
       return Boolean(linked)
     },
-    newSpaceId: () => crypto.randomUUID(),
+    newSpaceId: () => ulid(),
     sendInviteEmail: input => sendInviteEmail(env, input),
     googleKind: email => googleKind(email, tracedFetch(deps.dnsFetch)),
     async allowInviteLookup(request) {

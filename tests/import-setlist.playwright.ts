@@ -69,7 +69,7 @@ test('a song the library lacks must be imported from SongSelect first, then the 
   await expect(createButton(page)).toBeEnabled()
 
   await createButton(page).click()
-  await expect(page).toHaveURL(/\/setlist\/[0-9a-f-]+$/)
+  await expect(page).toHaveURL(/\/setlist\/[0-9A-Za-z-]+$/)
 
   const result = await page.evaluate(async () => {
     const { getCurrentDB } = await import('/js/db.ts')
