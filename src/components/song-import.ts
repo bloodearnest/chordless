@@ -69,7 +69,13 @@ import { goTo, loadPage } from '../js/navigation.ts'
 import { describeSignature, noteName } from '../js/pitch.ts'
 import type { Score } from '../js/score.ts'
 import { SONGSELECT } from '../js/song-source.ts'
-import { ensureCurrentSpace, getSpaceById, listSpaces, setCurrentSpace } from '../js/space.ts'
+import {
+  ensureCurrentSpace,
+  getCurrentSpace,
+  getSpaceById,
+  listSpaces,
+  setCurrentSpace,
+} from '../js/space.ts'
 import { noteLicence } from '../js/space-licence.ts'
 import { visibleSpaces } from '../js/space-tabs.ts'
 import { songImportStyles } from './song-import-styles.ts'
@@ -182,8 +188,6 @@ export class SongImport extends LitElement {
   declare _askWho: boolean
   declare _spaces: Space[]
   declare _spaceId: string
-  /** The space the app is in, which may not be the one importing into */
-  _currentSpaceId = ''
   /** Whether the person chose where the songs go (the default does not override that) */
   _spaceChosen = false
   /** Once the spaces are known */
@@ -261,11 +265,12 @@ export class SongImport extends LitElement {
     void this._takeIncoming()
   }
 
-  /** The spaces to import into, and the one the app is in, which it goes to unless told otherwise */
+  /** The spaces to import into; it goes to the default space (docs/SPACES.md, "Presenting spaces") unless told otherwise */
   async _loadSpaces(): Promise<void> {
-    this._currentSpaceId = (await ensureCurrentSpace()).id
-    this._spaceId ||= this._currentSpaceId
     this._spaces = await visibleSpaces()
+    if (this._spaceId) return
+    const target = importTargetOf(await listSpaces())
+    this._spaceId = target?.id ?? (await ensureCurrentSpace()).id
   }
 
   /**
@@ -841,7 +846,7 @@ export class SongImport extends LitElement {
   /** Go to url, unless an imported listener prevents it */
   async _finish(url: string): Promise<void> {
     // Into another space: the app goes there, to show what was imported
-    const another = this._spaceId !== this._currentSpaceId
+    const another = this._spaceId !== getCurrentSpace().id
     if (another) await setCurrentSpace(this._spaceId)
     const event = new SongImportedEvent(url)
     if (!this.dispatchEvent(event)) return

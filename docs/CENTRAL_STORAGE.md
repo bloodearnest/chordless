@@ -83,6 +83,11 @@ follows the licence rule in `docs/CCLI.md`: the same licence number is the same 
 silently; a different or unknown licence asks first (a confirmation, never a block); a chart with no
 SongSelect source moves freely.
 
+**Setlist ids are unique across spaces** (decided 2026-11-20): they are random UUIDs, the URL stays
+`/setlist/<id>` with no space in it, and the space is found from the id (`all-spaces.ts`). D1 will enforce it
+(a setlist's `doc_id` unique across `space_id`s, not only within one). Until then the one exception is the
+moment a setlist is moved or a received share is joined, when two copies exist and the default space's wins.
+
 ## Where it lives: the storage seam already exists
 
 The sync engine talks to a space through `StorageBackend` (`docs/STORAGE_API.md`), whose files are in
