@@ -85,12 +85,20 @@ random tail of a ULID or links from new setlists lose it. The ids made by `crypt
 
 ## Steps
 
-Each is its own pull request, in this order, and each passes the whole of `just ci` alone (Biome, `tsc -b`,
+Each is its own pull request, in this order (step 0 first), and each passes the whole of `just ci` alone (Biome, `tsc -b`,
 knip, node tests, browser unit tests, coverage-check, Playwright). Each ships by the ordinary merge;
 nothing is turned on for a team until step 4.
 
+**0. Clean up the existing schema first (decided with the owner, 2026-11-20).**
+[SCHEMA_AUDIT.md](SCHEMA_AUDIT.md) found no foreign keys on any of the 13 tables, team members keyed by a login
+instead of an account, nullable columns that should be required, empty-string sentinels, no `CHECK`s and a few
+missing indexes. One migration (`0011_schema_cleanup.sql`) rebuilds the tables with proper keys, `NOT NULL`,
+`CHECK`s and `ON DELETE` rules, in the same pull request as the Worker code that uses them, rehearsed on a copy of
+production's data and run by the owner with a backup taken. Nothing below starts until it is merged. The tables
+in the steps after it are written the same way, so the new migration is `0012_space_data.sql`.
+
 **1. The tables and the space-data API on the Worker (no client change).**
-Migration `0011_space_data.sql`: the five typed tables of [D1_SCHEMA.md](D1_SCHEMA.md) (`space_songs`,
+Migration `0012_space_data.sql`: the five typed tables of [D1_SCHEMA.md](D1_SCHEMA.md) (`space_songs`,
 `space_setlists`, `space_setlist_songs`, `space_people`, `space_pad_sets`), the unique setlist id, and
 `teams.storage` (`'drive'` by default, `'d1'` once moved: only for the move, deleted afterwards). `worker/src/space-data.ts` with the routes
 above, the role checks and the ETag. Tests (`team-api.node.test.ts` style): roles; a stale write is a 409

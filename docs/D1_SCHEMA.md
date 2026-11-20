@@ -3,8 +3,9 @@
 ![The D1 schema](D1_SCHEMA.svg)
 
 Grey tables exist today (`migrations/0001` to `0010`); the colours are the phase that adds each one (the CCLI usage report, phase 2, needs no table of its own)
-([CENTRAL_STORAGE.md](CENTRAL_STORAGE.md), [D1_PHASE1_PLAN.md](D1_PHASE1_PLAN.md)). Foreign keys inside a
-row (`team_members.account_id` and the like) point at `accounts` and are not drawn.
+([CENTRAL_STORAGE.md](CENTRAL_STORAGE.md), [D1_PHASE1_PLAN.md](D1_PHASE1_PLAN.md)). The foreign keys, `CHECK`s and
+indexes are written out in [SCHEMA_AUDIT.md](SCHEMA_AUDIT.md), section 3, and the team tables are drawn as they
+should be after the clean-up.
 
 Choices worth reviewing:
 
