@@ -8,6 +8,8 @@ export interface SetlistRow {
   displayName?: string
   /** Who leads it, if known */
   leader?: string
+  /** The space it is in, named when the device has more than one */
+  space?: string
   /** The kind of service, if it is not the catch-all "Other" */
   type?: string
   url?: string
@@ -152,10 +154,9 @@ export class SetlistGroup extends LitElement {
     const meta = [
       setlist.leader ? html`<span class="setlist-leader">${setlist.leader}</span>` : '',
       type ? html`<span class="setlist-type">${type}</span>` : '',
+      setlist.space ? html`<span class="setlist-space">${setlist.space}</span>` : '',
     ].filter(Boolean)
-    if (meta.length === 2) {
-      meta.splice(1, 0, html` · `)
-    }
+    for (let at = meta.length - 1; at > 0; at--) meta.splice(at, 0, html` · `)
 
     return html`
       <a class="setlist-button" href=${url}>

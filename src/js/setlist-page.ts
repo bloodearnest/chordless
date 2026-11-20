@@ -29,11 +29,18 @@ import {
   SongResetClickEvent,
   type SongSettingsPopover,
 } from '../components/song-settings-popover.ts'
+import { findSetlistSpace } from './all-spaces.ts'
 import { canShareAnnotations, withAnnotations } from './annotations/store.ts'
 import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
 import { hasUnsentChanges } from './auto-sync.ts'
 import { DataChangeEvent, touches } from './data-changes.ts'
-import type { Setlist, SetlistEntry, SharedChartAnnotation, SongWithContent } from './data-types.ts'
+import type {
+  Setlist,
+  SetlistEntry,
+  SharedChartAnnotation,
+  SongWithContent,
+  Space,
+} from './data-types.ts'
 import { type ChordlessDB, getCurrentDB, NO_CHANGE, openSpace, type RemovedSetlist } from './db.ts'
 import { type PitchId, pitchSemitones } from './instrument-pitch.ts'
 import { leaderName, normalizeEmail, resolvePerson } from './leaders.ts'
@@ -264,6 +271,11 @@ export class SetlistPage {
     return this._database().spaceId
   }
 
+  /** The space the setlist is in */
+  async _space(): Promise<Space> {
+    return (await getSpaceById(this.spaceId())) ?? (await getCurrentSpaceFull())
+  }
+
   /** The space's database; start() opens it */
   _database(): ChordlessDB {
     if (!this.db) throw new Error('The setlist page has not been started')
@@ -273,8 +285,11 @@ export class SetlistPage {
   async start() {
     // (before anything is shown: the header's buttons work as soon as it shows the setlist)
     this._listenToControls()
-    // Initialize IndexedDB with current space
-    this.db ??= await getCurrentDB()
+    // The setlist's own space, whichever space the app was last in (setlist ids are unique across spaces)
+    if (!this.db) {
+      const space = await findSetlistSpace(this._setlistId)
+      this.db = space ? await openSpace(space.id) : await getCurrentDB()
+    }
 
     await this.renderSetlist(this._setlistId, this._initialSongIndex)
     this._starting = false
@@ -869,7 +884,7 @@ export class SetlistPage {
     dialog.deleteBlocked = null
     dialog.moveTargets = []
     if (dialog.readonly) return
-    const [space, spaces] = await Promise.all([getCurrentSpaceFull(), listSpaces()])
+    const [space, spaces] = await Promise.all([this._space(), listSpaces()])
     const role = space.team?.role ?? null
     const leader = resolvePerson(dialog.people, setlist.leaderId)
     const leadsIt = Boolean(leader && dialog.meId && leader.id === dialog.meId)
@@ -896,7 +911,7 @@ export class SetlistPage {
     const modal = this.root.querySelector<AppModal>('#delete-setlist-modal')
     const text = modal?.querySelector('#delete-setlist-text')
     if (text) {
-      const space = await getCurrentSpaceFull()
+      const space = await this._space()
       text.textContent = setlist.fileRef
         ? t('confirm-setlist-delete-shared', { space: space.name })
         : t('confirm-setlist-delete-local')
@@ -937,7 +952,7 @@ export class SetlistPage {
   async moveSetlist(spaceId: string) {
     const setlist = this.currentSetlist
     if (!setlist) return
-    const [here, target] = await Promise.all([getCurrentSpaceFull(), getSpaceById(spaceId)])
+    const [here, target] = await Promise.all([this._space(), getSpaceById(spaceId)])
     if (!target) return
     const title = setlistTitle(setlist, 'short')
     const modal = this.root.querySelector<AppModal>('#move-setlist-modal')
@@ -1883,7 +1898,7 @@ export class SetlistPage {
    */
   async _decideControls(setlist: Setlist): Promise<boolean> {
     if (this._readOnly) return false
-    const space = await getCurrentSpaceFull()
+    const space = await this._space()
     if (!syncsBack(space)) return false
     if (!space.team) return true
     const db = this._database()

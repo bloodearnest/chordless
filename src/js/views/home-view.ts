@@ -14,17 +14,25 @@ import type {
 import '../../components/setlist-details-form.ts'
 import type { SetlistGroup, SetlistRow } from '../../components/setlist-group.ts'
 import '../../components/setlist-group.ts'
-import '../../components/space-tabs.ts'
 import '../../components/status-message.ts'
+import { listAllSetlists } from '../all-spaces.ts'
 import type { Person, Setlist, Space } from '../data-types.ts'
 import { watchData } from '../data-watcher.ts'
-import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
+import {
+  type ChordlessDB,
+  createSetlist,
+  determineSetlistType,
+  getCurrentDB,
+  getNextSunday,
+  openSpace,
+} from '../db.ts'
+import { importTargetOf } from '../default-space.ts'
 import { emptySpaceKind } from '../empty-space-kind.ts'
 import { leaderName } from '../leaders.ts'
 import { goTo } from '../navigation.ts'
 import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
-import { getCurrentSpaceFull } from '../space.ts'
+import { listSpaces } from '../space.ts'
 import { SyncStatusEvent } from '../sync-status.ts'
 import { t } from '../text.ts'
 import { toast } from '../toast.ts'
@@ -54,7 +62,8 @@ interface HomeViewState extends ViewState {
 export function groupSetlistsByYear(
   setlists: Setlist[],
   currentYear: number = new Date().getFullYear(),
-  people: Person[] = []
+  people: Person[] | ((setlist: Setlist) => Person[]) = [],
+  spaceName: (setlist: Setlist) => string | undefined = () => undefined
 ): SetlistYear[] {
   const byYear = new Map<string, Setlist[]>()
   for (const setlist of setlists) {
@@ -75,7 +84,11 @@ export function groupSetlistsByYear(
           id: setlist.id,
           url: `/setlist/${setlist.id}`,
           displayName: setlistTitle(setlist, 'short'),
-          leader: leaderName(people, setlist.leaderId),
+          leader: leaderName(
+            typeof people === 'function' ? people(setlist) : people,
+            setlist.leaderId
+          ),
+          space: spaceName(setlist),
           type: setlist.type,
           songCount: Array.isArray(setlist.songs) ? setlist.songs.length : 0,
         })),
@@ -122,13 +135,24 @@ export class HomeView extends PageView {
       if (this.#sharedOnly) {
         return { groups: [], shared: sharedGroup(await listSharedWithMe().catch(() => [])) }
       }
-      const db = await getCurrentDB()
+      // Every space's setlists at once: no space is switched to (docs/CENTRAL_STORAGE.md, phase 0)
+      const spaces = await listSpaces()
+      const entries = await listAllSetlists(spaces)
+      const people = new Map(
+        await Promise.all(
+          spaces.map(
+            async space => [space.id, await (await openSpace(space.id)).getAllPeople()] as const
+          )
+        )
+      )
+      const where = new Map(entries.map(entry => [entry.setlist.id, entry.space]))
       return {
-        space: await getCurrentSpaceFull(),
+        space: importTargetOf(spaces),
         groups: groupSetlistsByYear(
-          await db.getAllSetlists(),
+          entries.map(entry => entry.setlist),
           new Date().getFullYear(),
-          await db.getAllPeople()
+          setlist => people.get(where.get(setlist.id)?.id ?? '') ?? [],
+          setlist => (spaces.length > 1 ? where.get(setlist.id)?.name : undefined)
         ),
         shared: sharedGroup(await listSharedWithMe().catch(() => [])),
       }
@@ -146,7 +170,7 @@ export class HomeView extends PageView {
 
   /** A space started or finished syncing: an empty one says which, and shows what came when it is done */
   #onSyncStatus = (event: SyncStatusEvent): void => {
-    if (!this.#sharedOnly && event.spaceId === this.#groups.value?.space?.id) {
+    if (!this.#sharedOnly && event.spaceId) {
       void this.#groups.run()
     }
   }
@@ -161,9 +185,15 @@ export class HomeView extends PageView {
     super.disconnectedCallback()
   }
 
+  /** The database a new setlist goes to: the default space's (or the first one that can be written to) */
+  async #targetDB(): Promise<ChordlessDB> {
+    const target = importTargetOf(await listSpaces())
+    return target ? openSpace(target.id) : getCurrentDB()
+  }
+
   /** Give the form the people there are now, and who is using the app among them */
   async #fillPeople(form: SetlistDetailsForm) {
-    const { people, me, askWho } = await getSpacePeople(await getCurrentDB())
+    const { people, me, askWho } = await getSpacePeople(await this.#targetDB())
     form.people = people
     form.meId = me?.id ?? null
     form.askWho = askWho
@@ -173,7 +203,7 @@ export class HomeView extends PageView {
   /** The person said which of the people they are: it is kept, and they become the default leader if none is chosen */
   async #identify(event: SetlistDetailsIdentifyEvent): Promise<void> {
     const form = this.#form.value as SetlistDetailsForm
-    await identifyMe(await getCurrentDB(), event.personId)
+    await identifyMe(await this.#targetDB(), event.personId)
     const me = await this.#fillPeople(form)
     if (me && !form.setlist.leaderId) form.setlist = { ...form.setlist, leaderId: me.id }
   }
@@ -195,7 +225,7 @@ export class HomeView extends PageView {
 
   async #create(event: SetlistDetailsSaveEvent): Promise<void> {
     try {
-      const db = await getCurrentDB()
+      const db = await this.#targetDB()
       const newSetlist = createSetlist({
         ...(await settleLeader(db, event.details)),
         createdBy: (await getSignedInUser())?.email,
@@ -271,7 +301,6 @@ export class HomeView extends PageView {
               <app-icon name="add" size="24"></app-icon>
             </button>
       </app-header>
-      <space-tabs ?shared=${this.#sharedOnly}></space-tabs>
 
       <main class="home-content">
         <div id="setlist-list" class="setlist-list">

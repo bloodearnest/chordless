@@ -105,11 +105,10 @@ describe('the home view', () => {
   const modal = () => must(view.querySelector<AppModal>('app-modal'))
   const form = () => must(view.querySelector<SetlistDetailsForm>('setlist-details-form'))
 
-  it('shows only what was shared, with the Shared tab marked, when opened as /?shared', async () => {
+  it('shows only what was shared when opened as /?shared', async () => {
     await db.saveSetlist(makeSetlist({ id: 'own', date: '2001-03-04' }))
     await open(undefined, { name: 'home', shared: true })
     expect(view.querySelector('setlist-group')).to.equal(null)
-    expect(view.querySelector('space-tabs')?.hasAttribute('shared')).to.equal(true)
   })
 
   it('shows a setlist a sync saved, or removed, without being reopened', async () => {
