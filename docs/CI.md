@@ -7,20 +7,33 @@ so what CI runs can be run, and fixed, locally.
 
 1. Work on a branch (`<agent>/<topic>`, in a worktree of its own when several agents work at once).
    Commit as you go, one logical step per commit.
-2. Before asking for review: `git fetch && git rebase origin/main`, then `just ci`, then
-   `git push --force-with-lease`. Open the pull request with `gh pr create`, using the template (ready for
-   review; a draft only for a spike).
+2. Before asking for review: run `just ci` on the commits being submitted, then push the branch.
+   Open the pull request with `gh pr create`, using the template (ready for review; a draft only for a spike).
 3. The pull request needs `ci-ok` to pass, CodeQL's findings below the ruleset's thresholds, and the
    approvals the ruleset asks for. It need not be up to date with `main` (that would cost another run of
-   CI per merge): the checks on `main` after a merge, which the deploy waits for, catch what slips in. It is merged with **Rebase and merge**: no merge commits, no squash. "Enable auto-merge"
+   CI per merge): the checks on `main` after a merge, which the deploy waits for, catch what slips in. It is merged with **Create a merge commit**: no rebase or squash. "Enable auto-merge"
    on a pull request merges it when all that is so.
 4. Deploys are `.github/workflows/deploy.yml` (on every push to `main`, and by hand; below), or still `just deploy` from a laptop.
 
 The rules are in Terraform (`infra/github/`), and no one bypasses them, the owner included. To get out
 of a CI that cannot pass, set the ruleset's `enforcement = "disabled"` there and apply.
 
-"Rebase and merge" gives the commits new SHAs on `main`, so `docs/test-catches.jsonl` names a fix by
-its pull request (`"#42"`), and `docs/stats.jsonl` records each run's tree as well as its commit (the trees are the same on `main`).
+Merge commits preserve the original commit SHAs. For a stack, target each PR at the branch below it
+and merge from the bottom up. GitHub retargets dependent PRs when their base branch is deleted;
+otherwise change their base to `main` after the lower PR lands. Do not rebase or update the upper
+branches just because a lower PR merged: their commits and existing checks remain intact. Changes
+to an underlying branch or merge conflicts can still require an update and fresh checks. Changing a
+PR's base does not itself trigger this repository's CI (`pull_request` uses the default opened,
+synchronize and reopened events). The checks on `main` before deployment still run after merges.
+
+`docs/test-catches.jsonl` continues to name a fix by its pull request (`"#42"`), including fixes from
+before merge commits were enabled; `docs/stats.jsonl` records each run's tree as well as its commit.
+
+To switch an existing repository, first apply the `main` ruleset change (allow `merge`, remove linear
+history), then enable merge commits and disable rebase merging in GitHub's repository settings.
+The repository merge settings are intentionally in Terraform's `ignore_changes`: applying Terraform
+alone does not change them. Its GraphQL check will report drift until GitHub matches `main.tf`.
+Update any already-enabled auto-merge requests to use merge commits too.
 
 ## The checks (`.github/workflows/ci.yml`)
 
@@ -232,8 +245,8 @@ repository, and the app has no secret of ours. It is a third party that can push
 pull request from it goes through the same checks as any other, and `main` is protected by the ruleset.
 
 The rules are Dependabot's: one pull request a week (Mondays, before 7, London time) of every tool with
-a new version at least a week old, merged by itself once its checks pass (GitHub's auto-merge, by
-rebase). A major version is its own pull request and is not merged by itself: Node 22 to 24 is a
+a new version at least a week old, merged by itself once its checks pass (GitHub's auto-merge, with a
+merge commit). A major version is its own pull request and is not merged by itself: Node 22 to 24 is a
 decision. (gcloud numbers every release a major, so it is exempt.) ZAP's is its own pull request, never
 merged by itself: a new ZAP can make the weekly scan fail, which no pull request's checks show.
 

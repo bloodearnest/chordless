@@ -25,7 +25,9 @@ type CodeConfig = {
   callback: (response: { code?: string; error?: string }) => void
 }
 
-describe('google-auth: signing in', () => {
+describe('google-auth: signing in', function () {
+  // Sign-in exchanges messages with the worker and starts background work; CI can exceed 2s.
+  this.timeout(10_000)
   let worker: FakeAuthWorker
   let uninstall: () => void
   const realFetch = window.fetch

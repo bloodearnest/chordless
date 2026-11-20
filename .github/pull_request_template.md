@@ -4,6 +4,6 @@
 
 ## Checks
 
-- [ ] `just ci` passes locally, on a branch rebased on `origin/main`
+- [ ] `just ci` passes locally on the submitted commits
 - [ ] Test catches logged in `docs/test-catches.jsonl`, with `"fix": "#<this PR>"`
 - [ ] Docs changed with the code they describe

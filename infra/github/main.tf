@@ -56,11 +56,11 @@ variable "required_approvals" {
 
 locals {
   merge_settings = {
-    # Linear history with no merge commits: GitHub's "Rebase and merge" only. A branch need not be up
-    # to date with main to merge (the ruleset), and can be brought up to date from the pull request
-    allow_merge_commit  = false
+    # Preserve commit identities so stacked pull requests can land without rebasing. A branch
+    # need not be up to date with main to merge (the ruleset).
+    allow_merge_commit  = true
     allow_squash_merge  = false
-    allow_rebase_merge  = true
+    allow_rebase_merge  = false
     allow_update_branch = true
     # "Enable auto-merge" on a pull request: it merges itself once its required checks pass
     # (Dependabot's weekly pull request is set to, .github/workflows/dependabot-auto-merge.yml)
@@ -152,7 +152,7 @@ resource "github_repository_dependabot_security_updates" "chordless" {
 }
 
 # main: changed only by a pull request whose `ci-ok` passed (it need not be up to date with main), and whose
-# CodeQL findings are below the thresholds, merged by rebase; never force-pushed or deleted. No one
+# CodeQL findings are below the thresholds, merged with merge commits; never force-pushed or deleted. No one
 # bypasses it, the owner included.
 resource "github_repository_ruleset" "main" {
   name        = "main"
@@ -170,10 +170,10 @@ resource "github_repository_ruleset" "main" {
   rules {
     deletion                = true
     non_fast_forward        = true
-    required_linear_history = true
+    required_linear_history = false
 
     pull_request {
-      allowed_merge_methods             = ["rebase"]
+      allowed_merge_methods             = ["merge"]
       required_approving_review_count   = var.required_approvals
       dismiss_stale_reviews_on_push     = true
       require_last_push_approval        = var.required_approvals > 0

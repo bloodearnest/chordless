@@ -25,7 +25,7 @@
   commitMessagePrefix: "tools:",
   automerge: true,
   platformAutomerge: true,
-  automergeStrategy: "rebase",
+  automergeStrategy: "merge",
   packageRules: [
     {
       matchManagers: ["mise"],
