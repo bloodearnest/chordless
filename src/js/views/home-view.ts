@@ -190,6 +190,7 @@ export class HomeView extends PageView {
   /** The database a new setlist goes to: the default space's (or the first one that can be written to) */
   async #targetDB(): Promise<ChordlessDB> {
     const target = importTargetOf(await listSpaces())
+    /* v8 ignore next -- a device always has a space: the home page makes the first */
     return target ? openSpace(target.id) : getCurrentDB()
   }
 

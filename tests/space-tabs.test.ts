@@ -191,6 +191,32 @@ describe('the tabs of the spaces on this device', () => {
     expect(switched).to.deep.equal([second])
   })
 
+  it('marks Shared as the current tab when it is the page shown, and labels the kind of a space', async () => {
+    const team = await space('Crew', 1)
+    await space('Mine', 1)
+    const { updateSpace } = await import('../src/js/space.ts')
+    await updateSpace(team, { team: { id: 'space-cccc3333', role: 'writer' } })
+    const shared = new ChordlessDB(SHARED_DB_ID)
+    await shared.init()
+    await addChart(shared, '{title: Gift}\n{key: G}\n[G]Gift line', {
+      variantLabel: 'Shared',
+      importSource: 'test',
+      makeDefault: 'first',
+    })
+    shared.db?.close()
+    const tabs = await fixture<SpaceTabs>(
+      html`<space-tabs shared .spaces=${await mine()}></space-tabs>`
+    )
+    await waitUntil(() => tabs.shadowRoot?.querySelector('[role=tab]'))
+    const found = [...(tabs.shadowRoot?.querySelectorAll<HTMLElement>('[role=tab]') ?? [])]
+    expect(
+      found.find(each => each.dataset.space === SHARED_DB_ID)?.getAttribute('aria-selected')
+    ).to.equal('true')
+    expect(
+      found.find(each => each.dataset.space === team)?.querySelector('.kind')?.textContent
+    ).to.equal('Team')
+  })
+
   it('offers imports every space, as every space has a tab', async () => {
     const empty = await space('Empty')
     const full = await space('Full', 1)

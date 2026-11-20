@@ -273,6 +273,7 @@ export class SetlistPage {
 
   /** The space the setlist is in */
   async _space(): Promise<Space> {
+    /* v8 ignore next -- the setlist's database is a space's, which is kept */
     return (await getSpaceById(this.spaceId())) ?? (await getCurrentSpaceFull())
   }
 
@@ -288,6 +289,7 @@ export class SetlistPage {
     // The setlist's own space, whichever space the app was last in (setlist ids are unique across spaces)
     if (!this.db) {
       const space = await findSetlistSpace(this._setlistId)
+      /* v8 ignore next 2 -- a setlist that is in no space is shown as not found, by the page */
       this.db = space ? await openSpace(space.id) : await getCurrentDB()
     }
 
