@@ -1,4 +1,4 @@
-/** Atomic local snapshots, queued changes and acknowledgements for space-data sync. */
+/** Atomic server data application, queued changes and acknowledgements for space-data sync. */
 import { announceDataChange } from './data-changes.ts'
 import type { Setlist, SongRecord, SpaceOutboxRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
@@ -208,10 +208,10 @@ export class SpaceDataStore {
         records.some(record => !validRecord(kind, record)) ||
         new Set(records.map(record => recordId(kind, record))).size !== records.length
       )
-        throw new Error('Invalid space snapshot')
+        throw new Error('Invalid space data response')
     }
     if (data.from !== null && !/^\d{4}-\d{2}-\d{2}$/.test(data.from))
-      throw new Error('Invalid snapshot window')
+      throw new Error('Invalid space data window')
     const tx = this.#tx('readwrite')
     const pending: SpaceOutboxRecord[] = await requestResult(
       tx.objectStore('space_outbox').getAll()

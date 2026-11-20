@@ -41,7 +41,7 @@ or fetched file by file, and a record missing from the answer is deleted, so the
 
 - **An ETag** (count, latest `modified_at` and sum of versions over the space's rows) lets the periodic
   tick send `If-None-Match` and get a 304 for an unchanged space. The live channel still says one word,
-  "changed", and the device then reads the snapshot.
+  "changed", and the device then reads the space data response.
 - **History is windowed.** The default answer holds setlists dated in the last 12 months and any later,
   and everything else (every song, person and pad set). `?all=1` adds the older setlists: a **first sync on a
   device asks for everything**, and a "show older setlists" action asks later. The device remembers which
@@ -58,7 +58,7 @@ changed is a **409 with the row as it now is**.
 
 **The outbox.** An edit is applied locally at once and queued, with the base version, in a new store of the
 device's database. It is sent when online and removed when accepted. A record with a pending edit is not
-overwritten by a snapshot until the edit is settled, and a record created offline is not mistaken for one
+overwritten by server data until the edit is settled, and a record created offline is not mistaken for one
 the server deleted.
 
 **On a 409** the device takes the fresh row and re-applies its own change to it: for a setlist, a three-way
@@ -135,7 +135,7 @@ Tests (`tests/space-data.node.test.ts`, through the router with real tokens): al
 **2a (ULIDs; built, #281):** new ids are ULIDs (a new person too), people who share an address are joined on every device
 (`dedupePeople`), and the code that read an id's shape is fixed. **2b:** the database version bump (below). **2c:** `space-data.ts`
 and the sync. **2d:** the Drive engine skips the moved collections. The whole of it:
-`src/js/space-data.ts` (`space-sync.ts` is taken, by the Account page's Sync button): snapshot apply, the outbox, the 409 merge, the live "changed" trigger. A
+`src/js/space-data.ts` (`space-sync.ts` is taken, by the Account page's Sync button): applying server data, the outbox, the 409 merge, the live "changed" trigger. A
 database version bump (see [MIGRATIONS.md](MIGRATIONS.md): roll forward only) adds the outbox store,
 `version` on these records, a song-index record (uuid, `songId`, title, CCLI number, default key,
 `isDefault`, `variantOf`, the licence it came in under, content hash, `fileRef`) written when a song is added,
@@ -154,10 +154,10 @@ is absent, and maintained atomically with song saves, updates, batches, Drive ac
 and deletions. A chart's CCLI licence is extracted where available; no chart text enters the index.
 Setlist entries gain optional `title` and `ccli`, filled from the index on save and refreshed on
 opening the setlist. Entries whose songs are missing retain their labels. The chart/content stores,
-Drive links, existing IDs and personal setlist layer remain intact. Snapshot application, outbox
+Drive links, existing IDs and personal setlist layer remain intact. Applying server data, outbox
 replay and displaying songs known only to the index follow in 2c.
 
-**2c implementation.** `space-data.ts` reads conditional snapshots and replays record operations;
+**2c implementation.** `space-data.ts` conditionally reads space data and replays record operations;
 `space-data-store.ts` applies them atomically and owns the durable outbox. Database v17 adds
 `space_data` (the moved/probing state, ETag and complete-history checkpoint) and an outbox index
 by record. Existing records and queued operations are retained; v16 gains no rewritten records.
@@ -170,7 +170,7 @@ the minute tick retry it. Web Locks serialize senders of the same space across t
 song file links update the index and queue its metadata too; chart text never enters the outbox.
 
 The first request fetches all history. Later conditional requests use the saved ETag and the
-window, retaining older local history. Snapshots protect queued creations, updates and deletions,
+window, retaining older local history. Server data updates protect queued creations, updates and deletions,
 preserve personal additions and local state, and validate their shape before replacing anything.
 A Team opened offline provisionally queues edits before its mode is known, and probing also queues edits made during the very first request; `not_moved` drops only this temporary
 queue and keeps the Drive-backed records. A space already on D1 cannot silently revert to Drive.
@@ -179,11 +179,11 @@ A conflict reapplies edited scalar/body/entry fields and entry additions/removal
 id, retaining independent server changes. A shared-field collision keeps the later local change
 and says so with a toast. Lost acknowledgements reconcile against the returned row instead of
 creating duplicates. Permanent refusals retain local edits and stop automatic retries; the toast
-explains the refusal and offers an explicit retry. Further snapshots merge shared changes into
+explains the refusal and offers an explicit retry. Further server data updates merge shared changes into
 these retained local edits, so a reader's key change does not freeze the rest of a setlist.
 
 `space-data-runtime.ts` starts delivery from committed edits and routes live “changed” messages
-to the snapshot sync. A combined sync attempts both metadata and content even if either fails,
+to the space data sync. A combined sync attempts both metadata and content even if either fails,
 then reports the failure; neither backend prevents the other from running. Polling remains current-space scoped until step 5; explicit edits/manual
 syncs can name their own space. Indexed songs without charts appear with their title, key and CCLI
 number and a “Get this song” link; pad-set metadata is read from D1 for a moved Team. The reader's
@@ -193,7 +193,7 @@ storage, seeds the server, or excludes Drive collections yet: those are 2d, 3 an
 **3. Seeding.**
 The owner runs the move by hand (a button on the Account page only an owner sees, or a script): from the
 owner's device, which has the complete local copy, push the space's setlists, people (after `dedupePeople`, so a person two devices made twice is one) and index through the
-API, then set `teams.storage` to `'d1'`. Other devices read the snapshot on their next sync. Tests: a
+API, then set `teams.storage` to `'d1'`. Other devices read the space data on their next sync. Tests: a
 Drive-only space seeded; the index from a song whose file is absent; a second device reading it all; an
 offline edit that meets a 409 on reconnect.
 

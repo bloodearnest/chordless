@@ -1,15 +1,15 @@
-/** The device's D1 sync: read snapshots, then send durable record edits without Drive's debounce. */
+/** The device's D1 sync: read space data responses, then send durable record edits without Drive's debounce. */
 import type { SpaceOutboxRecord } from './data-types.ts'
 import type { SpaceDataStore } from './space-data-store.ts'
 import type { SpaceData, SpaceOp, SpaceOpResult } from './space-data-types.ts'
 import { callWorker, TeamError, type WorkerConnection } from './worker-call.ts'
 
-export type SpaceSnapshot =
+export type SpaceDataResponse =
   | { moved: false }
   | { unchanged: true }
   | { data: SpaceData; etag: string | null }
 export interface SpaceDataTransport {
-  read(options: { all: boolean; etag: string | null }): Promise<SpaceSnapshot>
+  read(options: { all: boolean; etag: string | null }): Promise<SpaceDataResponse>
   write(ops: SpaceOp[]): Promise<SpaceOpResult[]>
 }
 
@@ -150,7 +150,7 @@ export class SpaceDataSync {
       return false
     }
     if ('data' in result) await this.#store.apply(result.data, result.etag)
-    else if (!state.enabled) throw new Error('First space snapshot was not returned')
+    else if (!state.enabled) throw new Error('First space data response was not returned')
     return true
   }
 }

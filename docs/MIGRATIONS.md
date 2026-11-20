@@ -88,7 +88,7 @@ The migration runs in the same atomic versionchange transaction as the schema ad
 ### Version 17: durable space-data sync checkpoints
 
 Adds `space_data` (one `state` row: whether the Team has moved, an in-flight initial probe,
-whether its mode has been checked, its snapshot ETag and whether a complete history has been read) and the non-unique compound
+whether its mode has been checked, its space data ETag and whether a complete history has been read) and the non-unique compound
 `space_outbox.record` index on `change.kind`, `change.id`. The initial probe is durable so an edit
 made while waiting for the first response is protected. No existing records are rewritten, and
 pending v16 outbox entries remain intact. The new metadata is local; this adds no Worker migration.

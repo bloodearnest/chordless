@@ -2,9 +2,9 @@ import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { getLibrarySongs, getSongWithContent } from '../src/js/song-utils.ts'
 import {
+  type SpaceDataResponse,
   SpaceDataSync,
   type SpaceDataTransport,
-  type SpaceSnapshot,
   spaceDataTransport,
 } from '../src/js/space-data.ts'
 import { mergeSpaceRecord } from '../src/js/space-data-merge.ts'
@@ -34,7 +34,7 @@ const remote = (overrides: Partial<SpaceSetlist> = {}): SpaceSetlist => ({
   version: 1,
   ...overrides,
 })
-const snapshot = (setlists: SpaceSetlist[] = []): SpaceData => ({
+const spaceData = (setlists: SpaceSetlist[] = []): SpaceData => ({
   songs: [],
   setlists,
   people: [],
@@ -42,7 +42,7 @@ const snapshot = (setlists: SpaceSetlist[] = []): SpaceData => ({
   from: null,
 })
 const clone = <T>(value: T): T => structuredClone(value)
-async function ready(data = snapshot()) {
+async function ready(data = spaceData()) {
   const db = await open()
   const store = new SpaceDataStore(db)
   await store.apply(data, 'etag-1')
@@ -61,12 +61,12 @@ const entry = (songId: string, key = 'C') => ({
 })
 
 class Server implements SpaceDataTransport {
-  data = snapshot([remote()])
+  data = spaceData([remote()])
   reads: { all: boolean; etag: string | null }[] = []
   writes: SpaceOp[][] = []
   beforeWrite: (() => Promise<void>) | null = null
   failure = false
-  async read(options: { all: boolean; etag: string | null }): Promise<SpaceSnapshot> {
+  async read(options: { all: boolean; etag: string | null }): Promise<SpaceDataResponse> {
     this.reads.push(options)
     return { data: clone(this.data), etag: 'server-tag' }
   }
@@ -100,7 +100,7 @@ function engine(
   return new SpaceDataSync({ store, transport, online, lock: work => work(), ...notify })
 }
 
-describe('D1 device snapshots and outbox', () => {
+describe('D1 device data sync and outbox', () => {
   it('keeps Drive-only writes out of the outbox, including after a not-moved probe', async () => {
     const db = await open()
     const store = new SpaceDataStore(db)
@@ -117,7 +117,7 @@ describe('D1 device snapshots and outbox', () => {
     expect(must(await db.getSetlist('setlist-1')).name).to.equal('During probe')
   })
 
-  it('queues before the first snapshot so an edit made during the request survives it', async () => {
+  it('queues before the first space data response so an edit made during the request survives it', async () => {
     const db = await open()
     await db.saveSetlist(makeSetlist())
     const store = new SpaceDataStore(db)
@@ -139,8 +139,8 @@ describe('D1 device snapshots and outbox', () => {
     expect(server.reads[0].all).to.equal(true)
   })
 
-  it('coalesces offline edits durably, retaining the original base and keeping them over a snapshot', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+  it('coalesces offline edits durably, retaining the original base and keeping them when server data arrives', async () => {
+    const { db, store } = await ready(spaceData([remote()]))
     await db.updateSetlist('setlist-1', row => {
       row.name = 'First'
     })
@@ -154,7 +154,7 @@ describe('D1 device snapshots and outbox', () => {
     const server = new Server()
     await engine(store, server, () => false).sync()
     expect(server.writes).to.have.length(0)
-    await store.apply(snapshot([remote({ name: 'Remote', version: 2 })]), 'later')
+    await store.apply(spaceData([remote({ name: 'Remote', version: 2 })]), 'later')
     expect(must(await db.getSetlist('setlist-1')).name).to.equal('Second')
     const another = new ChordlessDB(db.spaceId)
     await another.init()
@@ -164,27 +164,27 @@ describe('D1 device snapshots and outbox', () => {
 
   it('applies window deletions while retaining old history, pending creations, and personal state', async () => {
     const { db, store } = await ready(
-      snapshot([remote(), remote({ setlistId: 'old', date: '2020-01-01' })])
+      spaceData([remote(), remote({ setlistId: 'old', date: '2020-01-01' })])
     )
     await db.saveLocalState(makeLocalState('setlist-1'))
     await db.saveSetlist(makeSetlist({ id: 'offline-new' }))
-    await store.apply({ ...snapshot(), from: '2026-01-01' }, 'window')
+    await store.apply({ ...spaceData(), from: '2026-01-01' }, 'window')
     expect(await db.getSetlist('setlist-1')).to.equal(undefined)
     expect(await db.getSetlist('old')).to.exist
     expect(await db.getSetlist('offline-new')).to.exist
     expect((await db.getLocalState('setlist-1')).padsEnabled).to.equal(true)
-    await store.apply(snapshot(), 'all')
+    await store.apply(spaceData(), 'all')
     expect(await db.getSetlist('old')).to.equal(undefined)
   })
 
   it('keeps personal additions on a shared pull and excludes them and Drive links from writes', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     await db.updateSetlist('setlist-1', row => {
       row.songs.push(makeEntry({ local: true }))
       row.fileRef = 'private-drive-link'
     })
     expect(await store.pending()).to.deep.equal([])
-    await store.apply(snapshot([remote({ name: 'Server edit' })]), 'next')
+    await store.apply(spaceData([remote({ name: 'Server edit' })]), 'next')
     expect(must(await db.getSetlist('setlist-1')).songs[0].local).to.equal(true)
     await db.updateSetlist('setlist-1', row => {
       row.name = 'Shared edit'
@@ -196,7 +196,7 @@ describe('D1 device snapshots and outbox', () => {
   })
 
   it('does not overwrite a newer local edit with the acknowledgement for an earlier one', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     await db.updateSetlist('setlist-1', row => {
       row.name = 'Sent'
     })
@@ -229,7 +229,7 @@ describe('D1 device snapshots and outbox', () => {
   })
 
   it('sends an edit, merges a conflict and sends edits made while the request was in flight', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     const server = new Server()
     server.data.setlists[0] = remote({ name: 'Other device', time: '12:00', version: 2 })
     await db.updateSetlist('setlist-1', row => {
@@ -261,7 +261,7 @@ describe('D1 device snapshots and outbox', () => {
   it('recovers a lost acknowledgement without duplicating a create', async () => {
     const { db, store } = await ready()
     const server = new Server()
-    server.data = snapshot()
+    server.data = spaceData()
     await db.saveSetlist(makeSetlist({ name: 'Only once' }))
     const sent = (await store.pending())[0]
     await server.write([sent.change])
@@ -272,7 +272,7 @@ describe('D1 device snapshots and outbox', () => {
   })
 
   it('retains edits on network failure, then sends them on reconnect', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     const server = new Server()
     await db.updateSetlist('setlist-1', row => {
       row.name = 'Offline'
@@ -294,7 +294,7 @@ describe('D1 device snapshots and outbox', () => {
 
   for (const status of ['forbidden', 'invalid', 'missing'] as const) {
     it(`keeps a ${status} edit local and retries only when asked`, async () => {
-      const { db, store } = await ready(snapshot([remote()]))
+      const { db, store } = await ready(spaceData([remote()]))
       await db.updateSetlist('setlist-1', row => {
         row.name = 'Local choice'
       })
@@ -302,7 +302,7 @@ describe('D1 device snapshots and outbox', () => {
       const refused: SpaceOpResult =
         status === 'missing' ? { status } : { status, error: 'Refused' }
       await store.settle(sent, refused)
-      await store.apply(snapshot([remote({ name: 'Server', version: 2 })]), 'updated')
+      await store.apply(spaceData([remote({ name: 'Server', version: 2 })]), 'updated')
       expect(must(await db.getSetlist('setlist-1')).name).to.equal('Local choice')
       expect((await store.pending())[0].refusal?.status).to.equal(status)
       await store.retryRefused()
@@ -337,7 +337,7 @@ describe('D1 device snapshots and outbox', () => {
         modifiedAt: '2026-11-20T10:00:00Z',
       }) as SpaceRecord),
     }
-    const { db } = await ready({ ...snapshot(), songs: [indexed as SpaceData['songs'][number]] })
+    const { db } = await ready({ ...spaceData(), songs: [indexed as SpaceData['songs'][number]] })
     expect(await db.getSong('song-uuid')).to.equal(undefined)
     const song = await getSongWithContent('song-uuid', db)
     expect(song).to.include({ missing: true, title: 'Known song', ccliNumber: '12345' })
@@ -372,16 +372,16 @@ describe('D1 device snapshots and outbox', () => {
     await sync.saveSetlist(makeSetlist())
     expect(await store.pending()).to.deep.equal([])
     await db.saveChordPro({ id: 'chart', content: 'Kept', contentHash: 'hash' })
-    await store.apply(snapshot(), 'new')
+    await store.apply(spaceData(), 'new')
     expect(must(await db.getChordPro('chart')).content).to.equal('Kept')
     sync.db?.close()
   })
 
-  it('refuses malformed snapshots before deleting anything', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+  it('refuses malformed space data responses before deleting anything', async () => {
+    const { db, store } = await ready(spaceData([remote()]))
     let failed = false
     try {
-      await store.apply({ ...snapshot(), songs: undefined } as unknown as SpaceData, null)
+      await store.apply({ ...spaceData(), songs: undefined } as unknown as SpaceData, null)
     } catch {
       failed = true
     }
@@ -465,7 +465,7 @@ describe('space-data HTTP transport', () => {
 describe('space-data retries and record kinds', () => {
   it('persists people, merged-person links and deletions, and pad-set edits/deletions', async () => {
     const { db, store } = await ready({
-      ...snapshot(),
+      ...spaceData(),
       people: [
         {
           personId: 'leader',
@@ -523,7 +523,7 @@ describe('space-data retries and record kinds', () => {
       version: 4,
       modifiedAt: '2026-11-20T10:00:00Z',
     }
-    await store.apply({ ...snapshot(), songs: [indexed] }, 'tag')
+    await store.apply({ ...spaceData(), songs: [indexed] }, 'tag')
     expect(must(await db.getSong(song.uuid))).to.include({ title: 'Indexed title', version: 4 })
     const sync = new ChordlessDB(db.spaceId, 'sync')
     await sync.init()
@@ -539,27 +539,30 @@ describe('space-data retries and record kinds', () => {
     await store.settle(pending, { status: 'ok', version: 5 })
     await db.unlinkFiles(new Set(['uploaded-file']))
     expect((await store.pending())[0].change.record).to.include({ fileRef: null })
-    await store.apply(snapshot(), 'removed')
-    // A pending local link edit remains protected even when absent from the snapshot.
+    await store.apply(spaceData(), 'removed')
+    // A pending local link edit remains protected even when absent from the space data response.
     expect(await db.getSongIndex(song.uuid)).to.exist
     await store.settle((await store.pending())[0], { status: 'missing' })
     await store.retryRefused()
   })
 
   it('retains a reader’s local changes while still incorporating later shared fields', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     await db.updateSetlist('setlist-1', row => {
       row.name = 'Local name'
     })
     await store.settle((await store.pending())[0], { status: 'forbidden', error: 'Reader' })
-    await store.apply(snapshot([remote({ name: 'Server name', time: '19:00', version: 3 })]), 'new')
+    await store.apply(
+      spaceData([remote({ name: 'Server name', time: '19:00', version: 3 })]),
+      'new'
+    )
     expect(must(await db.getSetlist('setlist-1'))).to.include({ name: 'Local name', time: '19:00' })
     expect((await store.pending())[0].change.baseVersion).to.equal(3)
     expect((await store.pending())[0].refusal?.status).to.equal('forbidden')
   })
 
   it('does not block a corrected edit because an older in-flight request was invalid', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     await db.updateSetlist('setlist-1', row => {
       row.name = 'Bad'
     })
@@ -574,7 +577,7 @@ describe('space-data retries and record kinds', () => {
   })
 
   it('rebases deletions against the current version and never recreates a remotely removed record', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     const removed = must(await db.removeSetlist('setlist-1'))
     const sent = (await store.pending())[0]
     const conflict = await store.settle(sent, {
@@ -650,7 +653,7 @@ describe('space-data retries and record kinds', () => {
   })
 
   it('keeps a trailing sync when asked during a request and bounds repeated contention', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     await db.updateSetlist('setlist-1', row => {
       row.name = 'Mine'
     })
@@ -684,10 +687,10 @@ describe('space-data retries and record kinds', () => {
     expect(await store.pending()).to.have.length(1)
   })
 
-  it('refuses a missing first snapshot and a rollback from D1 to Drive', async () => {
+  it('refuses a missing first space data response and a rollback from D1 to Drive', async () => {
     const db = await open()
     const store = new SpaceDataStore(db)
-    const fails = async (read: () => Promise<SpaceSnapshot>) => {
+    const fails = async (read: () => Promise<SpaceDataResponse>) => {
       let error = ''
       try {
         await engine(store, { read, write: async () => [] }).sync()
@@ -696,13 +699,13 @@ describe('space-data retries and record kinds', () => {
       }
       return error
     }
-    expect(await fails(async () => ({ unchanged: true }))).to.contain('First space snapshot')
-    await store.apply(snapshot(), 'tag')
+    expect(await fails(async () => ({ unchanged: true }))).to.contain('First space data response')
+    await store.apply(spaceData(), 'tag')
     expect(await fails(async () => ({ moved: false }))).to.contain('may not revert')
   })
 
   it('rejects a malformed batch response without dropping the queued edits', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     await db.updateSetlist('setlist-1', row => {
       row.name = 'Pending'
     })
@@ -722,7 +725,7 @@ describe('space-data retries and record kinds', () => {
   })
 
   it('honours an explicit retry of a refused write through the engine', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     await db.updateSetlist('setlist-1', row => {
       row.name = 'Retry'
     })
@@ -757,7 +760,7 @@ describe('space-data record round trips and malformed replies', () => {
       },
       songs: [{ ...entry('a'), extra: { future: 'entry' } }],
     })
-    const { db, store } = await ready(snapshot([data]))
+    const { db, store } = await ready(spaceData([data]))
     const row = must(await db.getSetlist(data.setlistId))
     expect(row.owner).to.equal('Ann')
     expect(row.songs[0].spaceDataExtra).to.deep.equal({ future: 'entry' })
@@ -789,7 +792,7 @@ describe('space-data record round trips and malformed replies', () => {
       title: 'Missing chart',
       modifiedAt: '2026-11-20T10:00:00Z',
     }
-    await store.apply({ ...snapshot(), songs: [indexed] }, 'tag')
+    await store.apply({ ...spaceData(), songs: [indexed] }, 'tag')
     expect((await getSongWithContent('song-uuid', db)).missing).to.equal(true)
     const runtime = await buildRuntimeSongs(makeSetlist({ songs: [makeEntry()] }), {
       db,
@@ -800,27 +803,27 @@ describe('space-data record round trips and malformed replies', () => {
   })
 
   it('rejects malformed record identities, windows and record shapes before changing the device', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     const broken = [
-      { ...snapshot(), from: 'not-a-date' },
-      snapshot([remote({ version: 0 })]),
-      snapshot([remote(), remote()]),
-      { ...snapshot(), setlists: [{ ...remote(), setlistId: undefined }] },
-      { ...snapshot(), setlists: [{ ...remote(), songs: null }] },
-      { ...snapshot(), setlists: [{ ...remote(), body: null }] },
+      { ...spaceData(), from: 'not-a-date' },
+      spaceData([remote({ version: 0 })]),
+      spaceData([remote(), remote()]),
+      { ...spaceData(), setlists: [{ ...remote(), setlistId: undefined }] },
+      { ...spaceData(), setlists: [{ ...remote(), songs: null }] },
+      { ...spaceData(), setlists: [{ ...remote(), body: null }] },
       {
-        ...snapshot(),
+        ...spaceData(),
         setlists: [{ ...remote(), songs: [{ ...entry('bad'), annotations: null }] }],
       },
       {
-        ...snapshot(),
+        ...spaceData(),
         people: [{ personId: 'p', name: 'P', emails: null, version: 1, modifiedAt: 'now' }],
       },
       {
-        ...snapshot(),
+        ...spaceData(),
         songs: [{ songUuid: 's', songId: 'song', title: 42, version: 1, modifiedAt: 'now' }],
       },
-      { ...snapshot(), padSets: [{ padSetId: 'p', name: null, version: 1, modifiedAt: 'now' }] },
+      { ...spaceData(), padSets: [{ padSetId: 'p', name: null, version: 1, modifiedAt: 'now' }] },
     ]
     for (const data of broken) {
       let failed = false
@@ -834,7 +837,7 @@ describe('space-data record round trips and malformed replies', () => {
     }
   })
 
-  it('reads not-moved responses, JSON snapshots, server errors and rejects malformed HTTP batches', async () => {
+  it('reads not-moved responses, JSON data, server errors and rejects malformed HTTP batches', async () => {
     let response = Response.json({ error: 'not_moved' }, { status: 409 })
     const transport = spaceDataTransport('team', {
       origin: 'https://chordless.test',
@@ -842,9 +845,9 @@ describe('space-data record round trips and malformed replies', () => {
       fetch: (async () => response) as typeof fetch,
     })
     expect(await transport.read({ all: false, etag: null })).to.deep.equal({ moved: false })
-    response = Response.json(snapshot(), { headers: { ETag: 'tag' } })
+    response = Response.json(spaceData(), { headers: { ETag: 'tag' } })
     expect(await transport.read({ all: false, etag: null })).to.deep.equal({
-      data: snapshot(),
+      data: spaceData(),
       etag: 'tag',
     })
     response = Response.json({ error: 'Forbidden' }, { status: 403 })
@@ -866,7 +869,7 @@ describe('space-data record round trips and malformed replies', () => {
   })
 })
 
-describe('snapshot deletion and merge edge cases', () => {
+describe('server data deletion and merge edge cases', () => {
   it('removes a remotely deleted song from the library while retaining its cached chart', async () => {
     const db = await open()
     const song = await db.saveSong(makeSong())
@@ -879,14 +882,14 @@ describe('snapshot deletion and merge edge cases', () => {
       ) as SpaceData['songs'][number]),
       version: 1,
     }
-    await store.apply({ ...snapshot(), songs: [indexed] }, 'present')
-    await store.apply(snapshot(), 'deleted')
+    await store.apply({ ...spaceData(), songs: [indexed] }, 'present')
+    await store.apply(spaceData(), 'deleted')
     expect(await db.getSong(song.uuid)).to.equal(undefined)
     expect(await db.getSongIndex(song.uuid)).to.equal(undefined)
     expect(must(await db.getChordPro(song.chordproFileId)).content).to.equal('Kept chart')
   })
   it('queues soft deletion as deletion and checks that the database is open', async () => {
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     await db.updateSetlist('setlist-1', row => {
       row.deletedAt = '2026-11-20T10:00:00Z'
     })
@@ -948,7 +951,7 @@ describe('a Team first opened offline', () => {
       expect(await store.pending()).to.deep.equal([])
       expect(must(await db.getSetlist('setlist-1')).name).to.equal('Drive owns this edit')
       // An already enabled checkpoint is not turned back into a probe by another handle.
-      await store.apply(snapshot([remote()]), 'active')
+      await store.apply(spaceData([remote()]), 'active')
       await store.probe({ onlyUnknown: true })
       expect((await store.state()).probing).to.equal(false)
     } finally {
@@ -961,7 +964,7 @@ describe('a Team first opened offline', () => {
 describe('acknowledgements in a live chart', () => {
   it('does not turn sync bookkeeping into a visible content change', async () => {
     const { setlistContentHash, setlistContent } = await import('../src/js/sync/setlist-hash.ts')
-    const { db, store } = await ready(snapshot([remote()]))
+    const { db, store } = await ready(spaceData([remote()]))
     await db.updateSetlist('setlist-1', row => {
       row.songs = [makeEntry({ title: 'Known', ccli: null })]
     })
@@ -983,13 +986,16 @@ describe('shared annotations and private sync metadata', () => {
     const row = remote({
       songs: [{ ...entry('song-1'), annotations: [annotation], extra: { future: true } }],
     })
-    const { db, store } = await ready(snapshot([row]))
+    const { db, store } = await ready(spaceData([row]))
     const annotated = must(await db.getSetlist('setlist-1'))
     expect(annotated.songs[0].annotations).to.deep.equal([annotation])
     const { setlistContent } = await import('../src/js/sync/setlist-hash.ts')
     expect(setlistContent(annotated).songs[0]).not.to.have.property('spaceDataExtra')
     expect(annotated.songs[0].spaceDataExtra).to.deep.equal({ future: true })
-    await store.apply(snapshot([{ ...row, version: 2, songs: [{ ...entry('song-1') }] }]), 'etag-2')
+    await store.apply(
+      spaceData([{ ...row, version: 2, songs: [{ ...entry('song-1') }] }]),
+      'etag-2'
+    )
     expect(must(await db.getSetlist('setlist-1')).songs[0].annotations).to.deep.equal([])
   })
 })
