@@ -65,19 +65,12 @@ import {
   type LeadSheetRead,
   type MelodyRead,
 } from '../js/lead-sheet.ts'
-import { goTo, loadPage } from '../js/navigation.ts'
+import { goTo } from '../js/navigation.ts'
 import { describeSignature, noteName } from '../js/pitch.ts'
 import type { Score } from '../js/score.ts'
 import { SONGSELECT } from '../js/song-source.ts'
-import {
-  ensureCurrentSpace,
-  getCurrentSpace,
-  getSpaceById,
-  listSpaces,
-  setCurrentSpace,
-} from '../js/space.ts'
+import { ensureCurrentSpace, getSpaceById, listSpaces } from '../js/space.ts'
 import { noteLicence } from '../js/space-licence.ts'
-import { visibleSpaces } from '../js/space-tabs.ts'
 import { songImportStyles } from './song-import-styles.ts'
 
 /** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */
@@ -267,7 +260,7 @@ export class SongImport extends LitElement {
 
   /** The spaces to import into; it goes to the default space (docs/SPACES.md, "Presenting spaces") unless told otherwise */
   async _loadSpaces(): Promise<void> {
-    this._spaces = await visibleSpaces()
+    this._spaces = await listSpaces()
     if (this._spaceId) return
     const target = importTargetOf(await listSpaces())
     this._spaceId = target?.id ?? (await ensureCurrentSpace()).id
@@ -845,14 +838,10 @@ export class SongImport extends LitElement {
 
   /** Go to url, unless an imported listener prevents it */
   async _finish(url: string): Promise<void> {
-    // Into another space: the app goes there, to show what was imported
-    const another = this._spaceId !== getCurrentSpace().id
-    if (another) await setCurrentSpace(this._spaceId)
+    // (what was imported is found in its own space from its id: no space is switched to)
     const event = new SongImportedEvent(url)
     if (!this.dispatchEvent(event)) return
-    /* v8 ignore next -- loading a page would end the test run (navigation.ts) */
-    if (another) loadPage(url)
-    else goTo(url)
+    goTo(url)
   }
 
   async _addToSetlist(setlistId: string): Promise<void> {

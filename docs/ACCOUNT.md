@@ -162,9 +162,8 @@ the sign-in backup (download, import), which were for fixing a sign-in and are n
   Manage Users It is shown to every member, not only those who manage
   people, because leaving is there and any member can see who is in the Team; the controls inside follow the role.
 - **Switch** (not "Open") is the word. After a confirmation it makes that space the one in use and
-  shows the home page afresh in it, without reloading the app. It is the second way to switch: the
-  main one is the tabs under the header of the Setlists, Library and Add Song pages
-  (`space-tabs.ts`, docs/SPACES.md, "Space tabs"), which show every space, a Personal one even when it is empty.
+  shows the home page afresh in it, without reloading the app. The tabs that were the main way to
+  switch are gone (2026-11-20, docs/SPACES.md, "Space tabs"): the Setlists and Library pages show every space.
 - **Signed out disables nothing that works without an account.** The Personal space, export, import
   and deleting from the device all work. Sync is not offered, and **Delete everywhere** is disabled
   (it needs Drive); a card's line says "Sign in to sync".

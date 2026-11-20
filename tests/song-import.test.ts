@@ -871,7 +871,7 @@ describe('song-import', () => {
       })
     })
 
-    it('takes the app to the space it imported into, to show the song there', async () => {
+    it('shows the song from another space without switching the app to it', async () => {
       await withOtherSpace(async (other, current) => {
         const element: any = await importer()
         await waitFor(() => element._spaces.length > 1)
@@ -881,7 +881,8 @@ describe('song-import', () => {
         const url = finished(element)
         $(element, '.library-only').click()
         expect(await url).to.contain('/songs')
-        expect((await ensureCurrentSpace()).id).to.equal(other.id)
+        // (the song is found in its own space from its id)
+        expect((await ensureCurrentSpace()).id).to.equal(current)
         expect(current).to.not.equal(other.id)
       })
     })

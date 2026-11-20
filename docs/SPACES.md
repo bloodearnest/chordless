@@ -702,7 +702,15 @@ browser, and it never stops anything:
   and it falls back the same way when the one chosen is deleted or left.
 - Not synced: a Team's default is nobody else's business.
 
-## Space tabs, and joining by invite (decided and built 2026-10-23)
+## Space tabs (removed 2026-11-20), and joining by invite (decided and built 2026-10-23)
+
+**The tabs are gone.** The Setlists, Library and Add Song pages list or offer every space at once
+(see "The default space", above): a setlist or song opens in its own space, found from its id
+(`all-spaces.ts`), and Add Song has an "Import into" dropdown that starts on the default space. The
+`<space-tabs>` component, `space-tabs.ts` and the "More" menu were deleted with them. What follows is
+the design as first built, kept for the reasoning: the Shared tab is now a group on the home page
+(and `/?shared`), and "the current space" remains only for sync and a few dialogs, until it is
+removed too (`docs/CENTRAL_STORAGE.md`, phase 0).
 
 The reason: someone tries Chordless alone, then their church makes a team and invites them. Their
 songs and setlists must not seem to vanish, and someone whose first contact is an invite should
