@@ -87,8 +87,11 @@ random tail of a ULID or links from new setlists lose it. The ids made by `crypt
 
 **Built (2026-11-20, step 2a).** `src/js/ulid.ts` (monotonic within a millisecond, steady if the clock steps back) and the places that made
 record ids now use it: a setlist, a song's `uuid` and its fallback `songId`, a chart's file id, a copied setlist, an annotation,
-a personal space, and the Worker's team space id. Person ids are not random: they are made from the person's address
-(`idFromKey`), so two devices agree on one person, and stay so. Telemetry, message and tab ids are not records and stay
+a personal space, and the Worker's team space id, and a new person (an id made from an address would be taken by whoever
+next has it, once it is removed from the first person). Two devices that each make the person for one address make two, and
+`dedupePeople` joins them on the shared address, the same way on every device (the id that is not a ULID, else the earliest, is
+kept; the setlists they led follow). Only the conversion of a legacy record keeps its derived id (`personFromLegacy`), so
+devices converting apart agree. Telemetry, message and tab ids are not records and stay
 uuids. Two places read the shape of an id and were fixed: `setlistCode()` (a ULID has a code from its random end) and the
 file names in a space export and a person's Drive file, which took the first eight characters of an id (the time, for a ULID)
 and now use `shortId()`.

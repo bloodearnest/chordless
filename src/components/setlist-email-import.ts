@@ -120,6 +120,8 @@ export class SetlistEmailImport extends LitElement {
   _db: ChordlessDB | null = null
   /** The people there were when the email was opened, and who its leader is among them */
   _stored: Person[] = []
+  /** The person that would be made of the email's leader, made once for this email (a new person has an id of its own) */
+  _newLeader: Person | null = null
   _who: { name: string; email: string } = { name: '', email: '' }
   _match: LeaderMatch = { kind: 'none' }
   /** People the email's leader needs that are not stored yet: saved with the setlist, if they lead it */
@@ -344,6 +346,7 @@ export class SetlistEmailImport extends LitElement {
     const { people, me } = await getSpacePeople(db)
     this._stored = people
     this._who = { name: email.leader.name.trim(), email: normalizeEmail(email.leader.email) }
+    this._newLeader = newPerson(this._who)
     this._match = resolveLeader(people, this._who)
     const date = email.date || nearestSunday()
     this._setlist = {
@@ -359,7 +362,7 @@ export class SetlistEmailImport extends LitElement {
         ? this._match.person.id
         : this._match.kind === 'suggest'
           ? this._match.candidates[0].id
-          : newPerson(this._who)
+          : this._newLeader
             ? NEW_PERSON
             : (me?.id ?? '')
     this._chooseLeader(first)
@@ -381,9 +384,9 @@ export class SetlistEmailImport extends LitElement {
     let pending: Person[] = []
     let leaderId = choice
     if (choice === NEW_PERSON) {
-      const made = newPerson(this._who) as Person
+      const made = this._newLeader as Person
       leaderId = made.id
-      if (!this._stored.some(each => each.id === made.id)) pending = [made]
+      pending = [made]
     } else {
       const chosen = this._stored.find(each => each.id === choice)
       if (chosen && this._who.email && !chosen.emails.includes(this._who.email)) {
@@ -599,9 +602,8 @@ export class SetlistEmailImport extends LitElement {
     const match = this._match
     if ((!name && !email) || (match.kind === 'match' && match.by === 'email')) return nothing
     const label = name || email
-    const isNew = newPerson(this._who)?.id
-    const hasNew = isNew && !this._stored.some(each => each.id === isNew)
-    const chosen = this._setlist.leaderId === isNew && hasNew ? NEW_PERSON : this._setlist.leaderId
+    const isNew = this._newLeader?.id
+    const chosen = this._setlist.leaderId === isNew ? NEW_PERSON : this._setlist.leaderId
     const learns =
       email && chosen !== NEW_PERSON ? html` ${t('email-import-learns', { email })}` : nothing
     return html`
@@ -623,11 +625,7 @@ export class SetlistEmailImport extends LitElement {
           id="leader-match"
           @change=${(event: Event) => this._chooseLeader((event.target as HTMLSelectElement).value)}
         >
-          ${
-            hasNew
-              ? html`<option value=${NEW_PERSON} ?selected=${chosen === NEW_PERSON}>${t('email-import-new-person', { label })}</option>`
-              : nothing
-          }
+          <option value=${NEW_PERSON} ?selected=${chosen === NEW_PERSON}>${t('email-import-new-person', { label })}</option>
           ${this._stored.map(each => html`<option value=${each.id} ?selected=${chosen === each.id}>${each.name}</option>`)}
         </select>
       </div>
