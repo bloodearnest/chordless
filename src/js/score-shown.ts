@@ -65,17 +65,12 @@ export function shownSheet(content: ParentNode | null | undefined): HTMLElement 
 
 /**
  * Give a song's sections the notes of its lead sheet they have (docs/LEAD_SHEETS.md, "In the chart"), or take them
- * away (with no melody). Returns whether any section has some, which is when the song's section states are
- * to be worked out again: a part with no words shows its notes by default.
+ * away (with no melody).
  */
 export function attachCues(
   content: ParentNode,
   found: { melody: Score; key: string } | null
-): boolean {
+): void {
   const display = content.querySelector<SongDisplay>('song-display')
-  if (!display) return false
-  const cues = songCues(found, display.parsed)
-  const changed = Boolean(cues) !== Boolean(display.cues)
-  display.cues = cues
-  return changed || Boolean(cues)
+  if (display) display.cues = songCues(found, display.parsed)
 }

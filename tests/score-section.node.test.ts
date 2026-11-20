@@ -199,6 +199,11 @@ describe('the notes of a chart section', () => {
       ]
     )
   })
+
+  it('keeps the original voices when a requested measure has no cue notes', () => {
+    const cut = sliceMeasures(sheet, [2])
+    assert.deepEqual(cut.measures[0]?.voices, sheet.measures[2]?.voices)
+  })
 })
 
 describe('the cues of a song', () => {

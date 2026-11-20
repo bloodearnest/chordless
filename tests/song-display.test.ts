@@ -187,6 +187,6 @@ describe('song-display', () => {
   })
 
   it('has no cues to attach to content with no song in it', () => {
-    expect(attachCues(document.createElement('div'), null)).to.equal(false)
+    expect(() => attachCues(document.createElement('div'), null)).not.to.throw()
   })
 })

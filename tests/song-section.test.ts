@@ -211,12 +211,10 @@ describe('song-section', () => {
       expect(showButtons()[0].getAttribute('aria-pressed')).to.equal('true')
     })
 
-    it('recommends the notes for a part with no words, else what it recommended', async () => {
+    it('recommends chords for an instrumental part with melody available', async () => {
       await withMelody()
       expect(section.getRecommendedHideMode()).to.equal('none')
       section.lines = [{ segments: [{ chord: 'G', lyrics: '' }] }]
-      expect(section.getRecommendedHideMode()).to.equal('melody')
-      section.melodyMeasures = null
       expect(section.getRecommendedHideMode()).to.equal('lyrics')
     })
   })
