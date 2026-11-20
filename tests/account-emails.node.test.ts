@@ -20,6 +20,11 @@ function world() {
 describe('an address belongs to one account', () => {
   test('the database refuses a second owner', () => {
     const { sql } = world()
+    for (const account of ['a', 'b']) {
+      sql
+        .prepare('INSERT INTO accounts (account_id, created_at) VALUES (?, ?)')
+        .run(account, NOW.toISOString())
+    }
     const add = (account: string) =>
       sql
         .prepare('INSERT INTO account_emails (email, account_id, created_at) VALUES (?, ?, ?)')
@@ -145,6 +150,9 @@ describe('the migration', () => {
     const { sql } = world()
     // (the table is made empty by the migrations; this is the backfill's statement run over rows as they were)
     const at = (n: number) => `2026-11-0${n}T00:00:00.000Z`
+    for (const account of ['first', 'second']) {
+      sql.prepare('INSERT INTO accounts (account_id, created_at) VALUES (?, ?)').run(account, at(1))
+    }
     const insert = sql.prepare(
       'INSERT INTO account_identities (provider, sub, account_id, email, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)'
     )

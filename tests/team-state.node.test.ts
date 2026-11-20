@@ -87,7 +87,7 @@ describe('roles', () => {
     await state.setMember(bob, 'reader')
     await at(new Date('2027-01-01T00:00:00Z')).setMember(bob, 'admin')
     assert.equal(await state.roleOf(bob), 'admin')
-    assert.equal(rows('SELECT since FROM team_members')[0].since, NOW.toISOString())
+    assert.equal(rows('SELECT joined_at FROM team_members')[0].joined_at, NOW.toISOString())
   })
 
   test('are gone when a member is removed, and removing a stranger is fine', async () => {
@@ -199,7 +199,7 @@ describe('accounts', () => {
       (await state.members()).map(member => [member.email, member.role]),
       [
         ['ann@example.com', 'owner'],
-        ['bob@hotmail.example', 'admin'],
+        ['bob@example.com', 'admin'],
       ]
     )
   })
@@ -207,11 +207,10 @@ describe('accounts', () => {
   test('list every address the team knows a member by, and any of them names the member', async () => {
     const { state, sql, rows } = await made()
     await state.setMember(bob, 'writer')
+    // (an address the team was told they are known by, from the invite made out to it)
     sql
-      .prepare(
-        `INSERT INTO team_member_emails (space_id, email, account_id, source) VALUES (?, 'bob@hotmail.example', ?, 'invite')`
-      )
-      .run(SPACE, accountOfLogin(sql, bob) as string)
+      .prepare("UPDATE team_members SET invited_as = 'bob@hotmail.example' WHERE space_id = ?")
+      .run(SPACE)
     assert.deepEqual((await state.members())[1], {
       email: 'bob@example.com',
       emails: ['bob@example.com', 'bob@hotmail.example'],
@@ -221,11 +220,7 @@ describe('accounts', () => {
     assert.equal(await state.roleOf(bob), 'reader')
     assert.equal(await state.removeByEmail('bob@hotmail.example'), true)
     assert.equal(await state.roleOf(bob), null)
-    assert.deepEqual(
-      rows('SELECT email FROM team_member_emails'),
-      [],
-      'every address goes with them'
-    )
+    assert.deepEqual(rows('SELECT * FROM team_members'), [], 'the label goes with them')
     assert.equal(await state.removeByEmail('bob@hotmail.example'), false)
   })
 
@@ -265,55 +260,26 @@ describe('accounts', () => {
     assert.equal(before(), base + 1, 'the account that lost is not left behind')
   })
 
-  test('still work for a space made before accounts, whose owner has none recorded', async () => {
-    const { state, sql } = await made()
-    sql.exec('UPDATE teams SET owner_account_id = NULL')
-    assert.equal(await state.roleOf(ann), 'owner')
-    await assert.rejects(state.setMember(ann, 'admin'), /owner is not a member/)
-    await state.setMember(bob, 'writer')
-    assert.equal(await state.roleOf(bob), 'writer')
+  test('are kept by the database: a live space has an owner account that cannot be deleted, an ended one may lose it', async () => {
+    const { state, sql, rows } = await made()
+    const owner = accountOfLogin(sql, ann) as string
+    assert.throws(
+      () => sql.prepare('DELETE FROM accounts WHERE account_id = ?').run(owner),
+      /CHECK constraint failed/
+    )
+    await state.destroy(ann)
+    sql.prepare('DELETE FROM accounts WHERE account_id = ?').run(owner)
+    assert.deepEqual(rows('SELECT owner_account_id, owner_email FROM teams'), [
+      { owner_account_id: null, owner_email: 'ann@example.com' },
+    ])
   })
 
-  test('are not part of a space once sharing ends: its members and their addresses go, the accounts stay', async () => {
+  test('are not part of a space once sharing ends: its members go, the accounts stay', async () => {
     const { state, rows } = await made()
     await state.setMember(bob, 'writer')
     await state.destroy(ann)
     assert.deepEqual(rows('SELECT * FROM team_members'), [])
-    assert.deepEqual(rows('SELECT * FROM team_member_emails'), [])
     assert.equal(rows('SELECT * FROM accounts').length, 2)
-  })
-
-  test('still find a member the previous Worker made, with no account yet, by the key of their login', async () => {
-    const { state, sql } = await made()
-    sql
-      .prepare(
-        `INSERT INTO team_members (space_id, identity, email, role, since) VALUES (?, 'google:g-9', 'dee@example.com', 'reader', 't')`
-      )
-      .run(SPACE)
-    const dee = { provider: 'google', sub: 'g-9', email: 'dee@example.com' }
-    assert.equal(await state.roleOf(dee), 'reader')
-    assert.equal((await state.members())[1].email, 'dee@example.com')
-    assert.equal(await state.setRoleByEmail('dee@example.com', 'writer'), true)
-    assert.equal(await state.roleOf(dee), 'writer')
-    // (one more with no account, who leaves: nothing but their row to forget)
-    sql
-      .prepare(
-        `INSERT INTO team_members (space_id, identity, email, role, since) VALUES (?, 'google:g-8', 'eve@example.com', 'reader', 't')`
-      )
-      .run(SPACE)
-    assert.equal(await state.removeByEmail('eve@example.com'), true)
-    assert.equal(await state.roleOf({ provider: 'google', sub: 'g-8' }), null)
-    // (the next time they join, they get the account)
-    await state.setMember(dee, 'writer')
-    assert.ok(accountOfLogin(sql, dee))
-    assert.equal(
-      (
-        sql
-          .prepare('SELECT account_id AS id FROM team_members WHERE identity = ?')
-          .get('google:g-9') as { id: string }
-      ).id,
-      accountOfLogin(sql, dee)
-    )
   })
 })
 
@@ -435,7 +401,6 @@ test('keeps nothing but the space, its members, its refs, the blob, which creden
     'accounts',
     'team_credentials',
     'team_events',
-    'team_member_emails',
     'team_members',
     'team_refs',
     'teams',
@@ -536,9 +501,8 @@ describe('invites', () => {
       emails: ['cat@example.com', 'bob@example.com'],
       role: 'writer',
     })
-    assert.deepEqual(rows('SELECT email, source FROM team_member_emails ORDER BY email'), [
-      { email: 'bob@example.com', source: 'invite' },
-      { email: 'cat@example.com', source: 'signin' },
+    assert.deepEqual(rows('SELECT invited_as FROM team_members'), [
+      { invited_as: 'bob@example.com' },
     ])
     assert.deepEqual(
       rows("SELECT by_email, detail FROM team_events WHERE kind = 'joined_as_other'"),
@@ -561,7 +525,7 @@ describe('invites', () => {
     await state.setMember(bob, 'admin')
     const { code } = await state.createInvite('reader', 'bob@example.com', ann)
     assert.equal(await state.redeemInvite(code, cat), 'reader')
-    assert.deepEqual(rows("SELECT email FROM team_member_emails WHERE source = 'invite'"), [])
+    assert.deepEqual(rows('SELECT invited_as FROM team_members WHERE invited_as IS NOT NULL'), [])
     assert.equal(
       (await state.members()).find(member => member.email === 'bob@example.com')?.role,
       'admin',
