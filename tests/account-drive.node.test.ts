@@ -306,6 +306,11 @@ describe('POST /api/account/drive/adopt', () => {
   test('is refused (409) for a blob whose Google login is on another account: a blob is not a way to take one', async () => {
     const { env, sql } = setup()
     const token = await account(env, sql)
+    sql
+      .prepare(
+        "INSERT INTO accounts (account_id, created_at) VALUES ('someone-else', '2026-10-14T12:00:00.000Z')"
+      )
+      .run()
     withGoogleLogin(sql, 'someone-else')
     const response = await call(env, fakeGoogle().google, 'POST', `${DRIVE_PATH}/adopt`, token, {
       blob: await encryptBlob(blobOf(), env),
@@ -376,7 +381,7 @@ describe('DELETE /api/account/drive', () => {
     await connect(env, fakeGoogle().google, token)
     sql
       .prepare(
-        "INSERT INTO teams (space_id, name, owner_email, owner_account_id, created_at, updated_at) VALUES ('t1', 'T', 'a@b.example', 'acct-1', 'now', 'now')"
+        "INSERT INTO teams (space_id, name, owner_email, owner_account_id, owner_provider, owner_sub, created_at, updated_at) VALUES ('t1', 'T', 'a@b.example', 'acct-1', 'google', 'g-1', 'now', 'now')"
       )
       .run()
     const { google, calls } = fakeGoogle()

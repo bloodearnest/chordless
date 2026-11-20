@@ -42,15 +42,14 @@ number, when it was made, and when sharing ended (the row stays). A member is an
 with (a provider and its id for them: today Google's) and the addresses they are known by (`account_emails`, 0009: an address
 belongs to one account), so that one
 person on two logins is one member, and a later sign-in with Microsoft, Apple or an emailed link is another
-login of the same account, not a new kind of member. No password is ever kept. `team_members` (the
-member's key, the account, the primary email, role, since) and `team_member_emails` (the addresses *this team*
-knows the member by: the one they signed in with, and one an invite was sent to, which is a label and never
-proof), `team_invites` (the hash of the code, never the code), `team_refs` (the Drive file
+login of the same account, not a new kind of member. No password is ever kept. `team_members` (the space
+and the member's account, the role, when they joined, and `invited_as`: the address an invite was sent to when they signed
+in as another, which is a label and never proof; every other address of a member is the account's), `team_invites` (the hash of the code, never the code), `team_refs` (the Drive file
 ids in its tree) and `team_credentials` (the owner's encrypted token, a table of its own so a
 query about teams never selects it; a team on the service account has no row) are deleted when
 sharing ends, so the register that outlives a team names no member (the accounts are not the team's and stay). `team_events` is added to and
 never changed: `created`, `licence` (from, to, and who) and `ended`. Nothing in D1 is song,
-setlist or pad content. A team's own records of a member (`team_members`, `team_member_emails`) go
+setlist or pad content. A team's own record of a member (`team_members`) goes
 with the member; the **account** (`accounts`, `account_identities`: the login's id and the address its provider
 gave) is the person's, not the team's, so it stays until they ask for it to be deleted (CLAUDE.md;
 `src/privacy.html` says so, and was changed with 0003: it used to say a member's email was kept only
@@ -73,8 +72,8 @@ while they were in).
   SQLite (`tests/d1-db.ts`; in the browser, through Web Test Runner, `tests/d1-browser.ts`).
 - **Asking it.** There is no route that reads the register: the operator asks with wrangler, for
   example `npx wrangler d1 execute chordless-teams --remote --command "SELECT name, owner_email FROM teams WHERE ccli_licence = '471102'"`,
-  or how many people a team has: `SELECT t.name, COUNT(m.identity) + 1 AS people FROM teams t LEFT JOIN team_members m USING (space_id) WHERE t.ended_at IS NULL GROUP BY t.space_id`,
-  or the teams a person is in, by any address the team knows them by: `SELECT t.name FROM team_member_emails e JOIN team_members m ON m.account_id = e.account_id AND m.space_id = e.space_id JOIN teams t ON t.space_id = e.space_id WHERE e.email = 'x@example.com'`.
+  or how many people a team has: `SELECT t.name, COUNT(m.account_id) + 1 AS people FROM teams t LEFT JOIN team_members m USING (space_id) WHERE t.ended_at IS NULL GROUP BY t.space_id`,
+  or the teams a person is in, by any address the team knows them by: `SELECT t.name FROM account_emails e JOIN team_members m ON m.account_id = e.account_id JOIN teams t ON t.space_id = m.space_id WHERE e.email = 'x@example.com'`.
 - **Not covered.** A team's renaming is not noted (a team cannot be renamed yet).
 
 The CCLI licence number and SongSelect's terms are in [CCLI.md](CCLI.md).
@@ -519,8 +518,8 @@ Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
   (`POST /invites`) and gets its code once. Only the code's hash is kept; it lasts a week and is used up
   once. For a team member or a worship leader it is for **whoever has the link** (`POST /api/spaces/join`):
   they sign in with any Google account, and when it is not the address invited, that address is kept as
-  one of theirs in `team_member_emails` (source `invite`: a label, never proof, and never taken from
-  another member), the join is noted in the team's history (`joined_as_other`, both addresses), and the
+  one of theirs in `team_members.invited_as` (a label, never proof, and never taken from
+  another account), the join is noted in the team's history (`joined_as_other`, both addresses), and the
   people who know them by the invited address still do (docs/IDENTITIES.md). The cost: a forwarded link
   can be used by the wrong person, so it is single-use, lasts a week, and the admin sees whoever joined in
   the members list and can remove them. An **admin** invite stays bound to the invited address: anyone

@@ -181,3 +181,30 @@ then a rehearsal of the migration on a copy of the exported data (`just db-backu
 4. **A few seconds of downtime is acceptable** for the migration, with two teams, and not on a Sunday (section 4).
 
 What is left to decide is only what the production queries of section 6 turn up.
+
+## 8. What was built (`0011_schema_cleanup.sql`), and where it differs from section 3
+
+The rules it followed are now in [SCHEMA_RULES.md](SCHEMA_RULES.md). Differences from the proposal, with why:
+
+- **`team_member_emails` is gone, but not wholly redundant.** Its `'signin'` rows are derivable from `account_emails`, as
+  decided. Its `'invite'` rows were not: when someone is invited as `alice@x` and signs in as `alice@y`, the team keeps
+  `alice@x` as theirs (so the people who know them by it still do, and `setRoleByEmail('alice@x')` still finds
+  them). That is now **`team_members.invited_as`**, one address, set when the invite is used. (One member who had
+  several 'invite' rows keeps the first, by address.) A member's shown address is their account's first.
+- **No timestamp `CHECK`.** Proposed in section 3; dropped: every write is `toISOString()`, and it would have meant
+  changing most fixtures for little protection.
+- **No `CHECK` on `account_identities.provider` or `team_events.kind`**: both are open sets (a Microsoft sign-in is
+  planned), and SQLite cannot change a `CHECK` without a rebuild. Closed sets are checked: roles, `credential`,
+  lower-case addresses, non-empty owner login.
+- **`teams.owner_account_id` is nullable, `ON DELETE SET NULL`, with `CHECK (ended_at IS NOT NULL OR owner_account_id
+  IS NOT NULL)`**, not `NOT NULL RESTRICT` as proposed: the register of teams outlives the team, so an *ended*
+  team must be able to lose its owner's account, while a live one cannot (the delete is refused).
+- **`team_invites.created_by` stays an address**, not an account: it is shown as one, and an invite is short-lived.
+- **`team_credentials` stays, with `owner_provider` and `owner_sub`** (decision 2), now `NOT NULL` and not empty.
+- **Sessions of an account that is gone are dropped** in the copy (they are disposable); every other row that would
+  break a constraint stops the migration instead.
+- **Tested** against rows as production has them and against the cases it must refuse
+  (`tests/schema-cleanup.node.test.ts`), and a failing migration was shown to be undone whole on a local D1.
+- **Deploy order** (`.github/workflows/deploy.yml`): the Worker is deployed, then the migration applied, with a
+  Time Travel bookmark noted between: for a few seconds the new Worker runs on the old schema. Merging the pull
+  request is what runs it.
