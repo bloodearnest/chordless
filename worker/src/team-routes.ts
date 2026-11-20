@@ -3,8 +3,10 @@
  * space itself): `/api/spaces...` and `/api/space/<id>...`. Who is asking is settled first, and
  * nothing is kept by anything on the way.
  */
+import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
 import { jsonResponse } from './http.ts'
+import { handleAllSpaceData, handleSpaceData, isSpaceDataRoute } from './space-data.ts'
 import {
   handleCreateSpace,
   handleInviteLookup,
@@ -24,6 +26,7 @@ export function isTeamPath(path: string): boolean {
     path === '/api/spaces' ||
     path === '/api/spaces/join' ||
     path === '/api/spaces/invite' ||
+    path === '/api/spaces/data' ||
     teamSpacePath(path) !== null
   )
 }
@@ -54,6 +57,18 @@ export async function handleTeamRoutes(
         ? handleInviteLookup(request, admin)
         : jsonResponse({ error: 'Not found' }, 404)
     }
+    if (path === '/api/spaces/data') {
+      // (the data of every space the account is in, in one answer: docs/D1_PHASE1_PLAN.md)
+      if (request.method !== 'POST') return jsonResponse({ error: 'Not found' }, 404)
+      const asking = await admin.identify(request)
+      if (!asking) return refusal('unauthenticated')
+      return handleAllSpaceData(
+        request,
+        env.DB as D1Db,
+        await admin.spacesOf(asking),
+        new Date((deps?.now ?? Date.now)())
+      )
+    }
     if (path === '/api/spaces/join') {
       return request.method === 'POST'
         ? handleJoin(request, admin)
@@ -74,6 +89,18 @@ export async function handleTeamRoutes(
     if (!role) return refusal('not-a-member')
 
     if (isAdminRoute(team.rest)) return handleSpaceAdmin(request, team, admin, { identity, role })
+    if (isSpaceDataRoute(team.rest)) {
+      // (a team that is still on Drive is answered by the files API below, or told it has not moved)
+      const answered = await handleSpaceData(
+        request,
+        team.spaceId,
+        team.rest,
+        env.DB as D1Db,
+        { identity, role },
+        new Date((deps?.now ?? Date.now)())
+      )
+      if (answered) return answered
+    }
     return handleTeamRequest(request, team, createTeamContext(env, deps), role, identity)
   })()
 
