@@ -1,4 +1,5 @@
 import { expect, waitUntil } from '@open-wc/testing'
+import { openSpace } from '../src/js/db.ts'
 import { PadAudioController } from '../src/js/pad-audio-controller.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import {
@@ -20,6 +21,7 @@ import {
   uploadPadSet,
 } from '../src/js/pad-set-service.ts'
 import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
+import { SpaceDataStore } from '../src/js/space-data-store.ts'
 import { TeamStorage } from '../src/js/storage/team-storage.ts'
 import type { PadStorage } from '../src/js/storage/types.ts'
 import { makePadSet } from './builders.ts'
@@ -95,6 +97,40 @@ describe('pad sets', () => {
       const padSet = await makeDrivePadSet()
       const sets = await listPadSets(true)
       expect(sets.map(s => [s.id, s.name])).to.deep.equal([[padSet.id, padSet.name]])
+    })
+
+    it('uses D1 pad metadata without requiring Drive, and refreshes it over an old list cache', async () => {
+      const space = await createSpace(`D1 pads ${crypto.randomUUID()}`)
+      await updateSpace(space.id, { team: { id: 'team-pads', role: 'reader' } })
+      const db = await openSpace(space.id)
+      try {
+        const store = new SpaceDataStore(db)
+        expect(await listPadSets(true)).to.deep.equal([])
+        const data = {
+          songs: [],
+          setlists: [],
+          people: [],
+          from: null,
+          padSets: [
+            {
+              padSetId: 'remote-pads',
+              name: 'Known pads',
+              version: 1,
+              modifiedAt: '2026-11-20T10:00:00Z',
+            },
+          ],
+        }
+        await store.apply(data, 'tag')
+        expect((await listPadSets()).map(pad => pad.name)).to.deep.equal(['Known pads'])
+        await store.apply(
+          { ...data, padSets: [{ ...data.padSets[0], name: 'Renamed', version: 2 }] },
+          'new'
+        )
+        expect((await listPadSets()).map(pad => pad.name)).to.deep.equal(['Renamed'])
+      } finally {
+        db.db?.close()
+        await deleteSpace(space.id)
+      }
     })
 
     it('is empty when the storage cannot be listed', async () => {

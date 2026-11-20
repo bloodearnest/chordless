@@ -78,4 +78,5 @@ import('./live-sync.ts').then(({ startLiveSync }) => startLiveSync())
 import('./data-changes.ts').then(({ listenForOtherTabs }) => listenForOtherTabs())
 // Files the system opens with the installed app, and links for its open window
 listenForLaunches()
+import('./space-data-runtime.ts').then(({ startSpaceDataSync }) => startSpaceDataSync())
 /* v8 ignore stop */

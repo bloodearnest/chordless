@@ -7,6 +7,8 @@
 import type { TeamLicence } from './ccli-licence.ts'
 import type { Person } from './data-types.ts'
 import { getIdentityToken } from './google-auth.ts'
+import { localRecord } from './space-data-records.ts'
+import type { SpacePerson } from './space-data-types.ts'
 import type { StoredFile } from './storage/types.ts'
 import type { InviteInfo, MemberRole, TeamMember, TeamRole } from './team-roles.ts'
 import { callWorker, TeamError, type WorkerCall } from './worker-call.ts'
@@ -93,12 +95,20 @@ export const teamApi = {
    * files, but may name themselves): the Worker checks the person has your verified email. It
    * answers with the file as written and the person as now stored.
    */
-  nameSelf: (id: string, personId: string, name: string) =>
-    call<{ file: StoredFile; person: Person }>(
+  nameSelf: async (
+    id: string,
+    personId: string,
+    name: string
+  ): Promise<{ file?: StoredFile; person: Person }> => {
+    const result = await call<{ file?: StoredFile; person: Person | SpacePerson }>(
       'PUT',
       `${space(id)}/people/${encodeURIComponent(personId)}/name`,
       { name }
-    ),
+    )
+    return 'personId' in result.person
+      ? { person: localRecord('person', result.person) as Person }
+      : { file: result.file, person: result.person }
+  },
   leave: (id: string) => call<void>('POST', `${space(id)}/leave`),
 
   /** The owner's new sign-in, when Google no longer honours the one the space holds */

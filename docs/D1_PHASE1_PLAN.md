@@ -1,6 +1,6 @@
 # Build plan: phase 1 of storage in D1 (Teams)
 
-**Status (2026-11-20): steps 0 and 1 are built, merged and applied in production (migrations `0011`, `0012`; `0013` merged in #278, applied by its deploy). Step 2a (ULIDs, people included) is built (#281). Step 2b (device schema and metadata) is implemented in #285; steps 2c onward are not built, and nothing reads or writes the new D1 tables from a device yet.** Written against the design in
+**Status (2026-11-20): steps 0 and 1 are built, merged and applied in production (migrations `0011`, `0012`; `0013` merged in #278, applied by its deploy). Step 2a (ULIDs, people included) is built (#281). Step 2b (device schema and metadata) is built (#285). Step 2c (device sync) is implemented on the current branch; 2d onward is not built. No Team is switched to D1 until the owner runs the move.** Written against the design in
 [CENTRAL_STORAGE.md](CENTRAL_STORAGE.md) (an old name: it is only "central" because the app began distributed) as updated on `codex/beta-stable-release-design` (song index
 in D1, preferences later). The Beta and Stable release channels are only a plan, so this one does not wait
 for them. The schema it ends in is drawn in [D1_SCHEMA.md](D1_SCHEMA.md).
@@ -156,6 +156,38 @@ Setlist entries gain optional `title` and `ccli`, filled from the index on save 
 opening the setlist. Entries whose songs are missing retain their labels. The chart/content stores,
 Drive links, existing IDs and personal setlist layer remain intact. Snapshot application, outbox
 replay and displaying songs known only to the index follow in 2c.
+
+**2c implementation.** `space-data.ts` reads conditional snapshots and replays record operations;
+`space-data-store.ts` applies them atomically and owns the durable outbox. Database v17 adds
+`space_data` (the moved/probing state, ETag and complete-history checkpoint) and an outbox index
+by record. Existing records and queued operations are retained; v16 gains no rewritten records.
+
+A local setlist/person/index/pad-metadata edit and its queued operation commit together. Edits of
+one record coalesce, retaining the original merge base, with a fresh operation id on each edit so
+an acknowledgement cannot remove a newer edit. Delivery starts immediately after the commit when
+online: there is no debounce or wait for the tick. Reconnect, visible-page resume, manual Sync and
+the minute tick retry it. Web Locks serialize senders of the same space across tabs. Drive-written
+song file links update the index and queue its metadata too; chart text never enters the outbox.
+
+The first request fetches all history. Later conditional requests use the saved ETag and the
+window, retaining older local history. Snapshots protect queued creations, updates and deletions,
+preserve personal additions and local state, and validate their shape before replacing anything.
+A Team opened offline provisionally queues edits before its mode is known, and probing also queues edits made during the very first request; `not_moved` drops only this temporary
+queue and keeps the Drive-backed records. A space already on D1 cannot silently revert to Drive.
+
+A conflict reapplies edited scalar/body/entry fields and entry additions/removals/moves by song
+id, retaining independent server changes. A shared-field collision keeps the later local change
+and says so with a toast. Lost acknowledgements reconcile against the returned row instead of
+creating duplicates. Permanent refusals retain local edits and stop automatic retries; the toast
+explains the refusal and offers an explicit retry. Further snapshots merge shared changes into
+these retained local edits, so a reader's key change does not freeze the rest of a setlist.
+
+`space-data-runtime.ts` starts delivery from committed edits and routes live “changed” messages
+to the snapshot sync. Polling remains current-space scoped until step 5; explicit edits/manual
+syncs can name their own space. Indexed songs without charts appear with their title, key and CCLI
+number and a “Get this song” link; pad-set metadata is read from D1 for a moved Team. The reader's
+self-name route accepts the D1 response without expecting a Drive file. Nothing switches a Team's
+storage, seeds the server, or excludes Drive collections yet: those are 2d, 3 and 4.
 
 **3. Seeding.**
 The owner runs the move by hand (a button on the Account page only an owner sees, or a script): from the

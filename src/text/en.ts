@@ -2188,4 +2188,10 @@ google-sign-in-expired = Chordless's access to your Google Drive has expired. Re
 picker-offline = Couldn't load Google's folder picker. Are you offline?
 picker-team-title = Choose where to keep the Team's songs
 setlist-not-found = That setlist is not on this device.
+
+# D1 space data sync
+space-data-conflict = Another device changed the same details. Your later changes were kept.
+space-data-refused = This change is saved on this device, but could not be synced.
+space-data-get-song = Get this song
+space-data-missing-song = The chart is not on this device yet.
 `

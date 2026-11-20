@@ -89,6 +89,7 @@ import { SectionController } from './setlist/section-controller.ts'
 import { SetlistHeader } from './setlist/setlist-header.ts'
 import { controlsSetlist } from './setlist-control.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
+import { songSelectLink } from './songselect-link.ts'
 import { getCurrentSpaceFull, getSpaceById, listSpaces, syncsBack } from './space.ts'
 import { transferSetlists } from './space-transfer.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
@@ -652,6 +653,16 @@ export class SetlistPage {
         const songContent = document.createElement('div')
         songContent.className = 'song-content'
         songContent.appendChild(songDisplay)
+        if (song.missing) {
+          const note = document.createElement('p')
+          note.textContent = t('space-data-missing-song')
+          const link = document.createElement('a')
+          link.href = songSelectLink({ title: song.title, ccli: song.ccliNumber ?? null })
+          link.target = '_blank'
+          link.rel = 'noopener'
+          link.textContent = t('space-data-get-song')
+          songContent.append(note, link)
+        }
         songElement.appendChild(songContent)
       }
       fragment.appendChild(songElement)

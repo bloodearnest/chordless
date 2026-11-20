@@ -20,6 +20,8 @@ import { transposeSong } from '../transpose.ts'
  * A song of a setlist as the page works with it (see buildRuntimeSongs).
  */
 export interface RuntimeSong {
+  missing?: boolean
+  ccliNumber?: string | null
   title: string
   parsed: ParsedChart
   /** Its position in the setlist */
@@ -105,7 +107,9 @@ export async function buildRuntimeSongs(
     const sourceText = canonicalSong.chordpro
 
     // Parse the chordpro
-    const parsed = parser.parse(sourceText)
+    const parsed = canonicalSong.missing
+      ? structuredClone(canonicalSong.parsed)
+      : parser.parse(sourceText)
 
     // Capture original key from ChordPro file (for transposition reference)
     const originalKey = parsed.metadata.key || null
@@ -159,6 +163,7 @@ export async function buildRuntimeSongs(
 
     // Create song object for runtime
     songs.push({
+      ...(canonicalSong.missing ? { missing: true, ccliNumber: canonicalSong.ccliNumber } : {}),
       title: parsed.metadata.title || `Song ${songEntry.order + 1}`,
       parsed: parsed,
       songIndex: songEntry.order,

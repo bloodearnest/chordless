@@ -24,6 +24,8 @@ import { timedFetch } from './telemetry/telemetry.ts'
 import { UserError } from './utils/errors.ts'
 
 export interface WorkerCall {
+  headers?: Record<string, string>
+  allowNotModified?: boolean
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   /** From the origin: `/api/...` */
   path: string
@@ -56,14 +58,14 @@ async function reasonOf(response: Response): Promise<string> {
  * `TeamError` when it is not. `describe` may add to the reason (it is given the token sent).
  */
 export async function callWorker(
-  { method = 'GET', path, query, body }: WorkerCall,
+  { method = 'GET', path, query, body, headers: extraHeaders, allowNotModified }: WorkerCall,
   connection: WorkerConnection,
   describe?: (reason: string, status: number, token: string) => string
 ): Promise<Response> {
   const url = new URL(path, connection.origin)
   for (const [key, value] of Object.entries(query ?? {})) url.searchParams.set(key, value)
   const token = await connection.token()
-  const headers: Record<string, string> = { Authorization: `Bearer ${token}` }
+  const headers: Record<string, string> = { ...extraHeaders, Authorization: `Bearer ${token}` }
   const raw = body instanceof Blob
   if (body !== undefined) headers['Content-Type'] = raw ? body.type : 'application/json'
   // (a span for the call, with its traceparent: the Worker's span is its child)
@@ -72,7 +74,7 @@ export async function callWorker(
     headers,
     body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
   })
-  if (response.ok) return response
+  if (response.ok || (allowNotModified && response.status === 304)) return response
   const reason = await reasonOf(response)
   throw new TeamError(describe ? describe(reason, response.status, token) : reason, response.status)
 }

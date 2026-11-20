@@ -101,6 +101,13 @@ export class SyncOrchestrator {
         // (told to the pages that say a space is syncing, and noted as the space's last sync)
         trackSync(this.spaceId, async report => {
           if (!this.syncManager) await phase('chordless.sync.init', {}, () => this.init())
+          if (this.spaceId) {
+            const { syncSpaceDataFor } = await import('./space-data-runtime.ts')
+            await syncSpaceDataFor(this.spaceId, {
+              all: trigger === 'manual',
+              retryRefused: trigger === 'manual',
+            })
+          }
           const syncManager = this.syncManager as SyncManager
           const send = (progress: SyncProgress) => {
             report(progress)

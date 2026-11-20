@@ -13,6 +13,8 @@ import type {
   TempoInput,
 } from './data-types.ts'
 import { leaderName } from './leaders.ts'
+import { queueSpaceChange, SpaceDataStore } from './space-data-store.ts'
+import type { SpaceRecordKind } from './space-data-types.ts'
 import { PERSON_SYNC_FIELDS } from './sync/person-hash.ts'
 import { setAmbient } from './telemetry/context.ts'
 import { recordSpan } from './telemetry/telemetry.ts'
@@ -28,7 +30,7 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 // NOTE: This now stores ALL space data in one database per space.
 // Space metadata is stored separately in the 'spaces' database.
 
-export const DB_VERSION = 16
+export const DB_VERSION = 17
 /**
  * The oldest version a database is upgraded from (docs/MIGRATIONS.md, "The floor"). Raised when the steps
  * for versions below it are dropped, which is when nobody has a device that old.
@@ -249,10 +251,22 @@ export class ChordlessDB {
       this.#changed(kind, null)
   }
 
+  async #queue(
+    tx: IDBTransaction,
+    kind: SpaceRecordKind,
+    id: string,
+    next: unknown
+  ): Promise<void> {
+    if (this.origin === 'local') await queueSpaceChange(tx, kind, id, next)
+  }
+
   /** A transaction on some stores; the database must have been opened with init() */
   #transaction(stores: string[], mode: IDBTransactionMode): IDBTransaction {
     if (!this.db) throw new Error('ChordlessDB is not initialised: call init() first')
-    return this.db.transaction(stores, mode)
+    return this.db.transaction(
+      mode === 'readwrite' ? [...new Set([...stores, 'space_data', 'space_outbox'])] : stores,
+      mode
+    )
   }
 
   /**
@@ -418,6 +432,14 @@ export class ChordlessDB {
           db.createObjectStore('pad_sets', { keyPath: 'padSetId' })
         }
 
+        if (!db.objectStoreNames.contains('space_data')) {
+          db.createObjectStore('space_data', { keyPath: 'id' })
+        }
+        const outbox = request.transaction?.objectStore('space_outbox')
+        if (outbox && !outbox.indexNames.contains('record')) {
+          outbox.createIndex('record', ['change.kind', 'change.id'], { unique: false })
+        }
+
         if (oldVersion > 0 && oldVersion < DB_VERSION) {
           upgradeRecords(request.transaction as IDBTransaction, oldVersion)
         }
@@ -443,6 +465,7 @@ export class ChordlessDB {
       }
     }
     await fillEntryMetadata(tx, stored)
+    await this.#queue(tx, 'setlist', stored.id, stored)
     store.put(stored)
     const result = await transactionDone(tx, stored)
     this.#changed('setlist', [stored.id])
@@ -468,6 +491,7 @@ export class ChordlessDB {
     if (change(draft) === NO_CHANGE) return undefined
     const stored = cloneForStorage(withNumericTempos(draft)) as Setlist
     await fillEntryMetadata(tx, stored)
+    await this.#queue(tx, 'setlist', stored.id, stored)
     store.put(stored)
     const result = await transactionDone(tx, stored)
     this.#changed('setlist', [id])
@@ -513,6 +537,7 @@ export class ChordlessDB {
     for (const setlist of setlists) {
       const stored = cloneForStorage(withNumericTempos(setlist)) as Setlist
       await fillEntryMetadata(tx, stored)
+      await this.#queue(tx, 'setlist', stored.id, stored)
       store.put(cloneForStorage(stored))
     }
 
@@ -532,7 +557,10 @@ export class ChordlessDB {
     const before = JSON.stringify(setlist.songs)
     await fillEntryMetadata(tx, setlist)
     const changed = before !== JSON.stringify(setlist.songs)
-    if (changed) store.put(setlist)
+    if (changed) {
+      await this.#queue(tx, 'setlist', setlist.id, setlist)
+      store.put(setlist)
+    }
     await transactionDone(tx)
     if (changed) this.#changed('setlist', [id])
     return setlist
@@ -559,6 +587,7 @@ export class ChordlessDB {
   async deleteSetlist(id: string): Promise<void> {
     const tx = this.#transaction(['setlists'], 'readwrite')
     const store = tx.objectStore('setlists')
+    await this.#queue(tx, 'setlist', id, null)
     await store.delete(id)
     await transactionDone(tx)
     this.#changed('setlist', [id])
@@ -596,6 +625,7 @@ export class ChordlessDB {
           }
         }
       }
+      await this.#queue(tx, 'person', stored.id, stored)
       store.put(stored)
     }
     await transactionDone(tx)
@@ -641,6 +671,7 @@ export class ChordlessDB {
     const added: Person[] = []
     for (const person of people) {
       if (await requestResult(store.getKey(person.id))) continue
+      await this.#queue(tx, 'person', person.id, person)
       store.put(cloneForStorage(person))
       added.push(person)
     }
@@ -665,6 +696,7 @@ export class ChordlessDB {
     if (!setlist) return undefined
     const local = await this.getLocalState(id)
     const tx = this.#transaction(['setlists', 'setlist_local', 'pending_deletions'], 'readwrite')
+    await this.#queue(tx, 'setlist', id, null)
     tx.objectStore('setlists').delete(id)
     tx.objectStore('setlist_local').delete(id)
     if (setlist.fileRef) {
@@ -789,6 +821,11 @@ export class ChordlessDB {
       'song',
       songs.map(song => song.uuid)
     )
+  }
+
+  async getAllSongIndex(): Promise<import('./data-types.ts').SongIndexRecord[]> {
+    const tx = this.#transaction(['song_index'], 'readonly')
+    return requestResult(tx.objectStore('song_index').getAll())
   }
 
   /** Metadata remains readable when the chart is absent. */
@@ -948,7 +985,7 @@ export class ChordlessDB {
       ['setlists', 'songs', 'people', 'scores', 'song_index'],
       'readwrite'
     )
-    unlinkSongIndex(tx)
+    await unlinkSongIndex(tx)
     const unlinked = {
       fileRef: null,
       fileModified: null,
@@ -999,7 +1036,7 @@ export class ChordlessDB {
    */
   async unlinkFiles(refs: Set<string>): Promise<number> {
     const tx = this.#transaction(['setlists', 'songs', 'scores', 'song_index'], 'readwrite')
-    unlinkSongIndex(tx, refs)
+    await unlinkSongIndex(tx, refs)
     const unlinked = {
       fileRef: null,
       fileModified: null,
@@ -1128,6 +1165,7 @@ export class ChordlessDB {
       ['songs', 'song_index', 'chordpro', 'pending_deletions'],
       'readwrite'
     )
+    await this.#queue(tx, 'song', uuid, null)
     tx.objectStore('songs').delete(uuid)
     tx.objectStore('song_index').delete(uuid)
     if (remember && song.fileRef) {
@@ -1348,16 +1386,15 @@ function songIndex(
 }
 
 /** File links belong to Drive, including when the device has only the index. */
-function unlinkSongIndex(tx: IDBTransaction, refs?: Set<string>): void {
-  const cursor = tx.objectStore('song_index').openCursor()
-  cursor.onsuccess = () => {
-    const at = cursor.result
-    if (!at) return
-    const record = at.value as SongIndexRecord
+async function unlinkSongIndex(tx: IDBTransaction, refs?: Set<string>): Promise<void> {
+  const store = tx.objectStore('song_index')
+  const records: SongIndexRecord[] = await requestResult(store.getAll())
+  for (const record of records) {
     if (!refs || (record.fileRef && refs.has(record.fileRef))) {
-      at.update({ ...record, fileRef: null })
+      const next = { ...record, fileRef: null }
+      await queueSpaceChange(tx, 'song', record.songUuid, next)
+      store.put(next)
     }
-    at.continue()
   }
 }
 
@@ -1365,7 +1402,9 @@ async function writeSongIndex(tx: IDBTransaction, song: SongRecord): Promise<voi
   const store = tx.objectStore('song_index')
   const previous = await requestResult(store.get(song.uuid))
   const chart = await requestResult(tx.objectStore('chordpro').get(song.chordproFileId))
-  store.put(songIndex(song, previous, chart))
+  const next = songIndex(song, previous, chart)
+  await queueSpaceChange(tx, 'song', song.uuid, next)
+  store.put(next)
 }
 
 async function fillEntryMetadata(tx: IDBTransaction, setlist: Setlist): Promise<void> {
@@ -1490,6 +1529,9 @@ export async function getCurrentDB(origin?: DataOrigin): Promise<ChordlessDB> {
 export async function openSpace(spaceId: string, origin?: DataOrigin): Promise<ChordlessDB> {
   const db = new ChordlessDB(spaceId, origin)
   await db.init()
+  // A Team first opened offline must capture edits before its first server probe too.
+  const { getSpaceById } = await import('./space.ts')
+  if ((await getSpaceById(spaceId))?.team) await new SpaceDataStore(db).probe({ onlyUnknown: true })
   return db
 }
 

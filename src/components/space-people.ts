@@ -312,6 +312,17 @@ export class SpacePeople extends LitElement {
   async _nameSelf(teamId: string, person: Person, name: string): Promise<void> {
     await this._change('toast-people-name-self-failed', async db => {
       const { file, person: stored } = await teamApi.nameSelf(teamId, person.id, name)
+      if (!file) {
+        const { ChordlessDB } = await import('../js/db.ts')
+        const synced = new ChordlessDB(db.spaceId, 'sync')
+        await synced.init()
+        try {
+          await synced.savePeople([stored])
+        } finally {
+          synced.db?.close()
+        }
+        return
+      }
       await db.savePeople([
         {
           ...stored,

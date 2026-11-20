@@ -11,6 +11,7 @@ import type {
   ChartMetadata,
   ParsedChart,
   SetlistEntry,
+  SongIndexRecord,
   SongInput,
   SongRecord,
   SongWithContent,
@@ -37,6 +38,37 @@ const MAX_CACHE_SIZE = 100
  * @param db - Optional database instance (uses getCurrentDB if not provided)
  * @returns Song with parsed content and metadata
  */
+function songWithoutChart(song: SongIndexRecord, local?: SongRecord): SongWithContent {
+  return {
+    uuid: song.songUuid,
+    id: song.songId,
+    variantOf: song.variantOf,
+    isDefault: song.isDefault,
+    variantLabel: song.variantLabel,
+    ccliNumber: song.ccli,
+    titleNormalized: normalizeTitle(song.title),
+    importDate: local?.importDate ?? song.modifiedAt,
+    importUser: local?.importUser ?? null,
+    importSource: local?.importSource ?? '',
+    modifiedDate: song.modifiedAt,
+    title: song.title,
+    artist: null,
+    author: null,
+    key: song.key,
+    originalKey: song.key,
+    tempo: null,
+    originalTempo: null,
+    metadata: { key: song.key, tempo: null, timeSignature: null },
+    chordpro: '',
+    chordproFileId: local?.chordproFileId ?? '',
+    parsed: {
+      metadata: { title: song.title, ...(song.key ? { key: song.key } : {}) },
+      sections: [],
+    },
+    missing: true,
+  }
+}
+
 export async function getSongWithContent(
   songUuid: string,
   db: ChordlessDB | null = null
@@ -45,12 +77,16 @@ export async function getSongWithContent(
 
   const song = await database.getSong(songUuid)
   if (!song) {
+    const indexed = await database.getSongIndex(songUuid)
+    if (indexed) return songWithoutChart(indexed)
     throw new Error(`Song not found: ${songUuid}`)
   }
 
   // Get chordpro content
   const chordpro = await database.getChordPro(song.chordproFileId)
   if (!chordpro) {
+    const indexed = await database.getSongIndex(songUuid)
+    if (indexed?.version) return songWithoutChart(indexed, song)
     throw new Error(`ChordPro content not found: ${song.chordproFileId}`)
   }
 
@@ -121,10 +157,16 @@ export async function getLibrarySongs(
     allVariants = false,
   }: { withLastUsage?: boolean; allVariants?: boolean } = {}
 ): Promise<SongWithContent[]> {
-  const records = await db.getAllSongs()
+  const localRecords = await db.getAllSongs()
+  const records: Pick<SongRecord, 'uuid' | 'id' | 'isDefault'>[] = [...localRecords]
+  const known = new Set(records.map(song => song.uuid))
+  for (const indexed of await db.getAllSongIndex()) {
+    if (!known.has(indexed.songUuid))
+      records.push({ uuid: indexed.songUuid, id: indexed.songId, isDefault: indexed.isDefault })
+  }
 
   // One song per deterministic id (its default), or every variant of each
-  const byId = new Map<string, SongRecord>()
+  const byId = new Map<string, Pick<SongRecord, 'uuid' | 'id' | 'isDefault'>>()
   const variantCounts = new Map<string, number>()
   for (const record of records) {
     variantCounts.set(record.id, (variantCounts.get(record.id) ?? 0) + 1)
@@ -215,10 +257,10 @@ export async function getDefaultVariant(
  *
  * @param variants All the versions of the entry's song (those with its id)
  */
-export function versionForEntry(
+export function versionForEntry<T extends Pick<SongRecord, 'uuid' | 'isDefault'>>(
   entry: Pick<SetlistEntry, 'songUuid'>,
-  variants: SongRecord[]
-): SongRecord | undefined {
+  variants: T[]
+): T | undefined {
   return (
     variants.find(variant => variant.uuid === entry.songUuid) ??
     variants.find(variant => variant.isDefault) ??
@@ -233,7 +275,15 @@ export async function songOfEntry(
 ): Promise<SongWithContent> {
   const database = db ?? (await getCurrentDB())
   const version = versionForEntry(entry, await database.getSongVariants(entry.songId))
-  if (!version) throw new Error(`Song not found: ${entry.songId}`)
+  if (!version) {
+    const indexed = (await database.getAllSongIndex()).filter(song => song.songId === entry.songId)
+    const found =
+      indexed.find(song => song.songUuid === entry.songUuid) ??
+      indexed.find(song => song.isDefault) ??
+      indexed[0]
+    if (found) return getSongWithContent(found.songUuid, database)
+    throw new Error(`Song not found: ${entry.songId}`)
+  }
   return getSongWithContent(version.uuid, database)
 }
 

@@ -399,6 +399,26 @@ describe('space-people', () => {
       expect(card('Anne Lee')).to.exist
     })
 
+    it('keeps a D1 self-name response as synced without expecting a Drive file', async () => {
+      answer = () =>
+        Response.json({
+          person: {
+            personId: 'ann',
+            name: 'Anne in D1',
+            emails: ['ann@example.com'],
+            teamMember: null,
+            mergedInto: null,
+            version: 7,
+            modifiedAt: '2026-11-20T10:00:00Z',
+          },
+        })
+      await open()
+      await element._nameSelf('team-1', ann, 'Anne in D1')
+      expect((await stored('ann')).name).to.equal('Anne in D1')
+      expect((await stored('ann')).version).to.equal(7)
+      expect((await stored('ann')).id).to.equal('ann')
+    })
+
     it('says so, and leaves the name as it was, when the Worker refuses', async () => {
       answer = () => Response.json({ error: 'That person is not you' }, { status: 403 })
       await open()

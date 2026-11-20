@@ -40,8 +40,10 @@ export const LIVE_NUDGE_MS = 400
  */
 export class SyncPushedEvent extends Event {
   static readonly type = 'sync:pushed'
-  constructor() {
+  readonly teamId?: string
+  constructor(teamId?: string) {
     super(SyncPushedEvent.type)
+    this.teamId = teamId
   }
 }
 
