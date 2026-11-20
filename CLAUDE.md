@@ -148,25 +148,5 @@ When the user wants to try a branch on a phone or tablet, serve it (`docs/PREVIE
 - Leave it running when you finish (the user is testing on it); stop it only if asked. A branch that raises
   `DB_VERSION` can break an older branch's data on that origin: say so if yours does.
 
-## Log of what the tests catch
-
-When a test fails and the cause turns out to be a real defect in the app code (not a wrong test,
-a flake, or an intended change of behaviour), append one JSON line to `docs/test-catches.jsonl`
-before moving on:
-
-    {"date": "2026-10-14", "suite": "node|unit|e2e", "test": "file › name", "kind": "regression|existing-bug", "summary": "one sentence", "fix": "#PR, or uncommitted", "caught_by": "new-test|existing-test"}
-
-- `regression` is a bug in code being changed at the time; `existing-bug` was already there.
-- A bug caught in work in progress counts: that is a test doing its job.
-- `caught_by` (for `regression` and `existing-bug` only) is `existing-test` when a test that was
-  already there failed, which is what keeping a suite pays for, and `new-test` when a test written
-  with the change found it. Leave it off `test-bug` and `flaky`.
-- Also log failures where the test was wrong or flaky, with `kind` `test-bug` or `flaky`, so we can
-  see which tests cost more than they catch.
-- Don't log an expected failure (a test written first), or a failure whose cause is not diagnosed
-  yet. Breaking the source on purpose to check a test (a mutation check) is not a catch.
-- `fix` is the number of the PR the fix is in (`"#42"`), not a sha. Older entries have shas from when
-  GitHub's "Rebase and merge" rewrote commits on `main`. Fill in an `uncommitted` entry once the PR is open.
-
 `just test` also records counts, run times and coverage in `docs/stats.jsonl` (one line per commit,
 by `scripts/stats.ts`), so the history of both is in the repo.
