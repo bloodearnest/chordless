@@ -2,8 +2,15 @@
 
 **Status: plan, nothing built (2026-11-20).** Written against the design in
 [CENTRAL_STORAGE.md](CENTRAL_STORAGE.md) as updated on `codex/beta-stable-release-design` (song index
-in D1, preferences later, the [Beta/Stable rules](BETA_CHANNEL.md) for rolling out), and against the
-code as it is: the storage seam in `src/js/storage/`, the Worker's team API in `worker/src/team-api.ts`.
+in D1, preferences later), and against the code as it is: the storage seam in `src/js/storage/`, the
+Worker's team API in `worker/src/team-api.ts`. The Beta and Stable release channels are only a plan, so
+this one does not wait for them or follow their rules. The schema it ends in is drawn in
+[D1_SCHEMA.svg](D1_SCHEMA.svg).
+
+**Decided with the owner (2026-11-20):** there are two Teams, both the owner's, from one church, so the
+move is done once, by hand, by the owner: no per-team switch, no export back to Drive, no grace period for
+other people's old builds. The live channel is one socket per Team space. The song index carries
+`isDefault` and `variantOf`.
 
 Phase 1 puts a **Team space's setlists, people and song index in D1**, and, as the first thing that
 needs it, makes **every space sync, not only the current one**, which is what lets the current space be
@@ -44,14 +51,11 @@ So phase 1 is a new `SpaceStorage` plus routing, not a new sync engine.
 6. **Setlist ids are unique across spaces**, enforced by a unique index on `(doc_id)` for the setlists
    collection (the lookup in `all-spaces.ts` relies on it). A create that collides with another space's id is
    refused, which only a move or a joined share can cause, and the move already deletes before it adds.
-7. **Gated per team on the server.** A column on the register (`teams.storage_v2`, default 0) turns D1 storage
-   on for one team. A team on it is read through D1; one off is Drive as today. This is the "server-side
-   feature gate for a Beta trial" of the release design, and the rollback.
-8. **Beta and Stable.** The Worker is one deployment for both channels, so every Worker change in this plan is
-   additive (expand), and the client that uses it follows (migrate); the Drive path for these collections is
-   retired no sooner than 30 days after the first Stable promotion of the client that stops using it
-   ([BETA_CHANNEL.md](BETA_CHANNEL.md#worker-api-support)). Each build declares an API version from the first
-   step, so the later floor can be raised.
+7. **One switch for all, then none.** D1 storage is turned on for a Team by a column on the register
+   (`teams.storage_v2`, default 0) only so that the owner can run the move when ready; once both Teams are
+   moved the column and the Drive path for these three collections are deleted. The final schema has no flag.
+8. **Old builds.** Every Worker change is additive until the move, so a device that has not updated keeps
+   working. After the move the Drive copies of setlists and people are an archive and are not read again.
 
 ## Steps
 
@@ -78,21 +82,19 @@ refreshed when the song is opened. `DB_VERSION` goes up for the new fields and s
 migration under [MIGRATIONS.md](MIGRATIONS.md): roll forward only, with a repair path tested on a device that
 took the build and one that skipped it. No team uses it yet, so behaviour is unchanged.
 
-**3. Seeding and the grace period.**
-On the first sync of a space the Worker says is `storage_v2`, the device **pushes its own setlists, people and
-index** to D1 as creates (the local copy is primary); a collision on a `doc_id` is an ordinary conflict, so
-two devices seeding at once converge by the engine's existing rules. The Worker records that the space is
-seeded (a flag on the register, not a file in Drive). For the grace period the owner's new builds also list
-the Drive `setlists` and `people` files and import any changed after the seeding, so an old owner build's
-late writes are not lost; the end of the period is set from the deployed versions and the support policy.
-Tests: a Drive-only space seeded; two devices seeding at once; a late Drive write imported; an
-index record from a song whose file is absent.
+**3. Seeding.**
+The owner runs the move by hand (a script or a button on the Account page that only the owner of a Team
+sees): from the owner's device, which has the complete local copy, push the space's **setlists, people and
+index** to D1 as creates, then set `storage_v2`. Other devices pull from D1 on their next sync, and a
+collision on a `doc_id` is an ordinary conflict. The index is built from the local songs (uuid, `songId`,
+title, CCLI number, default key, `isDefault`, `variantOf`, the licence, content hash, `fileRef`). Tests: a
+Drive-only space seeded; the index from a song whose file is absent; a second device pulling it all.
 
-**4. Turn it on, team by team.**
-`storage_v2` is set for one real team (this project's own) on Beta, watched through the existing traces (a
-span per D1 call, by build and channel), then widened. Release notes and the privacy page say the index keeps
-titles and CCLI numbers (CLAUDE.md's rule is reworded in the same step, as the design says). Nothing is
-retired: Drive's copies stay as the archive.
+**4. Run the move.**
+The owner seeds and switches the two Teams, watching the existing traces (a span per D1 call). The privacy
+page says the index keeps titles and CCLI numbers, and CLAUDE.md's rule is reworded in the same step, as the
+design says. Drive's copies of setlists and people stay as an archive. Then `storage_v2` and the Drive path
+for the three collections are deleted.
 
 **5. Sync every space.**
 The sync and live-sync code stops reading "the current space". A small `SyncOrchestrator` keeps one sync
@@ -100,8 +102,7 @@ session per space on the device (as `sync-orchestrator.ts` already does for one)
 (`auto-sync.ts`), the last-sync record keyed by space (`last-sync.ts`) and the data watcher telling which
 space a change was in (`data-watcher.ts`). Drive-backed spaces (Personal, still phase 3) sync as before, so
 the orchestrator is correct for mixed backends. **Live channel:** one socket per Team space the device is
-in (usually one to three), not per account, because the rooms are per space already (`team-room.ts`) and an
-account-wide room would be a new Durable Object; revisit if the number of teams per person grows. A space that
+in (decided), because the rooms are per space already (`team-room.ts`). A space that
 cannot be reached is skipped and retried, never blocking the others. Tests: two spaces syncing at once, one
 offline; a change in a space that is not in view reaches its backend.
 
@@ -112,26 +113,13 @@ create switches, which become a plain `goTo('/')`; `getCurrentDB` and `ensureCur
 `switchSpace` and `SpaceChangeEvent` are deleted, the tests that set a current space are rewritten, and the
 docs are updated. By then nothing reads it, so the compiler and knip say when it is done.
 
-## Rollout and rollback
+## Rollout
 
-- Steps 1 to 3 change nothing a person sees. Step 4 is the first visible one and is per team.
-- **Rollback** is clearing `storage_v2`: the team reads Drive again. Setlists changed in D1 since the
-  seeding would be missing from Drive, so before widening past the first team there is a one-way
-  **export back** (D1 to Drive files) in the Worker, tested; it is also how a team leaves. Decide whether to
-  build it before step 4 or accept that the first team is a trial with a manual repair.
-- A device that is offline across the grace period meets the API floor (`CLIENT_UPDATE_REQUIRED`) and the
-  recovery controls the release design requires before the first retirement.
-
-## Open questions for the owner
-
-1. **Export back before the first team, or a trial with manual repair?** (Rollback, above.) I would build it:
-   it is small and removes the fear.
-2. **Which team goes first?** The one this project uses, on Beta.
-3. **Live channel**: one socket per Team space (the plan) or one per account.
-4. **Whether the song index carries `isDefault` and `variantOf`** (what the variants view needs) or only the
-   identity and the title. I would carry them: a device with only the index should show variants.
-5. **Tombstone life** for a deleted setlist or song record (open in the design): I would keep them 180 days,
-   longer than the grace period and a device that is offline for a season.
+- Steps 1 to 3 change nothing a person sees. Step 4 is the one visible change, and the owner makes it.
+- **Rollback:** there is none built. Before step 4 the owner takes a zip export of each space
+  (`space-export.ts`), which already holds setlists, people and songs, and Drive keeps its own copies of
+  setlists and people as they were at the move.
+- Tombstones of deleted records are kept 180 days, longer than any device is likely to be offline.
 
 ## What this does not do
 
