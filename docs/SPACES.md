@@ -683,17 +683,20 @@ space" in the setlist's info dialog, in edit mode (keeps the setlist id: SYNC_AR
 chosen with **Make default** on its card on Account and Teams (the card says **Default**; with one
 space there is nothing to choose, so neither shows). It is a preference of this device, kept in this
 browser, and it never stops anything:
-- **It is the leftmost tab** on the Setlists, Library and Add Song pages, the others keeping their
-  fixed order, and it stays a tab when there are too many (the current tab and the default are
-  always shown).
+- **The Setlists and Library pages list every space at once (2026-11-20)**, each row or song naming its
+  space where the device has more than one; they have no tabs. A setlist or song opens in its own
+  space (`all-spaces.ts`: setlist ids and song uuids are found across spaces). Library's filter bar
+  leaves a space out. Add Song still has the tabs, with the default as the leftmost, and it stays a
+  tab when there are too many (the current tab and the default are always shown).
 - **It is where every import goes**, the import page included (not the tab in view): what the
   SongSelect bookmarklet brings, files or text shared to Chordless, and Add Song. They go to
   the default, with "Import into" saying so and open to change; once the person picks another,
   the default does not override it. If the default is one the person can only read (a team member,
   not a worship leader), the first Team they can write to, else any space they can, is used
   (`importTargetOf`).
-- **Where the person is working is still the tab in view.** A new setlist and
-  the "Save to" of a pad upload start at the space in use, not the default, and the app reopens on
+- **A new setlist starts in the default space**, with "Create in" to pick another when the person can
+  write to more than one. **Where the person is working is still the tab in view** for Add Song, and
+  the "Save to" of a pad upload starts at the space in use, not the default, and the app reopens on
   the space last used: in a service the last place is the better start (decided 2026-11-13).
 - With none chosen it is the first Team the device has (by when it was made), else the first space,
   and it falls back the same way when the one chosen is deleted or left.

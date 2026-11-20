@@ -20,8 +20,12 @@ import { must } from './must.ts'
 
 const { describe, it, afterEach } = window
 
-const here = { id: 'here', label: 'Here' }
-const own = { id: 'a' } as SongWithContent
+const names = new Map([
+  ['here', 'Here'],
+  ['there', 'There'],
+])
+const own = { id: 'a', spaceId: 'here' } as SongWithContent
+const theirs = { id: 'e', spaceId: 'there' } as SongWithContent
 const shared = { id: 'b', source: { dbId: 'shared', label: 'Shared with me' } } as SongWithContent
 const other = { id: 'c', source: { dbId: 'other', label: 'Other' } } as SongWithContent
 const another = { id: 'd', source: { dbId: 'other', label: 'Other' } } as SongWithContent
@@ -29,25 +33,29 @@ const another = { id: 'd', source: { dbId: 'other', label: 'Other' } } as SongWi
 describe('library places', () => {
   afterEach(() => localStorage.removeItem('library-places-left-out'))
 
-  it('puts a song in its own database, or the current space', () => {
-    expect(placeOf(own, here)).to.deep.equal(here)
-    expect(placeOf(shared, here)).to.deep.equal({ id: 'shared', label: 'Shared with me' })
+  it('puts a song in its own space, or the database it came from', () => {
+    expect(placeOf(own, names)).to.deep.equal({ id: 'here', label: 'Here' })
+    expect(placeOf(shared, names)).to.deep.equal({ id: 'shared', label: 'Shared with me' })
+    // (a song with no space, or one the names do not know, is in a place with no name)
+    expect(placeOf({ id: 'z' } as SongWithContent, names)).to.deep.equal({ id: '', label: '' })
+    expect(placeOf({ id: 'y', spaceId: 'gone' } as SongWithContent, names)).to.deep.equal({
+      id: 'gone',
+      label: '',
+    })
   })
 
-  it('lists the places songs are in, the current space first, each once', () => {
-    expect(placesOf([shared, other, another], here).map(place => place.id)).to.deep.equal([
-      'here',
-      'shared',
-      'other',
-    ])
-    expect(placesOf([], here)).to.deep.equal([here])
+  it('lists the places songs are in, each once, as they come', () => {
+    expect(
+      placesOf([theirs, own, shared, other, another], names).map(place => place.id)
+    ).to.deep.equal(['there', 'here', 'shared', 'other'])
+    expect(placesOf([], names)).to.deep.equal([])
   })
 
   it('leaves out the songs of the places named, and gives back the same list for none', () => {
     const songs = [own, shared, other]
-    expect(filterByPlace(songs, [], here)).to.equal(songs)
-    expect(filterByPlace(songs, ['shared'], here)).to.deep.equal([own, other])
-    expect(filterByPlace(songs, ['here', 'other'], here)).to.deep.equal([shared])
+    expect(filterByPlace(songs, [], names)).to.equal(songs)
+    expect(filterByPlace(songs, ['shared'], names)).to.deep.equal([own, other])
+    expect(filterByPlace(songs, ['here', 'other'], names)).to.deep.equal([shared])
   })
 
   it('keeps what was left out, and forgets it when nothing is', () => {
@@ -87,6 +95,7 @@ describe('library places', () => {
 })
 
 describe('library-space-filter', () => {
+  const here = { id: 'here', label: 'Here' }
   const places = [here, { id: 'shared', label: 'Shared with me' }]
   const buttons = (el: LibrarySpaceFilter) =>
     Array.from(el.shadowRoot?.querySelectorAll('button') ?? [])

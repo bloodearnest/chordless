@@ -1609,3 +1609,22 @@ body.edit-mode .key-selector:focus {
     font-size: var(--font-ui);
   }
 }
+
+/* Which space a new setlist goes to (the home page's create form, when there is a choice) */
+.create-space {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  font-size: var(--font-ui-small);
+}
+
+.create-space select {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  border: 2px solid var(--border-light, #ecf0f1);
+  border-radius: 6px;
+  background-color: var(--bg-secondary, #f8f9fa);
+  color: var(--text-color);
+}

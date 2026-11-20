@@ -7,7 +7,8 @@ import {
   SetlistDetailsSaveEvent,
 } from '../src/components/setlist-details-form.ts'
 import { announceDataChange } from '../src/js/data-changes.ts'
-import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
+import { type ChordlessDB, getCurrentDB, openSpace } from '../src/js/db.ts'
+import { setDefaultSpaceId } from '../src/js/default-space.ts'
 import { forgetSync, recordSync } from '../src/js/last-sync.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import {
@@ -357,6 +358,38 @@ describe('the home view', () => {
       expect(visited).to.have.length(1)
       expect(visited[0]).to.match(/^\/setlist\//)
       expect((await db.getAllSetlists()).map(setlist => setlist.name)).to.deep.equal(['Created'])
+    })
+
+    it('goes to the default space, and to another when the form says so', async () => {
+      const other = await createSpace(`Other ${crypto.randomUUID().slice(0, 8)}`)
+      await updateSpace(other.id, { team: { id: 'space-home0001', role: 'writer' } })
+      setDefaultSpaceId(spaceId)
+      try {
+        await open()
+        view.querySelector<HTMLButtonElement>('#create-setlist-button')?.click()
+        await waitUntil(() => modal().open, 'the form to be shown')
+        const picker = must(view.querySelector<HTMLSelectElement>('#create-setlist-space'))
+        expect(picker.value).to.equal(spaceId)
+        picker.value = other.id
+        picker.dispatchEvent(new Event('change'))
+        form().dispatchEvent(
+          new SetlistDetailsSaveEvent({
+            date: '2026-11-01',
+            time: '10:30',
+            type: 'Church Service',
+            name: 'Elsewhere',
+            leaderId: '',
+          })
+        )
+        await waitUntil(() => visited.length === 1)
+        expect((await db.getAllSetlists()).map(setlist => setlist.name)).to.deep.equal([])
+        expect(
+          (await (await openSpace(other.id)).getAllSetlists()).map(setlist => setlist.name)
+        ).to.deep.equal(['Elsewhere'])
+      } finally {
+        setDefaultSpaceId(null)
+        await deleteSpace(other.id)
+      }
     })
 
     it('says so when it cannot be saved', async () => {
