@@ -32,29 +32,45 @@ So phase 1 is a new `SpaceStorage` plus routing, not a new sync engine.
 
 ## Design decisions the plan takes
 
-1. **A `D1SpaceStorage` on the Worker** serves the collections `setlists`, `people` and `song-index`.
-   `TeamContext.space()` returns a **composite** that sends those three to D1 and `songs`, `shares` and pads
-   to what the space uses now (the owner's Drive token or the service account). Calls by `ref` are routed by
-   the ref's prefix (`d1:<collection>:<doc_id>`); everything else is Drive's.
+1. **Typed tables, not a generic one** (decided with the owner: the sync design should not shape the data).
+   `space_songs` (the index), `space_setlists`, `space_setlist_songs`, `space_people` and `space_pad_sets`,
+   each with its own columns and a `space_id`; one table per kind of record, with real columns to query and
+   foreign keys where they help. A `D1SpaceStorage` on the Worker maps the storage file shape (a ref, props,
+   a rev, a body) to and from those rows, one small mapping per collection. `TeamContext.space()` returns a
+   **composite** that sends `setlists`, `people`, `song-index` and pad-set metadata to it and `songs`, `shares`
+   and pad audio to what the space uses now (the owner's Drive token or the service account). Calls by `ref` are
+   routed by the ref's prefix (`d1:<collection>:<id>`); everything else is Drive's.
 2. **The owner goes through the Worker for those three collections too.** `storageFor(space)` becomes a
    composite on the device: the three D1 collections to `TeamStorage`, the rest as today (direct Drive for the
    owner, the Worker for a member). This is the one structural change on the client.
 3. **A member needs no migration path.** The HTTP contract is the same and refs are opaque, so an old
    build talking to the Worker sees D1-backed setlists as files. Only an **owner on an old build**, who
    writes Drive directly, can diverge: that is what the grace-period import below is for.
-4. **`rev` is the row's `version`.** A write names the version it was made from (`ifRev`); no row changed is a
-   409, which the engine already resolves. A delete is a tombstone (`deleted_at`) so a device that was
-   offline hears of it.
-5. **The change feed is a per-space sequence.** Each write takes the next `seq` for its space (a counter row,
-   not `modified_at`, which can tie). The feed token is `{drive, d1}`: the composite asks each half for what
-   changed after its own position and merges the answers, so the engine sees one feed.
-6. **Setlist ids are unique across spaces**, enforced by a unique index on `(doc_id)` for the setlists
-   collection (the lookup in `all-spaces.ts` relies on it). A create that collides with another space's id is
+4. **`rev` is the row's `change_id`.** Each row has a `change_id`, a ULID set on every write. A write names
+   the `change_id` it was made from (`ifRev`); no row changed is a 409, which the engine already resolves. A
+   delete is a tombstone (`deleted_at`) so a device that was offline hears of it.
+5. **The change feed is "rows after my cursor", with no counter table.** The cursor is a `change_id`. Two
+   Workers writing at nearly the same moment can commit out of ULID order, so a pull re-reads from a few
+   seconds before its cursor; the engine skips a record whose rev it already has, so the overlap is cheap and
+   nothing is missed. The feed token is `{drive, d1}`: the composite asks each half for what changed after its
+   own position and merges the answers, so the engine sees one feed.
+6. **Setlist ids are unique across spaces**: `setlist_id` is unique in `space_setlists` as well as part of its
+   key (the lookup in `all-spaces.ts` relies on it). A create that collides with another space's id is
    refused, which only a move or a joined share can cause, and the move already deletes before it adds.
-7. **One switch for all, then none.** D1 storage is turned on for a Team by a column on the register
+7. **ULIDs for every new id** (decided 2026-11-20). From now on, new setlists, songs, people, pad sets,
+   devices, invites and the like are given a ULID: time-ordered, so inserts stay at the end of an index, and
+   26 characters. **Existing uuids stay as they are** (they are in every device's database and every link) and
+   the two kinds sit side by side: an id is an opaque string. The code needs `src/js/ulid.ts` (written here, not
+   a package: monotonic within a millisecond, from `crypto.getRandomValues`) and one fix, found while
+   planning: `setlistCode()` in `share-crypto.ts` builds a share link's short code from a setlist id's first hex
+   digits and returns nothing for an id that is not a uuid, so it must learn the random tail of a ULID or
+   links from new setlists lose it. The ids made by `crypto.randomUUID()` today (`db.ts`, `song-utils.ts`,
+   `space-db.ts`, `space-transfer.ts`, `annotations-controller.ts`, the Worker's `newSpaceId`) change to it,
+   one place at a time, in step 2.
+8. **One switch for all, then none.** D1 storage is turned on for a Team by a column on the register
    (`teams.storage_v2`, default 0) only so that the owner can run the move when ready; once both Teams are
    moved the column and the Drive path for these three collections are deleted. The final schema has no flag.
-8. **Old builds.** Every Worker change is additive until the move, so a device that has not updated keeps
+9. **Old builds.** Every Worker change is additive until the move, so a device that has not updated keeps
    working. After the move the Drive copies of setlists and people are an archive and are not read again.
 
 ## Steps
@@ -63,14 +79,15 @@ Each is its own pull request, in this order, and each passes `just ci` alone. A 
 ordinary merge; nothing is turned on for a team until step 4.
 
 **1. The D1 storage on the Worker (no client change).**
-Migration `0011_space_docs.sql`: `space_docs` (as sketched in CENTRAL_STORAGE.md, plus `seq`), a
-`space_seq` counter, the unique setlist-id index, `teams.storage_v2`. `worker/src/d1-space-storage.ts`
+Migration `0011_space_content.sql`: the five typed tables of [D1_SCHEMA.md](D1_SCHEMA.md) (`space_songs`,
+`space_setlists`, `space_setlist_songs`, `space_people`, `space_pad_sets`), indexes on `(space_id, change_id)`,
+the unique setlist id, and `teams.storage_v2`. `worker/src/d1-space-storage.ts`
 implements `SpaceStorage` (list, read, create/update with `ifRev`, trash as tombstone, batches in a
-single `db.batch`, inventory, `status`, change feed by `seq`). The composite in `team-context.ts` routes by
+single `db.batch`, inventory, `status`, change feed by `change_id`). The composite in `team-context.ts` routes by
 collection and ref prefix, and is used only for a team with `storage_v2` set. Role rules and `leadsSetlist`
 carry over because they read through the composite. Tests: `D1SpaceStorage` through the conformance suite;
-`team-api.node.test.ts` cases for roles, 409 on a stale `ifRev`, tombstones, the feed after a gap; the
-setlist-id uniqueness; a team without the flag still goes to Drive.
+`team-api.node.test.ts` cases for roles, 409 on a stale `ifRev`, tombstones, the feed after a gap and two
+writes committed out of order; the setlist-id uniqueness; a team without the flag still goes to Drive.
 
 **2. The client's routing, the index record and the entry fields.**
 `storageFor(space)` returns the composite for a space whose record says `storageV2` (learned from
@@ -86,7 +103,7 @@ took the build and one that skipped it. No team uses it yet, so behaviour is unc
 The owner runs the move by hand (a script or a button on the Account page that only the owner of a Team
 sees): from the owner's device, which has the complete local copy, push the space's **setlists, people and
 index** to D1 as creates, then set `storage_v2`. Other devices pull from D1 on their next sync, and a
-collision on a `doc_id` is an ordinary conflict. The index is built from the local songs (uuid, `songId`,
+collision on an id is an ordinary conflict. The index is built from the local songs (uuid, `songId`,
 title, CCLI number, default key, `isDefault`, `variantOf`, the licence, content hash, `fileRef`). Tests: a
 Drive-only space seeded; the index from a song whose file is absent; a second device pulling it all.
 
@@ -124,4 +141,4 @@ docs are updated. By then nothing reads it, so the compiler and knip say when it
 ## What this does not do
 
 Personal spaces (phase 3: they need an account registered with the server), share-link ciphertext,
-preferences and overlays (phase 4), and the CCLI usage report (phase 2, a query once this is in).
+preferences and overlays (phase 4), and the CCLI usage report (phase 2: a join of `space_setlists` and `space_setlist_songs` once this is in).
