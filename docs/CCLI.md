@@ -48,6 +48,14 @@ Who imported a song, when and from where is already kept on it (`importUser`, `i
 a SongSelect chart goes to a space with a different licence number (a confirmation, not a block);
 and a count of the songs imported this term against 200.
 
+**Copying a song between spaces (decided 2026-11-20).** A SongSelect chart is the subscribing church's, and
+a licence number names a church, so: a copy into a space with the **same** licence number goes silently; a
+space with a **different** or no number asks first ("This chart came from SongSelect under licence X; Grace
+Church's is Y. Copy anyway?"), as a confirmation and never a block (the number is an attestation the app
+cannot check); a song with no SongSelect source (typed in, or a ChordPro file) moves freely. It needs the
+song to carry the licence it came in under (the planned field above). Setlists use songs of other spaces by
+this copy (`docs/CENTRAL_STORAGE.md`).
+
 ## Lead sheets
 
 What CCLI's agreements say about keeping and transposing a lead sheet. This is a reading of the

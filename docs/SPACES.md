@@ -686,13 +686,13 @@ browser, and it never stops anything:
 - **It is the leftmost tab** on the Setlists, Library and Add Song pages, the others keeping their
   fixed order, and it stays a tab when there are too many (the current tab and the default are
   always shown).
-- **It is where an import from outside the app goes:** what the SongSelect bookmarklet brings, and
-  files or text shared to Chordless. They arrive with no tab in front of the person, so they go to
+- **It is where every import goes**, the import page included (not the tab in view): what the
+  SongSelect bookmarklet brings, files or text shared to Chordless, and Add Song. They go to
   the default, with "Import into" saying so and open to change; once the person picks another,
   the default does not override it. If the default is one the person can only read (a team member,
   not a worship leader), the first Team they can write to, else any space they can, is used
   (`importTargetOf`).
-- **Where the person is working is still the tab in view.** Add Song from a tab, a new setlist, and
+- **Where the person is working is still the tab in view.** A new setlist and
   the "Save to" of a pad upload start at the space in use, not the default, and the app reopens on
   the space last used: in a service the last place is the better start (decided 2026-11-13).
 - With none chosen it is the first Team the device has (by when it was made), else the first space,

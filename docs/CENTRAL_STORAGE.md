@@ -54,6 +54,35 @@ enough to be recognised without its song:
   "Get this song".
 - Nothing else of the song is copied into the setlist: no text, no chords, no section names.
 
+## A song index in D1 (decided 2026-11-20)
+
+Besides setlists and people, D1 keeps an **index of a space's songs**, a third collection beside them
+(`song-index`, in `space_docs`). One row per song: `uuid`, `space_id`, title, CCLI song number, default key,
+the CCLI licence the chart came in under, a content hash, and the Drive file id (already allowed: "the ids of
+the Drive files in a team's tree"). **No lyrics, no chords, no first lines**: the ChordPro, the MusicXML and
+the pad audio stay on the device and in the space's Drive, so "no song content in D1" stays true. Titles and
+CCLI numbers are the same kind of data as the `title` and `ccli` a setlist entry gains below.
+
+What it gives:
+- A new device knows the whole library before it has a chart; "Get this song" has a real target.
+- A cross-space copy (below) finds which space has the song, and duplicates are caught by CCLI number.
+- The CCLI usage report is a query (phase 2).
+- Sync stops listing Drive folders or reading its change feed to learn what changed: the index says so.
+- A setlist entry's `title` and `ccli` are read from the index, not only copied.
+
+Risk: the index drifts from the files (an older build, or an edit made in Drive). The content hash lets the
+engine notice and reconcile it, as it does for setlists. The privacy page must say it keeps titles and CCLI
+numbers before this is built.
+
+## Setlists use songs from any space (decided 2026-11-20)
+
+The aim is that songs and setlists from **all** spaces are shown at once, with no "current space" to switch
+(`docs/SPACES.md`, "Presenting spaces"). A setlist may use a song that another space holds, and doing so
+**copies the song into the setlist's space**: a setlist only ever refers to songs of its own space. The copy
+follows the licence rule in `docs/CCLI.md`: the same licence number is the same church, so it copies
+silently; a different or unknown licence asks first (a confirmation, never a block); a chart with no
+SongSelect source moves freely.
+
 ## Where it lives: the storage seam already exists
 
 The sync engine talks to a space through `StorageBackend` (`docs/STORAGE_API.md`), whose files are in
@@ -136,8 +165,11 @@ query over its setlists for a period (`docs/CCLI.md`). That is a feature on top 
 
 ## Phases
 
-1. **Teams.** `setlists` and `people` of a Team space in D1; collection routing in the sync engine; entries
-   carry `title` and `ccli`; songs and pads stay as they are. Rewrite the rule in CLAUDE.md and the privacy page.
+0. **Show every space at once** (UI only, before any of this): the Setlists and Library pages list all spaces
+   behind one "all spaces" query, with the tabs as a filter; the current space is removed last. Sync of
+   several spaces is not built Drive-shaped first: it comes with phase 1, as one account-wide "changes since".
+1. **Teams.** `setlists`, `people` and the song index of a Team space in D1; collection routing in the sync
+   engine; entries carry `title` and `ccli`; songs and pads stay as they are. Rewrite the rule in CLAUDE.md and the privacy page.
 2. **CCLI usage report** from a Team's setlist history.
 3. **Personal spaces.** Registered to an account; the move out of Drive; a decision on share links.
 4. **Preferences per account** (a new feature: last). Small, local copy first, last write wins per key; which
@@ -145,6 +177,7 @@ query over its setlists for a period (`docs/CCLI.md`). That is a feature on top 
 
 ## Open questions
 
+- The live channel for several spaces: one socket per team, or one per account.
 - Conflicts: whole-setlist last write wins with the engine's conflict handling as now, or a merge per entry?
   Start as Drive does today.
 - The grace period for Drive's late writes, and whether to import for it or just warn.
