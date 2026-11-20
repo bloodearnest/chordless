@@ -1,9 +1,9 @@
 /** Setlists across spaces (all-spaces.ts): listed with their space, and found by id alone */
 import { expect } from '@open-wc/testing'
 import { findSetlistSpace, listAllSetlists } from '../src/js/all-spaces.ts'
+import type { Space } from '../src/js/data-types.ts'
 import { createSetlist, openSpace } from '../src/js/db.ts'
 import { createSpace, deleteSpace } from '../src/js/space.ts'
-import type { Space } from '../src/js/data-types.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 

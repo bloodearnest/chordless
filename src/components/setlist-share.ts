@@ -7,7 +7,7 @@ import { rich } from '../js/rich-text.ts'
 import { type ListedSong, songListHtml, songListText } from '../js/setlist/song-list-text.ts'
 import { shareUrl } from '../js/share-crypto.ts'
 import { createShare, refreshShare, stopShare } from '../js/share-manager.ts'
-import { getCurrentSpace } from '../js/space.ts'
+import { getCurrentSpace, getSpaceById } from '../js/space.ts'
 import { createSyncManager, isSyncAvailable } from '../js/sync-manager.ts'
 import { t } from '../js/text.ts'
 import { formatSetlistDate, setlistTitle } from '../js/utils/date-utils.ts'
@@ -21,6 +21,12 @@ import { buttonStyles } from './shared-styles.ts'
 const APP_URL = 'https://chordless.app'
 
 /** The setlist was shared, updated or stopped: its `share` has changed */
+/** The space a setlist's database is of (the share goes to its folder, not the current space's) */
+async function spaceOf(db: { spaceId: string }): Promise<{ id: string | null; name: string }> {
+  const space = await getSpaceById(db.spaceId)
+  return space ? { id: space.id, name: space.name } : getCurrentSpace()
+}
+
 export class SetlistShareChangeEvent extends Event {
   static readonly type = 'setlist-share:change'
   constructor() {
@@ -244,7 +250,7 @@ export class SetlistShare extends LitElement {
 
   _create() {
     return this._run(async (setlist, db) => {
-      const { id, name } = getCurrentSpace()
+      const { id, name } = await spaceOf(db)
       const manager = await createSyncManager(name, id)
       const share = await createShare(setlist, {
         db,
@@ -265,7 +271,7 @@ export class SetlistShare extends LitElement {
   _update() {
     return this._run(async (setlist, db) => {
       if (!setlist.share) return
-      const { id, name } = getCurrentSpace()
+      const { id, name } = await spaceOf(db)
       const manager = await createSyncManager(name, id)
       const share = await refreshShare(
         { ...setlist, share: setlist.share },
@@ -286,7 +292,7 @@ export class SetlistShare extends LitElement {
     if (!(await this._stopModal.value?.ask())) return
     return this._run(async (setlist, db) => {
       if (!setlist.share) return
-      const { id, name } = getCurrentSpace()
+      const { id, name } = await spaceOf(db)
       const manager = await createSyncManager(name, id)
       await stopShare(setlist.share, manager.space)
       setlist.share = null
