@@ -158,11 +158,14 @@ briefly in read-only mode or accepted downtime (a few seconds, two teams). Take 
 
 ## 6. Before it is run on production
 
-Run `scripts/schema-preflight.sql` against the real database (read-only; it is for the schema **before** `0011`):
+Run `scripts/schema-preflight.ts` against the real database (read-only; it is for the schema **before** `0011`):
 
 ```
-npx wrangler d1 execute chordless-teams --remote --file scripts/schema-preflight.sql
+node scripts/schema-preflight.ts
 ```
+
+It runs `scripts/schema-preflight.sql` a statement at a time, because wrangler's remote `--file` is an import that does not
+return a `SELECT`'s rows. `node scripts/schema-preflight.ts DB --local --persist-to <dir>` tries it on a local database.
 
 It answers with a row for each thing `0011` would stop on (`wanted` is `0`): a member whose account cannot be found, two logins of
 one account in one team, an empty owner login, a live team with no owner account, a role or a credential that is
