@@ -8,7 +8,7 @@
  * Lucide Contributors 2022.
  *
  * The keys are Chordless's names; the comment after each names its source icon.
- * The treble clef and staff are engraved by Verovio with Petaluma (SIL OFL 1.1).
+ * The treble clef is Verovio’s Leipzig gClef (SIL OFL 1.1), with three lighter staff lines.
  */
 
 import { leadSheetIcon } from './lead-sheet-icon.ts'
