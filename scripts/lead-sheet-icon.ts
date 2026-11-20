@@ -29,11 +29,11 @@ const clef = svg.match(/<use href="#E050-[^"]+" transform="([^"]+)"/)
 const staff = [...svg.matchAll(/<path d="M0 (\d+) L\d+ \1" stroke-width="([^"]+)"/g)]
 if (!glyph || !clef || staff.length !== 5) throw new Error('Unexpected Verovio clef or staff')
 
-// Centre the Petaluma clef in a square crop and trim the staff to 16px at icon size.
+// Centre the Petaluma clef in a square crop and trim the staff to 12px at icon size.
 // Keep the engraved vertical positions and weights.
 // Inline the glyph instead of using generated ids, since several buttons can share a page.
 const lines = staff
-  .map(([, y, width]) => `<path d="M120 ${y}H1080" stroke-width="${width}" />`)
+  .map(([, y, width]) => `<path d="M240 ${y}H960" stroke-width="${width}" />`)
   .join('')
 const icon = `<g transform="translate(2,-3) scale(0.0166666667)" stroke="none"><g stroke="currentColor" stroke-linecap="butt">${lines}</g><g transform="translate(272,0)"><g fill="currentColor" transform="${clef[1]}"><path transform="scale(1,-1)" d="${glyph[1]}" /></g></g></g>`
 writeFileSync(
