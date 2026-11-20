@@ -43,6 +43,12 @@ describe('making a space', () => {
     })
   })
 
+  test('has no root until one is linked: an unset one is read as empty', async () => {
+    const { state, sql } = await made()
+    sql.exec('UPDATE teams SET root_ref = NULL')
+    assert.equal((await state.info())?.rootRef, '')
+  })
+
   test('is dated by the clock when none is given', async () => {
     const state = new TeamSpaceState(d1Db().db, SPACE)
     await state.create({ rootRef: 'root-1', name: 'Pat Church', owner: ann })
@@ -272,6 +278,25 @@ describe('accounts', () => {
     assert.deepEqual(rows('SELECT owner_account_id, owner_email FROM teams'), [
       { owner_account_id: null, owner_email: 'ann@example.com' },
     ])
+  })
+
+  test('show an address the account has none of, and one that an invite named only once', async () => {
+    const { state, sql } = await made()
+    await state.setMember(bob, 'writer')
+    // (the account's addresses are gone: what is left of the member is the address the invite was made out to)
+    sql.exec('DELETE FROM account_emails WHERE account_id = (SELECT account_id FROM team_members)')
+    assert.deepEqual((await state.members())[1], { email: '', emails: [], role: 'writer' })
+    sql.exec("UPDATE team_members SET invited_as = 'bobby@example.com'")
+    assert.deepEqual((await state.members())[1], {
+      email: 'bobby@example.com',
+      emails: ['bobby@example.com'],
+      role: 'writer',
+    })
+    // (an invited-as address that is the account's own is not listed twice)
+    sql.exec(
+      `INSERT INTO account_emails (email, account_id, created_at) SELECT 'bobby@example.com', account_id, 't' FROM team_members`
+    )
+    assert.deepEqual((await state.members())[1].emails, ['bobby@example.com'])
   })
 
   test('are not part of a space once sharing ends: its members go, the accounts stay', async () => {
