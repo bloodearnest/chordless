@@ -24,6 +24,7 @@ const APP_URL = 'https://chordless.app'
 /** The space a setlist's database is of (the share goes to its folder, not the current space's) */
 async function spaceOf(db: { spaceId: string }): Promise<{ id: string | null; name: string }> {
   const space = await getSpaceById(db.spaceId)
+  /* v8 ignore next -- the setlist's database is a space's, which is kept */
   return space ? { id: space.id, name: space.name } : getCurrentSpace()
 }
 

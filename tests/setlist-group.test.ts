@@ -43,6 +43,21 @@ describe('setlist-group', () => {
     )
   })
 
+  it('names the space of a setlist when it is told, after the leader and type', async () => {
+    const group = await fixture<SetlistGroup>(html`<setlist-group year="2026"></setlist-group>`)
+    group.setlists = [
+      { id: 'a', name: 'Harvest', leader: 'Ann', type: 'Church Service', space: 'Gateway' },
+      { id: 'b', name: 'Advent' },
+    ] as SetlistGroup['setlists']
+    await group.updateComplete
+
+    const meta = rows(group).map(row =>
+      row.querySelector('.setlist-meta')?.textContent?.replace(/\s+/g, ' ').trim()
+    )
+    expect(meta).to.deep.equal(['Ann · Church Service · Gateway', undefined])
+    expect(rows(group)[0].querySelector('.setlist-space')?.textContent).to.equal('Gateway')
+  })
+
   it('names the type of service, unless it is Other', async () => {
     const group = await fixture<SetlistGroup>(html`<setlist-group year="2026"></setlist-group>`)
     group.setlists = [
