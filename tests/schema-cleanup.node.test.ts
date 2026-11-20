@@ -80,6 +80,11 @@ function production(sql: DatabaseSync) {
     ('t1', 'bob@x.com', 'a2', 'signin'), ('t1', 'bobby@x.com', 'a2', 'invite'), ('t1', 'cat@x.com', 'a3', 'signin')`)
   sql.exec(`INSERT INTO team_invites (space_id, id, email, role, created_by, created_at, expires_at, emailed_at)
     VALUES ('t1', 'inv-1', 'dee@x.com', 'reader', 'ann@x.com', '${T}', '2026-12-01T00:00:00.000Z', NULL)`)
+  // (one code and link as the Worker makes them, and one from before 0006, which had neither)
+  sql.exec(`INSERT INTO login_codes (address_hash, code_hash, created_at, expires_at, window_start, link_hash, address, code, next)
+    VALUES ('ah1', 'ch1', '${T}', '2026-11-04T10:00:00.000Z', '${T}', 'lh1', 'ann@x.com', '123456', '/setlist/s1')`)
+  sql.exec(`INSERT INTO login_codes (address_hash, code_hash, created_at, expires_at, window_start)
+    VALUES ('ah-old', 'ch-old', '2026-01-01T00:00:00.000Z', '2026-01-01T00:10:00.000Z', '2026-01-01T00:00:00.000Z')`)
   sql.exec("INSERT INTO team_refs (space_id, ref) VALUES ('t1', 'file-1'), ('t1', 'file-2')")
   sql.exec("INSERT INTO team_credentials (space_id, blob) VALUES ('t1', 'owner-blob')")
   sql.exec(`INSERT INTO team_events (space_id, at, kind, by_email, detail) VALUES
@@ -181,6 +186,26 @@ describe('the clean-up, on rows as they are in production', () => {
       rows(sql, 'SELECT max(id) AS id FROM team_events')[0].id,
       4,
       'the next id carries on'
+    )
+  })
+
+  test('keeps a sign-in code and its link, and drops one from before links that could not be used', () => {
+    assert.deepEqual(
+      rows(
+        sql,
+        'SELECT address_hash, link_hash, address, code, next, sent, attempts FROM login_codes'
+      ),
+      [
+        {
+          address_hash: 'ah1',
+          link_hash: 'lh1',
+          address: 'ann@x.com',
+          code: '123456',
+          next: '/setlist/s1',
+          sent: 1,
+          attempts: 0,
+        },
+      ]
     )
   })
 
@@ -305,6 +330,16 @@ describe('the schema it leaves', () => {
       unkeyed.filter(each => each !== 'accounts.account_id'),
       []
     )
+  })
+
+  test('refuses a sign-in code with no link, an address in capitals, or two with one link', () => {
+    const insert = (hash: string, link: string | null, address: string) => () =>
+      sql.exec(`INSERT INTO login_codes (address_hash, code_hash, created_at, expires_at, window_start, link_hash, address, code)
+        VALUES ('${hash}', 'c', '${T}', '${T}', '${T}', ${link ? `'${link}'` : 'NULL'}, '${address}', '1')`)
+    assert.throws(insert('x1', null, 'a@x.com'), /NOT NULL/)
+    assert.throws(insert('x2', 'l2', 'A@X.com'), /CHECK/)
+    insert('x3', 'l3', 'a@x.com')()
+    assert.throws(insert('x4', 'l3', 'b@x.com'), /UNIQUE/)
   })
 
   test('refuses what the code never writes: a member of no account, a role that does not exist, a credential that is not one', () => {
