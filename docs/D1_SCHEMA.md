@@ -31,3 +31,11 @@ Choices worth reviewing:
   (`setlist_overlays`), and only the owning account can read or write its rows, in a Team too.
 - **`teams.root_ref` and `team_refs` stay**, for the Drive folder that still holds songs and pads. The
   proposed `teams.storage` is only for the move and is not in the final shape.
+
+## As built in 0012 (step 1)
+
+`migrations/0012_space_data.sql` follows the picture above with these differences: the column is `song_key`, not `key`
+(`KEY` is an SQL word); `space_setlist_songs` also has `extra`, the rest of an entry kept as it came; `space_people`
+has `team_member`; `space_songs` has `variant_label` (a version list shows it); the JSON columns are `CHECK`ed to be
+the kind of JSON they hold; there is no `space_seq` (no change feed). `teams` gains `storage` (`'drive'` or `'d1'`), which
+exists only for the move.
