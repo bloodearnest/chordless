@@ -1,6 +1,6 @@
 # Audit of the D1 schema (2026-11-20)
 
-**Status: findings and a proposal; no migration written.** Read from `migrations/0001` to `0010` and the Worker
+**Status: findings, the owner's decisions on them (section 7), and a proposal; no migration written.** Read from `migrations/0001` to `0010` and the Worker
 code that uses each table, and checked against a local D1 with those migrations applied (`PRAGMA table_list`,
 `foreign_key_list`, the indexes). **Production was not looked at**: it may have drifted (manual fixes, rows
 that migration 0003's backfill missed). Section 6 lists what to run against it before any migration.
@@ -58,14 +58,15 @@ nullable columns added later (`link_hash`, `address`, `code`, `next`) that every
 **E. Duplicated or derivable data.**
 - `team_members.identity` and `.email` (B), and the index on `identity`.
 - `team_member_emails (space_id, email) -> account_id`: written whenever a member signs in, read to find a member
-  by address. `account_emails (email PK) -> account_id` already says which account owns an address, so this is
-  probably derivable by joining it to `team_members`. **Confirm against the sign-in code before dropping**: it may be
-  how an address survives an account merge or a `joined_as_other` join.
+  by address. `account_emails (email PK) -> account_id` already says which account owns an address, so it is
+  derivable by joining that to `team_members`. **Decided (the owner): redundant, dropped.** The queries that read it
+  (`team-state.ts`, around lines 458 and 605) join `account_emails` instead.
 - `teams.owner_provider` and `owner_sub` (the owner's Google login) next to `owner_account_id`. They are read to
   decide who is the owner (`team-state.ts` line 318) and, in `team-drive.ts` line 73, to check that the credential
-  blob in `team_credentials` was made by that login. If the owner's Drive token is the account's (`account_drive`,
-  migration 0010) rather than a per-team blob, `team_credentials` and these two columns go with it. **Needs a
-  decision** (question 2 below).
+  blob in `team_credentials` was made by that login. **Decided (the owner): a team's Drive token is its own blob,
+  not the account's.** `account_drive` is the Drive connection for an account's *personal* space; a team's is a
+  different token, so `team_credentials` and these two columns stay. They become `NOT NULL` with no `''` default,
+  and a `CHECK` that they are not empty, once the production query in section 6 shows no team has them empty.
 - `sessions.email` and `account_identities.email` are not duplicates: each is the address that login or session
   was made with. Keep.
 - `teams.owner_email` is a register fact ("who owned it, when it ended": CLAUDE.md), and `team_events.by_email` is
@@ -78,7 +79,8 @@ queries (SPACES.md) and stay.
 
 **G. Documentation that no longer matches the table.** CLAUDE.md says sign-in codes are "hashes, for ten
 minutes". Since migration 0006 `login_codes` also keeps the **address and the code readable for up to three
-days** (its comment says so and why). Either the rule is reworded or the design changes; the schema cannot decide.
+days** (its comment says so and why). **Decided (the owner): keep the design and reword the rule.** CLAUDE.md now says so (and ACCOUNT.md and SECURITY.md
+already did). No schema change.
 
 **Fine as it is.** `STRICT` throughout; `WITHOUT ROWID` on the keyed tables; every timestamp is one UTC ISO-8601
 string (`strftime('%Y-%m-%dT%H:%M:%fZ')` in SQL, `toISOString()` in code: the same format); the `account_identities`
@@ -107,7 +109,7 @@ teams               (space_id PK, name, owner_account_id → accounts RESTRICT, 
                     ccli_licence NULL, root_ref NULL, credential CHECK IN ('owner','service-account')
                     DEFAULT 'owner', created_at, updated_at, ended_at NULL,
                     INDEX (owner_account_id), INDEX (ccli_licence), INDEX (owner_email))
-                    -- owner_provider, owner_sub: dropped or kept, by question 2
+                    -- owner_provider, owner_sub: kept, NOT NULL, CHECK (<> '')  (the credential's owner login)
 team_members        (space_id → teams CASCADE, account_id → accounts CASCADE,
                     role CHECK IN ('admin','writer','reader'), joined_at,   -- was `since`
                     PK (space_id, account_id), INDEX (account_id))
@@ -116,11 +118,11 @@ team_invites        (space_id → teams CASCADE, id, email CHECK (= lower), role
                     created_by_account → accounts SET NULL, created_at, expires_at, emailed_at NULL,
                     PK (space_id, id), INDEX (email, created_at))
 team_refs           (space_id → teams CASCADE, ref, PK (space_id, ref))
-team_credentials    (space_id PK → teams CASCADE, blob)         -- or dropped, by question 2
+team_credentials    (space_id PK → teams CASCADE, blob)         -- the team's own Drive token, not account_drive's
 team_events         (id PK, space_id → teams CASCADE, created_at,   -- was `at`
                     kind CHECK IN ('created','joined_as_other','ended','licence'), by_email, detail NULL,
                     INDEX (space_id, id))                       -- by_email stays text: it outlives accounts
-team_member_emails  dropped if derivable (E)
+team_member_emails  dropped (E)
 ```
 
 Two notes. A `teams` row is **never deleted** (the register outlives the team), so the `CASCADE`s from `teams`
@@ -170,13 +172,12 @@ SELECT count(*) FROM team_members m LEFT JOIN accounts a USING (account_id) WHER
 
 then a rehearsal of the migration on a copy of the exported data (`just db-backup` makes the dump).
 
-## 7. Questions for the owner
+## 7. Decisions (the owner, 2026-11-20)
 
-1. **Is `team_member_emails` redundant?** I think so, given `account_emails`; I would drop it after reading the sign-in
-   and merge code once more. Do you remember why it was added?
-2. **Is the owner's Drive token a team's own blob (`team_credentials`, checked against `owner_sub`) or the
-   account's (`account_drive`)?** If every owner now uses the account's, `team_credentials` and `owner_provider` /
-   `owner_sub` can go. If a team can still have its own, they stay.
-3. **`login_codes` (G):** keep the readable address and code for three days and reword CLAUDE.md, or shorten it?
-4. **Downtime:** is a few seconds of "back in a moment" acceptable for the migration, with two teams and no live
-   service at the time? (Not on a Sunday.)
+1. **`team_member_emails` is redundant**: dropped (E).
+2. **A team's Drive token is its own blob**, different from `account_drive` (an account's personal space):
+   `team_credentials`, `owner_provider` and `owner_sub` stay (E).
+3. **`login_codes` keeps the readable address and code for three days**; CLAUDE.md is reworded (G, done).
+4. **A few seconds of downtime is acceptable** for the migration, with two teams, and not on a Sunday (section 4).
+
+What is left to decide is only what the production queries of section 6 turn up.
