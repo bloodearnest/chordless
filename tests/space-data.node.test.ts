@@ -360,6 +360,19 @@ describe('writing a record', () => {
     assert.equal((await json(answer)).error, 'missing')
   })
 
+  test('says a setlist is missing when it is changed after it was deleted, with songs or without', async () => {
+    const { put, call } = await world()
+    await put('setlists', 'with', setlist('with'))
+    await put('setlists', 'without', setlist('without', { songs: [] }))
+    await call('/setlists/with', dan, send('DELETE'))
+    await call('/setlists/without', dan, send('DELETE'))
+    assert.equal((await put('setlists', 'with', setlist('with'), bob, 1)).status, 404)
+    assert.equal(
+      (await put('setlists', 'without', setlist('without', { songs: [] }), bob, 1)).status,
+      404
+    )
+  })
+
   test('keeps a setlist id to one space: another team’s setlist is not shown, nor taken', async () => {
     const { put, call, sql } = await world()
     sql.exec(`UPDATE teams SET storage = 'd1' WHERE space_id = '${OTHER}'`)
@@ -956,5 +969,62 @@ describe('the edges', () => {
       404,
       'a merged person is not named'
     )
+  })
+})
+
+describe('the tables', () => {
+  test('refuse a version that is not the next one, whoever writes, and let the next one through', async () => {
+    const { sql } = await world()
+    const at = NOW.toISOString()
+    sql.exec(
+      `INSERT INTO space_songs (space_id, song_uuid, song_id, title, is_default, modified_at) VALUES ('${SPACE}', 's', 'ccli-1', 'S', 1, '${at}')`
+    )
+    sql.exec(
+      `INSERT INTO space_setlists (space_id, setlist_id, date, time, type, name, created_at, modified_at) VALUES ('${SPACE}', 'l', '2026-11-22', '', '', '', '${at}', '${at}')`
+    )
+    sql.exec(
+      `INSERT INTO space_people (space_id, person_id, name, modified_at) VALUES ('${SPACE}', 'p', 'P', '${at}')`
+    )
+    sql.exec(
+      `INSERT INTO space_pad_sets (space_id, pad_set_id, name, modified_at) VALUES ('${SPACE}', 'q', 'Q', '${at}')`
+    )
+    for (const table of ['space_songs', 'space_setlists', 'space_people', 'space_pad_sets']) {
+      assert.throws(
+        () => sql.exec(`UPDATE ${table} SET version = 3`),
+        /stale_version/,
+        `${table}: skipping one`
+      )
+      assert.throws(
+        () => sql.exec(`UPDATE ${table} SET version = 1`),
+        /stale_version/,
+        `${table}: staying put`
+      )
+      assert.throws(
+        () => sql.exec(`UPDATE ${table} SET version = 0`),
+        /stale_version|CHECK/,
+        `${table}: going back`
+      )
+      sql.exec(`UPDATE ${table} SET version = 2`)
+      assert.equal(
+        (sql.prepare(`SELECT version FROM ${table}`).get() as { version: number }).version,
+        2,
+        table
+      )
+    }
+  })
+
+  test('undo the whole of a change that names a version the record has left, its songs and all', async () => {
+    const { put, data, rows } = await world()
+    await put('setlists', 'a', setlist('a'))
+    await put('setlists', 'a', setlist('a', { name: 'Second', songs: [] }), bob, 1)
+    const stale = await put('setlists', 'a', setlist('a', { name: 'Stale' }), bob, 1)
+    assert.equal(stale.status, 409)
+    const [row] = (await data()).setlists
+    assert.deepEqual(
+      [row.name, row.version, row.songs.length],
+      ['Second', 2, 0],
+      'the stale change left nothing behind'
+    )
+    assert.deepEqual(rows('SELECT * FROM space_setlist_songs'), [])
   })
 })

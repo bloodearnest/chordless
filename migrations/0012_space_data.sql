@@ -5,6 +5,11 @@
 --
 -- Additive: new tables, and one column on `teams`. Written to docs/SCHEMA_RULES.md.
 --
+-- A write is refused if it was made from an out-of-date record, by the table itself: a record's `version` can only move
+-- to the next one (a trigger on each table, below), so a change that names a version the row has since left aborts the
+-- statement, and with it the batch that holds it (D1 undoes a batch if a statement fails). The Worker's writes carry the
+-- version they expect to find plus one (worker/src/space-data.ts).
+--
 -- There are no tombstones and no change feed: a space's data is read whole, and a record that is gone is a missing
 -- row. `version` is only there to refuse a write that was made from an out-of-date row (409); `modified_at`
 -- is for people, the ETag and reports. The keys of a table start with the space, so a space's rows sit together.
@@ -33,6 +38,12 @@ CREATE TABLE space_songs (
   PRIMARY KEY (space_id, song_uuid)
 ) STRICT;
 
+CREATE TRIGGER space_songs_version BEFORE UPDATE ON space_songs
+WHEN NEW.version <> OLD.version + 1
+BEGIN
+  SELECT RAISE(ABORT, 'stale_version');
+END;
+
 -- A setlist. `setlist_id` is unique across spaces (the app finds a setlist's space from its id alone), and is a
 -- key of its own for that reason. `body` holds the rest of the record (what is shared by link, and so on): a JSON object.
 CREATE TABLE space_setlists (
@@ -52,6 +63,12 @@ CREATE TABLE space_setlists (
 ) STRICT;
 
 CREATE INDEX space_setlists_date ON space_setlists (space_id, date);
+
+CREATE TRIGGER space_setlists_version BEFORE UPDATE ON space_setlists
+WHEN NEW.version <> OLD.version + 1
+BEGIN
+  SELECT RAISE(ABORT, 'stale_version');
+END;
 
 -- The songs of a setlist, in order. `title` and `ccli` are copied from the song so that a setlist can be read on a
 -- device that does not have it (docs/CENTRAL_STORAGE.md). `extra` is the rest of the entry, a JSON object.
@@ -84,6 +101,12 @@ CREATE TABLE space_people (
   PRIMARY KEY (space_id, person_id)
 ) STRICT;
 
+CREATE TRIGGER space_people_version BEFORE UPDATE ON space_people
+WHEN NEW.version <> OLD.version + 1
+BEGIN
+  SELECT RAISE(ABORT, 'stale_version');
+END;
+
 -- The pad sets of a space (their audio is not here).
 CREATE TABLE space_pad_sets (
   space_id TEXT NOT NULL REFERENCES teams (space_id) ON DELETE CASCADE,
@@ -93,3 +116,9 @@ CREATE TABLE space_pad_sets (
   modified_at TEXT NOT NULL,
   PRIMARY KEY (space_id, pad_set_id)
 ) STRICT;
+
+CREATE TRIGGER space_pad_sets_version BEFORE UPDATE ON space_pad_sets
+WHEN NEW.version <> OLD.version + 1
+BEGIN
+  SELECT RAISE(ABORT, 'stale_version');
+END;

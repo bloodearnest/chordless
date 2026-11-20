@@ -235,18 +235,25 @@ describe('a team space', () => {
   const ann = { provider: 'google', sub: 'g-1', email: 'ann@example.com' }
   const bob = { provider: 'google', sub: 'g-2', email: 'bob@example.com' }
 
-  /** The migrations in migrations/, applied once to the harness's local D1 (each statement ends at its `;`) */
+  /** The migrations in migrations/, applied once to the harness's local D1 (each statement ends at its `;`, a trigger at its `END;`) */
   let migrated: Promise<unknown> | undefined
   const migrate = async (db: NonNullable<Env['DB']>) => {
     const dir = new URL('../migrations/', import.meta.url)
     for (const file of readdirSync(dir).sort()) {
-      const statements = readFileSync(new URL(file, dir), 'utf8')
+      const statements: string[] = []
+      let open = ''
+      for (const piece of readFileSync(new URL(file, dir), 'utf8')
         .split('\n')
         .filter(line => !line.trim().startsWith('--'))
         .join('\n')
-        .split(';')
-        .map(statement => statement.trim())
-        .filter(Boolean)
+        .split(';')) {
+        // (a trigger's body has `;` inside it: it ends at its `END`)
+        open = open ? `${open};${piece}` : piece
+        const text = open.trim()
+        if (/^CREATE\s+TRIGGER\b/i.test(text) && !/\bEND$/i.test(text)) continue
+        if (text) statements.push(text)
+        open = ''
+      }
       await db.batch(statements.map(statement => db.prepare(statement)))
     }
   }
