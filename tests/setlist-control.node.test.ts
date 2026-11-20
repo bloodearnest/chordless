@@ -112,6 +112,19 @@ describe('songs added for this device alone', () => {
     assert.equal(setlistContentHash(mine), setlistContentHash(shared))
   })
 
+  it('keep D1 bookkeeping out of Drive content and its hash', () => {
+    const shared = full([entry('a')])
+    const synced = {
+      ...shared,
+      version: 2,
+      spaceDataBody: { future: true },
+      songs: shared.songs.map(song => ({ ...song, spaceDataExtra: { future: true } })),
+    }
+    assert.deepEqual(setlistContent(synced), shared)
+    assert.equal(setlistContentHash(synced), setlistContentHash(shared))
+    assert.deepEqual(synced.songs[0].spaceDataExtra, { future: true })
+  })
+
   it('are put back after the song they followed, or last', () => {
     const local = full([entry('a'), entry('x', true), entry('b'), entry('y', true)]).songs
     const merged = withLocalSongs(full([entry('a'), entry('c'), entry('b')]).songs, local)

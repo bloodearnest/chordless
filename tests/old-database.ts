@@ -41,6 +41,24 @@ export const SCHEMA_V15: StoreShape[] = [
   { name: 'people', keyPath: 'id' },
 ]
 
+/** Version 16 added the local D1 index, outbox and pad metadata. */
+export const SCHEMA_V16: StoreShape[] = [
+  {
+    name: 'songs',
+    keyPath: 'uuid',
+    indexes: ['id', 'ccliNumber', 'titleNormalized', 'isDefault', 'importDate'],
+  },
+  { name: 'chordpro', keyPath: 'id', indexes: ['contentHash'] },
+  { name: 'setlists', keyPath: 'id', indexes: ['date', 'type'] },
+  { name: 'setlist_local', keyPath: 'setlistId' },
+  { name: 'pending_deletions', keyPath: 'ref' },
+  { name: 'scores', keyPath: 'uuid' },
+  { name: 'people', keyPath: 'id' },
+  { name: 'song_index', keyPath: 'songUuid', indexes: ['songId'] },
+  { name: 'space_outbox', keyPath: 'id' },
+  { name: 'pad_sets', keyPath: 'padSetId' },
+]
+
 /** Make a database of this schema, at this version, holding `contents` (records by store), and give its name */
 export async function oldDatabase(
   version: number,

@@ -85,6 +85,14 @@ only. Setlist entries gain title and CCLI snapshots where their song is known, a
 songs, setlists and people get a null D1 revision. No outbox edits are generated during upgrade.
 The migration runs in the same atomic versionchange transaction as the schema additions.
 
+### Version 17: durable space-data sync checkpoints
+
+Adds `space_data` (one `state` row: whether the Team has moved, an in-flight initial probe,
+whether its mode has been checked, its space data ETag and whether a complete history has been read) and the non-unique compound
+`space_outbox.record` index on `change.kind`, `change.id`. The initial probe is durable so an edit
+made while waiting for the first response is protected. No existing records are rewritten, and
+pending v16 outbox entries remain intact. The new metadata is local; this adds no Worker migration.
+
 ## Drive
 
 Files are written by every build that has been in use, and read by every other. So what is read is more

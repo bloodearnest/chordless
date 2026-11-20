@@ -296,6 +296,19 @@ describe('Live sync', () => {
     sync.stop()
   })
 
+  it('announces a D1 push only to the Team whose records were sent', async () => {
+    const { sync, state, win, settle } = rig([
+      teamTarget({ key: 'team:first', teamId: 'first' }),
+      teamTarget({ key: 'team:second', teamId: 'second' }),
+    ])
+    sync.start()
+    await settle()
+    win.dispatchEvent(new SyncPushedEvent('second'))
+    expect(state.channels[0].notified).to.equal(0)
+    expect(state.channels[1].notified).to.equal(1)
+    sync.stop()
+  })
+
   describe('in a team space', () => {
     it('syncs at once when another device says it changed something, and again as Drive’s feed catches up', async () => {
       const { sync, state, settle, channel } = rig()

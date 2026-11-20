@@ -1180,6 +1180,7 @@ describe('the setlist page: header, menu and keys', () => {
         async () => (await rig.db.getSetlist(setlist.id)) === undefined,
         'the setlist to be deleted'
       )
+      await waitUntil(() => urls().at(-1) === '/', 'the deletion to finish navigating home')
       expect(localStorage.getItem(`state-${setlist.id}`)).to.equal(null)
       expect(urls().at(-1)).to.equal('/')
     })
@@ -1361,6 +1362,7 @@ describe('the setlist page: header, menu and keys', () => {
           async () => (await destination.getSetlist(setlist.id)) !== undefined,
           'the setlist to be moved'
         )
+        await waitUntil(() => urls().at(-1) === '/', 'the move to finish navigating home')
       })
 
       it('says what went wrong, and keeps it here, when the other space cannot be written', async () => {

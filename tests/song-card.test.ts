@@ -454,4 +454,25 @@ describe('song-card', () => {
       parent?.append(card)
     })
   })
+  it('shows where to get an indexed song whose chart is absent, without opening a blank chart', async () => {
+    const card = await fixture<SongCard>(
+      html`<song-card .song=${song({ missing: true, ccliNumber: '12345' })}></song-card>`
+    )
+    const link = must(card.shadowRoot?.querySelector<HTMLAnchorElement>('a'))
+    expect(link.href).to.equal('https://songselect.ccli.com/songs/12345')
+    expect(link.textContent).to.contain('Get this song')
+    let clicked = false
+    card.addEventListener(SongCardClickEvent.type, () => {
+      clicked = true
+    })
+    link.addEventListener('click', event => event.preventDefault())
+    link.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }))
+    card._handleClick()
+    expect(clicked).to.equal(false)
+    card.song = song({ missing: true })
+    await card.updateComplete
+    expect(must(card.shadowRoot?.querySelector<HTMLAnchorElement>('a')).href).to.contain(
+      'search/results'
+    )
+  })
 })

@@ -1,7 +1,9 @@
 import type { Space } from './data-types.ts'
+import { openSpace } from './db.ts'
 import { wantsPads } from './media-player-loader.ts'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.ts'
 import { listSpaces } from './space.ts'
+import { SpaceDataStore } from './space-data-store.ts'
 import { driveStorage } from './storage/browser-drive.ts'
 import { isTeamMember, storageFor } from './storage/space-storage.ts'
 import type { PadStorage } from './storage/types.ts'
@@ -151,6 +153,28 @@ export function getActivePadSet(): PadSet | null {
 }
 
 export async function listPadSets(force = false): Promise<PadSet[]> {
+  const moved = new Map<string, PadSet[]>()
+  for (const space of (await listSpaces()).filter(space => space.team)) {
+    const db = await openSpace(space.id)
+    try {
+      const store = new SpaceDataStore(db)
+      if (!(await store.state()).enabled) continue
+      moved.set(
+        space.id,
+        (await store.padSets()).map(pad => ({
+          id: pad.padSetId,
+          name: pad.name,
+          version: pad.version,
+          modifiedTime: pad.modifiedAt,
+          spaceId: space.id,
+          spaceName: space.name,
+        }))
+      )
+    } finally {
+      db.db?.close()
+    }
+  }
+  if (moved.size) force = true
   if (!force && padSetListCache) {
     return padSetListCache
   }
@@ -160,8 +184,8 @@ export async function listPadSets(force = false): Promise<PadSet[]> {
   }
 
   padSetListPromise = (async () => {
-    const sets: PadSet[] = []
-    const sources = await padSources()
+    const sets: PadSet[] = [...moved.values()].flat()
+    const sources = (await padSources()).filter(source => !moved.has(source.spaceId))
     // (each place on its own: one that cannot be reached leaves the others' sets)
     const listed = await Promise.all(
       sources.map(source =>
@@ -247,6 +271,19 @@ export async function uploadPadSet(
     name: normalizedName,
     spaceId: source.spaceId,
     spaceName: source.name,
+  }
+  const db = await openSpace(source.spaceId)
+  try {
+    const store = new SpaceDataStore(db)
+    const previous = (await store.padSets()).find(pad => pad.padSetId === folderId)
+    await store.savePadSet({
+      padSetId: folderId,
+      name: normalizedName,
+      version: previous?.version ?? 0,
+      modifiedAt: new Date().toISOString(),
+    })
+  } finally {
+    db.db?.close()
   }
   // The first set uploaded is the one to use: there is no default to fall back on
   if (!getActivePadSet()) await selectPadSet(folderId)

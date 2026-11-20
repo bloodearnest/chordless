@@ -100,8 +100,6 @@ export class SyncOrchestrator {
       () =>
         // (told to the pages that say a space is syncing, and noted as the space's last sync)
         trackSync(this.spaceId, async report => {
-          if (!this.syncManager) await phase('chordless.sync.init', {}, () => this.init())
-          const syncManager = this.syncManager as SyncManager
           const send = (progress: SyncProgress) => {
             report(progress)
             progressCallback?.({ ...progress, timestamp: new Date().toISOString() })
@@ -109,7 +107,16 @@ export class SyncOrchestrator {
 
           try {
             if (messages.starting) send({ stage: 'starting', message: messages.starting })
-            await operation(syncManager, send)
+            // Each backend gets its chance even when the other cannot be reached. Only then
+            // report failure, with rejected promises already observed by allSettled.
+            const results = await Promise.allSettled([
+              this.syncData(trigger),
+              (async () => {
+                if (!this.syncManager) await phase('chordless.sync.init', {}, () => this.init())
+                await operation(this.syncManager as SyncManager, send)
+              })(),
+            ])
+            for (const result of results) if (result.status === 'rejected') throw result.reason
             if (messages.complete) send({ stage: 'complete', message: messages.complete })
             return { success: true } as const
           } catch (error) {
@@ -127,6 +134,16 @@ export class SyncOrchestrator {
       // them, going by the trigger above)
       { trackCalls: true }
     )
+  }
+
+  /** The metadata side of a sync, independently of content storage availability. */
+  async syncData(trigger: SyncTrigger): Promise<void> {
+    if (!this.spaceId) return
+    const { syncSpaceDataFor } = await import('./space-data-runtime.ts')
+    await syncSpaceDataFor(this.spaceId, {
+      all: trigger === 'manual',
+      retryRefused: trigger === 'manual',
+    })
   }
 
   /**

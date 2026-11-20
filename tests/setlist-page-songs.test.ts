@@ -1,3 +1,7 @@
+import { ChordlessDB } from '../src/js/db.ts'
+import { SpaceDataStore } from '../src/js/space-data-store.ts'
+import { makeEntry } from './builders.ts'
+import { deleteDatabase } from './test-helpers.ts'
 /**
  * What the setlist page does with a song's sections, key, tempo, capo and settings, and the state
  * it keeps. (Moving between songs and the header are in setlist-page-header.test.ts.)
@@ -41,6 +45,51 @@ describe('the setlist page: sections, key, tempo and capo', () => {
   const section = (song: number, index: number) => must(rig.page.sections.find(song, index))
   const popover = () => must($<SongSettingsPopover>('#song-settings-popover'))
   const setReadOnly = async () => setSpaceReadOnly(must(getCurrentSpace().id), true)
+
+  it('keeps an indexed song in the setlist and offers its SongSelect link when the chart is absent', async () => {
+    const original = rig.db
+    const db = new ChordlessDB(`test-missing-chart-${crypto.randomUUID()}`)
+    await db.init()
+    try {
+      rig.db = db
+      await new SpaceDataStore(db).apply(
+        {
+          songs: [
+            {
+              songUuid: 'missing-chart',
+              songId: 'ccli-12345',
+              title: 'Known song',
+              ccli: '12345',
+              key: 'D',
+              licence: null,
+              isDefault: true,
+              variantOf: null,
+              variantLabel: '',
+              contentHash: null,
+              fileRef: null,
+              version: 1,
+              modifiedAt: '2026-11-20T10:00:00Z',
+            },
+          ],
+          setlists: [],
+          people: [],
+          padSets: [],
+          from: null,
+        },
+        'tag'
+      )
+      await rig.open(0, { songs: [makeEntry({ songId: 'ccli-12345', songUuid: 'missing-chart' })] })
+      expect(rig.page.songs[0].title).to.equal('Known song')
+      const link = must(rig.root.querySelector<HTMLAnchorElement>('#song-0 a'))
+      expect(link.href).to.equal('https://songselect.ccli.com/songs/12345')
+      expect(link.textContent).to.contain('Get this song')
+    } finally {
+      rig.page?.dispose()
+      rig.db = original
+      db.db?.close()
+      await deleteDatabase(db.dbName)
+    }
+  })
 
   describe('the sections’ states', () => {
     it('start from the app’s defaults', async () => {

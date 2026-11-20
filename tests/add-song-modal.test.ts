@@ -112,7 +112,11 @@ describe('AddSongModal', () => {
   })
 
   it('opens, with a message, when the library is empty', async () => {
-    const emptyDb = { dbName: 'org-empty', getAllSongs: async () => [] } as unknown as ChordlessDB
+    const emptyDb = {
+      dbName: 'org-empty',
+      getAllSongs: async () => [],
+      getAllSongIndex: async () => [],
+    } as unknown as ChordlessDB
     modal = new AddSongModal({
       root,
       getDb: () => emptyDb,

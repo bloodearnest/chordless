@@ -269,6 +269,8 @@ export type SharedChartAnnotation = ChartAnnotation & { body: { kind: 'text'; te
 
 /** A song in a setlist: a reference, with this setlist's key and tempo for it */
 export interface SetlistEntry {
+  /** Unrecognised D1 metadata retained for newer clients. Never populated from a chart. */
+  spaceDataExtra?: Record<string, unknown>
   /** Kept even when this device has no chart */
   title?: string
   ccli?: string | null
@@ -326,6 +328,8 @@ export interface ReceivedShare {
 }
 
 export interface Setlist {
+  /** Unrecognised shared metadata retained across a round trip. */
+  spaceDataBody?: Record<string, unknown>
   version?: number | null
   id: string
   /** YYYY-MM-DD */
@@ -451,6 +455,8 @@ export interface Person {
  * what its chart says, and the chart's text and parsed form.
  */
 export interface SongWithContent {
+  /** The index is known, but this device has no chart yet. */
+  missing?: boolean
   uuid: string
   id: string
   variantOf: string | null
@@ -555,4 +561,6 @@ export interface SpaceOutboxRecord {
   id: string
   change: SpaceOp
   base: unknown
+  /** A permanent refusal stays local and protects the record from snapshot replacement. */
+  refusal?: { status: string; reason: string }
 }

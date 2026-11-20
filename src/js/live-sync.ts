@@ -21,6 +21,7 @@ import { generateLiveSecret } from './share-crypto.ts'
 import { refreshShare, ShareUpdatedEvent } from './share-manager.ts'
 import { reloadShare } from './share-receiver.ts'
 import { getCurrentSpace, getCurrentSpaceFull, SpaceChangeEvent } from './space.ts'
+import { syncCurrentSpaceData } from './space-data-runtime.ts'
 import { withSyncLock } from './sync-lock.ts'
 import { createSyncManager } from './sync-manager.ts'
 import { atLeast } from './team-roles.ts'
@@ -317,9 +318,11 @@ export class LiveSync {
   }
 
   /** This device's changes are in the space: tell the others, if this person may (a reader's edits stay on the device) */
-  #onPushed = (): void => {
+  #onPushed = (event: Event): void => {
+    const { teamId } = event as SyncPushedEvent
     for (const { target, channel } of this.#joined.values()) {
-      if (target.kind === 'team' && target.canWrite) channel.notify()
+      if (target.kind === 'team' && target.canWrite && (!teamId || teamId === target.teamId))
+        channel.notify()
     }
   }
 
@@ -420,7 +423,9 @@ export function startLiveSync(): LiveSync {
     doc: document,
     targets: () => liveTargets(ownWorld),
     channel: realChannel,
-    syncSoon,
+    syncSoon: async () => {
+      await Promise.all([syncSoon(), syncCurrentSpaceData()])
+    },
     reloadShare,
     publishShare,
     visible: () => document.visibilityState === 'visible',

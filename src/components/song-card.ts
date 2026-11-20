@@ -3,6 +3,7 @@ import { rangeOfMetadata } from '../js/chart-range.ts'
 import type { ParsedChart } from '../js/data-types.ts'
 import { type SongMelody, songMelody } from '../js/melody-analysis.ts'
 import { formatArtistNames } from '../js/song-utils.ts'
+import { songSelectLink } from '../js/songselect-link.ts'
 import { t } from '../js/text.ts'
 import { getWeeksAgo } from '../js/utils/date-utils.ts'
 import { lyricSnippet, matchedFields, normalizeTerm } from '../js/utils/song-filter.ts'
@@ -13,6 +14,8 @@ import './key-selector.ts'
 
 /** A song as the card shows it: from the library (with its last use) or a setlist (with its key) */
 export interface SongCardSong {
+  missing?: boolean
+  ccliNumber?: string | null
   title: string
   artist?: string | null
   /** Which version of the song this is, if it is named ("Original" is not worth saying) */
@@ -475,7 +478,14 @@ export class SongCard extends LitElement {
               <div class="meta" part="meta">${this._renderMeta()}</div>
               ${this.variant !== 'setlist' ? this._renderLastPlayed() : ''}
             </div>
-            ${this._renderLyricMatch()}
+            ${
+              this.song.missing
+                ? html`<p>${t('space-data-missing-song')} <a
+              href=${songSelectLink({ title: this.song.title, ccli: this.song.ccliNumber ?? null })}
+              target="_blank" rel="noopener" @click=${(event: Event) => event.stopPropagation()}
+              >${t('space-data-get-song')}</a></p>`
+                : this._renderLyricMatch()
+            }
           </div>
 
           <div class="edit-controls">
@@ -674,7 +684,7 @@ export class SongCard extends LitElement {
   // Click handler
   _handleClick() {
     // In edit mode, don't fire click (avoid accidental navigation)
-    if (this.editMode) {
+    if (this.editMode || this.song?.missing) {
       return
     }
 

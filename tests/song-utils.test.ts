@@ -410,7 +410,7 @@ describe('getLibrarySongs', () => {
 })
 
 describe('which version of a song a setlist entry plays', () => {
-  const record = (uuid: string, isDefault: boolean) => ({ uuid, isDefault }) as never
+  const record = (uuid: string, isDefault: boolean) => ({ uuid, isDefault })
   const entry = (songUuid: string) => makeEntry({ songId: 'title-x', songUuid })
 
   it('is the one it names, else the default, else the first', () => {

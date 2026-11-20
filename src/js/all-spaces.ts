@@ -66,7 +66,9 @@ export async function findSong(uuid: string, spaces?: Space[]): Promise<SpaceSon
   const found: SpaceSong[] = []
   for (const space of all) {
     const song = await withSpace(space.id, async db =>
-      (await db.getSong(uuid)) ? await getSongWithContent(uuid, db) : undefined
+      (await db.getSong(uuid)) || (await db.getSongIndex(uuid))
+        ? await getSongWithContent(uuid, db)
+        : undefined
     )
     if (song) found.push({ song, space })
   }

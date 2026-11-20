@@ -69,6 +69,52 @@ describe('SyncOrchestrator', () => {
     return messages
   }
 
+  it('attempts content sync even when the metadata backend fails, then reports that failure', async () => {
+    const orchestrator = orchestratorWith('sync')
+    const failure = new Error('Metadata is unavailable')
+    let contentRan = false
+    orchestrator.syncData = async () => {
+      throw failure
+    }
+    orchestrator.syncManager = {
+      sync: async () => {
+        contentRan = true
+        return report()
+      },
+    } as unknown as SyncManager
+    const messages: SyncBroadcast[] = []
+    let caught: unknown
+    try {
+      await orchestrator.sync(progress => messages.push(progress))
+    } catch (error) {
+      caught = error
+    }
+    expect(contentRan).to.equal(true)
+    expect(caught).to.equal(failure)
+    expect(messages.at(-1)?.stage).to.equal('error')
+  })
+
+  it('attempts metadata sync when content storage cannot even be initialized', async () => {
+    const orchestrator = new SyncOrchestrator('Test', null)
+    const failure = new Error('Drive is unavailable')
+    let metadataRan = false
+    orchestrator.init = async () => {
+      throw failure
+    }
+    orchestrator.syncData = async trigger => {
+      expect(trigger).to.equal('manual')
+      metadataRan = true
+    }
+    let caught: unknown
+    try {
+      await orchestrator.sync(null, 'manual')
+    } catch (error) {
+      caught = error
+    }
+    expect(metadataRan).to.equal(true)
+    expect(caught).to.equal(failure)
+  })
+
   describe('an incremental sync, the one the app makes by itself', () => {
     it('runs the manager’s, tells it whether to push, and says it ran', async () => {
       const calls: unknown[] = []

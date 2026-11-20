@@ -16,6 +16,8 @@ const SETLIST_SYNC_FIELDS = [
   'lastSyncedAt',
   'syncedContentHash',
   '_lastSyncHash',
+  'version',
+  'spaceDataBody',
 ] as const
 
 type SyncField = (typeof SETLIST_SYNC_FIELDS)[number]
@@ -37,6 +39,9 @@ export function setlistContent(setlist: Setlist): Omit<Setlist, SyncField> {
     content.songs = setlist.songs
       .filter(entry => !entry.local)
       .map((entry, order) => ({ ...entry, order }))
+  }
+  if (content.songs?.some(entry => entry.spaceDataExtra !== undefined)) {
+    content.songs = content.songs.map(({ spaceDataExtra: _extra, ...entry }) => entry)
   }
   return content as Omit<Setlist, SyncField>
 }
