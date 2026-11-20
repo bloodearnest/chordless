@@ -75,8 +75,8 @@ So phase 1 is a new `SpaceStorage` plus routing, not a new sync engine.
 
 ## Steps
 
-Each is its own pull request, in this order, and each passes `just ci` alone. A step ships to Beta by the
-ordinary merge; nothing is turned on for a team until step 4.
+Each is its own pull request, in this order, and each passes `just ci` alone. Each ships by the ordinary
+merge; nothing is turned on for a team until step 4.
 
 **1. The D1 storage on the Worker (no client change).**
 Migration `0011_space_content.sql`: the five typed tables of [D1_SCHEMA.md](D1_SCHEMA.md) (`space_songs`,
@@ -95,9 +95,8 @@ writes committed out of order; the setlist-id uniqueness; a team without the fla
 written when a song is added, changed or removed (uuid, `songId`, title, CCLI number, default key, the licence
 it came in under, content hash, `fileRef`), and read on pull to show songs whose files are not on this
 device ("Get this song"). `SetlistEntry` gains `title` and `ccli`, filled when an entry is made and
-refreshed when the song is opened. `DB_VERSION` goes up for the new fields and store; this is a Beta
-migration under [MIGRATIONS.md](MIGRATIONS.md): roll forward only, with a repair path tested on a device that
-took the build and one that skipped it. No team uses it yet, so behaviour is unchanged.
+refreshed when the song is opened. `DB_VERSION` goes up for the new fields and store; this is a
+migration under [MIGRATIONS.md](MIGRATIONS.md): roll forward only. No team uses it yet, so behaviour is unchanged.
 
 **3. Seeding.**
 The owner runs the move by hand (a script or a button on the Account page that only the owner of a Team
