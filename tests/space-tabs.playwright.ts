@@ -1,6 +1,6 @@
 import { expect, openApp, seedSetlist, test } from './fixtures.ts'
 
-test('a tab switches space without reloading the page, and shows only that space', {
+test('the home page shows the setlists of every space at once, and opens one of another space', {
   tag: '@logic',
 }, async ({ page }) => {
   // Personal has the seeded setlist; a team has one of its own
@@ -18,26 +18,17 @@ test('a tab switches space without reloading the page, and shows only that space
   })
 
   await openApp(page, '/')
-  const tabs = page.getByRole('tablist', { name: 'Where songs and setlists are kept' })
-  await expect(tabs.getByRole('tab')).toHaveCount(2)
-  // (Teams come before Personal)
-  await expect(tabs.getByRole('tab').first()).toContainText('Gateway Church')
-  await expect(tabs.getByRole('tab', { selected: true })).toContainText('Personal')
-  await expect(page.locator('setlist-group')).toHaveCount(1)
-
-  // Mark this page: a reload would lose it
-  await page.evaluate(() => {
-    ;(window as unknown as { marker: string }).marker = 'same page'
-  })
-  await tabs.getByRole('tab').first().click()
-  await expect(tabs.getByRole('tab', { selected: true })).toContainText('Gateway Church')
+  // Both spaces' setlists at once, with no tab to switch (the space is named on each row)
   await expect(page.locator('home-view')).toContainText('2031')
-  expect(await page.evaluate(() => (window as unknown as { marker?: string }).marker)).toBe(
-    'same page'
-  )
+  await expect(page.locator('home-view')).toContainText('Gateway Church')
+  await expect(page.locator('home-view')).toContainText('Personal')
+  await expect(
+    page.getByRole('tablist', { name: 'Where songs and setlists are kept' })
+  ).toHaveCount(0)
 
-  // ...and back
-  await tabs.getByRole('tab', { name: /Personal/ }).click()
-  await expect(tabs.getByRole('tab', { selected: true })).toContainText('Personal')
-  await expect(page.locator('home-view')).not.toContainText('2031')
+  // A setlist of the team opens from its id alone, in its own space (its year is collapsed: open it)
+  await page.getByRole('button', { name: /2031/ }).click()
+  await page.getByRole('link', { name: /Gateway Church/ }).click()
+  await expect(page).toHaveURL(/\/setlist\//)
+  await expect(page.locator('body')).toContainText('Team set')
 })
