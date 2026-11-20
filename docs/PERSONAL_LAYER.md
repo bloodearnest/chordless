@@ -5,6 +5,11 @@ the app first had to be thought of for several people: until then it had one use
 the writer and the reader all at once, and the design mixed the three up. **Designed, not built**
 (except where it says so); what is built today is in "Today", below.
 
+The [central storage design](CENTRAL_STORAGE.md#preferences-and-personal-setlist-overlays) supersedes
+the device-only storage rules below. Once it ships, the shared setlist moves to D1 and each person's
+overlay and preferences sync privately through their own account. The distinction between shared and
+personal edits still applies.
+
 The principle is in CLAUDE.md: *be permissive in the moment*. Nobody is stopped from adapting what they
 see to how they play; rights only decide **what reaches the shared setlist**. This is the model that
 makes both true.
