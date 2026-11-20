@@ -1,6 +1,6 @@
 # Build plan: phase 1 of storage in D1 (Teams)
 
-**Status (2026-11-20): steps 0 and 1 are built, merged and applied in production (migrations `0011`, `0012`; `0013` merged in #278, applied by its deploy). Step 2a (ULIDs, people included) is in review (#281); the rest of step 2 onward is not built, and nothing reads or writes the new tables from a device yet.** Written against the design in
+**Status (2026-11-20): steps 0 and 1 are built, merged and applied in production (migrations `0011`, `0012`; `0013` merged in #278, applied by its deploy). Step 2a (ULIDs, people included) is built (#281). Step 2b (device schema and metadata) is implemented on the current branch; steps 2c onward are not built, and nothing reads or writes the new D1 tables from a device yet.** Written against the design in
 [CENTRAL_STORAGE.md](CENTRAL_STORAGE.md) (an old name: it is only "central" because the app began distributed) as updated on `codex/beta-stable-release-design` (song index
 in D1, preferences later). The Beta and Stable release channels are only a plan, so this one does not wait
 for them. The schema it ends in is drawn in [D1_SCHEMA.md](D1_SCHEMA.md).
@@ -143,6 +143,19 @@ changed or removed and read on a device whose song file is not there ("Get this 
 `ccli` on a setlist entry, filled when it is made and refreshed when the song is opened. (`ulid.ts` and the
 `setlistCode()` fix are 2a.) The Drive engine learns to skip `setlists` and `people` for a space the Worker says has
 moved (`GET /root` gains the flag). Nothing uses it yet, so behaviour is unchanged.
+
+**2b implementation.** Device database v16 adds `song_index` (keyed by song UUID, indexed by
+`songId`), `space_outbox` (keyed by monotonic edit ULID) and `pad_sets` (keyed by `padSetId`).
+An outbox entry retains the operation, base version and base record for the merge in 2c; this step
+creates no queued edits. Existing song, setlist and person records gain a nullable D1 `version`;
+null or absent means not yet synced to D1. The index uses the shared API's song fields, with a
+nullable revision until first sync. It is seeded from existing songs, including those whose chart
+is absent, and maintained atomically with song saves, updates, batches, Drive acknowledgements
+and deletions. A chart's CCLI licence is extracted where available; no chart text enters the index.
+Setlist entries gain optional `title` and `ccli`, filled from the index on save and refreshed on
+opening the setlist. Entries whose songs are missing retain their labels. The chart/content stores,
+Drive links, existing IDs and personal setlist layer remain intact. Snapshot application, outbox
+replay and displaying songs known only to the index follow in 2c.
 
 **3. Seeding.**
 The owner runs the move by hand (a button on the Account page only an owner sees, or a script): from the

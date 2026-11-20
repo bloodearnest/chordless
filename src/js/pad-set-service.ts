@@ -14,6 +14,8 @@ import { readZip, type ZipArchive } from './utils/zip.ts'
  * It is kept in the folder of the space it belongs to, a personal space's or a team's.
  */
 export interface PadSet {
+  /** D1 revision, once pad-set metadata has synced */
+  version?: number | null
   id: string
   name: string
   modifiedTime?: string | null

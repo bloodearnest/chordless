@@ -5,7 +5,7 @@
  */
 import { expect } from '@open-wc/testing'
 import { ChordlessDB, DB_VERSION, OLDEST_UPGRADABLE } from '../src/js/db.ts'
-import { oldDatabase, SCHEMA_V14, type StoreShape, schemaOf } from './old-database.ts'
+import { oldDatabase, SCHEMA_V14, SCHEMA_V15, type StoreShape, schemaOf } from './old-database.ts'
 import { deleteDatabase } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -13,7 +13,7 @@ const { describe, it } = window
 const OLDEST = OLDEST_UPGRADABLE
 
 /** What each version below the current one had: add one when DB_VERSION goes up */
-const SCHEMAS: Record<number, StoreShape[]> = { 14: SCHEMA_V14 }
+const SCHEMAS: Record<number, StoreShape[]> = { 14: SCHEMA_V14, 15: SCHEMA_V15 }
 
 async function schemaAfterOpening(name: string): Promise<StoreShape[]> {
   const db = new ChordlessDB(name)

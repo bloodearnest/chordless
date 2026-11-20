@@ -5,7 +5,7 @@ cannot store the song data, as that is copyrighted. The users must store it, on
 their devices or on their own google drive.
 
 Each space (called "organisation" before 2026-10-20; some stored names still are) has an IndexedDB
-database named exactly after its `spaceId`, with seven object stores:
+database named exactly after its `spaceId`, with ten object stores:
 
 1. `songs` – flattened song variants (metadata only)
 2. `chordpro` – raw chordpro text + hashes
@@ -14,6 +14,15 @@ database named exactly after its `spaceId`, with seven object stores:
 5. `people` – who leads the setlists (`docs/IDENTITIES.md`; since database version 10)
 6. `scores` – the MusicXML of a song's lead sheet, one a song (`docs/LEAD_SHEETS.md`; `melodies` from database version 13, holding the score since 14, renamed `scores` in 15)
 7. `pending_deletions` – Drive files to put in the trash at the next sync (`docs/SYNC_ARCHITECTURE.md`, "Deleting songs")
+
+8. `song_index` – the D1-shaped song metadata, keyed by variant UUID, usable without a local chart (v16)
+9. `space_outbox` – pending D1 operations in ULID order, retaining their merge base (v16; replay comes next)
+10. `pad_sets` – D1 pad-set metadata, without audio (v16)
+
+Songs, setlists and people carry an optional nullable `version` for D1; null/absent means they have
+not synced with D1. The song index has its own revision, independent of the Drive file revision.
+These stores prepare for the space-data sync; Drive still handles the existing collections until
+that space is moved. See [D1_PHASE1_PLAN.md](D1_PHASE1_PLAN.md).
 
 Drive sync stores JSON/ChordPro files inside the space’s Google Drive folder
 and tracks Drive metadata (`fileRef`, `fileModified`, `lastSyncedAt`, `syncedContentHash` (`_lastSyncHash` on older records), etc.)
@@ -103,6 +112,7 @@ Each song in the setlist has metadata specific to this setlist:
 
 - order: position in the setlist
 - songId: the deterministic id of the song
+- title, ccli: copied from the index on save and refreshed on opening, retained without a chart
 - songUuid: the specific variant uuid chosen for this setlist
 - key: transposition/key override for this setlist (optional)
 - tempo: tempo override for this setlist (optional)

@@ -1,3 +1,4 @@
+import { licenceOfChart } from './ccli-licence.ts'
 import { announceDataChange, type DataKind, type DataOrigin } from './data-changes.ts'
 import type {
   ChordProRecord,
@@ -6,6 +7,7 @@ import type {
   ScoreRecord,
   Setlist,
   SetlistLocalState,
+  SongIndexRecord,
   SongInput,
   SongRecord,
   TempoInput,
@@ -26,7 +28,7 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 // NOTE: This now stores ALL space data in one database per space.
 // Space metadata is stored separately in the 'spaces' database.
 
-export const DB_VERSION = 15
+export const DB_VERSION = 16
 /**
  * The oldest version a database is upgraded from (docs/MIGRATIONS.md, "The floor"). Raised when the steps
  * for versions below it are dropped, which is when nobody has a device that old.
@@ -404,6 +406,18 @@ export class ChordlessDB {
           db.createObjectStore('people', { keyPath: 'id' })
         }
 
+        // D1's metadata and queued edits are separate from the content/Drive records.
+        if (!db.objectStoreNames.contains('song_index')) {
+          const index = db.createObjectStore('song_index', { keyPath: 'songUuid' })
+          index.createIndex('songId', 'songId', { unique: false })
+        }
+        if (!db.objectStoreNames.contains('space_outbox')) {
+          db.createObjectStore('space_outbox', { keyPath: 'id' })
+        }
+        if (!db.objectStoreNames.contains('pad_sets')) {
+          db.createObjectStore('pad_sets', { keyPath: 'padSetId' })
+        }
+
         if (oldVersion > 0 && oldVersion < DB_VERSION) {
           upgradeRecords(request.transaction as IDBTransaction, oldVersion)
         }
@@ -414,7 +428,7 @@ export class ChordlessDB {
   // Setlist operations
   /** Save a setlist (its songs' tempos as numbers); resolves with what was stored */
   async saveSetlist(setlist: Setlist): Promise<Setlist> {
-    const tx = this.#transaction(['setlists'], 'readwrite')
+    const tx = this.#transaction(['setlists', 'song_index'], 'readwrite')
     const store = tx.objectStore('setlists')
     const stored = cloneForStorage(withNumericTempos(setlist)) as Setlist
     // A page's copy of a setlist that was not in Drive yet has no link to its file: if a sync sent
@@ -428,6 +442,7 @@ export class ChordlessDB {
         }
       }
     }
+    await fillEntryMetadata(tx, stored)
     store.put(stored)
     const result = await transactionDone(tx, stored)
     this.#changed('setlist', [stored.id])
@@ -445,13 +460,14 @@ export class ChordlessDB {
     id: string,
     change: (setlist: Setlist) => unknown
   ): Promise<Setlist | undefined> {
-    const tx = this.#transaction(['setlists'], 'readwrite')
+    const tx = this.#transaction(['setlists', 'song_index'], 'readwrite')
     const store = tx.objectStore('setlists')
     const current = (await requestResult(store.get(id))) as Setlist | undefined
     if (!current) return undefined
     const draft = cloneForStorage(current) as Setlist
     if (change(draft) === NO_CHANGE) return undefined
     const stored = cloneForStorage(withNumericTempos(draft)) as Setlist
+    await fillEntryMetadata(tx, stored)
     store.put(stored)
     const result = await transactionDone(tx, stored)
     this.#changed('setlist', [id])
@@ -490,12 +506,14 @@ export class ChordlessDB {
   async saveSetlistsBatch(setlists: Setlist[]): Promise<void> {
     if (setlists.length === 0) return
 
-    const tx = this.#transaction(['setlists'], 'readwrite')
+    const tx = this.#transaction(['setlists', 'song_index'], 'readwrite')
     const store = tx.objectStore('setlists')
 
     // Queue all puts in one transaction
     for (const setlist of setlists) {
-      store.put(cloneForStorage(withNumericTempos(setlist)))
+      const stored = cloneForStorage(withNumericTempos(setlist)) as Setlist
+      await fillEntryMetadata(tx, stored)
+      store.put(cloneForStorage(stored))
     }
 
     await transactionDone(tx)
@@ -505,7 +523,26 @@ export class ChordlessDB {
     )
   }
 
-  async getSetlist(id: string): Promise<Setlist | undefined> {
+  /** Refresh the entry labels when opening a setlist, without replacing its performance settings. */
+  async refreshSetlistMetadata(id: string): Promise<Setlist | undefined> {
+    const tx = this.#transaction(['setlists', 'song_index'], 'readwrite')
+    const store = tx.objectStore('setlists')
+    const setlist: Setlist | undefined = await requestResult(store.get(id))
+    if (!setlist) return undefined
+    const before = JSON.stringify(setlist.songs)
+    await fillEntryMetadata(tx, setlist)
+    const changed = before !== JSON.stringify(setlist.songs)
+    if (changed) store.put(setlist)
+    await transactionDone(tx)
+    if (changed) this.#changed('setlist', [id])
+    return setlist
+  }
+
+  async getSetlist(
+    id: string,
+    { refreshMetadata = false }: { refreshMetadata?: boolean } = {}
+  ): Promise<Setlist | undefined> {
+    if (refreshMetadata) return this.refreshSetlistMetadata(id)
     const tx = this.#transaction(['setlists'], 'readonly')
     const store = tx.objectStore('setlists')
     const request = store.get(id)
@@ -668,7 +705,7 @@ export class ChordlessDB {
   // Song operations (per-space)
   /** Save a song (its tempos as numbers); resolves with what was stored */
   async saveSong(song: SongInput): Promise<SongRecord> {
-    const tx = this.#transaction(['songs'], 'readwrite')
+    const tx = this.#transaction(['songs', 'song_index', 'chordpro'], 'readwrite')
     const store = tx.objectStore('songs')
     const stored = withNumericSongTempos(song)
     // (as saveSetlist: a copy made before a sync sent the song must not drop the link to its file)
@@ -681,6 +718,7 @@ export class ChordlessDB {
       }
     }
     store.put(stored)
+    await writeSongIndex(tx, stored)
     const result = await transactionDone(tx, stored)
     this.#changed('song', [stored.uuid])
     return result
@@ -691,7 +729,7 @@ export class ChordlessDB {
     uuid: string,
     change: (song: SongRecord) => unknown
   ): Promise<SongRecord | undefined> {
-    const tx = this.#transaction(['songs'], 'readwrite')
+    const tx = this.#transaction(['songs', 'song_index', 'chordpro'], 'readwrite')
     const store = tx.objectStore('songs')
     const current = (await requestResult(store.get(uuid))) as SongRecord | undefined
     if (!current) return undefined
@@ -699,6 +737,7 @@ export class ChordlessDB {
     if (change(draft) === NO_CHANGE) return undefined
     const stored = withNumericSongTempos(draft)
     store.put(stored)
+    await writeSongIndex(tx, stored)
     const result = await transactionDone(tx, stored)
     this.#changed('song', [uuid])
     return result
@@ -711,7 +750,7 @@ export class ChordlessDB {
    */
   async saveSongsSent(sent: SongRecord[]): Promise<void> {
     if (sent.length === 0) return
-    const tx = this.#transaction(['songs'], 'readwrite')
+    const tx = this.#transaction(['songs', 'song_index', 'chordpro'], 'readwrite')
     const store = tx.objectStore('songs')
     for (const song of sent) {
       const current = (await requestResult(store.get(song.uuid))) as SongRecord | undefined
@@ -724,6 +763,7 @@ export class ChordlessDB {
         updated.lastSyncedAt = current.lastSyncedAt
       }
       store.put(withNumericSongTempos(updated))
+      await writeSongIndex(tx, updated)
     }
     await transactionDone(tx)
     this.#changed(
@@ -735,11 +775,13 @@ export class ChordlessDB {
   async saveSongsBatch(songs: SongInput[]): Promise<void> {
     if (songs.length === 0) return
 
-    const tx = this.#transaction(['songs'], 'readwrite')
+    const tx = this.#transaction(['songs', 'song_index', 'chordpro'], 'readwrite')
     const store = tx.objectStore('songs')
 
     for (const song of songs) {
-      store.put(withNumericSongTempos(song))
+      const stored = withNumericSongTempos(song)
+      store.put(stored)
+      await writeSongIndex(tx, stored)
     }
 
     await transactionDone(tx)
@@ -747,6 +789,12 @@ export class ChordlessDB {
       'song',
       songs.map(song => song.uuid)
     )
+  }
+
+  /** Metadata remains readable when the chart is absent. */
+  async getSongIndex(uuid: string): Promise<SongIndexRecord | undefined> {
+    const tx = this.#transaction(['song_index'], 'readonly')
+    return requestResult(tx.objectStore('song_index').get(uuid))
   }
 
   async getSong(uuid: string): Promise<SongRecord | undefined> {
@@ -896,7 +944,11 @@ export class ChordlessDB {
    * its file was in the folder that is let go. Used to start over in a new Drive folder.
    */
   async clearFileLinks(): Promise<void> {
-    const tx = this.#transaction(['setlists', 'songs', 'people', 'scores'], 'readwrite')
+    const tx = this.#transaction(
+      ['setlists', 'songs', 'people', 'scores', 'song_index'],
+      'readwrite'
+    )
+    unlinkSongIndex(tx)
     const unlinked = {
       fileRef: null,
       fileModified: null,
@@ -946,7 +998,8 @@ export class ChordlessDB {
    * @returns how many records were let go
    */
   async unlinkFiles(refs: Set<string>): Promise<number> {
-    const tx = this.#transaction(['setlists', 'songs', 'scores'], 'readwrite')
+    const tx = this.#transaction(['setlists', 'songs', 'scores', 'song_index'], 'readwrite')
+    unlinkSongIndex(tx, refs)
     const unlinked = {
       fileRef: null,
       fileModified: null,
@@ -1071,8 +1124,12 @@ export class ChordlessDB {
   async deleteSong(uuid: string, { remember = true }: { remember?: boolean } = {}): Promise<void> {
     const song = await this.getSong(uuid)
     if (!song) return
-    const tx = this.#transaction(['songs', 'chordpro', 'pending_deletions'], 'readwrite')
+    const tx = this.#transaction(
+      ['songs', 'song_index', 'chordpro', 'pending_deletions'],
+      'readwrite'
+    )
     tx.objectStore('songs').delete(uuid)
+    tx.objectStore('song_index').delete(uuid)
     if (remember && song.fileRef) {
       const pending: PendingDeletion = {
         ref: song.fileRef,
@@ -1114,7 +1171,18 @@ export class ChordlessDB {
   // Clear all data (for re-import)
   async clearAll(): Promise<void> {
     const tx = this.#transaction(
-      ['setlists', 'songs', 'chordpro', 'setlist_local', 'pending_deletions', 'people', 'scores'],
+      [
+        'setlists',
+        'songs',
+        'chordpro',
+        'setlist_local',
+        'pending_deletions',
+        'people',
+        'scores',
+        'song_index',
+        'space_outbox',
+        'pad_sets',
+      ],
       'readwrite'
     )
 
@@ -1130,6 +1198,9 @@ export class ChordlessDB {
     await localStore.clear()
     await tx.objectStore('people').clear()
     await tx.objectStore('scores').clear()
+    tx.objectStore('song_index').clear()
+    tx.objectStore('space_outbox').clear()
+    tx.objectStore('pad_sets').clear()
 
     await transactionDone(tx)
     this.#changedAll()
@@ -1240,9 +1311,143 @@ export function withNumericTempos<T extends { songs?: { tempo?: TempoInput }[] }
  * which `legacyFile` says.
  */
 function upgradeRecords(transaction: IDBTransaction, oldVersion: number) {
+  if (oldVersion < 16) {
+    migrateSpaceData(transaction)
+  }
   if (oldVersion < 15) {
     migrateMelodiesToScores(transaction)
     migratePendingDeletionKinds(transaction)
+  }
+}
+
+/** Metadata only: never copy a parsed chart, lyrics, author or copyright into the index. */
+function songIndex(
+  song: SongRecord,
+  previous?: SongIndexRecord,
+  chart?: ChordProRecord
+): SongIndexRecord {
+  return {
+    songUuid: song.uuid,
+    songId: song.id,
+    title: song.title,
+    ccli: song.ccliNumber,
+    key: song.key,
+    licence:
+      song.licence ??
+      (chart
+        ? licenceOfChart(chart.content) || previous?.licence || null
+        : (previous?.licence ?? null)),
+    isDefault: song.isDefault,
+    variantOf: song.variantOf,
+    variantLabel: song.variantLabel,
+    contentHash: song.contentHash,
+    fileRef: song.fileRef,
+    version: previous?.version ?? song.version ?? null,
+    modifiedAt: song.modifiedDate,
+  }
+}
+
+/** File links belong to Drive, including when the device has only the index. */
+function unlinkSongIndex(tx: IDBTransaction, refs?: Set<string>): void {
+  const cursor = tx.objectStore('song_index').openCursor()
+  cursor.onsuccess = () => {
+    const at = cursor.result
+    if (!at) return
+    const record = at.value as SongIndexRecord
+    if (!refs || (record.fileRef && refs.has(record.fileRef))) {
+      at.update({ ...record, fileRef: null })
+    }
+    at.continue()
+  }
+}
+
+async function writeSongIndex(tx: IDBTransaction, song: SongRecord): Promise<void> {
+  const store = tx.objectStore('song_index')
+  const previous = await requestResult(store.get(song.uuid))
+  const chart = await requestResult(tx.objectStore('chordpro').get(song.chordproFileId))
+  store.put(songIndex(song, previous, chart))
+}
+
+async function fillEntryMetadata(tx: IDBTransaction, setlist: Setlist): Promise<void> {
+  const index = tx.objectStore('song_index')
+  for (const entry of setlist.songs ?? []) {
+    // Older entries name only the deterministic song id, or a variant no longer held here.
+    let song: SongIndexRecord | undefined = entry.songUuid
+      ? await requestResult(index.get(entry.songUuid))
+      : undefined
+    if (song?.songId !== entry.songId) song = undefined
+    if (!song && entry.songId) {
+      const variants: SongIndexRecord[] = await requestResult(
+        index.index('songId').getAll(entry.songId)
+      )
+      song = variants.find(variant => variant.isDefault) ?? variants[0]
+    }
+    if (!song) continue
+    entry.title = song.title
+    entry.ccli = song.ccli
+  }
+}
+
+/** Version 16: seed metadata without changing identities, Drive links or the local layer. */
+function migrateSpaceData(tx: IDBTransaction): void {
+  const chartsRead = tx.objectStore('chordpro').getAll()
+  const read = tx.objectStore('songs').getAll()
+  read.onsuccess = () => {
+    const charts = new Map(
+      (chartsRead.result as { id: string; content: string }[]).map(chart => [chart.id, chart])
+    )
+    const songs = new Map<string, { songId: string; title: string; ccli: string | null }>()
+    const defaults = new Map<string, { songId: string; title: string; ccli: string | null }>()
+    // Read the v15 records directly. Keep this projection frozen when the live index changes.
+    for (const song of read.result) {
+      const chart = charts.get(song.chordproFileId)?.content ?? ''
+      const directive = /\{\s*ccli_license\s*:\s*([^}\s]+)\s*\}/i.exec(chart)
+      const trailer = /CCLI®?\s+Licen[cs]e\s*(?:#|No\.?|Number)?\s*:?\s*(\d[\d ]*\d|\d)/i.exec(
+        chart
+      )
+      const indexed = {
+        songUuid: song.uuid,
+        songId: song.id,
+        title: song.title,
+        ccli: song.ccliNumber,
+        key: song.key,
+        licence: (directive?.[1] ?? trailer?.[1] ?? '').replace(/\s+/g, '') || null,
+        isDefault: song.isDefault,
+        variantOf: song.variantOf,
+        variantLabel: song.variantLabel,
+        contentHash: song.contentHash,
+        fileRef: song.fileRef,
+        version: null,
+        modifiedAt: song.modifiedDate,
+      }
+      songs.set(song.uuid, indexed)
+      if (song.isDefault || !defaults.has(song.id)) defaults.set(song.id, indexed)
+      tx.objectStore('song_index').put(indexed)
+      tx.objectStore('songs').put({ ...song, version: song.version ?? null })
+    }
+    const setlists = tx.objectStore('setlists').openCursor()
+    setlists.onsuccess = () => {
+      const cursor = setlists.result
+      if (!cursor) return
+      const setlist = cursor.value
+      for (const entry of setlist.songs ?? []) {
+        const variant = songs.get(entry.songUuid)
+        const song = variant?.songId === entry.songId ? variant : defaults.get(entry.songId)
+        if (song) {
+          entry.title = song.title
+          entry.ccli = song.ccli
+        }
+      }
+      cursor.update({ ...setlist, version: setlist.version ?? null })
+      cursor.continue()
+    }
+  }
+  const people = tx.objectStore('people').openCursor()
+  people.onsuccess = () => {
+    const cursor = people.result
+    if (!cursor) return
+    cursor.update({ ...cursor.value, version: cursor.value.version ?? null })
+    cursor.continue()
   }
 }
 

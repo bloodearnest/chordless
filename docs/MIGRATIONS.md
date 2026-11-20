@@ -77,6 +77,14 @@ go wrong:
   `DatabaseNewerError`, and says "This device has newer Chordless data than this version can read", with a
   button that looks for a newer app.
 
+### Version 16: the device side of space data
+
+Adds `song_index`, `space_outbox` and `pad_sets`, retaining every existing store. The index is
+seeded from the device's song records (even without a chart); known chart licences are metadata
+only. Setlist entries gain title and CCLI snapshots where their song is known, and existing
+songs, setlists and people get a null D1 revision. No outbox edits are generated during upgrade.
+The migration runs in the same atomic versionchange transaction as the schema additions.
+
 ## Drive
 
 Files are written by every build that has been in use, and read by every other. So what is read is more
