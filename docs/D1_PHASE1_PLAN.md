@@ -46,8 +46,10 @@ or fetched file by file, and a record missing from the answer is deleted, so the
   and everything else (every song, person and pad set). `?all=1` adds the older setlists: a **first sync on a
   device asks for everything**, and a "show older setlists" action asks later. The device remembers which
   it holds, so a window never deletes an older setlist it already has.
-- **Every space in one call.** `GET /api/spaces` (the existing path, which also takes `POST` to make a space) answers for all the account's spaces at once (an ETag per
-  space), which is what syncing every space needs.
+- **Every space in one call.** `POST /api/spaces/data` (`GET /api/spaces` is the list of spaces, which already
+  existed) answers for all the account's spaces at once: the body says `{all?, etags?}`, and each space is answered with
+  its data, `{unchanged: true}` where its ETag is still right, or `{moved: false}` where it is still on Drive. This is what
+  syncing every space needs.
 
 **Writing.** Plain record operations, not file writes: `PUT /api/space/<id>/setlists/<id>`
 with the `version` the edit was based on (`DELETE` likewise, `POST` to create, `POST /api/space/<id>/batch` for replaying
@@ -97,13 +99,25 @@ missing indexes. One migration (`0011_schema_cleanup.sql`) rebuilds the tables w
 production's data and run by the owner with a backup taken. Nothing below starts until it is merged. The tables
 in the steps after it are written the same way, so the new migration is `0012_space_data.sql`.
 
-**1. The tables and the space-data API on the Worker (no client change).**
+**1. The tables and the space-data API on the Worker (no client change). Built (2026-11-20).**
 Migration `0012_space_data.sql`: the five typed tables of [D1_SCHEMA.md](D1_SCHEMA.md) (`space_songs`,
 `space_setlists`, `space_setlist_songs`, `space_people`, `space_pad_sets`), the unique setlist id, and
 `teams.storage` (`'drive'` by default, `'d1'` once moved: only for the move, deleted afterwards). `worker/src/space-data.ts` with the routes
-above, the role checks and the ETag. Tests (`team-api.node.test.ts` style): roles; a stale write is a 409
-with the current row; the ETag and 304; the window and `?all=1`; deletes; the setlist id unique across spaces;
-an unmoved team still answers from Drive.
+above, the role checks and the ETag, and the types both sides share (`src/js/space-data-types.ts`). As built:
+- **A write is one batch that undoes itself.** A change made from `baseVersion` starts with a statement that is an
+  error unless the record is at that version (`json('{')` is malformed JSON, so SQLite refuses it), then the update; D1 undoes a
+  batch if a statement fails, so two writes a moment apart cannot both pass. A create that finds the id taken, in this space
+  or another, is a 409 (another space's record is never shown: `current` is null). A change to a record that has since been
+  deleted is a 404 `missing`.
+- **Roles are the Drive-backed API's:** a reader reads; a writer changes setlists, songs and people; a writer deletes a
+  setlist they lead (through a merged person, or by the legacy owner address) or made when it has no leader, an admin or the
+  owner any; any member adds a pad set, an admin changes or deletes one; any member names the person who is them.
+- **Records are checked** (ids, a `YYYY-MM-DD` date, lengths, at most 300 songs a setlist, a whole-number tempo, JSON
+  in a field at most 64 KB) and a record that is not right is a 400 with what is wrong, and nothing is written.
+- **A team that has not moved** (`teams.storage = 'drive'`) is told `409 not_moved`; its files API goes on as it was.
+- **The batch** (`POST /batch`) applies up to 100 changes one at a time, each with its own answer
+  (`ok | conflict | missing | forbidden | invalid`).
+Tests (`tests/space-data.node.test.ts`, through the router with real tokens): all of the above, 40 cases.
 
 **2. The device's side of it, ids and entry fields.**
 `src/js/space-data.ts` (`space-sync.ts` is taken, by the Account page's Sync button): snapshot apply, the outbox, the 409 merge, the live "changed" trigger. A
