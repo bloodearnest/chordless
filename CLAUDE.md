@@ -116,6 +116,14 @@ Changes reach `main` only through pull requests (`docs/CI.md`): never commit to 
 - Commit as you go, one logical step per commit; keep other people's uncommitted work out of them.
 - Before asking for review: rebase on `origin/main`, run `just ci` (the checks CI runs, on Linux), and
   `git push --force-with-lease`. Open the pull request with `gh pr create`, ready for review (a draft only for a spike).
+- **Read the result of every check; never throw it away.** Do not send a check's output to `/dev/null`
+  or run it and look only at the next one: a suite's failure then goes unseen and reaches CI (a removed
+  component left two unused messages, which the node tests catch, and the node tests had been run with
+  their output discarded). Run every step `just ci` runs, one at a time, each with its exit status and
+  failure lines in view: format and lint (Biome, `tsc -b`, knip), the node tests, the browser unit tests,
+  `just coverage-check` after a full run of both, and Playwright. If `just ci` cannot run to the end here
+  (the dependency audit needs the network and `node_modules`), run the rest by hand: that is no reason
+  to skip any of them. Say a check passes only when its result was seen to; when one was not run, say so.
 - Never merge your own pull request. They are merged with "Rebase and merge": no merge commits.
 - At the end of a session, `just wrap-up`: it fast-forwards the primary checkout's `main` to
   `origin/main` and lists the worktrees and branches whose pull request has merged (`--prune`
