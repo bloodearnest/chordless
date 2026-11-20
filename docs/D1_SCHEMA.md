@@ -2,6 +2,9 @@
 
 ![The D1 schema](D1_SCHEMA.svg)
 
+The schema **as it is after `0011_schema_cleanup.sql`**, with every column, foreign key, `CHECK` and index, generated from
+the migrated database: [D1_SCHEMA_0011.svg](D1_SCHEMA_0011.svg). The picture above is where it is going.
+
 Grey tables exist today (`migrations/0001` to `0010`); the colours are the phase that adds each one (the CCLI usage report, phase 2, needs no table of its own)
 ([CENTRAL_STORAGE.md](CENTRAL_STORAGE.md), [D1_PHASE1_PLAN.md](D1_PHASE1_PLAN.md)). The foreign keys, `CHECK`s and
 indexes are written out in [SCHEMA_AUDIT.md](SCHEMA_AUDIT.md), section 3, and the team tables are drawn as they
