@@ -15,14 +15,13 @@ import '../../components/setlist-details-form.ts'
 import type { SetlistGroup, SetlistRow } from '../../components/setlist-group.ts'
 import '../../components/setlist-group.ts'
 import '../../components/status-message.ts'
-import { listAllSetlists, withSpace } from '../all-spaces.ts'
+import { listAllSetlists, openDefaultSpace, withSpace } from '../all-spaces.ts'
 import type { Person, Setlist, Space } from '../data-types.ts'
 import { watchData } from '../data-watcher.ts'
 import {
   type ChordlessDB,
   createSetlist,
   determineSetlistType,
-  getCurrentDB,
   getNextSunday,
   openSpace,
 } from '../db.ts'
@@ -214,9 +213,7 @@ export class HomeView extends PageView {
   async #targetDB(): Promise<ChordlessDB> {
     const spaces = await listSpaces()
     const chosen = spaces.find(space => space.id === this.#targetId)
-    const target = chosen ?? importTargetOf(spaces)
-    /* v8 ignore next -- a device always has a space: the home page makes the first */
-    return target ? openSpace(target.id) : getCurrentDB()
+    return chosen ? openSpace(chosen.id) : openDefaultSpace()
   }
 
   /** The create form is opening: which spaces it can go to, starting at the default */

@@ -35,11 +35,10 @@ import type {
 } from '../../components/song-section.ts'
 import '../../components/song-section.ts'
 import '../../components/status-message.ts'
-import { findSong, withSpace } from '../all-spaces.ts'
+import { findSong, openDefaultSpace, withSpace } from '../all-spaces.ts'
 import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../data-types.ts'
 import { watchData } from '../data-watcher.ts'
-import { type ChordlessDB, getCurrentDB, openSpace } from '../db.ts'
-import { importTargetOf } from '../default-space.ts'
+import { type ChordlessDB, openSpace } from '../db.ts'
 import { filterByPlace, loadLeftOut, placesOf, saveLeftOut } from '../library-spaces.ts'
 import { goTo } from '../navigation.ts'
 import {
@@ -149,8 +148,7 @@ export class LibraryView extends PageView {
 
   /** The default space's database (or the first one that can be written to) */
   async #libraryDB(): Promise<ChordlessDB> {
-    const target = importTargetOf(await listSpaces())
-    return target ? openSpace(target.id) : getCurrentDB()
+    return openDefaultSpace()
   }
 
   // ==================== Lifecycle ====================

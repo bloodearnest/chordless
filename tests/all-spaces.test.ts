@@ -1,6 +1,11 @@
 /** Setlists across spaces (all-spaces.ts): listed with their space, and found by id alone */
 import { expect } from '@open-wc/testing'
-import { findSetlistSpace, findSong, listAllSetlists } from '../src/js/all-spaces.ts'
+import {
+  findSetlistSpace,
+  findSong,
+  listAllSetlists,
+  openDefaultSpace,
+} from '../src/js/all-spaces.ts'
 import type { ChordProRecord, Setlist, SongRecord, Space } from '../src/js/data-types.ts'
 import { createSetlist, openSpace } from '../src/js/db.ts'
 import { setDefaultSpaceId } from '../src/js/default-space.ts'
@@ -64,6 +69,17 @@ describe('Setlists across spaces', () => {
       expect((await findSong(first.uuid, [a, b]))?.space.id).to.equal(b.id)
       setDefaultSpaceId(a.id)
       expect((await findSong(first.uuid, [a, b]))?.space.id).to.equal(a.id)
+    } finally {
+      setDefaultSpaceId(null)
+    }
+  })
+
+  it('opens the default space for what no space was asked for', async () => {
+    setDefaultSpaceId(b.id)
+    try {
+      const db = await openDefaultSpace()
+      expect(db.spaceId).to.equal(b.id)
+      db.db?.close()
     } finally {
       setDefaultSpaceId(null)
     }
