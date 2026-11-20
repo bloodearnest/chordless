@@ -43,11 +43,12 @@ import { PageView, type ViewState } from './page-view.ts'
 /** The heading of the group of setlists received by link (its "year", as the home page groups them) */
 export const SHARED_GROUP = 'Shared with me'
 
-/** One year's setlists, for a <setlist-group> */
+/** One group of setlists, for a <setlist-group> */
 export interface SetlistYear {
   year: string
   expanded: boolean
   setlists: SetlistRow[]
+  current?: boolean
 }
 
 /** What the home page keeps of itself: which years are open, and the scroll */
@@ -56,43 +57,57 @@ interface HomeViewState extends ViewState {
 }
 
 /**
- * The setlists, grouped by year, newest first, for <setlist-group>s: the
- * current year starts expanded.
+ * Today and future setlists first, nearest first; past setlists by year,
+ * newest first, with every past year initially collapsed.
  */
-export function groupSetlistsByYear(
+export function groupSetlistsByDate(
   setlists: Setlist[],
-  currentYear: number = new Date().getFullYear(),
+  today: string = toLocalDateString(new Date()),
   people: Person[] | ((setlist: Setlist) => Person[]) = [],
   spaceName: (setlist: Setlist) => string | undefined = () => undefined
 ): SetlistYear[] {
+  const row = (setlist: Setlist): SetlistRow => ({
+    id: setlist.id,
+    url: `/setlist/${setlist.id}`,
+    displayName: setlistTitle(setlist, 'short'),
+    leader: leaderName(typeof people === 'function' ? people(setlist) : people, setlist.leaderId),
+    space: spaceName(setlist),
+    type: setlist.type,
+    songCount: Array.isArray(setlist.songs) ? setlist.songs.length : 0,
+  })
+  const upcoming: Setlist[] = []
   const byYear = new Map<string, Setlist[]>()
   for (const setlist of setlists) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(setlist.date) && setlist.date >= today) {
+      upcoming.push(setlist)
+      continue
+    }
     const year = setlist.date.match(/^(\d{4})/)?.[1] ?? 'Unknown'
     const inYear = byYear.get(year) ?? []
     inYear.push(setlist)
     byYear.set(year, inYear)
   }
 
-  return [...byYear.keys()]
+  const history = [...byYear.keys()]
     .sort((a, b) => Number(b) - Number(a))
     .map(year => ({
       year,
-      expanded: Number(year) === currentYear,
+      expanded: false,
       setlists: (byYear.get(year) as Setlist[])
         .sort((a, b) => b.date.localeCompare(a.date))
-        .map(setlist => ({
-          id: setlist.id,
-          url: `/setlist/${setlist.id}`,
-          displayName: setlistTitle(setlist, 'short'),
-          leader: leaderName(
-            typeof people === 'function' ? people(setlist) : people,
-            setlist.leaderId
-          ),
-          space: spaceName(setlist),
-          type: setlist.type,
-          songCount: Array.isArray(setlist.songs) ? setlist.songs.length : 0,
-        })),
+        .map(row),
     }))
+  return upcoming.length
+    ? [
+        {
+          year: t('home-current-upcoming'),
+          expanded: true,
+          current: true,
+          setlists: upcoming.sort((a, b) => a.date.localeCompare(b.date)).map(row),
+        },
+        ...history,
+      ]
+    : history
 }
 
 /** The leader a new setlist starts with: the person using the app, if they are one of the space's people */
@@ -153,9 +168,9 @@ export class HomeView extends PageView {
       const where = new Map(entries.map(entry => [entry.setlist.id, entry.space]))
       return {
         space: importTargetOf(spaces),
-        groups: groupSetlistsByYear(
+        groups: groupSetlistsByDate(
           entries.map(entry => entry.setlist),
-          new Date().getFullYear(),
+          toLocalDateString(new Date()),
           setlist => people.get(where.get(setlist.id)?.id ?? '') ?? [],
           setlist => (spaces.length > 1 ? where.get(setlist.id)?.name : undefined)
         ),
@@ -309,15 +324,30 @@ export class HomeView extends PageView {
       void import('../../components/welcome-card.ts')
       return html`<welcome-card></welcome-card>`
     }
-    return repeat(
-      [...groups, ...shared],
-      group => group.year,
-      group => html`<setlist-group
+    const current = groups.filter(group => group.current)
+    const history = groups.filter(group => !group.current)
+    const renderGroups = (items: SetlistYear[]) =>
+      repeat(
+        items,
+        group => group.year,
+        group => html`<setlist-group
         .year=${group.year}
         .setlists=${group.setlists}
         .expanded=${this.restoredState?.expanded?.[group.year] ?? group.expanded}
       ></setlist-group>`
-    )
+      )
+    return html`
+      ${renderGroups(current)}
+      ${
+        history.length
+          ? html`<section class="history-groups" aria-label=${t('home-history')}>
+            <h2>${t('home-history')}</h2>
+            ${renderGroups(history)}
+          </section>`
+          : ''
+      }
+      ${renderGroups(shared)}
+    `
   }
 
   override render() {

@@ -392,6 +392,16 @@ body:not([data-view='setlist']) media-player:not([active]) {
   margin: 0 auto;
 }
 
+.history-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.history-groups h2 {
+  margin: 0;
+}
+
 /* Year sections */
 .year-section {
   border: 2px solid #ecf0f1;

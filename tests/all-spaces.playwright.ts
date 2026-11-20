@@ -26,9 +26,10 @@ test('the home page shows the setlists of every space at once, and opens one of 
     page.getByRole('tablist', { name: 'Where songs and setlists are kept' })
   ).toHaveCount(0)
 
-  // A setlist of the team opens from its id alone, in its own space (its year is collapsed: open it)
-  await page.getByRole('button', { name: /2031/ }).click()
-  await page.getByRole('link', { name: /Gateway Church/ }).click()
+  // A setlist of the team opens from its id alone, in its own space.
+  const group = page.locator('setlist-group').filter({ hasText: 'Gateway Church' })
+  if ((await group.getAttribute('expanded')) === null) await group.getByRole('button').click()
+  await group.getByRole('link', { name: /Gateway Church/ }).click()
   await expect(page).toHaveURL(/\/setlist\//)
   await expect(page.locator('body')).toContainText('Team set')
 })

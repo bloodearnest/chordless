@@ -197,23 +197,33 @@ describe('the home view', () => {
     })
   })
 
-  it('shows the setlists by year, opening the current year, or the years it was left with', async () => {
-    const thisYear = new Date().getFullYear()
-    await db.saveSetlist(makeSetlist({ id: 'now', date: `${thisYear}-01-04` }))
+  it('shows current and upcoming setlists before collapsed past years, remembering which were opened', async () => {
+    await db.saveSetlist(makeSetlist({ id: 'now', date: '2099-01-04' }))
+    await db.saveSetlist(makeSetlist({ id: 'earlier', date: '2002-01-04' }))
     await db.saveSetlist(makeSetlist({ id: 'old', date: '2001-03-04' }))
     await open()
     const groups = [...view.querySelectorAll('setlist-group')] as Array<
       HTMLElement & { year: string; expanded: boolean }
     >
-    expect(groups.map(group => group.year)).to.deep.equal([String(thisYear), '2001'])
-    expect(groups.map(group => group.expanded)).to.deep.equal([true, false])
+    expect(groups.map(group => group.year)).to.deep.equal(['Current and upcoming', '2002', '2001'])
+    expect(groups.map(group => group.expanded)).to.deep.equal([true, false, false])
+    expect(view.querySelector('.history-groups h2')?.textContent).to.equal('Past setlists')
     view.remove()
 
-    await open({ expanded: { '2001': true, [String(thisYear)]: false } })
+    await open({ expanded: { '2001': true, 'Current and upcoming': false } })
     const again = [...view.querySelectorAll('setlist-group')] as Array<
       HTMLElement & { expanded: boolean }
     >
-    expect(again.map(group => group.expanded)).to.deep.equal([false, true])
+    expect(again.map(group => group.expanded)).to.deep.equal([false, false, true])
+  })
+
+  it('shows no history heading when every setlist is upcoming', async () => {
+    await db.saveSetlist(makeSetlist({ id: 'future', date: '2099-01-04' }))
+    await open()
+    expect([...view.querySelectorAll('setlist-group')].map(group => group.year)).to.deep.equal([
+      'Current and upcoming',
+    ])
+    expect(view.querySelector('.history-groups')).to.equal(null)
   })
 
   it('keeps which years are open, and the scroll, for when it is come back to', async () => {
