@@ -1,228 +1,76 @@
-# Central storage for setlists, the song index and user settings
+# Central storage: churches, teams and content
 
-**Status: design, not built (2026-11-16).** Agreed in outline with the owner; nothing here is in the code yet.
-Where a decision is still open it is under "Open questions".
+**Status (2026-11-21): design.** D1 sync for existing Team setlists, people, song index and pad-set metadata is built through step 2d (#290). No Team has been switched. The church and team model, R2 storage and migration below are future work.
 
-## The idea
+## Goal and model
 
-Chordless used to need a Google account because everything it syncs was copyrighted or derived from
-copyrighted work: ChordPro files, and then lead sheets (MusicXML). It also wanted to be local and offline
-first, so Drive held the data and the device held a copy.
+Chordless will keep shared metadata in D1 and song content, source PDFs, pad audio and anonymous shares in R2. Devices retain the content needed offline. Google Drive sync will be retired after existing Teams move.
 
-Since then Teams have arrived, with a name, a CCLI licence number, members and roles, and those live in D1
-(`docs/SPACES.md`) because a central, online API is far easier to run than files in Drive, and none of it is
-needed offline. A Team's songs already reach its members through the Worker, so a member needs no Google
-account at all.
+A **church** represents one CCLI licence holder. It owns a shared song library and has one or more **teams**, each with its own setlist history. Most churches will have one team. Personal use remains available without joining a church, locally or synced.
 
-The goal is for a signed-in device to rebuild its library index, setlists and settings from D1,
-even if the person has never connected Google Drive. The personal song files themselves, ChordPro
-and MusicXML, stay on the device and sync only through optional user-controlled storage. Pad audio
-follows the same content storage rule.
+Songs never move or get copied between churches or personal libraries. A team's setlists use only songs from their own church's library. Teams in a church share that library. Replace the current space terminology and model with church and team where appropriate, preserving existing identities and links during migration.
 
-| Kept in D1 and synced to the device | Content kept on the device and optionally in user-controlled storage |
-|---|---|
-| Setlists: date, time, type, name, leader, song references, keys, tempos, notes and annotations | Song files: ChordPro and MusicXML |
-| Song index: stable song IDs, titles, CCLI numbers when known and variant metadata | Pad audio |
-| People, teams, roles, invites and CCLI licences | Share-link ciphertext follows the separate rules below |
-| All user preferences, personal setlist overlays, per-song settings and pad set metadata | |
+## Church records and authorization
 
-**A personal space works like a Team space.** Its song index appears on every signed-in device.
-Each device can open the files it already has or retrieve them from connected storage. Without
-that connection, another device can see which songs exist and which files it still needs to get.
+D1 holds the church's name, CCLI licence information and other records needed to identify the church and maintain its licensing history. Support the licences a church holds rather than assuming a single licence number. Define what information is required and retained after deletion, and how corrections and licence changes are recorded.
 
-## Decisions
+Church membership and roles govern access to its library and content; team membership and permissions govern its setlists. The Worker checks authorization before reading or changing R2 objects; knowing an object key is insufficient. Local edits remain possible offline, including for someone who cannot write shared changes back.
 
-- Free text in a setlist (an entry's `notes`, an annotation) is not a worry: it is very unlikely to be more
-  than a short phrase, and quoting a fragment is allowed. D1 may hold it.
-- Holding this data centrally is fine for the privacy policy: it already says what the server keeps about a
-  user (`src/privacy.html`), and accounts were added to it with `0003_accounts.sql`.
-- The rule is now worded as CLAUDE.md has it (2026-11-16): Chordless never stores copyrighted content
-  itself; that is stored locally, and optionally synced with the user's own cloud storage (e.g. Google Drive).
-  The privacy page and `docs/SPACES.md` follow when the first part is built, so that no text says something
-  the code does not do.
+## Song content and immutable PDFs
 
-## The song index and missing files
+D1 retains the song index and existing song identities. R2 stores chart content needed in live use, which devices sync for offline use. A fresh device reads the index and retrieves available content. A missing file remains visible as missing without deleting its index entry.
 
-A second device with a setlist and no songs is the case the email import already handles: entries whose songs
-are missing are shown as such, and the person is guided to SongSelect and the bookmarklet to get the song
-(`docs/EMAIL_IMPORT.md`). The D1 index gives a new device the library even before its files arrive:
+Evaluate packaging ChordPro and MusicXML together in one object. Decide its format and update granularity during backend design, including concurrent edits to different parts.
 
-- Keep an index record per song and variant in each space. Preserve existing song and variant IDs
-  so setlists and local files keep their links. Store the title, CCLI number when known, and metadata
-  that identifies the variant. Sync additions, changes and deletions, including tombstones for devices
-  that reconnect later.
-- Seed the index from existing local and Drive libraries using their existing IDs. A device with only
-  the index shows that the song file is missing. Downloading or importing a file for that entry attaches
-  it to the existing identity. An absent file on one device does not delete the index record.
+Store source PDFs separately from synced chart content. Each imported PDF is immutable. A different PDF creates a new source version; retain earlier versions and import history. Associate each source with its church and song, import details and parsed output. Fetch PDFs on demand for audit, reparsing or download; exclude them from routine device sync. No source PDFs are currently stored. Plan a later bulk reimport to upload and link them without changing song identities.
 
-- `SetlistEntry` has `songId`, `songUuid`, `key`, `tempo`, `notes` and `annotations`, but no title. It gains
-  **`title`** and the song's **`ccli`** number (from the song, where it has one), copied when the entry is made
-  and refreshed when the song is opened. A missing song then shows its title, key and CCLI number, and
-  "Get this song".
-- The index and setlists contain metadata only. ChordPro, MusicXML, lyrics and chords never enter D1.
+Move pad audio to R2, scoped to the appropriate church or personal library.
 
-## Preferences and personal setlist overlays
+## Backend and sync
 
-Every user preference has a local copy and syncs through D1 for signed-in users. This includes display,
-theme, instrument, chart and media preferences, along with per-song preferences. Account-wide settings
-follow the person. Store hardware-specific settings under the user's device profile so an audio output
-chosen on one device does not replace the choice on another. Browser permissions and the app's
-[release channel](BETA_CHANNEL.md) are device state and remain local.
+Build an R2 storage backend behind the existing interfaces, extending them where song bundles, source PDFs, pad audio or shares need additional operations. Preserve the current offline, versioning and conflict behavior: edits commit locally first, pending changes survive offline use, and online delivery starts promptly. Map R2 revisions and conditional writes to existing conflict handling. Test concurrent edits, interrupted uploads and reconciliation between D1 metadata and R2 objects.
 
-Sync the [personal layer](PERSONAL_LAYER.md) separately from the shared setlist, scoped to the account,
-space and setlist. It includes capo, tuning, pitch, section visibility, private annotations and songs
-added for that person alone. A personal addition syncs as a song reference. Its file follows the usual
-song storage rules. A Team reader can edit their own overlay. Only the account that owns it can read or
-write it, including in a Team space. A shared setlist pull does not replace anyone's overlay.
+Evaluate separate EU and US buckets and whether a bucket per church is worthwhile. Compare residency, isolation, operational cost, limits and migration implications before choosing. A location hint is best effort; a jurisdiction restriction is a residency control. See [R2 data location](https://developers.cloudflare.com/r2/reference/data-location/).
 
-Apply edits locally and queue them while offline. Sync preferences per key so edits to different settings
-survive a reconnect from two devices. Sync overlays as revisioned records, with explicit removals so
-deletions reach other devices. On first sync, seed settings and overlays from existing device data where
-the account has no value. Keep signed-out use local. These synced records can be rebuilt during
-[Reset to Stable](BETA_CHANNEL.md#local-migrations-and-reset-to-stable).
+## Anonymous sharing
 
-## A song index in D1 (decided 2026-11-20)
+Redesign anonymous sharing around an application-owned share ID and R2 storage, removing dependencies on Drive file IDs, public permissions and the Drive download proxy.
 
-Besides setlists and people, D1 keeps an **index of a space's songs**, a third collection beside them
-(`song-index`, in `space_docs`). One row per song: `uuid`, `space_id`, title, CCLI song number, default key,
-the CCLI licence the chart came in under, a content hash, and the Drive file id (already allowed: "the ids of
-the Drive files in a team's tree"). **No lyrics, no chords, no first lines**: the ChordPro, the MusicXML and
-the pad audio stay on the device and in the space's Drive, so "no song content in D1" stays true. Titles and
-CCLI numbers are the same kind of data as the `title` and `ccli` a setlist entry gains below.
+- A leader creates a link or QR code for a setlist. Recipients need no account and can read it and its charts offline after opening it.
+- Keep the link stable when the shared setlist changes. Enforce expiry and stop-sharing through the Worker.
+- Retain encrypted share bundles, with the key in the URL fragment.
+- Keep received charts inside the view-only share. Remove or change “Add to my library” so a shared song cannot be copied into another church or personal library.
+- End existing Drive-backed links during migration; leaders create new R2-backed links.
 
-What it gives:
-- A new device knows the whole library before it has a chart; "Get this song" has a real target.
-- A cross-space copy (below) finds which space has the song, and duplicates are caught by CCLI number.
-- The CCLI usage report is a query (phase 2).
-- Sync stops listing Drive folders or reading its change feed to learn what changed: the index says so.
-- A setlist entry's `title` and `ccli` are read from the index, not only copied.
+Define what an already downloaded offline copy can show after expiry or revocation becomes known.
 
-Risk: the index drifts from the files (an older build, or an edit made in Drive). The content hash lets the
-engine notice and reconcile it, as it does for setlists. The privacy page must say it keeps titles and CCLI
-numbers before this is built.
+## Migration and rollout
 
-## Setlists use songs from any space (decided 2026-11-20)
+1. Design the church, team and personal models, permissions, church records and R2 backend. Build and test the backend and redesigned sharing with new data.
+2. Prepare a one-off migration per existing Team, controlled by the owner. Create its church and team, preserving existing song, setlist and other relevant identities.
+3. Move D1 metadata and R2 content together once the backend is ready. Verify before switching; retain the original Drive data and a recovery path until the move is confirmed.
+4. Handle old clients explicitly so later Drive writes are not silently treated as current. End old Drive-backed share links and create new ones where needed.
+5. Retire Drive sync and its configuration after existing Teams and supported clients have moved. Move personal use onto the new storage model.
+6. Bulk reimport source PDFs later, keeping every imported source version and its provenance.
+7. Continue account preferences, personal overlays, sync across teams and CCLI reporting as separate phases on the new model.
 
-The aim is that songs and setlists from **all** spaces are shown at once, with no "current space" to switch
-(`docs/SPACES.md`, "Presenting spaces"). A setlist may use a song that another space holds, and doing so
-**copies the song into the setlist's space**: a setlist only ever refers to songs of its own space. The copy
-follows the licence rule in `docs/CCLI.md`: the same licence number is the same church, so it copies
-silently; a different or unknown licence asks first (a confirmation, never a block); a chart with no
-SongSelect source moves freely.
+Update privacy information and the project's current prohibition on hosting copyrighted content before R2 storage ships. Review applicable CCLI and SongSelect terms for the hosting and sharing model.
 
-**Setlist ids are unique across spaces** (decided 2026-11-20): they are random UUIDs, the URL stays
-`/setlist/<id>` with no space in it, and the space is found from the id (`all-spaces.ts`). D1 will enforce it
-(a setlist's `doc_id` unique across `space_id`s, not only within one). Until then the one exception is the
-moment a setlist is moved or a received share is joined, when two copies exist and the default space's wins.
+## Verification
 
-## Where it lives: the storage seam already exists
+Test church and team boundaries, roles, shared access to a church library and rejection of songs from another church or personal library. Test personal use separately.
 
-The sync engine talks to a space through `StorageBackend` (`docs/STORAGE_API.md`), whose files are in
-**collections**: `songs`, `setlists`, `people`, `shares` (`src/js/storage/types.ts`). A Team member's backend
-is the Worker (`TeamStorage` over `worker/src/team-api.ts`, which serves any collection by name), and the
-owner's is Drive. Extend that storage seam to route synced records by collection:
+Test multiple devices for first download, offline edits, reconnect, concurrent changes, interrupted uploads, deletion and recovery. Verify source PDFs are immutable, remain out of routine sync, can be fetched on demand, and retain their version and parse history.
 
-1. A **D1-backed implementation of the file operations for shared records**, in the Worker:
-   `list`, `read`, `create`, `update`, `delete`, with the revision the engine already uses to tell a conflict
-   (`fileRev`, `syncedContentHash`).
-2. **Routing by collection** (`storageFor(space)` in `src/js/storage/space-storage.ts` returns one backend
-   today): a composite that sends setlists, people, the song index and pad set metadata to D1. Song
-   files and pad audio use the space's content store. Share ciphertext follows the share-link rules below.
-3. The local copy stays the primary. D1 is the sync target, as Drive is now; offline edits wait and go when
-   the device is online. This is simpler than Drive because the server is one authority with a number on
-   each row, where Drive means listing, change feeds, quotas and eventual consistency.
+Test anonymous shares without an account: create, update at the same link, expiry, revocation and offline viewing. Verify recipients cannot copy shared songs into another library.
 
-4. Sync preferences and overlays through account-scoped operations. Authorize them against the
-   signed-in account separately from the space's shared collections.
+Rehearse the one-off migration against representative Drive data, including missing files, pads and existing shares. Verify identities and content before switching, and exercise recovery and old-client behavior.
 
-### Tables (sketch)
+## Decisions to settle in design
 
-```sql
--- the documents of the collections kept in D1
-CREATE TABLE space_docs (
-  space_id TEXT NOT NULL,        -- a Team space's id, or a personal space's, registered to an account
-  collection TEXT NOT NULL,      -- setlists, people, song index or pad set metadata
-  doc_id TEXT NOT NULL,
-  body TEXT NOT NULL,            -- the record, as JSON
-  version INTEGER NOT NULL,      -- +1 on every write; a write names the version it was made from
-  modified_at TEXT NOT NULL,
-  deleted_at TEXT,               -- a tombstone, so a device that was offline hears of the delete
-  PRIMARY KEY (space_id, collection, doc_id)
-) STRICT, WITHOUT ROWID;
-CREATE INDEX space_docs_changes ON space_docs (space_id, collection, modified_at);
-```
-
-A write is `UPDATE … SET version = version + 1 … WHERE … AND version = ?`: no row changed means a conflict,
-which the engine already resolves for Drive. The live channel (`docs/LIVE_SYNC.md`) says "changed" on a write,
-as it does for Drive now, and still never carries a setlist.
-
-**Who may write:** a Team's roles apply as they do (`docs/SPACES.md`): a worship leader and above change
-setlists and people, a team member reads and names themselves (`docs/IDENTITIES.md`). A personal space belongs
-to one account. Apply the space's library permissions to changes to the shared song index. Keep private
-preferences and overlays in separate account-scoped records, with keys for the device profile, space,
-song or setlist as applicable.
-
-## What it needs that is not there yet
-
-- **An account for a personal space.** Personal setlist sync belongs to a Chordless account (`accounts`,
-  0003). Today that means signing in with Google; "no Google at all" comes with the Chordless session and a
-  second sign-in method (Microsoft, emailed link), which is a separate piece of work. Without an account, a
-  personal space stays local-only, as now.
-- **A personal space registered with the server** when its owner turns sync on: a space id, its owner
-  account.
-- **Moving existing Drive users' setlists and people into D1** (below).
-- **Account deletion and export.** Deleting an account removes its personal spaces' rows and private
-  settings and overlays, including in Teams. Exports include the shared records the user can access
-  and include private data only in that user's own export when requested.
-
-## Moving the existing Drive data
-
-Devices on different builds share one Drive at once (`docs/MIGRATIONS.md`), so the move cannot be an
-instant switch:
-
-1. A new build, on its first sync of a space, imports the space's setlist and people files from Drive into
-   D1 (only where D1 has none for that space), and writes a marker file in the Drive folder.
-2. From then on it keeps those two collections in D1 and stops writing them to Drive.
-3. An older build, which does not know the marker, keeps writing setlists to Drive. For a grace period the
-   new build also looks at the Drive files and imports any changed after the marker, so a late device's edits
-   are not lost. After it, Drive's copies are an archive and are left alone.
-4. Keep importing late writes during the grace period. Set its end using the deployed client versions
-   and the [Worker API support policy](BETA_CHANNEL.md#worker-api-support). A device can stay offline
-   across several weekly releases.
-
-## Share links
-
-A share is an encrypted file in the space's Drive `shares/` folder, which the Worker caches without being
-able to read it (`docs/SHARING.md`). A personal space with no Drive has nowhere to put it, so it could not
-make a share link. Options: keep sharing a Drive feature; or let the Worker keep the ciphertext for the life
-of the share (an extension of the one exception to "never stores content" already made for the cache). Not
-decided; the first phase does not touch it.
-
-## An upside: what the church sang
-
-With setlists central and each entry carrying its CCLI number, the usage a church must report to CCLI is a
-query over its setlists for a period (`docs/CCLI.md`). That is a feature on top of the move, listed as phase 2.
-
-## Phases
-
-0. **Show every space at once** (UI only, before any of this): the Setlists and Library pages list all spaces
-   behind one "all spaces" query, with the tabs as a filter; the current space is removed last. Sync of
-   several spaces is not built Drive-shaped first: it comes with phase 1, as one account-wide "changes since".
-1. **Teams.** `setlists`, `people` and the song index of a Team space in D1; collection routing in the sync
-   engine; entries carry `title` and `ccli`; songs and pads stay as they are. Rewrite the rule in CLAUDE.md and the privacy page.
-2. **CCLI usage report** from a Team's setlist history.
-3. **Personal spaces.** Register spaces to an account, seed the song index and move shared metadata
-   out of Drive. Decide how to handle share links without Drive.
-4. **Preferences and overlays.** Sync all user preferences and private setlist state to D1. Verify a
-   fresh device can restore its index, setlists and personal state with no Drive connection.
-
-## Open questions
-
-- The live channel for several spaces: one socket per team, or one per account.
-- Conflicts: whole-setlist last write wins with the engine's conflict handling as now, or a merge per entry?
-  Start as Drive does today.
-- How long to import late writes from old Drive clients.
-- D1's size limit as the number of setlists grows: a setlist is a few KB; check the limit on the plan before
-  personal spaces.
-- Whether `people` stays per space (it does today) or becomes the account's own address book.
-- How long a deleted setlist's tombstone is kept.
+- Which church metadata and licence history must be recorded and retained.
+- The relationship between church membership, team membership and roles.
+- EU/US bucket selection and whether to use a bucket per church.
+- Song bundle format, PDF download handling and partial-update behavior.
+- PDF provenance and parser/version information needed to make reparsing auditable.
+- Migration verification and recovery, and treatment of offline clients at cutover.

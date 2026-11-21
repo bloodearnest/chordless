@@ -1,7 +1,6 @@
 # CCLI and SongSelect: what the terms mean for Chordless
 
-Summaries, not legal advice; the terms can change without notice. Chordless stores no copyrighted
-content (CLAUDE.md, "Spaces and copyright"; docs/SPACES.md, "Principle").
+Summaries, not legal advice; the terms can change without notice. The current app stores no copyrighted content on Chordless servers. The planned R2 backend changes this; see [CENTRAL_STORAGE.md](CENTRAL_STORAGE.md).
 
 What the SongSelect Terms of Use say that matters here (a summary, not legal advice; the terms can
 change without notice):
@@ -44,17 +43,9 @@ must work, as must a church outside the countries CCLI serves.
   typed when a team is made, and changed in the Team's "Users" window (`team-licence-panel.ts`).
 
 Who imported a song, when and from where is already kept on it (`importUser`, `importDate`,
-`importSource`). Planned, not built: the licence a song came in under; asking before a copy of
-a SongSelect chart goes to a space with a different licence number (a confirmation, not a block);
-and a count of the songs imported this term against 200.
-
-**Copying a song between spaces (decided 2026-11-20).** A SongSelect chart is the subscribing church's, and
-a licence number names a church, so: a copy into a space with the **same** licence number goes silently; a
-space with a **different** or no number asks first ("This chart came from SongSelect under licence X; Grace
-Church's is Y. Copy anyway?"), as a confirmation and never a block (the number is an attestation the app
-cannot check); a song with no SongSelect source (typed in, or a ChordPro file) moves freely. It needs the
-song to carry the licence it came in under (the planned field above). Setlists use songs of other spaces by
-this copy (`docs/CENTRAL_STORAGE.md`).
+`importSource`). The licence a song came in under and a count of imports against the annual allowance
+remain planned. **Songs are never copied between spaces**, regardless of licence number. See
+[CENTRAL_STORAGE.md](CENTRAL_STORAGE.md).
 
 ## Lead sheets
 
