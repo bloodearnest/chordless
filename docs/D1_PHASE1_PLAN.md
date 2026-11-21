@@ -1,5 +1,8 @@
 # Build plan: phase 1 of storage in D1 (Teams)
 
+> **Decision update (2026-11-21):** Step 2d is merged in #290. Song files, pad audio and share links are planned to move to R2, replacing Drive sync. Steps 3 and 4 below need replanning as a one-off migration for the existing Teams; their earlier Drive-only rollout is not the current target. See [CENTRAL_STORAGE.md](CENTRAL_STORAGE.md).
+
+
 **Status (2026-11-20): steps 0 and 1 are built, merged and applied in production (migrations `0011`, `0012`; `0013` merged in #278, applied by its deploy). Step 2a (ULIDs, people included) is built (#281). Step 2b (device schema and metadata) is built (#285). Step 2c (device sync) is built (#289). Step 2d (Drive exclusions) is implemented on the current branch; step 3 onward is not built. No Team is switched to D1 until the owner runs the move.** Written against the design in
 [CENTRAL_STORAGE.md](CENTRAL_STORAGE.md) (an old name: it is only "central" because the app began distributed) as updated on `codex/beta-stable-release-design` (song index
 in D1, preferences later). The Beta and Stable release channels are only a plan, so this one does not wait
