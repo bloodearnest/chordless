@@ -65,8 +65,16 @@ Each device migrates its own current space databases after updating, independent
 
 Church members may read every team's setlists and the shared church library. Worship leaders and admins may add and change songs; only admins may delete a whole song. Other teams' setlists do not appear on the homepage solely because of church membership; following or belonging to a team controls homepage visibility, not read access.
 
-Collapse owner and admin into church admin, alongside worship leader and church member. Any church admin can manage other admins; the last admin must appoint another before leaving or removing their own admin role. Worship leaders may update or delete shared setlists they control; admins may update or delete any. Keep the existing creator fallback for a setlist with no identifiable leader. Everyone can still make local personal changes. This is the rule for now and may be revisited.
+Collapse owner and admin into church admin, alongside worship leader and church member. Any church admin can manage other admins; the last admin must appoint another before leaving or removing their own admin role. Worship leaders and admins may update or delete any team’s shared setlists; deletion requires confirmation. Everyone can still make local personal changes.
 
 Setlist leaders are church members with the worship leader or church admin role. Preserve historical leader names without linked accounts; choosing a leader for a new or edited setlist requires an eligible account. Pad sets and audio are church-wide; personal use keeps its own pads.
 
 After a church ends or is deleted, keep a minimal register of its name, country, city and current licence details for posterity; delete members, songs, setlists and other content. Specify the retention and deletion details before implementation.
+
+## Further decisions
+
+Followed teams are an account-wide preference that syncs across devices. A new church member initially follows the team named by their invitation, and can change that selection. Church membership grants read access to all teams regardless of homepage selection.
+
+Worship leader is a church-wide role. A worship leader or church admin can be chosen to lead a setlist for any team, and can edit or delete any team's shared setlists. Deletion requires confirmation. Church members may make personal changes without changing the shared setlist. This supersedes the earlier leader-only control rule and the creator fallback for shared updates and deletions; it may be revisited later. Worship leaders and admins may add or change library songs; only admins may delete a whole song.
+
+Only church admins may create or delete teams. Deleting a team archives it: hide it from normal use, retaining its setlists for church history and CCLI reporting.
