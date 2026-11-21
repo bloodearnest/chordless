@@ -1092,8 +1092,9 @@ export class SyncManager {
         unsynced.push({ type: 'score', id: record.uuid, label: song?.title ?? '' })
       }
     }
-    for (const entry of await this.db.getPendingDeletions()) {
-      if (metadataInD1 && entry.kind === 'setlist') continue
+    const pending = await this.db.getPendingDeletions()
+    const drivePending = metadataInD1 ? pending.filter(entry => entry.kind !== 'setlist') : pending
+    for (const entry of drivePending) {
       unsynced.push({
         type: entry.kind,
         id: entry.ref,

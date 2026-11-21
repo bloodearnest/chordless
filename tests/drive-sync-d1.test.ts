@@ -82,9 +82,16 @@ describe('Drive sync after a Team moves to D1', () => {
   it('does not report a pending deletion of an archived setlist as a Drive change', async () => {
     const { device, setlist } = await movedDevice()
     await device.db.removeSetlist(setlist.id)
-    expect(
-      (await device.sync.findUnsyncedChanges()).some(change => change.id === setlist.fileRef)
-    ).to.equal(false)
+    expect(await device.db.getPendingDeletions()).to.deep.equal([
+      {
+        ref: setlist.fileRef,
+        kind: 'setlist',
+        deletedAt: (await device.db.getPendingDeletions())[0]?.deletedAt,
+      },
+    ])
+    expect((await device.sync.findUnsyncedChanges()).map(change => change.id)).not.to.include(
+      setlist.fileRef
+    )
   })
 
   it('does not delete unchanged D1 setlists when archived files disappear', async () => {
