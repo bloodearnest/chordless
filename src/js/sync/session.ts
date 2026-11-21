@@ -107,6 +107,8 @@ export class SyncRun {
 
   /** The refs of the files in the space, once listed (null: not listed, or the listing failed) */
   inventory: Set<string> | null = null
+  /** D1 owns setlists and people; Drive holds their old files only as an archive. */
+  metadataInD1 = false
   /** The space's people, as the push read them: the leaders' names go in the setlist files' names */
   people: Person[] = []
   /** The ids of the people that have a live file, as listed by the pull (null: not listed) */

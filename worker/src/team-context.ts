@@ -21,6 +21,7 @@ import {
 } from './identity.ts'
 import { sendInviteEmail } from './invite-email.ts'
 import { checkTeamStorage, serviceAccountAddress, serviceAccountToken } from './service-account.ts'
+import { storageOf } from './space-data.ts'
 import type { AdminContext } from './team-admin.ts'
 import type { TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'
@@ -107,7 +108,15 @@ export function createTeamContext(env: Env, deps: TeamDeps = {}): TeamContext {
     async root(spaceId) {
       const found = await drive(spaceId)
       const root = found && (await found.backend.inspectRoot(found.info.rootRef))
-      return root && { ref: root.ref, name: root.name, trashed: root.trashed }
+      const storage = await storageOf(env.DB as D1Db, spaceId)
+      return root && storage
+        ? {
+            ref: root.ref,
+            name: root.name,
+            trashed: root.trashed,
+            storage,
+          }
+        : null
     },
     owns: (spaceId, ref) => room(spaceId).owns(ref),
     ownedAmong: (spaceId, refs) => room(spaceId).ownedAmong(refs),

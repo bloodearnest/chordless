@@ -966,9 +966,15 @@ export class ChordlessDB {
 
   // Clear setlists, songs and charts, keeping per-setlist device state
   // (setlist_local). Used to reset from Drive.
-  async clearSyncedData(): Promise<void> {
+  async clearSyncedData({
+    keepSpaceData = false,
+  }: {
+    keepSpaceData?: boolean
+  } = {}): Promise<void> {
     const tx = this.#transaction(['setlists', 'songs', 'chordpro', 'people', 'scores'], 'readwrite')
-    for (const name of ['setlists', 'songs', 'chordpro', 'people', 'scores']) {
+    for (const name of keepSpaceData
+      ? ['songs', 'chordpro', 'scores']
+      : ['setlists', 'songs', 'chordpro', 'people', 'scores']) {
       tx.objectStore(name).clear()
     }
     await transactionDone(tx)
@@ -980,7 +986,7 @@ export class ChordlessDB {
    * seen, so the next sync uploads it all. Content stays; a setlist's share link goes, since
    * its file was in the folder that is let go. Used to start over in a new Drive folder.
    */
-  async clearFileLinks(): Promise<void> {
+  async clearFileLinks({ keepSpaceData = false }: { keepSpaceData?: boolean } = {}): Promise<void> {
     const tx = this.#transaction(
       ['setlists', 'songs', 'people', 'scores', 'song_index'],
       'readwrite'
@@ -998,7 +1004,7 @@ export class ChordlessDB {
     const setlistsRequest = setlists.getAll()
     const songsRequest = songs.getAll()
     setlistsRequest.onsuccess = () => {
-      for (const setlist of setlistsRequest.result as Setlist[]) {
+      for (const setlist of keepSpaceData ? [] : (setlistsRequest.result as Setlist[])) {
         setlists.put({ ...setlist, ...unlinked, _lastSyncHash: null, share: null })
       }
     }
@@ -1010,7 +1016,7 @@ export class ChordlessDB {
     const people = tx.objectStore('people')
     const peopleRequest = people.getAll()
     peopleRequest.onsuccess = () => {
-      for (const person of peopleRequest.result as Person[]) {
+      for (const person of keepSpaceData ? [] : (peopleRequest.result as Person[])) {
         people.put({ ...person, ...unlinked })
       }
     }

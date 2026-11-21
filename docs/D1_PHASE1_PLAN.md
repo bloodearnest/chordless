@@ -1,6 +1,6 @@
 # Build plan: phase 1 of storage in D1 (Teams)
 
-**Status (2026-11-20): steps 0 and 1 are built, merged and applied in production (migrations `0011`, `0012`; `0013` merged in #278, applied by its deploy). Step 2a (ULIDs, people included) is built (#281). Step 2b (device schema and metadata) is built (#285). Step 2c (device sync) is implemented in #289; 2d onward is not built. No Team is switched to D1 until the owner runs the move.** Written against the design in
+**Status (2026-11-20): steps 0 and 1 are built, merged and applied in production (migrations `0011`, `0012`; `0013` merged in #278, applied by its deploy). Step 2a (ULIDs, people included) is built (#281). Step 2b (device schema and metadata) is built (#285). Step 2c (device sync) is built (#289). Step 2d (Drive exclusions) is implemented on the current branch; step 3 onward is not built. No Team is switched to D1 until the owner runs the move.** Written against the design in
 [CENTRAL_STORAGE.md](CENTRAL_STORAGE.md) (an old name: it is only "central" because the app began distributed) as updated on `codex/beta-stable-release-design` (song index
 in D1, preferences later). The Beta and Stable release channels are only a plan, so this one does not wait
 for them. The schema it ends in is drawn in [D1_SCHEMA.md](D1_SCHEMA.md).
@@ -188,7 +188,17 @@ then reports the failure; neither backend prevents the other from running. Polli
 syncs can name their own space. Indexed songs without charts appear with their title, key and CCLI
 number and a “Get this song” link; pad-set metadata is read from D1 for a moved Team. The reader's
 self-name route accepts the D1 response without expecting a Drive file. Nothing switches a Team's
-storage, seeds the server, or excludes Drive collections yet: those are 2d, 3 and 4.
+storage or seeds the server: those are steps 3 and 4.
+
+**2d implementation.** The Drive engine checks where a Team keeps its metadata before each
+operation, for owners as well as members. `GET /root` includes `storage: 'drive' | 'd1'`;
+a confirmed local D1 checkpoint also suffices, and a running manager remembers a move permanently.
+If ownership cannot be checked, the operation stops before touching setlists or people.
+For a moved Team, full and incremental sync skip their archived Drive files in both directions,
+including removal detection, unlinking and pending setlist deletions. Drive resets and starting
+over preserve D1 setlists and people, and Drive-only unsynced warnings exclude them.
+Charts, lead sheets, audio and share links continue through their existing paths. Personal spaces
+and Teams still on Drive keep their current sync behavior. No Team is seeded or switched here.
 
 **3. Seeding.**
 The owner runs the move by hand (a button on the Account page only an owner sees, or a script): from the

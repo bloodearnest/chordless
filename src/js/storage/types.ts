@@ -60,6 +60,8 @@ export interface WriteResult {
 
 /** The folder a space is kept in */
 export interface RootInfo {
+  /** Where this Team keeps setlists and people; absent for a plain Drive root. */
+  storage?: 'drive' | 'd1'
   ref: string
   name: string
   /** In the backend's bin: not gone, but not to be synced with */
