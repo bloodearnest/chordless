@@ -27,7 +27,7 @@ Start from the tables and constraints in migrations `0011`–`0013`; this is a s
 
 Use `STRICT` tables and ULIDs for **new** identifiers. Existing team, song and setlist IDs remain unchanged opaque strings. Declare foreign keys with deliberate delete behavior and supporting indexes. Migration must carry existing JSON, defaults, checks and indexes forward, and retain the version guards in `0013` or their equivalent. Rehearse the real migration with production-shaped data and foreign keys enabled, as [SCHEMA_RULES.md](SCHEMA_RULES.md) requires.
 
-R2 holds objects; the proposal does not assume separate R2 tables. A chart and PDF reference may be stored with the song, but a single PDF key alone does not establish the agreed history of multiple immutable source PDFs. Decide how versions, import provenance and parser history are represented before specifying columns. Anonymous shares will be redesigned; encryption is an open decision, not assumed necessary for R2.
+R2 holds objects; the proposal does not assume separate R2 tables. A chart and PDF reference may be stored with the song, but a single PDF key alone does not establish the agreed history of multiple immutable source PDFs. Decide how versions, import provenance and parser history are represented before specifying columns. Anonymous shares will be redesigned without client-side encryption: unguessable share IDs and a private R2 object, served only after the Worker checks share status.
 
 ## Migration boundary
 
@@ -78,3 +78,12 @@ Followed teams are an account-wide preference that syncs across devices. A new c
 Worship leader is a church-wide role. A worship leader or church admin can be chosen to lead a setlist for any team, and can edit or delete any team's shared setlists. Deletion requires confirmation. Church members may make personal changes without changing the shared setlist. This supersedes the earlier leader-only control rule and the creator fallback for shared updates and deletions; it may be revisited later. Worship leaders and admins may add or change library songs; only admins may delete a whole song.
 
 Only church admins may create or delete teams. Deleting a team archives it: hide it from normal use, retaining its setlists for church history and CCLI reporting.
+
+
+## Further storage and sharing decisions
+
+Use one shared R2 bucket initially, with church-scoped keys and authorization on every request. Record church country; defer EU/US routing until there is a concrete need. Keep bucket selection behind the storage backend. Migration combines existing members into one church and takes the higher existing role where they differ.
+
+A song keeps a JSON array of source entries. Source PDFs and each successful MusicXML parse result are immutable. Compare PDF content hashes within that song: uploading an identical PDF is a no-op, without another object or entry. A successful reparse that passes basic checks becomes current automatically; failures leave the current MusicXML unchanged. Preserve successful parse results and their parser provenance. Two concurrent reparses retain their results, and the current pointer uses the existing version check. PDF reparsing does not change ChordPro. Preserve existing MusicXML during migration as a legacy entry with no PDF or known parser provenance; later PDF reuploads add source entries.
+
+Anonymous shares use long, unguessable IDs. Keep their R2 objects private and serve them only after the Worker checks share status; no client-side encryption. A share expires two weeks after the setlist date, or two weeks after creation if it has no date; the leader may stop it earlier. Run scheduled daily cleanup of expired shares. Expiry and revocation must be enforced by the Worker on access, independently of the cleanup schedule. Existing Drive-backed links end during migration; anonymous recipient overlays never sync.
