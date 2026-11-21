@@ -39,14 +39,14 @@ Songs belong to a church's library; multiple teams use that same library. Setlis
 
 Church membership grants access to the church's song library. Use a shared `libraries` parent for church and personal libraries: a library belongs to exactly one church or one personal account, enforced by a database check. Songs belong to a library; teams belong to a church and use its library. A personal library does not require a fictitious church. The exact keys, foreign keys and uniqueness constraints must preserve existing song identities and meet [SCHEMA_RULES.md](SCHEMA_RULES.md).
 
-A church initially records its name, CCLI licence number, country, city or town, and optionally a postcode or ZIP code. It also records a JSON document of the specific licences it holds, whose contents may vary by country. This information is for posterity, not automatic enforcement. Define its history, corrections and retention before implementing the schema.
+A church initially records its name, CCLI licence number, country, city or town, and optionally a postcode or ZIP code. It also records a JSON document of the specific licences it holds, whose contents may vary by country. This information is for posterity, not automatic enforcement. Keep only the current licence number and licence details, not a separate licence-change history. Any church member may view them; only an admin may change them.
 
 The one-off migration may drop existing anonymous shares, pads and invitations. **Preserve personal overlays** and their relationship to the correct user and setlist. An anonymous recipient's share overlays stay on that device and are never synced; this does not discard overlays belonging to signed-in users.
 
 ## Decisions needed before schema work
 
 - Whether church membership grants access to every team’s setlists, and how team membership and roles are assigned and inherited.
-- Which church information, licence types and changes are recorded, who may change them, and which records survive deletion.
+- The precise structure of the country-specific licence JSON and the deletion procedure for the retained minimal register.
 - How the current space id, device database, links, live rooms and API routes map to church and team identities while older clients still exist.
 - How existing shared people and retained personal overlays are scoped in the new model.
 - How personal library access and offline synchronization are authorized.
@@ -57,16 +57,16 @@ After these decisions, specify schema and API changes, migration invariants and 
 
 The owner confirmed that both existing Teams belong to the same church. A read-only inspection of the 2026-11-21 backup found two active Teams, both still on Drive, with the same owner account; one has a CCLI licence number and one has none. There are no D1 song, setlist, person or pad-set rows yet. The backup passes `foreign_key_check`.
 
-The one-off migration therefore creates **one church and one shared library for both existing teams**, not one church per team. Preserve each existing `space_id` as its team ID, and retain song and setlist IDs. Import and reconcile both Drive libraries into the one church library without discarding variants or silently overwriting different content. Preserve overlays. Carry forward the recorded licence and its history; the missing number on the other Team is not evidence of a different church. Verify the source data and resolve any collisions explicitly before switching either Team.
+The one-off migration therefore creates **one church and one shared library for both existing teams**, not one church per team. Preserve each existing `space_id` as its team ID, and retain song and setlist IDs. Import and reconcile both Drive libraries into the one church library without discarding variants or silently overwriting different content. Preserve overlays. Carry forward the recorded current licence; the missing number on the other Team is not evidence of a different church. Verify the source data and resolve any collisions explicitly before switching either Team.
 
 Each device migrates its own current space databases after updating, independently of the server cutover. Preserve each team's setlists and overlays, and consolidate accessible song data into the church library without losing local edits. The local migration must be restartable and must not remove source data until the consolidated library is verified. Preserve existing setlist URLs by resolving their IDs to the team and church library. Existing anonymous share links and live rooms can end. New routes name churches, libraries and teams; old clients must update before cutover and old write routes must refuse stale writes rather than silently accepting them. Remove compatibility routes only after supported clients have moved.
 
 ## Agreed roles, people and pads
 
-Church members may read every team's setlists and the shared church library. Other teams' setlists do not appear on the homepage solely because of church membership; following or belonging to a team controls homepage visibility, not read access.
+Church members may read every team's setlists and the shared church library. Worship leaders and admins may add and change songs; only admins may delete a whole song. Other teams' setlists do not appear on the homepage solely because of church membership; following or belonging to a team controls homepage visibility, not read access.
 
-Collapse owner and admin into church admin, alongside worship leader and church member. Any church admin can manage other admins; the last admin must appoint another before leaving or removing their own admin role. Retain the existing sync permissions and local-edit behavior; reconcile the existing difference between the setlist control rule and the D1 API's update and deletion checks when implementing them.
+Collapse owner and admin into church admin, alongside worship leader and church member. Any church admin can manage other admins; the last admin must appoint another before leaving or removing their own admin role. Worship leaders may update or delete shared setlists they control; admins may update or delete any. Keep the existing creator fallback for a setlist with no identifiable leader. Everyone can still make local personal changes. This is the rule for now and may be revisited.
 
 Setlist leaders are church members with the worship leader or church admin role. Preserve historical leader names without linked accounts; choosing a leader for a new or edited setlist requires an eligible account. Pad sets and audio are church-wide; personal use keeps its own pads.
 
-After a church ends or is deleted, keep a minimal register of its name, country, city, licence numbers and licence-change history for posterity; delete members, songs, setlists and other content. Specify the retention and deletion details before implementation.
+After a church ends or is deleted, keep a minimal register of its name, country, city and current licence details for posterity; delete members, songs, setlists and other content. Specify the retention and deletion details before implementation.
