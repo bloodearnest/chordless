@@ -9,7 +9,7 @@ import type { Person } from './data-types.ts'
 import { getIdentityToken } from './google-auth.ts'
 import { localRecord } from './space-data-records.ts'
 import type { SpacePerson } from './space-data-types.ts'
-import type { StoredFile } from './storage/types.ts'
+import type { RootInfo, StoredFile } from './storage/types.ts'
 import type { InviteInfo, MemberRole, TeamMember, TeamRole } from './team-roles.ts'
 import { callWorker, TeamError, type WorkerCall } from './worker-call.ts'
 
@@ -45,6 +45,9 @@ export interface InviteLookup {
 }
 
 export const teamApi = {
+  /** The Team's folder and where its shared metadata lives, for owners as well as members. */
+  root: (id: string) => call<RootInfo>('GET', `${space(id)}/root`),
+
   /** The spaces you are in (owner or member), for a device that has not set them up */
   list: () =>
     call<{ spaceId: string; name: string; role: TeamRole; rootRef?: string }[]>(

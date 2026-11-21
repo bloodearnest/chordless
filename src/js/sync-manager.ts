@@ -19,6 +19,7 @@ import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { ChordProParser } from './parser.ts'
 import { syncShares } from './share-manager.ts'
 import { getCurrentSpace, getSpaceById, setSpaceReadOnly } from './space.ts'
+import { SpaceDataStore } from './space-data-store.ts'
 import { SpaceDB } from './space-db.ts'
 import { driveStorage } from './storage/browser-drive.ts'
 import { storageFor } from './storage/space-storage.ts'
@@ -31,6 +32,7 @@ import {
 } from './sync/changes.ts'
 import { pullPeople, pullScores, pullSetlists, pullSongs } from './sync/pull.ts'
 import { pushPeople, pushScores, pushSetlists, pushSongs } from './sync/push.ts'
+import { teamApi } from './team-client.ts'
 import { t } from './text.ts'
 
 export type { ProgressCallback, SyncProgress } from './sync/session.ts'
@@ -88,6 +90,8 @@ export interface SyncManagerOptions {
   changeToken?: ChangeTokenStore | null
   /** Where the space's files are kept. Defaults to Google Drive. Tests pass a fake. */
   storage?: StorageBackend | null
+  /** Where this space's shared metadata lives; rechecked before each operation. */
+  metadataStorage?: () => Promise<'drive' | 'd1'>
 }
 
 /**
@@ -279,6 +283,17 @@ export class SyncManager {
   readonly storage: StorageBackend
   /** The space's files, opened once the folder is known and dropped when a run ends */
   #space: SpaceStorage | null = null
+  readonly #metadataStorage: () => Promise<'drive' | 'd1'>
+  #metadataInD1 = false
+
+  async #metadataIsInD1(): Promise<boolean> {
+    this.#metadataInD1 ||= (await this.#metadataStorage()) === 'd1'
+    return this.#metadataInD1
+  }
+
+  async #prepareRun(run: SyncRun): Promise<void> {
+    run.metadataInD1 = await this.#metadataIsInD1()
+  }
   /** What the last check of the user's access to the folder said, and when (see refreshAccess) */
   #access: { readOnly: boolean; at: number } | null = null
 
@@ -315,6 +330,13 @@ export class SyncManager {
       memberCache: options.memberCache ?? spaceMemberCache(id, record),
       changeToken: options.changeToken ?? spaceChangeToken(record),
       storage: options.storage ?? driveStorage,
+      metadataStorage:
+        options.metadataStorage ??
+        (async () => {
+          if ((await new SpaceDataStore(db).state()).enabled) return 'd1'
+          const space = await getSpaceById(id)
+          return space?.team ? ((await teamApi.root(space.team.id)).storage ?? 'drive') : 'drive'
+        }),
     })
   }
 
@@ -327,6 +349,7 @@ export class SyncManager {
       memberCache: MemberCache
       changeToken: ChangeTokenStore
       storage: StorageBackend
+      metadataStorage: () => Promise<'drive' | 'd1'>
     }
   ) {
     this.spaceName = spaceName
@@ -336,6 +359,7 @@ export class SyncManager {
     this.memberCache = parts.memberCache
     this.changeToken = parts.changeToken
     this.storage = parts.storage
+    this.#metadataStorage = parts.metadataStorage
   }
 
   /** The space's files, once its folder is known (opened afresh for each sync) */
@@ -366,7 +390,7 @@ export class SyncManager {
    * touched: an old folder that can still be seen is left for the user to delete.
    */
   async startOver(): Promise<void> {
-    await this.db.clearFileLinks()
+    await this.db.clearFileLinks({ keepSpaceData: await this.#metadataIsInD1() })
     await this.folderLink.clear()
     await this.changeToken.clear()
     this.rootRef = null
@@ -455,8 +479,9 @@ export class SyncManager {
 
   /** Whether any local setlist or song has been synced to Drive */
   async hasSyncedRecords(): Promise<boolean> {
+    const metadataInD1 = await this.#metadataIsInD1()
     const records = [
-      ...(await this.db.getAllSetlists()),
+      ...(metadataInD1 ? [] : await this.db.getAllSetlists()),
       ...(await this.db.getAllSongs()),
       ...(await this.db.getAllScores()),
     ]
@@ -486,7 +511,9 @@ export class SyncManager {
   async #within<T>(run: SyncRun | undefined, work: (run: SyncRun) => Promise<T>): Promise<T> {
     if (run) return work(run)
     try {
-      return await work(this.newRun())
+      const ownRun = this.newRun()
+      await this.#prepareRun(ownRun)
+      return await work(ownRun)
     } finally {
       this.#endRun()
     }
@@ -503,6 +530,7 @@ export class SyncManager {
     let report: SyncReport
     try {
       const run = this.newRun()
+      await this.#prepareRun(run)
       // Where the feed of changes stands before anything is read: what changes during this sync
       // is seen by the next incremental one
       // and who the space's folder is shared with, for choosing leaders, and whether the user can write
@@ -644,6 +672,7 @@ export class SyncManager {
     await phase('chordless.sync.members', {}, () => this.#refreshMembersIfOld())
     const run = this.newRun(new Set(changes.gone))
     try {
+      await this.#prepareRun(run)
       if (!push && changes.changed.length === 0 && changes.gone.length === 0) {
         // (nothing to pull and nothing to push: the one request was all it took)
         await this.changeToken.set(changes.token)
@@ -658,9 +687,10 @@ export class SyncManager {
       await this.trashPendingDeletions(run)
 
       // (the people first: a setlist whose leader is not stored shows none)
-      if (people.length > 0 || changes.gone.length > 0)
+      if (!run.metadataInD1 && (people.length > 0 || changes.gone.length > 0))
         await pullPeople(run, progressCallback, people)
-      if (setlists.length > 0) await pullSetlists(run, progressCallback, setlists)
+      if (!run.metadataInD1 && setlists.length > 0)
+        await pullSetlists(run, progressCallback, setlists)
       if (songs.length > 0) await pullSongs(run, progressCallback, songs)
       else run.liveSongUuids = new Set()
       // (the songs folder holds the melodies too: the files of this feed that are one)
@@ -673,7 +703,7 @@ export class SyncManager {
         await this.removeScoresDeletedInDrive(run)
         // What is left of them was edited here. The feed says a file is gone once, so the record
         // lets go of it now, or a later sync would update a file in the bin
-        await this.#unlinkEditedGone(new Set(changes.gone))
+        await this.#unlinkEditedGone(new Set(changes.gone), run)
       }
 
       // (a user who can only read has nothing to push: it finds that out itself)
@@ -704,9 +734,9 @@ export class SyncManager {
    * then as one never uploaded, and the push makes a new file. A record not edited here keeps its
    * link and what it knows of the file, so that the pull can still bring Drive's version over it.
    */
-  async #unlinkEditedGone(gone: Set<string>): Promise<void> {
+  async #unlinkEditedGone(gone: Set<string>, run: SyncRun): Promise<void> {
     const edited = new Set<string>()
-    for (const setlist of await this.db.getAllSetlists()) {
+    for (const setlist of run.metadataInD1 ? [] : await this.db.getAllSetlists()) {
       if (setlist.fileRef && gone.has(setlist.fileRef) && setlistHasLocalChanges(setlist)) {
         edited.add(setlist.fileRef)
       }
@@ -742,6 +772,12 @@ export class SyncManager {
     run.pendingDeletedRefs = new Set(pending.map(entry => entry.ref))
     let trashed = 0
     for (const entry of pending) {
+      // Its old Drive file is an archive, even if this deletion was queued before the move.
+      if (run.metadataInD1 && entry.kind === 'setlist') {
+        await this.db.clearPendingDeletion(entry.ref)
+        run.pendingDeletedRefs.delete(entry.ref)
+        continue
+      }
       try {
         await run.space.trash(entry.ref)
         await this.db.clearPendingDeletion(entry.ref)
@@ -918,7 +954,7 @@ export class SyncManager {
     if (!run.inventory) return
 
     const missing = [
-      ...(await this.db.getAllSetlists()),
+      ...(run.metadataInD1 ? [] : await this.db.getAllSetlists()),
       ...(await this.db.getAllSongs()),
       ...(await this.db.getAllScores()),
     ].filter(record => record.fileRef && !run.fileExistsInDrive(record.fileRef))
@@ -942,7 +978,7 @@ export class SyncManager {
    * @returns how many setlists were removed
    */
   async removeSetlistsDeletedInDrive(run: SyncRun): Promise<number> {
-    if (!run.knowsWhatIsGone) return 0
+    if (run.metadataInD1 || !run.knowsWhatIsGone) return 0
 
     let removed = 0
     for (const setlist of await this.db.getAllSetlists()) {
@@ -973,6 +1009,7 @@ export class SyncManager {
   ): Promise<void> {
     try {
       const run = this.newRun()
+      await this.#prepareRun(run)
       const feedPosition = await this.#feedPosition()
       progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
       await this.buildDriveInventory(run)
@@ -989,7 +1026,7 @@ export class SyncManager {
       }
 
       progressCallback?.({ stage: 'clearing', message: 'Clearing local copy...' })
-      await this.db.clearSyncedData()
+      await this.db.clearSyncedData({ keepSpaceData: run.metadataInD1 })
       // (from here on the old place in the feed says nothing of what this device has: if the pull
       // below stops short, the next sync must list everything)
       await this.changeToken.clear()
@@ -1034,8 +1071,9 @@ export class SyncManager {
    * Local setlists and songs with changes that aren't in Drive.
    */
   async findUnsyncedChanges(): Promise<UnsyncedChange[]> {
+    const metadataInD1 = await this.#metadataIsInD1()
     const unsynced: UnsyncedChange[] = []
-    for (const setlist of await this.db.getAllSetlists()) {
+    for (const setlist of metadataInD1 ? [] : await this.db.getAllSetlists()) {
       if (setlistHasLocalChanges(setlist)) {
         const label = [setlist.date, setlist.name].filter(Boolean).join(' ')
         unsynced.push({ type: 'setlist', id: setlist.id, label })
@@ -1055,6 +1093,7 @@ export class SyncManager {
       }
     }
     for (const entry of await this.db.getPendingDeletions()) {
+      if (metadataInD1 && entry.kind === 'setlist') continue
       unsynced.push({
         type: entry.kind,
         id: entry.ref,
@@ -1073,16 +1112,18 @@ export class SyncManager {
   ): Promise<SyncReport> {
     return this.#within(run, async run => {
       // Pull people first: a setlist whose leader is not stored shows none
-      await pullPeople(run, progressCallback)
+      if (!run.metadataInD1) {
+        await pullPeople(run, progressCallback)
 
-      // Pull setlists
-      progressCallback?.({
-        stage: 'pulling',
-        message: 'Checking setlists...',
-        current: 0,
-        total: 1,
-      })
-      await pullSetlists(run, progressCallback)
+        // Pull setlists
+        progressCallback?.({
+          stage: 'pulling',
+          message: 'Checking setlists...',
+          current: 0,
+          total: 1,
+        })
+        await pullSetlists(run, progressCallback)
+      }
 
       // Pull songs (chordpro files)
       progressCallback?.({ stage: 'pulling', message: 'Checking songs...', current: 0, total: 1 })
@@ -1127,16 +1168,18 @@ export class SyncManager {
     }
 
     // Push people first: the setlists' file names say their leaders
-    await pushPeople(run, progressCallback)
+    if (!run.metadataInD1) {
+      await pushPeople(run, progressCallback)
 
-    // Push setlists
-    progressCallback?.({
-      stage: 'pushing',
-      message: 'Scanning setlists...',
-      current: 0,
-      total: 1,
-    })
-    await pushSetlists(run, progressCallback)
+      // Push setlists
+      progressCallback?.({
+        stage: 'pushing',
+        message: 'Scanning setlists...',
+        current: 0,
+        total: 1,
+      })
+      await pushSetlists(run, progressCallback)
+    }
 
     // Push songs (chordpro files)
     progressCallback?.({

@@ -297,6 +297,15 @@ describe('the spaces a person is in', () => {
 })
 
 describe('what a role may do', () => {
+  test('the root reports when shared metadata moves from Drive to D1, for owners and readers', async () => {
+    const { call, db } = await world()
+    assert.equal((await json(await call(`${SPACE}/root`, ann))).storage, 'drive')
+    await db.prepare("UPDATE teams SET storage = 'd1' WHERE space_id = ?").bind(SPACE).run()
+    for (const who of [ann, cat]) {
+      assert.equal((await json(await call(`${SPACE}/root`, who))).storage, 'd1')
+    }
+  })
+
   test('a reader reads: the root (which says it is not writable), the list and a file', async () => {
     const { call, direct } = await world()
     const ref = await direct('Amazing Grace')
@@ -540,6 +549,17 @@ describe('team-managed storage (the service account)', () => {
 })
 
 describe('the context', () => {
+  test('does not describe a root after its Team ends during a request', async () => {
+    const { env, deps, db } = await world()
+    const context = createTeamContext(env, deps)
+    await context.space(SPACE)
+    await db
+      .prepare('UPDATE teams SET ended_at = ? WHERE space_id = ?')
+      .bind('2026-11-20T00:00:00Z', SPACE)
+      .run()
+    assert.equal(await context.root(SPACE), null)
+  })
+
   test('says there is no such space, and no root, for an id with no space', async () => {
     const { env, deps } = await world()
     const context = createTeamContext(env, deps)

@@ -2,7 +2,12 @@ import { expect } from '@open-wc/testing'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import type { StorageBackend } from '../src/js/storage/types.ts'
-import { type ChangeTokenStore, type FolderLink, SyncManager } from '../src/js/sync-manager.ts'
+import {
+  type ChangeTokenStore,
+  type FolderLink,
+  SyncManager,
+  type SyncManagerOptions,
+} from '../src/js/sync-manager.ts'
 import { makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { MemoryStorage } from './memory-storage.ts'
@@ -90,7 +95,12 @@ export function makeRig(storage: () => StorageBackend | undefined) {
     {
       spaceName = TEST_SPACE.name,
       folderLink = memoryFolderLink(),
-    }: { spaceName?: string; folderLink?: FolderLink & { value?: string | null } } = {}
+      metadataStorage,
+    }: {
+      spaceName?: string
+      folderLink?: FolderLink & { value?: string | null }
+      metadataStorage?: SyncManagerOptions['metadataStorage']
+    } = {}
   ) {
     const db = new ChordlessDB(`test-sync-${name}-${crypto.randomUUID()}`)
     await db.init()
@@ -111,6 +121,7 @@ export function makeRig(storage: () => StorageBackend | undefined) {
       memberCache,
       changeToken,
       storage: storage(),
+      metadataStorage,
     })
     await sync.init()
     const device = { name, db, sync, folderLink, memberCache, changeToken }

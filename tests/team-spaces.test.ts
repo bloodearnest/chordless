@@ -105,6 +105,12 @@ describe('team spaces on this device', () => {
   })
 
   describe('the Worker’s routes', () => {
+    it('reads the Team metadata storage mode from its root', async () => {
+      const root = { ref: 'team', name: 'Church', trashed: false, canWrite: true, storage: 'd1' }
+      routes['GET /api/space/team/root'] = () => json(root)
+      expect(await teamApi.root('team')).to.deep.equal(root)
+    })
+
     it('are called with the Google ID token, and the answer is what they say', async () => {
       routes['POST /api/spaces'] = () => json({ spaceId: 'space-12345678', role: 'owner' })
       const answer = await teamApi.createSpace({ rootRef: 'folder', name: 'Church' })

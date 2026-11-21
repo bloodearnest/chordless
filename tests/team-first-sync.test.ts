@@ -17,21 +17,35 @@ import {
 } from '../src/js/space.ts'
 import { createSyncManager } from '../src/js/sync-manager.ts'
 import { SyncStatusEvent, syncRunning } from '../src/js/sync-status.ts'
+import { teamApi } from '../src/js/team-client.ts'
 import { syncTeamSpace } from '../src/js/team-spaces.ts'
 import { makeSetlist } from './builders.ts'
 import { useFakeDriveRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
-const { describe, it, afterEach } = window
+const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
 describe('syncTeamSpace', () => {
   const rig = useFakeDriveRig()
   const made: string[] = []
+  const realRoot = teamApi.root
+
+  beforeEach(() => {
+    // These tests fake the owner's Drive; the Team remains on Drive as well.
+    teamApi.root = async ref => ({
+      ref,
+      name: 'Team',
+      trashed: false,
+      canWrite: true,
+      storage: 'drive',
+    })
+  })
 
   afterEach(async () => {
+    teamApi.root = realRoot
     for (const id of made.splice(0)) await deleteSpace(id).catch(() => {})
   })
 

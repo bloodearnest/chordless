@@ -50,7 +50,9 @@ export interface TeamContext {
   /** The pad sets in the space's own folder; null if there is no such space */
   pads(spaceId: string): Promise<PadStorage | null>
   /** The space's root, for `GET /root` */
-  root(spaceId: string): Promise<{ ref: string; name: string; trashed: boolean } | null>
+  root(
+    spaceId: string
+  ): Promise<{ ref: string; name: string; trashed: boolean; storage?: 'drive' | 'd1' } | null>
   /**
    * Whether a file belongs to the space. Calls are kept inside the space's tree, so a member who
    * knows another file's ref gets nothing of it.

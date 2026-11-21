@@ -21,7 +21,7 @@ people who lead setlists, one JSON file each: `docs/IDENTITIES.md`), and the `sh
 | Call | What it is for |
 |---|---|
 | `backend.available()` | signed in, and the backend answers (the sync panel on a space's page) |
-| `inspectRoot(ref)` | the root a space was linked to: its name, whether it is in the bin, whether this person may write; null if it is gone |
+| `inspectRoot(ref)` | a Team root also reports `storage` (`drive` or `d1`) for its shared metadata; the root a space was linked to: its name, whether it is in the bin, whether this person may write; null if it is gone |
 | `findRootByName(name)`, `ensureRoot(name, spaceId)` | first sync on a device: find or make the root by name (goes away for team spaces, which are issued an id) |
 | `renameRoot(ref, name)` | a renamed space renames its root |
 | `writeRefusals()` | how many writes were refused for lack of permission: how a person who can only read is found out |
@@ -168,3 +168,9 @@ Records keep what they know of their file as `fileRef`, `fileRev`, `fileModified
 `driveFileId`, `driveChecksum`, `driveModifiedTime`, `driveProperties` and `driveFolderId`. Each
 space's database is brought over when it next opens (version 7, `migrateRecords` in `db.ts`),
 and the spaces database moves to its new name the same way (`SpaceDB.init`).
+
+
+For a Team moved to D1, the device's Drive engine leaves archived setlist and person files alone.
+It checks the Worker's root response even for an owner who accesses song files directly in Drive,
+or uses its confirmed D1 checkpoint. Resets and file unlinking also preserve these D1 collections.
+The files API remains available; seeding and the owner-controlled switch follow in the migration plan.
