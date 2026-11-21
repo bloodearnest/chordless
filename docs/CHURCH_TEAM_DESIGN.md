@@ -52,3 +52,11 @@ The one-off migration may drop existing anonymous shares, pads and invitations. 
 - How personal library access and offline synchronization are authorized.
 
 After these decisions, specify schema and API changes, migration invariants and failure handling, then rehearse the real migration against existing-shaped data as required by [SCHEMA_RULES.md](SCHEMA_RULES.md). R2 object layout and bucket jurisdiction are designed alongside, but are not prerequisites for choosing the membership model.
+
+## Existing Teams: one church
+
+The owner confirmed that both existing Teams belong to the same church. A read-only inspection of the 2026-11-21 backup found two active Teams, both still on Drive, with the same owner account; one has a CCLI licence number and one has none. There are no D1 song, setlist, person or pad-set rows yet. The backup passes `foreign_key_check`.
+
+The one-off migration therefore creates **one church and one shared library for both existing teams**, not one church per team. Preserve each existing `space_id` as its team ID, and retain song and setlist IDs. Import and reconcile both Drive libraries into the one church library without discarding variants or silently overwriting different content. Preserve overlays. Carry forward the recorded licence and its history; the missing number on the other Team is not evidence of a different church. Verify the source data and resolve any collisions explicitly before switching either Team.
+
+Each device migrates its own current space databases after updating, independently of the server cutover. Preserve each team's setlists and overlays, and consolidate accessible song data into the church library without losing local edits. The local migration must be restartable and must not remove source data until the consolidated library is verified. Preserve existing setlist URLs by resolving their IDs to the team and church library. Existing anonymous share links and live rooms can end. New routes name churches, libraries and teams; old clients must update before cutover and old write routes must refuse stale writes rather than silently accepting them. Remove compatibility routes only after supported clients have moved.
