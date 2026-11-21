@@ -8,6 +8,27 @@ The current `teams` row represents the whole shared space: its identity (`space_
 
 This conflates a church's library and its team's history. Adding a second team requires a church identity and authorization boundary shared by the teams, and a distinct team identity for setlists. Simply creating another current Team would create another library, contrary to the agreed model.
 
+## Proposed changes to the existing schema
+
+Start from the tables and constraints in migrations `0011`–`0013`; this is a schema delta, not a replacement data model. Preserve the existing columns, JSON fields, validation, indexes and version guards unless a specific change below requires an equivalent update. In particular, a setlist song carries its own key, tempo, notes, annotations and JSON `extra`; its metadata must survive unchanged. Whether setlist songs remain rows or become a JSON document is a design decision to resolve against the existing API and reporting requirements, not a license to discard their metadata.
+
+| Current | Proposal | Ownership / migration |
+|---|---|---|
+| — | `churches` | New church identity and name; licence records and retention need design. |
+| `teams` | `teams` | Add a church foreign key. Keep each existing `space_id` value as the team identity; rename the column to `team_id` when dependent relationships and routes can move together. |
+| `space_songs` | `church_songs` | Change ownership from team to church; preserve song UUIDs and fields. Add reference(s) to R2 chart content and source PDFs; their exact representation and immutable PDF version history need design. |
+| `space_setlists` | `team_setlists` | Team-owned; preserve IDs, fields, JSON `body`, unique setlist ID, date index and version guard. |
+| `space_setlist_songs` | `team_setlist_songs` | Preserve entry order and metadata, including JSON `annotations` and `extra`; enforce that each referenced song belongs to the team's church. |
+| `space_people` | `team_people` | Rename proposed; confirm whether people are shared across a church before fixing ownership. |
+| `space_pad_sets` | `team_pad_sets` | Rename proposed; confirm whether pad sets belong to a church or team. |
+| `team_members`, `team_invites`, `team_events` | Existing tables | Preserve their data and constraints; membership, invitation and retained licence-event ownership need decisions. |
+| `accounts`, `account_identities`, `account_emails`, `sessions`, `login_codes` | Existing tables | Retain account and sign-in behavior. |
+| `account_drive`, `team_refs`, `team_credentials` | Retire after migration | Drive credentials and file references remain until migration and supported-client cutover are complete. Review `teams.root_ref`, `credential`, `owner_provider`, `owner_sub` and `storage` at the same time; remove a field only after confirming no remaining dependency. |
+
+Use `STRICT` tables and ULIDs for **new** identifiers. Existing team, song and setlist IDs remain unchanged opaque strings. Declare foreign keys with deliberate delete behavior and supporting indexes. Migration must carry existing JSON, defaults, checks and indexes forward, and retain the version guards in `0013` or their equivalent. Rehearse the real migration with production-shaped data and foreign keys enabled, as [SCHEMA_RULES.md](SCHEMA_RULES.md) requires.
+
+R2 holds objects; the proposal does not assume separate R2 tables. A chart and PDF reference may be stored with the song, but a single PDF key alone does not establish the agreed history of multiple immutable source PDFs. Decide how versions, import provenance and parser history are represented before specifying columns. Anonymous shares will be redesigned; encryption is an open decision, not assumed necessary for R2.
+
 ## Migration boundary
 
 For each existing Team, the one-off move must create one church and one team, preserve the existing song and setlist identities and their relationships, and carry membership, licence details and history forward. Determine how existing space ids and links map to the new identities before choosing keys or changing routes. Migration must validate the mapping, preserve local changes and fail rather than guess if it cannot preserve data. Move metadata and R2 content together only after verification; retain Drive data and a recovery path until confirmed.
