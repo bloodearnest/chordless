@@ -16,7 +16,7 @@ Start from the tables and constraints in migrations `0011`–`0013`; this is a s
 |---|---|---|
 | — | `churches` | New church identity and name; licence records and retention need design. |
 | `teams` | `teams` | Add a church foreign key. Keep each existing `space_id` value as the team identity; rename the column to `team_id` when dependent relationships and routes can move together. |
-| `space_songs` | `church_songs` | Change ownership from team to church; preserve song UUIDs and fields. Add reference(s) to R2 chart content and source PDFs; their exact representation and immutable PDF version history need design. |
+| `space_songs` | `church_songs` | Change ownership from team to the church or personal library; preserve song UUIDs and fields. Add reference(s) to R2 chart content and source PDFs; their exact representation and immutable PDF version history need design. |
 | `space_setlists` | `team_setlists` | Team-owned; preserve IDs, fields, JSON `body`, unique setlist ID, date index and version guard. |
 | `space_setlist_songs` | `team_setlist_songs` | Preserve entry order and metadata, including JSON `annotations` and `extra`; enforce that each referenced song belongs to the team's church. |
 | `space_people` | `team_people` | Rename proposed; confirm whether people are shared across a church before fixing ownership. |
@@ -35,12 +35,20 @@ For each existing Team, the one-off move must create one church and one team, pr
 
 Songs belong to a church's library; multiple teams use that same library. Setlists belong to a team and reference only that church's songs. No operation copies songs across churches or personal libraries. Personal use remains possible without a church. Authorization must check the actual church or team, not merely a storage key or an identifier supplied by the client.
 
+## Decisions: churches, libraries and migration
+
+Church membership grants access to the church's song library. Use a shared `libraries` parent for church and personal libraries: a library belongs to exactly one church or one personal account, enforced by a database check. Songs belong to a library; teams belong to a church and use its library. A personal library does not require a fictitious church. The exact keys, foreign keys and uniqueness constraints must preserve existing song identities and meet [SCHEMA_RULES.md](SCHEMA_RULES.md).
+
+A church initially records its name, CCLI licence number, country, city or town, and optionally a postcode or ZIP code. It also records a JSON document of the specific licences it holds, whose contents may vary by country. This information is for posterity, not automatic enforcement. Define its history, corrections and retention before implementing the schema.
+
+The one-off migration may drop existing anonymous shares, pads and invitations. **Preserve personal overlays** and their relationship to the correct user and setlist. An anonymous recipient's share overlays stay on that device and are never synced; this does not discard overlays belonging to signed-in users.
+
 ## Decisions needed before schema work
 
-- Whether church membership grants library access to all its teams, and how team membership and roles are assigned and inherited.
+- Whether church membership grants access to every team’s setlists, and how team membership and roles are assigned and inherited.
 - Which church information, licence types and changes are recorded, who may change them, and which records survive deletion.
 - How the current space id, device database, links, live rooms and API routes map to church and team identities while older clients still exist.
-- How existing shared people, pads, invitations and personal overlays are scoped in the new model.
-- How personal libraries are represented and authorized without inventing a church for their users.
+- How existing shared people and retained personal overlays are scoped in the new model.
+- How personal library access and offline synchronization are authorized.
 
 After these decisions, specify schema and API changes, migration invariants and failure handling, then rehearse the real migration against existing-shaped data as required by [SCHEMA_RULES.md](SCHEMA_RULES.md). R2 object layout and bucket jurisdiction are designed alongside, but are not prerequisites for choosing the membership model.
