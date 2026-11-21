@@ -106,7 +106,7 @@ fails on a violation. What the policy allows, and why, is in the comment at the 
 A worker has the policy of its own response, not the page's, so a file that needs something the page does not allow (Verovio's WebAssembly) gets a rule of its own in the file, taking the page's policy off first with a `!` line (two policies on one file are both enforced). When the app starts using a new host, add it there; the service worker script gets the same
 header, so its `connect-src` must cover what it fetches.
 
-Below the floor (`.browserslistrc`), `public/floor.js` replaces the page with a plain "Please update your device" message and stops it loading the app. It is a classic script in syntax any browser parses, and tests `scrollend` (the check that sets the floor), `:has()` and `structuredClone`. "Try it anyway" is remembered in localStorage, so a wrong guess never locks anyone out.
+Below the floor (`.browserslistrc`), `public/floor.js` replaces the page with a plain "Please update your device" message and stops it loading the app. It is a classic script in syntax any browser parses, and tests `:has()` and `structuredClone` as an approximation of the floor. "Try it anyway" is remembered in localStorage, so a wrong guess never locks anyone out.
 
 The one exception to "no `<style>` elements" is the Google Picker's, which puts a single inline `<style>`
 on the page (the layout of its dialog). It is allowed by its hash in `style-src`, because without it the
@@ -119,7 +119,7 @@ The page has no inline script (`public/floor.js` and `public/boot.js` are the cl
 
 ## The browser floor
 
-Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120 (raised to Safari/iOS 17.4 on 2026-10-27, for `scrollend`), set in .browserslistrc
+Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120 (raised to Safari/iOS 17.4 on 2026-10-27; the original `scrollend` rationale was incorrect, as Safari added it in 26.2), set in .browserslistrc
 and TARGET in vite.config.ts (keep them the same). Reasoning: support devices up to about five
 years old; asking people to update their OS is fine, excluding a device that cannot update is
 not, and every iPhone/iPad from 2021 on can run iOS 17 and later (a survey of the worship team:

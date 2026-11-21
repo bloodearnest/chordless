@@ -74,6 +74,40 @@ test.describe('Moving through a setlist', () => {
 })
 
 test.describe('Sections', () => {
+  test('the section label hides the native WebKit disclosure marker', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'webkit', 'The WebKit-specific marker is only exposed by WebKit')
+    await openFirstSong(page)
+    const summary = page.locator('#song-0 song-section summary.section-label').first()
+    await expect(summary).toBeVisible()
+    const markerHidden = await summary.evaluate(element =>
+      [
+        ...(element.getRootNode() as ShadowRoot).styleSheets,
+        ...(element.getRootNode() as ShadowRoot).adoptedStyleSheets,
+      ].some(sheet =>
+        Array.from(sheet.cssRules).some(rule => {
+          if (
+            !(rule instanceof CSSStyleRule) ||
+            !rule.selectorText.endsWith('::-webkit-details-marker')
+          ) {
+            return false
+          }
+          const selector = rule.selectorText.replace('::-webkit-details-marker', '')
+          return element.matches(selector) && rule.style.display === 'none'
+        })
+      )
+    )
+    expect(markerHidden).toBe(true)
+    const details = summary.locator('..')
+    await expect(details).toHaveAttribute('open', '')
+    await summary.click()
+    await expect(details).not.toHaveAttribute('open', '')
+    await summary.click()
+    await expect(details).toHaveAttribute('open', '')
+  })
+
   test('showing a section as none or lyrics only applies in the setlist, and after a reload', {
     tag: '@logic',
   }, async ({ page }) => {

@@ -3,15 +3,14 @@
 // below the floor (.browserslistrc: iOS/Safari 17.4, Chrome/Edge 120), say so plainly, instead
 // of whatever happens when the app meets syntax or APIs it lacks, and stop the page loading the
 // app. "Try it anyway" is remembered on this device: a wrong guess must never lock someone out.
-// What it tests is what the floor guarantees: scrollend (Safari 17.4, Chrome 114), :has() and
-// structuredClone (Safari 15.4, Chrome 105/98), so scrollend is the one that sets the floor.
+// These feature checks are a conservative approximation of the floor, not version detection.
+// scrollend is deliberately excluded: Safari did not support it until 26.2.
 ;(function () {
   var KEY = 'chordless-open-below-floor'
 
   function ok() {
     try {
       return (
-        'onscrollend' in window &&
         typeof structuredClone === 'function' &&
         !!window.CSS &&
         typeof CSS.supports === 'function' &&

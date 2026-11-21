@@ -282,6 +282,24 @@ describe('the library view', () => {
       expect(visited).to.deep.equal([{ url: '/songs', replace: undefined }])
     })
 
+    it('returns to the list after scrolling on browsers without scrollend', async () => {
+      const descriptor = Object.getOwnPropertyDescriptor(window, 'onscrollend')
+      delete (window as unknown as Record<string, unknown>).onscrollend
+      try {
+        const song = await addChart(db, ALPHA, ADD)
+        await open({ name: 'songs', songUuid: song.uuid })
+        const container = must(view.querySelector('#songs-content-container'))
+        Object.defineProperty(container, 'scrollLeft', { value: 0, configurable: true })
+        Object.defineProperty(container, 'clientWidth', { value: 400, configurable: true })
+        container.dispatchEvent(new Event('scroll'))
+        container.dispatchEvent(new Event('scroll'))
+        await waitUntil(() => visited.length > 0, 'the scroll settles')
+        expect(visited).to.deep.equal([{ url: '/songs', replace: undefined }])
+      } finally {
+        if (descriptor) Object.defineProperty(window, 'onscrollend', descriptor)
+      }
+    })
+
     it('has no swipe back when no song is open', async () => {
       await open()
       comeToRest(0)

@@ -328,11 +328,22 @@ export class LibraryView extends PageView {
    */
   #observeScrollBack(): void {
     const container = this.querySelector<HTMLElement>('#songs-content-container')
-    container?.addEventListener('scrollend', () => {
+    /* v8 ignore next -- the view always renders its scroll container before observing it */
+    if (!container) return
+    const closeOnList = () => {
       if (this.#route.songUuid && container.scrollLeft < container.clientWidth / 2) {
         goTo(buildUrl({ name: 'songs' }))
       }
-    })
+    }
+    if ('onscrollend' in window) {
+      container.addEventListener('scrollend', closeOnList)
+    } else {
+      let timer: ReturnType<typeof setTimeout>
+      container.addEventListener('scroll', () => {
+        clearTimeout(timer)
+        timer = setTimeout(closeOnList, 150)
+      })
+    }
   }
 
   // ==================== Header controls ====================
