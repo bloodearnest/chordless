@@ -60,3 +60,13 @@ The owner confirmed that both existing Teams belong to the same church. A read-o
 The one-off migration therefore creates **one church and one shared library for both existing teams**, not one church per team. Preserve each existing `space_id` as its team ID, and retain song and setlist IDs. Import and reconcile both Drive libraries into the one church library without discarding variants or silently overwriting different content. Preserve overlays. Carry forward the recorded licence and its history; the missing number on the other Team is not evidence of a different church. Verify the source data and resolve any collisions explicitly before switching either Team.
 
 Each device migrates its own current space databases after updating, independently of the server cutover. Preserve each team's setlists and overlays, and consolidate accessible song data into the church library without losing local edits. The local migration must be restartable and must not remove source data until the consolidated library is verified. Preserve existing setlist URLs by resolving their IDs to the team and church library. Existing anonymous share links and live rooms can end. New routes name churches, libraries and teams; old clients must update before cutover and old write routes must refuse stale writes rather than silently accepting them. Remove compatibility routes only after supported clients have moved.
+
+## Agreed roles, people and pads
+
+Church members may read every team's setlists and the shared church library. Other teams' setlists do not appear on the homepage solely because of church membership; following or belonging to a team controls homepage visibility, not read access.
+
+Collapse owner and admin into church admin, alongside worship leader and church member. Any church admin can manage other admins; the last admin must appoint another before leaving or removing their own admin role. Retain the existing sync permissions and local-edit behavior; reconcile the existing difference between the setlist control rule and the D1 API's update and deletion checks when implementing them.
+
+Setlist leaders are church members with the worship leader or church admin role. Preserve historical leader names without linked accounts; choosing a leader for a new or edited setlist requires an eligible account. Pad sets and audio are church-wide; personal use keeps its own pads.
+
+After a church ends or is deleted, keep a minimal register of its name, country, city, licence numbers and licence-change history for posterity; delete members, songs, setlists and other content. Specify the retention and deletion details before implementation.
