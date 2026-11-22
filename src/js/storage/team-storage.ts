@@ -4,9 +4,9 @@
  * space's Drive. Nothing is cached or kept here. See docs/STORAGE_API.md, "The team backend".
  *
  * A team space's root ref is the space's id (issued, not found by name), and bodies are text, but
- * for the audio of the space's pad sets (`padsIn`).
+ * for encrypted shares and the audio of the space's pad sets (`padsIn`).
  */
-import { jwtClaims } from '../base64url.ts'
+import { jwtClaims, toBase64Url } from '../base64url.ts'
 import type { SpaceMember } from '../data-types.ts'
 import { callWorker, TeamError, type WorkerCall, type WorkerConnection } from '../worker-call.ts'
 import {
@@ -145,12 +145,21 @@ class TeamClient {
   }
 }
 
-/** Only text goes to a team space for now */
+/** Ordinary files in a team space are text only. */
 function textOf(body: FileBody): string {
   if (typeof body !== 'string') {
     throw new Error('A team space holds text only for now: this file is not text')
   }
   return body
+}
+
+/** Ciphertext shares can cross the text-only API without changing their stored bytes. */
+async function writeBody(body: FileBody, allowBytes: boolean) {
+  if (typeof body === 'string') return { body }
+  if (!allowBytes) return { body: textOf(body) }
+  const bytes =
+    body instanceof Blob ? new Uint8Array(await body.arrayBuffer()) : new Uint8Array(body)
+  return { body: toBase64Url(bytes), encoding: 'base64url' }
 }
 
 class TeamSpace implements SpaceStorage {
@@ -224,7 +233,7 @@ class TeamSpace implements SpaceStorage {
     return texts
   }
 
-  create(
+  async create(
     collection: Collection,
     input: FileInput,
     body: FileBody,
@@ -234,7 +243,11 @@ class TeamSpace implements SpaceStorage {
       method: 'POST',
       path: '/files',
       query: { collection },
-      body: { input, body: textOf(body), publicLink: options?.publicLink === true },
+      body: {
+        input,
+        ...(await writeBody(body, collection === 'shares')),
+        publicLink: options?.publicLink === true,
+      },
     })
   }
 
@@ -252,7 +265,7 @@ class TeamSpace implements SpaceStorage {
     return results
   }
 
-  update(
+  async update(
     ref: string,
     input: FileInput,
     body: FileBody,
@@ -261,7 +274,7 @@ class TeamSpace implements SpaceStorage {
     return this.#client.json(this.#id, {
       method: 'PUT',
       path: `/files/${encodeURIComponent(ref)}`,
-      body: { input, body: textOf(body), ifRev },
+      body: { input, ...(await writeBody(body, input.props.type === 'share')), ifRev },
     })
   }
 

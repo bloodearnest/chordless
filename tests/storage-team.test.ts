@@ -1,5 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
+import { decryptBundle } from '../src/js/share-crypto.ts'
+import { createShare, refreshShare } from '../src/js/share-manager.ts'
 import { TeamStorage } from '../src/js/storage/team-storage.ts'
 import { ChangeTokenLost } from '../src/js/storage/types.ts'
 import { SyncManager } from '../src/js/sync-manager.ts'
@@ -210,6 +212,44 @@ describe('TeamStorage', () => {
     expect(rig.storage.publicDownload(file.ref).status).to.equal(200)
     await space.unpublish(file.ref)
     expect(rig.storage.publicDownload(file.ref).status).to.equal(404)
+  })
+
+  it('creates and refreshes a share a recipient can decrypt through the team service', async () => {
+    const rig = await makeTeamRig()
+    const db = new ChordlessDB(`test-team-share-${crypto.randomUUID()}`)
+    await db.init()
+    try {
+      const setlist = makeSetlist({ id: 'team-share', name: 'Before', date: '2026-12-20' })
+      const ctx = {
+        db,
+        spaceId: 'space-1',
+        space: teamFor(rig).space('space-1'),
+        today: '2026-12-01',
+      }
+      const share = await createShare(setlist, ctx)
+      const open = async () =>
+        decryptBundle(
+          share.key,
+          must(rig.storage.publicDownload(share.fileId).bytes) as Uint8Array<ArrayBuffer>
+        )
+      expect((await open()).setlist.name).to.equal('Before')
+      await refreshShare({ ...setlist, name: 'After', share }, ctx)
+      expect((await open()).setlist.name).to.equal('After')
+    } finally {
+      db.db?.close()
+    }
+  })
+
+  it('preserves encrypted share bytes when creating and refreshing a public share', async () => {
+    const rig = await makeTeamRig()
+    const space = teamFor(rig).space('space-1')
+    const input = { ...text, props: { type: 'share' } }
+    const original = new Uint8Array([0, 255, 128, 42])
+    const { file } = await space.create('shares', input, original, { publicLink: true })
+    expect(rig.storage.publicDownload(file.ref).bytes).to.deep.equal(original)
+    const refreshed = new Uint8Array([255, 0, 1])
+    await space.update(file.ref, input, refreshed)
+    expect(rig.storage.publicDownload(file.ref).bytes).to.deep.equal(refreshed)
   })
 
   it('says what a team space does not do yet', async () => {
