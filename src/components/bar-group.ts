@@ -93,7 +93,7 @@ export class BarGroup extends LitElement {
     .chord chord-display {
       background: var(--chord-tint-bg, transparent);
       border-radius: 0.2em;
-      box-shadow: 0 0 0 0.15em var(--chord-tint-bg, transparent);
+      box-shadow: 0.12em 0 0 var(--chord-tint-bg, transparent), -0.12em 0 0 var(--chord-tint-bg, transparent);
     }
 
     .chord.bar {

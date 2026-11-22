@@ -224,7 +224,14 @@ export class SongSection extends LitElement {
       width: 100%;
     }
 
-    .song-section-wrapper details.song-section summary.section-label::-webkit-details-marker,
+    .song-section-wrapper details.song-section summary.section-label::-webkit-details-marker {
+      display: none;
+    }
+
+    .song-section-wrapper details.song-section summary.section-label::marker {
+      content: '';
+    }
+
     .song-section-wrapper details.song-section summary.section-label:focus,
     .song-section-wrapper details.song-section summary.section-label:focus-visible,
     .song-section-wrapper details.song-section summary.section-label:active {
@@ -562,7 +569,7 @@ export class SongSection extends LitElement {
     .song-section-wrapper .chord chord-display {
       background: var(--chord-tint-bg, transparent);
       border-radius: 0.2em;
-      box-shadow: 0 0 0 0.15em var(--chord-tint-bg, transparent);
+      box-shadow: 0.12em 0 0 var(--chord-tint-bg, transparent), -0.12em 0 0 var(--chord-tint-bg, transparent);
       -webkit-box-decoration-break: clone;
       box-decoration-break: clone;
     }

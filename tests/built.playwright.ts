@@ -327,13 +327,22 @@ test('the build is for the production Google project, and carries nothing of the
   expect(prod.VITE_DRIVE_ROOT_FOLDER).toBe('Chordless')
 })
 
+test('a browser without scrollend can open the app', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'onscrollend', { value: undefined, configurable: true })
+    delete (window as unknown as Record<string, unknown>).onscrollend
+  })
+  await page.goto('/')
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(page.locator('#view-outlet .boot-shell')).toHaveCount(0)
+})
+
 test.describe('below the browser floor', () => {
-  // A browser without scrollend (Safari before 17.4) is what the check looks for. The page stops
+  // A browser without structuredClone is below the feature check. The page stops
   // loading (window.stop()), so it never reaches `load`
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      Object.defineProperty(window, 'onscrollend', { value: undefined, configurable: true })
-      delete (window as unknown as Record<string, unknown>).onscrollend
+      Object.defineProperty(window, 'structuredClone', { value: undefined, configurable: true })
     })
   })
 
