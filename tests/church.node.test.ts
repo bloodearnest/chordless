@@ -76,6 +76,64 @@ test('a signed-in person creates a church and its library, and only admins chang
     204
   )
   assert.equal((await call('admin', 'PUT', `/api/churches/${id}/teams/${teams[0].id}`)).status, 204)
+  const inviteResponse = await call(
+    'admin',
+    'POST',
+    `/api/churches/${id}/teams/${teams[0].id}/invites`,
+    { email: 'someone@example.com', role: 'reader' }
+  )
+  assert.equal(inviteResponse.status, 201)
+  const invitation = (await inviteResponse.json()) as { code: string }
+  assert.equal(
+    (
+      await call('stranger', 'POST', '/api/church-invites/join', {
+        teamId: teams[0].id,
+        code: invitation.code,
+      })
+    ).status,
+    200
+  )
+  assert.equal(
+    sql
+      .prepare('SELECT role FROM church_members WHERE church_id = ? AND account_id = ?')
+      .get(id, 'stranger')?.role,
+    'reader'
+  )
+  assert.equal(
+    sql
+      .prepare('SELECT count(*) AS n FROM followed_teams WHERE account_id = ? AND space_id = ?')
+      .get('stranger', teams[0].id)?.n,
+    1
+  )
+  assert.equal(
+    (
+      await call('reader', 'POST', '/api/church-invites/join', {
+        teamId: teams[0].id,
+        code: invitation.code,
+      })
+    ).status,
+    404
+  )
+  assert.equal((await call('admin', 'DELETE', `/api/churches/${id}/members/stranger`)).status, 204)
+  assert.equal(
+    sql.prepare('SELECT count(*) AS n FROM followed_teams WHERE account_id = ?').get('stranger')?.n,
+    0
+  )
+  const adminInvite = (await (
+    await call('admin', 'POST', `/api/churches/${id}/teams/${teams[0].id}/invites`, {
+      email: 'reader@example.com',
+      role: 'admin',
+    })
+  ).json()) as { code: string }
+  assert.equal(
+    (
+      await call('stranger', 'POST', '/api/church-invites/join', {
+        teamId: teams[0].id,
+        code: adminInvite.code,
+      })
+    ).status,
+    403
+  )
 
   assert.equal(
     sql
@@ -88,12 +146,86 @@ test('a signed-in person creates a church and its library, and only admins chang
       "INSERT INTO church_members (church_id, account_id, role, joined_at) VALUES (?, ?, 'reader', ?)"
     )
     .run(id, 'reader', now)
+  assert.equal(
+    (
+      await call('reader', 'POST', '/api/church-invites/join', {
+        teamId: teams[0].id,
+        code: adminInvite.code,
+      })
+    ).status,
+    200
+  )
+  assert.equal(
+    sql
+      .prepare('SELECT role FROM church_members WHERE church_id = ? AND account_id = ?')
+      .get(id, 'reader')?.role,
+    'reader'
+  )
   assert.equal((await call('stranger', 'GET', `/api/churches/${id}`)).status, 404)
   assert.equal((await call('reader', 'GET', `/api/churches/${id}`)).status, 200)
   assert.equal((await call('reader', 'PUT', `/api/churches/${id}`, data)).status, 403)
   assert.equal((await call('stranger', 'GET', `/api/churches/${id}/members`)).status, 404)
+  assert.equal((await call('stranger', 'GET', `/api/churches/${id}/teams`)).status, 404)
+  assert.equal((await call('admin', 'POST', `/api/churches/${id}/members`, {})).status, 404)
+  assert.equal((await call('admin', 'GET', `/api/churches/${id}/teams/${teams[0].id}`)).status, 404)
+  assert.equal((await call('admin', 'GET', '/api/church-invites/join')).status, 404)
+  assert.equal(
+    (
+      await call('admin', 'POST', `/api/churches/${id}/teams/missing/invites`, {
+        email: 'a@example.com',
+        role: 'reader',
+      })
+    ).status,
+    404
+  )
+  assert.equal(
+    (await call('admin', 'POST', `/api/churches/${id}/teams/${teams[0].id}/follow`)).status,
+    404
+  )
   assert.equal((await call('reader', 'GET', `/api/churches/${id}/members`)).status, 200)
   assert.equal((await call('reader', 'GET', `/api/churches/${id}/teams`)).status, 200)
+  assert.equal(
+    (await call('reader', 'PUT', `/api/churches/${id}/teams/${teams[0].id}/follow`)).status,
+    204
+  )
+  assert.equal(
+    (await call('reader', 'DELETE', `/api/churches/${id}/teams/${teams[0].id}/follow`)).status,
+    204
+  )
+  assert.equal(
+    (await call('stranger', 'PUT', `/api/churches/${id}/teams/${teams[0].id}/follow`)).status,
+    404
+  )
+  assert.equal(
+    (await call('reader', 'PUT', `/api/churches/${id}/teams/missing/follow`)).status,
+    404
+  )
+  assert.equal(
+    (await call('admin', 'PUT', `/api/churches/${id}/members/missing`, { role: 'reader' })).status,
+    404
+  )
+  assert.equal(
+    (await call('admin', 'GET', `/api/churches/${id}/teams/${teams[0].id}/invites`)).status,
+    404
+  )
+  assert.equal(
+    (
+      await call('admin', 'POST', `/api/churches/${id}/teams/${teams[0].id}/invites`, {
+        role: 'owner',
+        email: 'x@example.com',
+      })
+    ).status,
+    400
+  )
+  assert.equal(
+    (
+      await call('admin', 'POST', `/api/churches/${id}/teams/${teams[0].id}/invites`, {
+        role: 'reader',
+        email: 'invalid',
+      })
+    ).status,
+    400
+  )
   assert.equal(
     (await call('reader', 'POST', `/api/churches/${id}/teams`, { name: 'No' })).status,
     403
@@ -139,6 +271,9 @@ test('a signed-in person creates a church and its library, and only admins chang
   )
   const list = (await (await call('admin', 'GET', '/api/churches')).json()) as { name: string }[]
   assert.ok(list.some(row => row.name === 'New name'))
+  const matches = await call('reader', 'GET', '/api/churches/matches?licence=12345')
+  assert.equal(matches.status, 200)
+  assert.equal((await call('reader', 'GET', '/api/churches/matches')).status, 400)
   assert.equal(
     (await call('admin', 'POST', '/api/churches', { ...data, licences: [] })).status,
     400
