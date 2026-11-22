@@ -39,7 +39,7 @@ Songs belong to a church's library; multiple teams use that same library. Setlis
 
 Church membership grants access to the church's song library. Use a shared `libraries` parent for church and personal libraries: a library belongs to exactly one church or one personal account, enforced by a database check. Songs belong to a library; teams belong to a church and use its library. A personal library does not require a fictitious church. The exact keys, foreign keys and uniqueness constraints must preserve existing song identities and meet [SCHEMA_RULES.md](SCHEMA_RULES.md).
 
-A church initially records its name, CCLI licence number, country, city or town, and optionally a postcode or ZIP code. It also records a JSON document of the specific licences it holds, whose contents may vary by country. This information is for posterity, not automatic enforcement. Keep only the current licence number and licence details, not a separate licence-change history. Any church member may view them; only an admin may change them.
+A church requires a name, country and city or town; postcode or ZIP code and CCLI licence number are optional. An admin may change these fields, and only current values are kept. It also records a JSON document of the specific licences it holds, whose contents may vary by country. This information is for posterity, not automatic enforcement. Keep only the current licence number and licence details, not a separate licence-change history. Any church member may view them; only an admin may change them.
 
 The one-off migration may drop existing anonymous shares, pads and invitations. **Preserve personal overlays** and their relationship to the correct user and setlist. An anonymous recipient's share overlays stay on that device and are never synced; this does not discard overlays belonging to signed-in users.
 
@@ -130,3 +130,5 @@ When a church member leaves or is removed, server access stops immediately. Remo
 Source PDFs remain in the song's history until the whole song is deleted. Church deletion has a 30-day recovery period: the church and its content are inaccessible in normal use, but an admin can restore them during that period. Afterward, remove content and membership and retain the minimal church register with current licence details. Preserve enough authorization during the recovery period for an admin to restore it, without permitting normal access.
 
 Account deletion has a 30-day recovery period for the personal library and synced preferences. A last church admin must appoint another admin or delete the church before deleting their account.
+
+CCLI usage reporting includes archived teams by default, uses the last 12 months initially, and allows an admin to choose another date range. A church match during setup may show name and location to distinguish similarly named churches.
