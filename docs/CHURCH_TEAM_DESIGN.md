@@ -33,7 +33,7 @@ R2 holds objects; the proposal does not assume separate R2 tables. A chart and P
 
 For each existing Team, the one-off move must create one church and one team, preserve the existing song and setlist identities and their relationships, and carry membership, licence details and history forward. Determine how existing space ids and links map to the new identities before choosing keys or changing routes. Migration must validate the mapping, preserve local changes and fail rather than guess if it cannot preserve data. Move metadata and R2 content together only after verification; retain Drive data and a recovery path until confirmed.
 
-Songs belong to a church's library; multiple teams use that same library. Setlists belong to a team and reference only that church's songs. No operation copies songs across churches or personal libraries. Personal use remains possible without a church. Authorization must check the actual church or team, not merely a storage key or an identifier supplied by the client.
+Songs belong to a church's library; multiple teams use that same library. Setlists belong to a team and reference only that church's songs. No operation copies songs across churches or personal libraries except the explicit personal-to-church promotion workflow below. Personal use remains possible without a church. Authorization must check the actual church or team, not merely a storage key or an identifier supplied by the client.
 
 ## Decisions: churches, libraries and migration
 
@@ -99,3 +99,8 @@ A deleted song disappears from the library immediately and is recoverable by an 
 Church export includes church data and setlists, with separate options for current ChordPro, latest source PDFs and pad audio. It excludes MusicXML and parse history. This export is not a substitute for a backup and recovery design (see TODO).
 
 An anonymous share's expired received setlist, charts and local overlays are removed on regular sync, app startup or opening the share, including while offline. The Worker enforces expiry on access and scheduled daily cleanup removes expired server-side objects.
+
+
+## Promote a personal space
+
+A person can explicitly promote a personal space to a new church, choosing the personal setlists to copy into its first team. Copy their referenced songs into the new church library and point the copied setlists to those songs. Offer an optional, initially unchecked choice to copy the whole personal library as well. The original personal space, songs and setlists remain. This is an explicit exception to the general no-cross-library-copy rule; ordinary church use and anonymous shares are not exceptions. Preserve provenance and review the applicable licence terms for this workflow.
