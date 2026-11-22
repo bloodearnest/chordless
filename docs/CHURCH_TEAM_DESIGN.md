@@ -45,9 +45,7 @@ The one-off migration may drop existing anonymous shares, pads and invitations. 
 
 ## Decisions needed before schema work
 
-- Whether church membership grants access to every team’s setlists, and how team membership and roles are assigned and inherited.
 - The precise structure of the country-specific licence JSON and the deletion procedure for the retained minimal register.
-- How the current space id, device database, links, live rooms and API routes map to church and team identities while older clients still exist.
 - How existing shared people and retained personal overlays are scoped in the new model.
 - How personal library access and offline synchronization are authorized.
 
@@ -124,3 +122,9 @@ Provide a church admin console separate from the normal setlist and library UI f
 Any church member may download a source PDF they can access. Worship leaders and admins may upload PDFs as part of bookmarklet import; its initial parse runs as part of that import. Only church admins may manually reparse an existing PDF. A trusted parser-release job may reparse current source PDFs across churches in the background; skip songs without a PDF. Historical PDFs remain available for an admin to reparse.
 
 Save an uploaded immutable PDF even if its initial parse fails, leave any current MusicXML unchanged and emit a telemetry alert so the failure can be investigated. Report parser failures for both church and personal libraries, including failures during imports and reparses. Include the error, parser version and identifiers needed to locate the PDF without attaching the PDF or chart text. Provide restricted operator access to retrieve stored church or personal PDFs for investigation. Define operator authorization before implementation; no access audit is required now.
+
+## Deletion and membership removal
+
+When a church member leaves or is removed, server access stops immediately. The app removes that church's downloaded data from the device when it next learns membership has ended; an offline device cannot learn this until it reconnects.
+
+Source PDFs remain in the song's history until the whole song is deleted. Church deletion has a 30-day recovery period: the church and its content are inaccessible in normal use, but an admin can restore them during that period. Afterward, remove content and membership and retain the minimal church register with current licence details. Preserve enough authorization during the recovery period for an admin to restore it, without permitting normal access.
