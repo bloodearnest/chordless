@@ -145,18 +145,10 @@ class TeamClient {
   }
 }
 
-/** Ordinary files in a team space are text only. */
-function textOf(body: FileBody): string {
-  if (typeof body !== 'string') {
-    throw new Error('A team space holds text only for now: this file is not text')
-  }
-  return body
-}
-
 /** Ciphertext shares can cross the text-only API without changing their stored bytes. */
 async function writeBody(body: FileBody, allowBytes: boolean) {
   if (typeof body === 'string') return { body }
-  if (!allowBytes) return { body: textOf(body) }
+  if (!allowBytes) throw new Error('A team space holds text only for now: this file is not text')
   const bytes =
     body instanceof Blob ? new Uint8Array(await body.arrayBuffer()) : new Uint8Array(body)
   return { body: toBase64Url(bytes), encoding: 'base64url' }

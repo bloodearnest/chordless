@@ -123,6 +123,43 @@ test('writes: create, update and trash a file; unpublish ends a share link', asy
   assert.equal(rig.storage.file(ref).trashed, true)
 })
 
+test('encoded share uploads preserve bytes and cannot be used for ordinary files', async () => {
+  const rig = await makeTeamRig()
+  const request = (body: string, encoding: string) => ({ input: file, body, encoding })
+  const created = await call(rig, 'POST', '/files?collection=shares', {
+    body: { ...request('AP-A', 'base64url'), publicLink: true },
+  })
+  assert.equal(created.status, 200)
+  const ref = created.json().file.ref
+  assert.deepEqual(rig.storage.publicDownload(ref).bytes, new Uint8Array([0, 255, 128]))
+  assert.equal(
+    (await call(rig, 'PUT', `/files/${ref}`, { body: request('_w', 'base64url') })).status,
+    200
+  )
+  assert.deepEqual(rig.storage.publicDownload(ref).bytes, new Uint8Array([255]))
+  assert.equal(
+    (await call(rig, 'POST', '/files?collection=shares', { body: request('x', 'unknown') })).status,
+    400
+  )
+  assert.equal(
+    (await call(rig, 'POST', '/files?collection=shares', { body: request('!', 'base64url') }))
+      .status,
+    400
+  )
+  assert.equal(
+    (await call(rig, 'POST', '/files?collection=songs', { body: request('eA', 'base64url') }))
+      .status,
+    400
+  )
+  const song = await rig.storage.space(rig.spaces[0].root).create('songs', file, 'original')
+  assert.equal(
+    (await call(rig, 'PUT', `/files/${song.file.ref}`, { body: request('eA', 'base64url') }))
+      .status,
+    400
+  )
+  assert.equal(await rig.storage.space(rig.spaces[0].root).readText(song.file.ref), 'original')
+})
+
 test('a share can be public and unpublished; nothing else can be public', async () => {
   const rig = await makeTeamRig()
   const share = (

@@ -248,7 +248,7 @@ describe('TeamStorage', () => {
     const { file } = await space.create('shares', input, original, { publicLink: true })
     expect(rig.storage.publicDownload(file.ref).bytes).to.deep.equal(original)
     const refreshed = new Uint8Array([255, 0, 1])
-    await space.update(file.ref, input, refreshed)
+    await space.update(file.ref, input, new Blob([refreshed]))
     expect(rig.storage.publicDownload(file.ref).bytes).to.deep.equal(refreshed)
   })
 
