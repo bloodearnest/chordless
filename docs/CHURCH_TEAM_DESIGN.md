@@ -19,8 +19,8 @@ Start from the tables and constraints in migrations `0011`–`0013`; this is a s
 | `space_songs` | `church_songs` | Change ownership from team to the church or personal library; preserve song UUIDs and fields. Add reference(s) to R2 chart content and source PDFs; their exact representation and immutable PDF version history need design. |
 | `space_setlists` | `team_setlists` | Team-owned; preserve IDs, fields, JSON `body`, unique setlist ID, date index and version guard. |
 | `space_setlist_songs` | JSON document on `team_setlists` | Migrate ordered entries and all metadata, including `annotations` and `extra`; enforce that each referenced song belongs to the team's church. |
-| `space_people` | `team_people` | Rename proposed; confirm whether people are shared across a church before fixing ownership. |
-| `space_pad_sets` | `team_pad_sets` | Rename proposed; confirm whether pad sets belong to a church or team. |
+| `space_people` | Account-based church membership and historical leader names | Members are accounts; retain historical leader names even when an account is unlinked or no longer eligible. |
+| `space_pad_sets` | Church-wide pad sets | Pad sets and audio belong to the church; existing pads may be dropped during the one-off migration. |
 | `team_members`, `team_invites`, `team_events` | Existing tables | Preserve their data and constraints; membership, invitation and retained licence-event ownership need decisions. |
 | `accounts`, `account_identities`, `account_emails`, `sessions`, `login_codes` | Existing tables | Retain account and sign-in behavior. |
 | `account_drive`, `team_refs`, `team_credentials` | Retire after migration | Drive credentials and file references remain until migration and supported-client cutover are complete. Review `teams.root_ref`, `credential`, `owner_provider`, `owner_sub` and `storage` at the same time; remove a field only after confirming no remaining dependency. |
@@ -31,7 +31,7 @@ R2 holds objects; the proposal does not assume separate R2 tables. A chart and P
 
 ## Migration boundary
 
-For each existing Team, the one-off move must create one church and one team, preserve the existing song and setlist identities and their relationships, and carry membership, licence details and history forward. Determine how existing space ids and links map to the new identities before choosing keys or changing routes. Migration must validate the mapping, preserve local changes and fail rather than guess if it cannot preserve data. Move metadata and R2 content together only after verification; retain Drive data and a recovery path until confirmed.
+The one-off move creates one church and shared library for both existing Teams, preserves their team, song and setlist identities and relationships, and carries membership and current licence details forward. Determine how existing space ids and links map to the new identities before choosing keys or changing routes. Migration must validate the mapping, preserve local changes and fail rather than guess if it cannot preserve data. Move metadata and R2 content together only after verification; retain Drive data and a recovery path until confirmed.
 
 Songs belong to a church's library; multiple teams use that same library. Setlists belong to a team and reference only that church's songs. No operation copies songs across churches or personal libraries except the explicit personal-to-church promotion workflow below. Personal use remains possible without a church. Authorization must check the actual church or team, not merely a storage key or an identifier supplied by the client.
 
@@ -45,8 +45,8 @@ The one-off migration may drop existing anonymous shares, pads and invitations. 
 
 ## Decisions needed before schema work
 
-- The precise structure of the country-specific licence JSON and the deletion procedure for the retained minimal register.
-- How existing shared people and retained personal overlays are scoped in the new model.
+- The country-specific licence JSON structure and form are deferred pending research; the current CCLI number is a separate optional field. Specify deletion of content and retention of the minimal church register.
+- The detailed mapping of existing people to account-based membership and historical names, and how retained overlays are migrated.
 - How personal library access and offline synchronization are authorized.
 
 After these decisions, specify schema and API changes, migration invariants and failure handling, then rehearse the real migration against existing-shaped data as required by [SCHEMA_RULES.md](SCHEMA_RULES.md). R2 object layout and bucket jurisdiction are designed alongside, but are not prerequisites for choosing the membership model.
@@ -119,7 +119,7 @@ Provide a church admin console separate from the normal setlist and library UI f
 
 ## PDF import, reparsing and investigation
 
-Any church member may download a source PDF they can access. Worship leaders and admins may upload PDFs as part of bookmarklet import; its initial parse runs as part of that import. Only church admins may manually reparse an existing PDF. A trusted parser-release job may reparse current source PDFs and retry failed PDFs across church and personal libraries in the background, including failed imports that never became current; skip songs without a PDF. Historical PDFs remain available for an admin to reparse.
+Any church member may download a source PDF they can access. Worship leaders and admins may upload PDFs as part of bookmarklet import; its initial parse runs as part of that import. Only church admins may manually reparse an existing PDF. A trusted parser-release job may reparse current source PDFs and retry failed PDFs across church and personal libraries in the background, including failed imports that never became current; skip songs without a PDF. Historical PDFs remain available for an admin to reparse. A successful reparse of a non-current PDF stays in history and does not become current automatically.
 
 Save an uploaded immutable PDF even if its initial parse fails, leave any current MusicXML unchanged and emit a telemetry alert so the failure can be investigated. Report parser failures for both church and personal libraries, including failures during imports and reparses. Include the error, parser version and identifiers needed to locate the PDF without attaching the PDF or chart text. Provide restricted operator access to retrieve stored church or personal PDFs for investigation. Define operator authorization before implementation; no access audit is required now.
 
@@ -132,3 +132,5 @@ Source PDFs remain in the song's history until the whole song is deleted. Church
 Account deletion has a 30-day recovery period for the personal library and synced preferences. A last church admin must appoint another admin or delete the church before deleting their account.
 
 CCLI usage reporting includes archived teams by default, uses the last 12 months initially, and allows an admin to choose another date range. A church match during setup may show name and location to distinguish similarly named churches.
+
+Church members are Chordless accounts, not entries in a separate address book. Preserve plain historical leader names on setlists when an account is no longer linked or eligible.
