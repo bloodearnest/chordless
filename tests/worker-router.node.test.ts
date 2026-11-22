@@ -274,3 +274,8 @@ test('a share download is cached in the background: the runtime is asked to wait
   await Promise.all(waiting)
   assert.deepEqual(cached, ['/api/share/1gaujHBXmLfJDPtBn5plrCrTukHnkIB8Y'])
 })
+
+test('church requests reach the church API rather than the app shell', async () => {
+  const { send } = setup()
+  assert.equal((await send('/api/churches')).status, 503)
+})
