@@ -234,9 +234,9 @@ describe('space-people', () => {
       select.dispatchEvent(new Event('change'))
       await answer(true)
 
+      await waitUntil(() => $$('.person').length === 2, 'the merged people list to refresh')
       expect(must(await db.getSetlist('a')).leaderId).to.equal('tom-smith')
       expect((await stored('tom')).mergedInto).to.equal('tom-smith')
-      await waitUntil(() => $$('.person').length === 2, 'the merged people list to refresh')
       expect($$('.person')).to.have.length(2)
       expect(card('Tom Smith').textContent).to.not.contain('leads 1')
     })
