@@ -320,7 +320,7 @@ export async function spacesOf(
         FROM teams t
         LEFT JOIN (SELECT COALESCE(?, (SELECT account_id FROM account_identities WHERE provider = ? AND sub = ?)) AS id) acct ON 1
         LEFT JOIN team_members m ON m.space_id = t.space_id AND m.account_id = acct.id
-        WHERE t.ended_at IS NULL
+        WHERE t.ended_at IS NULL AND t.church_id IS NULL
           AND (t.owner_provider || ':' || t.owner_sub = ?
                OR (acct.id IS NOT NULL AND t.owner_account_id = acct.id)
                OR m.account_id IS NOT NULL)
@@ -437,7 +437,7 @@ export class TeamSpaceState implements TeamSpaceApi {
           FROM teams t
           LEFT JOIN (SELECT COALESCE(?, (SELECT account_id FROM account_identities WHERE provider = ? AND sub = ?)) AS id) acct ON 1
           LEFT JOIN team_members m ON m.space_id = t.space_id AND m.account_id = acct.id
-          WHERE t.space_id = ? AND t.ended_at IS NULL`
+          WHERE t.space_id = ? AND t.ended_at IS NULL AND t.church_id IS NULL`
       )
       .bind(key, direct, identity.provider, identity.sub, this.#id)
       .first<{ role: TeamRole | null }>()

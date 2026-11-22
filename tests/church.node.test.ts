@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { handleChurch } from '../worker/src/church.ts'
 import type { Env } from '../worker/src/env.ts'
 import { signAccessToken } from '../worker/src/session-tokens.ts'
+import { spacesOf, TeamSpaceState } from '../worker/src/team-state.ts'
 import { d1Db } from './d1-db.ts'
 
 const key = () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64')
@@ -54,6 +55,28 @@ test('a signed-in person creates a church and its library, and only admins chang
   const { id } = (await response.json()) as { id: string }
   assert.match(id, /^[0-9A-HJKMNP-TV-Z]{26}$/)
   assert.equal(sql.prepare('SELECT count(*) AS n FROM libraries WHERE church_id = ?').get(id)?.n, 1)
+  const teams = (await (await call('admin', 'GET', `/api/churches/${id}/teams`)).json()) as {
+    id: string
+    name: string
+    archivedAt: string | null
+  }[]
+  assert.equal(teams.length, 1)
+  assert.equal(teams[0].name, 'St Mary')
+  assert.deepEqual(await spacesOf(db, { provider: 'chordless', sub: 'admin' }), [])
+  assert.equal(
+    await new TeamSpaceState(db, teams[0].id).roleOf({ provider: 'chordless', sub: 'admin' }),
+    null
+  )
+  assert.equal(
+    (await call('admin', 'POST', `/api/churches/${id}/teams`, { name: 'Evening' })).status,
+    201
+  )
+  assert.equal(
+    (await call('admin', 'DELETE', `/api/churches/${id}/teams/${teams[0].id}`)).status,
+    204
+  )
+  assert.equal((await call('admin', 'PUT', `/api/churches/${id}/teams/${teams[0].id}`)).status, 204)
+
   assert.equal(
     sql
       .prepare('SELECT role FROM church_members WHERE church_id = ? AND account_id = ?')
@@ -68,6 +91,48 @@ test('a signed-in person creates a church and its library, and only admins chang
   assert.equal((await call('stranger', 'GET', `/api/churches/${id}`)).status, 404)
   assert.equal((await call('reader', 'GET', `/api/churches/${id}`)).status, 200)
   assert.equal((await call('reader', 'PUT', `/api/churches/${id}`, data)).status, 403)
+  assert.equal((await call('stranger', 'GET', `/api/churches/${id}/members`)).status, 404)
+  assert.equal((await call('reader', 'GET', `/api/churches/${id}/members`)).status, 200)
+  assert.equal((await call('reader', 'GET', `/api/churches/${id}/teams`)).status, 200)
+  assert.equal(
+    (await call('reader', 'POST', `/api/churches/${id}/teams`, { name: 'No' })).status,
+    403
+  )
+  assert.equal(
+    (await call('reader', 'DELETE', `/api/churches/${id}/teams/${teams[0].id}`)).status,
+    403
+  )
+  assert.equal((await call('admin', 'DELETE', `/api/churches/${id}/teams/other`)).status, 404)
+  assert.equal(
+    (await call('admin', 'PUT', `/api/churches/${id}/members/reader`, { role: 'owner' })).status,
+    400
+  )
+
+  assert.equal(
+    (await call('reader', 'PUT', `/api/churches/${id}/members/admin`, { role: 'reader' })).status,
+    403
+  )
+  assert.equal(
+    (await call('admin', 'PUT', `/api/churches/${id}/members/admin`, { role: 'reader' })).status,
+    409
+  )
+  assert.equal((await call('admin', 'DELETE', `/api/churches/${id}/members/admin`)).status, 409)
+  assert.equal(
+    (await call('admin', 'PUT', `/api/churches/${id}/members/reader`, { role: 'admin' })).status,
+    204
+  )
+  assert.equal(
+    (await call('admin', 'PUT', `/api/churches/${id}/members/admin`, { role: 'reader' })).status,
+    204
+  )
+  assert.equal((await call('reader', 'DELETE', `/api/churches/${id}/members/admin`)).status, 204)
+  assert.equal((await call('reader', 'DELETE', `/api/churches/${id}/members/reader`)).status, 409)
+  sql
+    .prepare(
+      "INSERT INTO church_members (church_id, account_id, role, joined_at) VALUES (?, 'admin', 'admin', ?)"
+    )
+    .run(id, now)
+
   assert.equal(
     (await call('admin', 'PUT', `/api/churches/${id}`, { ...data, name: 'New name' })).status,
     200
