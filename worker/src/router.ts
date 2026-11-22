@@ -6,6 +6,7 @@
 
 import { ACCOUNT_PATH, handleAccount } from './account.ts'
 import { DRIVE_PATH, handleDrive } from './account-drive.ts'
+import { handleChurch, isChurchPath } from './church.ts'
 import {
   handleEmailLink,
   handleEmailLinkPeek,
@@ -97,6 +98,8 @@ async function route(
     if (path === DRIVE_PATH || path.startsWith(`${DRIVE_PATH}/`)) {
       return await handleDrive(request, env, google)
     }
+
+    if (isChurchPath(path)) return await handleChurch(request, env)
 
     // Team spaces (docs/SPACES.md): making one, joining, its people, and its files
     if (isTeamPath(path)) return await handleTeamRoutes(request, env, team)

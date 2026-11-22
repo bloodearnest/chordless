@@ -137,3 +137,10 @@ Church members are Chordless accounts, not entries in a separate address book. A
 Each account has exactly one personal space, with one owner; enforce the one-to-one account relationship. The person promoting a personal space becomes the new church’s first admin. Signed-out personal use remains available locally. On sign-in, ask before combining local personal data with an existing account personal space. If declined, leave local data on the device and unuploaded, make the choice available later, and do not block the account’s church access. Never silently lose either copy. Migrate any existing personal spaces into that one space, merging identical songs while preserving differing variants, all setlists and personal overlays. Preserve or explicitly map existing identifiers and references; do not discard data on a collision.
 
 A church member can import and use a song locally; only a worship leader or admin may add it to the shared church library. During a church's 30-day deletion period, devices remove its downloaded shared data when they learn it has been deleted. Personal overlays follow the local-retention and explicit resync behavior for ended membership. If the church is restored, devices can download shared data again.
+
+
+## Church administration API (first step)
+
+The authenticated Worker API provides `GET /api/churches` to list the account's active churches, `POST /api/churches` to create one, and `GET` / `PUT /api/churches/<id>` to read or update its details. Creation atomically adds its shared library and the creator as the first church admin. The request supplies name, country and city, plus optional postcode, CCLI number and licence JSON. Members can read; only an admin can update. Responses are not cached. Church-wide roles are kept in `church_members` alongside existing Team membership until migration.
+
+This first API does not yet create teams, manage invitations or members, or migrate any existing Team. There is no church administration UI yet; those follow with the rest of the church/team work.
