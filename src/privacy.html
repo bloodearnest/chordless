@@ -14,7 +14,7 @@
     <header class="doc-header"><a href="/">Chordless</a></header>
     <main class="doc">
       <h1>Privacy policy</h1>
-      <p class="updated">Last updated 16 November 2026</p>
+      <p class="updated">Last updated 22 November 2026</p>
 
       <p>
         Chordless (<a href="https://chordless.app/">chordless.app</a>) is a web app for arranging
@@ -24,11 +24,11 @@
 
       <h2>In short</h2>
       <ul>
-        <li>Your songs and setlists live on your device, and in your own Google Drive if you sign in.</li>
+        <li>Your songs and setlists live on your device so you can use them offline.</li>
         <li>
-          We do not keep your songs, setlists or Google data on any server. The only thing Chordless
-          keeps about a Team space is a register of the Team itself (see
-          <a href="#teams">Team spaces</a>).
+          Church teams' setlists are also kept on Chordless's server and shared with church members.
+          Older Drive-backed spaces sync their songs and setlists with the Google Drive chosen for that
+          space (see <a href="#teams">Churches and Team spaces</a>).
         </li>
         <li>We do not sell, share or use your data for advertising. There are no ads and no tracking across sites.</li>
         <li>
@@ -67,12 +67,18 @@
           you and are governed by Google's terms and privacy policy.
         </li>
         <li>
+          <strong>On Chordless's server:</strong> church teams' setlists, including their ordered
+          song titles, keys, notes and shared annotations, and church membership and settings.
+          Church members can read the setlists. Your device keeps a copy for offline use. Song charts
+          for the existing Drive-backed spaces remain in Drive; church song storage is not yet available.
+        </li>
+        <li>
           <strong>Sign-in:</strong> when you sign in, a small server component of Chordless, running
           on Cloudflare Workers, exchanges Google's sign-in code for tokens. It encrypts Google's
-          refresh token into a blob with a key only the server holds, and gives the blob back to
-          your browser to keep. It stores nothing itself. Later it decrypts the blob only to get a
-          new short-lived Google access token for you, or to change who can open your Chordless
-          folder, when you ask it to.
+          refresh token with a key only the server holds. When Google Drive is connected, the encrypted
+          token is kept with your Chordless account so your signed-in devices can sync. It is used
+          to obtain access to the Drive files Chordless is allowed to use, or to change who can open
+          a shared folder when you ask it to.
         </li>
       </ul>
       <p>
@@ -81,14 +87,20 @@
         privacy policy</a>. Chordless does not use cookies.
       </p>
 
-      <h2 id="teams">Team spaces</h2>
+      <h2 id="teams">Churches and Team spaces</h2>
       <p>
-        A Team space is shared by several people. To run it, Chordless's server keeps, in a database,
+        A church has members and one or more teams. Chordless stores the church's name, location,
+        licence details, members, roles and invitations. It stores each team's setlists, including
+        their song entries and shared annotations, and the teams each account follows. Church
+        members can read every team's setlists; worship leaders and admins can change them.
+      </p>
+      <p>
+        An older Drive-backed Team space is shared by several people. To run it, Chordless's server keeps, in a database,
         the Team's name, who owns it, who its members are and their roles, the invitations that are
         open, the ids of the files in the Team's Google Drive folder, and the owner's encrypted
         Google sign-in (or a note that it uses Chordless's own service account to reach the Team's
-        shared drive). It never keeps the Team's songs, setlists or pads: those pass through to the
-        Team's Google Drive.
+        shared drive). Its song charts and pads pass through to the Team's Google Drive. The server
+        can also hold setlist and song-index metadata for Teams that use D1 sync.
       </p>
       <p>
         When a Team stops sharing, the members, invitations, file ids and sign-in are deleted. What

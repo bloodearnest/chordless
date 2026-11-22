@@ -5,6 +5,7 @@ import {
   type ChurchInfo,
   type ChurchMember,
   type ChurchTeam,
+  ChurchTeamsChangedEvent,
   churchClient,
 } from '../js/church-client.ts'
 import { isAuthenticated } from '../js/google-auth.ts'
@@ -118,6 +119,7 @@ export class ChurchConsole extends LitElement {
     try {
       await work()
       await this.refresh()
+      window.dispatchEvent(new ChurchTeamsChangedEvent())
     } catch (error) {
       this.fail(error)
     } finally {

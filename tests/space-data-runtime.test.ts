@@ -6,6 +6,24 @@ import { SpaceOutboxChangedEvent } from '../src/js/space-data-store.ts'
 const { describe, it } = window
 
 describe('space-data automatic delivery', () => {
+  it('also refreshes followed teams when the app resumes', async () => {
+    const win = new EventTarget()
+    const doc = new EventTarget()
+    const sent: string[] = []
+    const auto = new SpaceDataAutoSync({
+      win,
+      doc,
+      current: () => 'current',
+      visible: () => true,
+      followed: async () => ['current', 'other'],
+      run: id => sent.push(id),
+      every: () => () => {},
+    })
+    auto.start()
+    await Promise.resolve()
+    expect(sent).to.deep.equal(['current', 'other'])
+    auto.stop()
+  })
   it('sends committed edits immediately, including another space and another tab, without a debounce', () => {
     const win = new EventTarget()
     const doc = new EventTarget()

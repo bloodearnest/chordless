@@ -113,11 +113,17 @@ export async function createLocalTeamSpace(team: {
   name: string
   role: TeamRole
   rootRef?: string
+  churchId?: string
+  followed?: boolean
 }): Promise<Space> {
   const space = await createSpace(await freeName(team.name || 'Team'))
   return updateSpace(space.id, {
     rootRef: team.role === 'owner' ? team.rootRef : team.spaceId,
-    team: { id: team.spaceId, role: team.role },
+    team: {
+      id: team.spaceId,
+      role: team.role,
+      ...(team.churchId ? { churchId: team.churchId, followed: team.followed } : {}),
+    },
     readOnly: team.role === 'reader',
   })
 }
@@ -256,6 +262,10 @@ export function leadersOf(setlists: Setlist[], people: Person[], own?: string | 
  * (every file comes through the Worker), so the sync's progress goes to `onProgress`.
  */
 export async function syncTeamSpace(space: Space, onProgress?: ProgressCallback): Promise<void> {
+  if (space.team?.churchId) {
+    const { syncSpaceDataFor } = await import('./space-data-runtime.ts')
+    return syncSpaceDataFor(space.id, { all: true })
+  }
   const { SyncManager } = await import('./sync-manager.ts')
   const db = new ChordlessDB(space.id)
   await db.init()

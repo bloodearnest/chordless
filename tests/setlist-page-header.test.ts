@@ -1247,6 +1247,32 @@ describe('the setlist page: header, menu and keys', () => {
       }
     })
 
+    it('lets a church leader delete any setlist but does not offer cross-library moves', async () => {
+      const { setlist, dialog } = await ready()
+      const space = getCurrentSpace().id as string
+      const other = await createSpace(`Other ${crypto.randomUUID()}`)
+      try {
+        await updateSpace(space, { team: { id: 'team', churchId: 'church', role: 'writer' } })
+        await rig.page._loadDialogActions(dialog, setlist)
+        expect(dialog.deleteBlocked).to.equal(null)
+        expect(dialog.moveTargets).to.deep.equal([])
+        await rig.page.moveSetlist(other.id)
+        expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
+        await updateSpace(space, { team: { id: 'team', churchId: 'church', role: 'reader' } })
+        await rig.page._loadDialogActions(dialog, setlist)
+        expect(dialog.deleteBlocked).to.not.equal(null)
+        await updateSpace(space, { team: undefined })
+        await updateSpace(other.id, { team: { id: 'team2', churchId: 'other', role: 'writer' } })
+        await rig.page._loadDialogActions(dialog, setlist)
+        expect(dialog.moveTargets.map(target => target.id)).to.not.include(other.id)
+        await rig.page.moveSetlist(other.id)
+        expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
+      } finally {
+        await updateSpace(space, { team: undefined })
+        await deleteSpace(other.id)
+      }
+    })
+
     it('says who may change it: a worship leader of a team, for a setlist they do not lead', async () => {
       const { setlist, dialog } = await ready()
       const space = getCurrentSpace().id as string

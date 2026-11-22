@@ -69,6 +69,7 @@ export interface SpacePerson {
   mergedInto: string | null
   version: number
   modifiedAt: string
+  leaderEligible?: boolean
 }
 
 export interface SpacePadSet {

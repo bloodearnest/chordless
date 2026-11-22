@@ -3,6 +3,14 @@ import { getIdentityToken } from './google-auth.ts'
 import type { MemberRole } from './team-roles.ts'
 import { callWorker, type WorkerCall } from './worker-call.ts'
 
+/** Team membership or following choices may have changed. */
+export class ChurchTeamsChangedEvent extends Event {
+  static readonly type = 'church-teams:changed'
+  constructor() {
+    super(ChurchTeamsChangedEvent.type)
+  }
+}
+
 export interface ChurchInfo {
   id: string
   name: string

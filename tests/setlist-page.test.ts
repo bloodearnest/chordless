@@ -317,6 +317,23 @@ describe('the setlist page', () => {
   })
 
   describe('adding a song', () => {
+    it('keeps a church song local until it has reached the shared library', async () => {
+      const setlist = await open(2)
+      const previous = page._space
+      page._space = async () => ({
+        id: db.spaceId,
+        name: 'Church',
+        createdDate: '',
+        modifiedDate: '',
+        team: { id: 'team', churchId: 'church', role: 'writer' },
+      })
+      try {
+        await page.addSongToSetlist(asLibrarySong(songs[3], 'D'))
+        expect(must(await db.getSetlist(setlist.id)).songs.at(-1)?.local).to.equal(true)
+      } finally {
+        page._space = previous
+      }
+    })
     it('adds it at the end with the key and tempo it has now, and shows it', async () => {
       const setlist = await open(2)
 

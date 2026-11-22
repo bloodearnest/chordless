@@ -5,6 +5,7 @@
  * Worker's answer and the first sync are given by the test.
  */
 import { expect } from '@open-wc/testing'
+import { churchClient } from '../src/js/church-client.ts'
 import type { Space } from '../src/js/data-types.ts'
 import {
   createSpace,
@@ -20,12 +21,13 @@ import {
   acceptTeam,
   addMissingTeamSpaces,
   checkTeamMemberships,
+  churchTeams,
   declinedTeams,
   declineTeam,
   type MyTeam,
   watchTeamMemberships,
 } from '../src/js/team-memberships.ts'
-import { withMembershipLock } from '../src/js/team-spaces.ts'
+import { syncTeamSpace, withMembershipLock } from '../src/js/team-spaces.ts'
 import { must } from './must.ts'
 import { shownToast, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -85,6 +87,48 @@ describe('teams on another device', () => {
     const reader = team('reader')
     const { added } = await check([reader])
     expect(must(await getSpaceById(must(added[0]).id)).readOnly).to.equal(true)
+  })
+
+  it('keeps church teams on the device while following controls their visibility', async () => {
+    const member = team('writer', { churchId: 'church', followed: true })
+    const { added } = await check([member])
+    const id = must(added[0]).id
+    expect(must(await getSpaceById(id)).team).to.include({ churchId: 'church', followed: true })
+    await syncTeamSpace(must(await getSpaceById(id)))
+    await check([{ ...member, followed: false }])
+    expect(must(await getSpaceById(id)).team).to.include({ churchId: 'church', followed: false })
+    await check([{ ...member, followed: true, role: 'reader' }])
+    expect(must(await getSpaceById(id)).readOnly).to.equal(true)
+  })
+
+  it('loads church-wide roles and account follow choices', async () => {
+    const list = churchClient.list
+    const teams = churchClient.teams
+    churchClient.list = async () => [
+      {
+        id: 'church',
+        name: 'Church',
+        country: 'GB',
+        city: 'York',
+        postcode: null,
+        ccliLicence: null,
+        licences: {},
+        role: 'writer',
+      },
+    ]
+    churchClient.teams = async () => [
+      { id: 'team', name: 'Morning', archivedAt: null, followed: 1 },
+      { id: 'old', name: 'Archived', archivedAt: '2026-01-01', followed: 1 },
+    ]
+    try {
+      expect(await churchTeams()).to.deep.equal([
+        { spaceId: 'team', name: 'Morning', role: 'writer', churchId: 'church', followed: true },
+        { spaceId: 'old', name: 'Archived', role: 'writer', churchId: 'church', followed: false },
+      ])
+    } finally {
+      churchClient.list = list
+      churchClient.teams = teams
+    }
   })
 
   it('reaches an owner’s team straight in its folder, and leaves one with no folder to be told of', async () => {

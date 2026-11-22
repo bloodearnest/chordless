@@ -3,7 +3,7 @@ import { SyncPushedEvent } from './auto-sync.ts'
 import { DataChangeEvent } from './data-changes.ts'
 import { openSpace } from './db.ts'
 import { getIdentityToken, isAuthenticated } from './google-auth.ts'
-import { getCurrentSpace, getSpaceById, SpaceChangeEvent } from './space.ts'
+import { getCurrentSpace, getSpaceById, listSpaces, SpaceChangeEvent } from './space.ts'
 import { SpaceDataSync, spaceDataTransport } from './space-data.ts'
 import { SpaceDataStore, SpaceOutboxChangedEvent } from './space-data-store.ts'
 import { t } from './text.ts'
@@ -17,6 +17,7 @@ export class SpaceDataAutoSync {
     current: () => string | null
     visible: () => boolean
     run: (spaceId: string) => void
+    followed?: () => Promise<string[]>
     every: (fn: () => void) => () => void
   }
   #cancel: (() => void) | null = null
@@ -26,6 +27,7 @@ export class SpaceDataAutoSync {
     current: () => string | null
     visible: () => boolean
     run: (spaceId: string) => void
+    followed?: () => Promise<string[]>
     every: (fn: () => void) => () => void
   }) {
     this.#deps = deps
@@ -33,6 +35,12 @@ export class SpaceDataAutoSync {
   #send = () => {
     const id = this.#deps.current()
     if (id) this.#deps.run(id)
+    void this.#deps
+      .followed?.()
+      .then(ids => {
+        for (const followed of ids) if (followed !== id) this.#deps.run(followed)
+      })
+      .catch(error => console.warn('[Team sync] Could not list followed teams:', error))
   }
   #resume = () => {
     if (this.#deps.visible()) this.#send()
@@ -83,13 +91,20 @@ export async function syncSpaceDataFor(
     creating = (async () => {
       const db = await openSpace(spaceId, 'sync')
       return new SpaceDataSync({
-        store: new SpaceDataStore(db),
+        store: new SpaceDataStore(
+          db,
+          space.team?.churchId ? { readKinds: ['setlist', 'person'], writeKinds: ['setlist'] } : {}
+        ),
         online: () => navigator.onLine,
-        transport: spaceDataTransport(teamId, {
-          token: getIdentityToken,
-          origin: location.origin,
-          fetch: (input, init) => window.fetch(input, init),
-        }),
+        transport: spaceDataTransport(
+          teamId,
+          {
+            token: getIdentityToken,
+            origin: location.origin,
+            fetch: (input, init) => window.fetch(input, init),
+          },
+          Boolean(space.team?.churchId)
+        ),
         lock: work => navigator.locks.request(`chordless-space-data-${spaceId}`, work),
         pushed: () => window.dispatchEvent(new SyncPushedEvent(teamId)),
         conflict: () => toast(t('space-data-conflict')),
@@ -142,6 +157,10 @@ export function startSpaceDataSync(): () => void {
     current: () => getCurrentSpace().id,
     visible: () => document.visibilityState === 'visible',
     run: id => send(id),
+    followed: async () =>
+      (await listSpaces())
+        .filter(space => space.team?.churchId && space.team.followed)
+        .map(space => space.id),
     every: fn => {
       const timer = setInterval(fn, 60_000)
       return () => clearInterval(timer)

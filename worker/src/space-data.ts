@@ -58,7 +58,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/
 // ---------------------------------------------------------------------------------------------------------
 // Validation: a record that is not one is refused, with what is wrong
 
-class Invalid extends Error {}
+export class Invalid extends Error {}
 
 function text(
   value: unknown,
@@ -155,7 +155,7 @@ function parseSetlistSong(value: unknown): SpaceSetlistSong {
   }
 }
 
-function parseSetlist(
+export function parseSetlist(
   record: unknown,
   setlistId: string
 ): Omit<SpaceSetlist, 'version' | 'modifiedAt'> {

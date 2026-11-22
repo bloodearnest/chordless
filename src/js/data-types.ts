@@ -396,6 +396,9 @@ export interface SpaceMember {
 export interface TeamLink {
   id: string
   role: TeamRole
+  /** Church-backed teams use the D1 setlist API, not the legacy Drive team service. */
+  churchId?: string
+  followed?: boolean
 }
 
 /** The 'spaces' store: a space's identity and its link to Drive */
@@ -432,6 +435,8 @@ export interface Person {
   /** A uuid, never changed */
   id: string
   name: string
+  /** Church members without a leader role may remain visible in old setlists. */
+  leaderEligible?: boolean
   /** Lower-cased Google accounts and other addresses the person writes from */
   emails: string[]
   /** In a team space, who they are there (`provider:sub`) */

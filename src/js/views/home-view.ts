@@ -31,7 +31,7 @@ import { leaderName } from '../leaders.ts'
 import { goTo } from '../navigation.ts'
 import { getSignedInUser, getSpacePeople, identifyMe, settleLeader } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
-import { ensureCurrentSpace, listSpaces } from '../space.ts'
+import { ensureCurrentSpace, getSpaceById, listSpaces } from '../space.ts'
 import { SyncStatusEvent } from '../sync-status.ts'
 import { t } from '../text.ts'
 import { toast } from '../toast.ts'
@@ -155,7 +155,9 @@ export class HomeView extends PageView {
       // Every space's setlists at once: no space is switched to (docs/CENTRAL_STORAGE.md, phase 0)
       // (a device's first visit makes its Personal space, as opening the current one used to)
       await ensureCurrentSpace()
-      const spaces = await listSpaces()
+      const spaces = (await listSpaces()).filter(
+        space => !space.team?.churchId || space.team.followed !== false
+      )
       const entries = await listAllSetlists(spaces)
       const people = new Map(
         await Promise.all(
@@ -236,7 +238,10 @@ export class HomeView extends PageView {
 
   /** Give the form the people there are now, and who is using the app among them */
   async #fillPeople(form: SetlistDetailsForm) {
-    const { people, me, askWho } = await getSpacePeople(await this.#targetDB())
+    const db = await this.#targetDB()
+    const { people, me, askWho } = await getSpacePeople(db)
+    const space = await getSpaceById(db.spaceId)
+    form.allowOtherLeader = !space?.team?.churchId
     form.people = people
     form.meId = me?.id ?? null
     form.askWho = askWho

@@ -42,6 +42,7 @@ export function controlsSetlist(
 ): boolean {
   const role: TeamRole | null = space?.team?.role ?? null
   if (role === null) return true
+  if (space?.team?.churchId) return role === 'writer' || role === 'admin'
   const noLeader = !resolvePerson(people, setlist.leaderId)
   const madeIt =
     noLeader && Boolean(me.email) && normalizeEmail(setlist.createdBy) === normalizeEmail(me.email)

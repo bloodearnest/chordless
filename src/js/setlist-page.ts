@@ -877,6 +877,7 @@ export class SetlistPage {
    * members and you would be as well, and who of them is you (or that the person should say)
    */
   async _loadDialogPeople(dialog: SetlistInfoDialog) {
+    dialog.allowOtherLeader = !(await this._space()).team?.churchId
     if (dialog.readonly) {
       dialog.people = await this._database().getAllPeople()
       dialog.meId = null
@@ -905,12 +906,21 @@ export class SetlistPage {
     const email = (await getSignedInUser())?.email
     const madeIt =
       !leader && Boolean(email) && normalizeEmail(setlist.createdBy) === normalizeEmail(email)
-    if (!mayChangeSetlist(role, leadsIt, madeIt)) {
+    const allowed = space.team?.churchId
+      ? role === 'writer' || role === 'admin'
+      : mayChangeSetlist(role, leadsIt, madeIt)
+    if (!allowed) {
       dialog.deleteBlocked = t('setlist-info-delete-blocked', { space: space.name })
       return
     }
     dialog.moveTargets = spaces
-      .filter(other => other.id !== space.id && other.team?.role !== 'reader')
+      .filter(
+        other =>
+          other.id !== space.id &&
+          other.team?.role !== 'reader' &&
+          !space.team?.churchId &&
+          !other.team?.churchId
+      )
       .map(other => ({ id: other.id, name: other.name }))
   }
 
@@ -967,6 +977,7 @@ export class SetlistPage {
     if (!setlist) return
     const [here, target] = await Promise.all([this._space(), getSpaceById(spaceId)])
     if (!target) return
+    if (here.team?.churchId || target.team?.churchId) return
     const title = setlistTitle(setlist, 'short')
     const modal = this.root.querySelector<AppModal>('#move-setlist-modal')
     const text = modal?.querySelector('#move-setlist-text')
@@ -2028,6 +2039,12 @@ export class SetlistPage {
       // (A library song has no top-level key or tempo: the chart's are in its metadata)
       const songCurrentKey = song.metadata?.key || song.parsed?.metadata?.key || null
       const songCurrentTempo = (song.metadata?.tempo || null) as number | null
+      const space = await this._space()
+      // A locally imported song has not entered the shared church library yet. Keep its entry
+      // on this device until the library backend can give it a server version.
+      const localSong = Boolean(
+        space.team?.churchId && !(await this._database().getSong(song.uuid))?.version
+      )
 
       // Preload pads for the song's current key in the background
       if (songCurrentKey) {
@@ -2044,7 +2061,7 @@ export class SetlistPage {
           tempo: songCurrentTempo, // Explicit snapshot of canonical tempo
           notes: '',
           // (someone who does not control the setlist adds for themselves alone)
-          ...(this._controls ? {} : { local: true as const }),
+          ...(this._controls && !localSong ? {} : { local: true as const }),
         })
       })
       if (!saved) return

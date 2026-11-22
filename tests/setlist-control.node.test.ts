@@ -51,6 +51,14 @@ describe('leadsSetlist', () => {
 })
 
 describe('controlsSetlist', () => {
+  it('lets any worship leader manage a church team setlist', () => {
+    const church = (role: 'writer' | 'admin' | 'reader') => ({
+      team: { id: 'team', churchId: 'church', role },
+    })
+    assert.equal(controlsSetlist(setlist(), church('writer'), people, me), true)
+    assert.equal(controlsSetlist(setlist(), church('admin'), people, me), true)
+    assert.equal(controlsSetlist(setlist(), church('reader'), people, me), false)
+  })
   it('is always yours in a personal space', () => {
     assert.equal(controlsSetlist(setlist(), undefined, people, me), true)
     assert.equal(controlsSetlist(setlist(), {} as never, people, me), true)
