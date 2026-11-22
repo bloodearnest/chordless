@@ -118,3 +118,9 @@ A church can be created without a CCLI number. While it is missing, show admins 
 Only admins may create or archive teams. An admin can restore an archived team with its existing identity and history. Historical setlists retain the leader's name when that person leaves the church or loses the worship leader role, but they are no longer offered as a leader for new or edited setlists.
 
 Provide a church admin console separate from the normal setlist and library UI for church settings, membership and roles, teams, licences, exports and archived items. A service-wide operator console is future work and has a separate permission boundary. Any church member may download the source PDF of a song they can access.
+
+## PDF import, reparsing and investigation
+
+Any church member may download a source PDF they can access. Worship leaders and admins may upload PDFs as part of bookmarklet import; its initial parse runs as part of that import. Only church admins may manually reparse an existing PDF. A trusted parser-release job may reparse current source PDFs across churches in the background; skip songs without a PDF. Historical PDFs remain available for an admin to reparse.
+
+Save an uploaded immutable PDF even if its initial parse fails, leave any current MusicXML unchanged and emit a telemetry alert so the failure can be investigated. Include the error, parser version and identifiers needed to locate the PDF without attaching the PDF or chart text. Provide restricted operator access to retrieve the stored PDF for investigation; audit who accessed which PDF and when. Define the operator authorization and audit retention before implementation.
