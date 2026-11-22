@@ -108,3 +108,13 @@ A person can explicitly promote a personal space to a new church, choosing the p
 The person promoting the personal space becomes the new church's first admin. Promotion copies the selected songs' complete source PDF and parse history as well as their current chart. Preserve provenance in the new library.
 
 When creating a church, a CCLI number matching an existing church can be shown as a possible match, with an option to ask an existing admin for an invitation. Explain that the entered number may be incorrect. A match does not automatically join the person or prevent them from continuing to create a church. Design the lookup so it does not expose private church or member information unnecessarily.
+
+## Church setup and administration
+
+A new member initially follows the team named by their invitation. Keep the existing invitation rules: worship leader and member links may be used by whoever has the link, while an admin invitation is restricted to its named email. Followed teams sync as an account-wide preference.
+
+A church can be created without a CCLI number. While it is missing, show admins a persistent, unobtrusive reminder on the church settings page; do not block imports or live use. A possible matching church should be offered during creation without blocking it, and explain that the entered number might be incorrect.
+
+Only admins may create or archive teams. An admin can restore an archived team with its existing identity and history. Historical setlists retain the leader's name when that person leaves the church or loses the worship leader role, but they are no longer offered as a leader for new or edited setlists.
+
+Provide a church admin console separate from the normal setlist and library UI for church settings, membership and roles, teams, licences, exports and archived items. A service-wide operator console is future work and has a separate permission boundary. Any church member may download the source PDF of a song they can access.
