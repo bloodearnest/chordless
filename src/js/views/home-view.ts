@@ -56,7 +56,7 @@ interface HomeViewState extends ViewState {
 }
 
 /**
- * Today and future setlists first, nearest first; past setlists by year,
+ * Today and future setlists first, newest first; past setlists by year,
  * newest first, with every past year initially collapsed.
  */
 export function groupSetlistsByDate(
@@ -102,7 +102,7 @@ export function groupSetlistsByDate(
           year: t('home-current-upcoming'),
           expanded: true,
           current: true,
-          setlists: upcoming.sort((a, b) => a.date.localeCompare(b.date)).map(row),
+          setlists: upcoming.sort((a, b) => b.date.localeCompare(a.date)).map(row),
         },
         ...history,
       ]

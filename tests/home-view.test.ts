@@ -29,10 +29,10 @@ describe('groupSetlistsByDate', () => {
   it('puts today and future setlists first, then past years newest first', () => {
     const groups = groupSetlistsByDate([...setlists, setlist('today', today)], today)
     expect(groups.map(group => group.year)).to.deep.equal(['Current and upcoming', '2026', '2025'])
-    expect(groups[0].setlists.map(item => item.id)).to.deep.equal(['today', 'c'])
+    expect(groups[0].setlists.map(item => item.id)).to.deep.equal(['c', 'today'])
   })
 
-  it('lists the nearest future setlist first and newest past setlist first within a year', () => {
+  it('lists future and past setlists newest first within their groups', () => {
     const [upcoming, group2026, group2025] = groupSetlistsByDate(setlists, today)
     expect(upcoming.setlists.map(item => item.id)).to.deep.equal(['c'])
     expect(group2026.setlists.map(item => item.id)).to.deep.equal(['b'])
