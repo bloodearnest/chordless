@@ -38,6 +38,7 @@ export interface SpaceDataState {
   checked?: boolean
   etag: string | null
   complete: boolean
+  writableKinds?: SpaceRecordKind[]
 }
 const emptyState = (): SpaceDataState => ({
   id: 'state',
@@ -67,6 +68,7 @@ export async function queueSpaceChange(
     tx.objectStore('space_data').get('state')
   )
   if (!state?.enabled && !state?.probing) return
+  if (state.writableKinds && !state.writableKinds.includes(kind)) return
   const store = tx.objectStore(SPACE_STORES[kind])
   const previous = sharedRecord(kind, await requestResult(store.get(id)))
   const record = sharedRecord(kind, next)
@@ -149,10 +151,17 @@ function validRecord(kind: SpaceRecordKind, record: SpaceRecord): boolean {
 }
 
 export class SpaceDataStore {
-  constructor(db: ChordlessDB) {
+  constructor(
+    db: ChordlessDB,
+    options: { readKinds?: SpaceRecordKind[]; writeKinds?: SpaceRecordKind[] } = {}
+  ) {
     this.#db = db
+    this.#readKinds = options.readKinds ?? [...kinds]
+    this.#writeKinds = options.writeKinds
   }
   readonly #db: ChordlessDB
+  readonly #readKinds: SpaceRecordKind[]
+  readonly #writeKinds: SpaceRecordKind[] | undefined
 
   #tx(mode: IDBTransactionMode): IDBTransaction {
     if (!this.#db.db) throw new Error('Space database is not open')
@@ -171,7 +180,8 @@ export class SpaceDataStore {
     const tx = this.#tx('readwrite')
     const store = tx.objectStore('space_data')
     const state: SpaceDataState = (await requestResult(store.get('state'))) ?? emptyState()
-    if (!state.enabled && (!onlyUnknown || !state.checked)) store.put({ ...state, probing: true })
+    if (!state.enabled && (!onlyUnknown || !state.checked))
+      store.put({ ...state, probing: true, writableKinds: this.#writeKinds })
     await transactionDone(tx)
   }
 
@@ -183,7 +193,12 @@ export class SpaceDataStore {
   }
 
   async pending(): Promise<SpaceOutboxRecord[]> {
-    return requestResult(this.#tx('readonly').objectStore('space_outbox').getAll())
+    const pending: SpaceOutboxRecord[] = await requestResult(
+      this.#tx('readonly').objectStore('space_outbox').getAll()
+    )
+    return this.#writeKinds
+      ? pending.filter(entry => this.#writeKinds?.includes(entry.change.kind))
+      : pending
   }
 
   #changed(kind: SpaceRecordKind): void {
@@ -203,6 +218,7 @@ export class SpaceDataStore {
       ['person', data.people],
       ['pad-set', data.padSets],
     ] as const) {
+      if (!this.#readKinds.includes(kind)) continue
       if (
         !Array.isArray(records) ||
         records.some(record => !validRecord(kind, record)) ||
@@ -222,6 +238,7 @@ export class SpaceDataStore {
       ['person', data.people],
       ['pad-set', data.padSets],
     ] as const) {
+      if (!this.#readKinds.includes(kind)) continue
       const protectedIds = new Set(
         pending.filter(entry => entry.change.kind === kind).map(entry => entry.change.id)
       )
@@ -268,9 +285,10 @@ export class SpaceDataStore {
       probing: false,
       etag,
       complete: state.complete || data.from === null,
+      writableKinds: this.#writeKinds,
     })
     await transactionDone(tx)
-    for (const kind of kinds) this.#changed(kind)
+    for (const kind of this.#readKinds) this.#changed(kind)
   }
 
   async #put(tx: IDBTransaction, kind: SpaceRecordKind, record: SpaceRecord): Promise<void> {

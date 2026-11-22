@@ -102,6 +102,12 @@ test('the API sends no CORS headers', async () => {
   assert.equal(response.headers.get('access-control-allow-origin'), null)
 })
 
+test('church team data is routed to its authenticated API', async () => {
+  const { send, assetRequests } = setup()
+  assert.equal((await send('/api/teams/team/data')).status, 503)
+  assert.deepEqual(assetRequests, [])
+})
+
 test("each session route is the Worker's: an empty request is refused by its own handler", async () => {
   const { send, assetRequests } = setup()
   for (const path of ['/session/token', '/session/upgrade']) {

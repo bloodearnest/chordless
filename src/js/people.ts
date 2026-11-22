@@ -16,7 +16,7 @@ import {
   normalizeEmail,
   resolvePerson,
 } from './leaders.ts'
-import { getCurrentSpaceFull } from './space.ts'
+import { getCurrentSpaceFull, getSpaceById } from './space.ts'
 import { ulid } from './ulid.ts'
 
 /** The signed-in Google account, or null if not signed in */
@@ -143,6 +143,15 @@ export async function chooseMe(db: ChordlessDB, personId: string): Promise<void>
 export async function getSpacePeople(
   db: ChordlessDB
 ): Promise<{ people: Person[]; me: Person | null; askWho: boolean }> {
+  const team = await getSpaceById(db.spaceId)
+  if (team?.team?.churchId) {
+    const [user, people] = await Promise.all([getSignedInUser(), db.getAllPeople()])
+    return {
+      people: livePeople(people),
+      me: user ? (findPerson(people, { email: user.email }) ?? null) : null,
+      askWho: false,
+    }
+  }
   // (two devices that each made the person for a member before they synced made two: they are joined first)
   await dedupePeople(db)
   const [user, space] = await Promise.all([getSignedInUser(), getCurrentSpaceFull()])

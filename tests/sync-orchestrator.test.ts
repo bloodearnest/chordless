@@ -1,7 +1,13 @@
 import { expect } from '@open-wc/testing'
 import { trace } from '@opentelemetry/api'
 import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace'
-import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
+import {
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  setCurrentSpace,
+  updateSpace,
+} from '../src/js/space.ts'
 import type { ProgressCallback, SyncManager } from '../src/js/sync-manager.ts'
 import {
   createSyncOrchestrator,
@@ -61,6 +67,31 @@ describe('SyncOrchestrator', () => {
   }
 
   const stages = (messages: SyncBroadcast[]) => messages.map(m => m.stage)
+
+  it('syncs church team metadata without invoking Drive operations', async () => {
+    const space = await createSpace(`Church team ${crypto.randomUUID()}`)
+    await updateSpace(space.id, { team: { id: 'team', churchId: 'church', role: 'writer' } })
+    try {
+      const orchestrator = new SyncOrchestrator(space.name, space.id)
+      let calls = 0
+      orchestrator.syncData = async () => {
+        calls++
+      }
+      await orchestrator.init()
+      await orchestrator.sync()
+      await orchestrator.incrementalSync()
+      expect(calls).to.equal(2)
+      let failure: unknown
+      try {
+        await orchestrator.push()
+      } catch (error) {
+        failure = error
+      }
+      expect((failure as Error).message).to.equal('This team does not use Google Drive')
+    } finally {
+      await deleteSpace(space.id)
+    }
+  })
 
   /** Run `call` with a callback that collects what is reported */
   async function reported(call: (callback: (progress: SyncBroadcast) => void) => Promise<unknown>) {

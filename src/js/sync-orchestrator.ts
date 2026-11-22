@@ -5,6 +5,7 @@
  * time and the message of any error, and throws the error again.
  */
 
+import { getSpaceById } from './space.ts'
 import { withSyncLock } from './sync-lock.ts'
 import type { SyncProgress } from './sync-manager.ts'
 import {
@@ -57,6 +58,8 @@ export class SyncOrchestrator {
    * Initialize sync manager
    */
   async init(): Promise<void> {
+    const space = await getSpaceById(this.spaceId)
+    if (space?.team?.churchId) return
     this.syncManager = await createSyncManager(this.spaceName, this.spaceId)
   }
 
@@ -112,6 +115,11 @@ export class SyncOrchestrator {
             const results = await Promise.allSettled([
               this.syncData(trigger),
               (async () => {
+                const space = await getSpaceById(this.spaceId)
+                if (space?.team?.churchId) {
+                  if (name === 'Sync' || name === 'Incremental sync') return
+                  throw new Error('This team does not use Google Drive')
+                }
                 if (!this.syncManager) await phase('chordless.sync.init', {}, () => this.init())
                 await operation(this.syncManager as SyncManager, send)
               })(),

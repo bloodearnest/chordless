@@ -2198,7 +2198,8 @@ space-data-missing-song = The chart is not on this device yet.
 # Church administration
 church-console-title = Churches
 church-console-open = Church administration
-church-console-setup = Church setup is underway. Teams created here will be available for setlists in a later update.
+church-console-setup = Church teams can use setlists. Shared songs will be available in a later update.
+church-no-song-copy = Songs cannot be copied between a church and another library.
 title-churches = Churches - Chordless
 church-console-signin = Sign in on the Account page, then open this link again.
 church-console-loading = Loading churches…

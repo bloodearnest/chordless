@@ -9,18 +9,21 @@ import type { SongSource, SongWithContent } from './data-types.ts'
 import { ChordlessDB } from './db.ts'
 import { databaseExists, SHARED_DB_ID } from './share-receiver.ts'
 import { addChart, getLibrarySongs, getSongWithContent } from './song-utils.ts'
-import { listSpaces } from './space.ts'
+import { getSpaceById, listSpaces } from './space.ts'
+import { t } from './text.ts'
+import { UserError } from './utils/errors.ts'
 
 const SHARED_LABEL = 'Shared with me'
 
 /** The databases other than the current space's that may hold songs, shared first */
 async function otherSources(currentDbId: string): Promise<SongSource[]> {
   const sources: SongSource[] = []
+  if ((await getSpaceById(currentDbId))?.team?.churchId) return sources
   if (currentDbId !== SHARED_DB_ID && (await databaseExists(SHARED_DB_ID))) {
     sources.push({ dbId: SHARED_DB_ID, label: SHARED_LABEL })
   }
   for (const space of await listSpaces()) {
-    if (space.id === currentDbId) continue
+    if (space.id === currentDbId || space.team?.churchId) continue
     if (await databaseExists(space.id)) {
       sources.push({ dbId: space.id, label: space.name })
     }
@@ -139,6 +142,12 @@ export async function addToLibrary(
   song: SongWithContent,
   library: ChordlessDB
 ): Promise<SongWithContent> {
+  if (
+    song.source &&
+    ((await getSpaceById(library.spaceId))?.team?.churchId ||
+      (await getSpaceById(song.source.dbId))?.team?.churchId)
+  )
+    throw new UserError(t('church-no-song-copy'))
   const record = await addChart(library, song.chordpro, {
     variantLabel: song.source?.dbId === SHARED_DB_ID ? 'Shared' : 'Copied',
     importSource: song.importSource,

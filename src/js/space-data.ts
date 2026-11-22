@@ -15,9 +15,10 @@ export interface SpaceDataTransport {
 
 export function spaceDataTransport(
   spaceId: string,
-  connection: WorkerConnection
+  connection: WorkerConnection,
+  churchTeam = false
 ): SpaceDataTransport {
-  const path = `/api/space/${encodeURIComponent(spaceId)}`
+  const path = `/api/${churchTeam ? 'teams' : 'space'}/${encodeURIComponent(spaceId)}`
   return {
     async read({ all, etag }) {
       try {

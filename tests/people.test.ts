@@ -15,7 +15,13 @@ import {
   personForMember,
   settleLeader,
 } from '../src/js/people.ts'
-import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
+import {
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  setCurrentSpace,
+  updateSpace,
+} from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
 import { isUlid, ulid } from '../src/js/ulid.ts'
 import { makeSetlist } from './builders.ts'
@@ -243,6 +249,16 @@ describe('the signed-in user and the space’s people', () => {
     await spaces.updateSpace(spaceId, { members })
     spaces.db?.close()
   }
+
+  it('uses the church account identities without creating a separate person', async () => {
+    await updateSpace(spaceId, { team: { id: 'team', churchId: 'church', role: 'writer' } })
+    await db.savePeople([person({ id: 'account', name: 'Ann', emails: ['ann@example.com'] })])
+    signIn({ name: 'Ann', email: 'ann@example.com' })
+    expect((await getSpacePeople(db)).me?.id).to.equal('account')
+    auth.worker.stored = undefined
+    expect((await getSpacePeople(db)).me).to.equal(null)
+    expect(await db.getAllPeople()).to.have.length(1)
+  })
 
   it('joins two people made for one member before the devices synced, and the setlists the extra one led', async () => {
     const first = person({

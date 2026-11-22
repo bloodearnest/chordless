@@ -56,7 +56,7 @@ export function sharedRecord(kind: SpaceRecordKind, value: unknown): SpaceRecord
       time: setlist.time,
       type: setlist.type,
       name: setlist.name,
-      leaderId: setlist.leaderId ?? null,
+      leaderId: setlist.leaderId || null,
       createdBy: setlist.createdBy ?? null,
       createdAt: setlist.createdDate,
       body: {
@@ -88,6 +88,7 @@ export function sharedRecord(kind: SpaceRecordKind, value: unknown): SpaceRecord
     return {
       personId: person.id,
       name: person.name,
+      leaderEligible: person.leaderEligible,
       emails: person.emails,
       teamMember: person.teamMember ?? null,
       mergedInto: person.mergedInto ?? null,
@@ -158,6 +159,7 @@ export function localRecord(
       ...(previous as Person),
       id: person.personId,
       name: person.name,
+      leaderEligible: person.leaderEligible,
       emails: person.emails,
       teamMember: person.teamMember ?? undefined,
       mergedInto: person.mergedInto ?? undefined,

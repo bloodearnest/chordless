@@ -1537,7 +1537,12 @@ export async function openSpace(spaceId: string, origin?: DataOrigin): Promise<C
   await db.init()
   // A Team first opened offline must capture edits before its first server probe too.
   const { getSpaceById } = await import('./space.ts')
-  if ((await getSpaceById(spaceId))?.team) await new SpaceDataStore(db).probe({ onlyUnknown: true })
+  const team = (await getSpaceById(spaceId))?.team
+  if (team)
+    await new SpaceDataStore(
+      db,
+      team.churchId ? { readKinds: ['setlist', 'person'], writeKinds: ['setlist'] } : {}
+    ).probe({ onlyUnknown: true })
   return db
 }
 

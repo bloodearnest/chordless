@@ -74,6 +74,7 @@ export class SetlistInfoDialog extends LitElement {
     /** The person using the app (marked in the menu), and whether to ask which of the people they are */
     meId: { attribute: false },
     askWho: { type: Boolean },
+    allowOtherLeader: { type: Boolean },
     /** A setlist received by link: no editing or deleting */
     readonly: { type: Boolean },
     /** Why it cannot be changed here, when it cannot: said under what the setlist is */
@@ -112,6 +113,7 @@ export class SetlistInfoDialog extends LitElement {
   declare people: Person[]
   declare meId: string | null
   declare askWho: boolean
+  declare allowOtherLeader: boolean
   declare readonly: boolean
   declare readonlyReason: string
   declare deleteBlocked: string | null
@@ -127,6 +129,7 @@ export class SetlistInfoDialog extends LitElement {
     this.people = []
     this.meId = null
     this.askWho = false
+    this.allowOtherLeader = true
     this.readonly = false
     this.readonlyReason = ''
     this.deleteBlocked = null
@@ -222,6 +225,7 @@ export class SetlistInfoDialog extends LitElement {
                 .people=${this.people}
                 .meId=${this.meId}
                 .askWho=${this.askWho}
+                .allowOtherLeader=${this.allowOtherLeader}
                 submit-label=${t('action-save')}
                 @setlist-details-form:save=${this._save}
                 @setlist-details-form:cancel=${this._cancel}

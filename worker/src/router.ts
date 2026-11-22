@@ -27,6 +27,7 @@ import { handleShareLive, shareLiveId } from './share-live.ts'
 import { withSharePreview } from './share-page.ts'
 import type { TeamDeps } from './team-context.ts'
 import { handleTeamRoutes, isTeamPath } from './team-routes.ts'
+import { handleTeamSetlists, isTeamSetlistPath } from './team-setlists.ts'
 import { handleTelemetry, TELEMETRY_PATH, type TelemetryDeps } from './telemetry.ts'
 import { withWorkerSpan } from './trace.ts'
 
@@ -100,6 +101,8 @@ async function route(
     }
 
     if (isChurchPath(path)) return await handleChurch(request, env)
+
+    if (isTeamSetlistPath(path)) return await handleTeamSetlists(request, env)
 
     // Team spaces (docs/SPACES.md): making one, joining, its people, and its files
     if (isTeamPath(path)) return await handleTeamRoutes(request, env, team)

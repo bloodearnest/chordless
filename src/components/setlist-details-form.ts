@@ -66,7 +66,9 @@ export function leaderChoices(
   setlist: { leaderId?: string | null } = {},
   people: Person[] = []
 ): { options: LeaderChoice[]; selected: string } {
-  const options: LeaderChoice[] = people.map(person => ({ value: person.id, person }))
+  const options: LeaderChoice[] = people
+    .filter(person => person.leaderEligible !== false || person.id === setlist.leaderId)
+    .map(person => ({ value: person.id, person }))
   const leader = resolvePerson(people, setlist.leaderId)
   return { options, selected: leader?.id ?? NO_LEADER }
 }
@@ -101,6 +103,7 @@ export class SetlistDetailsForm extends LitElement {
     people: { attribute: false },
     meId: { attribute: false },
     askWho: { type: Boolean },
+    allowOtherLeader: { type: Boolean },
     _otherLeader: { state: true },
   }
 
@@ -113,6 +116,7 @@ export class SetlistDetailsForm extends LitElement {
   declare meId: string | null
   /** The person using the app is not known: ask which of the people they are */
   declare askWho: boolean
+  declare allowOtherLeader: boolean
   declare _otherLeader: boolean
 
   _dateField: Ref<HTMLInputElement>
@@ -216,6 +220,7 @@ export class SetlistDetailsForm extends LitElement {
     this.meId = null
     this.askWho = false
     this._otherLeader = false
+    this.allowOtherLeader = true
     this._leaders = leaderChoices()
   }
 
@@ -341,7 +346,7 @@ export class SetlistDetailsForm extends LitElement {
               o =>
                 html`<option value=${o.value}>${o.person.id === this.meId ? t('details-leader-you', { name: o.person.name }) : o.person.name}</option>`
             )}
-            <option value=${OTHER_LEADER}>${t('details-leader-other')}</option>
+            ${this.allowOtherLeader ? html`<option value=${OTHER_LEADER}>${t('details-leader-other')}</option>` : ''}
           </select>
           ${
             this._otherLeader

@@ -9,6 +9,9 @@
  * device on purpose (`declineTeam`): those are not put back. Asking by hand (`includeDeclined`)
  * does put them back.
  */
+
+import { ChurchTeamsChangedEvent, churchClient } from './church-client.ts'
+import { announceDataChange } from './data-changes.ts'
 import type { Space } from './data-types.ts'
 import {
   hasCurrentSpace,
@@ -39,6 +42,32 @@ export interface MyTeam {
   role: TeamRole
   /** The team's folder in Drive: given to the owner only */
   rootRef?: string
+  churchId?: string
+  followed?: boolean
+}
+
+/** Church membership grants access to all teams; only followed teams appear on the home page. */
+export async function churchTeams(): Promise<MyTeam[]> {
+  const churches = await churchClient.list()
+  const teams = await Promise.all(
+    churches.map(async church =>
+      (await churchClient.teams(church.id)).map(team => ({
+        spaceId: team.id,
+        name: team.name,
+        role: church.role,
+        churchId: church.id,
+        followed: Boolean(team.followed) && !team.archivedAt,
+      }))
+    )
+  )
+  return teams.flat()
+}
+
+async function allTeams(): Promise<MyTeam[]> {
+  const results = await Promise.allSettled([teamApi.list(), churchTeams()])
+  const found = results.flatMap(result => (result.status === 'fulfilled' ? result.value : []))
+  if (results.every(result => result.status === 'rejected')) throw new Error('Could not load teams')
+  return found
 }
 
 /** The ids of the teams taken off this device on purpose */
@@ -89,7 +118,7 @@ export async function addMissingTeamSpaces(options: CheckOptions = {}): Promise<
   const report: MembershipReport = { added: [], declined: [] }
   let mine: MyTeam[]
   try {
-    mine = await (options.list ?? teamApi.list)()
+    mine = await (options.list ?? allTeams)()
   } catch (error) {
     // Not signed in, offline, or the Worker is down: nothing to learn
     console.warn('[TeamMemberships] Could not ask which teams there are:', error)
@@ -103,6 +132,20 @@ export async function addMissingTeamSpaces(options: CheckOptions = {}): Promise<
     for (const team of mine) {
       const space = known.get(team.spaceId)
       if (space?.team) {
+        if (team.churchId) {
+          await updateSpace(space.id, {
+            team: {
+              id: team.spaceId,
+              role: team.role,
+              churchId: team.churchId,
+              followed: team.followed,
+            },
+            readOnly: team.role === 'reader',
+          })
+          if (space.team.followed !== team.followed)
+            announceDataChange({ spaceId: space.id, kind: 'setlist', ids: null, origin: 'sync' })
+          continue
+        }
         // (an owner's role never changes, and it is how the space is reached: left as it is)
         if (space.team.role !== team.role && space.team.role !== 'owner' && team.role !== 'owner') {
           await updateSpace(space.id, {
@@ -133,7 +176,7 @@ export async function addMissingTeamSpaces(options: CheckOptions = {}): Promise<
     }
   }
   report.added = adds
-  const first = adds[0]
+  const first = adds.find(space => !space.team?.churchId || space.team.followed)
   if (first && !hasCurrentSpace()) {
     await setCurrentSpace(first.id, first.name)
     window.dispatchEvent(new SpaceChangeEvent(first.id))
@@ -191,6 +234,10 @@ export function checkTeamMemberships(
 /** Check now, and again whenever the app comes back to the screen after a while (called once, at start-up) */
 export function watchTeamMemberships(): void {
   void checkTeamMemberships()
+  window.addEventListener(
+    ChurchTeamsChangedEvent.type,
+    () => void checkTeamMemberships({ force: true })
+  )
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') void checkTeamMemberships()
   })

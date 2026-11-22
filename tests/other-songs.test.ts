@@ -10,7 +10,7 @@ import {
 } from '../src/js/other-songs.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
 import { addChart, getLibrarySongs } from '../src/js/song-utils.ts'
-import { createSpace, deleteSpace } from '../src/js/space.ts'
+import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
 import { must } from './must.ts'
 import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -47,6 +47,30 @@ describe('Songs from the other databases', () => {
     const songs = await getSongsElsewhere(libraryId)
     expect(songs.map(song => song.title)).to.deep.equal(['Beta'])
     expect(songs[0].source).to.deep.equal({ dbId: SHARED_DB_ID, label: 'Shared with me' })
+  })
+
+  it('does not copy a song into or out of a church library', async () => {
+    const church = await createSpace(`Church ${crypto.randomUUID()}`)
+    await updateSpace(church.id, { team: { id: 'team', churchId: 'church', role: 'writer' } })
+    const churchDb = new ChordlessDB(church.id)
+    await churchDb.init()
+    try {
+      await addChart(churchDb, ALPHA, ADD)
+      await addChart(shared, BETA, ADD)
+      expect(await getSongsElsewhere(church.id)).to.deep.equal([])
+      expect(
+        (await getSongsElsewhere(libraryId)).some(song => song.source?.dbId === church.id)
+      ).to.equal(false)
+      const source = must((await getSharedSongs())[0])
+      let failed = false
+      await addToLibrary(source, churchDb).catch(() => {
+        failed = true
+      })
+      expect(failed).to.equal(true)
+    } finally {
+      churchDb.db?.close()
+      await deleteSpace(church.id)
+    }
   })
 
   it('has nothing from elsewhere, and makes no database, when there is none', async () => {

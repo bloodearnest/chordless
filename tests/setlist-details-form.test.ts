@@ -22,6 +22,13 @@ const ann: Person = {
 const ben: Person = { id: 'ben-id', name: 'Ben Jones', emails: [], modifiedDate: NOW }
 
 describe('leaderChoices', () => {
+  it('offers eligible leaders while retaining the leader of a historical setlist', () => {
+    const former = { ...ann, leaderEligible: false }
+    expect(leaderChoices({}, [former, ben]).options.map(option => option.person.id)).to.deep.equal([
+      ben.id,
+    ])
+    expect(leaderChoices({ leaderId: former.id }, [former, ben]).selected).to.equal(former.id)
+  })
   it('offers the people, with nothing selected for a setlist without a leader', () => {
     const { options, selected } = leaderChoices({}, [ann, ben])
     expect(options.map(o => o.person)).to.deep.equal([ann, ben])
@@ -120,6 +127,16 @@ describe('setlist-details-form', () => {
       'Ann Smith',
       'Ben Jones',
       'Other…',
+    ])
+  })
+
+  it('limits church-team leaders to eligible members', async () => {
+    await makeForm({ ...setlist, leaderId: '' }, [{ ...ann, leaderEligible: false }, ben])
+    form.allowOtherLeader = false
+    await form.updateComplete
+    expect([...field('leader').options].map(option => option.text)).to.deep.equal([
+      'No leader',
+      'Ben Jones',
     ])
   })
 
