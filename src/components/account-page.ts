@@ -272,6 +272,7 @@ export class AccountPage extends LitElement {
     return html`
       <div class="content">
         <account-card></account-card>
+        ${this._signIn === 'signed-in' ? html`<a class="btn" href="/account/churches">${t('church-console-open')}</a>` : nothing}
         <h2>${t('account-spaces-heading')}</h2>
         <div class="spaces">
           ${this._spaces.map(

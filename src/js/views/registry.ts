@@ -59,6 +59,11 @@ export const views: Record<string, ViewEntry> = {
     () => import('./account-view.ts'),
     () => t('title-account')
   ),
+  churches: view(
+    'churches-view',
+    () => import('./churches-view.ts'),
+    () => t('title-churches')
+  ),
   preferences: view(
     'preferences-view',
     () => import('./preferences-view.ts'),

@@ -61,6 +61,13 @@ describe('the views of the app shell', () => {
 })
 
 describe('the about page', () => {
+  it('shows the church administration page', async () => {
+    const element = await views.churches.load({ name: 'churches' } as Route)
+    document.body.append(element)
+    await (element as unknown as { updateComplete: Promise<unknown> }).updateComplete
+    expect(element.querySelector('church-console')).to.exist
+    element.remove()
+  })
   it('shows the app’s name and what it is, and the policies', async () => {
     const element = await views.about.load({ name: 'about' } as Route)
     document.body.append(element)

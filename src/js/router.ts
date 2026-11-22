@@ -33,6 +33,7 @@ export type PageName =
   | 'home'
   | 'preferences'
   | 'account'
+  | 'churches'
   | 'import-song'
   | 'import-setlist'
   | 'about'
@@ -57,6 +58,7 @@ const PAGES: Readonly<Record<string, PageName | 'songs' | 'join' | 'sign-in'>> =
   '/songs': 'songs',
   '/preferences': 'preferences',
   '/account': 'account',
+  '/account/churches': 'churches',
   '/import-song': 'import-song',
   '/import-setlist': 'import-setlist',
   '/about': 'about',
