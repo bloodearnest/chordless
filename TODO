@@ -39,6 +39,7 @@ song data
 
 
 spaces (personal and team): the plan, the order of work and the status list are in docs/SPACES.md
+- Design a backup and recovery process for centrally stored data, including compromise and rogue deletion.
 - a team space's default pad set, chosen by a worship leader and synced with the space, which a
   device can still change for itself (today the choice is each device's: docs/SPACES.md, "Pads in
   team spaces")

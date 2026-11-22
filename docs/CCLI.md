@@ -44,7 +44,7 @@ must work, as must a church outside the countries CCLI serves.
 
 Who imported a song, when and from where is already kept on it (`importUser`, `importDate`,
 `importSource`). The licence a song came in under and a count of imports against the annual allowance
-remain planned. **Songs are never copied between spaces**, regardless of licence number. See
+remain planned. **Songs are not copied between libraries**, except in the explicit personal-to-church promotion workflow. See
 [CENTRAL_STORAGE.md](CENTRAL_STORAGE.md).
 
 ## Lead sheets

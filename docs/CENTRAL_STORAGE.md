@@ -8,7 +8,11 @@ Chordless will keep shared metadata in D1 and song content, source PDFs, pad aud
 
 A **church** represents one CCLI licence holder. It owns a shared song library and has one or more **teams**, each with its own setlist history. Most churches will have one team. Personal use remains available without joining a church, locally or synced.
 
-Songs never move or get copied between churches or personal libraries. A team's setlists use only songs from their own church's library. Teams in a church share that library. Replace the current space terminology and model with church and team where appropriate, preserving existing identities and links during migration.
+Songs are not copied between churches or personal libraries, except in the explicit personal-to-church promotion workflow below. A team's setlists use only songs from their own church's library. Teams in a church share that library. Replace the current space terminology and model with church and team where appropriate, preserving existing identities and links during migration.
+
+## Promote a personal space to a church
+
+A person can explicitly promote a personal space to a new church and choose which personal setlists to copy into its first team. Copy the songs referenced by those setlists into the church library and point the copied setlists at them. Offer an optional, initially unchecked choice to copy the whole personal library too. The original personal space, songs and setlists remain. This workflow is the explicit exception to the no-cross-library-copy rule; ordinary use and anonymous shares do not copy songs between libraries. Preserve song provenance and review applicable licence terms for this workflow.
 
 ## Church records and authorization
 
