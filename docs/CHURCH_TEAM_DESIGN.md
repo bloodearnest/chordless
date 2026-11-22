@@ -65,7 +65,7 @@ Church members may read every team's setlists and the shared church library. Wor
 
 Collapse owner and admin into church admin, alongside worship leader and church member. Any church admin can manage other admins; the last admin must appoint another before leaving or removing their own admin role. Worship leaders and admins may update or delete any team’s shared setlists; deletion requires confirmation. Everyone can still make local personal changes.
 
-Setlist leaders are church members with the worship leader or church admin role. Preserve historical leader names without linked accounts; choosing a leader for a new or edited setlist requires an eligible account. Pad sets and audio are church-wide; personal use keeps its own pads.
+Setlist leaders are church members with the worship leader or church admin role. Preserve historical leader names without linked accounts; choosing or changing a leader requires an eligible account; editing another field leaves an existing historical name untouched. Pad sets and audio are church-wide; personal use keeps its own pads.
 
 After a church ends or is deleted, keep a minimal register of its name, country, city and current licence details for posterity; delete members, songs, setlists and other content. Specify the retention and deletion details before implementation.
 
@@ -137,4 +137,4 @@ Church members are Chordless accounts, not entries in a separate address book. P
 
 ## One personal space per account
 
-Each account has exactly one personal space, with one owner; enforce the one-to-one account relationship. Signed-out personal use remains available locally. On sign-in, associate local personal data with the account's personal space without silently losing either copy. Migrate any existing personal spaces into that one space, merging identical songs while preserving differing variants, all setlists and personal overlays. Preserve or explicitly map existing identifiers and references; do not discard data on a collision.
+Each account has exactly one personal space, with one owner; enforce the one-to-one account relationship. Signed-out personal use remains available locally. On sign-in, ask before combining local personal data with an existing account personal space. If declined, leave local data on the device and unuploaded, make the choice available later, and do not block the account’s church access. Never silently lose either copy. Migrate any existing personal spaces into that one space, merging identical songs while preserving differing variants, all setlists and personal overlays. Preserve or explicitly map existing identifiers and references; do not discard data on a collision.
