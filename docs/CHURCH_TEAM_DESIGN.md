@@ -134,3 +134,7 @@ Account deletion has a 30-day recovery period for the personal library and synce
 CCLI usage reporting includes archived teams by default, uses the last 12 months initially, and allows an admin to choose another date range. A church match during setup may show name and location to distinguish similarly named churches.
 
 Church members are Chordless accounts, not entries in a separate address book. Preserve plain historical leader names on setlists when an account is no longer linked or eligible.
+
+## One personal space per account
+
+Each account has exactly one personal space, with one owner; enforce the one-to-one account relationship. Signed-out personal use remains available locally. On sign-in, associate local personal data with the account's personal space without silently losing either copy. Migrate any existing personal spaces into that one space, merging identical songs while preserving differing variants, all setlists and personal overlays. Preserve or explicitly map existing identifiers and references; do not discard data on a collision.
