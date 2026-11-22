@@ -104,3 +104,7 @@ An anonymous share's expired received setlist, charts and local overlays are rem
 ## Promote a personal space
 
 A person can explicitly promote a personal space to a new church, choosing the personal setlists to copy into its first team. Copy their referenced songs into the new church library and point the copied setlists to those songs. Offer an optional, initially unchecked choice to copy the whole personal library as well. The original personal space, songs and setlists remain. This is an explicit exception to the general no-cross-library-copy rule; ordinary church use and anonymous shares are not exceptions. Preserve provenance and review the applicable licence terms for this workflow.
+
+The person promoting the personal space becomes the new church's first admin. Promotion copies the selected songs' complete source PDF and parse history as well as their current chart. Preserve provenance in the new library.
+
+When creating a church, a CCLI number matching an existing church can be shown as a possible match, with an option to ask an existing admin for an invitation. Explain that the entered number may be incorrect. A match does not automatically join the person or prevent them from continuing to create a church. Design the lookup so it does not expose private church or member information unnecessarily.
