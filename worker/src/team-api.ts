@@ -24,8 +24,9 @@
  *   PUT  /people/<id>/name  {name}          any member: the name of the person who is them
  *   …    /pads…                             the space's pad sets (team-pads.ts)
  *
- * Bodies are text, but for pad audio.
+ * Bodies are text, but for encoded share ciphertext and pad audio.
  */
+import { fromBase64Url } from '../../src/js/base64url.ts'
 import type { SpaceMember } from '../../src/js/data-types.ts'
 import {
   ChangeTokenLost,
@@ -100,6 +101,17 @@ function asWrite(value: unknown): Write {
     throw new Refusal(400, 'ifRev must be a rev')
   }
   return { input: asFileInput(value.input), body: value.body, ifRev: ifRev ?? undefined }
+}
+
+/** Decode an explicitly marked share upload, leaving ordinary text writes unchanged. */
+function shareBody(value: Record<string, unknown>, body: string): string | Uint8Array {
+  if (value.encoding === undefined) return body
+  if (value.encoding !== 'base64url') throw new Refusal(400, 'Unknown file encoding')
+  try {
+    return fromBase64Url(body)
+  } catch {
+    throw new Refusal(400, 'Invalid file encoding')
+  }
 }
 
 /**
@@ -253,7 +265,12 @@ export async function handleTeamRequest(
       if (publicLink && collection !== 'shares') {
         throw new Refusal(400, 'Only a share can have a public link')
       }
-      return jsonResponse(await space.create(collection, input, body, { publicLink }))
+      if (json.encoding !== undefined && collection !== 'shares') {
+        throw new Refusal(400, 'Only a share can have an encoded body')
+      }
+      return jsonResponse(
+        await space.create(collection, input, shareBody(json, body), { publicLink })
+      )
     }
     if (method === 'POST' && rest === '/create-many') {
       write()
@@ -304,12 +321,19 @@ export async function handleTeamRequest(
       }
       if (method === 'PUT' && action === undefined) {
         write()
-        const { input, body, ifRev } = asWrite(await readJson(request))
+        const json = await readJson(request)
+        const { input, body, ifRev } = asWrite(json)
         if (!(await owned(ref))) return jsonResponse({ error: 'No such file' }, 404)
         if (!(await isAsSeen(space, ref, ifRev))) {
           throw new Refusal(409, 'The file has changed since you last read it')
         }
-        return jsonResponse(await space.update(ref, input, body))
+        if (
+          json.encoding !== undefined &&
+          !(await space.list('shares')).some(file => file.ref === ref)
+        ) {
+          throw new Refusal(400, 'Only a share can have an encoded body')
+        }
+        return jsonResponse(await space.update(ref, input, shareBody(json, body)))
       }
       if (method === 'POST' && action === '/trash') {
         write()
