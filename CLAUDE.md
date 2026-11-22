@@ -64,27 +64,22 @@ they must be able to. Overly restrictive is an antipattern here.
   so the arrow keys and swipes carry on moving through the setlist. Behind a modal dialog (which
   makes the rest of the page inert) it can be seen but not pressed until the dialog is closed.
 
-## Spaces and copyright
+## Churches, spaces and copyright
 
-**Chordless never stores copyrighted content itself: that is stored locally, and optionally synced with the
-user's own cloud storage (e.g. Google Drive).** Charts, lyrics and pad
-audio live in the user's own browser and in a Drive the user (or their team space's owner) controls.
-The Worker passes team-space traffic through (streamed, never buffered to storage) without
-persisting or caching it: no KV, R2, D1, Durable Object or Cache API entry may hold song or pad
-content. They hold only accounts (a person's name, their logins and the addresses they are known by), their sessions (a hash of each refresh token), sign-in codes (keyed hashes to check them, and, for an emailed link, the address and code in the clear for up to three days: `docs/SECURITY.md`), membership, roles, invites, the ids of the Drive files in a team's tree, a
-team's CCLI licence number and the log of who changed it (a record CCLI may ask for), the register of
-teams in D1 that outlives them (name, owner's email, dates: `docs/SPACES.md`; the members and the rest
-go when sharing ends), an account's encrypted Google Drive token blob (one per account, so that any device it signs in on can sync: `docs/ACCOUNT.md`, "Google Drive"), the owner's encrypted token blob for a team (or that a space uses Chordless's
-service account instead), checksums, and, for
-the live channel (`docs/LIVE_SYNC.md`), the hash of the secret a share's sender proved. The channel's
-sockets carry one word, "changed", never a setlist, chart or key: the content moves by the sync, as ever.
-(Share links are the one exception: the Worker caches ciphertext it cannot read.) Usage reports are the other: Honeycomb
-*may* keep fragments of titles or lyrics (in an error's text, or a URL) for its 60 days of retention (`docs/OBSERVABILITY.md`);
-Chordless's own servers keep none, and no report carries a whole chart or song. The space model (personal
-and team spaces, roles, the Worker's team service) is in `docs/SPACES.md`. The word is **space** in the code and the docs;
-in the UI people see **Personal** and **Team** (the list's heading is "Personal and Team Spaces"; "Create a new Team", "Account and Teams": the page that lists them is
-designed in `docs/ACCOUNT.md`), and roles are called worship leader and team member. ("organisation" is the old name; it
-survives only in names already stored on devices and in Drive.)
+Chordless may store song charts, lyrics, MusicXML, source PDFs and pad audio in its own R2 storage,
+scoped to a church or personal library. The current app still uses the user's Drive until the R2
+backend and migration are built (`docs/CENTRAL_STORAGE.md`). Do not claim that content has moved
+before it has. Keep access private and authorize it against the relevant church or personal account;
+an object key is not authorization. Anonymous shares are deliberately public to a holder of an
+unguessable, expiring link, served through the Worker. Never send whole charts or PDFs to telemetry.
+
+D1 keeps accounts, membership, roles, invites, the retained church register, library and setlist
+metadata, checksums and references to stored content. Source PDFs remain immutable and outside routine
+device sync. The live channel carries only "changed", not a setlist, chart or key. Honeycomb may keep
+fragments of titles or lyrics for its 60-day retention (`docs/OBSERVABILITY.md`). Update privacy copy
+when behavior changes. The current implementation calls its personal and Team workspaces **spaces**;
+the target model is churches with a shared library and teams, plus a personal space. Existing stored
+names and IDs must remain compatible during migration (`docs/CHURCH_TEAM_DESIGN.md`).
 
 ## Tech Stack
 
