@@ -125,6 +125,6 @@ Save an uploaded immutable PDF even if its initial parse fails, leave any curren
 
 ## Deletion and membership removal
 
-When a church member leaves or is removed, server access stops immediately. The app removes that church's downloaded data from the device when it next learns membership has ended; an offline device cannot learn this until it reconnects.
+When a church member leaves or is removed, server access stops immediately. Remove their synced church overlays from server storage and reset their followed-team choices for that church. Each device removes downloaded church setlists and charts when it next learns membership has ended, but retains that person's overlays locally. An offline device cannot learn of the change until it reconnects. If the person rejoins with the same account, offer an explicit choice to sync retained overlays from that device again; different devices may hold different versions.
 
 Source PDFs remain in the song's history until the whole song is deleted. Church deletion has a 30-day recovery period: the church and its content are inaccessible in normal use, but an admin can restore them during that period. Afterward, remove content and membership and retain the minimal church register with current licence details. Preserve enough authorization during the recovery period for an admin to restore it, without permitting normal access.
