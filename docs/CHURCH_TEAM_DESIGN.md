@@ -10,7 +10,7 @@ This conflates a church's library and its team's history. Adding a second team r
 
 ## Proposed changes to the existing schema
 
-Start from the tables and constraints in migrations `0011`–`0013`; this is a schema delta, not a replacement data model. Preserve the existing columns, JSON fields, validation, indexes and version guards unless a specific change below requires an equivalent update. In particular, a setlist song carries its own key, tempo, notes, annotations and JSON `extra`; its metadata must survive unchanged. Whether setlist songs remain rows or become a JSON document is a design decision to resolve against the existing API and reporting requirements, not a license to discard their metadata.
+Start from the tables and constraints in migrations `0011`–`0013`; this is a schema delta, not a replacement data model. Preserve the existing columns, JSON fields, validation, indexes and version guards unless a specific change below requires an equivalent update. In particular, a setlist song carries its own key, tempo, notes, annotations and JSON `extra`; its metadata must survive unchanged. Store the ordered song entries as a JSON document on `team_setlists`, preserving all entry metadata. Remove the separate setlist-song table after migration.
 
 | Current | Proposal | Ownership / migration |
 |---|---|---|
@@ -18,7 +18,7 @@ Start from the tables and constraints in migrations `0011`–`0013`; this is a s
 | `teams` | `teams` | Add a church foreign key. Keep each existing `space_id` value as the team identity; rename the column to `team_id` when dependent relationships and routes can move together. |
 | `space_songs` | `church_songs` | Change ownership from team to the church or personal library; preserve song UUIDs and fields. Add reference(s) to R2 chart content and source PDFs; their exact representation and immutable PDF version history need design. |
 | `space_setlists` | `team_setlists` | Team-owned; preserve IDs, fields, JSON `body`, unique setlist ID, date index and version guard. |
-| `space_setlist_songs` | `team_setlist_songs` | Preserve entry order and metadata, including JSON `annotations` and `extra`; enforce that each referenced song belongs to the team's church. |
+| `space_setlist_songs` | JSON document on `team_setlists` | Migrate ordered entries and all metadata, including `annotations` and `extra`; enforce that each referenced song belongs to the team's church. |
 | `space_people` | `team_people` | Rename proposed; confirm whether people are shared across a church before fixing ownership. |
 | `space_pad_sets` | `team_pad_sets` | Rename proposed; confirm whether pad sets belong to a church or team. |
 | `team_members`, `team_invites`, `team_events` | Existing tables | Preserve their data and constraints; membership, invitation and retained licence-event ownership need decisions. |
@@ -119,7 +119,7 @@ Provide a church admin console separate from the normal setlist and library UI f
 
 ## PDF import, reparsing and investigation
 
-Any church member may download a source PDF they can access. Worship leaders and admins may upload PDFs as part of bookmarklet import; its initial parse runs as part of that import. Only church admins may manually reparse an existing PDF. A trusted parser-release job may reparse current source PDFs across churches in the background; skip songs without a PDF. Historical PDFs remain available for an admin to reparse.
+Any church member may download a source PDF they can access. Worship leaders and admins may upload PDFs as part of bookmarklet import; its initial parse runs as part of that import. Only church admins may manually reparse an existing PDF. A trusted parser-release job may reparse current source PDFs and retry failed PDFs across church and personal libraries in the background, including failed imports that never became current; skip songs without a PDF. Historical PDFs remain available for an admin to reparse.
 
 Save an uploaded immutable PDF even if its initial parse fails, leave any current MusicXML unchanged and emit a telemetry alert so the failure can be investigated. Report parser failures for both church and personal libraries, including failures during imports and reparses. Include the error, parser version and identifiers needed to locate the PDF without attaching the PDF or chart text. Provide restricted operator access to retrieve stored church or personal PDFs for investigation. Define operator authorization before implementation; no access audit is required now.
 
@@ -128,3 +128,5 @@ Save an uploaded immutable PDF even if its initial parse fails, leave any curren
 When a church member leaves or is removed, server access stops immediately. Remove their synced church overlays from server storage and reset their followed-team choices for that church. Each device removes downloaded church setlists and charts when it next learns membership has ended, but retains that person's overlays locally. An offline device cannot learn of the change until it reconnects. If the person rejoins with the same account, offer an explicit choice to sync retained overlays from that device again; different devices may hold different versions.
 
 Source PDFs remain in the song's history until the whole song is deleted. Church deletion has a 30-day recovery period: the church and its content are inaccessible in normal use, but an admin can restore them during that period. Afterward, remove content and membership and retain the minimal church register with current licence details. Preserve enough authorization during the recovery period for an admin to restore it, without permitting normal access.
+
+Account deletion has a 30-day recovery period for the personal library and synced preferences. A last church admin must appoint another admin or delete the church before deleting their account.
