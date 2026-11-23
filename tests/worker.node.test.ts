@@ -96,6 +96,25 @@ test('worker API: /api/spaces and /api/spaces/join are the Worker’s, and want 
   }
 })
 
+test('church, team and account Drive APIs reach the Worker before the app shell', async () => {
+  for (const [method, path] of [
+    ['GET', '/api/churches'],
+    ['POST', '/api/churches'],
+    ['GET', '/api/churches/example/teams'],
+    ['POST', '/api/church-invites/join'],
+    ['GET', '/api/teams/example/data'],
+    ['POST', '/api/teams/example/batch'],
+    ['POST', '/api/account/drive/token'],
+  ]) {
+    const response = await worker.fetch(path, {
+      method,
+      ...(method === 'POST' ? { body: '{}' } : {}),
+    })
+    assert.equal(response.status, 401, path)
+    assert.ok(response.headers.get('content-type')?.includes('application/json'), path)
+  }
+})
+
 test('worker API: /session/token route exists', async () => {
   const resp = await worker.fetch('/session/token', {
     method: 'POST',
