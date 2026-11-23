@@ -268,7 +268,7 @@ first part of the deploy (`deploy.yml`, below; both workflows use the same steps
    run) is **not a change**: `scripts/plan-noise.jq` says so, only when every change is an update in place and
    every value Terraform knows is as recorded (a create, delete, replace, import, move or changed output is
    always a change), so that a deploy does not wait for an approval to change nothing, nor the nightly check
-   fail every night. `ignore_changes` cannot do this: Terraform refuses it on values the provider decides.
+   fail every night. `ignore_changes` cannot do this: Terraform refuses it on values the provider decides. It is a workaround for the provider's bug (no upstream issue has been filed), to be removed when a release fixes it; the comment in the script says when.
 2. **Apply**, in the `infra-apply` environment, which waits for your approval: read the plan, then
    approve, and exactly that plan is applied, with credentials that can write.
 

@@ -5,6 +5,11 @@
 # tables, with provider 5.29), the rest of it being what is already recorded. Such a plan would ask for an
 # approval to change nothing, on every deploy, and fail the nightly drift check on every night.
 #
+# A workaround, not a fix: provider 5.29.0 (the latest when this was written) has no plan modifier to
+# keep those values from state, so cloudflare_d1_database plans them unknown on every update. Remove this
+# (and its use in scripts/terraform-ci.sh, its test and tests/fixtures/terraform-plan-d1.json) once a
+# release no longer plans a change for the D1 database in a plan with nothing else in it.
+#
 # Careful on purpose, so that a real change is never taken for one: a create, a delete, a replace, an
 # import, a move, a forgotten resource, a changed output, and an update that changes any value Terraform
 # knows are all changes. Anything it cannot read is a change too (jq -e fails on no input).
