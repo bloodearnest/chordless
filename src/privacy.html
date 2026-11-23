@@ -73,10 +73,10 @@
           song titles, keys, notes and shared annotations, and church membership and settings.
           Church members can read the setlists and shared song library. ChordPro charts and their
           MusicXML are stored as private objects in Cloudflare R2; the Worker checks church
-          membership before serving them. Your device keeps a copy for offline use. The PDF a
-          church song was imported from is also kept there, unchanged, as a private object, and
-          Chordless reads the lead sheet's melody from it on the server; that PDF is not synced to
-          devices, and only the church's members can fetch it. Pad audio is not stored there.
+          membership before serving them. Your device keeps a copy for offline use. The PDFs
+          a church song was imported from are also kept there, unchanged, as private objects, and
+          Chordless reads the lead sheet's melody from the newest on the server; they are not
+          synced to devices, and only the church's members can fetch them. Pad audio is not stored there.
           Existing Drive-backed spaces remain in Drive until they are migrated.
         </li>
         <li>

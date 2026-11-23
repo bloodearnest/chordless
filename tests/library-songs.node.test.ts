@@ -47,6 +47,9 @@ test('library song bundles are private, versioned and stored under their library
   const env = {
     DB: db,
     SONG_BUCKET: {
+      async list() {
+        return { objects: [] }
+      },
       async get(objectKey: string) {
         const value = objects.get(objectKey)
         return value === undefined

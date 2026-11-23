@@ -108,9 +108,9 @@ test('church library song API paths reach the Worker handler', async () => {
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
 })
 
-test('library song source paths reach the Worker handler', async () => {
+test('library song PDF paths reach the Worker handler', async () => {
   const { send } = setup()
-  const response = await send('/api/libraries/library-a/songs/song-1/sources')
+  const response = await send('/api/libraries/library-a/songs/song-1/pdf')
   assert.equal(response.status, 503, 'the handler reports unavailable storage')
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
 })

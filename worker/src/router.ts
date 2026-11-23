@@ -16,8 +16,8 @@ import {
 import type { Env } from './env.ts'
 import type { GoogleApi } from './google-auth.ts'
 import { isCrossOrigin, jsonResponse, message } from './http.ts'
+import { handleLibraryPdf, isLibraryPdfPath } from './library-pdf.ts'
 import { handleLibrarySongs, isLibrarySongPath } from './library-songs.ts'
-import { handleLibrarySources, isLibrarySourcePath } from './library-sources.ts'
 import {
   handleOAuthCallback,
   handleSessionLogout,
@@ -106,7 +106,7 @@ async function route(
 
     if (isLibrarySongPath(path)) return await handleLibrarySongs(request, env)
 
-    if (isLibrarySourcePath(path)) return await handleLibrarySources(request, env)
+    if (isLibraryPdfPath(path)) return await handleLibraryPdf(request, env)
 
     if (isTeamSetlistPath(path)) return await handleTeamSetlists(request, env)
 

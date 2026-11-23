@@ -11,14 +11,9 @@ export function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
-/** The SHA-256 of bytes, in hex */
-export async function sha256HexOfBytes(
-  bytes: ArrayBuffer | Uint8Array<ArrayBuffer>
-): Promise<string> {
-  return toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
-}
-
 /** The SHA-256 of text (as UTF-8), in hex */
 export async function sha256Hex(text: string): Promise<string> {
-  return sha256HexOfBytes(new TextEncoder().encode(text))
+  return toHex(
+    new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))
+  )
 }
