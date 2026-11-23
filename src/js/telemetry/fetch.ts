@@ -80,5 +80,13 @@ export const fetchConfig: FetchInstrumentationConfig = {
   },
 }
 
-/** Start making spans of the page's fetches (it patches `fetch` as it is made, and stops when it is disabled) */
-export const instrumentFetch = (): FetchInstrumentation => new FetchInstrumentation(fetchConfig)
+/**
+ * Start making spans of the page's fetches (it patches `fetch` as it is made, and stops when it is
+ * disabled). The instrumentation does nothing until it is enabled, which also takes the global tracer
+ * provider as it is then: so the provider is set before this is called.
+ */
+export const instrumentFetch = (): FetchInstrumentation => {
+  const instrumentation = new FetchInstrumentation(fetchConfig)
+  instrumentation.enable()
+  return instrumentation
+}
