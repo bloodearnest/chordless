@@ -6,6 +6,12 @@ name: CI
 on:
   pull_request:
   workflow_call:
+    inputs:
+      # A string, not a boolean: on the other triggers `inputs` is empty, and an empty value must mean "run them"
+      slow-e2e:
+        description: '"skip" leaves out the macOS and Windows end-to-end jobs (and the watchdog for their runners): deploy.yml does, as the pull request has passed them and a deploy must not wait for a runner (docs/CI.md)'
+        type: string
+        default: run
   workflow_dispatch:
   # Weekly on main: keeps the caches from expiring in a quiet week, and checks the pinned tools
   # and runner images still work
@@ -187,7 +193,7 @@ jobs:
   e2e:
     name: End to end (${{ matrix.name }})
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && inputs.slow-e2e != 'skip'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:
@@ -291,6 +297,7 @@ jobs:
   watch-runners:
     name: Watch for a runner
     needs: changes
+    if: inputs.slow-e2e != 'skip'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
