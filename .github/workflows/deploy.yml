@@ -59,6 +59,10 @@ jobs:
   ci:
     name: CI
     uses: ./.github/workflows/ci.yml
+    with:
+      # The pull request has passed the macOS and Windows jobs on this same tree, and a deploy must not wait
+      # for a macOS runner (docs/CI.md, "A job that never gets a runner")
+      slow-e2e: skip
     permissions:
       actions: write # for ci.yml's watchdog, which cancels a run that is only waiting for a runner
       contents: read

@@ -44,7 +44,7 @@ Update any already-enabled auto-merge requests to use merge commits too.
 | Unit tests | Linux, Chromium | `just test-unit` | - |
 | Coverage | Linux | `just coverage-check`, on the two runs' reports | node, unit |
 | End to end | Linux, Chromium | `just test-e2e chromium` | - |
-| End to end | macOS, WebKit | `just test-e2e webkit` | - |
+| End to end | macOS, WebKit | `just test-e2e webkit` (advisory: not in `ci-ok`) | - |
 | End to end | Windows, Edge | `just test-e2e msedge` | - |
 | Advisories | Linux | `just advisories` (advisory: not in `ci-ok`) | only when `package-lock.json` changed |
 | Terraform | Linux | `just lint-infra` | only when `infra/` changed |
@@ -55,10 +55,12 @@ A pull request that changes only notes (anything in `docs/`, and `TODO`) skips e
 nothing shipped is made from them. (Other Markdown, such as the READMEs, may ship, so it runs CI. A change to `docs/coverage-floor.json` alone is not checked until the next code change.) Runs with no base to compare, as on `main` before a deploy, always run everything.
 
 `ci-ok` is the one required check, so jobs can be renamed, split or skipped without touching the
-ruleset. The macOS and Windows end-to-end jobs are required too (they are in `ci-ok`'s `needs`): they are
+ruleset. The Windows end-to-end job is required too (it is in `ci-ok`'s `needs`), and the macOS one is **advisory** (its own job, `e2e-macos`, outside `ci-ok`: a pull request shows its result, and a failure, and is blocked by neither; decided 2026-11-23, when GitHub's macOS pool left merges waiting for a runner for an hour). They are
 slow (4 to 6 minutes against Linux's 2) and their runners flaky (macOS: see "A job that never gets a runner", below), so they skip the tests tagged `@logic`
 (`--grep-invert @logic`): about half of them, the ones that do not depend on the browser or the platform
 (`docs/TESTING.md`). Linux runs every test, every time. The weekly run (Mondays, 06:00 UTC) and a run by hand run them all, so a break only they would catch is found within a week.
+
+**A deploy does not run them** (`deploy.yml` calls `ci.yml` with `slow-e2e: skip`, which leaves out the macOS and Windows jobs and the watchdog for their runners). The pull request has passed both on this same tree, a reusable workflow's caller waits for every job in it (so they could not run alongside the deploy without being a workflow of their own), and a deploy waiting for a macOS runner is the one place that capacity problem cost something real (2026-11-23: two of six deploys). Linux Chromium, the unit and node tests, lint and the build still gate it. What this gives up is a break that only the merged result shows, on WebKit or Edge only, seen at the next pull request or the weekly run, not before the deploy.
 
 `just ci` runs the Linux jobs' checks in order, and fails if they changed any file. CI never writes to
 the repository: it does not retake the Help pictures (fonts differ between machines), record stats or
@@ -78,7 +80,7 @@ test from failing a run, and would hide it. Log each in `docs/test-catches.jsonl
 
 The macOS jobs run on GitHub's arm64 pool, which is at times short of capacity (its own annotation says so).
 A job that waits about 15 minutes for a runner is cancelled with "The job was not acquired by Runner of type
-hosted even after multiple attempts", and the run then fails as a whole, because `ci-ok` counts it. That
+hosted even after multiple attempts", and the run then failed as a whole, because `ci-ok` counted it (it no longer does: macOS is advisory, below and above). That
 says nothing of the code: on 2026-11-16 three of the day's attempts were lost to it, and a deploy was missed.
 Over the 43 macOS attempts before that, 38 passed, none failed a test, and one was a capacity cancel (the
 others were superseded by a newer push, or by hand).
@@ -125,7 +127,7 @@ It checks out only the default branch and takes nothing from the run but its num
 always exits 0: it must never be what fails a run. The cases are tested in `tests/flaky-summary.node.test.ts`
 with a fake `gh`. A Deploy run it re-runs deploys, if it is still the newest commit (the deploy step checks).
 
-Not done, and the options if the capacity problem outlasts this: an Intel macOS runner (`macos-15-intel`, a
+**Done 2026-11-23, when it did outlast this:** the macOS job is advisory (`e2e-macos`, not in `ci-ok`), and a deploy does not run it. The watchdog and the re-run still retry it, so its result usually arrives, but nothing waits for it. Not done, and the other options: an Intel macOS runner (`macos-15-intel`, a
 separate pool, slower), or macOS only on `main` with Linux WebKit on pull requests (loses the real Safari
 engine before merge, which has caught a WebKit-only bug: `docs/test-catches.jsonl`, 2026-10-22).
 
