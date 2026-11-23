@@ -60,6 +60,8 @@ slow (4 to 6 minutes against Linux's 2) and their runners flaky (macOS: see "A j
 (`--grep-invert @logic`): about half of them, the ones that do not depend on the browser or the platform
 (`docs/TESTING.md`). Linux runs every test, every time. The weekly run (Mondays, 06:00 UTC) and a run by hand run them all, so a break only they would catch is found within a week.
 
+**A deploy does not run them** (`deploy.yml` calls `ci.yml` with `slow-e2e: skip`, which leaves out the macOS and Windows jobs and the watchdog for their runners). The pull request has passed both on this same tree, a reusable workflow's caller waits for every job in it (so they could not run alongside the deploy without being a workflow of their own), and a deploy waiting for a macOS runner is the one place that capacity problem cost something real (2026-11-23: two of six deploys). Linux Chromium, the unit and node tests, lint and the build still gate it. What this gives up is a break that only the merged result shows, on WebKit or Edge only, seen at the next pull request or the weekly run, not before the deploy.
+
 `just ci` runs the Linux jobs' checks in order, and fails if they changed any file. CI never writes to
 the repository: it does not retake the Help pictures (fonts differ between machines), record stats or
 lower the coverage floor; `just test` still does all three locally.
