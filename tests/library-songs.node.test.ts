@@ -47,9 +47,17 @@ test('library song bundles are private, versioned and stored under their library
   const env = {
     DB: db,
     SONG_BUCKET: {
+      async list() {
+        return { objects: [] }
+      },
       async get(objectKey: string) {
         const value = objects.get(objectKey)
-        return value === undefined ? null : { text: async () => value }
+        return value === undefined
+          ? null
+          : {
+              text: async () => value,
+              arrayBuffer: async () => new TextEncoder().encode(value).buffer,
+            }
       },
       async put(objectKey: string, value: string) {
         writes++
@@ -74,7 +82,9 @@ test('library song bundles are private, versioned and stored under their library
   env.SONG_BUCKET.get = async objectKey => {
     if (missingObjects) return null
     const value = objects.get(objectKey)
-    return value === undefined ? null : { text: async () => value }
+    return value === undefined
+      ? null
+      : { text: async () => value, arrayBuffer: async () => new TextEncoder().encode(value).buffer }
   }
   const request = async (account: string, method: string, path: string, body?: unknown) =>
     new Request(`https://example.test${path}`, {

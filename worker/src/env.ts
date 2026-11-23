@@ -15,16 +15,21 @@ export interface EmailMessage {
   text: string
 }
 
+/** The part of an R2 bucket the song routes use */
+export interface SongBucket {
+  get(key: string): Promise<{ text(): Promise<string>; arrayBuffer(): Promise<ArrayBuffer> } | null>
+  /** The keys under a prefix, in key order */
+  list(options: { prefix: string; limit?: number }): Promise<{ objects: { key: string }[] }>
+  put(
+    key: string,
+    value: string | ArrayBuffer,
+    options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> }
+  ): Promise<unknown>
+}
+
 export interface Env extends GoogleEnv, ShareEnv, ServiceAccountEnv {
-  /** Private object storage for church and personal library song bundles. */
-  SONG_BUCKET?: {
-    get(key: string): Promise<{ text(): Promise<string> } | null>
-    put(
-      key: string,
-      value: string,
-      options?: { httpMetadata?: { contentType?: string } }
-    ): Promise<unknown>
-  }
+  /** Private object storage for church and personal library song bundles and source PDFs. */
+  SONG_BUCKET?: SongBucket
   /**
    * The live rooms of team spaces, one per space, named by the space's id (team-room.ts): they hold
    * the sockets of the devices that are live, and nothing else. Unset in tests that do not touch them
