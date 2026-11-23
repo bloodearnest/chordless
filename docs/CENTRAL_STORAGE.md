@@ -1,6 +1,6 @@
 # Central storage: churches, teams and content
 
-**Status (2026-11-23): step 3 implementation in progress.** D1 sync for existing Team setlists, people and pad-set metadata is built through step 2d (#300). Church and team administration is built; no existing Team has been switched. Step 3 adds current church-library song bundles in R2 while retaining the existing Drive and anonymous-share paths.
+**Status (2026-11-23): step 3 is in review in [PR #305](https://github.com/bloodearnest/chordless/pull/305), stacked on [PR #303](https://github.com/bloodearnest/chordless/pull/303).** D1 sync for existing Team setlists, people and pad-set metadata is built through step 2d (#300). Church and team administration is built; no existing Team has been switched. Step 3 adds current church-library song bundles in R2 while retaining the existing Drive and anonymous-share paths.
 
 ## Goal and model
 
