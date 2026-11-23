@@ -1,7 +1,7 @@
 /** Library song bundles: D1 owns the current pointer and version; private R2 holds immutable bytes. */
 import { sha256Hex } from '../../src/js/utils/bytes.ts'
 import type { D1Db } from './d1.ts'
-import type { Env } from './env.ts'
+import type { Env, SongBucket } from './env.ts'
 import { isRecord, jsonResponse, Refusal, readJson, refusing } from './http.ts'
 import { authenticate, SESSION_PROVIDER, sessionProvider } from './identity.ts'
 
@@ -11,7 +11,7 @@ const MAX_BUNDLE_BYTES = 8 * 1024 * 1024
 
 export const isLibrarySongPath = (path: string) => PATH.test(path)
 
-interface LibraryAccess {
+export interface LibraryAccess {
   library_id: string
   church_id: string | null
   account_id: string | null
@@ -100,7 +100,7 @@ function parseBundle(value: unknown): SongBundle {
   return bundle
 }
 
-function canWrite(access: LibraryAccess): boolean {
+export function canWrite(access: LibraryAccess): boolean {
   return access.account_id !== null ? true : access.role === 'writer' || access.role === 'admin'
 }
 
@@ -116,30 +116,54 @@ async function access(db: D1Db, library: string, account: string): Promise<Libra
     .first<LibraryAccess>()
 }
 
+/** A signed-in account's access to a library, named by its id or by a team of its church: a refusal if it has none */
+export async function authorizeLibrary(
+  request: Request,
+  env: Env,
+  scope: string,
+  scopeId: string
+): Promise<{
+  db: D1Db
+  bucket: SongBucket
+  accountId: string
+  libraryId: string
+  permitted: LibraryAccess
+}> {
+  const bucket = env.SONG_BUCKET
+  if (!env.DB || !bucket) throw new Refusal(503, 'Song storage is not available')
+  const identity = await authenticate(request, [sessionProvider(env)])
+  if (!identity || identity.provider !== SESSION_PROVIDER) throw new Refusal(401, 'Sign in first')
+  const db = env.DB
+  const libraryId =
+    scope === 'teams'
+      ? (
+          await db
+            .prepare(`SELECT l.library_id FROM teams t JOIN churches c ON c.church_id = t.church_id
+          JOIN libraries l ON l.church_id = c.church_id JOIN church_members m ON m.church_id = c.church_id
+          WHERE t.space_id = ? AND t.ended_at IS NULL AND c.ended_at IS NULL AND m.account_id = ?`)
+            .bind(scopeId, identity.sub)
+            .first<{ library_id: string }>()
+        )?.library_id
+      : scopeId
+  if (!libraryId) throw new Refusal(404, 'No such library')
+  const permitted = await access(db, libraryId, identity.sub)
+  if (!permitted) throw new Refusal(404, 'No such library')
+  return { db, bucket, accountId: identity.sub, libraryId, permitted }
+}
+
 /** The URL and key are private; every list, read and write rechecks account or church membership. */
 export function handleLibrarySongs(request: Request, env: Env): Promise<Response> {
   const answer = refusing(async () => {
-    if (!env.DB || !env.SONG_BUCKET) throw new Refusal(503, 'Song storage is not available')
-    const identity = await authenticate(request, [sessionProvider(env)])
-    if (!identity || identity.provider !== SESSION_PROVIDER) throw new Refusal(401, 'Sign in first')
     const match = PATH.exec(new URL(request.url).pathname)
     if (!match) throw new Refusal(404, 'Not found')
     const [, scope, scopeId, songId, resource] = match
-    const db = env.DB
-    const libraryId =
-      scope === 'teams'
-        ? (
-            await db
-              .prepare(`SELECT l.library_id FROM teams t JOIN churches c ON c.church_id = t.church_id
-          JOIN libraries l ON l.church_id = c.church_id JOIN church_members m ON m.church_id = c.church_id
-          WHERE t.space_id = ? AND t.ended_at IS NULL AND c.ended_at IS NULL AND m.account_id = ?`)
-              .bind(scopeId, identity.sub)
-              .first<{ library_id: string }>()
-          )?.library_id
-        : scopeId
-    if (!libraryId) throw new Refusal(404, 'No such library')
-    const permitted = await access(db, libraryId, identity.sub)
-    if (!permitted) throw new Refusal(404, 'No such library')
+    const { db, bucket, accountId, libraryId, permitted } = await authorizeLibrary(
+      request,
+      env,
+      scope,
+      scopeId
+    )
+    const identity = { sub: accountId }
 
     if (!songId && resource === undefined && request.method === 'GET') {
       const rows = await db
@@ -155,7 +179,7 @@ export function handleLibrarySongs(request: Request, env: Env): Promise<Response
         .bind(libraryId, songId)
         .first<SongRow>()
       if (!row?.bundle_ref) throw new Refusal(404, 'Song content is not available')
-      const object = await env.SONG_BUCKET.get(row.bundle_ref)
+      const object = await bucket.get(row.bundle_ref)
       if (!object) throw new Refusal(503, 'Song content is temporarily unavailable')
       let bundle: unknown
       const serialized = await object.text()
@@ -206,7 +230,7 @@ export function handleLibrarySongs(request: Request, env: Env): Promise<Response
           ? current.bundle_ref
           : `library/${libraryId}/songs/${songId}/${hash}.json`
       if (current?.content_hash !== hash || !current.bundle_ref) {
-        await env.SONG_BUCKET.put(key, serialized, {
+        await bucket.put(key, serialized, {
           httpMetadata: { contentType: 'application/json; charset=utf-8' },
         })
       }
