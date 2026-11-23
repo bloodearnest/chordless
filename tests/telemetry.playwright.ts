@@ -141,6 +141,10 @@ test('a setlist session: opened, then left, with the same session id on both and
   await page.locator('setlist-overview song-card').nth(1).click()
   await expect(page).toHaveURL(/\/song\/1$/)
 
+  // The screen turned: the layout is checked once it has settled (and late), and agrees with itself
+  await page.setViewportSize({ width: 1366, height: 1024 })
+  await page.waitForTimeout(2000)
+
   // The tab closed: the session ends, and what is waiting is sent
   await page.evaluate(() => window.dispatchEvent(new Event('pagehide')))
   await expect
@@ -148,6 +152,14 @@ test('a setlist session: opened, then left, with the same session id on both and
       timeout: 15_000,
     })
     .toBe(2)
+
+  await expect
+    .poll(() => spans.filter(span => span.name === 'chordless.layout.check').length)
+    .toBe(2)
+  for (const check of spans.filter(span => span.name === 'chordless.layout.check')) {
+    expect(check.attributes['chordless.layout.ok']).toEqual({ boolValue: true })
+    expect(check.attributes['chordless.layout.inner_width']).toEqual({ intValue: 1366 })
+  }
 
   const open = spans.find(span => span.name === 'chordless.setlist.open')
   const leave = spans.find(span => span.name === 'chordless.setlist.leave')

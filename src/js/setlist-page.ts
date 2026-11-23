@@ -71,6 +71,7 @@ import { AnnotationsController } from './setlist/annotations-controller.ts'
 import { enterEditMode, isEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
 import { autohideHeader } from './setlist/header-autohide.ts'
 import { listenForNavigationKeys } from './setlist/keyboard-navigation.ts'
+import { watchLayout } from './setlist/layout-check.ts'
 import {
   afterMove,
   clearSetlistLocalState,
@@ -317,6 +318,8 @@ export class SetlistPage {
     this.setupNavigationMenu()
 
     const { signal } = this._abort
+    // (a screen turned can leave the layout wrong on an iPad: checked, reported and mended)
+    watchLayout({ root: this.root, container: () => this._songContainer(), signal })
     window.addEventListener('storage', this._onSectionDefaultsChanged, { signal })
     window.addEventListener(SectionDefaultsEvent.type, this._onSectionDefaultsChanged, { signal })
     window.addEventListener('storage', this._onCapoPreferenceChange, { signal })
