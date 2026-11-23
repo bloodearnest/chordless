@@ -65,9 +65,9 @@ while they were in).
   spaces are not available (503); with the database down a team call fails, and devices carry on
   from their own copy (offline first). Nothing about a team is best effort now: the audit trail
   is written in the same batch as the change it records.
-- **Setting it up.** `wrangler.toml` has a `[[d1_databases]]` binding `DB` with no `database_id`:
-  wrangler makes the database, named `chordless-teams`, on the first deploy, and the deploy then
-  applies `migrations/`. The Cloudflare token the deploy uses needs **D1: Edit**. In development
+- **Setting it up.** `wrangler.toml` has a `[[d1_databases]]` binding `DB`. Terraform makes the
+  database, named `chordless-teams` (`infra/cloudflare`), and `wrangler.toml` holds its `database_id`;
+  the deploy applies `migrations/`. The Cloudflare token the deploy uses needs **D1: Edit**. In development
   it is a local database; `just db-local` makes its tables. Tests run the migration files against
   SQLite (`tests/d1-db.ts`; in the browser, through Web Test Runner, `tests/d1-browser.ts`).
 - **Asking it.** There is no route that reads the register: the operator asks with wrangler, for

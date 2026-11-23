@@ -1,6 +1,6 @@
 # Cloudflare config for chordless.app that wrangler does not own.
 #
-# NOT here, on purpose: the Worker, its assets and the rate limiters. `wrangler deploy` owns those (wrangler.toml); managing them here too would make
+# NOT here, on purpose: the Worker, its assets, its bindings and the rate limiters. `wrangler deploy` owns those (wrangler.toml); managing them here too would make
 # two tools fight over the same objects. Secrets are `wrangler secret put` (docs/ENVIRONMENTS.md).
 #
 # Here: the Worker's custom domain (the one thing about the Worker that is zone infrastructure, not
@@ -261,11 +261,32 @@ resource "cloudflare_r2_bucket" "tfstate" {
   }
 }
 
+# Every bucket and database the Worker uses is made here and only here, and wrangler.toml names it
+# (bucket_name, database_id): wrangler does not provision (its automatic provisioning marked a new
+# binding "inherited" on a Worker version that had none, and every deploy failed: code 10057). Deploy
+# waits for the apply (deploy.yml), so a resource is there before a Worker that binds it. None is ever
+# destroyed by Terraform: they hold churches' data. Private: no public access, no custom domain; the
+# Worker is the only way in.
+
+# The register of teams, accounts, libraries and setlists (migrations/, applied by the deploy).
+# Made by wrangler's provisioning before this was here, so imported. The dev environment has no remote
+# database: it runs against a local one (just db-local).
+resource "cloudflare_d1_database" "teams" {
+  account_id = var.account_id
+  name       = "chordless-teams"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+import {
+  to = cloudflare_d1_database.teams
+  id = "${var.account_id}/5f29b307-f375-4330-a9a8-e4a4b5c0fe82"
+}
+
 # Private song bundles (worker/src/library-songs.ts, docs/CENTRAL_STORAGE.md): one bucket for the
-# production Worker and one for dev. Named in wrangler.toml, not provisioned by wrangler: its automatic
-# provisioning marked the new binding "inherited" on a Worker version that had none, and the deploy failed
-# (code 10057). Private: no public access, no custom domain; the Worker is the only way in. Never destroyed
-# by Terraform, since it holds churches' charts.
+# production Worker and one for dev.
 
 resource "cloudflare_r2_bucket" "songs" {
   for_each   = toset(["chordless-songs", "chordless-songs-dev"])
