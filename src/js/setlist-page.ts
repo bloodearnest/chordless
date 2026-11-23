@@ -56,6 +56,7 @@ import {
   getPitchControlsPreference,
   getPitchPreference,
   getScrollToTopOnSwipe,
+  getTelemetryPreference,
   getTuningPreference,
   PitchControlsEvent,
   PitchPreferenceEvent,
@@ -95,6 +96,7 @@ import { transferSetlists } from './space-transfer.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
 import { mayChangeSetlist } from './team-roles.ts'
+import { afterPaint } from './telemetry/frames.ts'
 import {
   editModeEntered,
   endSetlistSession,
@@ -341,13 +343,42 @@ export class SetlistPage {
     /* v8 ignore stop */
   }
 
+  /**
+   * What drawing the setlist took, which `openMs` leaves out: every song is in the page at once, and
+   * a browser without `content-visibility` (Safari before 18) lays all of them out. The first paint
+   * is when something could be seen; settled is when every song's display has rendered and the
+   * browser has painted after it. Nothing is measured when reports are off.
+   */
+  async _timeDrawing(timeoutMs?: number): Promise<{
+    firstPaintMs?: number
+    settledMs?: number
+    domElements?: number
+  }> {
+    if (!getTelemetryPreference()) return {}
+    const first = await afterPaint(timeoutMs)
+    const displays = Array.from(this.root.querySelectorAll<SongDisplay>('song-display'))
+    await Promise.all(displays.map(display => display.updateComplete))
+    const settled = await afterPaint(timeoutMs)
+    let domElements = this.root.getElementsByTagName('*').length
+    for (const shadow of displays
+      .map(display => display.shadowRoot)
+      .filter(root => root !== null)) {
+      domElements += shadow.querySelectorAll('*').length
+    }
+    return {
+      ...(first === null ? {} : { firstPaintMs: first - this._createdAt }),
+      ...(settled === null ? {} : { settledMs: settled - this._createdAt }),
+      domElements,
+    }
+  }
+
   /** The setlist is shown: its session begins (docs/OBSERVABILITY.md) */
   async _startSession() {
     const setlist = this.currentSetlist
     if (!setlist) return
     // (taken before looking for the lead sheets, which is not part of how long the setlist took to show)
     const openMs = performance.now() - this._createdAt
-    const scores = await this._scoresIn(setlist)
+    const [scores, drawn] = await Promise.all([this._scoresIn(setlist), this._timeDrawing()])
     if (this._disposed) return
     startSetlistSession({
       setlistId: setlist.id,
@@ -357,6 +388,7 @@ export class SetlistPage {
       ccli: this.songs.flatMap(song => song._canonicalSong?.ccliNumber ?? []),
       source: this._readOnly ? 'share' : 'library',
       openMs,
+      ...drawn,
       hasUnsent: hasUnsentChanges,
     })
     // (the page may already show a song: it was made with the route)
