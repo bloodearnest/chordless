@@ -25,7 +25,7 @@ page=$(curl -fsS --max-time 20 "$site/") || status=1
 grep -qi '<title>' <<<"$page" || { echo "$site/ is not the page" >&2; status=1; }
 curl -fsS --max-time 20 "$site/api/config" | jq -e . >/dev/null || { echo "$site/api/config does not answer" >&2; status=1; }
 # An unauthenticated request must reach each API, rather than being served the SPA fallback.
-for path in /api/churches /api/churches/smoke/teams /api/church-invites/join /api/teams/smoke/data /api/account/drive/token; do
+for path in /api/churches /api/churches/smoke/teams /api/church-invites/join /api/teams/smoke/data /api/teams/smoke/library/songs /api/account/drive/token; do
   response=$(curl -sS --max-time 20 -w $'\n%{http_code}' "$site$path") || { echo "$site$path did not answer" >&2; status=1; continue; }
   code=${response##*$'\n'}
   body=${response%$'\n'*}

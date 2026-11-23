@@ -823,6 +823,31 @@ export class ChordlessDB {
     )
   }
 
+  /** Apply one downloaded central song bundle atomically with its metadata and optional MusicXML. */
+  async saveLibraryBundle(
+    song: SongRecord,
+    chart: ChordProRecord,
+    score: ScoreRecord | null
+  ): Promise<void> {
+    if (chart.id !== song.chordproFileId)
+      throw new Error('A library chart must use the song’s chordproFileId')
+    const tx = this.#transaction(['songs', 'song_index', 'chordpro', 'scores'], 'readwrite')
+    const previous = (await requestResult(tx.objectStore('songs').get(song.uuid))) as
+      | SongRecord
+      | undefined
+    if (previous && previous.chordproFileId !== song.chordproFileId)
+      tx.objectStore('chordpro').delete(previous.chordproFileId)
+    tx.objectStore('chordpro').put(chart)
+    tx.objectStore('songs').put(withNumericSongTempos(song))
+    if (score) tx.objectStore('scores').put(score)
+    else tx.objectStore('scores').delete(song.uuid)
+    await writeSongIndex(tx, song)
+    await transactionDone(tx)
+    this.#changed('song', [song.uuid])
+    this.#changed('chart', [chart.id])
+    this.#changed('score', [song.uuid])
+  }
+
   async getAllSongIndex(): Promise<import('./data-types.ts').SongIndexRecord[]> {
     const tx = this.#transaction(['song_index'], 'readonly')
     return requestResult(tx.objectStore('song_index').getAll())

@@ -104,6 +104,7 @@ test('church, team and account Drive APIs reach the Worker before the app shell'
     ['POST', '/api/church-invites/join'],
     ['GET', '/api/teams/example/data'],
     ['POST', '/api/teams/example/batch'],
+    ['GET', '/api/teams/example/library/songs'],
     ['POST', '/api/account/drive/token'],
   ]) {
     const response = await worker.fetch(path, {

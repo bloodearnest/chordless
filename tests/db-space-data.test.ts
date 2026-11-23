@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import type { SpaceOutboxRecord } from '../src/js/data-types.ts'
+import type { SongRecord, SpaceOutboxRecord } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import { ulid } from '../src/js/ulid.ts'
 import { requestResult, transactionDone } from '../src/js/utils/idb.ts'
@@ -24,6 +24,55 @@ async function open(): Promise<ChordlessDB> {
 }
 
 describe('device space data', () => {
+  it('applies a central bundle and optional MusicXML in one local transaction', async () => {
+    await open()
+    const song = makeSong({ uuid: 'library-song', chordproFileId: 'old-chart' }) as SongRecord
+    const oldChart = {
+      id: song.chordproFileId,
+      content: '{title: Old}\n[C]Old',
+      contentHash: 'old',
+    }
+    await db.saveChordPro(oldChart)
+    await db.saveSong(song)
+    await db.saveScore({
+      uuid: song.uuid,
+      xml: '<score-partwise/>',
+      key: 'G',
+      createdDate: song.importDate,
+      modifiedDate: song.modifiedDate,
+      contentHash: 'score',
+    })
+
+    const updated = { ...song, chordproFileId: 'new-chart', version: 2, libraryHash: 'bundle' }
+    const chart = {
+      id: updated.chordproFileId,
+      content: '{title: New}\n[D]New',
+      contentHash: 'chart',
+    }
+    await db.saveLibraryBundle(updated, chart, {
+      uuid: song.uuid,
+      xml: '<score-partwise><part-list/></score-partwise>',
+      key: 'D',
+      createdDate: song.importDate,
+      modifiedDate: song.modifiedDate,
+      contentHash: 'new-score',
+    })
+    expect(await db.getChordPro(oldChart.id)).to.equal(undefined)
+    expect(await db.getChordPro(chart.id)).to.deep.equal(chart)
+    expect(await db.getSong(song.uuid)).to.include({ version: 2, libraryHash: 'bundle' })
+    expect(await db.getSongIndex(song.uuid)).to.include({ version: 2, title: song.title })
+    expect(await db.getScore(song.uuid)).to.include({
+      xml: '<score-partwise><part-list/></score-partwise>',
+    })
+
+    await db.saveLibraryBundle({ ...updated, version: 3 }, chart, null)
+    expect(await db.getScore(song.uuid)).to.equal(undefined)
+    await db.saveLibraryBundle(updated, { ...chart, id: 'wrong-chart' }, null).then(
+      () => expect.fail('a chart with a different id should be rejected'),
+      error => expect(error.message).to.contain('chordproFileId')
+    )
+  })
+
   it('upgrades existing metadata without losing charts, links, identities or local state', async () => {
     const song = makeSong({ fileRef: 'drive-chart', ccliNumber: '123' })
     const setlist = makeSetlist({ songs: [makeEntry({ key: 'D', tempo: 90, notes: 'Twice' })] })

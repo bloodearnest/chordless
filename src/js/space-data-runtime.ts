@@ -3,6 +3,7 @@ import { SyncPushedEvent } from './auto-sync.ts'
 import { DataChangeEvent } from './data-changes.ts'
 import { openSpace } from './db.ts'
 import { getIdentityToken, isAuthenticated } from './google-auth.ts'
+import { syncLibrarySongs } from './library-song-sync.ts'
 import { getCurrentSpace, getSpaceById, listSpaces, SpaceChangeEvent } from './space.ts'
 import { SpaceDataSync, spaceDataTransport } from './space-data.ts'
 import { SpaceDataStore, SpaceOutboxChangedEvent } from './space-data-store.ts'
@@ -48,7 +49,10 @@ export class SpaceDataAutoSync {
   #queued = (event: Event) => this.#deps.run((event as SpaceOutboxChangedEvent).spaceId)
   #edited = (event: Event) => {
     const { change } = event as DataChangeEvent
-    if (change.origin === 'local' && ['setlist', 'person', 'song', 'pad-set'].includes(change.kind))
+    if (
+      change.origin === 'local' &&
+      ['setlist', 'person', 'song', 'chart', 'score', 'pad-set'].includes(change.kind)
+    )
       this.#deps.run(change.spaceId)
   }
   start(): void {
@@ -123,6 +127,14 @@ export async function syncSpaceDataFor(
     void creating.catch(() => controllers.delete(spaceId))
   }
   const sync = await creating
+  if (space.team.churchId) {
+    const db = await openSpace(spaceId, 'sync')
+    await syncLibrarySongs(teamId, db, {
+      token: getIdentityToken,
+      origin: location.origin,
+      fetch: (input, init) => window.fetch(input, init),
+    })
+  }
   await sync.sync(options)
   failures.delete(spaceId)
 }

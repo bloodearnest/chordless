@@ -61,11 +61,13 @@ describe('space-data automatic delivery', () => {
     const before = sent.length
     win.dispatchEvent(new DataChangeEvent({ ...change, origin: 'sync' }))
     win.dispatchEvent(new DataChangeEvent({ ...change, kind: 'chart' }))
-    expect(sent.length).to.equal(before)
+    win.dispatchEvent(new DataChangeEvent({ ...change, kind: 'score' }))
+    expect(sent.length).to.equal(before + 2)
+    const afterLocalChanges = sent.length
     visible = false
     tick()
     doc.dispatchEvent(new Event('visibilitychange'))
-    expect(sent.length).to.equal(before)
+    expect(sent.length).to.equal(afterLocalChanges)
     win.dispatchEvent(new Event('online'))
     expect(sent.at(-1)).to.equal('current')
     visible = true

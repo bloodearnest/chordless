@@ -1,6 +1,6 @@
 # Central storage: churches, teams and content
 
-**Status (2026-11-21): design.** D1 sync for existing Team setlists, people, song index and pad-set metadata is built through step 2d (#290). No Team has been switched. The church and team model, R2 storage and migration below are future work.
+**Status (2026-11-23): step 3 is in review in [PR #305](https://github.com/bloodearnest/chordless/pull/305), stacked on [PR #303](https://github.com/bloodearnest/chordless/pull/303).** D1 sync for existing Team setlists, people and pad-set metadata is built through step 2d (#300). Church and team administration is built; no existing Team has been switched. Step 3 adds current church-library song bundles in R2 while retaining the existing Drive and anonymous-share paths.
 
 ## Goal and model
 
@@ -33,6 +33,8 @@ Move pad audio to R2, scoped to the appropriate church or personal library.
 ## Backend and sync
 
 Build an R2 storage backend behind the existing interfaces, extending them where song bundles, source PDFs, pad audio or shares need additional operations. Preserve the current offline, versioning and conflict behavior: edits commit locally first, pending changes survive offline use, and online delivery starts promptly. Map R2 revisions and conditional writes to existing conflict handling. Test concurrent edits, interrupted uploads and reconciliation between D1 metadata and R2 objects.
+
+For current church-library songs, store a versioned JSON bundle with `format: 1`, `chordpro` text and nullable `musicxml` text. D1 keeps the SHA-256 of the complete serialized bundle, current R2 reference and version. R2 object keys are content-addressed under the library and song id; membership checks, never the key, authorize reads and writes. Write the immutable R2 object before the conditional D1 update, so a failed or concurrent update can leave an unreferenced object. Do not delete it in the request; orphan collection belongs in later cleanup work. An identical bundle and metadata write is a no-op. PDFs and pads are not included in this bundle or this sync path.
 
 Use one shared bucket initially, with church-scoped keys and authorization. Record country and keep bucket selection behind the backend; defer EU/US jurisdiction routing and per-church buckets until there is a concrete need. A location hint is best effort; a jurisdiction restriction is a residency control. See [R2 data location](https://developers.cloudflare.com/r2/reference/data-location/).
 
@@ -78,7 +80,7 @@ Rehearse the one-off migration against representative Drive data, including miss
 
 ## Design work still needed
 
-- Song bundle format, PDF provenance and partial-update behavior.
+- PDF provenance and partial-update behavior. Collect unreferenced content-addressed song objects without deleting an object still used by a library row.
 - Church member and team administration APIs and the admin console.
 - Migration verification and recovery, and treatment of offline clients at cutover.
 - Country-specific licence JSON and form, after further research.
