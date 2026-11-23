@@ -88,6 +88,18 @@ describe('opening a setlist', () => {
     expect(unknown.attributes).to.not.have.property('chordless.setlist.scores')
   })
 
+  it('says what drawing the setlist cost, when that is known', () => {
+    startSetlistSession(opened({ firstPaintMs: 210.6, settledMs: 840.2, domElements: 5123 }))
+    startSetlistSession(opened())
+    const [known, unknown] = named('chordless.setlist.open')
+    expect(known.attributes).to.include({
+      'chordless.setlist.first_paint_ms': 211,
+      'chordless.setlist.settled_ms': 840,
+      'chordless.setlist.dom_elements': 5123,
+    })
+    expect(unknown.attributes).to.not.have.property('chordless.setlist.settled_ms')
+  })
+
   it('is a new session each time, and says so of one received by link', () => {
     startSetlistSession(opened({ source: 'share' }))
     const first = baselineAttributes()['session.id']
@@ -117,6 +129,29 @@ describe('opening a setlist', () => {
     endSetlistSession()
     expect(spans()).to.have.length(0)
     expect(baselineAttributes()).to.not.have.property('session.id')
+  })
+})
+
+describe('how smoothly it ran', () => {
+  it('puts the frames measured on the leave span', async () => {
+    startSetlistSession(opened())
+    // (a frame or two, from the real clock: the figures themselves are frames.test's)
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    window.dispatchEvent(new Event('pointerdown'))
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    endSetlistSession()
+    const [leave] = named('chordless.setlist.leave')
+    expect(leave.attributes['chordless.perf.frames']).to.be.at.least(1)
+    for (const name of ['long_frames', 'long_frame_ms', 'worst_frame_ms', 'open_frames']) {
+      expect(leave.attributes, name).to.have.property(`chordless.perf.${name}`)
+    }
+  })
+
+  it('says nothing of frames when none were measured', () => {
+    startSetlistSession(opened())
+    endSetlistSession()
+    const [leave] = named('chordless.setlist.leave')
+    expect(leave.attributes).to.not.have.property('chordless.perf.frames')
   })
 })
 

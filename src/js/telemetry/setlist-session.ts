@@ -9,6 +9,7 @@
 import { getLive } from '../live.ts'
 import { getTelemetryPreference } from '../preferences.ts'
 import { setAmbient } from './context.ts'
+import { FrameMonitor } from './frames.ts'
 import { getDeviceId } from './ids.ts'
 import { recordSpan } from './telemetry.ts'
 
@@ -27,7 +28,20 @@ export interface SetlistOpened {
   openMs: number
   /** Whether changes made here have not been sent to the storage yet (see AutoSync.hasUnsent) */
   hasUnsent: () => boolean
+  /**
+   * What drawing the setlist cost, which `openMs` does not say (it is the page's own set-up, not
+   * the browser's work of laying out and painting every song). From the page being made, in ms:
+   * the first paint after the songs were in the page, and every song's display ready and painted.
+   * Not known if the page was hidden and no frame came.
+   */
+  firstPaintMs?: number
+  settledMs?: number
+  /** Elements in the page (the songs' shadow roots too), a measure of how much there is to lay out */
+  domElements?: number
 }
+
+/** The first seconds after opening, when the other songs are laid out behind the one in view */
+const OPENING_MS = 10_000
 
 interface Session {
   setlistId: string
@@ -38,11 +52,20 @@ interface Session {
   songChanges: number
   transposes: number
   editEntries: number
+  /** Which frames took long (frames.ts) */
+  frames: FrameMonitor
   /** The index of the song in view, -1 for the overview */
   index: number
 }
 
 let session: Session | null = null
+
+/** A person did something: the frames that follow it are the ones that tell whether it was smooth */
+function onActivity(): void {
+  session?.frames.arm()
+}
+
+const ACTIVITY = ['scroll', 'pointerdown', 'keydown'] as const
 
 /** One id for the whole of a live service, even across a reload; any other session is a new one */
 function newSessionId(): string {
@@ -64,13 +87,28 @@ export function startSetlistSession(opened: SetlistOpened): void {
     songChanges: 0,
     transposes: 0,
     editEntries: 0,
+    frames: new FrameMonitor(OPENING_MS),
     index: -1,
+  }
+  session.frames.start()
+  // (scroll does not bubble: captured, it is seen from any scroller)
+  for (const type of ACTIVITY) {
+    window.addEventListener(type, onActivity, { capture: true, passive: true })
   }
   setAmbient({ sessionId: newSessionId() })
   // (the tab being closed or the page reloaded is leaving too)
   // (capturing, so that it comes before the SDK's own flush on pagehide: the leave span goes with it)
   window.addEventListener('pagehide', endOnPageHide, { capture: true })
   recordSpan('chordless.setlist.open', {
+    ...(opened.firstPaintMs === undefined
+      ? {}
+      : { 'chordless.setlist.first_paint_ms': Math.round(opened.firstPaintMs) }),
+    ...(opened.settledMs === undefined
+      ? {}
+      : { 'chordless.setlist.settled_ms': Math.round(opened.settledMs) }),
+    ...(opened.domElements === undefined
+      ? {}
+      : { 'chordless.setlist.dom_elements': opened.domElements }),
     'chordless.setlist.id': opened.setlistId,
     'chordless.setlist.date': opened.date,
     'chordless.setlist.songs': opened.songs,
@@ -121,9 +159,11 @@ function endOnPageHide(): void {
  */
 export function endSetlistSession(left: 'page' | 'navigation' = 'navigation'): void {
   window.removeEventListener('pagehide', endOnPageHide, { capture: true })
+  for (const type of ACTIVITY) window.removeEventListener(type, onActivity, { capture: true })
   if (!session) return
   const ended = session
   session = null
+  const { opening, total } = ended.frames.stop()
   recordSpan('chordless.setlist.leave', {
     'chordless.setlist.id': ended.setlistId,
     'chordless.setlist.date': ended.date,
@@ -134,6 +174,19 @@ export function endSetlistSession(left: 'page' | 'navigation' = 'navigation'): v
     'chordless.setlist.song_changes': ended.songChanges,
     'chordless.setlist.transposes': ended.transposes,
     'chordless.setlist.edit_entries': ended.editEntries,
+    // (frames.ts: the frames that took 50 ms or more, in the first seconds and in the moments
+    // after a scroll, a tap or a key; none if nothing was measured)
+    ...(total.frames === 0
+      ? {}
+      : {
+          'chordless.perf.frames': total.frames,
+          'chordless.perf.long_frames': total.long,
+          'chordless.perf.long_frame_ms': Math.round(total.longMs),
+          'chordless.perf.worst_frame_ms': Math.round(total.worstMs),
+          'chordless.perf.open_frames': opening.frames,
+          'chordless.perf.open_long_frames': opening.long,
+          'chordless.perf.open_worst_frame_ms': Math.round(opening.worstMs),
+        }),
   })
   setAmbient({ sessionId: undefined })
 }

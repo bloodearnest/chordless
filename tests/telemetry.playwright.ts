@@ -153,6 +153,18 @@ test('a setlist session: opened, then left, with the same session id on both and
   const leave = spans.find(span => span.name === 'chordless.setlist.leave')
   expect(open?.attributes['chordless.setlist.songs']).toEqual({ intValue: 4 })
   expect(open?.attributes['chordless.setlist.source']).toEqual({ stringValue: 'library' })
+  // (what drawing cost, and how smoothly it ran, are measured: their size is the device's)
+  expect(open?.attributes['chordless.setlist.first_paint_ms']).toEqual({
+    intValue: expect.any(Number),
+  })
+  expect(open?.attributes['chordless.setlist.settled_ms']).toEqual({ intValue: expect.any(Number) })
+  expect(open?.attributes['chordless.setlist.dom_elements']).toEqual({
+    intValue: expect.any(Number),
+  })
+  expect(leave?.attributes['chordless.perf.frames']).toEqual({ intValue: expect.any(Number) })
+  expect(leave?.attributes['chordless.perf.open_long_frames']).toEqual({
+    intValue: expect.any(Number),
+  })
   expect(leave?.attributes['chordless.setlist.songs_viewed']).toEqual({ intValue: 1 })
   expect(leave?.attributes['chordless.setlist.song_changes']).toEqual({ intValue: 1 })
   // (the id is on every span of the session, and the open span began it)
