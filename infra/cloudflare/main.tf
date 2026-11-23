@@ -260,3 +260,20 @@ resource "cloudflare_r2_bucket" "tfstate" {
     prevent_destroy = true
   }
 }
+
+# Private song bundles (worker/src/library-songs.ts, docs/CENTRAL_STORAGE.md): one bucket for the
+# production Worker and one for dev. Named in wrangler.toml, not provisioned by wrangler: its automatic
+# provisioning marked the new binding "inherited" on a Worker version that had none, and the deploy failed
+# (code 10057). Private: no public access, no custom domain; the Worker is the only way in. Never destroyed
+# by Terraform, since it holds churches' charts.
+
+resource "cloudflare_r2_bucket" "songs" {
+  for_each   = toset(["chordless-songs", "chordless-songs-dev"])
+  account_id = var.account_id
+  name       = each.key
+  location   = "WEUR"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}

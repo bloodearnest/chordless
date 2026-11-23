@@ -104,10 +104,12 @@ class_name = "TeamRoom"
 name = "SHARE_ROOM"
 class_name = "ShareRoom"
 
-# Private song bundles (worker/src/library-songs.ts). Wrangler provisions the bucket for each
-# environment; object keys begin with the owning library id and are never authorization.
+# Private song bundles (worker/src/library-songs.ts). The buckets are made by Terraform
+# (infra/cloudflare), not provisioned by wrangler, which broke a deploy; apply it before the deploy that
+# first uses them. Object keys begin with the owning library id and are never authorization.
 [[r2_buckets]]
 binding = "SONG_BUCKET"
+bucket_name = "chordless-songs"
 
 # The team spaces and the register of teams (worker/src/team-state.ts, docs/SPACES.md): which teams use
 # Chordless, who owns them, their members and what CCLI licence they hold; a team that ends stays as a
@@ -208,6 +210,7 @@ class_name = "ShareRoom"
 
 [[env.dev.r2_buckets]]
 binding = "SONG_BUCKET"
+bucket_name = "chordless-songs-dev"
 
 [[env.dev.migrations]]
 tag = "v1"
