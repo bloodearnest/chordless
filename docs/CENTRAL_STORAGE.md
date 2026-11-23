@@ -1,6 +1,6 @@
 # Central storage: churches, teams and content
 
-**Status (2026-11-23): step 3 is in review in [PR #305](https://github.com/bloodearnest/chordless/pull/305), stacked on [PR #303](https://github.com/bloodearnest/chordless/pull/303).** D1 sync for existing Team setlists, people and pad-set metadata is built through step 2d (#300). Church and team administration is built; no existing Team has been switched. Step 3 adds current church-library song bundles in R2 while retaining the existing Drive and anonymous-share paths.
+**Status (2026-11-23): steps 1 to 3 are built and merged:** church and team administration (#298), D1 sync for Team setlists, people and pad-set metadata (#300), and current church-library song bundles in R2 (#305). No existing Team has been switched: the Drive and anonymous-share paths remain the live ones until step 8.
 
 ## Goal and model
 
@@ -12,7 +12,7 @@ Songs are not copied between churches or personal libraries, except in the expli
 
 ## Promote a personal space to a church
 
-A person can explicitly promote a personal space to a new church and choose which personal setlists to copy into its first team. Copy the songs referenced by those setlists into the church library and point the copied setlists at them. Offer an optional, initially unchecked choice to copy the whole personal library too. The original personal space, songs and setlists remain. This workflow is the explicit exception to the no-cross-library-copy rule; ordinary use and anonymous shares do not copy songs between libraries. Preserve song provenance and review applicable licence terms for this workflow.
+A person can explicitly promote a personal space to a new church and choose which personal setlists to copy into its first team. Copy the songs referenced by those setlists into the church library and point the copied setlists at them. Offer an optional, initially unchecked choice to copy the whole personal library too. The original personal space, songs and setlists remain. This workflow is the explicit exception to the no-cross-library-copy rule; ordinary use and anonymous shares do not copy songs between libraries. Preserve song provenance, and carry each copied song's source PDFs and parse history across (step 9).
 
 ## Church records and authorization
 
@@ -24,7 +24,7 @@ Church membership grants access to its library and all teams’ setlists. Church
 
 D1 retains the song index and existing song identities. R2 stores chart content needed in live use, which devices sync for offline use. A fresh device reads the index and retrieves available content. A missing file remains visible as missing without deleting its index entry.
 
-Evaluate packaging ChordPro and MusicXML together in one object. Decide its format and update granularity during backend design, including concurrent edits to different parts.
+A song's current content is one bundle holding its ChordPro and its MusicXML (the format is under Backend and sync). MusicXML is derived from the imported PDFs. One bundle per song means a ChordPro edit and a MusicXML edit to the same song conflict; that is accepted.
 
 Store source PDFs separately from synced chart content. Each imported PDF is immutable. A different PDF creates a new source version; retain earlier versions and import history. Associate each source with its church and song, import details and parsed output. Fetch PDFs on demand for audit, reparsing or download; exclude them from routine device sync. No source PDFs are currently stored. Plan a later bulk reimport to upload and link them without changing song identities.
 
@@ -32,11 +32,15 @@ Move pad audio to R2, scoped to the appropriate church or personal library.
 
 ## Backend and sync
 
-Build an R2 storage backend behind the existing interfaces, extending them where song bundles, source PDFs, pad audio or shares need additional operations. Preserve the current offline, versioning and conflict behavior: edits commit locally first, pending changes survive offline use, and online delivery starts promptly. Map R2 revisions and conditional writes to existing conflict handling. Test concurrent edits, interrupted uploads and reconciliation between D1 metadata and R2 objects.
-
 For current church-library songs, store a versioned JSON bundle with `format: 1`, `chordpro` text and nullable `musicxml` text. D1 keeps the SHA-256 of the complete serialized bundle, current R2 reference and version. R2 object keys are content-addressed under the library and song id; membership checks, never the key, authorize reads and writes. Write the immutable R2 object before the conditional D1 update, so a failed or concurrent update can leave an unreferenced object. Do not delete it in the request; orphan collection belongs in later cleanup work. An identical bundle and metadata write is a no-op. PDFs and pads are not included in this bundle or this sync path.
 
+Build an R2 storage backend behind the existing interfaces, extending them where song bundles, source PDFs, pad audio or shares need additional operations. Preserve the current offline, versioning and conflict behavior: edits commit locally first, pending changes survive offline use, and online delivery starts promptly. Test concurrent edits, interrupted uploads and reconciliation between D1 metadata and R2 objects. Conflicts are decided by the D1 version (a compare-and-swap); R2 objects are immutable, so there are no R2 conditional writes to map.
+
 Use one shared bucket initially, with church-scoped keys and authorization. Record country and keep bucket selection behind the backend; defer EU/US jurisdiction routing and per-church buckets until there is a concrete need. A location hint is best effort; a jurisdiction restriction is a residency control. See [R2 data location](https://developers.cloudflare.com/r2/reference/data-location/).
+
+## Infrastructure
+
+Terraform (`infra/cloudflare`) makes every bucket and database, and nothing else does. `wrangler.toml` names them (`bucket_name`, `database_id`); wrangler only binds them and applies `migrations/`. Wrangler's automatic provisioning is not used: it listed a new binding as inherited on a Worker version that lacked it, and every deploy failed (code 10057). The deploy waits for the apply (`deploy.yml`: `needs: apply`), so a resource exists before a Worker that binds it. A step that needs a new bucket or database adds it to Terraform in the same PR. All are `prevent_destroy`, private, with no public access or custom domain. The apply token needs R2: Edit and D1: Edit. Development uses local R2 and D1, not remote ones.
 
 ## Anonymous sharing
 
@@ -60,13 +64,13 @@ Church and library identities (#294), library-owned song metadata (#295), and th
 4. **Source PDFs and reparsing.** Store immutable PDFs separately, deduplicate identical uploads per song, retain parse results and provenance, and exclude PDFs from routine sync. Add on-demand download, admin reparsing, parser-failure telemetry and the background reparse job.
 5. **Personal space and overlays.** Give each account one synced personal space, preserve signed-out local use, and ask before combining local and account data. Sync signed-in personal overlays, keep anonymous overlays local, and handle church membership ending and resuming.
 6. **Church-wide pads and anonymous shares.** Move pad audio and redesigned shares to R2. Use private objects and unguessable links, Worker-enforced expiry and revocation, daily cleanup, stable updates and offline viewing. Received charts remain inside the view-only share.
-7. **Deletion, recovery and export.** Add 30-day recovery for songs, churches and accounts; retain the minimal church register after final deletion. Export church data and setlists with separate options for current ChordPro, latest PDFs and pads, excluding MusicXML and parse history. Backup and disaster recovery remain a separate TODO.
-8. **One-off migration and cutover.** Move both existing Teams into one church and one library, preserve IDs, setlists and overlays, merge identical charts and retain differing variants. Verify D1 and R2 before switching, keep a recovery path and refuse stale writes from older clients. End Drive share links.
+7. **Deletion, recovery and export.** Add 30-day recovery for songs, churches and accounts; retain the minimal church register after final deletion. Export church data and setlists with separate options for current ChordPro, latest PDFs and pads, excluding MusicXML and parse history. Backup and disaster recovery of D1 and R2 remain a separate TODO (R2 has no object versioning; D1 has Time Travel). Drive is not covered: export it by hand before the migration.
+8. **One-off migration and cutover.** Move both existing Teams (one church: one licence holder, two teams) into one church and one library, preserve IDs, setlists and overlays, merge identical charts and retain differing variants. Verify D1 and R2 before switching, keep a recovery path and refuse stale writes from older clients. End Drive share links.
 9. **Personal-to-church promotion.** Create a church from selected personal setlists, with optional whole-library copy, including source PDF and parse history. Keep personal originals; this is the explicit copy exception.
 10. **Retire Drive sync.** After migration and client cutover, remove Drive-specific backends, credentials, references and compatibility paths. Google sign-in may remain.
 11. **CCLI usage report.** Report usage across a church’s teams, including archived teams, defaulting to the last 12 months with a selectable date range.
 
-Review applicable CCLI and SongSelect terms for the hosting and sharing model. The detailed decisions, including roles and deletion behavior, are in [CHURCH_TEAM_DESIGN.md](CHURCH_TEAM_DESIGN.md).
+The detailed decisions, including roles and deletion behavior, are in [CHURCH_TEAM_DESIGN.md](CHURCH_TEAM_DESIGN.md).
 
 ## Verification
 
