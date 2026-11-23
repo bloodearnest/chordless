@@ -5,6 +5,7 @@
  */
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
 const FILTER = new URL('../scripts/plan-noise.jq', import.meta.url).pathname
@@ -75,4 +76,23 @@ test('an import, a move and a changed output are changes though nothing else is'
 test('what cannot be read is a change', () => {
   assert.equal(isNoise(''), false)
   assert.equal(isNoise('not json'), false)
+})
+
+/** The D1 database's change in the plan of the deploy of 2026-11-23 (`terraform show -json`, provider 5.29.0), as it was */
+const REAL = JSON.parse(
+  readFileSync(new URL('./fixtures/terraform-plan-d1.json', import.meta.url), 'utf8')
+)
+
+test('the real plan of the D1 database, as the provider made it, is not a change', () => {
+  assert.equal(REAL.resource_changes[0].change.actions[0], 'update')
+  assert.equal(isNoise(REAL), true)
+})
+
+test('the same real plan with a value of ours changed is a change', () => {
+  const renamed = structuredClone(REAL)
+  renamed.resource_changes[0].change.after.name = 'chordless-teams-2'
+  assert.equal(isNoise(renamed), false)
+  const moved = structuredClone(REAL)
+  moved.resource_changes[0].change.after.read_replication = { mode: 'auto' }
+  assert.equal(isNoise(moved), false)
 })
