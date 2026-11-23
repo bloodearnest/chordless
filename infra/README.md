@@ -7,7 +7,7 @@ own state, so a mistake in one cannot touch another. (Six now: `google-ci/` and 
 
 | Stack | Holds |
 |---|---|
-| `cloudflare/` | the R2 bucket that holds every stack's state, the Worker's custom domain `chordless.app`, Email Routing (`import@chordless.app` to the Worker), the TXT records we own (SPF, Google site verification), the DNS of Email Sending on `mail.chordless.app` (bounce MX and SPF, DKIM, DMARC: sign-in codes are sent from `signin@mail.chordless.app`, enabled with `wrangler email sending enable`), the TLS and HTTPS zone settings |
+| `cloudflare/` | the R2 bucket that holds every stack's state, the private song buckets (`chordless-songs`, `chordless-songs-dev`) and the D1 database `chordless-teams` (the only place they are made: wrangler's automatic provisioning is not used, and `wrangler.toml` names them), the Worker's custom domain `chordless.app`, Email Routing (`import@chordless.app` to the Worker), the TXT records we own (SPF, Google site verification), the DNS of Email Sending on `mail.chordless.app` (bounce MX and SPF, DKIM, DMARC: sign-in codes are sent from `signin@mail.chordless.app`, enabled with `wrangler email sending enable`), the TLS and HTTPS zone settings |
 | `google-dev/` | the DEV project (`chordless-dev`, created here; the first project, `setalight`, was left behind): the Drive API, for the OAuth client the local app and the real-Drive suite use, apart from the app's own project so tests cannot use up its quota or touch its users' files. The consent screen and the OAuth client are by hand |
 | `google-chordless/` | the app project `chordless-app` (`chordless` was taken), created by Terraform: the Drive, Picker, API Keys and IAM APIs, the Team Key (`team-key`) and Sharing Key (`sharing-key`), the `team-storage` service account; it outputs the project number, the Picker app id. See [docs/SPACES.md](../docs/SPACES.md) |
 | `google-ci/` | how CI signs in to Google: a Workload Identity pool and a GitHub OIDC provider in `chordless-app`, restricted to this repository's jobs on `main`, and two service accounts, `ci-plan` (the `infra` environment: reads both projects) and `ci-apply` (`infra-apply`: enables APIs and manages API keys in both, and the app project's service accounts); also `agent-vm`, the read-only account agent VMs use ([docs/AGENT_VMS.md](../docs/AGENT_VMS.md)). **Never in CI**: planned and applied by hand, so a change to what CI runs can never widen what CI may do |
@@ -129,7 +129,7 @@ still local (its `backend` block set aside, `terraform apply`), then moved its s
 `terraform init -migrate-state`, as each of the others did. On a fresh account, do the same.
 
 The `cloudflare/` stack's token (`CLOUDFLARE_API_TOKEN`) also needs Workers R2 Storage: Edit, for the
-bucket. Locally it is the one in the git-ignored `.cloudflare-token` (bare, as `just deploy` reads it).
+buckets, and D1: Edit, for the database (the `infra-apply` token needs both; the read-only `infra` one, D1: Read). The `.cloudflare-token` here cannot list D1. Locally it is the one in the git-ignored `.cloudflare-token` (bare, as `just deploy` reads it).
 
 ## The Google stacks in CI
 
