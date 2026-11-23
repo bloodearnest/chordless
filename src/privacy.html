@@ -14,7 +14,7 @@
     <header class="doc-header"><a href="/">Chordless</a></header>
     <main class="doc">
       <h1>Privacy policy</h1>
-      <p class="updated">Last updated 22 November 2026</p>
+      <p class="updated">Last updated 23 November 2026</p>
 
       <p>
         Chordless (<a href="https://chordless.app/">chordless.app</a>) is a web app for arranging
@@ -27,6 +27,8 @@
         <li>Your songs and setlists live on your device so you can use them offline.</li>
         <li>
           Church teams' setlists are also kept on Chordless's server and shared with church members.
+          Church libraries store song charts and MusicXML on Chordless's server and sync them to
+          members' devices for offline use.
           Older Drive-backed spaces sync their songs and setlists with the Google Drive chosen for that
           space (see <a href="#teams">Churches and Team spaces</a>).
         </li>
@@ -69,8 +71,11 @@
         <li>
           <strong>On Chordless's server:</strong> church teams' setlists, including their ordered
           song titles, keys, notes and shared annotations, and church membership and settings.
-          Church members can read the setlists. Your device keeps a copy for offline use. Song charts
-          for the existing Drive-backed spaces remain in Drive; church song storage is not yet available.
+          Church members can read the setlists and shared song library. ChordPro charts and their
+          MusicXML are stored as private objects in Cloudflare R2; the Worker checks church
+          membership before serving them. Your device keeps a copy for offline use. Source PDFs
+          and pad audio are not stored there. Existing Drive-backed spaces remain in Drive until
+          they are migrated.
         </li>
         <li>
           <strong>Sign-in:</strong> when you sign in, a small server component of Chordless, running

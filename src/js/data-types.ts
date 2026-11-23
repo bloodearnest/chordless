@@ -126,6 +126,10 @@ export interface SongRecord {
   syncedContentHash?: string | null
   /** What this device recorded about the synced file */
   fileProps?: SongFileProps | null
+  /** SHA-256 of the last ChordPro + MusicXML bundle this device received from its library. */
+  libraryHash?: string | null
+  /** SHA-256 of the last shared metadata this device received from its library. */
+  libraryMetadataHash?: string | null
   /** The song's metadata as last synced, in Drive's form (sync/song-metadata.ts): a change since is told from one in Drive */
   syncedMetadata?: Record<string, string> | null
   /**

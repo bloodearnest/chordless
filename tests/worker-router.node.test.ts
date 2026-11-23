@@ -97,6 +97,17 @@ test('the API answers the app itself, and tools that send neither header', async
   }
 })
 
+test('church library song API paths reach the Worker handler', async () => {
+  const { send } = setup()
+  const response = await send('/api/teams/team-a/library/songs')
+  assert.equal(
+    response.status,
+    503,
+    'the handler reports unavailable storage instead of serving the app shell'
+  )
+  assert.equal(response.headers.get('cache-control'), 'private, no-store')
+})
+
 test('the API sends no CORS headers', async () => {
   const response = await setup().send('/session/token', postJson('{}'))
   assert.equal(response.headers.get('access-control-allow-origin'), null)

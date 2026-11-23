@@ -104,6 +104,11 @@ class_name = "TeamRoom"
 name = "SHARE_ROOM"
 class_name = "ShareRoom"
 
+# Private song bundles (worker/src/library-songs.ts). Wrangler provisions the bucket for each
+# environment; object keys begin with the owning library id and are never authorization.
+[[r2_buckets]]
+binding = "SONG_BUCKET"
+
 # The team spaces and the register of teams (worker/src/team-state.ts, docs/SPACES.md): which teams use
 # Chordless, who owns them, their members and what CCLI licence they hold; a team that ends stays as a
 # row. No database_id: wrangler makes the
@@ -200,6 +205,9 @@ class_name = "TeamRoom"
 [[env.dev.durable_objects.bindings]]
 name = "SHARE_ROOM"
 class_name = "ShareRoom"
+
+[[env.dev.r2_buckets]]
+binding = "SONG_BUCKET"
 
 [[env.dev.migrations]]
 tag = "v1"

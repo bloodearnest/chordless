@@ -2192,6 +2192,7 @@ setlist-not-found = That setlist is not on this device.
 # D1 space data sync
 space-data-conflict = Another device changed the same details. Your later changes were kept.
 space-data-refused = This change is saved on this device, but could not be synced.
+library-song-sync-conflict = A song changed on another device. This device's copy is safe; resolve the difference before syncing again.
 space-data-get-song = Get this song
 space-data-missing-song = The chart is not on this device yet.
 
