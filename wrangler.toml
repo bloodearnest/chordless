@@ -207,9 +207,9 @@ class_name = "TeamRoom"
 name = "SHARE_ROOM"
 class_name = "ShareRoom"
 
+# Local only (`wrangler dev` simulates R2): there is no remote dev bucket.
 [[env.dev.r2_buckets]]
 binding = "SONG_BUCKET"
-bucket_name = "chordless-songs-dev"
 
 [[env.dev.migrations]]
 tag = "v1"

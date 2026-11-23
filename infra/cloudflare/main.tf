@@ -285,16 +285,29 @@ import {
   id = "${var.account_id}/5f29b307-f375-4330-a9a8-e4a4b5c0fe82"
 }
 
-# Private song bundles (worker/src/library-songs.ts, docs/CENTRAL_STORAGE.md): one bucket for the
-# production Worker and one for dev.
-
-resource "cloudflare_r2_bucket" "songs" {
-  for_each   = toset(["chordless-songs", "chordless-songs-dev"])
+# Private song bundles (worker/src/library-songs.ts, docs/CENTRAL_STORAGE.md): the production Worker's
+# bucket. Development uses wrangler's local R2, not a remote bucket.
+resource "cloudflare_r2_bucket" "song_library" {
   account_id = var.account_id
-  name       = each.key
+  name       = "chordless-songs"
   location   = "WEUR"
 
   lifecycle {
     prevent_destroy = true
+  }
+}
+
+# It was `songs`, one bucket per environment. The production one moves to its new name; the dev one was
+# never used, so the old name is forgotten (not destroyed: delete the bucket by hand, it is empty).
+moved {
+  from = cloudflare_r2_bucket.songs["chordless-songs"]
+  to   = cloudflare_r2_bucket.song_library
+}
+
+removed {
+  from = cloudflare_r2_bucket.songs
+
+  lifecycle {
+    destroy = false
   }
 }
