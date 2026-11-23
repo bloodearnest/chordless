@@ -54,7 +54,7 @@ async function current(
   account: string
 ): Promise<SpaceSetlist | null> {
   const row = await db
-    .prepare(`SELECT s.* FROM team_setlists s JOIN teams t ON t.space_id = s.space_id
+    .prepare(`SELECT s.* FROM setlists s JOIN teams t ON t.space_id = s.space_id
       JOIN churches c ON c.church_id = t.church_id JOIN church_members m ON m.church_id = c.church_id
       WHERE s.space_id = ? AND s.setlist_id = ? AND m.account_id = ? AND c.ended_at IS NULL`)
     .bind(team, id, account)
@@ -92,13 +92,13 @@ export function handleTeamSetlists(request: Request, env: Env): Promise<Response
     if (!access) throw new Refusal(404, 'No such team')
     if (resource === 'data' && request.method === 'GET') {
       const { results } = await db
-        .prepare('SELECT * FROM team_setlists WHERE space_id = ? ORDER BY date, setlist_id')
+        .prepare('SELECT * FROM setlists WHERE space_id = ? ORDER BY date, setlist_id')
         .bind(team)
         .all<Row>()
       const people = await db
         .prepare(`SELECT a.account_id AS id, a.name, a.created_at, m.joined_at, m.role
         FROM accounts a LEFT JOIN church_members m ON m.account_id = a.account_id AND m.church_id = ?
-        WHERE m.account_id IS NOT NULL OR a.account_id IN (SELECT leader_id FROM team_setlists WHERE space_id = ? AND leader_id IS NOT NULL)
+        WHERE m.account_id IS NOT NULL OR a.account_id IN (SELECT leader_id FROM setlists WHERE space_id = ? AND leader_id IS NOT NULL)
         ORDER BY a.account_id`)
         .bind(access.church, team)
         .all<{
@@ -168,7 +168,7 @@ export async function applyTeamSetlist(
     if (base !== undefined && base !== null && (!Number.isInteger(base) || base < 1))
       return { status: 'invalid', error: 'Invalid version' }
     const result = await db
-      .prepare(`DELETE FROM team_setlists WHERE space_id = ? AND setlist_id = ? AND (? IS NULL OR version = ?)
+      .prepare(`DELETE FROM setlists WHERE space_id = ? AND setlist_id = ? AND (? IS NULL OR version = ?)
       AND EXISTS (SELECT 1 FROM teams t JOIN churches c ON c.church_id = t.church_id JOIN church_members m ON m.church_id = c.church_id
       WHERE t.space_id = ? AND t.ended_at IS NULL AND c.ended_at IS NULL AND m.account_id = ? AND m.role IN ('writer', 'admin'))`)
       .bind(team, op.id, base ?? null, base ?? null, team, account)
@@ -204,16 +204,17 @@ export async function applyTeamSetlist(
   const eligible = `EXISTS (SELECT 1 FROM teams t JOIN churches c ON c.church_id = t.church_id JOIN church_members m ON m.church_id = c.church_id
     WHERE t.space_id = ? AND t.church_id = ? AND t.ended_at IS NULL AND c.ended_at IS NULL AND m.account_id = ? AND m.role IN ('writer','admin'))`
   const sameLibrary = `NOT EXISTS (SELECT 1 FROM json_each(?) s WHERE NOT EXISTS (SELECT 1 FROM library_songs ls WHERE ls.library_id = ? AND ls.song_uuid = json_extract(s.value, '$.songUuid')))`
-  const leader = `(? IS NULL OR EXISTS (SELECT 1 FROM church_members WHERE church_id = ? AND account_id = ? AND role IN ('writer','admin')) OR EXISTS (SELECT 1 FROM team_setlists WHERE space_id = ? AND setlist_id = ? AND leader_id = ?))`
+  const leader = `(? IS NULL OR EXISTS (SELECT 1 FROM church_members WHERE church_id = ? AND account_id = ? AND role IN ('writer','admin')) OR EXISTS (SELECT 1 FROM setlists WHERE space_id = ? AND setlist_id = ? AND leader_id = ?))`
   try {
     const result =
       base === null
         ? await db
-            .prepare(`INSERT INTO team_setlists (space_id, setlist_id, date, time, type, name, leader_id, created_by, created_at, body, songs, version, modified_at)
-          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE ${eligible} AND ${sameLibrary} AND ${leader}`)
+            .prepare(`INSERT INTO setlists (space_id, setlist_id, library_id, date, time, type, name, leader_id, created_by, created_at, body, songs, version, modified_at)
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE ${eligible} AND ${sameLibrary} AND ${leader}`)
             .bind(
               team,
               op.id,
+              access.library,
               ...values,
               now,
               team,
@@ -230,7 +231,7 @@ export async function applyTeamSetlist(
             )
             .run()
         : await db
-            .prepare(`UPDATE team_setlists SET date = ?, time = ?, type = ?, name = ?, leader_id = ?, created_by = ?, created_at = ?, body = ?, songs = ?, version = version + 1, modified_at = ?
+            .prepare(`UPDATE setlists SET date = ?, time = ?, type = ?, name = ?, leader_id = ?, created_by = ?, created_at = ?, body = ?, songs = ?, version = version + 1, modified_at = ?
           WHERE space_id = ? AND setlist_id = ? AND version = ? AND ${eligible} AND ${sameLibrary} AND ${leader}`)
             .bind(
               ...values,
