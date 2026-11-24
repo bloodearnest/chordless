@@ -4,7 +4,7 @@
 
 The schema **as it is after `0011_schema_cleanup.sql`**, with every column, foreign key, `CHECK` and index, generated from
 the migrated database: [D1_SCHEMA_0011.svg](D1_SCHEMA_0011.svg). The picture above is where it is going.
-The schema **as it is after `0019_setlists_by_owner.sql`**, generated the same way (23 tables, every column, foreign key with its `ON DELETE` rule, and index; the `CHECK`s are counted, not drawn): [D1_SCHEMA_0019.svg](D1_SCHEMA_0019.svg).
+The schema **as it is after `0019_setlists_by_owner.sql`**, generated the same way (23 tables, every column, foreign key with its `ON DELETE` rule, and index; the `CHECK`s are counted, not drawn): [D1_SCHEMA_0019.svg](D1_SCHEMA_0019.svg). After `0020_setlist_leader_name.sql` (a personal setlist's leader in words, `setlists.leader_name`, drawn in orange): [D1_SCHEMA_0020.svg](D1_SCHEMA_0020.svg).
 
 Grey tables exist today (`migrations/0001` to `0010`); the colours are the phase that adds each one (the CCLI usage report, phase 2, needs no table of its own)
 ([CENTRAL_STORAGE.md](CENTRAL_STORAGE.md), [D1_PHASE1_PLAN.md](D1_PHASE1_PLAN.md)). The foreign keys, `CHECK`s and

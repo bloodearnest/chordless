@@ -24,6 +24,7 @@ export interface SetlistRow {
   type: string
   name: string
   leader_id: string | null
+  leader_name: string | null
   created_by: string | null
   created_at: string
   body: string
@@ -39,6 +40,7 @@ export function fromRow(row: SetlistRow): SpaceSetlist {
     type: row.type,
     name: row.name,
     leaderId: row.leader_id,
+    leaderName: row.leader_name,
     createdBy: row.created_by,
     createdAt: row.created_at,
     body: JSON.parse(row.body),
@@ -188,6 +190,10 @@ export async function applyTeamSetlist(
     if (error instanceof Invalid) return { status: 'invalid', error: error.message }
     throw error
   }
+  // A team's leader is chosen from the church's people: a name in words can be there (kept from before), but is
+  // never made here. A new setlist has none, and an update leaves one alone (choosing a leader replaces it)
+  if (base === null && record.leaderName)
+    return { status: 'invalid', error: 'The leader of a team setlist is a person' }
   const songs = JSON.stringify(record.songs)
   const values = [
     record.date,
@@ -230,11 +236,12 @@ export async function applyTeamSetlist(
             )
             .run()
         : await db
-            .prepare(`UPDATE setlists SET date = ?, time = ?, type = ?, name = ?, leader_id = ?, created_by = ?, created_at = ?, body = ?, songs = ?, version = version + 1, modified_at = ?
+            .prepare(`UPDATE setlists SET date = ?, time = ?, type = ?, name = ?, leader_id = ?, created_by = ?, created_at = ?, body = ?, songs = ?, version = version + 1, modified_at = ?, leader_name = CASE WHEN ? IS NULL THEN leader_name END
           WHERE space_id = ? AND setlist_id = ? AND version = ? AND ${eligible} AND ${sameLibrary} AND ${leader}`)
             .bind(
               ...values,
               now,
+              record.leaderId,
               team,
               op.id,
               base,

@@ -81,6 +81,12 @@ function textOrNull(value: unknown, what: string, max: number): string | null {
   return value === null || value === undefined ? null : text(value, what, max, { empty: true })
 }
 
+/** A leader named in words: trimmed, and null for none */
+function leaderName(value: unknown): string | null {
+  const name = textOrNull(value, 'leaderName', 200)?.trim()
+  return name ? name : null
+}
+
 function id(value: unknown, what: string): string {
   if (typeof value !== 'string' || !ID.test(value)) throw new Invalid(`${what} is not an id`)
   return value
@@ -171,6 +177,7 @@ export function parseSetlist(
     type: text(record.type, 'type', 200, { empty: true }),
     name: text(record.name, 'name', 200, { empty: true }),
     leaderId: idOrNull(record.leaderId, 'leaderId'),
+    leaderName: leaderName(record.leaderName),
     createdBy: textOrNull(record.createdBy, 'createdBy', 254)?.toLowerCase() ?? null,
     createdAt: text(record.createdAt, 'createdAt', 40),
     body: record.body === undefined ? {} : object(record.body, 'body'),

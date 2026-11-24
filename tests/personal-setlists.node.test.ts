@@ -224,6 +224,29 @@ test('a person has a library and setlists of their own, and nobody else sees the
     { status: 'ok', version: 4 },
   ])
 
+  // ...or a name in words: one or the other, never both; trimmed; null when empty
+  assert.equal(
+    (await batch('me', put(4, record({ leaderId: 'me', leaderName: 'Sam', songs: [song] }))))[0]
+      .status,
+    'invalid'
+  )
+  assert.equal(
+    (await batch('me', put(4, record({ leaderName: 'x'.repeat(201), songs: [song] }))))[0].status,
+    'invalid'
+  )
+  assert.deepEqual(await batch('me', put(4, record({ leaderName: '  Sam  ', songs: [song] }))), [
+    { status: 'ok', version: 5 },
+  ])
+  const named = (await list('me'))[0] as unknown as { leaderId: unknown; leaderName: unknown }
+  assert.deepEqual([named.leaderId, named.leaderName], [null, 'Sam'])
+  assert.deepEqual(await batch('me', put(5, record({ leaderName: '   ', songs: [song] }))), [
+    { status: 'ok', version: 6 },
+  ])
+  assert.equal(((await list('me'))[0] as unknown as { leaderName: unknown }).leaderName, null)
+  assert.deepEqual(await batch('me', put(6, record({ leaderId: 'me', songs: [song] }))), [
+    { status: 'ok', version: 7 },
+  ])
+
   // What is not a change, or not one that can be made
   const bad = await batch(
     'me',
@@ -256,7 +279,7 @@ test('a person has a library and setlists of their own, and nobody else sees the
   )[0]
   assert.equal(refused.status, 'conflict')
   assert.deepEqual(
-    await batch('me', { kind: 'setlist', op: 'delete', id: 'set', baseVersion: 4 }),
+    await batch('me', { kind: 'setlist', op: 'delete', id: 'set', baseVersion: 7 }),
     [{ status: 'ok', version: 0 }]
   )
   assert.deepEqual(await batch('me', { kind: 'setlist', op: 'delete', id: 'set' }), [
