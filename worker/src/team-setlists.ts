@@ -17,7 +17,7 @@ interface TeamAccess {
   role: string
   archived: string | null
 }
-interface Row {
+export interface SetlistRow {
   setlist_id: string
   date: string
   time: string
@@ -31,7 +31,7 @@ interface Row {
   version: number
   modified_at: string
 }
-function fromRow(row: Row): SpaceSetlist {
+export function fromRow(row: SetlistRow): SpaceSetlist {
   return {
     setlistId: row.setlist_id,
     date: row.date,
@@ -58,7 +58,7 @@ async function current(
       JOIN churches c ON c.church_id = t.church_id JOIN church_members m ON m.church_id = c.church_id
       WHERE s.space_id = ? AND s.setlist_id = ? AND m.account_id = ? AND c.ended_at IS NULL`)
     .bind(team, id, account)
-    .first<Row>()
+    .first<SetlistRow>()
   return row ? fromRow(row) : null
 }
 
@@ -94,7 +94,7 @@ export function handleTeamSetlists(request: Request, env: Env): Promise<Response
       const { results } = await db
         .prepare('SELECT * FROM setlists WHERE space_id = ? ORDER BY date, setlist_id')
         .bind(team)
-        .all<Row>()
+        .all<SetlistRow>()
       const people = await db
         .prepare(`SELECT a.account_id AS id, a.name, a.created_at, m.joined_at, m.role
         FROM accounts a LEFT JOIN church_members m ON m.account_id = a.account_id AND m.church_id = ?

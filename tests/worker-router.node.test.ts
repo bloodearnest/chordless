@@ -108,6 +108,19 @@ test('church library song API paths reach the Worker handler', async () => {
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
 })
 
+test('the personal library and setlist paths reach the Worker handler', async () => {
+  const { send } = setup()
+  for (const path of [
+    '/api/account/library',
+    '/api/account/setlists',
+    '/api/account/setlists/batch',
+  ]) {
+    const response = await send(path)
+    assert.equal(response.status, 503, path)
+    assert.equal(response.headers.get('cache-control'), 'private, no-store', path)
+  }
+})
+
 test('library song PDF paths reach the Worker handler', async () => {
   const { send } = setup()
   const response = await send('/api/libraries/library-a/songs/song-1/pdf')
