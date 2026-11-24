@@ -72,7 +72,9 @@ async function apply(db: D1Db, account: string, value: unknown): Promise<SpaceOp
     throw error
   }
   if (record.leaderId !== null && record.leaderId !== account)
-    return { status: 'invalid', error: 'The leader of your own setlist is you' }
+    return { status: 'invalid', error: 'The leader of your own setlist is you, or a name' }
+  if (record.leaderId !== null && record.leaderName)
+    return { status: 'invalid', error: 'The leader is you or a name, not both' }
   const songs = JSON.stringify(record.songs)
   const values = [
     record.date,
@@ -80,6 +82,7 @@ async function apply(db: D1Db, account: string, value: unknown): Promise<SpaceOp
     record.type,
     record.name,
     record.leaderId,
+    record.leaderName,
     record.createdBy,
     record.createdAt,
     JSON.stringify(record.body),
@@ -90,12 +93,12 @@ async function apply(db: D1Db, account: string, value: unknown): Promise<SpaceOp
     const result =
       base === null
         ? await db
-            .prepare(`INSERT INTO setlists (account_id, setlist_id, date, time, type, name, leader_id, created_by, created_at, body, songs, version, modified_at)
-              SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE ${OWN_SONGS}`)
+            .prepare(`INSERT INTO setlists (account_id, setlist_id, date, time, type, name, leader_id, leader_name, created_by, created_at, body, songs, version, modified_at)
+              SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE ${OWN_SONGS}`)
             .bind(account, op.id, ...values, now, songs, account)
             .run()
         : await db
-            .prepare(`UPDATE setlists SET date = ?, time = ?, type = ?, name = ?, leader_id = ?, created_by = ?, created_at = ?, body = ?, songs = ?, version = version + 1, modified_at = ?
+            .prepare(`UPDATE setlists SET date = ?, time = ?, type = ?, name = ?, leader_id = ?, leader_name = ?, created_by = ?, created_at = ?, body = ?, songs = ?, version = version + 1, modified_at = ?
               WHERE account_id = ? AND setlist_id = ? AND version = ? AND ${OWN_SONGS}`)
             .bind(...values, now, account, op.id, base, songs, account)
             .run()

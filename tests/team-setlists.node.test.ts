@@ -155,6 +155,9 @@ test('church setlists enforce membership, library ownership and versions', async
     'invalid'
   )
   assert.equal((await batch('admin', put(null, { ...record, date: 'bad' }))).status, 'invalid')
+  // A team's leader is a person: a name in words is for a personal setlist
+  const named = { ...record, leaderName: 'Sam' }
+  assert.equal((await batch('admin', put(null, named))).status, 'invalid')
   assert.equal(
     (await batch('admin', { ...put(1), id: 'absent', record: { ...record, setlistId: 'absent' } }))
       .status,
@@ -231,5 +234,33 @@ test('church setlists enforce membership, library ownership and versions', async
     (await batch('admin', { kind: 'setlist', id: 'set', op: 'delete', baseVersion: 3 })).status,
     'ok'
   )
+  // A leader kept as a name, from before there were accounts for them: kept through changes to the rest of the
+  // setlist (whatever the record carries), and replaced when a leader is chosen
+  sql
+    .prepare(`INSERT INTO setlists (setlist_id, space_id, date, time, type, name, leader_id, leader_name, created_at, modified_at)
+    VALUES ('old', ?, '2026-11-22', '', '', 'Old', NULL, 'Sam', ?, ?)`)
+    .run(team, now, now)
+  const leaderNameOf = () =>
+    sql.prepare("SELECT leader_name FROM setlists WHERE setlist_id = 'old'").get()?.leader_name
+  const old = (baseVersion: number, data: Record<string, unknown>) => ({
+    kind: 'setlist',
+    id: 'old',
+    op: 'put',
+    baseVersion,
+    record: { ...record, setlistId: 'old', ...data },
+  })
+  assert.equal(
+    (await batch('admin', old(1, { name: 'Renamed', leaderId: null, leaderName: 'Sam' }))).status,
+    'ok'
+  )
+  assert.equal(leaderNameOf(), 'Sam', 'kept')
+  assert.equal(
+    (await batch('admin', old(2, { name: 'Again', leaderId: null, leaderName: 'Someone else' })))
+      .status,
+    'ok'
+  )
+  assert.equal(leaderNameOf(), 'Sam', 'not changed from here')
+  assert.equal((await batch('admin', old(3, { leaderId: 'admin' }))).status, 'ok')
+  assert.equal(leaderNameOf(), null, 'replaced by the person chosen')
   assert.deepEqual(sql.prepare('PRAGMA foreign_key_check').all(), [])
 })

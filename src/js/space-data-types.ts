@@ -49,6 +49,8 @@ export interface SpaceSetlist {
   type: string
   name: string
   leaderId: string | null
+  /** A personal setlist's leader, in words (a person is `leaderId`; never both, and a team's is always a person) */
+  leaderName?: string | null
   createdBy: string | null
   createdAt: string
   /** The rest of the record (what is shared by link, and so on), kept as it came */
