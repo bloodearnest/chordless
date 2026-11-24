@@ -11,6 +11,7 @@
  */
 import type { SpaceOp, SpaceOpResult, SpaceSetlist } from '../../src/js/space-data-types.ts'
 import { ulid } from '../../src/js/ulid.ts'
+import { sha256Hex } from '../../src/js/utils/bytes.ts'
 import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
 import { isRecord, jsonResponse, Refusal, readJson, refusing } from './http.ts'
@@ -141,7 +142,14 @@ export function handlePersonalSetlists(request: Request, env: Env): Promise<Resp
         .prepare('SELECT * FROM setlists WHERE account_id = ? ORDER BY date, setlist_id')
         .bind(account)
         .all<SetlistRow>()
-      return jsonResponse({ setlists: results.map(fromRow) })
+      // Kept by the browser and the service worker, and asked again each time (a 304 if nothing changed), as the
+      // Team data is. Private: it is one person's, so a shared cache must not keep it for anyone else
+      const data = { setlists: results.map(fromRow) }
+      const etag = `"${await sha256Hex(JSON.stringify(data))}"`
+      const headers = { ETag: etag, 'Cache-Control': 'private, no-cache' }
+      if (request.headers.get('If-None-Match') === etag)
+        return new Response(null, { status: 304, headers })
+      return Response.json(data, { headers })
     }
     if (resource === 'setlists' && batch && request.method === 'POST') {
       const body = await readJson(request)
@@ -152,10 +160,12 @@ export function handlePersonalSetlists(request: Request, env: Env): Promise<Resp
     }
     throw new Refusal(404, 'Not found')
   })
-  // (one person's own: never kept by a cache)
+  // The answer depends on who asks (the Authorization header), whatever is cached; what has no policy of its
+  // own (the other calls and every refusal) is kept by nobody
   return answer.then(response => {
     const headers = new Headers(response.headers)
-    headers.set('Cache-Control', 'private, no-store')
+    if (!headers.has('Cache-Control')) headers.set('Cache-Control', 'private, no-store')
+    headers.append('Vary', 'Authorization')
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,

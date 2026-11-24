@@ -109,6 +109,33 @@ test('a person has a library and setlists of their own, and nobody else sees the
   assert.equal(sql.prepare('SELECT count(*) AS n FROM libraries').get()?.n, 2)
   assert.deepEqual(await list('me'), [])
 
+  // What is read is kept by the browser and asked again, and says it depends on who asks
+  const first = await send('me', 'GET', '/api/account/setlists')
+  assert.equal(first.headers.get('Cache-Control'), 'private, no-cache')
+  assert.equal(first.headers.get('Vary'), 'Authorization')
+  const etag = first.headers.get('ETag') ?? ''
+  assert.match(etag, /^"[0-9a-f]{64}"$/)
+  const again = await handlePersonalSetlists(
+    new Request('https://example.test/api/account/setlists', {
+      headers: {
+        Authorization: `Bearer ${await signAccessToken({ accountId: 'me', sessionId: 's', email: 'me@example.com' }, env)}`,
+        'If-None-Match': etag,
+      },
+    }),
+    env
+  )
+  assert.equal(again.status, 304)
+  assert.equal(again.headers.get('ETag'), etag)
+  assert.equal(again.headers.get('Vary'), 'Authorization')
+  // (what is written, and what is refused, is kept by nobody)
+  const written = await send('me', 'POST', '/api/account/setlists/batch', { ops: [] })
+  assert.equal(written.headers.get('Cache-Control'), 'private, no-store')
+  assert.equal(written.headers.get('Vary'), 'Authorization')
+  assert.equal(
+    (await send(null, 'GET', '/api/account/setlists')).headers.get('Cache-Control'),
+    'private, no-store'
+  )
+
   // A setlist is made, changed from the version it was, and refused when it was changed meanwhile
   assert.deepEqual(await batch('me', put(null)), [{ status: 'ok', version: 1 }])
   assert.deepEqual(await batch('me', put(1, record({ name: 'Evening' }))), [
@@ -128,6 +155,11 @@ test('a person has a library and setlists of their own, and nobody else sees the
   assert.deepEqual(
     (await list('me')).map(row => row.setlistId),
     ['set']
+  )
+  assert.notEqual(
+    (await send('me', 'GET', '/api/account/setlists')).headers.get('ETag'),
+    etag,
+    'it changed'
   )
   assert.equal(
     sql.prepare("SELECT account_id, space_id FROM setlists WHERE setlist_id = 'set'").get()
