@@ -80,6 +80,15 @@ heading for is drawn in [D1_SCHEMA.md](D1_SCHEMA.md). D1 is SQLite on Cloudflare
   (`tests/d1-db.ts`, `node:sqlite`, with foreign keys on, as D1).
 - **Back up first** (`just db-backup`), and rehearse on a copy of the data when the migration is not additive.
 
+## The diagram
+
+A pull request that adds or changes a table, a column or an index **regenerates the picture with its migration marked**,
+so that a reviewer sees what it does: `just schema-diagram 0019` writes `docs/D1_SCHEMA_0019.svg` from the migrations
+(`scripts/schema-svg.ts`: every migration applied to a SQLite database, every table drawn with its columns, keys, foreign keys
+and their `ON DELETE` rule, and indexes, parents to the left). **Orange is what the migrations from that number on add or
+change**: a new table whole, and the columns and indexes of an existing one that are new or differ; a dropped table is named
+in the heading. Add the file beside the older ones, and link it from `docs/D1_SCHEMA.md`.
+
 ## Checking a database
 
 ```sql
