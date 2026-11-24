@@ -1,8 +1,7 @@
 /**
- * The rebuild of team_setlists as setlists (migrations/0019_setlists_by_library.sql): a setlist is in
- * a library, and in a team or in none. Rows are written as the code before it wrote them, then it is
- * applied, and each row has to come out as it went in, with its library; a team with no library
- * stops it rather than leave a setlist without one.
+ * The rebuild of team_setlists as setlists (migrations/0019_setlists_by_owner.sql): a setlist is owned by
+ * a team or by an account, one of the two. Rows are written as the code before it wrote them, then it is
+ * applied, and each row has to come out as it went in, owned by its team.
  */
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -10,7 +9,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { test } from 'node:test'
 
 const DIRECTORY = new URL('../migrations/', import.meta.url)
-const THIS = '0019_setlists_by_library.sql'
+const THIS = '0019_setlists_by_owner.sql'
 
 /** A database with the migrations before this one applied */
 function before(): DatabaseSync {
@@ -69,7 +68,7 @@ const setlist = (sql: DatabaseSync, id: string, team: string, over: Record<strin
       T
     )
 
-test('each setlist comes out as it went in, in the library of its team', () => {
+test('each setlist comes out as it went in, owned by its team', () => {
   const sql = before()
   church(sql, 'a', 'team')
   church(sql, 'b', 'team')
@@ -83,11 +82,11 @@ test('each setlist comes out as it went in, in the library of its team', () => {
     unknown
   >[]
   assert.deepEqual(
-    rows.map(row => [row.setlist_id, row.library_id, row.space_id, row.name, row.version]),
+    rows.map(row => [row.setlist_id, row.space_id, row.account_id, row.name, row.version]),
     [
-      ['one', 'library-a', 'team-a', 'Morning', 3],
-      ['three', 'library-b', 'team-b', 'Morning', 3],
-      ['two', 'library-a', 'team-a', 'Evening', 3],
+      ['one', 'team-a', null, 'Morning', 3],
+      ['three', 'team-b', null, 'Morning', 3],
+      ['two', 'team-a', null, 'Evening', 3],
     ]
   )
   assert.equal(rows[0].body, '{"notes":"hi"}')
@@ -100,7 +99,18 @@ test('each setlist comes out as it went in, in the library of its team', () => {
   assert.deepEqual(sql.prepare('PRAGMA foreign_key_check').all(), [])
 })
 
-test('a setlist is still refused a stale version, and goes with its team and its library', () => {
+test('a team that has no church is copied as it was', () => {
+  const sql = before()
+  church(sql, 'x', 'none')
+  setlist(sql, 'orphan', 'team-x')
+  apply(sql)
+  assert.equal(
+    sql.prepare("SELECT space_id FROM setlists WHERE setlist_id = 'orphan'").get()?.space_id,
+    'team-x'
+  )
+})
+
+test('a setlist is still refused a stale version, and goes with its team', () => {
   const sql = before()
   church(sql, 'a', 'team')
   setlist(sql, 'one', 'team-a')
@@ -111,40 +121,27 @@ test('a setlist is still refused a stale version, and goes with its team and its
   assert.equal(sql.prepare('SELECT count(*) AS n FROM setlists').get()?.n, 0)
 })
 
-test('a personal setlist is in a library and in no team', () => {
-  const sql = before()
-  apply(sql)
-  sql.prepare('INSERT INTO accounts (account_id, created_at) VALUES (?, ?)').run('me', T)
-  sql
-    .prepare('INSERT INTO libraries (library_id, account_id, created_at) VALUES (?, ?, ?)')
-    .run('personal-me', 'me', T)
-  sql
-    .prepare(`INSERT INTO setlists (setlist_id, library_id, date, time, type, name, created_at, modified_at)
-    VALUES ('mine', 'personal-me', '2026-11-22', '10:00', 'Sunday', 'Mine', ?, ?)`)
-    .run(T, T)
-  assert.equal(
-    sql.prepare("SELECT space_id FROM setlists WHERE setlist_id = 'mine'").get()?.space_id,
-    null
-  )
-  assert.throws(
-    () =>
-      sql
-        .prepare(`INSERT INTO setlists (setlist_id, library_id, date, time, type, name, created_at, modified_at)
-        VALUES ('x', 'no-library', '2026-11-22', '10:00', 'Sunday', 'X', ?, ?)`)
-        .run(T, T),
-    /FOREIGN KEY/
-  )
-  sql.prepare("DELETE FROM libraries WHERE library_id = 'personal-me'").run()
-  assert.equal(sql.prepare('SELECT count(*) AS n FROM setlists').get()?.n, 0)
-})
-
-test('a team with no library stops the migration, and leaves the table as it was', () => {
+test('a personal setlist is owned by an account, and by exactly one owner', () => {
   const sql = before()
   church(sql, 'a', 'team')
-  church(sql, 'x', 'none')
-  setlist(sql, 'one', 'team-a')
-  setlist(sql, 'orphan', 'team-x')
-  assert.throws(() => apply(sql), /NOT NULL/)
-  assert.equal(sql.prepare('SELECT count(*) AS n FROM team_setlists').get()?.n, 2)
-  assert.equal(sql.prepare("SELECT 1 FROM sqlite_master WHERE name = 'setlists'").get(), undefined)
+  apply(sql)
+  sql.prepare('INSERT INTO accounts (account_id, created_at) VALUES (?, ?)').run('me', T)
+  const insert = (id: string, team: string | null, account: string | null) =>
+    sql
+      .prepare(`INSERT INTO setlists (setlist_id, space_id, account_id, date, time, type, name, created_at, modified_at)
+      VALUES (?, ?, ?, '2026-11-22', '10:00', 'Sunday', 'Mine', ?, ?)`)
+      .run(id, team, account, T, T)
+  insert('mine', null, 'me')
+  insert('theirs', 'team-a', null)
+  assert.throws(() => insert('both', 'team-a', 'me'), /CHECK/)
+  assert.throws(() => insert('neither', null, null), /CHECK/)
+  assert.throws(() => insert('nobody', null, 'no-such-account'), /FOREIGN KEY/)
+  sql.prepare("DELETE FROM accounts WHERE account_id = 'me'").run()
+  assert.deepEqual(
+    sql
+      .prepare('SELECT setlist_id FROM setlists ORDER BY setlist_id')
+      .all()
+      .map(row => row.setlist_id),
+    ['theirs']
+  )
 })

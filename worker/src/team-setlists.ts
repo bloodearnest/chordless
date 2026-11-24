@@ -209,12 +209,11 @@ export async function applyTeamSetlist(
     const result =
       base === null
         ? await db
-            .prepare(`INSERT INTO setlists (space_id, setlist_id, library_id, date, time, type, name, leader_id, created_by, created_at, body, songs, version, modified_at)
-          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE ${eligible} AND ${sameLibrary} AND ${leader}`)
+            .prepare(`INSERT INTO setlists (space_id, setlist_id, date, time, type, name, leader_id, created_by, created_at, body, songs, version, modified_at)
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE ${eligible} AND ${sameLibrary} AND ${leader}`)
             .bind(
               team,
               op.id,
-              access.library,
               ...values,
               now,
               team,
