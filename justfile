@@ -103,6 +103,10 @@ format:
 # The browser report alone is in coverage/index.html
 coverage: test-node test-unit coverage-check
 
+# Draw the D1 schema from the migrations, the ones from NNNN on marked as new or changed (docs/SCHEMA_RULES.md, "The diagram")
+schema-diagram since:
+    node scripts/schema-svg.ts docs/D1_SCHEMA_{{since}}.svg --since {{since}}
+
 # Check the coverage left by the last full node and browser unit runs (`just test` does it)
 coverage-check:
     node scripts/coverage.ts
