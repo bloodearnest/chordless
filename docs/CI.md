@@ -263,7 +263,12 @@ first part of the deploy (`deploy.yml`, below; both workflows use the same steps
 
 1. **Plan**, in the `infra` environment, with credentials that can only read (an R2 key that reads
    the state, so the plan takes no lock; a GitHub token that reads the repository's settings). The plan
-   is in the run's summary.
+   is in the run's summary. A plan that only has the provider reporting values of its own (the D1
+   database's `file_size`, `num_tables` and `version`, which provider 5.29 plans as "known after apply" on every
+   run) is **not a change**: `scripts/plan-noise.jq` says so, only when every change is an update in place and
+   every value Terraform knows is as recorded (a create, delete, replace, import, move or changed output is
+   always a change), so that a deploy does not wait for an approval to change nothing, nor the nightly check
+   fail every night. `ignore_changes` cannot do this: Terraform refuses it on values the provider decides. It is a workaround for the provider's bug (no upstream issue has been filed), to be removed when a release fixes it; the comment in the script says when.
 2. **Apply**, in the `infra-apply` environment, which waits for your approval: read the plan, then
    approve, and exactly that plan is applied, with credentials that can write.
 
