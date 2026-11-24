@@ -326,3 +326,13 @@ song screen and import (raised 2026-11-19)
   instead of always the original key
 - importing an export: show a confirmation screen first, where each song, setlist, pad set and preference
   can be selected or deselected before anything is imported
+
+schema
+- rename `teams.space_id` to `team_id`, and every foreign key to it (`followed_teams`, the `team_*` tables,
+  `setlists.space_id`, the Worker's ~100 mentions and the client's `spaceId`): one rebuild migration
+  (docs/SCHEMA_RULES.md says a column naming another table's row is `<thing>_id`). The tables have been `team_*`
+  since 0002; only the key kept the older "space" word. Best before overlays and personal setlists add more
+  rows that depend on the name. Draw it with `just schema-diagram NNNN` so the review shows what changes
+- drop the first-generation Team data tables (`space_songs`, `space_setlists`, `space_setlist_songs`,
+  `space_people`, `space_pad_sets`, migration 0012; `worker/src/space-data.ts`) at the cutover, once no Team has
+  `storage = 'd1'` on them: `setlists` and `library_songs` supersede them
