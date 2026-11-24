@@ -44,10 +44,16 @@ case "$mode" in
           rm -f "plans/$stack.tfplan"
           ;;
         2)
-          changed=true
-          echo "$stack: changes:" >&2
-          sed -n '/Terraform will perform/,/^Plan:/p' "plans/$stack.txt" >&2
-          { echo "### $stack"; echo '```'; sed -n '/Terraform will perform/,/^Plan:/p' "plans/$stack.txt"; echo '```'; } | summary
+          # (a plan of values the provider reports about an object, and nothing we set: scripts/plan-noise.jq)
+          if tf -chdir="infra/$stack" show -json "$PWD/plans/$stack.tfplan" | jq -e -f scripts/plan-noise.jq >/dev/null 2>&1; then
+            echo "$stack: no changes (only values the provider reports of its own)" >&2
+            rm -f "plans/$stack.tfplan"
+          else
+            changed=true
+            echo "$stack: changes:" >&2
+            sed -n '/Terraform will perform/,/^Plan:/p' "plans/$stack.txt" >&2
+            { echo "### $stack"; echo '```'; sed -n '/Terraform will perform/,/^Plan:/p' "plans/$stack.txt"; echo '```'; } | summary
+          fi
           ;;
         *)
           cat "plans/$stack.txt" >&2

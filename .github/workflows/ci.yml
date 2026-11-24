@@ -6,6 +6,12 @@ name: CI
 on:
   pull_request:
   workflow_call:
+    inputs:
+      # A string, not a boolean: on the other triggers `inputs` is empty, and an empty value must mean "run them"
+      slow-e2e:
+        description: '"skip" leaves out the macOS and Windows end-to-end jobs (and the watchdog for their runners): deploy.yml does, as the pull request has passed them and a deploy must not wait for a runner (docs/CI.md)'
+        type: string
+        default: run
   workflow_dispatch:
   # Weekly on main: keeps the caches from expiring in a quiet week, and checks the pinned tools
   # and runner images still work
@@ -187,7 +193,7 @@ jobs:
   e2e:
     name: End to end (${{ matrix.name }})
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && inputs.slow-e2e != 'skip'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:
@@ -196,11 +202,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # (2 workers: 3.8 minutes; 3 were slower on its three processors, 4.8)
-          - name: macOS, WebKit
-            os: macos-15
-            browser: webkit
-            workers: 2
           # Edge, as Windows' own browser (Chrome's engine is the Linux job's)
           - name: Windows, Edge
             os: windows-2025
@@ -237,6 +238,58 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-${{ matrix.browser }}-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+      - if: env.SAVE_CACHE == 'true'
+        uses: ./.github/actions/save-cache
+        with:
+          setup: ${{ steps.setup.outputs.save }}
+
+  # macOS, with Safari's own engine: advisory. Not in `ci-ok`, so a pull request shows its result, and a
+  # failure, and is blocked by neither: GitHub's arm64 macOS pool is often short of runners, and a merge
+  # waiting for one was worse than the break it might have caught (docs/CI.md). Linux and Windows still
+  # gate. (2 workers: 3.8 minutes; 3 were slower on its three processors, 4.8)
+  e2e-macos:
+    name: End to end (macOS, WebKit)
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && inputs.slow-e2e != 'skip'
+    runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup
+        with:
+          tools: node just
+          browser: webkit
+      - run: scripts/ci/fake-dev-vars.sh
+      # Not the tests tagged @logic: they do not depend on the browser or the platform, and Linux runs
+      # them. The weekly run, and a run by hand, run them here too
+      - run: |
+          if [ "$EVENT" = schedule ] || [ "$EVENT" = workflow_dispatch ]; then
+            just test-e2e "$BROWSER"
+          else
+            just test-e2e "$BROWSER" --grep-invert @logic
+          fi
+        env:
+          EVENT: ${{ github.event_name }}
+          BROWSER: webkit
+          CHORDLESS_WORKERS: "2"
+      - if: always()
+        run: node scripts/flaky-summary.ts
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-webkit-report
           path: |
             playwright-report/
             test-results/
@@ -291,6 +344,7 @@ jobs:
   watch-runners:
     name: Watch for a runner
     needs: changes
+    if: inputs.slow-e2e != 'skip'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
