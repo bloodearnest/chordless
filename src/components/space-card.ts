@@ -2,8 +2,10 @@ import { css, html, LitElement, nothing } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
-import { formatSyncTime, lastSyncOf } from '../js/last-sync.ts'
+import { formatSyncTime, lastSyncOf, recordSync } from '../js/last-sync.ts'
+import { trashMovedSpaceDriveFiles } from '../js/space-deletion.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
+import { ServerHasDataError } from '../js/space-move.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
 import { syncSpaceAfterAdoptionAnswer, syncSpaceNow } from '../js/space-sync.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
@@ -173,11 +175,106 @@ export class SpaceCard extends LitElement {
 
   /** Whether syncing can be done now: a team's member needs only a sign-in, everyone else Drive too */
   get _canSync(): boolean {
+    if (this.space.server) return this.signIn === 'signed-in' || this.signIn === 'no-drive'
     if (this.signIn === 'signed-in') return true
     return this.signIn === 'no-drive' && isTeamMember(this.space)
   }
 
   _adoptModal = createRef<AppModal>()
+  _confirmModal = createRef<AppModal>()
+
+  /** Move the space to the server (a test gives its own: the real one is of the device and the Worker) */
+  /* v8 ignore next 2 -- the real move needs the Worker and a session: its parts are tested in space-move.test.ts */
+  moveSpace: (spaceId: string) => Promise<void> = async spaceId =>
+    (await import('../js/space-data-runtime.ts')).moveSpaceToServerNow(spaceId)
+
+  /** Put the Drive files a moved space left in the Drive bin (a test gives its own) */
+  trashDriveFiles: (space: Space) => Promise<void> = trashMovedSpaceDriveFiles
+
+  /** Ask the person to confirm something that cannot be undone; true if they do */
+  async _confirm(heading: string, message: string, confirmLabel: string): Promise<boolean> {
+    const modal = this._confirmModal.value as AppModal
+    modal.heading = heading
+    modal.message = message
+    modal.confirmLabel = confirmLabel
+    await this.updateComplete
+    await modal.updateComplete
+    return modal.ask()
+  }
+
+  /** A Personal space still on Drive, for someone signed in to Chordless: it can move to the server, for good */
+  get _canMove(): boolean {
+    return (
+      this._isPersonal &&
+      !this.space.server &&
+      (this.signIn === 'signed-in' || this.signIn === 'no-drive')
+    )
+  }
+
+  /** A moved space whose old Drive files are still there, for someone who can reach Drive: they can be deleted */
+  get _canDeleteDriveFiles(): boolean {
+    return Boolean(this.space.server && this.space.rootRef && this.signIn === 'signed-in')
+  }
+
+  async _move(): Promise<void> {
+    if (this._syncing) return
+    const { id, name } = this.space
+    if (
+      !(await this._confirm(
+        t('space-move-heading', { name }),
+        t('space-move-message'),
+        t('action-move-to-server')
+      ))
+    )
+      return
+    this._syncing = true
+    this._error = ''
+    this._progress = t('space-move-starting')
+    try {
+      await this.moveSpace(id)
+      this._syncedAt = recordSync(id)
+      this.dispatchEvent(new SpaceSyncedEvent())
+      void this._loadSummary()
+    } catch (error) {
+      console.error('[SpaceCard] Move failed:', error)
+      this._error =
+        error instanceof ServerHasDataError
+          ? t('space-move-has-data')
+          : failedWith(
+              error,
+              t('space-move-failed', { reason: errorMessage(error) }),
+              t('space-move-failed-plain')
+            )
+    } finally {
+      this._syncing = false
+      this._progress = ''
+    }
+  }
+
+  async _deleteDriveFiles(): Promise<void> {
+    if (this._syncing) return
+    const { name } = this.space
+    if (
+      !(await this._confirm(
+        t('space-drive-delete-heading', { name }),
+        t('space-drive-delete-message'),
+        t('space-drive-delete-confirm')
+      ))
+    )
+      return
+    this._error = ''
+    try {
+      await this.trashDriveFiles(this.space)
+      this.dispatchEvent(new SpaceSyncedEvent())
+    } catch (error) {
+      console.error('[SpaceCard] Could not delete the Drive files:', error)
+      this._error = failedWith(
+        error,
+        t('space-drive-delete-failed', { reason: errorMessage(error) }),
+        t('space-drive-delete-failed-plain')
+      )
+    }
+  }
 
   /** Ask whether the folder an AdoptFolderError names should be used; true to use it */
   async _askToAdopt(folder: { name: string }): Promise<boolean> {
@@ -234,9 +331,13 @@ export class SpaceCard extends LitElement {
       case 'signed-out':
         return t('space-sync-sign-in')
       case 'expired':
-        return t(this._isPersonal ? 'space-drive-reconnect' : 'account-status-expired')
+        return t(
+          this._isPersonal && !this.space.server
+            ? 'space-drive-reconnect'
+            : 'account-status-expired'
+        )
       case 'no-drive':
-        if (this._isPersonal) return t('space-drive-off')
+        if (this._isPersonal && !this.space.server) return t('space-drive-off')
         break
     }
     return this._syncedAt
@@ -277,8 +378,18 @@ export class SpaceCard extends LitElement {
           }
         </p>
         ${
-          this._isPersonal && this.signIn === 'signed-in' && this.driveEmail
+          this._isPersonal && this.space.server && this.signIn !== 'signed-out'
+            ? html`<p class="line" id="server-line">${t('space-server-on')}</p>`
+            : nothing
+        }
+        ${
+          this._isPersonal && !this.space.server && this.signIn === 'signed-in' && this.driveEmail
             ? html`<p class="line" id="drive-line">${t('space-drive-on', { email: this.driveEmail })}</p>`
+            : nothing
+        }
+        ${
+          this._canDeleteDriveFiles
+            ? html`<p class="line" id="drive-left-line">${t('space-drive-left')}</p>`
             : nothing
         }
         <div class="actions">
@@ -290,14 +401,28 @@ export class SpaceCard extends LitElement {
               : nothing
           }
           ${
-            this._isPersonal && this.signIn === 'no-drive'
+            this._canMove
+              ? html`<button class="btn" id="move-to-server" ?disabled=${this._syncing} @click=${this._move}>
+                  ${t('action-move-to-server')}
+                </button>`
+              : nothing
+          }
+          ${
+            this._canDeleteDriveFiles
+              ? html`<button class="btn" id="delete-drive-files" ?disabled=${this._syncing} @click=${this._deleteDriveFiles}>
+                  ${t('action-delete-drive-files')}
+                </button>`
+              : nothing
+          }
+          ${
+            this._isPersonal && !this.space.server && this.signIn === 'no-drive'
               ? html`<button class="btn primary" id="connect-drive" @click=${() => this.dispatchEvent(new SpaceConnectDriveEvent())}>
                   ${t('action-connect-drive')}
                 </button>`
               : nothing
           }
           ${
-            this._isPersonal && this.signIn === 'expired'
+            this._isPersonal && !this.space.server && this.signIn === 'expired'
               ? html`<button class="btn primary" id="reconnect-drive" @click=${() => this.dispatchEvent(new SpaceConnectDriveEvent())}>
                   ${t('action-reconnect-drive')}
                 </button>`
@@ -317,7 +442,7 @@ export class SpaceCard extends LitElement {
               : nothing
           }
           ${
-            this._isPersonal && this.signIn === 'signed-in'
+            this._isPersonal && !this.space.server && this.signIn === 'signed-in'
               ? html`<button class="btn" id="disconnect-drive" @click=${() => this.dispatchEvent(new SpaceDisconnectDriveEvent())}>
                   ${t('action-disconnect-drive')}
                 </button>`
@@ -326,6 +451,7 @@ export class SpaceCard extends LitElement {
         </div>
       </div>
       <app-modal ${ref(this._adoptModal)} type="confirm" size="small"></app-modal>
+      <app-modal ${ref(this._confirmModal)} type="confirm" size="small"></app-modal>
     `
   }
 }

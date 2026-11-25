@@ -1,7 +1,7 @@
 /** The device's D1 sync: read space data responses, then send durable record edits without Drive's debounce. */
 import type { SpaceOutboxRecord } from './data-types.ts'
 import type { SpaceDataStore } from './space-data-store.ts'
-import type { SpaceData, SpaceOp, SpaceOpResult } from './space-data-types.ts'
+import type { SpaceData, SpaceOp, SpaceOpResult, SpaceSetlist } from './space-data-types.ts'
 import { callWorker, TeamError, type WorkerConnection } from './worker-call.ts'
 
 export type SpaceDataResponse =
@@ -53,11 +53,37 @@ export function spaceDataTransport(
 }
 
 /**
+ * How a Personal space's leaders are told to the server, which has no people for it: a setlist there names its leader in
+ * words (`leaderName`). The space keeps its people, and its setlists their `leaderId`s, as they always were.
+ */
+export interface LeaderNames {
+  /** The names of the space's people, by id */
+  names(): Promise<Map<string, string>>
+  /** The id of the person with this name: one of the space's people, or made */
+  idFor(name: string): Promise<string>
+}
+
+/** A setlist from the server as the space keeps it: a leader named in words is the person of that name */
+async function fromServer(setlist: SpaceSetlist, leaders: LeaderNames): Promise<SpaceSetlist> {
+  if (setlist.leaderId || !setlist.leaderName) return setlist
+  return { ...setlist, leaderId: await leaders.idFor(setlist.leaderName), leaderName: null }
+}
+
+/** A setlist for the server: its leader, a person of the space, named in words */
+function toServer(setlist: SpaceSetlist, names: Map<string, string>): SpaceSetlist {
+  if (!setlist.leaderId) return setlist
+  return { ...setlist, leaderId: null, leaderName: names.get(setlist.leaderId) ?? null }
+}
+
+/**
  * A Personal space's setlists on the server (`/api/account/setlists`, worker/src/personal-setlists.ts): read and
  * written as a Team's are, but only the setlists (its songs are the personal library's, and it has no people or pads
- * there), so the rest of the data is empty.
+ * there), so the rest of the data is empty. Its leaders cross as names (LeaderNames).
  */
-export function personalDataTransport(connection: WorkerConnection): SpaceDataTransport {
+export function personalDataTransport(
+  connection: WorkerConnection,
+  leaders: LeaderNames
+): SpaceDataTransport {
   return {
     async read({ etag }) {
       const response = await callWorker(
@@ -71,19 +97,42 @@ export function personalDataTransport(connection: WorkerConnection): SpaceDataTr
       if (response.status === 304) return { unchanged: true }
       const { setlists } = (await response.json()) as { setlists: SpaceData['setlists'] }
       return {
-        data: { songs: [], setlists, people: [], padSets: [], from: null },
+        data: {
+          songs: [],
+          setlists: await Promise.all(setlists.map(setlist => fromServer(setlist, leaders))),
+          people: [],
+          padSets: [],
+          from: null,
+        },
         etag: response.headers.get('ETag'),
       }
     },
     async write(ops) {
+      const names = await leaders.names()
       const response = await callWorker(
-        { method: 'POST', path: '/api/account/setlists/batch', body: { ops } },
+        {
+          method: 'POST',
+          path: '/api/account/setlists/batch',
+          body: {
+            ops: ops.map(op =>
+              op.kind === 'setlist' && op.op === 'put' && op.record
+                ? { ...op, record: toServer(op.record as SpaceSetlist, names) }
+                : op
+            ),
+          },
+        },
         connection
       )
       const { results } = (await response.json()) as { results: SpaceOpResult[] }
       if (!Array.isArray(results) || results.length !== ops.length)
         throw new Error('Invalid space write response')
-      return results
+      return Promise.all(
+        results.map(async result =>
+          result.status === 'conflict' && result.current
+            ? { ...result, current: await fromServer(result.current as SpaceSetlist, leaders) }
+            : result
+        )
+      )
     },
   }
 }

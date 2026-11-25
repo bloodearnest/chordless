@@ -66,6 +66,7 @@ export class SetlistShare extends LitElement {
     linkable: { type: Boolean },
     _mode: { state: true },
     _available: { state: true },
+    _moved: { state: true },
     _busy: { state: true },
     _error: { state: true },
     _copied: { state: true },
@@ -200,6 +201,8 @@ export class SetlistShare extends LitElement {
   declare linkable: boolean
   declare _mode: 'link' | 'list'
   declare _available: boolean
+  /** The setlist's space has moved to Chordless's server: its links are of Drive, which it has left (until step 6 of docs/CENTRAL_STORAGE.md) */
+  declare _moved: boolean
   declare _busy: boolean
   declare _error: string
   declare _copied: boolean
@@ -216,9 +219,19 @@ export class SetlistShare extends LitElement {
     this.linkable = true
     this._mode = 'link'
     this._available = false
+    this._moved = false
     this._busy = false
     this._error = ''
     this._copied = false
+  }
+
+  override willUpdate(changed: Map<string, unknown>): void {
+    if (changed.has('db')) {
+      const spaceId = this.db?.spaceId ?? getCurrentSpace().id
+      void getSpaceById(spaceId).then(space => {
+        this._moved = Boolean(space?.server)
+      })
+    }
   }
 
   override async connectedCallback() {
@@ -495,6 +508,15 @@ export class SetlistShare extends LitElement {
 
   /** What the modal shows */
   _renderPanel(share: Setlist['share']) {
+    if (this._moved) {
+      // (a link made before the move keeps working, as long as its Drive files are there: it can be copied, and stopped)
+      return html`
+        <section>
+          ${share ? this._renderShared(share.expires) : nothing}
+          <p class="note" id="share-moved">${t('share-moved')}</p>
+        </section>
+      `
+    }
     if (!share && !this._available) {
       return html`
         <section>
@@ -552,9 +574,13 @@ export class SetlistShare extends LitElement {
         ${t('share-ends', { date: formatSetlistDate(expires, 'long') })}
       </p>
       <div class="actions center">
-        <button class="btn" ?disabled=${this._busy} @click=${this._update}>
-          ${this._busy ? t('share-working') : t('share-update')}
-        </button>
+        ${
+          this._moved
+            ? nothing
+            : html`<button class="btn" ?disabled=${this._busy} @click=${this._update}>
+                ${this._busy ? t('share-working') : t('share-update')}
+              </button>`
+        }
         <button class="btn danger" ?disabled=${this._busy} @click=${this._stop}>${t('confirm-share-stop-button')}</button>
       </div>
     `

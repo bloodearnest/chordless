@@ -6,7 +6,13 @@ import {
 } from '../src/components/setlist-share.ts'
 import { type ChordlessDB, createSetlist, getCurrentDB } from '../src/js/db.ts'
 import { generateShareKey, setlistCode } from '../src/js/share-crypto.ts'
-import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
+import {
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  setCurrentSpace,
+  updateSpace,
+} from '../src/js/space.ts'
 import '../src/components/setlist-share.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
@@ -196,6 +202,28 @@ describe('setlist-share', () => {
       await new Promise(resolve => setTimeout(resolve, 200))
       await el.updateComplete
     }
+
+    it('offers no new link, and no update, for a space that has moved to Chordless', async () => {
+      await updateSpace(spaceId, {
+        server: { libraryId: 'library', movedAt: '2026-11-25T00:00:00.000Z' },
+      })
+      const none = await show()
+      expect(text(none.el)).to.include('not available yet for a space stored on Chordless')
+      expect(none.el.shadowRoot?.querySelector('#share-moved')).to.not.equal(null)
+      expect(
+        [...(none.el.shadowRoot?.querySelectorAll('button') ?? [])].map(b => b.textContent?.trim())
+      ).to.not.include('Create share link')
+      // (a link made before the move is still shown, and can be stopped, but not updated)
+      const made = shared()
+      const held = await show({ ...made, date: '2099-10-12' })
+      expect(held.el.shadowRoot?.querySelector('input')).to.not.equal(null)
+      expect(text(held.el)).to.include('not available yet')
+      const labels = [...(held.el.shadowRoot?.querySelectorAll('button') ?? [])].map(b =>
+        b.textContent?.trim()
+      )
+      expect(labels).to.not.include('Update now')
+      expect(labels).to.include('Stop sharing')
+    })
 
     it('makes the link, saves it on the setlist, and says so', async () => {
       const { el, setlist } = await show()

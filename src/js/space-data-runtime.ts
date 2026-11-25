@@ -1,13 +1,26 @@
 /** Current-space wiring; account-wide polling and sockets remain step 5 of the D1 plan. */
 import { SyncPushedEvent } from './auto-sync.ts'
 import { DataChangeEvent } from './data-changes.ts'
-import { openSpace } from './db.ts'
+import { type ChordlessDB, openSpace } from './db.ts'
 import { getIdentityToken, isAuthenticated } from './google-auth.ts'
 import { syncLibrarySongs, syncPersonalLibrarySongs } from './library-song-sync.ts'
-import { getCurrentSpace, getSpaceById, listSpaces, SpaceChangeEvent } from './space.ts'
-import { personalDataTransport, SpaceDataSync, spaceDataTransport } from './space-data.ts'
+import { personFor } from './people.ts'
+import {
+  getCurrentSpace,
+  getSpaceById,
+  listSpaces,
+  SpaceChangeEvent,
+  updateSpace,
+} from './space.ts'
+import {
+  type LeaderNames,
+  personalDataTransport,
+  SpaceDataSync,
+  spaceDataTransport,
+} from './space-data.ts'
 import { SpaceDataStore, SpaceOutboxChangedEvent } from './space-data-store.ts'
 import type { SpaceRecordKind } from './space-data-types.ts'
+import { moveToServer, serverSteps } from './space-move.ts'
 import { t } from './text.ts'
 import { toast } from './toast.ts'
 import { errorMessage } from './utils/errors.ts'
@@ -84,6 +97,18 @@ const PERSONAL: { readKinds: SpaceRecordKind[]; writeKinds: SpaceRecordKind[] } 
   readKinds: ['setlist'],
   writeKinds: ['setlist'],
 }
+/** A Personal space's leaders, for the server, which names them: the space's people (people.ts) */
+function leadersOf(db: ChordlessDB): LeaderNames {
+  return {
+    names: async () => new Map((await db.getAllPeople()).map(person => [person.id, person.name])),
+    idFor: async name => {
+      const made = personFor(await db.getAllPeople(), { name })
+      if (!made) throw new Error('A leader needs a name')
+      await db.savePeople(made.changed)
+      return made.person.id
+    },
+  }
+}
 const controllers = new Map<string, Promise<SpaceDataSync>>()
 const failures = new Map<string, string>()
 
@@ -118,7 +143,7 @@ export async function syncSpaceDataFor(
         ),
         online: () => navigator.onLine,
         transport: personal
-          ? personalDataTransport(connection)
+          ? personalDataTransport(connection, leadersOf(db))
           : spaceDataTransport(teamId, connection, Boolean(space.team?.churchId)),
         lock: work => navigator.locks.request(`chordless-space-data-${spaceId}`, work),
         // (a Personal space has no live room: nothing tells other devices, which find it at their next sync)
@@ -151,6 +176,31 @@ export async function syncSpaceDataFor(
   }
   await sync.sync(options)
   failures.delete(spaceId)
+}
+
+/**
+ * Move a Personal space to the server, once and for good (space-move.ts): its songs and setlists are sent, and Drive is not
+ * synced again. A space that is not a Personal one still on Drive does not move.
+ */
+export async function moveSpaceToServerNow(spaceId: string): Promise<void> {
+  const space = await getSpaceById(spaceId)
+  if (!space || space.team || space.server)
+    throw new Error('Only a Personal space on Drive can move')
+  const server = serverSteps({
+    token: getIdentityToken,
+    origin: location.origin,
+    fetch: (input, init) => window.fetch(input, init),
+  })
+  await moveToServer({
+    ...server,
+    seed: async () =>
+      new SpaceDataStore(await openSpace(spaceId, 'sync'), PERSONAL).seedPersonalMove(),
+    mark: async (libraryId, movedAt) => {
+      await updateSpace(spaceId, { server: { libraryId, movedAt } })
+    },
+    sync: () => syncSpaceDataFor(spaceId, { all: true }),
+    now: () => new Date().toISOString(),
+  })
 }
 
 export async function syncCurrentSpaceData(): Promise<void> {

@@ -12,7 +12,7 @@
 import type { Space } from './data-types.ts'
 import { trashFile } from './drive-api.ts'
 import { forgetSync } from './last-sync.ts'
-import { deleteSpace, getCurrentSpace, listSpaces, setCurrentSpace } from './space.ts'
+import { deleteSpace, getCurrentSpace, listSpaces, setCurrentSpace, updateSpace } from './space.ts'
 import { storageFor } from './storage/space-storage.ts'
 import { teamApi } from './team-client.ts'
 import { declineTeam } from './team-memberships.ts'
@@ -35,6 +35,18 @@ async function trashPersonalFolder(space: Space): Promise<'trashed' | 'none'> {
   if (!ref) return 'none'
   await trashFile(ref)
   return 'trashed'
+}
+
+/**
+ * The Drive files a Personal space left behind when it moved to the server (space-move.ts): its folder, with everything in
+ * it, goes to the Drive trash (recoverable there for thirty days), and the space forgets the folder, so there is nothing
+ * left to offer to delete. A space that has not moved, or has no folder, is left alone.
+ * @throws if the folder could not be trashed (the space still knows it, and it can be tried again)
+ */
+export async function trashMovedSpaceDriveFiles(space: Space): Promise<void> {
+  if (!space.server || !space.rootRef) return
+  await trashFile(space.rootRef)
+  await updateSpace(space.id, { rootRef: null, driveClientId: null })
 }
 
 /**

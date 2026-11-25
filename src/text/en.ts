@@ -645,6 +645,30 @@ space-sync-sign-in = Sign in to sync
 space-drive-off = Google Drive is not connected, so this space does not sync between your devices.
 space-drive-reconnect = Google Drive needs reconnecting to sync.
 space-drive-on = Google Drive: { $email }
+# The card of a Personal space that has been moved to Chordless: where it syncs now.
+space-server-on = Stored on Chordless
+# The card of a Personal space that has not been moved: the button that starts it, and the question it asks first.
+action-move-to-server = Move to Chordless
+# { $name } is the name of the space, the heading of the question to confirm moving it.
+space-move-heading = Move { $name } to Chordless?
+space-move-message = Its songs and setlists will be stored on Chordless, and synced between your devices from then on. It will not sync with Google Drive again, and this cannot be undone. Its files in Google Drive stay where they are until you delete them. Pad audio is not moved: add your pads again when you need them.
+# Shown on the card while a space is being moved.
+space-move-starting = Moving to Chordless…
+# The account already has songs or setlists on Chordless, so nothing was moved or changed.
+space-move-has-data = Your Chordless account already has songs or setlists, so this space cannot be moved yet. Combining them is not available yet.
+# { $reason } is what went wrong.
+space-move-failed = Could not move the space: { $reason }
+space-move-failed-plain = Could not move the space.
+# On the card of a moved space whose old files are still in Google Drive.
+space-drive-left = Its old files are still in Google Drive.
+action-delete-drive-files = Delete Google Drive files
+# { $name } is the name of the space, the heading of the question to confirm.
+space-drive-delete-heading = Delete the Google Drive files of { $name }?
+space-drive-delete-message = Its folder in Google Drive, with everything in it (including pad audio and shared setlists), goes to your Drive bin, where it can be recovered for thirty days. The space stays on Chordless.
+space-drive-delete-confirm = Delete files
+# { $reason } is what went wrong.
+space-drive-delete-failed = Could not delete the files: { $reason }
+space-drive-delete-failed-plain = Could not delete the files.
 action-connect-drive = Connect Google Drive
 action-reconnect-drive = Reconnect Google Drive
 action-disconnect-drive = Disconnect Google Drive
@@ -684,6 +708,9 @@ space-missing = This device has no such Personal space or Team. It may have been
 space-copy-team-heading = Team copy
 space-copy-drive-heading = Google Drive
 space-copy-team-text = Replace this device's songs and setlists with the Team's copy. Sync is on the space's card.
+# The Manage Data page of a Personal space that has moved to Chordless, where there is no Google Drive copy to restore from.
+space-copy-server-heading = Chordless
+space-copy-server-text = This space is stored on Chordless, and syncs from its card on the Account and Teams page. It no longer syncs with Google Drive.
 space-copy-drive-text = Replace this device's songs and setlists with the copy stored on Google Drive.
 # <connect> is a link to the Account and Teams page.
 space-drive-not-connected = You are signed in, but Google Drive is not connected, so this space is not syncing. <connect>Connect Google Drive</connect> on the Account and Teams page.
@@ -2064,6 +2091,8 @@ share-list-label = Song list
 share-list-copy = Copy song list
 share-list-email = Email song list
 # <account> is a link to the Account and Teams page.
+# In the share dialog of a setlist in a space that has been moved to Chordless: new links and updates are not available yet.
+share-moved = Sharing by link is not available yet for a space stored on Chordless. A link made before the move keeps working until the space's old Google Drive files are deleted.
 share-sign-in = Connect Google Drive on the <account>Account and Teams page</account> to share this setlist by link.
 share-link-text = Make a link to this setlist for people outside your Chordless space, whether or not they use Chordless.
 share-link-point-1 = They need no account or install, and can keep it on their phone.
