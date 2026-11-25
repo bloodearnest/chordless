@@ -114,6 +114,8 @@ test('the personal library and setlist paths reach the Worker handler', async ()
     '/api/account/library',
     '/api/account/setlists',
     '/api/account/setlists/batch',
+    '/api/account/overlays',
+    '/api/account/overlays/batch',
   ]) {
     const response = await send(path)
     assert.equal(response.status, 503, path)
