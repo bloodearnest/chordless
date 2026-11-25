@@ -130,6 +130,13 @@ test('library song PDF paths reach the Worker handler', async () => {
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
 })
 
+test('library pad paths reach the Worker handler', async () => {
+  const { send } = setup()
+  const response = await send('/api/libraries/library-a/pads')
+  assert.equal(response.status, 503, 'the handler reports unavailable storage')
+  assert.equal(response.headers.get('cache-control'), 'private, no-store')
+})
+
 test('the API sends no CORS headers', async () => {
   const response = await setup().send('/session/token', postJson('{}'))
   assert.equal(response.headers.get('access-control-allow-origin'), null)

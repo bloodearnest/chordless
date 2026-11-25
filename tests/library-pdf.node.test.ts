@@ -70,7 +70,7 @@ test('a library song keeps one source PDF, private, replaced by the next, and re
     SONG_BUCKET: {
       async list({ prefix, limit }: { prefix: string; limit?: number }) {
         const keys = [...objects.keys()].filter(k => k.startsWith(prefix)).sort()
-        return { objects: keys.slice(0, limit).map(k => ({ key: k })) }
+        return { objects: keys.slice(0, limit).map(k => ({ key: k, size: 0 })) }
       },
       async get(objectKey: string) {
         const found = objects.get(objectKey)
@@ -82,14 +82,19 @@ test('a library song keeps one source PDF, private, replaced by the next, and re
             (typeof value === 'string'
               ? new TextEncoder().encode(value).buffer
               : value) as ArrayBuffer,
+          body: new Blob([value]).stream(),
         }
       },
+      async delete() {},
       async put(
         objectKey: string,
-        value: string | ArrayBuffer,
+        value: string | ArrayBuffer | Blob,
         options?: { customMetadata?: Record<string, string> }
       ) {
-        objects.set(objectKey, { value, meta: options?.customMetadata })
+        objects.set(objectKey, {
+          value: value as ArrayBuffer | string,
+          meta: options?.customMetadata,
+        })
       },
     },
     SESSION_SIGNING_KEY: key(),
