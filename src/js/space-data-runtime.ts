@@ -3,10 +3,11 @@ import { SyncPushedEvent } from './auto-sync.ts'
 import { DataChangeEvent } from './data-changes.ts'
 import { openSpace } from './db.ts'
 import { getIdentityToken, isAuthenticated } from './google-auth.ts'
-import { syncLibrarySongs } from './library-song-sync.ts'
+import { syncLibrarySongs, syncPersonalLibrarySongs } from './library-song-sync.ts'
 import { getCurrentSpace, getSpaceById, listSpaces, SpaceChangeEvent } from './space.ts'
-import { SpaceDataSync, spaceDataTransport } from './space-data.ts'
+import { personalDataTransport, SpaceDataSync, spaceDataTransport } from './space-data.ts'
 import { SpaceDataStore, SpaceOutboxChangedEvent } from './space-data-store.ts'
+import type { SpaceRecordKind } from './space-data-types.ts'
 import { t } from './text.ts'
 import { toast } from './toast.ts'
 import { errorMessage } from './utils/errors.ts'
@@ -78,6 +79,11 @@ export class SpaceDataAutoSync {
 }
 
 /* v8 ignore start -- wiring to the real account, database, Web Locks, window and clock; the lifecycle is tested above */
+/** What a Personal space on the server holds there: its setlists (its songs are the library's) */
+const PERSONAL: { readKinds: SpaceRecordKind[]; writeKinds: SpaceRecordKind[] } = {
+  readKinds: ['setlist'],
+  writeKinds: ['setlist'],
+}
 const controllers = new Map<string, Promise<SpaceDataSync>>()
 const failures = new Map<string, string>()
 
@@ -88,8 +94,15 @@ export async function syncSpaceDataFor(
 ): Promise<void> {
   if (!navigator.onLine) return
   const space = await getSpaceById(spaceId)
-  if (!space?.team || !(await isAuthenticated())) return
-  const teamId = space.team.id
+  // A Team's, or a Personal space's that has moved to the server (space.server)
+  if (!(space?.team || space?.server) || !(await isAuthenticated())) return
+  const connection = {
+    token: getIdentityToken,
+    origin: location.origin,
+    fetch: (input: RequestInfo | URL, init?: RequestInit) => window.fetch(input, init),
+  }
+  const personal = !space.team
+  const teamId = space.team?.id ?? space.id
   let creating = controllers.get(spaceId)
   if (!creating) {
     creating = (async () => {
@@ -97,20 +110,19 @@ export async function syncSpaceDataFor(
       return new SpaceDataSync({
         store: new SpaceDataStore(
           db,
-          space.team?.churchId ? { readKinds: ['setlist', 'person'], writeKinds: ['setlist'] } : {}
+          personal
+            ? PERSONAL
+            : space.team?.churchId
+              ? { readKinds: ['setlist', 'person'], writeKinds: ['setlist'] }
+              : {}
         ),
         online: () => navigator.onLine,
-        transport: spaceDataTransport(
-          teamId,
-          {
-            token: getIdentityToken,
-            origin: location.origin,
-            fetch: (input, init) => window.fetch(input, init),
-          },
-          Boolean(space.team?.churchId)
-        ),
+        transport: personal
+          ? personalDataTransport(connection)
+          : spaceDataTransport(teamId, connection, Boolean(space.team?.churchId)),
         lock: work => navigator.locks.request(`chordless-space-data-${spaceId}`, work),
-        pushed: () => window.dispatchEvent(new SyncPushedEvent(teamId)),
+        // (a Personal space has no live room: nothing tells other devices, which find it at their next sync)
+        pushed: personal ? undefined : () => window.dispatchEvent(new SyncPushedEvent(teamId)),
         conflict: () => toast(t('space-data-conflict')),
         refused: reason =>
           toast(t('space-data-refused'), {
@@ -127,13 +139,15 @@ export async function syncSpaceDataFor(
     void creating.catch(() => controllers.delete(spaceId))
   }
   const sync = await creating
-  if (space.team.churchId) {
-    const db = await openSpace(spaceId, 'sync')
-    await syncLibrarySongs(teamId, db, {
-      token: getIdentityToken,
-      origin: location.origin,
-      fetch: (input, init) => window.fetch(input, init),
-    })
+  // (the songs go first: a setlist is refused for a song the library does not have)
+  if (space.server) {
+    await syncPersonalLibrarySongs(
+      space.server.libraryId,
+      await openSpace(spaceId, 'sync'),
+      connection
+    )
+  } else if (space.team?.churchId) {
+    await syncLibrarySongs(teamId, await openSpace(spaceId, 'sync'), connection)
   }
   await sync.sync(options)
   failures.delete(spaceId)

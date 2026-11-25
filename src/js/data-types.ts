@@ -344,6 +344,8 @@ export interface Setlist {
   name: string
   /** The leader: a person of the space (docs/IDENTITIES.md); none if empty */
   leaderId?: string | null
+  /** A Personal space on the server names its leader in words (the person of the space it was, when it moved); never beside `leaderId` */
+  leaderName?: string | null
   /** Before leaders were people: the leader's name and Google account email. Read once, by the upgrade */
   owner?: string
   ownerId?: string
@@ -423,6 +425,12 @@ export interface Space {
   readOnly?: boolean
   /** Set once the space is shared with a team */
   team?: TeamLink
+  /**
+   * Set once a Personal space has moved to Chordless's server (docs/CENTRAL_STORAGE.md, step 5): its personal library, and
+   * when. It syncs there from then on and never with Drive again; `rootRef` stays, so that the Drive files that are left
+   * can be found and deleted when the person says
+   */
+  server?: { libraryId: string; movedAt: string }
   /**
    * The church's CCLI licence number, for records (docs/SPACES.md, "Licensing"). Optional and
    * never checked: nothing is blocked for lack of it. Kept on this device only for now.

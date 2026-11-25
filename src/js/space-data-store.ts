@@ -16,6 +16,7 @@ import type {
   SpaceOpResult,
   SpacePadSet,
   SpaceRecordKind,
+  SpaceSetlist,
   SpaceSong,
 } from './space-data-types.ts'
 import { ulid } from './ulid.ts'
@@ -183,6 +184,46 @@ export class SpaceDataStore {
     if (!state.enabled && (!onlyUnknown || !state.checked))
       store.put({ ...state, probing: true, writableKinds: this.#writeKinds })
     await transactionDone(tx)
+  }
+
+  /**
+   * Queue every setlist of this space as a create, for a Personal space that is moving to the server, where none of it is yet
+   * (nothing here is sent by the first read, and a read replaces what the server does not have, unless it is queued). A
+   * leader that is a person of the space becomes that person's name, as the server's setlists take the account or a name
+   * (worker/src/personal-setlists.ts). It also starts the probe, so that edits made while it goes are queued too.
+   */
+  async seedPersonalMove(): Promise<void> {
+    const tx = this.#tx('readwrite')
+    const data = tx.objectStore('space_data')
+    const state: SpaceDataState = (await requestResult(data.get('state'))) ?? emptyState()
+    data.put({ ...state, probing: true, writableKinds: this.#writeKinds })
+    const people = new Map<string, string>(
+      (await requestResult<{ id: string; name: string }[]>(tx.objectStore('people').getAll())).map(
+        person => [person.id, person.name]
+      )
+    )
+    const outbox = tx.objectStore('space_outbox')
+    for (const current of await requestResult(tx.objectStore(SPACE_STORES.setlist).getAll())) {
+      const shared = sharedRecord('setlist', current) as SpaceSetlist | null
+      if (!shared) continue
+      const leaderName = shared.leaderId ? people.get(shared.leaderId)?.trim() : undefined
+      const record: SpaceSetlist = {
+        ...shared,
+        leaderId: null,
+        leaderName: leaderName || shared.leaderName || null,
+      }
+      for (const waiting of await requestResult<SpaceOutboxRecord[]>(
+        outbox.index('record').getAll(['setlist', record.setlistId])
+      ))
+        outbox.delete(waiting.id)
+      outbox.put({
+        id: ulid(),
+        base: null,
+        change: { kind: 'setlist', id: record.setlistId, op: 'put', baseVersion: null, record },
+      })
+    }
+    await transactionDone(tx)
+    window.dispatchEvent(new SpaceOutboxChangedEvent(this.#db.spaceId))
   }
 
   async notMoved(): Promise<void> {

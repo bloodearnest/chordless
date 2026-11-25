@@ -289,7 +289,8 @@ export class AutoSync {
 /* v8 ignore start -- wiring to the real clock, network and sync: the Playwright tests run the app */
 async function currentState(): Promise<SyncState> {
   const space = await getCurrentSpaceFull()
-  if (!space.rootRef) return 'unavailable'
+  // (a space that has moved to the server is never synced with Drive again, though its folder is still known)
+  if (!space.rootRef || space.server) return 'unavailable'
   const signIn = await getSignInState()
   if (signIn === 'expired') return 'expired'
   const canSync = signIn === 'signed-in' || (signIn === 'no-drive' && isTeamMember(space))
