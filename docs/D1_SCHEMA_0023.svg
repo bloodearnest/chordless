@@ -22,12 +22,12 @@
 <path d="M1070,710.5 C1016,710.5 1004,1212 950,1212" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1212" r="3" fill="#2e8b57"/>
 <path d="M1520,303.5 C1466,303.5 554,102 500,102" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="102" r="3" fill="#2e8b57"/>
 <path d="M1520,288.5 C1466,288.5 1454,676 1400,676" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="1400" cy="676" r="3" fill="#2e8b57"/>
-<path d="M1520,511.5 C1466,511.5 1454,361 1400,361" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="1400" cy="361" r="3" fill="#2e8b57"/>
-<path d="M1520,526.5 C1466,526.5 1454,361 1400,361" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="1400" cy="361" r="3" fill="#2e8b57"/>
-<path d="M1520,496.5 C1466,496.5 554,102 500,102" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="102" r="3" fill="#2e8b57"/>
+<path d="M1520,481.5 C1466,481.5 1454,361 1400,361" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="1400" cy="361" r="3" fill="#2e8b57"/>
+<path d="M1520,496.5 C1466,496.5 1454,361 1400,361" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="1400" cy="361" r="3" fill="#2e8b57"/>
+<path d="M1520,466.5 C1466,466.5 554,102 500,102" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="102" r="3" fill="#2e8b57"/>
 <path d="M1070,1023.5 C1016,1023.5 1004,1212 950,1212" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1212" r="3" fill="#2e8b57"/>
 <path d="M1070,1156.5 C1016,1156.5 1004,1212 950,1212" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1212" r="3" fill="#2e8b57"/>
-<path d="M1520,663.5 C1466,663.5 1454,1315 1400,1315" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="1400" cy="1315" r="3" fill="#2e8b57"/>
+<path d="M1520,633.5 C1466,633.5 1454,1315 1400,1315" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="1400" cy="1315" r="3" fill="#2e8b57"/>
 <path d="M1070,1334.5 C1016,1334.5 1004,1212 950,1212" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1212" r="3" fill="#2e8b57"/>
 <path d="M1070,1604.5 C1016,1604.5 1004,1212 950,1212" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1212" r="3" fill="#2e8b57"/>
 <path d="M1070,1872.5 C1016,1872.5 1004,1212 950,1212" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1212" r="3" fill="#2e8b57"/>
@@ -205,30 +205,28 @@
 <text x="1078" y="929" font-size="9" fill="#8a96a2">idx leader (leader_id)</text>
 <text x="1078" y="942" font-size="9" fill="#8a96a2">idx account_date (account_id, date)</text>
 <text x="1078" y="955" font-size="9" fill="#8a96a2">idx team_date (space_id, date)</text>
-<rect x="1520" y="242" width="330" height="197" rx="5" fill="#fff" stroke="#d9822b" stroke-width="1.6"/>
+<rect x="1520" y="242" width="330" height="167" rx="5" fill="#fff" stroke="#d9822b" stroke-width="1.6"/>
 <rect x="1520" y="242" width="330" height="24" rx="5" fill="#d9822b"/><rect x="1520" y="260" width="330" height="6" fill="#d9822b"/>
-<text x="1528" y="258" font-size="13" font-weight="700" fill="#fff">shares (new)</text><text x="1842" y="258" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 2 checks</text>
+<text x="1528" y="258" font-size="13" font-weight="700" fill="#fff">shares (new)</text><text x="1842" y="258" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 1 check</text>
 <text x="1528" y="277" font-size="10.5" fill="#a8590f" font-weight="700">◆ share_id</text><text x="1688" y="277" font-size="10" fill="#a8590f">text</text>
 <text x="1528" y="292" font-size="10.5" fill="#a8590f" font-weight="700">setlist_id</text><text x="1688" y="292" font-size="10" fill="#a8590f">text</text><text x="1842" y="292" font-size="9.5" fill="#2e8b57" text-anchor="end">→ setlists</text>
 <text x="1528" y="307" font-size="10.5" fill="#a8590f" font-weight="700">created_by</text><text x="1688" y="307" font-size="10" fill="#a8590f">text</text><text x="1842" y="307" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
 <text x="1528" y="322" font-size="10.5" fill="#a8590f" font-weight="700">created_at</text><text x="1688" y="322" font-size="10" fill="#a8590f">text</text>
 <text x="1528" y="337" font-size="10.5" fill="#a8590f" font-weight="700">expires_at</text><text x="1688" y="337" font-size="10" fill="#a8590f">text</text>
 <text x="1528" y="352" font-size="10.5" fill="#a8590f" font-weight="700">stopped_at?</text><text x="1688" y="352" font-size="10" fill="#a8590f">text</text>
-<text x="1528" y="367" font-size="10.5" fill="#a8590f" font-weight="700">version</text><text x="1688" y="367" font-size="10" fill="#a8590f">integer</text>
-<text x="1528" y="382" font-size="10.5" fill="#a8590f" font-weight="700">modified_at</text><text x="1688" y="382" font-size="10" fill="#a8590f">text</text>
-<text x="1528" y="402" font-size="9" fill="#a8590f">idx expires (expires_at)</text>
-<text x="1528" y="415" font-size="9" fill="#a8590f">idx created_by (created_by)</text>
-<text x="1528" y="428" font-size="9" fill="#a8590f">idx unique live_setlist (setlist_id) where…</text>
-<rect x="1520" y="465" width="330" height="141" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
-<rect x="1520" y="465" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1520" y="483" width="330" height="6" fill="#3f6fb0"/>
-<text x="1528" y="481" font-size="13" font-weight="700" fill="#fff">song_overlays</text><text x="1842" y="481" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT · 2 checks</text>
-<text x="1528" y="500" font-size="10.5" fill="#1b2733" font-weight="700">◆ account_id</text><text x="1688" y="500" font-size="10" fill="#6b7885">text</text><text x="1842" y="500" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
-<text x="1528" y="515" font-size="10.5" fill="#1b2733" font-weight="700">◆ library_id</text><text x="1688" y="515" font-size="10" fill="#6b7885">text</text><text x="1842" y="515" font-size="9.5" fill="#2e8b57" text-anchor="end">→ library_songs</text>
-<text x="1528" y="530" font-size="10.5" fill="#1b2733" font-weight="700">◆ song_uuid</text><text x="1688" y="530" font-size="10" fill="#6b7885">text</text><text x="1842" y="530" font-size="9.5" fill="#2e8b57" text-anchor="end">→ library_songs</text>
-<text x="1528" y="545" font-size="10.5" fill="#3a4753" font-weight="400">body</text><text x="1688" y="545" font-size="10" fill="#6b7885">text</text>
-<text x="1528" y="560" font-size="10.5" fill="#3a4753" font-weight="400">version</text><text x="1688" y="560" font-size="10" fill="#6b7885">integer</text>
-<text x="1528" y="575" font-size="10.5" fill="#3a4753" font-weight="400">modified_at</text><text x="1688" y="575" font-size="10" fill="#6b7885">text</text>
-<text x="1528" y="595" font-size="9" fill="#8a96a2">idx song (library_id, song_uuid)</text>
+<text x="1528" y="372" font-size="9" fill="#a8590f">idx expires (expires_at)</text>
+<text x="1528" y="385" font-size="9" fill="#a8590f">idx created_by (created_by)</text>
+<text x="1528" y="398" font-size="9" fill="#a8590f">idx unique live_setlist (setlist_id) where…</text>
+<rect x="1520" y="435" width="330" height="141" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="1520" y="435" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1520" y="453" width="330" height="6" fill="#3f6fb0"/>
+<text x="1528" y="451" font-size="13" font-weight="700" fill="#fff">song_overlays</text><text x="1842" y="451" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT · 2 checks</text>
+<text x="1528" y="470" font-size="10.5" fill="#1b2733" font-weight="700">◆ account_id</text><text x="1688" y="470" font-size="10" fill="#6b7885">text</text><text x="1842" y="470" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="1528" y="485" font-size="10.5" fill="#1b2733" font-weight="700">◆ library_id</text><text x="1688" y="485" font-size="10" fill="#6b7885">text</text><text x="1842" y="485" font-size="9.5" fill="#2e8b57" text-anchor="end">→ library_songs</text>
+<text x="1528" y="500" font-size="10.5" fill="#1b2733" font-weight="700">◆ song_uuid</text><text x="1688" y="500" font-size="10" fill="#6b7885">text</text><text x="1842" y="500" font-size="9.5" fill="#2e8b57" text-anchor="end">→ library_songs</text>
+<text x="1528" y="515" font-size="10.5" fill="#3a4753" font-weight="400">body</text><text x="1688" y="515" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="530" font-size="10.5" fill="#3a4753" font-weight="400">version</text><text x="1688" y="530" font-size="10" fill="#6b7885">integer</text>
+<text x="1528" y="545" font-size="10.5" fill="#3a4753" font-weight="400">modified_at</text><text x="1688" y="545" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="565" font-size="9" fill="#8a96a2">idx song (library_id, song_uuid)</text>
 <rect x="1070" y="992" width="330" height="107" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
 <rect x="1070" y="992" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1070" y="1010" width="330" height="6" fill="#3f6fb0"/>
 <text x="1078" y="1008" font-size="13" font-weight="700" fill="#fff">space_pad_sets</text><text x="1392" y="1008" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT · 1 check</text>
@@ -248,20 +246,20 @@
 <text x="1078" y="1235" font-size="10.5" fill="#3a4753" font-weight="400">merged_into?</text><text x="1238" y="1235" font-size="10" fill="#6b7885">text</text>
 <text x="1078" y="1250" font-size="10.5" fill="#3a4753" font-weight="400">version</text><text x="1238" y="1250" font-size="10" fill="#6b7885">integer</text>
 <text x="1078" y="1265" font-size="10.5" fill="#3a4753" font-weight="400">modified_at</text><text x="1238" y="1265" font-size="10" fill="#6b7885">text</text>
-<rect x="1520" y="632" width="330" height="197" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
-<rect x="1520" y="632" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1520" y="650" width="330" height="6" fill="#3f6fb0"/>
-<text x="1528" y="648" font-size="13" font-weight="700" fill="#fff">space_setlist_songs</text><text x="1842" y="648" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 3 checks</text>
-<text x="1528" y="667" font-size="10.5" fill="#1b2733" font-weight="700">◆ setlist_id</text><text x="1688" y="667" font-size="10" fill="#6b7885">text</text><text x="1842" y="667" font-size="9.5" fill="#2e8b57" text-anchor="end">→ space_setlists</text>
-<text x="1528" y="682" font-size="10.5" fill="#1b2733" font-weight="700">◆ position</text><text x="1688" y="682" font-size="10" fill="#6b7885">integer</text>
-<text x="1528" y="697" font-size="10.5" fill="#3a4753" font-weight="400">song_uuid</text><text x="1688" y="697" font-size="10" fill="#6b7885">text</text>
-<text x="1528" y="712" font-size="10.5" fill="#3a4753" font-weight="400">song_id</text><text x="1688" y="712" font-size="10" fill="#6b7885">text</text>
-<text x="1528" y="727" font-size="10.5" fill="#3a4753" font-weight="400">title</text><text x="1688" y="727" font-size="10" fill="#6b7885">text</text>
-<text x="1528" y="742" font-size="10.5" fill="#3a4753" font-weight="400">ccli?</text><text x="1688" y="742" font-size="10" fill="#6b7885">text</text>
-<text x="1528" y="757" font-size="10.5" fill="#3a4753" font-weight="400">song_key?</text><text x="1688" y="757" font-size="10" fill="#6b7885">text</text>
-<text x="1528" y="772" font-size="10.5" fill="#3a4753" font-weight="400">tempo?</text><text x="1688" y="772" font-size="10" fill="#6b7885">integer</text>
-<text x="1528" y="787" font-size="10.5" fill="#3a4753" font-weight="400">notes</text><text x="1688" y="787" font-size="10" fill="#6b7885">text</text>
-<text x="1528" y="802" font-size="10.5" fill="#3a4753" font-weight="400">annotations</text><text x="1688" y="802" font-size="10" fill="#6b7885">text</text>
-<text x="1528" y="817" font-size="10.5" fill="#3a4753" font-weight="400">extra</text><text x="1688" y="817" font-size="10" fill="#6b7885">text</text>
+<rect x="1520" y="602" width="330" height="197" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="1520" y="602" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1520" y="620" width="330" height="6" fill="#3f6fb0"/>
+<text x="1528" y="618" font-size="13" font-weight="700" fill="#fff">space_setlist_songs</text><text x="1842" y="618" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 3 checks</text>
+<text x="1528" y="637" font-size="10.5" fill="#1b2733" font-weight="700">◆ setlist_id</text><text x="1688" y="637" font-size="10" fill="#6b7885">text</text><text x="1842" y="637" font-size="9.5" fill="#2e8b57" text-anchor="end">→ space_setlists</text>
+<text x="1528" y="652" font-size="10.5" fill="#1b2733" font-weight="700">◆ position</text><text x="1688" y="652" font-size="10" fill="#6b7885">integer</text>
+<text x="1528" y="667" font-size="10.5" fill="#3a4753" font-weight="400">song_uuid</text><text x="1688" y="667" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="682" font-size="10.5" fill="#3a4753" font-weight="400">song_id</text><text x="1688" y="682" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="697" font-size="10.5" fill="#3a4753" font-weight="400">title</text><text x="1688" y="697" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="712" font-size="10.5" fill="#3a4753" font-weight="400">ccli?</text><text x="1688" y="712" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="727" font-size="10.5" fill="#3a4753" font-weight="400">song_key?</text><text x="1688" y="727" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="742" font-size="10.5" fill="#3a4753" font-weight="400">tempo?</text><text x="1688" y="742" font-size="10" fill="#6b7885">integer</text>
+<text x="1528" y="757" font-size="10.5" fill="#3a4753" font-weight="400">notes</text><text x="1688" y="757" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="772" font-size="10.5" fill="#3a4753" font-weight="400">annotations</text><text x="1688" y="772" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="787" font-size="10.5" fill="#3a4753" font-weight="400">extra</text><text x="1688" y="787" font-size="10" fill="#6b7885">text</text>
 <rect x="1070" y="1303" width="330" height="244" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
 <rect x="1070" y="1303" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1070" y="1321" width="330" height="6" fill="#3f6fb0"/>
 <text x="1078" y="1319" font-size="13" font-weight="700" fill="#fff">space_setlists</text><text x="1392" y="1319" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT · 3 checks</text>

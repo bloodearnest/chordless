@@ -34,7 +34,7 @@ export default {
 
   /** The daily cleanup of shares that have ended (wrangler.toml `[triggers]`) */
   async scheduled(_event: unknown, env: Env) {
-    if (env.DB && env.SONG_BUCKET) await removeEndedShares(env.DB, env.SONG_BUCKET)
+    if (env.DB) await removeEndedShares(env.DB)
   },
 
   /** An email sent to the import address (Cloudflare Email Routing): answered with a link */

@@ -1,36 +1,32 @@
 /**
- * Anonymous setlist shares kept in the Worker's own storage (docs/CENTRAL_STORAGE.md, "Anonymous sharing"): a link anyone
- * who holds it can open, with no account, until it expires or the leader stops it. The share's bundle (the setlist and
- * its charts, as the leader's device made it) is one private R2 object, replaced on each update so the link stays the
- * same. `shares` in D1 says whether it may still be served: the Worker checks it on every read, so expiry and stopping
- * hold whenever the daily cleanup (`removeEndedShares`) last ran. There is no encryption: the bundle is private to R2
- * and reached only through the Worker.
+ * Anonymous setlist shares (docs/CENTRAL_STORAGE.md, "Anonymous sharing"): a link that lets anyone who holds it read
+ * one real setlist and its songs, with no account, until it expires or its leader stops it. It is no copy: the Worker
+ * reads the setlist and its songs from where they are kept, so the link always shows their current state (a key
+ * changed, a chart fixed) and is never updated. `shares` in D1 only says whether the link may still be served, and the
+ * Worker checks it on every read, so expiry and stopping hold whenever the daily cleanup last ran.
  *
- *   POST   /api/shares            { setlistId, bundle }   a leader makes a share → { shareId, expiresAt, version }
- *   GET    /api/shares?setlistId  the leader's live share of a setlist → { shareId, expiresAt, version }, or 404
- *   PUT    /api/shares/<id>       { bundle }              a leader updates it in place → { expiresAt, version }
- *   DELETE /api/shares/<id>                               a leader stops it
- *   GET    /api/shares/<id>       anyone with the link: { shareId, version, expiresAt, bundle }; 304 for the version
- *                                  they hold; 404 for a link that never was, 410 for one that ended
+ *   POST   /api/shares            { setlistId }  a leader makes a share → { shareId, expiresAt }
+ *   GET    /api/shares?setlistId  the leader's live share of a setlist → { shareId, expiresAt }, or 404
+ *   DELETE /api/shares/<id>       a leader stops it
+ *   GET    /api/shares/<id>       anyone with the link: the setlist and its songs (see `read`); 304 for the copy they
+ *                                  hold, 404 for a link that never was, 410 for one that ended
  *
- * A leader is whoever may write the setlist: its owner (a personal setlist), or a writer or admin of the church of its team.
+ * A leader is whoever may write the setlist: its owner (a personal setlist), or a writer or admin of the church of its
+ * team. What a reader is given leaves out what is the church's own: who made the setlist, accounts, the rest of its record.
  */
+import { sha256Hex } from '../../src/js/utils/bytes.ts'
 import type { D1Db } from './d1.ts'
-import type { Env, SongBucket } from './env.ts'
-import { isRecord, jsonResponse, Refusal, readJson, refusing } from './http.ts'
+import type { Env } from './env.ts'
+import { jsonResponse, Refusal, readJson, refusing } from './http.ts'
 import { authenticate, SESSION_PROVIDER, sessionProvider } from './identity.ts'
 
 const PATH = /^\/api\/shares(?:\/(sh_[A-Za-z0-9_-]{22}))?$/
 const SETLIST_ID = /^[A-Za-z0-9_-]{1,64}$/
 export const isSharePath = (path: string) => PATH.test(path)
 
-/** A bundle is a setlist and its charts: a few hundred KB at most */
-const MAX_BUNDLE_BYTES = 2 * 1024 * 1024
 const DAY = 24 * 60 * 60 * 1000
 /** A share lasts two weeks after its setlist's date */
 const LIFETIME_DAYS = 14
-
-const keyOf = (shareId: string) => `shares/${shareId}/bundle.json`
 
 /** `sh_` and 128 random bits: no one finds it by trying */
 function newShareId(): string {
@@ -55,7 +51,6 @@ interface ShareRow {
   setlist_id: string
   expires_at: string
   stopped_at: string | null
-  version: number
 }
 
 async function writableSetlist(
@@ -73,19 +68,91 @@ async function writableSetlist(
     .first<{ date: string }>()
 }
 
-/** The bundle of a request, as the text to keep: an object, of a size a share can be */
-function bundleOf(body: Record<string, unknown>): string {
-  if (!isRecord(body.bundle)) throw new Refusal(400, 'A share needs its bundle')
-  const text = JSON.stringify(body.bundle)
-  if (text.length > MAX_BUNDLE_BYTES) throw new Refusal(413, 'That share is too large')
-  return text
+interface SetlistRead {
+  setlist_id: string
+  date: string
+  time: string
+  type: string
+  name: string
+  leader_name: string | null
+  leader_account_name: string | null
+  songs: string
+  version: number
+  library_id: string
 }
 
-const answer = (row: ShareRow) => ({
-  shareId: row.share_id,
-  expiresAt: row.expires_at,
-  version: row.version,
-})
+interface SongRead {
+  song_uuid: string
+  song_id: string
+  title: string
+  ccli: string | null
+  song_key: string | null
+  licence: string | null
+  is_default: number
+  variant_of: string | null
+  variant_label: string
+  bundle_ref: string | null
+  version: number
+}
+
+/** What a share shows: the setlist, with its leader's name, and each of its songs with its chart */
+async function read(db: D1Db, bucket: NonNullable<Env['SONG_BUCKET']>, setlistId: string) {
+  const setlist = await db
+    .prepare(`SELECT s.setlist_id, s.date, s.time, s.type, s.name, s.leader_name, a.name AS leader_account_name,
+      s.songs, s.version, l.library_id
+      FROM setlists s LEFT JOIN accounts a ON a.account_id = s.leader_id
+      JOIN libraries l ON l.account_id = s.account_id OR l.church_id = (
+        SELECT t.church_id FROM teams t WHERE t.space_id = s.space_id)
+      WHERE s.setlist_id = ?`)
+    .bind(setlistId)
+    .first<SetlistRead>()
+  if (!setlist) return null
+  const entries = JSON.parse(setlist.songs) as Record<string, unknown>[]
+  const uuids = [...new Set(entries.map(entry => String(entry.songUuid)))]
+  const { results } = uuids.length
+    ? await db
+        .prepare(`SELECT song_uuid, song_id, title, ccli, song_key, licence, is_default, variant_of, variant_label, bundle_ref, version
+          FROM library_songs WHERE library_id = ? AND song_uuid IN (SELECT value FROM json_each(?))`)
+        .bind(setlist.library_id, JSON.stringify(uuids))
+        .all<SongRead>()
+    : { results: [] }
+  const songs = await Promise.all(
+    results.map(async row => {
+      const object = row.bundle_ref ? await bucket.get(row.bundle_ref) : null
+      return {
+        songUuid: row.song_uuid,
+        songId: row.song_id,
+        title: row.title,
+        ccli: row.ccli,
+        key: row.song_key,
+        licence: row.licence,
+        isDefault: row.is_default === 1,
+        variantOf: row.variant_of,
+        variantLabel: row.variant_label,
+        version: row.version,
+        // (a song with no chart yet is a title)
+        bundle: object ? JSON.parse(await object.text()) : null,
+      }
+    })
+  )
+  return {
+    setlist: {
+      setlistId: setlist.setlist_id,
+      date: setlist.date,
+      time: setlist.time,
+      type: setlist.type,
+      name: setlist.name,
+      leader: setlist.leader_account_name ?? setlist.leader_name,
+      songs: entries,
+    },
+    songs,
+    // (what a device holding a copy asks if it is current)
+    fingerprint: `${setlist.version}:${songs
+      .map(song => `${song.songUuid}.${song.version}`)
+      .sort()
+      .join(',')}`,
+  }
+}
 
 export function handleShares(request: Request, env: Env): Promise<Response> {
   return refusing(async () => {
@@ -95,34 +162,38 @@ export function handleShares(request: Request, env: Env): Promise<Response> {
     const shareId = match[1]
     if (!env.DB || !env.SONG_BUCKET) throw new Refusal(503, 'Sharing is not available')
     const db = env.DB
-    const bucket: SongBucket = env.SONG_BUCKET
+    const now = new Date()
 
     // Anyone with the link
     if (shareId && request.method === 'GET') {
       const row = await db
-        .prepare('SELECT * FROM shares WHERE share_id = ?')
+        .prepare(`SELECT sh.*, s.date AS setlist_date FROM shares sh
+          JOIN setlists s ON s.setlist_id = sh.setlist_id WHERE sh.share_id = ?`)
         .bind(shareId)
-        .first<ShareRow>()
+        .first<ShareRow & { setlist_date: string }>()
       if (!row) throw new Refusal(404, 'No such share')
-      if (row.stopped_at !== null || row.expires_at <= new Date().toISOString())
+      // (a setlist moved to a later date moves the end with it)
+      const ends = [row.expires_at, expiryFor(row.setlist_date, new Date(0))].sort().at(-1)
+      if (row.stopped_at !== null || (ends as string) <= now.toISOString())
         throw new Refusal(410, 'This share has ended')
+      const shown = await read(db, env.SONG_BUCKET, row.setlist_id)
+      if (!shown) throw new Refusal(404, 'No such share')
+      const { fingerprint, ...body } = shown
+      const etag = `"${(await sha256Hex(fingerprint)).slice(0, 32)}"`
       const headers = {
-        ETag: `"${row.version}"`,
+        ETag: etag,
         'Cache-Control': 'no-cache',
         'X-Robots-Tag': 'noindex, nofollow',
       }
-      if (request.headers.get('If-None-Match') === headers.ETag)
+      if (request.headers.get('If-None-Match') === etag)
         return new Response(null, { status: 304, headers })
-      const object = await bucket.get(keyOf(shareId))
-      if (!object) throw new Refusal(404, 'No such share')
-      return Response.json({ ...answer(row), bundle: JSON.parse(await object.text()) }, { headers })
+      return Response.json({ shareId, expiresAt: ends, ...body }, { headers })
     }
 
     // A leader
     const identity = await authenticate(request, [sessionProvider(env)])
     if (!identity || identity.provider !== SESSION_PROVIDER) throw new Refusal(401, 'Sign in first')
     const account = identity.sub
-    const now = new Date()
 
     if (!shareId && request.method === 'GET') {
       const setlistId = url.searchParams.get('setlistId') ?? ''
@@ -135,7 +206,7 @@ export function handleShares(request: Request, env: Env): Promise<Response> {
         .bind(setlistId, now.toISOString())
         .first<ShareRow>()
       if (!row) throw new Refusal(404, 'This setlist is not shared')
-      return jsonResponse(answer(row))
+      return jsonResponse({ shareId: row.share_id, expiresAt: row.expires_at })
     }
 
     if (!shareId && request.method === 'POST') {
@@ -145,64 +216,46 @@ export function handleShares(request: Request, env: Env): Promise<Response> {
         ? await writableSetlist(db, account, setlistId)
         : null
       if (!setlist) throw new Refusal(404, 'No such setlist')
-      const bundle = bundleOf(body)
       const id = newShareId()
       const expiresAt = expiryFor(setlist.date, now)
       try {
         await db
-          .prepare(`INSERT INTO shares (share_id, setlist_id, created_by, created_at, expires_at, version, modified_at)
-            VALUES (?, ?, ?, ?, ?, 1, ?)`)
-          .bind(id, setlistId, account, now.toISOString(), expiresAt, now.toISOString())
+          .prepare(
+            'INSERT INTO shares (share_id, setlist_id, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?)'
+          )
+          .bind(id, setlistId, account, now.toISOString(), expiresAt)
           .run()
       } catch (error) {
         /* v8 ignore next -- an unexpected database failure must propagate to the Worker error handler */
         if (!/UNIQUE constraint failed/i.test(String(error))) throw error
-        // (one live share a setlist: the one there is, which the leader may update or stop)
-        const existing = await db
+        // (one live share a setlist: the one there is, which the leader may stop)
+        const existing = (await db
           .prepare('SELECT * FROM shares WHERE setlist_id = ? AND stopped_at IS NULL')
           .bind(setlistId)
-          .first<ShareRow>()
+          .first<ShareRow>()) as ShareRow
         return jsonResponse(
-          { error: 'This setlist is already shared', ...answer(existing as ShareRow) },
+          {
+            error: 'This setlist is already shared',
+            shareId: existing.share_id,
+            expiresAt: existing.expires_at,
+          },
           409
         )
       }
-      await bucket.put(keyOf(id), bundle, { httpMetadata: { contentType: 'application/json' } })
-      return jsonResponse({ shareId: id, expiresAt, version: 1 }, 201)
+      return jsonResponse({ shareId: id, expiresAt }, 201)
     }
 
     const row = shareId
       ? await db.prepare('SELECT * FROM shares WHERE share_id = ?').bind(shareId).first<ShareRow>()
       : null
     // (a share is not described to someone who may not write its setlist)
-    const setlist = row ? await writableSetlist(db, account, row.setlist_id) : null
-    if (!row || !setlist) throw new Refusal(404, 'No such share')
-
-    if (request.method === 'PUT') {
-      if (row.stopped_at !== null || row.expires_at <= now.toISOString())
-        throw new Refusal(410, 'This share has ended')
-      const bundle = bundleOf(await readJson(request))
-      // (a setlist moved to another date moves the end)
-      const expiresAt = expiryFor(setlist.date, now)
-      await bucket.put(keyOf(row.share_id), bundle, {
-        httpMetadata: { contentType: 'application/json' },
-      })
-      await db
-        .prepare(
-          'UPDATE shares SET version = version + 1, expires_at = ?, modified_at = ? WHERE share_id = ?'
-        )
-        .bind(expiresAt, now.toISOString(), row.share_id)
-        .run()
-      return jsonResponse({ shareId: row.share_id, expiresAt, version: row.version + 1 })
-    }
+    if (!row || !(await writableSetlist(db, account, row.setlist_id)))
+      throw new Refusal(404, 'No such share')
     if (request.method === 'DELETE') {
       await db
-        .prepare(
-          'UPDATE shares SET stopped_at = ?, version = version + 1, modified_at = ? WHERE share_id = ? AND stopped_at IS NULL'
-        )
-        .bind(now.toISOString(), now.toISOString(), row.share_id)
+        .prepare('UPDATE shares SET stopped_at = ? WHERE share_id = ? AND stopped_at IS NULL')
+        .bind(now.toISOString(), row.share_id)
         .run()
-      await bucket.delete([keyOf(row.share_id)])
       return new Response(null, { status: 204 })
     }
     throw new Refusal(404, 'Not found')
@@ -220,31 +273,14 @@ export function handleShares(request: Request, env: Env): Promise<Response> {
 }
 
 /**
- * The daily cleanup: the objects of shares that ended (expired or stopped) are removed, and so are their rows a week
- * later. Reads already refuse an ended share whether or not this has run; this only frees the storage.
+ * The daily cleanup: the rows of shares that ended (expired or stopped) a week ago. Reads already refuse an ended
+ * share whether or not this has run, and a share keeps no objects, so this only tidies the table.
  */
-export async function removeEndedShares(
-  db: D1Db,
-  bucket: SongBucket,
-  now = new Date()
-): Promise<{ objects: number; rows: number }> {
-  const at = now.toISOString()
-  const { results } = await db
-    .prepare('SELECT share_id FROM shares WHERE stopped_at IS NOT NULL OR expires_at <= ?')
-    .bind(at)
-    .all<{ share_id: string }>()
-  let objects = 0
-  for (const { share_id } of results) {
-    const { objects: found } = await bucket.list({ prefix: `shares/${share_id}/` })
-    if (found.length) await bucket.delete(found.map(each => each.key))
-    objects += found.length
-  }
+export async function removeEndedShares(db: D1Db, now = new Date()): Promise<number> {
   const old = new Date(now.getTime() - 7 * DAY).toISOString()
   const removed = await db
-    .prepare(
-      'DELETE FROM shares WHERE (stopped_at IS NOT NULL AND stopped_at <= ?) OR expires_at <= ?'
-    )
+    .prepare('DELETE FROM shares WHERE stopped_at <= ? OR expires_at <= ?')
     .bind(old, old)
     .run()
-  return { objects, rows: removed.meta.changes }
+  return removed.meta.changes
 }
