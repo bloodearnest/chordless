@@ -5,20 +5,24 @@
  */
 import type { Space } from '../data-types.ts'
 import { getIdentityToken } from '../google-auth.ts'
+import type { WorkerConnection } from '../worker-call.ts'
 import { driveStorage } from './browser-drive.ts'
+import { LibraryPads } from './library-pads.ts'
 import { TeamStorage } from './team-storage.ts'
-import type { StorageBackend } from './types.ts'
+import type { PadStorage, StorageBackend } from './types.ts'
+
+/** The signed-in person's connection to the Worker (`window.fetch` is read at each call, so a test that replaces it is heard) */
+const connection = (): WorkerConnection => ({
+  token: getIdentityToken,
+  origin: window.location.origin,
+  fetch: (input, init) => window.fetch(input, init),
+})
 
 let team: TeamStorage | undefined
 
 /** The backend for team spaces this person is a member of, not the owner (made once) */
 function teamStorage(): TeamStorage {
-  // (`window.fetch` is read at each call, so a test that replaces it is heard)
-  team ??= new TeamStorage({
-    token: getIdentityToken,
-    origin: window.location.origin,
-    fetch: (input, init) => window.fetch(input, init),
-  })
+  team ??= new TeamStorage(connection())
   return team
 }
 
@@ -30,4 +34,9 @@ export function isTeamMember(space: Pick<Space, 'team'> | null | undefined): boo
 /** The backend for a space (Google Drive for one that is not a team's, or the owner's) */
 export function storageFor(space: Pick<Space, 'team'> | null | undefined): StorageBackend {
   return isTeamMember(space) ? teamStorage() : driveStorage
+}
+
+/** The pad sets of a Personal space that has moved to Chordless: in its library on the server, not in Drive */
+export function serverPadsFor(space: Pick<Space, 'server'>): PadStorage | null {
+  return space.server ? new LibraryPads(connection(), space.server.libraryId) : null
 }

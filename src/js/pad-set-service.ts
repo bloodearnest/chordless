@@ -5,7 +5,7 @@ import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad
 import { listSpaces } from './space.ts'
 import { SpaceDataStore } from './space-data-store.ts'
 import { driveStorage } from './storage/browser-drive.ts'
-import { isTeamMember, storageFor } from './storage/space-storage.ts'
+import { isTeamMember, serverPadsFor, storageFor } from './storage/space-storage.ts'
 import type { PadStorage } from './storage/types.ts'
 import { t } from './text.ts'
 import { UserError } from './utils/errors.ts'
@@ -83,12 +83,13 @@ export function setPadSources(sources?: PadSource[] | null) {
 }
 
 /**
- * A space's pads: in its folder, straight in Drive for a personal space's and a team's owner,
+ * A space's pads: in its library on the server if it has moved there, else in its folder, straight in Drive for a personal space's and a team's owner,
  * through the Worker for anyone else. A space not in Drive yet has no folder, so none.
  */
 function spaceSource(space: Space): PadSource | null {
-  const storage =
-    space.team && isTeamMember(space)
+  const storage = space.server
+    ? serverPadsFor(space)
+    : space.team && isTeamMember(space)
       ? storageFor(space).padsIn(space.team.id)
       : space.rootRef
         ? driveStorage.padsIn(space.rootRef)

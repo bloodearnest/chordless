@@ -169,7 +169,7 @@ describe('pad sets', () => {
       await selectPadSet('no-such-folder').catch(e => {
         error = e
       })
-      expect((error as Error | null)?.message).to.include('no longer in Google Drive')
+      expect((error as Error | null)?.message).to.include('no longer where it was kept')
       expect(getActivePadSet()).to.equal(null)
     })
 
@@ -782,6 +782,22 @@ describe('pad sets', () => {
         expect(names.indexOf(personal.name)).to.be.below(names.indexOf(owned.name))
       } finally {
         for (const space of [owned, joined, unlinked, personal]) await deleteSpace(space.id)
+      }
+    })
+
+    it('keeps a space that has moved to Chordless in its library, whether or not it still knows its Drive folder', async () => {
+      setPadSources(null)
+      const moved = await createSpace(`Moved ${crypto.randomUUID().slice(0, 8)}`)
+      const bare = await createSpace(`Bare ${crypto.randomUUID().slice(0, 8)}`)
+      try {
+        const server = { libraryId: 'library', movedAt: '2026-11-25T10:00:00.000Z' }
+        await updateSpace(moved.id, { rootRef: null, server })
+        await updateSpace(bare.id, { rootRef: null })
+        const names = (await listPadDestinations()).map(each => each.name)
+        expect(names).to.include(moved.name)
+        expect(names).to.not.include(bare.name)
+      } finally {
+        for (const space of [moved, bare]) await deleteSpace(space.id)
       }
     })
 
