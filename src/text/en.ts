@@ -1938,12 +1938,12 @@ export-read-failed = Couldn't read that file.
 
 ## Errors that are written for the person who reads them (thrown as a UserError)
 
-pads-space-unavailable = That pad set’s space is not available: pad sets are kept in a space’s folder in Google Drive
+pads-space-unavailable = That pad set’s space is not available: pad sets are kept with a space, in its Google Drive folder or on Chordless
 pads-no-file = Please select a pad set ZIP file.
 pads-no-name = Please provide a pad set name.
 # { $keys } is the notes a pad set lacks a sound for ("D, F#").
 pads-missing-keys = Missing keys in pad set: { $keys }
-pads-gone = That pad set is no longer in Google Drive.
+pads-gone = That pad set is no longer where it was kept.
 pads-encrypted = Encrypted ZIP archives are not supported.
 
 team-needs-name = A team space needs a name
