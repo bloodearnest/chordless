@@ -15,6 +15,7 @@ import { handleEmail, type IncomingEmail } from './email.ts'
 import type { Env } from './env.ts'
 import { handleRequest } from './router.ts'
 import type { ShareCache } from './share.ts'
+import { removeEndedShares } from './shares.ts'
 
 export { ShareRoom } from './share-room.ts'
 export { TeamRoom } from './team-room.ts'
@@ -29,6 +30,11 @@ export default {
       misconfigured(request, env) ??
       handleRequest(request, env, ctx, (caches as unknown as { default: ShareCache }).default)
     )
+  },
+
+  /** The daily cleanup of shares that have ended (wrangler.toml `[triggers]`) */
+  async scheduled(_event: unknown, env: Env) {
+    if (env.DB && env.SONG_BUCKET) await removeEndedShares(env.DB, env.SONG_BUCKET)
   },
 
   /** An email sent to the import address (Cloudflare Email Routing): answered with a link */

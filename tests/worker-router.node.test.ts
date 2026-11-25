@@ -137,6 +137,12 @@ test('library pad paths reach the Worker handler', async () => {
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
 })
 
+test('anonymous share paths reach the Worker handler', async () => {
+  const { send } = setup()
+  const response = await send('/api/shares/sh_aaaaaaaaaaaaaaaaaaaaaa')
+  assert.equal(response.status, 503, 'the handler reports unavailable storage')
+})
+
 test('the API sends no CORS headers', async () => {
   const response = await setup().send('/session/token', postJson('{}'))
   assert.equal(response.headers.get('access-control-allow-origin'), null)
