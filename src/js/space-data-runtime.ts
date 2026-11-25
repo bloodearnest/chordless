@@ -1,4 +1,5 @@
 /** Current-space wiring; account-wide polling and sockets remain step 5 of the D1 plan. */
+
 import { SyncPushedEvent } from './auto-sync.ts'
 import { DataChangeEvent } from './data-changes.ts'
 import { type ChordlessDB, openSpace } from './db.ts'
@@ -24,6 +25,7 @@ import { moveToServer, serverSteps } from './space-move.ts'
 import { t } from './text.ts'
 import { toast } from './toast.ts'
 import { errorMessage } from './utils/errors.ts'
+import type { WorkerConnection } from './worker-call.ts'
 
 export class SpaceDataAutoSync {
   readonly #deps: {
@@ -176,6 +178,21 @@ export async function syncSpaceDataFor(
   }
   await sync.sync(options)
   failures.delete(spaceId)
+  if (space.server) await syncOverlaysOf(spaceId, space.server.libraryId, connection)
+}
+
+/** What the person keeps for themselves goes with their space: a failure here is not one of the space's data */
+async function syncOverlaysOf(
+  spaceId: string,
+  libraryId: string,
+  connection: WorkerConnection
+): Promise<void> {
+  try {
+    const { syncOverlays } = await import('./overlay-sync.ts')
+    await syncOverlays({ db: await openSpace(spaceId, 'sync'), libraryId, connection })
+  } catch (error) {
+    console.warn('[Overlays] Could not sync what you keep for yourself:', errorMessage(error))
+  }
 }
 
 /**
