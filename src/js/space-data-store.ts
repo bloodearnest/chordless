@@ -188,30 +188,18 @@ export class SpaceDataStore {
 
   /**
    * Queue every setlist of this space as a create, for a Personal space that is moving to the server, where none of it is yet
-   * (nothing here is sent by the first read, and a read replaces what the server does not have, unless it is queued). A
-   * leader that is a person of the space becomes that person's name, as the server's setlists take the account or a name
-   * (worker/src/personal-setlists.ts). It also starts the probe, so that edits made while it goes are queued too.
+   * (nothing here is sent by the first read, and a read replaces what the server does not have, unless it is queued). It also
+   * starts the probe, so that edits made while it goes are queued too.
    */
   async seedPersonalMove(): Promise<void> {
     const tx = this.#tx('readwrite')
     const data = tx.objectStore('space_data')
     const state: SpaceDataState = (await requestResult(data.get('state'))) ?? emptyState()
     data.put({ ...state, probing: true, writableKinds: this.#writeKinds })
-    const people = new Map<string, string>(
-      (await requestResult<{ id: string; name: string }[]>(tx.objectStore('people').getAll())).map(
-        person => [person.id, person.name]
-      )
-    )
     const outbox = tx.objectStore('space_outbox')
     for (const current of await requestResult(tx.objectStore(SPACE_STORES.setlist).getAll())) {
-      const shared = sharedRecord('setlist', current) as SpaceSetlist | null
-      if (!shared) continue
-      const leaderName = shared.leaderId ? people.get(shared.leaderId)?.trim() : undefined
-      const record: SpaceSetlist = {
-        ...shared,
-        leaderId: null,
-        leaderName: leaderName || shared.leaderName || null,
-      }
+      const record = sharedRecord('setlist', current) as SpaceSetlist | null
+      if (!record) continue
       for (const waiting of await requestResult<SpaceOutboxRecord[]>(
         outbox.index('record').getAll(['setlist', record.setlistId])
       ))

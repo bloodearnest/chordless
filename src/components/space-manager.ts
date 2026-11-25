@@ -190,7 +190,13 @@ export class SpaceManager extends LitElement {
             : nothing
         }
 
-        <div class="panel">
+        ${
+          space.server
+            ? html`<div class="panel" id="server-panel">
+                <h3>${t('space-copy-server-heading')}</h3>
+                <p>${t('space-copy-server-text')}</p>
+              </div>`
+            : html`        <div class="panel">
           <h3>${isTeamMember(space) ? t('space-copy-team-heading') : t('space-copy-drive-heading')}</h3>
           <p>
             ${isTeamMember(space) ? t('space-copy-team-text') : t('space-copy-drive-text')}
@@ -207,7 +213,8 @@ export class SpaceManager extends LitElement {
                 </p>`
                 : html`<p class="hint">${t('space-sync-sign-in-hint')}</p>`
           }
-        </div>
+        </div>`
+        }
 
         <div class="panel">
           <h3>${t('space-export-heading')}</h3>

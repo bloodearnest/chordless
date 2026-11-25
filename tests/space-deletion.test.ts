@@ -18,6 +18,7 @@ import {
   deleteSpaceEverywhere,
   mayDeleteEverywhere,
   removeSpaceFromDevice,
+  trashMovedSpaceDriveFiles,
 } from '../src/js/space-deletion.ts'
 import { storageFor } from '../src/js/storage/space-storage.ts'
 import { teamApi } from '../src/js/team-client.ts'
@@ -68,6 +69,36 @@ describe('deleting a space', () => {
       expect(as('admin')).to.equal(true)
       expect(as('writer')).to.equal(false)
       expect(as('reader')).to.equal(false)
+    })
+  })
+
+  describe('the Drive files of a space that has moved to the server', () => {
+    const moved = { libraryId: 'library', movedAt: '2026-11-25T10:00:00.000Z' }
+
+    it('are put in the trash, and the space forgets the folder but stays', async () => {
+      const folder = await createTeamFolder('root', unique('Left behind'))
+      const personal = await space('Moved', {
+        rootRef: folder,
+        driveClientId: 'app',
+        server: moved,
+      })
+      await trashMovedSpaceDriveFiles(personal)
+      expect(trashed(folder)).to.equal(true)
+      const after = must(await getSpaceById(personal.id))
+      expect(after.rootRef ?? null).to.equal(null)
+      expect(after.driveClientId ?? null).to.equal(null)
+      expect(after.server).to.deep.equal(moved)
+    })
+
+    it('are left alone for a space that has not moved, or has no folder', async () => {
+      const folder = await createTeamFolder('root', unique('Still synced'))
+      const synced = await space('Not moved', { rootRef: folder })
+      await trashMovedSpaceDriveFiles(synced)
+      expect(trashed(folder)).to.equal(false)
+      expect(must(await getSpaceById(synced.id)).rootRef).to.equal(folder)
+      const none = await space('No folder', { server: moved })
+      await trashMovedSpaceDriveFiles(none)
+      expect((await getSpaceById(none.id))?.rootRef ?? null).to.equal(null)
     })
   })
 

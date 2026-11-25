@@ -20,7 +20,9 @@ import type { SignInState } from '../src/js/google-auth.ts'
 import { forgetSync, recordSync } from '../src/js/last-sync.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
+import { ServerHasDataError } from '../src/js/space-move.ts'
 import { syncSpaceNow } from '../src/js/space-sync.ts'
+import { UserError } from '../src/js/utils/errors.ts'
 import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
@@ -229,7 +231,13 @@ describe('space-card', () => {
 
   it('has no Switch button: the space tabs switch', async () => {
     const el = await card('signed-in')
-    expect(order(el)).to.deep.equal(['sync', 'manage', 'manage-data', 'disconnect-drive'])
+    expect(order(el)).to.deep.equal([
+      'sync',
+      'move-to-server',
+      'manage',
+      'manage-data',
+      'disconnect-drive',
+    ])
   })
 
   it('says a Team is a Team, and what the person is in it', async () => {
@@ -367,6 +375,213 @@ describe('space-card', () => {
         /Starting…|Syncing|Scanning|Checking|Downloading|Uploading|Initializing/
       )
       await waitUntil(() => !el._syncing, undefined, { timeout: 3000 })
+    })
+  })
+
+  describe('moving to Chordless', () => {
+    const server = { libraryId: 'library', movedAt: '2026-11-25T10:00:00.000Z' }
+
+    /** Answer the card's question to confirm (the second modal: the first is the Drive folder's) */
+    async function confirmWith(el: SpaceCard, answer: boolean) {
+      const modal = must(el.shadowRoot?.querySelectorAll<AppModal>('app-modal')[1])
+      await waitUntil(() => modal.open, 'the question', { timeout: 3000 })
+      await modal.updateComplete
+      must(
+        modal.shadowRoot?.querySelector<HTMLElement>(
+          answer ? '.modal-btn-confirm' : '.modal-btn-cancel'
+        )
+      ).click()
+      return modal
+    }
+
+    it('is offered on a Personal space still on Drive, to someone signed in, and on nothing else', async () => {
+      for (const state of ['signed-in', 'no-drive'] as const)
+        expect(button(await card(state), 'move-to-server')).to.not.equal(null)
+      for (const state of ['signed-out', 'expired', null] as const)
+        expect(button(await card(state), 'move-to-server')).to.equal(null)
+      const team = await make(`Team ${crypto.randomUUID().slice(0, 8)}`, {
+        team: { id: 'team-1', role: 'owner' },
+      })
+      expect(button(await card('signed-in', { space: team }), 'move-to-server')).to.equal(null)
+      const moved = await make(`Moved ${crypto.randomUUID().slice(0, 8)}`, { server })
+      expect(button(await card('signed-in', { space: moved }), 'move-to-server')).to.equal(null)
+    })
+
+    it('asks first, says it cannot be undone, and moves nothing if told no', async () => {
+      const el = await card('signed-in')
+      const moves: string[] = []
+      el.moveSpace = async id => {
+        moves.push(id)
+      }
+      must(button(el, 'move-to-server')).click()
+      const modal = await confirmWith(el, false)
+      expect(modal.heading).to.contain(space.name)
+      expect(modal.message).to.contain('cannot be undone')
+      expect(modal.message).to.contain('Pad audio is not moved')
+      await el.updateComplete
+      expect(moves).to.deep.equal([])
+      expect(text(el)).not.to.contain('Moving to Chordless')
+    })
+
+    it('does nothing while another sync, move or deletion is going', async () => {
+      const el = await card('signed-in', {
+        space: await make(`Busy ${crypto.randomUUID().slice(0, 8)}`, { server, rootRef: 'folder' }),
+      })
+      const calls: string[] = []
+      el.moveSpace = async () => {
+        calls.push('move')
+      }
+      el.trashDriveFiles = async () => {
+        calls.push('trash')
+      }
+      el._syncing = true
+      await el._move()
+      await el._deleteDriveFiles()
+      expect(calls).to.deep.equal([])
+    })
+
+    it('moves the space when told yes, says when, and tells the page', async () => {
+      const el = await card('signed-in')
+      const moves: string[] = []
+      let release: () => void = () => {}
+      const held = new Promise<void>(resolve => {
+        release = resolve
+      })
+      el.moveSpace = async id => {
+        moves.push(id)
+        await held
+      }
+      let told = 0
+      el.addEventListener(SpaceSyncedEvent.type, () => told++)
+      must(button(el, 'move-to-server')).click()
+      await confirmWith(el, true)
+      await waitUntil(() => moves.length === 1, 'the move', { timeout: 3000 })
+      await el.updateComplete
+      expect(text(el)).to.contain('Moving to Chordless')
+      expect(button(el, 'move-to-server')?.disabled).to.equal(true)
+      release()
+      await waitUntil(() => !el._syncing, undefined, { timeout: 3000 })
+      expect(moves).to.deep.equal([space.id])
+      expect(text(el)).to.contain('Synced Just now')
+      expect(told).to.equal(1)
+    })
+
+    it('says when the account already has data, and says what went wrong otherwise, and can be tried again', async () => {
+      const el = await card('signed-in')
+      must(button(el, 'move-to-server')).click()
+      el.moveSpace = async () => {
+        throw new ServerHasDataError()
+      }
+      await confirmWith(el, true)
+      await waitUntil(() => el._error, 'the refusal', { timeout: 3000 })
+      expect(text(el)).to.contain('already has songs or setlists')
+      expect(button(el, 'move-to-server')?.disabled).to.equal(false)
+      el.moveSpace = async () => {
+        throw new UserError('offline')
+      }
+      must(button(el, 'move-to-server')).click()
+      await confirmWith(el, true)
+      await waitUntil(() => text(el).includes('Could not move the space: offline'), undefined, {
+        timeout: 3000,
+      })
+      // (an error not written for people is not shown: the plain sentence, with the error in the log)
+      el.moveSpace = async () => {
+        throw new Error('internal detail')
+      }
+      must(button(el, 'move-to-server')).click()
+      await confirmWith(el, true)
+      await waitUntil(() => text(el).includes('Could not move the space.'), undefined, {
+        timeout: 3000,
+      })
+      expect(text(el)).not.to.contain('internal detail')
+    })
+
+    describe('a space that has moved', () => {
+      let moved: Space
+      beforeEach(async () => {
+        moved = await make(`Moved ${crypto.randomUUID().slice(0, 8)}`, {
+          server,
+          rootRef: 'old-folder',
+        })
+      })
+
+      it('says it is stored on Chordless, and offers nothing of Google Drive but its leftover files', async () => {
+        const el = await card('signed-in', { space: moved })
+        expect(text(el)).to.contain('Stored on Chordless')
+        expect(text(el)).not.to.contain('Google Drive:')
+        expect(button(el, 'disconnect-drive')).to.equal(null)
+        expect(button(el, 'connect-drive')).to.equal(null)
+        expect(button(el, 'reconnect-drive')).to.equal(null)
+        expect(text(el)).to.contain('Its old files are still in Google Drive')
+        expect(button(el, 'delete-drive-files')).to.not.equal(null)
+      })
+
+      it('syncs with a Chordless sign-in alone, and does not say Drive needs reconnecting', async () => {
+        const el = await card('no-drive', { space: moved })
+        expect(button(el, 'sync')).to.not.equal(null)
+        expect(text(el)).not.to.contain('Google Drive is not connected')
+        const expired = await card('expired', { space: moved })
+        expect(text(expired)).not.to.contain('Google Drive needs reconnecting')
+        expect(button(expired, 'sync')).to.equal(null)
+      })
+
+      it('offers to delete the Drive files only while there are some, to someone who can reach Drive', async () => {
+        const none = await make(`Clean ${crypto.randomUUID().slice(0, 8)}`, { server })
+        const clean = await card('signed-in', { space: none })
+        expect(button(clean, 'delete-drive-files')).to.equal(null)
+        expect(text(clean)).not.to.contain('old files')
+        expect(button(await card('no-drive', { space: moved }), 'delete-drive-files')).to.equal(
+          null
+        )
+        const notMoved = await make(`Drive ${crypto.randomUUID().slice(0, 8)}`, {
+          rootRef: 'folder',
+        })
+        expect(button(await card('signed-in', { space: notMoved }), 'delete-drive-files')).to.equal(
+          null
+        )
+      })
+
+      it('asks first, and puts nothing in the Drive bin if told no', async () => {
+        const el = await card('signed-in', { space: moved })
+        const trashed: Space[] = []
+        el.trashDriveFiles = async which => {
+          trashed.push(which)
+        }
+        must(button(el, 'delete-drive-files')).click()
+        const modal = await confirmWith(el, false)
+        expect(modal.heading).to.contain(moved.name)
+        expect(modal.message).to.contain('Drive bin')
+        await el.updateComplete
+        expect(trashed).to.deep.equal([])
+      })
+
+      it('puts the files in the Drive bin when told yes, and tells the page', async () => {
+        const el = await card('signed-in', { space: moved })
+        const trashed: Space[] = []
+        el.trashDriveFiles = async which => {
+          trashed.push(which)
+        }
+        let told = 0
+        el.addEventListener(SpaceSyncedEvent.type, () => told++)
+        must(button(el, 'delete-drive-files')).click()
+        await confirmWith(el, true)
+        await waitUntil(() => trashed.length === 1, 'the files', { timeout: 3000 })
+        expect(trashed[0].id).to.equal(moved.id)
+        expect(told).to.equal(1)
+      })
+
+      it('says what went wrong when the files could not be deleted', async () => {
+        const el = await card('signed-in', { space: moved })
+        el.trashDriveFiles = async () => {
+          throw new UserError('quota')
+        }
+        must(button(el, 'delete-drive-files')).click()
+        await confirmWith(el, true)
+        await waitUntil(() => text(el).includes('Could not delete the files: quota'), undefined, {
+          timeout: 3000,
+        })
+        expect(button(el, 'delete-drive-files')).to.not.equal(null)
+      })
     })
   })
 })

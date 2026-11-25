@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
-import { personalDataTransport } from '../src/js/space-data.ts'
+import { type LeaderNames, personalDataTransport } from '../src/js/space-data.ts'
 import { sharedRecord } from '../src/js/space-data-records.ts'
 import { SpaceDataStore } from '../src/js/space-data-store.ts'
 import type { SpaceSetlist } from '../src/js/space-data-types.ts'
@@ -120,20 +120,28 @@ describe('what the server is asked for a move', () => {
   })
 })
 
+const noLeaders: LeaderNames = {
+  names: async () => new Map(),
+  idFor: async name => `person-of-${name}`,
+}
+
 describe('the Personal space on the server, as the device sends and reads it', () => {
   it('reads the setlists as a space and says when they are unchanged', async () => {
     const seen: (string | null)[] = []
-    const transport = personalDataTransport({
-      token: async () => 't',
-      origin: 'https://chordless.test',
-      fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
-        const headers = new Headers(init?.headers)
-        seen.push(headers.get('If-None-Match'))
-        if (headers.get('If-None-Match') === '"tag"') return new Response(null, { status: 304 })
-        expect(new URL(String(input)).pathname).to.equal('/api/account/setlists')
-        return Response.json({ setlists: [] }, { headers: { ETag: '"tag"' } })
-      }) as typeof fetch,
-    })
+    const transport = personalDataTransport(
+      {
+        token: async () => 't',
+        origin: 'https://chordless.test',
+        fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+          const headers = new Headers(init?.headers)
+          seen.push(headers.get('If-None-Match'))
+          if (headers.get('If-None-Match') === '"tag"') return new Response(null, { status: 304 })
+          expect(new URL(String(input)).pathname).to.equal('/api/account/setlists')
+          return Response.json({ setlists: [] }, { headers: { ETag: '"tag"' } })
+        }) as typeof fetch,
+      },
+      noLeaders
+    )
     expect(await transport.read({ all: true, etag: null })).to.deep.equal({
       data: { songs: [], setlists: [], people: [], padSets: [], from: null },
       etag: '"tag"',
@@ -144,15 +152,18 @@ describe('the Personal space on the server, as the device sends and reads it', (
 
   it('writes changes as a batch, and refuses an answer that does not match them', async () => {
     let answer: unknown = { results: [{ status: 'ok', version: 1 }] }
-    const transport = personalDataTransport({
-      token: async () => 't',
-      origin: 'https://chordless.test',
-      fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
-        expect(new URL(String(input)).pathname).to.equal('/api/account/setlists/batch')
-        expect(init?.method).to.equal('POST')
-        return Response.json(answer)
-      }) as typeof fetch,
-    })
+    const transport = personalDataTransport(
+      {
+        token: async () => 't',
+        origin: 'https://chordless.test',
+        fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+          expect(new URL(String(input)).pathname).to.equal('/api/account/setlists/batch')
+          expect(init?.method).to.equal('POST')
+          return Response.json(answer)
+        }) as typeof fetch,
+      },
+      noLeaders
+    )
     const op = { kind: 'setlist' as const, op: 'delete' as const, id: 'x' }
     expect(await transport.write([op])).to.deep.equal([{ status: 'ok', version: 1 }])
     answer = { results: [] }
@@ -166,6 +177,99 @@ describe('the Personal space on the server, as the device sends and reads it', (
   })
 })
 
+describe('the leaders of a Personal space, told to the server by name', () => {
+  const people = new Map([['person-1', 'Sam']])
+  const leaders: LeaderNames = {
+    names: async () => people,
+    idFor: async name => `person-of-${name}`,
+  }
+  const sent: unknown[] = []
+  const serverSays = (response: unknown) =>
+    personalDataTransport(
+      {
+        token: async () => 't',
+        origin: 'https://chordless.test',
+        fetch: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+          if (init?.method === 'POST') sent.push(JSON.parse(String(init.body)))
+          return Response.json(response)
+        }) as typeof fetch,
+      },
+      leaders
+    )
+  const record = (over: Partial<SpaceSetlist>): SpaceSetlist => ({
+    ...(sharedRecord('setlist', makeSetlist({ id: 'x' })) as SpaceSetlist),
+    version: 1,
+    ...over,
+  })
+
+  it('names the leader on the way out, and sends nothing of the person but the name', async () => {
+    const transport = serverSays({
+      results: [
+        { status: 'ok', version: 1 },
+        { status: 'ok', version: 1 },
+        { status: 'ok', version: 1 },
+      ],
+    })
+    await transport.write([
+      {
+        kind: 'setlist',
+        op: 'put',
+        id: 'a',
+        baseVersion: null,
+        record: record({ setlistId: 'a', leaderId: 'person-1' }),
+      },
+      {
+        kind: 'setlist',
+        op: 'put',
+        id: 'b',
+        baseVersion: null,
+        record: record({ setlistId: 'b', leaderId: 'gone' }),
+      },
+      { kind: 'setlist', op: 'delete', id: 'c' },
+    ])
+    const ops = (sent.at(-1) as { ops: { id: string; record?: SpaceSetlist }[] }).ops
+    expect([ops[0].record?.leaderId, ops[0].record?.leaderName]).to.deep.equal([null, 'Sam'])
+    expect([ops[1].record?.leaderId, ops[1].record?.leaderName]).to.deep.equal(
+      [null, null],
+      'a person who is no longer there'
+    )
+    expect(ops[2]).to.deep.equal({ kind: 'setlist', op: 'delete', id: 'c' })
+  })
+
+  it('makes the leader a person of the space on the way in, in what is read and in a conflict', async () => {
+    const read = await serverSays({
+      setlists: [
+        record({ setlistId: 'a', leaderId: null, leaderName: 'Anna' }),
+        record({ setlistId: 'b', leaderId: null, leaderName: null }),
+      ],
+    }).read({ all: true, etag: null })
+    expect('data' in read).to.equal(true)
+    const setlists = ('data' in read ? read.data.setlists : []) as SpaceSetlist[]
+    expect([setlists[0].leaderId, setlists[0].leaderName]).to.deep.equal(['person-of-Anna', null])
+    expect([setlists[1].leaderId, setlists[1].leaderName]).to.deep.equal([null, null])
+    const results = await serverSays({
+      results: [
+        { status: 'conflict', current: record({ setlistId: 'a', leaderName: 'Anna' }) },
+        { status: 'conflict', current: null },
+        { status: 'missing' },
+      ],
+    }).write([
+      { kind: 'setlist', op: 'put', id: 'a', baseVersion: 1, record: record({ setlistId: 'a' }) },
+      {
+        kind: 'setlist',
+        op: 'put',
+        id: 'z',
+        baseVersion: null,
+        record: record({ setlistId: 'z' }),
+      },
+      { kind: 'setlist', op: 'delete', id: 'q' },
+    ])
+    expect((results[0] as { current: SpaceSetlist }).current.leaderId).to.equal('person-of-Anna')
+    expect(results[1]).to.deep.equal({ status: 'conflict', current: null })
+    expect(results[2]).to.deep.equal({ status: 'missing' })
+  })
+})
+
 describe('queueing a Personal space for the move', () => {
   const person = {
     id: 'person-1',
@@ -174,12 +278,11 @@ describe('queueing a Personal space for the move', () => {
     modifiedDate: '2026-11-01T00:00:00.000Z',
   }
 
-  it('queues every setlist as a create, a leader who is a person of the space as their name', async () => {
+  it('queues every setlist as a create, as the space has it', async () => {
     const db = await open()
     await db.savePeople([person])
     await db.saveSetlist(makeSetlist({ id: 'led', leaderId: 'person-1' }))
     await db.saveSetlist(makeSetlist({ id: 'alone', date: '2026-11-18' }))
-    await db.saveSetlist(makeSetlist({ id: 'named', date: '2026-11-19', leaderName: 'Anna' }))
     await db.saveSetlist(
       makeSetlist({ id: 'gone', date: '2026-11-20', deletedAt: '2026-11-21T00:00:00.000Z' })
     )
@@ -188,18 +291,14 @@ describe('queueing a Personal space for the move', () => {
     const queued = (await store.pending())
       .map(entry => entry.change)
       .sort((a, b) => a.id.localeCompare(b.id))
-    expect(queued.map(change => change.id)).to.deep.equal(['alone', 'led', 'named'])
+    expect(queued.map(change => change.id)).to.deep.equal(['alone', 'led'])
     for (const change of queued) {
       expect(change.kind).to.equal('setlist')
       expect(change.op).to.equal('put')
       expect(change.baseVersion).to.equal(null)
     }
-    const led = queued.find(change => change.id === 'led')?.record as SpaceSetlist
-    expect([led.leaderId, led.leaderName]).to.deep.equal([null, 'Sam'])
-    const alone = queued.find(change => change.id === 'alone')?.record as SpaceSetlist
-    expect([alone.leaderId, alone.leaderName]).to.deep.equal([null, null])
-    const named = queued.find(change => change.id === 'named')?.record as SpaceSetlist
-    expect([named.leaderId, named.leaderName]).to.deep.equal([null, 'Anna'])
+    // (its leader is told to the server by name when it is sent: the transport's)
+    expect((queued[1].record as SpaceSetlist).leaderId).to.equal('person-1')
   })
 
   it('keeps what is queued when the first read finds nothing on the server, and later edits are queued too', async () => {
