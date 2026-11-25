@@ -21,7 +21,7 @@ test('the migrations since a number are marked: a new table, a dropped one, a ch
     assert.equal(run(out, '--since', '0019').status, 0)
     const svg = readFileSync(out, 'utf8')
     assert.match(svg, /setlists \(new\)/)
-    assert.match(svg, /new: setlists/)
+    assert.match(svg, /new: [^<]*\bsetlists\b/)
     assert.match(svg, /dropped: team_setlists/)
     assert.match(svg, /d9822b/, 'orange')
     // a table that 0019 did not touch is not marked
