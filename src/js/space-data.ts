@@ -52,6 +52,42 @@ export function spaceDataTransport(
   }
 }
 
+/**
+ * A Personal space's setlists on the server (`/api/account/setlists`, worker/src/personal-setlists.ts): read and
+ * written as a Team's are, but only the setlists (its songs are the personal library's, and it has no people or pads
+ * there), so the rest of the data is empty.
+ */
+export function personalDataTransport(connection: WorkerConnection): SpaceDataTransport {
+  return {
+    async read({ etag }) {
+      const response = await callWorker(
+        {
+          path: '/api/account/setlists',
+          headers: etag ? { 'If-None-Match': etag } : undefined,
+          allowNotModified: true,
+        },
+        connection
+      )
+      if (response.status === 304) return { unchanged: true }
+      const { setlists } = (await response.json()) as { setlists: SpaceData['setlists'] }
+      return {
+        data: { songs: [], setlists, people: [], padSets: [], from: null },
+        etag: response.headers.get('ETag'),
+      }
+    },
+    async write(ops) {
+      const response = await callWorker(
+        { method: 'POST', path: '/api/account/setlists/batch', body: { ops } },
+        connection
+      )
+      const { results } = (await response.json()) as { results: SpaceOpResult[] }
+      if (!Array.isArray(results) || results.length !== ops.length)
+        throw new Error('Invalid space write response')
+      return results
+    },
+  }
+}
+
 export class SpaceDataSync {
   #running: Promise<void> | null = null
   #again = false

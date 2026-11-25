@@ -57,6 +57,7 @@ export function sharedRecord(kind: SpaceRecordKind, value: unknown): SpaceRecord
       type: setlist.type,
       name: setlist.name,
       leaderId: setlist.leaderId || null,
+      leaderName: setlist.leaderName ?? null,
       createdBy: setlist.createdBy ?? null,
       createdAt: setlist.createdDate,
       body: {
@@ -142,6 +143,7 @@ export function localRecord(
       type: setlist.type,
       name: setlist.name,
       leaderId: setlist.leaderId,
+      leaderName: setlist.leaderName ?? null,
       createdBy: setlist.createdBy ?? undefined,
       createdDate: setlist.createdAt,
       modifiedDate: setlist.modifiedAt,

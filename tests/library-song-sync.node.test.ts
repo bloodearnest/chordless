@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { ScoreRecord, SongRecord } from '../src/js/data-types.ts'
 import type { ChordlessDB } from '../src/js/db.ts'
-import { LibrarySongSyncConflict, syncLibrarySongs } from '../src/js/library-song-sync.ts'
+import {
+  LibrarySongSyncConflict,
+  syncLibrarySongs,
+  syncPersonalLibrarySongs,
+} from '../src/js/library-song-sync.ts'
 import type { SpaceSong } from '../src/js/space-data-types.ts'
 import { sha256Hex } from '../src/js/utils/bytes.ts'
 import { hashText } from '../src/js/utils/hash.ts'
@@ -411,4 +415,18 @@ test('library song sync reconciles offline charts, metadata and conflicts withou
   localChart = null
   await syncLibrarySongs('team-1', db, connection)
   assert.equal(central.song, null, 'a local record without a chart is not uploaded')
+})
+
+test("a Personal space reads its songs from the person's own library", async () => {
+  const paths: string[] = []
+  const db = { getAllSongs: async () => [] } as unknown as ChordlessDB
+  await syncPersonalLibrarySongs('library 1', db, {
+    token: async () => 'token',
+    origin: 'https://example.test',
+    async fetch(input) {
+      paths.push(new URL(String(input)).pathname)
+      return Response.json({ songs: [] })
+    },
+  })
+  assert.deepEqual(paths, ['/api/libraries/library%201/songs'])
 })

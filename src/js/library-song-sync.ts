@@ -195,7 +195,23 @@ export async function syncLibrarySongs(
   db: ChordlessDB,
   connection: WorkerConnection
 ): Promise<void> {
-  const root = `/api/teams/${encodeURIComponent(teamId)}/library/songs`
+  await syncLibrarySongsAt(`/api/teams/${encodeURIComponent(teamId)}/library/songs`, db, connection)
+}
+
+/** The songs of the person's own library (a Personal space that has moved to the server) */
+export async function syncPersonalLibrarySongs(
+  libraryId: string,
+  db: ChordlessDB,
+  connection: WorkerConnection
+): Promise<void> {
+  await syncLibrarySongsAt(`/api/libraries/${encodeURIComponent(libraryId)}/songs`, db, connection)
+}
+
+async function syncLibrarySongsAt(
+  root: string,
+  db: ChordlessDB,
+  connection: WorkerConnection
+): Promise<void> {
   const response = await callWorker({ path: root }, connection)
   const index = (await response.json()) as SongIndex
   if (!Array.isArray(index.songs)) throw new Error('The library returned an invalid song index')

@@ -19,6 +19,13 @@ export async function syncSpaceNow(
   space: Space,
   onProgress: BroadcastCallback | null
 ): Promise<string> {
+  // A space that has moved to the server: it is there it syncs, and never with Drive again
+  /* v8 ignore next 5 -- wiring to the server sync of the space, which the Playwright tests run */
+  if (space.server) {
+    const { syncSpaceDataFor } = await import('./space-data-runtime.ts')
+    await syncSpaceDataFor(space.id, { all: true })
+    return recordSync(space.id)
+  }
   const orchestrator = await createSyncOrchestrator(space.name, space.id)
   // (the Sync button of a space's card)
   await orchestrator.sync(onProgress, 'manual')
