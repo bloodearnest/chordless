@@ -15,16 +15,25 @@ export interface EmailMessage {
   text: string
 }
 
-/** The part of an R2 bucket the song routes use */
+/** The part of an R2 bucket the song, PDF and pad routes use */
 export interface SongBucket {
-  get(key: string): Promise<{ text(): Promise<string>; arrayBuffer(): Promise<ArrayBuffer> } | null>
-  /** The keys under a prefix, in key order */
-  list(options: { prefix: string; limit?: number }): Promise<{ objects: { key: string }[] }>
+  get(key: string): Promise<{
+    text(): Promise<string>
+    arrayBuffer(): Promise<ArrayBuffer>
+    /** The object as it arrives (a pad is streamed to the device, not held) */
+    body: ReadableStream<Uint8Array>
+  } | null>
+  /** The objects under a prefix, in key order */
+  list(options: {
+    prefix: string
+    limit?: number
+  }): Promise<{ objects: { key: string; size: number }[] }>
   put(
     key: string,
-    value: string | ArrayBuffer,
+    value: string | ArrayBuffer | Blob,
     options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> }
   ): Promise<unknown>
+  delete(keys: string[]): Promise<void>
 }
 
 export interface Env extends GoogleEnv, ShareEnv, ServiceAccountEnv {

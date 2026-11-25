@@ -114,6 +114,8 @@ test('the personal library and setlist paths reach the Worker handler', async ()
     '/api/account/library',
     '/api/account/setlists',
     '/api/account/setlists/batch',
+    '/api/account/overlays',
+    '/api/account/overlays/batch',
   ]) {
     const response = await send(path)
     assert.equal(response.status, 503, path)
@@ -124,6 +126,13 @@ test('the personal library and setlist paths reach the Worker handler', async ()
 test('library song PDF paths reach the Worker handler', async () => {
   const { send } = setup()
   const response = await send('/api/libraries/library-a/songs/song-1/pdf')
+  assert.equal(response.status, 503, 'the handler reports unavailable storage')
+  assert.equal(response.headers.get('cache-control'), 'private, no-store')
+})
+
+test('library pad paths reach the Worker handler', async () => {
+  const { send } = setup()
+  const response = await send('/api/libraries/library-a/pads')
   assert.equal(response.status, 503, 'the handler reports unavailable storage')
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
 })
