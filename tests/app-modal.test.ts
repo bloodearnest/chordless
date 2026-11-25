@@ -54,6 +54,21 @@ describe('app-modal ask()', () => {
     expect(await answer).to.equal(false)
   })
 
+  it('stays open for a second question asked as the first one is answered', async () => {
+    await makeConfirmModal()
+    const first = modal.ask()
+    await click('.modal-btn-confirm')
+    expect(await first).to.equal(true)
+    // (asked straight away, as a confirmation that leads to another does)
+    const second = modal.ask()
+    await modal.updateComplete
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(modal.open).to.equal(true)
+    expect(modal.shadowRoot.querySelector('dialog').open).to.equal(true)
+    await click('.modal-btn-confirm')
+    expect(await second).to.equal(true)
+  })
+
   it('does not carry an answer over to the next ask', async () => {
     await makeConfirmModal()
     const first = modal.ask()

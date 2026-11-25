@@ -182,7 +182,7 @@ export async function syncSpaceDataFor(
  * Move a Personal space to the server, once and for good (space-move.ts): its songs and setlists are sent, and Drive is not
  * synced again. A space that is not a Personal one still on Drive does not move.
  */
-export async function moveSpaceToServerNow(spaceId: string): Promise<void> {
+export async function moveSpaceToServerNow(spaceId: string, combine = false): Promise<void> {
   const space = await getSpaceById(spaceId)
   if (!space || space.team || space.server)
     throw new Error('Only a Personal space on Drive can move')
@@ -191,16 +191,19 @@ export async function moveSpaceToServerNow(spaceId: string): Promise<void> {
     origin: location.origin,
     fetch: (input, init) => window.fetch(input, init),
   })
-  await moveToServer({
-    ...server,
-    seed: async () =>
-      new SpaceDataStore(await openSpace(spaceId, 'sync'), PERSONAL).seedPersonalMove(),
-    mark: async (libraryId, movedAt) => {
-      await updateSpace(spaceId, { server: { libraryId, movedAt } })
+  await moveToServer(
+    {
+      ...server,
+      seed: async () =>
+        new SpaceDataStore(await openSpace(spaceId, 'sync'), PERSONAL).seedPersonalMove(),
+      mark: async (libraryId, movedAt) => {
+        await updateSpace(spaceId, { server: { libraryId, movedAt } })
+      },
+      sync: () => syncSpaceDataFor(spaceId, { all: true }),
+      now: () => new Date().toISOString(),
     },
-    sync: () => syncSpaceDataFor(spaceId, { all: true }),
-    now: () => new Date().toISOString(),
-  })
+    combine
+  )
 }
 
 export async function syncCurrentSpaceData(): Promise<void> {

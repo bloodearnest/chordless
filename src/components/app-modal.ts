@@ -398,7 +398,8 @@ export class AppModal extends LitElement {
 
   /** The dialog closed itself (Esc), rather than through close() */
   _handleDialogClose() {
-    if (this.open) this.close()
+    // (a dialog closed by close() reports it a moment later: if it has been opened again since, that is not Esc)
+    if (this.open && !this._dialog()?.open) this.close()
   }
 
   _handleConfirm() {

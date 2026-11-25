@@ -654,8 +654,11 @@ space-move-heading = Move { $name } to Chordless?
 space-move-message = Its songs and setlists will be stored on Chordless, and synced between your devices from then on. It will not sync with Google Drive again, and this cannot be undone. Its files in Google Drive stay where they are until you delete them. Pad audio is not moved: add your pads again when you need them.
 # Shown on the card while a space is being moved.
 space-move-starting = Moving to Chordless…
-# The account already has songs or setlists on Chordless, so nothing was moved or changed.
-space-move-has-data = Your Chordless account already has songs or setlists, so this space cannot be moved yet. Combining them is not available yet.
+# The account already has songs or setlists on Chordless: nothing has been moved yet, and this asks whether to combine.
+# { $name } is the name of the space.
+space-combine-heading = Combine { $name } with your Chordless account?
+space-combine-message = Your Chordless account already has songs or setlists. Moving this space will add its songs and setlists to them; nothing already on your account is removed. A song or setlist that is on both, such as one moved from another of your devices, is kept once, and a change made to it on both is settled the way any other change on two devices is. A song that was imported twice may show twice. This cannot be undone.
+action-combine-with-server = Combine and move
 # { $reason } is what went wrong.
 space-move-failed = Could not move the space: { $reason }
 space-move-failed-plain = Could not move the space.

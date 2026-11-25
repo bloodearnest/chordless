@@ -185,8 +185,8 @@ export class SpaceCard extends LitElement {
 
   /** Move the space to the server (a test gives its own: the real one is of the device and the Worker) */
   /* v8 ignore next 2 -- the real move needs the Worker and a session: its parts are tested in space-move.test.ts */
-  moveSpace: (spaceId: string) => Promise<void> = async spaceId =>
-    (await import('../js/space-data-runtime.ts')).moveSpaceToServerNow(spaceId)
+  moveSpace: (spaceId: string, combine?: boolean) => Promise<void> = async (spaceId, combine) =>
+    (await import('../js/space-data-runtime.ts')).moveSpaceToServerNow(spaceId, combine)
 
   /** Put the Drive files a moved space left in the Drive bin (a test gives its own) */
   trashDriveFiles: (space: Space) => Promise<void> = trashMovedSpaceDriveFiles
@@ -231,20 +231,31 @@ export class SpaceCard extends LitElement {
     this._error = ''
     this._progress = t('space-move-starting')
     try {
-      await this.moveSpace(id)
+      try {
+        await this.moveSpace(id)
+      } catch (error) {
+        // the account has data of its own: nothing was changed, so ask whether to combine the two
+        if (!(error instanceof ServerHasDataError)) throw error
+        if (
+          !(await this._confirm(
+            t('space-combine-heading', { name }),
+            t('space-combine-message'),
+            t('action-combine-with-server')
+          ))
+        )
+          return
+        await this.moveSpace(id, true)
+      }
       this._syncedAt = recordSync(id)
       this.dispatchEvent(new SpaceSyncedEvent())
       void this._loadSummary()
     } catch (error) {
       console.error('[SpaceCard] Move failed:', error)
-      this._error =
-        error instanceof ServerHasDataError
-          ? t('space-move-has-data')
-          : failedWith(
-              error,
-              t('space-move-failed', { reason: errorMessage(error) }),
-              t('space-move-failed-plain')
-            )
+      this._error = failedWith(
+        error,
+        t('space-move-failed', { reason: errorMessage(error) }),
+        t('space-move-failed-plain')
+      )
     } finally {
       this._syncing = false
       this._progress = ''

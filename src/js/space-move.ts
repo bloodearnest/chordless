@@ -2,8 +2,9 @@
  * Moving a Personal space from Google Drive to Chordless's server (docs/CENTRAL_STORAGE.md, step 5): once, and for good. The
  * server gets the space's songs and setlists; Drive is never synced again (the space is marked `server`), though its
  * files stay where they are until the person deletes them. Pad audio is not moved (it is added again when pads are
- * kept on the server). Only a space whose account has nothing on the server yet can move: combining the two is
- * for later.
+ * kept on the server). A space whose account already has songs or setlists on the server moves only when asked to
+ * combine: the two are merged (songs by their identity, setlists by theirs; what the two disagree about is settled
+ * as any other conflict is), and nothing on the server is removed.
  */
 import { callWorker, type WorkerConnection } from './worker-call.ts'
 
@@ -30,9 +31,9 @@ export interface MoveSteps {
 }
 
 /** @returns the personal library's id */
-export async function moveToServer(steps: MoveSteps): Promise<string> {
+export async function moveToServer(steps: MoveSteps, combine = false): Promise<string> {
   const libraryId = await steps.makeLibrary()
-  if (await steps.serverHasData(libraryId)) throw new ServerHasDataError()
+  if (!combine && (await steps.serverHasData(libraryId))) throw new ServerHasDataError()
   await steps.seed()
   await steps.mark(libraryId, steps.now())
   await steps.sync()

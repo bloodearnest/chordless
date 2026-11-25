@@ -466,16 +466,55 @@ describe('space-card', () => {
       expect(told).to.equal(1)
     })
 
-    it('says when the account already has data, and says what went wrong otherwise, and can be tried again', async () => {
+    it('asks whether to combine when the account already has data, and moves with it if so', async function () {
+      this.timeout(8000)
       const el = await card('signed-in')
+      const calls: Array<boolean | undefined> = []
+      el.moveSpace = async (_id, combine) => {
+        calls.push(combine)
+        if (!combine) throw new ServerHasDataError()
+      }
       must(button(el, 'move-to-server')).click()
-      el.moveSpace = async () => {
+      await confirmWith(el, true)
+      await waitUntil(
+        () => el._confirmModal.value?.heading.includes('Combine'),
+        'the second question',
+        { timeout: 3000 }
+      )
+      expect(el._confirmModal.value?.heading).to.contain('Combine')
+      await confirmWith(el, true)
+      await waitUntil(() => calls.length === 2 && !el._syncing, 'the combined move', {
+        timeout: 3000,
+      })
+      expect(calls).to.deep.equal([undefined, true])
+      expect(el._error).to.equal('')
+    })
+
+    it('moves nothing when the question to combine is declined', async function () {
+      this.timeout(8000)
+      const el = await card('signed-in')
+      const calls: Array<boolean | undefined> = []
+      el.moveSpace = async (_id, combine) => {
+        calls.push(combine)
         throw new ServerHasDataError()
       }
+      must(button(el, 'move-to-server')).click()
       await confirmWith(el, true)
-      await waitUntil(() => el._error, 'the refusal', { timeout: 3000 })
-      expect(text(el)).to.contain('already has songs or setlists')
+      await waitUntil(
+        () => el._confirmModal.value?.heading.includes('Combine'),
+        'the second question',
+        { timeout: 3000 }
+      )
+      await confirmWith(el, false)
+      await waitUntil(() => !el._syncing, undefined, { timeout: 3000 })
+      expect(calls).to.deep.equal([undefined])
+      expect(el._error).to.equal('')
       expect(button(el, 'move-to-server')?.disabled).to.equal(false)
+    })
+
+    it('says what went wrong, and can be tried again', async () => {
+      const el = await card('signed-in')
+      must(button(el, 'move-to-server')).click()
       el.moveSpace = async () => {
         throw new UserError('offline')
       }

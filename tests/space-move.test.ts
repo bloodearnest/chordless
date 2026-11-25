@@ -79,6 +79,12 @@ describe('moving a Personal space to the server', () => {
     // (the library is made, which is harmless and the same each time: nothing is queued, marked or sent)
     expect(log).to.deep.equal(['library'])
   })
+
+  it('moves anyway, without asking the server, when told to combine', async () => {
+    const log: string[] = []
+    await moveToServer(steps(log, { serverHasData: async () => true }), true)
+    expect(log).to.deep.equal(['library', 'seed', 'mark lib-1 2026-11-25T10:00:00.000Z', 'sync'])
+  })
 })
 
 describe('what the server is asked for a move', () => {
