@@ -6,45 +6,41 @@ import { deleteDatabase } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
-/** What the server keeps: the Worker's rules in a few lines, enough to test the other side of them */
+/** What the server keeps: the Worker's rules in a few lines (one document, a version to write from), enough to test the other side of them */
 class Server {
-  items = new Map<string, { version: number; body: unknown }>()
+  version = 0
+  body = {
+    settings: {} as Record<string, string>,
+    setlists: {} as Record<string, unknown>,
+    songs: {} as Record<string, unknown>,
+  }
   calls: string[] = []
-  refuse = new Set<string>()
+  /** Writes that another device gets in first: each makes the next write find a newer version */
+  interfere = 0
   fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input))
     this.calls.push(`${init?.method ?? 'GET'} ${url.pathname}`)
-    if (url.pathname.endsWith('/batch')) {
-      const { ops } = JSON.parse(String(init?.body)) as { ops: Record<string, unknown>[] }
-      return Response.json({ results: ops.map(op => this.apply(op)) })
+    if (init?.method === 'PUT') {
+      const sent = JSON.parse(String(init.body)) as { baseVersion: number; body: Server['body'] }
+      if (this.interfere > 0) {
+        this.interfere--
+        this.version++
+      }
+      if (sent.baseVersion !== this.version)
+        return Response.json(
+          { error: 'The overlays changed', current: { version: this.version, body: this.body } },
+          { status: 409 }
+        )
+      this.version++
+      this.body = sent.body
+      return Response.json({ version: this.version })
     }
-    const out = { preferences: null as unknown, setlists: [] as unknown[], songs: [] as unknown[] }
-    for (const [key, item] of this.items) {
-      if (key === 'preferences') out.preferences = item
-      else if (key.startsWith('setlist:')) out.setlists.push({ setlistId: key.slice(8), ...item })
-      else out.songs.push({ libraryId: 'lib', songUuid: key.slice(5), ...item })
-    }
-    return Response.json(out)
+    return Response.json({ version: this.version, body: this.body })
   }) as typeof fetch
-  keyOf(op: Record<string, unknown>) {
-    return op.kind === 'preferences'
-      ? 'preferences'
-      : op.kind === 'setlist'
-        ? `setlist:${op.setlistId}`
-        : `song:${op.songUuid}`
-  }
-  apply(op: Record<string, unknown>) {
-    const key = this.keyOf(op)
-    if (this.refuse.has(key)) return { status: 'forbidden' }
-    const have = this.items.get(key)
-    if (op.op === 'delete') {
-      this.items.delete(key)
-      return { status: 'ok', version: 0 }
-    }
-    if ((have?.version ?? null) !== op.baseVersion) return { status: 'conflict', current: have }
-    const version = (have?.version ?? 0) + 1
-    this.items.set(key, { version, body: op.body })
-    return { status: 'ok', version }
+  /** Set an item as another device would have */
+  set(key: 'setlists' | 'songs', id: string, value: unknown) {
+    this.body[key][id] = value
+    this.version++
   }
 }
 
@@ -74,7 +70,6 @@ async function device(server: Server) {
   const sync = () =>
     syncOverlays({
       db,
-      libraryId: 'lib',
       storage,
       connection: { token: async () => 't', origin: 'https://chordless.test', fetch: server.fetch },
     })
@@ -93,15 +88,12 @@ describe('syncing what a person keeps for themselves', () => {
     one.storage.setItem('musician_type', 'guitarist')
     one.storage.setItem('theme', 'dark')
     expect(await one.sync()).to.deep.equal({ sent: 3, taken: 0 })
-    expect(server.items.get('setlist:set')?.body).to.deep.equal({
-      state: { capo: 2, annotations: ['a'] },
+    expect(server.body).to.deep.equal({
+      settings: { musician_type: 'guitarist' },
+      setlists: { set: { state: { capo: 2, annotations: ['a'] } } },
+      songs: { 'uuid-song': { capo: 3, padSetId: 'SET1' } },
     })
-    expect(server.items.get('song:uuid-song')?.body).to.deep.equal({ capo: 3, padSetId: 'SET1' })
-    expect(server.items.get('preferences')?.body).to.deep.equal({ musician_type: 'guitarist' })
-    expect(server.items.size).to.equal(
-      3,
-      'a song the device does not have, and the theme, are not sent'
-    )
+    expect(server.calls).to.deep.equal(['GET /api/account/overlays', 'PUT /api/account/overlays'])
   })
 
   it('sends nothing again when nothing changed, and only what did when something has', async () => {
@@ -110,14 +102,13 @@ describe('syncing what a person keeps for themselves', () => {
     one.storage.setItem('state-set', JSON.stringify({ capo: 2 }))
     one.storage.setItem('pitch', 'Bb')
     await one.sync()
+    server.calls.length = 0
     expect(await one.sync()).to.deep.equal({ sent: 0, taken: 0 })
+    expect(server.calls).to.deep.equal(['GET /api/account/overlays'])
     one.storage.setItem('state-set', JSON.stringify({ capo: 4 }))
     expect(await one.sync()).to.deep.equal({ sent: 1, taken: 0 })
-    expect(server.items.get('setlist:set')).to.deep.equal({
-      version: 2,
-      body: { state: { capo: 4 } },
-    })
-    expect(server.items.get('preferences')?.version).to.equal(1)
+    expect(server.body.setlists).to.deep.equal({ set: { state: { capo: 4 } } })
+    expect(server.body.settings).to.deep.equal({ pitch: 'Bb' })
   })
 
   it('takes what another device changed, onto a device that has the setlist and song', async () => {
@@ -151,9 +142,7 @@ describe('syncing what a person keeps for themselves', () => {
     const setlist = must(await one.db.getSetlist('set'))
     await one.db.saveSetlist({ ...setlist, songs: [...setlist.songs, mine] })
     await one.sync()
-    expect(
-      ((server.items.get('setlist:set')?.body ?? {}) as { local?: unknown[] }).local
-    ).to.have.length(1)
+    expect(((server.body.setlists.set ?? {}) as { local?: unknown[] }).local).to.have.length(1)
     const two = await device(server)
     await two.sync()
     const taken = must(await two.db.getSetlist('set'))
@@ -174,7 +163,62 @@ describe('syncing what a person keeps for themselves', () => {
     await one.sync()
     two.storage.setItem('state-set', JSON.stringify({ capo: 9 }))
     expect(await two.sync()).to.deep.equal({ sent: 1, taken: 0 })
-    expect(server.items.get('setlist:set')?.body).to.deep.equal({ state: { capo: 9 } })
+    expect(server.body.setlists).to.deep.equal({ set: { state: { capo: 9 } } })
+  })
+
+  it('leaves what another device changed in another item alone when it sends its own', async () => {
+    const server = new Server()
+    const one = await device(server)
+    one.storage.setItem('state-set', JSON.stringify({ capo: 1 }))
+    one.storage.setItem('pitch', 'F')
+    await one.sync()
+    const two = await device(server)
+    await two.sync()
+    // the first changes a setting, the second a setlist, and each sends: neither undoes the other
+    one.storage.setItem('pitch', 'Bb')
+    two.storage.setItem('state-set', JSON.stringify({ capo: 6 }))
+    await one.sync()
+    await two.sync()
+    expect(server.body.settings).to.deep.equal({ pitch: 'Bb' })
+    expect(server.body.setlists).to.deep.equal({ set: { state: { capo: 6 } } })
+    await one.sync()
+    expect(JSON.parse(one.storage.getItem('state-set') ?? '')).to.deep.equal({ capo: 6 })
+  })
+
+  it('goes again from what is there when another device wrote first, and gives up when it keeps happening', async () => {
+    const server = new Server()
+    const one = await device(server)
+    one.storage.setItem('pitch', 'F')
+    server.interfere = 1
+    expect(await one.sync()).to.deep.equal({ sent: 1, taken: 0 })
+    expect(server.calls.filter(call => call.startsWith('PUT'))).to.have.length(2)
+    one.storage.setItem('pitch', 'Bb')
+    server.interfere = 5
+    let error: unknown
+    try {
+      await one.sync()
+    } catch (caught) {
+      error = caught
+    }
+    expect(String(error)).to.contain('keep changing')
+  })
+
+  it('says so when the server refuses a write for another reason', async () => {
+    const server = new Server()
+    const one = await device(server)
+    one.storage.setItem('pitch', 'F')
+    const answer = server.fetch
+    server.fetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
+      init?.method === 'PUT'
+        ? Response.json({ error: 'Not allowed' }, { status: 400 })
+        : answer(input, init)) as typeof fetch
+    let error: unknown
+    try {
+      await one.sync()
+    } catch (caught) {
+      error = caught
+    }
+    expect(String(error)).to.contain('Not allowed')
   })
 
   it('sends a removal, and does not clear what is kept when the server stops showing it', async () => {
@@ -184,24 +228,21 @@ describe('syncing what a person keeps for themselves', () => {
     await one.sync()
     one.storage.removeItem('state-set')
     expect(await one.sync()).to.deep.equal({ sent: 1, taken: 0 })
-    expect(server.items.has('setlist:set')).to.equal(false)
+    expect(server.body.setlists).to.deep.equal({})
     // (the person left the church: the server shows nothing, and the device keeps its own)
     one.storage.setItem('state-set', JSON.stringify({ capo: 3 }))
     await one.sync()
-    server.items.clear()
+    server.body.setlists = {}
+    server.version++
     expect(await one.sync()).to.deep.equal({ sent: 0, taken: 0 })
     expect(JSON.parse(one.storage.getItem('state-set') ?? '')).to.deep.equal({ capo: 3 })
   })
 
-  it('leaves alone what the server refuses, and takes nothing for a setlist or song it does not have yet', async () => {
+  it('takes nothing for a setlist or song this device does not have yet', async () => {
     const server = new Server()
     const one = await device(server)
-    one.storage.setItem('state-set', JSON.stringify({ capo: 2 }))
-    one.storage.setItem('pitch', 'F')
-    server.refuse.add('setlist:set')
-    expect(await one.sync()).to.deep.equal({ sent: 1, taken: 0 })
-    server.items.set('setlist:other', { version: 1, body: { state: { capo: 1 } } })
-    server.items.set('song:other', { version: 1, body: { capo: 1 } })
+    server.set('setlists', 'other', { state: { capo: 1 } })
+    server.set('songs', 'other', { capo: 1 })
     expect(await one.sync()).to.deep.equal({ sent: 0, taken: 0 })
     expect(one.storage.getItem('state-other')).to.equal(null)
   })
@@ -226,7 +267,7 @@ describe('syncing what a person keeps for themselves', () => {
       JSON.stringify({ 'title-two': { capo: 1 } })
     )
     expect(await one.sync()).to.deep.equal({ sent: 1, taken: 0 })
-    expect([...server.items.keys()]).to.deep.equal(['song:uuid-main'])
+    expect(Object.keys(server.body.songs)).to.deep.equal(['uuid-main'])
     // (a device with settings of its own for another song keeps them when this one arrives)
     const two = await device(server)
     two.storage.setItem(
@@ -246,15 +287,15 @@ describe('syncing what a person keeps for themselves', () => {
   it('takes an overlay with nothing in it as nothing kept', async () => {
     const server = new Server()
     const one = await device(server)
-    server.items.set('setlist:set', { version: 1, body: {} })
+    server.set('setlists', 'set', {})
     one.storage.setItem('state-set', JSON.stringify({ capo: 2 }))
     expect(await one.sync()).to.deep.equal({ sent: 1, taken: 0 })
-    server.items.set('setlist:set', { version: 5, body: {} })
+    server.set('setlists', 'set', {})
     expect(await one.sync()).to.deep.equal({ sent: 0, taken: 1 })
     expect(one.storage.getItem('state-set')).to.equal(null)
   })
 
-  it('sends more than a hundred items in more than one batch', async () => {
+  it('sends a great many items in one write', async () => {
     const server = new Server()
     const one = await device(server)
     for (let n = 0; n < 120; n++) {
@@ -262,7 +303,7 @@ describe('syncing what a person keeps for themselves', () => {
       one.storage.setItem(`state-s${n}`, JSON.stringify({ n }))
     }
     expect((await one.sync()).sent).to.equal(120)
-    expect(server.calls.filter(call => call.endsWith('/batch'))).to.have.length(2)
+    expect(server.calls.filter(call => call.startsWith('PUT'))).to.have.length(1)
   })
 })
 

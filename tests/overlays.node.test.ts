@@ -8,7 +8,7 @@ import { d1Db } from './d1-db.ts'
 const key = () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64')
 const T = '2026-11-25T10:00:00.000Z'
 
-test('what a person keeps is theirs alone, versioned, and reaches only what they still can', async () => {
+test('what a person keeps is one document of theirs alone, versioned, and reaches only what they still can', async () => {
   const { db, sql } = d1Db()
   const env = {
     DB: db,
@@ -67,9 +67,9 @@ test('what a person keeps is theirs alone, versioned, and reaches only what they
   const send = async (
     who: string | null,
     method: string,
-    path: string,
     body?: unknown,
-    headers: Record<string, string> = {}
+    headers: Record<string, string> = {},
+    path = '/api/account/overlays'
   ) =>
     handleOverlays(
       new Request(`https://example.test${path}`, {
@@ -87,177 +87,118 @@ test('what a person keeps is theirs alone, versioned, and reaches only what they
       }),
       env
     )
-  const batch = async (who: string, ...ops: unknown[]) => {
-    const response = await send(who, 'POST', '/api/account/overlays/batch', { ops })
-    assert.equal(response.status, 200)
-    return ((await response.json()) as { results: Record<string, unknown>[] }).results
-  }
-  const all = async (who: string) =>
-    (await (await send(who, 'GET', '/api/account/overlays')).json()) as Record<string, any>
-  const setlist = (setlistId: string, baseVersion: number | null, body: unknown = { capo: 2 }) => ({
-    kind: 'setlist',
-    op: 'put',
-    setlistId,
-    baseVersion,
-    body,
-  })
-  const song = (
-    libraryId: string,
-    songUuid: string,
-    baseVersion: number | null,
-    body: unknown = { capo: 1 }
-  ) => ({ kind: 'song', op: 'put', libraryId, songUuid, baseVersion, body })
-  const prefs = (baseVersion: number | null, body: unknown = { musician_type: 'guitarist' }) => ({
-    kind: 'preferences',
-    op: 'put',
-    baseVersion,
-    body,
-  })
+  const read = async (who: string) =>
+    (await (await send(who, 'GET')).json()) as {
+      version: number
+      body: Record<string, Record<string, unknown>>
+    }
+  const write = async (who: string, baseVersion: unknown, body: unknown) =>
+    send(who, 'PUT', { baseVersion, body })
+  const nothing = { settings: {}, setlists: {}, songs: {} }
 
   // Who asks, and what is said to anything in between
-  assert.equal((await send(null, 'GET', '/api/account/overlays')).status, 401)
-  assert.equal((await send('me', 'GET', '/api/account/other')).status, 404)
-  assert.equal((await send('me', 'PUT', '/api/account/overlays')).status, 404)
+  assert.equal((await send(null, 'GET')).status, 401)
+  assert.equal((await send('me', 'GET', undefined, {}, '/api/account/other')).status, 404)
+  assert.equal((await send('me', 'DELETE')).status, 404)
   assert.equal(
     (await handleOverlays(new Request('https://example.test/api/account/overlays'), {} as Env))
       .status,
     503
   )
-  assert.equal((await send('me', 'POST', '/api/account/overlays/batch', { ops: 'no' })).status, 400)
-  const first = await send('me', 'GET', '/api/account/overlays')
+  const first = await send('me', 'GET')
   assert.equal(first.headers.get('Cache-Control'), 'private, no-cache')
   assert.equal(first.headers.get('Vary'), 'Authorization')
-  assert.deepEqual(await first.json(), { preferences: null, setlists: [], songs: [] })
+  assert.deepEqual(await first.json(), { version: 0, body: nothing })
   const etag = first.headers.get('ETag') ?? ''
-  assert.equal(
-    (await send('me', 'GET', '/api/account/overlays', undefined, { 'If-None-Match': etag })).status,
-    304
-  )
-  const written = await send('me', 'POST', '/api/account/overlays/batch', { ops: [] })
-  assert.equal(written.headers.get('Cache-Control'), 'private, no-store')
+  assert.equal((await send('me', 'GET', undefined, { 'If-None-Match': etag })).status, 304)
+  const refused = await send('me', 'PUT', { baseVersion: 'x', body: nothing })
+  assert.equal(refused.status, 400)
+  assert.equal(refused.headers.get('Cache-Control'), 'private, no-store')
 
-  // Made, for what the person can reach: their own setlist and a team's, their own library and their church's
+  // Made, from nothing: what the person can reach is kept, and what they cannot is not
+  const mine = {
+    settings: { musician_type: 'guitarist' },
+    setlists: {
+      'my-set': { capo: 2 },
+      'team-set': { capo: 1 },
+      'your-set': { capo: 9 },
+      nope: { capo: 9 },
+    },
+    songs: { b: { capo: 1 }, a: { capo: 3 }, c: { capo: 9 }, nope: { capo: 9 } },
+  }
+  const made = await write('me', 0, mine)
+  assert.deepEqual(await made.json(), { version: 1 })
+  const kept = await read('me')
+  assert.equal(kept.version, 1)
+  assert.deepEqual(kept.body, {
+    settings: { musician_type: 'guitarist' },
+    setlists: { 'my-set': { capo: 2 }, 'team-set': { capo: 1 } },
+    songs: { b: { capo: 1 }, a: { capo: 3 } },
+  })
   assert.deepEqual(
-    await batch(
-      'me',
-      setlist('my-set', null),
-      setlist('team-set', null),
-      song('my-lib', 'b', null),
-      song('church-lib', 'a', null),
-      prefs(null)
-    ),
-    [
-      { status: 'ok', version: 1 },
-      { status: 'ok', version: 1 },
-      { status: 'ok', version: 1 },
-      { status: 'ok', version: 1 },
-      { status: 'ok', version: 1 },
-    ]
-  )
-  const mine = await all('me')
-  assert.deepEqual(mine.preferences, { body: { musician_type: 'guitarist' }, version: 1 })
-  assert.deepEqual(
-    mine.setlists.map((each: { setlistId: string }) => each.setlistId),
-    ['my-set', 'team-set']
-  )
-  assert.equal(mine.songs.length, 2)
-
-  // Not someone else's setlist or library, and nothing that is not there
-  assert.deepEqual(
-    await batch(
-      'me',
-      setlist('your-set', null),
-      song('your-lib', 'c', null),
-      setlist('nope', null),
-      song('my-lib', 'nope', null)
-    ),
-    [
-      { status: 'forbidden' },
-      { status: 'forbidden' },
-      { status: 'forbidden' },
-      { status: 'forbidden' },
-    ]
-  )
-  assert.deepEqual(
-    await all('you'),
-    { preferences: null, setlists: [], songs: [] },
-    "nobody reads another person's"
+    await read('you'),
+    { version: 0, body: nothing },
+    'nobody reads another person’s'
   )
 
-  // Changed from the version it was; refused, with the current, when changed meanwhile or made twice
-  assert.deepEqual(await batch('me', setlist('my-set', 1, { capo: 3 })), [
-    { status: 'ok', version: 2 },
-  ])
-  assert.deepEqual(await batch('me', setlist('my-set', 1, { capo: 4 })), [
-    { status: 'conflict', current: { body: { capo: 3 }, version: 2 } },
-  ])
-  assert.deepEqual(await batch('me', setlist('my-set', null)), [
-    { status: 'conflict', current: { body: { capo: 3 }, version: 2 } },
-  ])
-  assert.deepEqual(await batch('me', prefs(1, { tuning: '-1' })), [{ status: 'ok', version: 2 }])
-  assert.deepEqual(await batch('me', setlist('team-set', 5)), [
-    { status: 'conflict', current: { body: { capo: 2 }, version: 1 } },
-  ])
-  assert.deepEqual(await batch('me', setlist('gone', 1)), [{ status: 'missing' }])
+  // Changed from the version it was; refused, with what is kept, when another device wrote first or it was made twice
+  assert.deepEqual(
+    await (await write('me', 1, { ...kept.body, settings: { tuning: '-1' } })).json(),
+    { version: 2 }
+  )
+  const stale = await write('me', 1, nothing)
+  assert.equal(stale.status, 409)
+  assert.deepEqual(((await stale.json()) as { current: unknown }).current, {
+    version: 2,
+    body: { ...kept.body, settings: { tuning: '-1' } },
+  })
+  assert.equal((await write('me', 0, nothing)).status, 409, 'made twice')
+  assert.equal((await write('you', 3, nothing)).status, 409, 'nothing to write from')
 
   // What is asked of it is checked
-  const bad = await batch(
-    'me',
-    { kind: 'other' },
-    'text',
-    { ...setlist('my-set', 2), setlistId: '../x' },
-    { ...song('my-lib', 'b', 1), songUuid: '' },
-    { ...song('my-lib', 'b', 1), libraryId: 4 },
-    { ...setlist('my-set', 2), baseVersion: 0 },
-    { ...setlist('my-set', 2), body: [] },
-    { ...setlist('my-set', 2), body: { text: 'x'.repeat(300 * 1024) } },
-    prefs(2, { not_a_setting: 'x' }),
-    prefs(2, { tuning: 4 }),
-    { ...setlist('my-set', 2), op: 'merge' }
-  )
+  const bad = [
+    { baseVersion: -1, body: nothing },
+    { baseVersion: 2 },
+    { baseVersion: 2, body: [] },
+    { baseVersion: 2, body: { ...nothing, extra: {} } },
+    { baseVersion: 2, body: { settings: [], setlists: {}, songs: {} } },
+    { baseVersion: 2, body: { ...nothing, settings: { not_a_setting: 'x' } } },
+    { baseVersion: 2, body: { ...nothing, settings: { tuning: 4 } } },
+    { baseVersion: 2, body: { ...nothing, setlists: { '../x': {} } } },
+    { baseVersion: 2, body: { ...nothing, setlists: { 'my-set': [] } } },
+    { baseVersion: 2, body: { ...nothing, songs: { '': {} } } },
+    { baseVersion: 2, body: { ...nothing, songs: { b: 'x' } } },
+    { baseVersion: 2, body: { ...nothing, songs: { b: { text: 'x'.repeat(1024 * 1024) } } } },
+  ]
+  for (const each of bad)
+    assert.equal((await send('me', 'PUT', each)).status, 400, JSON.stringify(each).slice(0, 60))
   assert.deepEqual(
-    bad.map(each => each.status),
-    Array(11).fill('invalid')
+    await (await write('me', 2, { settings: {}, songs: { b: { capo: 4 } } })).json(),
+    { version: 3 },
+    'a part left out is none'
   )
 
-  // Leaving the church ends reaching its setlists and library, though the rows are kept until they are removed
+  // Leaving the church ends reaching its setlist and library: it is no longer shown, and is not kept by the next write
   sql.prepare('DELETE FROM church_members WHERE account_id = ?').run('me')
-  const left = await all('me')
-  assert.deepEqual(
-    left.setlists.map((each: { setlistId: string }) => each.setlistId),
-    ['my-set']
-  )
-  assert.deepEqual(
-    left.songs.map((each: { libraryId: string }) => each.libraryId),
-    ['my-lib']
-  )
-  assert.deepEqual(await batch('me', setlist('team-set', 1)), [{ status: 'forbidden' }])
-
-  // Deleted, from the version it was or without one; a setlist taking its overlay with it
-  assert.deepEqual(
-    await batch('me', { kind: 'setlist', op: 'delete', setlistId: 'my-set', baseVersion: 1 }),
-    [{ status: 'conflict', current: { body: { capo: 3 }, version: 2 } }]
-  )
-  assert.deepEqual(
-    await batch(
-      'me',
-      { kind: 'setlist', op: 'delete', setlistId: 'my-set', baseVersion: 2 },
-      { kind: 'song', op: 'delete', libraryId: 'my-lib', songUuid: 'b', baseVersion: null },
-      { kind: 'preferences', op: 'delete', baseVersion: null },
-      { kind: 'preferences', op: 'delete', baseVersion: null }
-    ),
-    [
-      { status: 'ok', version: 0 },
-      { status: 'ok', version: 0 },
-      { status: 'ok', version: 0 },
-      { status: 'ok', version: 0 },
-    ]
-  )
-  assert.deepEqual((await all('me')).setlists, [])
-  await batch('me', setlist('my-set', null))
-  sql.prepare('DELETE FROM setlists WHERE setlist_id = ?').run('my-set')
+  const left = await read('me')
+  assert.deepEqual(left.body, { settings: {}, setlists: {}, songs: { b: { capo: 4 } } })
+  await write('me', 3, { ...nothing, setlists: { 'team-set': { capo: 5 }, 'my-set': { capo: 6 } } })
+  assert.deepEqual((await read('me')).body.setlists, { 'my-set': { capo: 6 } })
   assert.equal(
-    sql.prepare('SELECT count(*) AS n FROM setlist_overlays WHERE setlist_id = ?').get('my-set')?.n,
+    sql.prepare('SELECT body FROM account_overlays WHERE account_id = ?').get('me')?.body,
+    '{"settings":{},"setlists":{"my-set":{"capo":6}},"songs":{}}'
+  )
+
+  // The account takes its overlays with it
+  run(`INSERT INTO accounts (account_id, created_at) VALUES ('gone', ?)`, T)
+  sql
+    .prepare(
+      "INSERT INTO account_overlays (account_id, body, modified_at) VALUES ('gone', '{}', ?)"
+    )
+    .run(T)
+  sql.prepare('DELETE FROM accounts WHERE account_id = ?').run('gone')
+  assert.equal(
+    sql.prepare('SELECT count(*) AS n FROM account_overlays WHERE account_id = ?').get('gone')?.n,
     0
   )
 })

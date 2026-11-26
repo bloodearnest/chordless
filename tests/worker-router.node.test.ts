@@ -115,7 +115,6 @@ test('the personal library and setlist paths reach the Worker handler', async ()
     '/api/account/setlists',
     '/api/account/setlists/batch',
     '/api/account/overlays',
-    '/api/account/overlays/batch',
   ]) {
     const response = await send(path)
     assert.equal(response.status, 503, path)
@@ -135,6 +134,12 @@ test('library pad paths reach the Worker handler', async () => {
   const response = await send('/api/libraries/library-a/pads')
   assert.equal(response.status, 503, 'the handler reports unavailable storage')
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
+})
+
+test('anonymous share paths reach the Worker handler', async () => {
+  const { send } = setup()
+  const response = await send('/api/shares/sh_aaaaaaaaaaaaaaaaaaaaaa')
+  assert.equal(response.status, 503, 'the handler reports unavailable storage')
 })
 
 test('the API sends no CORS headers', async () => {

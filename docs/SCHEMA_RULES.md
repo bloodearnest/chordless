@@ -57,6 +57,23 @@ heading for is drawn in [D1_SCHEMA.md](D1_SCHEMA.md). D1 is SQLite on Cloudflare
   (D1_PHASE1_PLAN.md, "Space data and its sync"). A `version INTEGER` is for refusing a write that was based on an
   out-of-date row, and `modified_at` for people and reports.
 
+## A document, or a table
+
+A table is for what the database has to **query** or **keep consistent**: a column filtered or joined by, a key another
+table must point at, a uniqueness or a foreign key that must hold across rows. Anything else is a JSON document in a
+column of the row that owns it, with a `version` to refuse a stale write (the client merges, as it does for a setlist).
+
+Ask of each new table: *does anything look rows up by their content, join to them, or need the database to refuse a
+combination of rows?* If not, it is a document. What a person keeps for themselves (`account_overlays`: their settings
+and the overlay of each setlist and song) and a library's list of pad sets (`libraries.pad_sets`) are documents: they are
+read and written whole by one owner, and nothing joins to them. What the foreign keys used to tidy up (an overlay of a
+setlist the person can no longer reach) is the Worker's to leave out when it reads and writes the document.
+
+Tables stay where there is a query or an integrity rule: a share is looked up by its unguessable id, one is live for a
+setlist at a time, and the cleanup finds them by date (`shares`); setlists and songs are listed, searched and joined
+(`setlists`, `library_songs`); membership is the authorization (`church_members`). Keep the document small (the Worker
+caps it) and out of any index; **a field that has to be queried is a column**, not a path into the JSON.
+
 ## A migration
 
 - **Additive by default**: a new table, a column with a default, an index. The Worker that was running before a
@@ -78,6 +95,8 @@ heading for is drawn in [D1_SCHEMA.md](D1_SCHEMA.md). D1 is SQLite on Cloudflare
   wrote them (the awkward ones included: a member with no account, an empty string, an orphan), run yours, and check the result row by row
   (`tests/schema-cleanup.node.test.ts` is the pattern). Tests run the real migration files against SQLite
   (`tests/d1-db.ts`, `node:sqlite`, with foreign keys on, as D1).
+- **A change to the schema is drawn and approved before more is built on it**: `just schema-diagram NNNN` (below), shown to
+  the owner, and no code, test or pull request that depends on the change goes on until it is approved.
 - **Back up first** (`just db-backup`), and rehearse on a copy of the data when the migration is not additive.
 
 ## The diagram
@@ -87,7 +106,7 @@ so that a reviewer sees what it does: `just schema-diagram 0019` writes `docs/D1
 (`scripts/schema-svg.ts`: every migration applied to a SQLite database, every table drawn with its columns, keys, foreign keys
 and their `ON DELETE` rule, and indexes, parents to the left). **Orange is what the migrations from that number on add or
 change**: a new table whole, and the columns and indexes of an existing one that are new or differ; a dropped table is named
-in the heading. Add the file beside the older ones, and link it from `docs/D1_SCHEMA.md`.
+in the heading. **Red is a table that exists only for Drive** (`DRIVE_ONLY` in `scripts/schema-svg.ts`), to be removed when Drive sync is retired (step 10). Add the file beside the older ones, and link it from `docs/D1_SCHEMA.md`.
 
 ## Checking a database
 
