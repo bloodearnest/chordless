@@ -11,6 +11,7 @@ import {
 import { getSongsElsewhere } from '../src/js/other-songs.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
 import { addChart, createVariant } from '../src/js/song-utils.ts'
+import { createSpace, deleteSpace } from '../src/js/space.ts'
 import { makeEntry, makeImportedSong, makeSetlist } from './builders.ts'
 import { must } from './must.ts'
 import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
@@ -26,12 +27,15 @@ const ADD = { variantLabel: 'Test', importSource: 'test', makeDefault: 'first' }
 describe('importing a setlist into the library', () => {
   const libraryId = `org-${crypto.randomUUID()}`
   let library: ChordlessDB
+  /** The database of another space of the device, the songs of which the library can copy */
   let shared: ChordlessDB
+  let other: { id: string; name: string }
 
   beforeEach(async () => {
     library = new ChordlessDB(libraryId)
     await library.init()
-    shared = new ChordlessDB(SHARED_DB_ID)
+    other = await createSpace(`Other ${crypto.randomUUID().slice(0, 8)}`)
+    shared = new ChordlessDB(other.id)
     await shared.init()
   })
 
@@ -39,7 +43,8 @@ describe('importing a setlist into the library', () => {
     library.db?.close()
     shared.db?.close()
     await deleteDatabase(libraryId)
-    await deleteDatabase(SHARED_DB_ID)
+    await deleteDatabase(other.id)
+    await deleteSpace(other.id)
   })
 
   describe('the songs to match with', () => {
@@ -87,7 +92,7 @@ describe('importing a setlist into the library', () => {
       const songs = await libraryForMatching(library, new Map(), elsewhere)
       expect(songs.map(song => song.title).sort()).to.deep.equal(['Alpha', 'Beta'])
       const beta = must(songs.find(song => song.title === 'Beta'))
-      expect(beta.source?.dbId).to.equal(SHARED_DB_ID)
+      expect(beta.source?.dbId).to.equal(other.id)
       expect(beta.lyrics).to.contain('beta line one')
       expect(must(songs.find(song => song.title === 'Alpha')).source).to.equal(undefined)
     })

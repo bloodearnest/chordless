@@ -1875,8 +1875,6 @@ songs-search = Search songs by title, artist, or lyrics...
 songs-search-start = Start typing to search songs...
 
 # A song of another space, shown in the library. { $source } is that space.
-library-source-from = From { $source }: not in your library.
-library-add = Add to my library
 library-select = Select a song to view
 
 media-page-text = Pads and a click track for your setlists. These settings apply to all of them.
@@ -2237,6 +2235,7 @@ church-console-title = Churches
 church-console-open = Church administration
 church-console-setup = Church teams can use setlists. Shared songs will be available in a later update.
 church-no-song-copy = Songs cannot be copied between a church and another library.
+share-no-song-copy = A song in a shared setlist stays in that setlist: it cannot be added to a library.
 title-churches = Churches - Chordless
 church-console-signin = Sign in on the Account page, then open this link again.
 church-console-loading = Loading churches…

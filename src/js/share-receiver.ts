@@ -27,6 +27,9 @@ export const SHARED_DB_ID = 'shared-with-me'
 /** Before there was one database for all shares, each had its own, with this prefix */
 export const LEGACY_SHARE_DB_PREFIX = 'chordless-share-'
 
+/** A share the Worker keeps (`/api/shares/sh_…`, with no key): the other kind is a Drive file's, with its key in the link */
+export const isServerShareId = (id: string) => id.startsWith('sh_')
+
 /** The id of a share's setlist in the shared database */
 export const shareSetlistId = (fileId: string) => `share-${fileId}`
 
@@ -66,10 +69,21 @@ export async function databaseExists(name: string): Promise<boolean> {
   return (await indexedDB.databases()).some(database => database.name === name)
 }
 
-/** Remove a received setlist from this device, with its state here; its songs stay */
+/**
+ * Remove a received setlist from this device, with its state here, and its songs that no other received setlist uses:
+ * a chart received in a share stays inside the share (it is no one's to copy into a library: docs/CENTRAL_STORAGE.md)
+ */
 async function forgetSetlist(db: ChordlessDB, fileId: string): Promise<void> {
-  await db.deleteSetlist(shareSetlistId(fileId))
-  await db.deleteLocalState(shareSetlistId(fileId))
+  const id = shareSetlistId(fileId)
+  const gone = await db.getSetlist(id)
+  await db.deleteSetlist(id)
+  await db.deleteLocalState(id)
+  if (!gone) return
+  const used = new Set(
+    (await db.getAllSetlists()).flatMap(setlist => setlist.songs.map(entry => entry.songUuid))
+  )
+  for (const { songUuid } of gone.songs)
+    if (!used.has(songUuid)) await db.deleteSong(songUuid, { remember: false })
 }
 
 /**
@@ -148,6 +162,7 @@ export async function openShare(
   options: OpenShareOptions = {}
 ): Promise<ShareOpening> {
   const trail: Attributes = {}
+  trail['chordless.share.kind'] = isServerShareId(fileId) ? 'server' : 'drive'
   const started = performance.now()
   const record = (outcome: string) =>
     recordSpan('chordless.share.open', {
@@ -159,7 +174,9 @@ export async function openShare(
       ...trail,
     })
   try {
-    const opening = await openShareUntraced(fileId, keyFromLink, options, trail)
+    const opening = isServerShareId(fileId)
+      ? await openServerShare(fileId, options, trail)
+      : await openShareUntraced(fileId, keyFromLink, options, trail)
     record(opening.state)
     return opening
   } catch (error) {
@@ -278,6 +295,128 @@ async function openShareUntraced(
       etag: response.headers.get('ETag') ?? '',
       expires: bundle.expires,
       ...(bundle.setlistId && { setlistId: bundle.setlistId }),
+    },
+    kept?.createdDate
+  )
+  return { state: 'ready', db, setlist, fresh: true }
+}
+
+/** What the Worker says of a share it keeps (worker/src/shares.ts) */
+interface ServerShareBody {
+  expiresAt: string
+  setlist: {
+    setlistId: string
+    date: string
+    time: string
+    type: string
+    name: string
+    leader: string | null
+    songs: {
+      songUuid: string
+      title: string
+      key: string | null
+      tempo: number | null
+      notes: string
+      annotations?: unknown[]
+    }[]
+  }
+  songs: { songUuid: string; title: string; bundle: { chordpro: string } | null }[]
+}
+
+/**
+ * Open a share the Worker keeps: no key, and nothing to decrypt. The Worker says whether it changed (an ETag), and 404 or 410
+ * when it never was or has ended. A copy on this device is shown when the Worker cannot be reached, until the end it was
+ * given, which this device knows without the Worker.
+ */
+async function openServerShare(
+  shareId: string,
+  { fetchFile = fetch, origin, fresh = false }: OpenShareOptions,
+  trail: Attributes
+): Promise<ShareOpening> {
+  const db = new ChordlessDB(SHARED_DB_ID, origin)
+  await db.init()
+  const kept = await db.getSetlist(shareSetlistId(shareId))
+  const known = kept?.received
+  trail['chordless.share.had_copy'] = Boolean(kept)
+  const ended = async (): Promise<ShareOpening> => {
+    if (kept) await forgetSetlist(db, shareId)
+    db.db?.close()
+    return { state: 'ended' }
+  }
+  const unreachable = (reason: string, offline: boolean): ShareOpening => {
+    trail['chordless.share.via'] = kept ? 'local_copy' : 'none'
+    trail['chordless.share.reason'] = reason
+    if (kept) return { state: 'ready', db, setlist: kept, fresh: false }
+    db.db?.close()
+    return { state: 'unavailable', offline }
+  }
+
+  if (known?.expiresAt && Date.now() >= Date.parse(known.expiresAt)) {
+    trail['chordless.share.expired'] = true
+    return ended()
+  }
+
+  let response: Response
+  try {
+    response = await fetchFile(`/api/shares/${encodeURIComponent(shareId)}`, {
+      headers: known?.etag && !fresh ? { 'If-None-Match': known.etag } : {},
+    })
+  } catch {
+    return unreachable('offline', true)
+  }
+  trail['chordless.share.http_status'] = response.status
+  if (response.status === 404 || response.status === 410) return ended()
+  if (response.status === 304 && kept) {
+    trail['chordless.share.via'] = 'not_modified'
+    return { state: 'ready', db, setlist: kept, fresh: false }
+  }
+  if (!response.ok) return unreachable('server_error', false)
+  if (!response.headers.get('Content-Type')?.startsWith('application/json'))
+    return unreachable('not_a_file', false)
+
+  const body = (await response.json()) as ServerShareBody
+  const charts = new Map(body.songs.map(song => [song.songUuid, song]))
+  // (a song the Worker has no chart for yet is left out: there is nothing to show of it)
+  const songs = body.setlist.songs.flatMap(entry => {
+    const chordpro = charts.get(entry.songUuid)?.bundle?.chordpro
+    return chordpro
+      ? [
+          {
+            title: entry.title,
+            key: entry.key,
+            tempo: entry.tempo,
+            notes: entry.notes,
+            chordpro,
+            ...(entry.annotations?.length && { annotations: entry.annotations }),
+          } as ShareBundle['setlist']['songs'][number],
+        ]
+      : []
+  })
+  trail['chordless.share.songs'] = songs.length
+  trail['chordless.share.via'] = 'downloaded'
+  const expires = body.expiresAt.slice(0, 10)
+  const bundle = {
+    expires,
+    setlistId: body.setlist.setlistId,
+    setlist: {
+      date: body.setlist.date,
+      time: body.setlist.time,
+      type: body.setlist.type,
+      name: body.setlist.name,
+      owner: body.setlist.leader ?? '',
+      songs,
+    },
+  } as ShareBundle
+  const setlist = await store(
+    db,
+    bundle,
+    {
+      fileId: shareId,
+      key: '',
+      etag: response.headers.get('ETag') ?? '',
+      expires,
+      expiresAt: body.expiresAt,
+      setlistId: body.setlist.setlistId,
     },
     kept?.createdDate
   )

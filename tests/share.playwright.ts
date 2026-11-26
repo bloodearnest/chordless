@@ -169,7 +169,7 @@ test.describe('A setlist shared by link', () => {
     await page.goto(`/s/${FILE}`)
     await expect(page.locator('#share-status')).toHaveText('This share has ended')
 
-    // The setlist is gone from this device, and its songs are kept
+    // The setlist is gone from this device, and its songs with it (they stay inside the share)
     const kept = await page.evaluate(
       () =>
         new Promise<{ setlists: number; songs: number }>((resolve, reject) => {
@@ -187,7 +187,7 @@ test.describe('A setlist shared by link', () => {
           }
         })
     )
-    expect(kept).toEqual({ setlists: 0, songs: 2 })
+    expect(kept).toEqual({ setlists: 0, songs: 0 })
   })
 
   test('says so when the link has lost its key', { tag: '@logic' }, async ({ context, page }) => {
@@ -263,28 +263,110 @@ test.describe('A setlist shared by link', () => {
     })
   })
 
-  test('its songs are in the song library, to read and to add to it', { tag: '@logic' }, async ({
-    context,
-    page,
-  }) => {
+  test('its songs stay inside the share: not in the song library, and not to be added to it', {
+    tag: '@logic',
+  }, async ({ context, page }) => {
     const key = generateShareKey()
     await serveShare(context, key)
     await openLink(page, key)
     await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
 
     await page.goto('/songs')
-    const card = page.locator('song-card', { hasText: 'Be Still' })
-    await expect(card).toContainText('From Shared with me')
-    await card.click()
-    await expect(page.locator('#library-song-source')).toContainText('From Shared with me')
-    await expect(page.locator('#library-song-content')).toContainText('Be still and')
+    await expect(page.locator('#song-library-list')).toBeVisible()
+    await expect(page.locator('song-card', { hasText: 'Be Still' })).toHaveCount(0)
+    await expect(page.locator('song-card', { hasText: 'Amazing Grace' })).toHaveCount(0)
+    await expect(page.locator('#add-to-library')).toHaveCount(0)
+  })
+})
 
-    await page.locator('#add-to-library').click()
-    await expect(page.locator('#library-song-source')).toHaveCount(0)
-    await expect(page.locator('#library-song-content')).toContainText('Be still and')
-    await page.goto('/songs')
-    await expect(page.locator('song-card', { hasText: 'Be Still' })).not.toContainText(
-      'From Shared with me'
+// A link to a share the Worker keeps (/s/sh_…): no key, and no file to decrypt; the page asks the Worker for the setlist.
+test.describe('A setlist shared by a link the Worker keeps', () => {
+  test.use({ serviceWorkers: 'block', locale: 'en-GB' })
+  const ID = 'sh_aaaaaaaaaaaaaaaaaaaaaa'
+
+  const body = (name: string) => ({
+    shareId: ID,
+    expiresAt: '2099-12-31T23:59:59.999Z',
+    setlist: {
+      setlistId: 'set-1',
+      date: '2099-10-11',
+      time: '10:30',
+      type: 'Church Service',
+      name: '',
+      leader: 'Ann Smith',
+      songs: [
+        {
+          songUuid: 'u1',
+          songId: 'title-grace',
+          title: name,
+          key: 'A',
+          tempo: null,
+          notes: 'repeat 4x',
+          annotations: [],
+        },
+      ],
+    },
+    songs: [
+      {
+        songUuid: 'u1',
+        title: name,
+        bundle: {
+          format: 1,
+          chordpro: `{title: ${name}}\n{key: G}\n\n[G]${name} how [C]sweet`,
+          musicxml: null,
+        },
+      },
+    ],
+  })
+
+  test('opens with no key, and shows the setlist as the Worker has it now', {
+    tag: '@logic',
+  }, async ({ context, page }) => {
+    await context.route(`**/api/shares/${ID}`, route =>
+      route.fulfill({
+        status: 200,
+        headers: { ETag: '"1"', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body('Amazing Grace')),
+      })
     )
+    await page.goto(`/s/${ID}`)
+    await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
+
+    // (the setlist changed: the next open shows it)
+    await context.unroute(`**/api/shares/${ID}`)
+    await context.route(`**/api/shares/${ID}`, route =>
+      route.fulfill({
+        status: 200,
+        headers: { ETag: '"2"', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body('Be Still')),
+      })
+    )
+    await page.goto(`/s/${ID}`)
+    await expect(page.locator('setlist-overview')).toContainText('Be Still')
+  })
+
+  test('says it has ended when the Worker says so, and keeps nothing', { tag: '@logic' }, async ({
+    context,
+    page,
+  }) => {
+    await context.route(`**/api/shares/${ID}`, route =>
+      route.fulfill({
+        status: 200,
+        headers: { ETag: '"1"', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body('Amazing Grace')),
+      })
+    )
+    await page.goto(`/s/${ID}`)
+    await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
+    await context.unroute(`**/api/shares/${ID}`)
+    await context.route(`**/api/shares/${ID}`, route =>
+      route.fulfill({
+        status: 410,
+        body: '{"error":"This share has ended"}',
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+    await page.goto(`/s/${ID}`)
+    await expect(page.locator('#share-status')).toHaveText('This share has ended')
   })
 })

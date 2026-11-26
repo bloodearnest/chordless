@@ -261,13 +261,13 @@ describe('Receiving a share link', () => {
     expect((await inside()).setlists).to.have.length(0)
   })
 
-  it('deletes the setlist, but keeps its songs, when the share has ended (a 404)', async () => {
+  it('deletes the setlist, and its songs, when the share has ended (a 404)', async () => {
     await open(key, (await worker()).fetchFile)
 
     expect(await open('', status(404))).to.deep.equal({ state: 'ended' })
     const { setlists, songs } = await inside()
     expect(setlists).to.have.length(0)
-    expect(songs.map(song => song.title)).to.deep.equal(['Alpha'])
+    expect(songs).to.have.length(0)
     // ...and it stays ended
     expect(await open(key, status(404))).to.deep.equal({ state: 'ended' })
   })
@@ -280,7 +280,7 @@ describe('Receiving a share link', () => {
     expect(calls).to.have.length(0)
     const { setlists, songs } = await inside()
     expect(setlists).to.have.length(0)
-    expect(songs).to.have.length(1)
+    expect(songs).to.have.length(0)
   })
 
   it('does not keep a share that arrives already ended', async () => {
@@ -533,5 +533,207 @@ describe('Receiving a share link', () => {
         SHARED_DB_ID
       )
     })
+  })
+})
+
+describe('Receiving a link to a share the Worker keeps', () => {
+  const ID = 'sh_aaaaaaaaaaaaaaaaaaaaaa'
+  const OTHER = 'sh_bbbbbbbbbbbbbbbbbbbbbb'
+
+  const body = (over: { expiresAt?: string; chart?: string | null; songs?: number } = {}) => ({
+    shareId: ID,
+    expiresAt: over.expiresAt ?? '2099-01-01T23:59:59.999Z',
+    setlist: {
+      setlistId: 'set-1',
+      date: '2026-10-11',
+      time: '10:30',
+      type: 'Church Service',
+      name: '',
+      leader: 'Ann Smith',
+      songs: [
+        {
+          songUuid: 'u1',
+          songId: 'title-alpha',
+          title: 'Alpha',
+          key: 'A',
+          tempo: 90,
+          notes: 'repeat 4x',
+          annotations: [],
+        },
+        ...(over.songs === 2
+          ? [
+              {
+                songUuid: 'u2',
+                songId: 'title-draft',
+                title: 'Draft',
+                key: 'C',
+                tempo: null,
+                notes: '',
+                annotations: [],
+              },
+            ]
+          : []),
+      ],
+    },
+    songs: [
+      {
+        songUuid: 'u1',
+        title: 'Alpha',
+        bundle:
+          over.chart === null
+            ? null
+            : {
+                format: 1,
+                chordpro: over.chart ?? '{title: Alpha}\n{key: G}\n[G]Alpha line',
+                musicxml: null,
+              },
+      },
+      ...(over.songs === 2 ? [{ songUuid: 'u2', title: 'Draft', bundle: null }] : []),
+    ],
+  })
+
+  /** The Worker's answer for a share, and what it was asked */
+  const worker = (data = body(), etag = '"abc"') => {
+    const calls: { url: string; init?: RequestInit }[] = []
+    const fetchFile = (async (url: string, init?: RequestInit) => {
+      calls.push({ url, init })
+      if (new Headers(init?.headers).get('If-None-Match') === etag)
+        return new Response(null, { status: 304 })
+      return Response.json(data, { headers: { ETag: etag } })
+    }) as unknown as typeof fetch
+    return { fetchFile, calls }
+  }
+  const status = (code: number, type = 'application/json') =>
+    (async () =>
+      new Response('x', {
+        status: code,
+        headers: { 'Content-Type': type },
+      })) as unknown as typeof fetch
+  const offline = (async () => {
+    throw new TypeError('Failed to fetch')
+  }) as unknown as typeof fetch
+
+  const open = async (fetchFile: typeof fetch, id = ID, fresh = false) => {
+    const result = await openShare(id, '', { fetchFile, fresh })
+    if (result.state === 'ready') result.db.db?.close()
+    return result
+  }
+  const inside = async () => {
+    const db = new ChordlessDB(SHARED_DB_ID)
+    await db.init()
+    const contents = { setlists: await db.getAllSetlists(), songs: await db.getAllSongs() }
+    db.db?.close()
+    return contents
+  }
+
+  afterEach(async () => {
+    await deleteDatabase(SHARED_DB_ID)
+  })
+
+  it('opens it with no key, and keeps the setlist and its songs, with the end it was given', async () => {
+    const { fetchFile, calls } = worker()
+    const result = await openShare(ID, '', { fetchFile })
+    if (result.state !== 'ready') throw new Error(result.state)
+    expect(result.fresh).to.equal(true)
+    expect(calls[0].url).to.equal(`/api/shares/${ID}`)
+    const setlist = must(await result.db.getSetlist(shareSetlistId(ID)))
+    expect(setlist.songs).to.have.length(1)
+    expect(setlist.songs[0]).to.include({ key: 'A', notes: 'repeat 4x', order: 0 })
+    expect(setlist.received).to.deep.include({
+      fileId: ID,
+      key: '',
+      etag: '"abc"',
+      expires: '2099-01-01',
+      expiresAt: '2099-01-01T23:59:59.999Z',
+      setlistId: 'set-1',
+      leaderName: 'Ann Smith',
+    })
+    expect((await result.db.getAllSongs()).map(song => song.title)).to.deep.equal(['Alpha'])
+    result.db.db?.close()
+  })
+
+  it('leaves out a song the Worker has no chart for', async () => {
+    const result = await open(worker(body({ songs: 2 })).fetchFile)
+    expect(result.state).to.equal('ready')
+    const { setlists, songs } = await inside()
+    expect(setlists[0].songs).to.have.length(1)
+    expect(songs.map(song => song.title)).to.deep.equal(['Alpha'])
+  })
+
+  it('asks whether the copy it has is current, and keeps it on a 304', async () => {
+    const { fetchFile, calls } = worker()
+    await open(fetchFile)
+    const again = await openShare(ID, '', { fetchFile })
+    if (again.state !== 'ready') throw new Error(again.state)
+    expect(again.fresh).to.equal(false)
+    expect(new Headers(calls[1].init?.headers).get('If-None-Match')).to.equal('"abc"')
+    again.db.db?.close()
+    // (told it changed, it asks for the file as it is now, whatever it holds)
+    const fresh = await openShare(ID, '', {
+      fetchFile: worker(body(), '"new"').fetchFile,
+      fresh: true,
+    })
+    if (fresh.state !== 'ready') throw new Error(fresh.state)
+    expect(fresh.fresh).to.equal(true)
+    expect(must(await fresh.db.getSetlist(shareSetlistId(ID))).received?.etag).to.equal('"new"')
+    fresh.db.db?.close()
+  })
+
+  it('takes the setlist, and its songs, off the device when the Worker says it ended or never was', async () => {
+    await open(worker().fetchFile)
+    expect(await open(status(410))).to.deep.equal({ state: 'ended' })
+    let held = await inside()
+    expect(held.setlists).to.have.length(0)
+    expect(held.songs).to.have.length(0)
+    expect(await open(status(404), OTHER)).to.deep.equal({ state: 'ended' })
+    held = await inside()
+    expect(held.setlists).to.have.length(0)
+  })
+
+  it('keeps the songs another received setlist still uses when one ends', async () => {
+    await open(worker().fetchFile)
+    await open(worker({ ...body(), shareId: OTHER }).fetchFile, OTHER)
+    expect((await inside()).setlists).to.have.length(2)
+    await open(status(410))
+    const held = await inside()
+    expect(held.setlists).to.have.length(1)
+    expect(held.songs.map(song => song.title)).to.deep.equal(['Alpha'])
+  })
+
+  it('removes the copy once the end it was given has passed, without asking the Worker', async () => {
+    await open(worker(body({ expiresAt: new Date(Date.now() + 1000).toISOString() })).fetchFile)
+    const passed = worker()
+    const db = new ChordlessDB(SHARED_DB_ID)
+    await db.init()
+    const kept = must(await db.getSetlist(shareSetlistId(ID)))
+    await db.saveSetlist({
+      ...kept,
+      received: {
+        ...(kept.received as NonNullable<typeof kept.received>),
+        expiresAt: '2020-01-01T00:00:00.000Z',
+      },
+    })
+    db.db?.close()
+    expect(await open(passed.fetchFile)).to.deep.equal({ state: 'ended' })
+    expect(passed.calls).to.have.length(0)
+    expect((await inside()).songs).to.have.length(0)
+  })
+
+  it('shows the copy it has when the Worker cannot be reached or fails, and says so when it has none', async () => {
+    expect(await open(offline)).to.deep.equal({ state: 'unavailable', offline: true })
+    expect(await open(status(500))).to.deep.equal({ state: 'unavailable', offline: false })
+    expect(await open(status(200, 'text/html'))).to.deep.equal({
+      state: 'unavailable',
+      offline: false,
+    })
+    await open(worker().fetchFile)
+    for (const answer of [offline, status(500), status(200, 'text/html')]) {
+      const result = await openShare(ID, '', { fetchFile: answer })
+      expect(result.state).to.equal('ready')
+      if (result.state === 'ready') {
+        expect(result.fresh).to.equal(false)
+        result.db.db?.close()
+      }
+    }
   })
 })
