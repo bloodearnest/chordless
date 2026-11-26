@@ -817,7 +817,7 @@ export class SetlistPage {
       )
       shareDialog.addEventListener(
         SetlistShareChangeEvent.type,
-        () => share.classList.toggle('shared', Boolean(shareDialog.setlist?.share)),
+        () => share.classList.toggle('shared', shareDialog.shared),
         { signal }
       )
     }

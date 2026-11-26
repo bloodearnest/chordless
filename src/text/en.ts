@@ -2095,7 +2095,11 @@ share-list-copy = Copy song list
 share-list-email = Email song list
 # <account> is a link to the Account and Teams page.
 # In the share dialog of a setlist in a space that has been moved to Chordless: new links and updates are not available yet.
-share-moved = Sharing by link is not available yet for a space stored on Chordless. A link made before the move keeps working until the space's old Google Drive files are deleted.
+share-checking = Checking whether it is shared…
+# A link to a setlist in a space stored on Chordless: there is nothing to update, it always shows the setlist as it is.
+share-server-point-3 = It always shows the setlist as it is now, and is deleted two weeks after the setlist date.
+# { $date } is when the link stops working.
+share-server-ends = Ends after { $date }. It always shows the setlist as it is now.
 share-sign-in = Connect Google Drive on the <account>Account and Teams page</account> to share this setlist by link.
 share-link-text = Make a link to this setlist for people outside your Chordless space, whether or not they use Chordless.
 share-link-point-1 = They need no account or install, and can keep it on their phone.
