@@ -178,18 +178,14 @@ export async function syncSpaceDataFor(
   }
   await sync.sync(options)
   failures.delete(spaceId)
-  if (space.server) await syncOverlaysOf(spaceId, space.server.libraryId, connection)
+  if (space.server) await syncOverlaysOf(spaceId, connection)
 }
 
 /** What the person keeps for themselves goes with their space: a failure here is not one of the space's data */
-async function syncOverlaysOf(
-  spaceId: string,
-  libraryId: string,
-  connection: WorkerConnection
-): Promise<void> {
+async function syncOverlaysOf(spaceId: string, connection: WorkerConnection): Promise<void> {
   try {
     const { syncOverlays } = await import('./overlay-sync.ts')
-    await syncOverlays({ db: await openSpace(spaceId, 'sync'), libraryId, connection })
+    await syncOverlays({ db: await openSpace(spaceId, 'sync'), connection })
   } catch (error) {
     console.warn('[Overlays] Could not sync what you keep for yourself:', errorMessage(error))
   }

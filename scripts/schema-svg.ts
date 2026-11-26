@@ -37,6 +37,22 @@ interface Table {
 
 const DIRECTORY = new URL('../migrations/', import.meta.url)
 const ORANGE = '#d9822b'
+const RED = '#c0392b'
+/**
+ * The tables that exist only for the Drive-backed Teams, and go when Drive sync is retired (docs/CENTRAL_STORAGE.md, step 10):
+ * the first-generation copies of a team's data (`setlists` and `library_songs` supersede them), a team's Drive file ids
+ * and token, and the account's own Drive connection. Drawn in red. A table that is not in the schema is ignored.
+ */
+const DRIVE_ONLY = new Set([
+  'space_songs',
+  'space_setlists',
+  'space_setlist_songs',
+  'space_people',
+  'space_pad_sets',
+  'team_refs',
+  'team_credentials',
+  'account_drive',
+])
 const WIDTH = 330
 const GAP_X = 120
 const GAP_Y = 26
@@ -152,7 +168,7 @@ function draw(files: string[], since: string | null): string {
   const place = new Map<string, { x: number; y: number; h: number }>()
   let bottom = 0
   columns.forEach((names, index) => {
-    let y = 90
+    let y = 108
     for (const name of names) {
       const table = tables.get(name) as Table
       const h =
@@ -187,6 +203,9 @@ function draw(files: string[], since: string | null): string {
     ].filter(Boolean)
     svg += `<rect x="30" y="62" width="12" height="12" rx="2" fill="${ORANGE}"/><text x="48" y="73" font-size="12" font-weight="700" fill="${ORANGE}">Added or changed by migrations ${xml(since.slice(0, 4))} on · ${xml(bits.join(' · '))}</text>\n`
   }
+  const legacy = [...tables.keys()].filter(name => DRIVE_ONLY.has(name))
+  if (legacy.length)
+    svg += `<rect x="30" y="80" width="12" height="12" rx="2" fill="${RED}"/><text x="48" y="91" font-size="12" font-weight="700" fill="${RED}">Drive only, removed when Drive sync is retired · ${xml(legacy.join(', '))}</text>\n`
   for (const [name, table] of tables) {
     const at = place.get(name) as { x: number; y: number }
     for (const fk of table.foreignKeys) {
@@ -207,8 +226,9 @@ function draw(files: string[], since: string | null): string {
     const at = place.get(name) as { x: number; y: number; h: number }
     const isNew = since !== null && !baseline.has(name)
     const diff = since !== null && baseline.has(name) ? changes(table, baseline.get(name)) : null
-    const head = isNew ? ORANGE : '#3f6fb0'
-    svg += `<rect x="${at.x}" y="${at.y}" width="${WIDTH}" height="${at.h}" rx="5" fill="#fff" stroke="${isNew ? ORANGE : '#c9d1d9'}" stroke-width="${isNew ? 1.6 : 1}"/>\n`
+    const driveOnly = DRIVE_ONLY.has(name)
+    const head = driveOnly ? RED : isNew ? ORANGE : '#3f6fb0'
+    svg += `<rect x="${at.x}" y="${at.y}" width="${WIDTH}" height="${at.h}" rx="5" fill="#fff" stroke="${driveOnly ? RED : isNew ? ORANGE : '#c9d1d9'}" stroke-width="${driveOnly || isNew ? 1.6 : 1}"/>\n`
     svg += `<rect x="${at.x}" y="${at.y}" width="${WIDTH}" height="${HEAD}" rx="5" fill="${head}"/><rect x="${at.x}" y="${at.y + HEAD - 6}" width="${WIDTH}" height="6" fill="${head}"/>\n`
     const note = [
       table.flags,
@@ -216,7 +236,7 @@ function draw(files: string[], since: string | null): string {
     ]
       .filter(Boolean)
       .join(' · ')
-    svg += `<text x="${at.x + 8}" y="${at.y + 16}" font-size="13" font-weight="700" fill="#fff">${xml(name)}${isNew ? ' (new)' : diff && (diff.columns.size || diff.indexes.size) ? ' (changed)' : ''}</text><text x="${at.x + WIDTH - 8}" y="${at.y + 16}" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">${xml(note)}</text>\n`
+    svg += `<text x="${at.x + 8}" y="${at.y + 16}" font-size="13" font-weight="700" fill="#fff">${xml(name)}${driveOnly ? ' (Drive only)' : ''}${isNew ? ' (new)' : diff && (diff.columns.size || diff.indexes.size) ? ' (changed)' : ''}</text><text x="${at.x + WIDTH - 8}" y="${at.y + 16}" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">${xml(note)}</text>\n`
     table.columns.forEach((column, index) => {
       const y = at.y + HEAD + index * ROW + 11
       const fk = table.foreignKeys.find(candidate => candidate.from === column.name)

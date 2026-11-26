@@ -336,3 +336,8 @@ schema
 - drop the first-generation Team data tables (`space_songs`, `space_setlists`, `space_setlist_songs`,
   `space_people`, `space_pad_sets`, migration 0012; `worker/src/space-data.ts`) at the cutover, once no Team has
   `storage = 'd1'` on them: `setlists` and `library_songs` supersede them
+- `login_codes` could be mostly a JSON document too: it is short-lived, read and written whole by
+  one lookup, and nothing joins to it (docs/SCHEMA_RULES.md, "A document, or a table"); look at it when the auth
+  tables are next touched
+- `account_identities` and `account_emails` could possibly be merged (one table, or a document on the account): look at
+  it when the auth tables are next touched, with `login_codes` above

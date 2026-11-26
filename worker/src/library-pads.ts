@@ -1,6 +1,6 @@
 /**
  * A library's pad sets (docs/CENTRAL_STORAGE.md, step 6): a church's or a person's own. The list of sets, with their
- * names, is `library_pad_sets` in D1; the audio is private R2, `library/<library>/pads/<set>/<key>.mp3`, streamed to
+ * names, is a JSON column of the library's row in D1 (`libraries.pad_sets`); the audio is private R2, `library/<library>/pads/<set>/<key>.mp3`, streamed to
  * the device and kept nowhere else. The routes and their rules are a team space's (team-pads.ts): any member reads and
  * adds, a set or a key already there is replaced only by an admin, and a person in their own library is its admin. What
  * is new is where the sets are kept: this is the `PadStorage` for R2.
@@ -24,6 +24,16 @@ export const isLibraryPadPath = (path: string) => PATH.test(path)
 const fileRef = (set: string, key: string) => `${set}:${key}`
 const SET_ID = /^[A-Za-z0-9_-]{1,64}$/
 
+/** A pad set as the library keeps it (its audio is in R2) */
+interface PadSetRecord {
+  id: string
+  name: string
+  modifiedAt: string
+}
+
+/** The most pad sets a library keeps: they are a list in one row */
+const MAX_SETS = 200
+
 class LibraryPads implements PadStorage {
   #db: D1Db
   #bucket: SongBucket
@@ -39,40 +49,66 @@ class LibraryPads implements PadStorage {
     return `library/${this.#library}/pads/${set}/`
   }
 
+  /** The library's sets, and the version they were read at */
+  async #sets(): Promise<{ sets: PadSetRecord[]; version: number }> {
+    // (the library is one the person was let into, so it is there)
+    const row = (await this.#db
+      .prepare('SELECT pad_sets, pad_sets_version FROM libraries WHERE library_id = ?')
+      .bind(this.#library)
+      .first<{ pad_sets: string; pad_sets_version: number }>()) as {
+      pad_sets: string
+      pad_sets_version: number
+    }
+    return { sets: JSON.parse(row.pad_sets), version: row.pad_sets_version }
+  }
+
+  /**
+   * Change the list of sets from the version it was read at, and again from the new one if another request wrote first
+   * (a name is unique in the list: the change is given the list as it is, and says what it makes of it)
+   */
+  async #change<T>(
+    change: (sets: PadSetRecord[]) => { sets: PadSetRecord[]; result: T }
+  ): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      const { sets, version } = await this.#sets()
+      const next = change(sets)
+      if (next.sets === sets) return next.result
+      const written = await this.#db
+        .prepare(
+          'UPDATE libraries SET pad_sets = ?, pad_sets_version = pad_sets_version + 1 WHERE library_id = ? AND pad_sets_version = ?'
+        )
+        .bind(JSON.stringify(next.sets), this.#library, version)
+        .run()
+      /* v8 ignore next 4 -- the version moved under it: another request wrote first, and five times in a row is rarer */
+      if (written.meta.changes) return next.result
+      if (attempt === 5) throw new Refusal(409, 'The pad sets are being changed: try again')
+    }
+  }
+
   /** Whether the set is one of this library's */
   async hasSet(set: string): Promise<boolean> {
     if (!SET_ID.test(set)) return false
-    return Boolean(
-      await this.#db
-        .prepare('SELECT 1 AS found FROM library_pad_sets WHERE library_id = ? AND pad_set_id = ?')
-        .bind(this.#library, set)
-        .first()
-    )
+    return (await this.#sets()).sets.some(each => each.id === set)
   }
 
   async listSets(): Promise<PadSetEntry[]> {
-    const { results } = await this.#db
-      .prepare(
-        'SELECT pad_set_id, name, modified_at FROM library_pad_sets WHERE library_id = ? ORDER BY name'
-      )
-      .bind(this.#library)
-      .all<{ pad_set_id: string; name: string; modified_at: string }>()
-    return results.map(row => ({ ref: row.pad_set_id, name: row.name, modified: row.modified_at }))
+    return (await this.#sets()).sets
+      .map(each => ({ ref: each.id, name: each.name, modified: each.modifiedAt }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   }
 
   async ensureSet(name: string): Promise<string> {
-    await this.#db
-      .prepare(
-        `INSERT INTO library_pad_sets (library_id, pad_set_id, name, version, modified_at) VALUES (?, ?, ?, 1, ?)
-         ON CONFLICT (library_id, name) DO NOTHING`
-      )
-      .bind(this.#library, ulid(), name, new Date().toISOString())
-      .run()
-    const row = await this.#db
-      .prepare('SELECT pad_set_id FROM library_pad_sets WHERE library_id = ? AND name = ?')
-      .bind(this.#library, name)
-      .first<{ pad_set_id: string }>()
-    return (row as { pad_set_id: string }).pad_set_id
+    return this.#change(sets => {
+      const there = sets.find(each => each.name === name)
+      if (there) return { sets, result: there.id }
+      if (sets.length >= MAX_SETS)
+        throw new Refusal(400, 'This library has as many pad sets as it may')
+      const id = ulid()
+      return {
+        sets: [...sets, { id, name, modifiedAt: new Date().toISOString() }],
+        result: id,
+      }
+    })
   }
 
   async listFiles(set: string): Promise<PadFileEntry[]> {
@@ -125,12 +161,11 @@ class LibraryPads implements PadStorage {
   }
 
   async #touch(set: string) {
-    await this.#db
-      .prepare(
-        'UPDATE library_pad_sets SET version = version + 1, modified_at = ? WHERE library_id = ? AND pad_set_id = ?'
-      )
-      .bind(new Date().toISOString(), this.#library, set)
-      .run()
+    const modifiedAt = new Date().toISOString()
+    await this.#change(sets => ({
+      sets: sets.map(each => (each.id === set ? { ...each, modifiedAt } : each)),
+      result: undefined,
+    }))
   }
 
   /** Whether a ref (a set's or a file's) is this library's */
