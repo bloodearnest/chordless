@@ -92,6 +92,18 @@ test('the overlays and pad sets of before are carried into their documents, and 
     ],
     'an account with something has its document, and one with nothing has none'
   )
+  // (each part is a JSON object in the document, not a string holding one: SQLite versions differ in whether a value keeps
+  // its JSON type through coalesce and a subquery)
+  assert.deepEqual(
+    {
+      ...sql
+        .prepare(
+          "SELECT json_type(body, '$.settings') AS a, json_type(body, '$.setlists') AS b, json_type(body, '$.songs') AS c FROM account_overlays WHERE account_id = 'me'"
+        )
+        .get(),
+    },
+    { a: 'object', b: 'object', c: 'object' }
+  )
   const sets = (id: string) => {
     const row = sql
       .prepare('SELECT pad_sets, pad_sets_version FROM libraries WHERE library_id = ?')

@@ -22,12 +22,14 @@ BEGIN
   SELECT RAISE(ABORT, 'stale_version');
 END;
 
+-- (json() around each part: a value that has been through coalesce or a subquery may have lost its JSON type, and would
+-- be written into the document as a string; which SQLite versions do is not the same)
 INSERT INTO account_overlays (account_id, body, version, modified_at)
 SELECT a.account_id,
   json_object(
-    'settings', coalesce((SELECT json(p.body) FROM account_preferences p WHERE p.account_id = a.account_id), json('{}')),
-    'setlists', coalesce((SELECT json_group_object(o.setlist_id, json(o.body)) FROM setlist_overlays o WHERE o.account_id = a.account_id), json('{}')),
-    'songs', coalesce((SELECT json_group_object(o.song_uuid, json(o.body)) FROM song_overlays o WHERE o.account_id = a.account_id), json('{}'))
+    'settings', json(coalesce((SELECT p.body FROM account_preferences p WHERE p.account_id = a.account_id), '{}')),
+    'setlists', json(coalesce((SELECT json_group_object(o.setlist_id, json(o.body)) FROM setlist_overlays o WHERE o.account_id = a.account_id), '{}')),
+    'songs', json(coalesce((SELECT json_group_object(o.song_uuid, json(o.body)) FROM song_overlays o WHERE o.account_id = a.account_id), '{}'))
   ),
   1,
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
