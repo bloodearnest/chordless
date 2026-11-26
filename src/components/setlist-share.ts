@@ -4,10 +4,18 @@ import qrcode from 'qrcode-generator'
 import type { Setlist } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
 import { rich } from '../js/rich-text.ts'
+import {
+  createServerShare,
+  findServerShare,
+  type ServerShare,
+  serverShareUrl,
+  stopServerShare,
+} from '../js/server-share.ts'
 import { type ListedSong, songListHtml, songListText } from '../js/setlist/song-list-text.ts'
 import { shareUrl } from '../js/share-crypto.ts'
 import { createShare, refreshShare, stopShare } from '../js/share-manager.ts'
 import { getCurrentSpace, getSpaceById } from '../js/space.ts'
+import { workerConnection } from '../js/storage/space-storage.ts'
 import { createSyncManager, isSyncAvailable } from '../js/sync-manager.ts'
 import { t } from '../js/text.ts'
 import { formatSetlistDate, setlistTitle } from '../js/utils/date-utils.ts'
@@ -67,6 +75,7 @@ export class SetlistShare extends LitElement {
     _mode: { state: true },
     _available: { state: true },
     _moved: { state: true },
+    _server: { state: true },
     _busy: { state: true },
     _error: { state: true },
     _copied: { state: true },
@@ -204,6 +213,7 @@ export class SetlistShare extends LitElement {
   /** The setlist's space has moved to Chordless's server: its links are of Drive, which it has left (until step 6 of docs/CENTRAL_STORAGE.md) */
   declare _moved: boolean
   declare _busy: boolean
+  declare _server: ServerShare | null | undefined
   declare _error: string
   declare _copied: boolean
 
@@ -220,6 +230,7 @@ export class SetlistShare extends LitElement {
     this._mode = 'link'
     this._available = false
     this._moved = false
+    this._server = undefined
     this._busy = false
     this._error = ''
     this._copied = false
@@ -232,6 +243,35 @@ export class SetlistShare extends LitElement {
         this._moved = Boolean(space?.server)
       })
     }
+    if (changed.has('_moved') || changed.has('setlist')) void this._loadServer()
+  }
+
+  /** The Worker, for a space stored on Chordless (a test gives its own: the real one needs a session) */
+  /* v8 ignore next 2 -- the real connection is the signed-in person's: the calls it makes are tested in server-share.test.ts */
+  connection = workerConnection
+
+  /** Make sure the Worker has the setlist before it is shared (a test gives its own) */
+  /* v8 ignore next 3 -- needs the account and the database of the device: space-data-runtime is tested above it */
+  syncFirst: (spaceId: string) => Promise<void> = async spaceId =>
+    (await import('../js/space-data-runtime.ts')).syncSpaceDataFor(spaceId)
+
+  /** Whether the setlist is shared, by either kind of link (the share button is lit by it) */
+  get shared(): boolean {
+    return Boolean(this.setlist?.share || this._server)
+  }
+
+  /** Ask the Worker whether a setlist of a space stored on Chordless is shared (offline, it is not known) */
+  async _loadServer() {
+    const setlist = this.setlist
+    if (!this._moved || !setlist || !navigator.onLine) return
+    try {
+      this._server = await findServerShare(this.connection(), setlist.id)
+    } catch (error) {
+      // (a setlist the Worker does not have yet is not shared; anything else is not known)
+      console.warn('[Share] Could not ask whether it is shared:', errorMessage(error))
+      return
+    }
+    this.dispatchEvent(new SetlistShareChangeEvent())
   }
 
   override async connectedCallback() {
@@ -264,6 +304,13 @@ export class SetlistShare extends LitElement {
 
   _create() {
     return this._run(async (setlist, db) => {
+      if (this._moved) {
+        // (the Worker reads the setlist itself, so it must have the setlist as it is)
+        await this.syncFirst(db.spaceId)
+        this._server = await createServerShare(this.connection(), setlist.id)
+        this.dispatchEvent(new SetlistShareChangeEvent())
+        return
+      }
       const { id, name } = await spaceOf(db)
       const manager = await createSyncManager(name, id)
       const share = await createShare(setlist, {
@@ -305,6 +352,12 @@ export class SetlistShare extends LitElement {
   async _stop() {
     if (!(await this._stopModal.value?.ask())) return
     return this._run(async (setlist, db) => {
+      if (this._moved && this._server) {
+        await stopServerShare(this.connection(), this._server.shareId)
+        this._server = null
+        this.dispatchEvent(new SetlistShareChangeEvent())
+        return
+      }
       if (!setlist.share) return
       const { id, name } = await spaceOf(db)
       const manager = await createSyncManager(name, id)
@@ -319,6 +372,7 @@ export class SetlistShare extends LitElement {
   }
 
   get _url() {
+    if (this._server) return serverShareUrl(location.origin, this._server.shareId)
     const share = this.setlist?.share
     return share ? shareUrl(location.origin, share.fileId, share.key, this.setlist?.id) : ''
   }
@@ -403,7 +457,7 @@ export class SetlistShare extends LitElement {
   /** What to say with the link, in a message */
   get _message() {
     const setlist = this.setlist
-    if (!setlist?.share) return ''
+    if (!setlist || !this.shared) return ''
     return t('share-message', { title: setlistTitle(setlist) })
   }
 
@@ -509,11 +563,22 @@ export class SetlistShare extends LitElement {
   /** What the modal shows */
   _renderPanel(share: Setlist['share']) {
     if (this._moved) {
-      // (a link made before the move keeps working, as long as its Drive files are there: it can be copied, and stopped)
+      // (a link made before the move, to the Drive file, is still copied and stopped as it was, until the files are deleted)
       return html`
         <section>
-          ${share ? this._renderShared(share.expires) : nothing}
-          <p class="note" id="share-moved">${t('share-moved')}</p>
+          ${
+            share
+              ? this._renderShared(formatSetlistDate(share.expires, 'long'), false)
+              : this._server
+                ? this._renderShared(
+                    formatSetlistDate(this._server.expiresAt.slice(0, 10), 'long'),
+                    true
+                  )
+                : this._server === null
+                  ? this._renderNotShared(true)
+                  : html`<p class="note" id="share-checking">${navigator.onLine ? t('share-checking') : t('share-offline-note')}</p>`
+          }
+          ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
         </section>
       `
     }
@@ -528,19 +593,19 @@ export class SetlistShare extends LitElement {
     }
     return html`
       <section>
-        ${share ? this._renderShared(share.expires) : this._renderNotShared()}
+        ${share ? this._renderShared(formatSetlistDate(share.expires, 'long'), false) : this._renderNotShared()}
         ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
       </section>
     `
   }
 
-  _renderNotShared() {
+  _renderNotShared(onServer = false) {
     return html`
       <p>${t('share-link-text')}</p>
       <ul>
         <li>${t('share-link-point-1')}</li>
         <li>${t('share-link-point-2')}</li>
-        <li>${t('share-link-point-3')}</li>
+        <li>${onServer ? t('share-server-point-3') : t('share-link-point-3')}</li>
         <li>${t('share-link-point-4')}</li>
       </ul>
       <div class="actions center">
@@ -551,7 +616,8 @@ export class SetlistShare extends LitElement {
     `
   }
 
-  _renderShared(expires: string) {
+  /** The link, its QR code and how to stop it. `ends` is the date in words; a link on Chordless has nothing to update */
+  _renderShared(ends: string, onServer: boolean) {
     return html`
       <div class="link">
         <input readonly aria-label=${t('share-link-label')} .value=${this._url} @focus=${(e: FocusEvent) => (e.target as HTMLInputElement).select()} />
@@ -571,11 +637,11 @@ export class SetlistShare extends LitElement {
       </div>
       <img src=${qrDataUrl(this._url)} alt=${t('share-qr')} />
       <p class="note">
-        ${t('share-ends', { date: formatSetlistDate(expires, 'long') })}
+        ${onServer ? t('share-server-ends', { date: ends }) : t('share-ends', { date: ends })}
       </p>
       <div class="actions center">
         ${
-          this._moved
+          onServer || this._moved
             ? nothing
             : html`<button class="btn" ?disabled=${this._busy} @click=${this._update}>
                 ${this._busy ? t('share-working') : t('share-update')}

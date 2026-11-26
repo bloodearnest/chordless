@@ -1,4 +1,4 @@
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import {
   qrDataUrl,
   SetlistShare,
@@ -203,26 +203,189 @@ describe('setlist-share', () => {
       await el.updateComplete
     }
 
-    it('offers no new link, and no update, for a space that has moved to Chordless', async () => {
-      await updateSpace(spaceId, {
-        server: { libraryId: 'library', movedAt: '2026-11-25T00:00:00.000Z' },
+    describe('a space that has moved to Chordless', () => {
+      /** The Worker's share routes, as far as the dialog uses them */
+      function worker(initial: { shareId: string; expiresAt: string } | null = null) {
+        const state = { share: initial, calls: [] as string[], fail: null as number | null }
+        const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = new URL(String(input))
+          const call = `${init?.method ?? 'GET'} ${url.pathname}${url.search}`
+          state.calls.push(call)
+          if (state.fail && init?.method === 'POST')
+            return Response.json({ error: 'Not allowed' }, { status: state.fail })
+          if (init?.method === 'POST') {
+            state.share = state.share ?? {
+              shareId: 'sh_aaaaaaaaaaaaaaaaaaaaaa',
+              expiresAt: '2099-10-25T23:59:59.999Z',
+            }
+            return Response.json(state.share, { status: 201 })
+          }
+          if (init?.method === 'DELETE') {
+            state.share = null
+            return new Response(null, { status: 204 })
+          }
+          return state.share
+            ? Response.json(state.share)
+            : Response.json({ error: 'None' }, { status: 404 })
+        }) as typeof window.fetch
+        return { state, fetch }
+      }
+
+      async function showMoved(server: ReturnType<typeof worker>, synced: string[] = []) {
+        await updateSpace(spaceId, {
+          server: { libraryId: 'library', movedAt: '2026-11-25T00:00:00.000Z' },
+        })
+        const setlist = createSetlist({ date: '2099-10-11' })
+        await db.saveSetlist(setlist)
+        const el = await fixture<SetlistShare>(html`<setlist-share></setlist-share>`)
+        el.connection = () => ({
+          token: async () => 'token',
+          origin: location.origin,
+          fetch: server.fetch,
+        })
+        el.syncFirst = async id => {
+          synced.push(id)
+        }
+        el.db = db
+        el.setlist = setlist
+        await waitUntil(() => server.state.calls.length > 0, 'the check', { timeout: 3000 })
+        await new Promise(resolve => setTimeout(resolve, 50))
+        await el.updateComplete
+        return { el, setlist }
+      }
+
+      const labels = (el: SetlistShare) =>
+        [...(el.shadowRoot?.querySelectorAll('button') ?? [])].map(b => b.textContent?.trim())
+
+      it('asks the Worker whether it is shared, and offers to make a link when it is not', async () => {
+        const server = worker()
+        const { el } = await showMoved(server)
+        expect(server.state.calls[0]).to.match(/^GET \/api\/shares\?setlistId=/)
+        expect(el.shared).to.equal(false)
+        expect(labels(el)).to.include('Create share link')
+        expect(text(el)).to.include('always shows the setlist as it is now')
       })
-      const none = await show()
-      expect(text(none.el)).to.include('not available yet for a space stored on Chordless')
-      expect(none.el.shadowRoot?.querySelector('#share-moved')).to.not.equal(null)
-      expect(
-        [...(none.el.shadowRoot?.querySelectorAll('button') ?? [])].map(b => b.textContent?.trim())
-      ).to.not.include('Create share link')
-      // (a link made before the move is still shown, and can be stopped, but not updated)
-      const made = shared()
-      const held = await show({ ...made, date: '2099-10-12' })
-      expect(held.el.shadowRoot?.querySelector('input')).to.not.equal(null)
-      expect(text(held.el)).to.include('not available yet')
-      const labels = [...(held.el.shadowRoot?.querySelectorAll('button') ?? [])].map(b =>
-        b.textContent?.trim()
-      )
-      expect(labels).to.not.include('Update now')
-      expect(labels).to.include('Stop sharing')
+
+      it('syncs the setlist, makes the link with no key in it, and says it is shared', async () => {
+        const server = worker()
+        const synced: string[] = []
+        const { el } = await showMoved(server, synced)
+        const seen = changes(el)
+        await press(el, /Create share link/)
+        expect(synced).to.deep.equal([spaceId])
+        expect(server.state.calls).to.include('POST /api/shares')
+        expect(el._url).to.equal(`${location.origin}/s/sh_aaaaaaaaaaaaaaaaaaaaaa`)
+        expect(el.shared).to.equal(true)
+        expect(seen.length).to.be.greaterThan(0)
+        expect(el.shadowRoot?.querySelector('input')).to.not.equal(null)
+        expect(text(el)).to.include('Ends after')
+        expect(labels(el)).to.not.include('Update now')
+        expect(labels(el)).to.include('Stop sharing')
+      })
+
+      it('shows a link another device made, and stops it after asking', async () => {
+        const server = worker({
+          shareId: 'sh_bbbbbbbbbbbbbbbbbbbbbb',
+          expiresAt: '2099-10-25T23:59:59.999Z',
+        })
+        const { el } = await showMoved(server)
+        expect(el.shared).to.equal(true)
+        expect(el._url).to.equal(`${location.origin}/s/sh_bbbbbbbbbbbbbbbbbbbbbb`)
+        const stopping = press(el, /Stop sharing/)
+        const confirm = must(el._stopModal.value)
+        await waitUntil(() => confirm.open, 'the question', { timeout: 3000 })
+        must(confirm.shadowRoot?.querySelector<HTMLElement>('.modal-btn-confirm')).click()
+        await stopping
+        await waitUntil(() => !el.shared, 'it stopped', { timeout: 3000 })
+        expect(server.state.calls).to.include('DELETE /api/shares/sh_bbbbbbbbbbbbbbbbbbbbbb')
+        expect(labels(el)).to.include('Create share link')
+      })
+
+      it('takes the link a setlist already has when another device made one first', async () => {
+        const server = worker()
+        const { el } = await showMoved(server)
+        server.state.share = {
+          shareId: 'sh_cccccccccccccccccccccc',
+          expiresAt: '2099-10-25T23:59:59.999Z',
+        }
+        // (the Worker says it is already shared: the dialog shows that link)
+        const fetch = server.fetch
+        let first = true
+        el.connection = () => ({
+          token: async () => 't',
+          origin: location.origin,
+          fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+            if (init?.method === 'POST' && first) {
+              first = false
+              return Response.json({ error: 'This setlist is already shared' }, { status: 409 })
+            }
+            return fetch(input, init)
+          }) as typeof window.fetch,
+        })
+        await press(el, /Create share link/)
+        expect(el._url).to.contain('sh_cccccccccccccccccccccc')
+      })
+
+      it('says why it could not make the link', async () => {
+        const server = worker()
+        const { el } = await showMoved(server)
+        server.state.fail = 403
+        await press(el, /Create share link/)
+        expect(text(el)).to.include("Couldn't do that")
+        expect(el.shared).to.equal(false)
+      })
+
+      it('says it is not known whether it is shared when the Worker cannot be asked', async () => {
+        await updateSpace(spaceId, {
+          server: { libraryId: 'library', movedAt: '2026-11-25T00:00:00.000Z' },
+        })
+        const setlist = createSetlist({ date: '2099-10-11' })
+        await db.saveSetlist(setlist)
+        const el = await fixture<SetlistShare>(html`<setlist-share></setlist-share>`)
+        let asked = 0
+        el.connection = () => ({
+          token: async () => 't',
+          origin: location.origin,
+          fetch: (async () => {
+            asked++
+            return Response.json({ error: 'Down' }, { status: 500 })
+          }) as typeof window.fetch,
+        })
+        el.db = db
+        el.setlist = setlist
+        await waitUntil(() => asked > 0, 'the check', { timeout: 3000 })
+        await el.updateComplete
+        expect(text(el)).to.include('Checking whether it is shared')
+        expect(el.shared).to.equal(false)
+      })
+
+      it('says it is offline, rather than that it is not shared, when it cannot ask', async () => {
+        await updateSpace(spaceId, {
+          server: { libraryId: 'library', movedAt: '2026-11-25T00:00:00.000Z' },
+        })
+        const setlist = createSetlist({ date: '2099-10-11' })
+        await db.saveSetlist(setlist)
+        Object.defineProperty(navigator, 'onLine', { value: false, configurable: true })
+        const el = await fixture<SetlistShare>(html`<setlist-share></setlist-share>`)
+        el.db = db
+        el.setlist = setlist
+        await waitUntil(() => el._moved, 'the space', { timeout: 3000 })
+        await el.updateComplete
+        expect(text(el)).to.include("You're offline")
+        expect(el.shared).to.equal(false)
+      })
+
+      it('shows a link made before the move, to a Drive file, and stops it as before', async () => {
+        const server = worker()
+        const { el, setlist } = await showMoved(server)
+        setlist.share = shared().share
+        el.requestUpdate()
+        await el.updateComplete
+        expect(el.shadowRoot?.querySelector('input')).to.not.equal(null)
+        expect(labels(el)).to.not.include('Update now')
+        expect(labels(el)).to.include('Stop sharing')
+        expect(el.shared).to.equal(true)
+      })
     })
 
     it('makes the link, saves it on the setlist, and says so', async () => {

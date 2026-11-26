@@ -12,7 +12,7 @@ import { TeamStorage } from './team-storage.ts'
 import type { PadStorage, StorageBackend } from './types.ts'
 
 /** The signed-in person's connection to the Worker (`window.fetch` is read at each call, so a test that replaces it is heard) */
-const connection = (): WorkerConnection => ({
+export const workerConnection = (): WorkerConnection => ({
   token: getIdentityToken,
   origin: window.location.origin,
   fetch: (input, init) => window.fetch(input, init),
@@ -22,7 +22,7 @@ let team: TeamStorage | undefined
 
 /** The backend for team spaces this person is a member of, not the owner (made once) */
 function teamStorage(): TeamStorage {
-  team ??= new TeamStorage(connection())
+  team ??= new TeamStorage(workerConnection())
   return team
 }
 
@@ -38,5 +38,5 @@ export function storageFor(space: Pick<Space, 'team'> | null | undefined): Stora
 
 /** The pad sets of a Personal space that has moved to Chordless: in its library on the server, not in Drive */
 export function serverPadsFor(space: Pick<Space, 'server'>): PadStorage | null {
-  return space.server ? new LibraryPads(connection(), space.server.libraryId) : null
+  return space.server ? new LibraryPads(workerConnection(), space.server.libraryId) : null
 }
