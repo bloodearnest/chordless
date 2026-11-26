@@ -5,7 +5,7 @@
  * `personal-layer.ts` lists them for an export. The media player's state is not here, nor is anything of the device.
  *
  * Nothing watches what the page writes. Each sync reads what this device keeps and sets it against what it last
- * sent or took (a hash and a version for each item, kept beside), and sends what changed here and takes what changed
+ * sent or took (a hash for each item, kept beside), and sends what changed here and takes what changed
  * elsewhere. An item changed in both places keeps what is here, which is the person's latest act on this device and is
  * sent over the other. An item the server no longer shows (the person left the church) is kept here and left alone.
  * A page that is open reads its state when it loads, so what arrives shows at the next load.
@@ -14,30 +14,25 @@ import type { SetlistEntry } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { PERSONAL_PREFERENCE_KEYS } from './personal-preference-keys.ts'
 import { sha256Hex } from './utils/bytes.ts'
-import { callWorker, type WorkerConnection } from './worker-call.ts'
+import { callWorker, TeamError, type WorkerConnection } from './worker-call.ts'
 
 /** What each item is called here: `setlist:<id>`, `song:<uuid>` or `preferences` */
 type ItemKey = string
 
+/** The server's document (worker/src/overlays.ts): the settings, and the overlay of each setlist and song */
+interface Document {
+  settings: Record<string, string>
+  setlists: Record<string, Record<string, unknown>>
+  songs: Record<string, Record<string, unknown>>
+}
+
 interface Remote {
   version: number
-  body: Record<string, unknown>
+  body: Document
 }
 
-interface Seen {
-  version: number
-  hash: string
-}
-
-type Snapshot = Record<ItemKey, Seen>
-
-interface ServerOverlays {
-  preferences: Remote | null
-  setlists: (Remote & { setlistId: string })[]
-  songs: (Remote & { libraryId: string; songUuid: string })[]
-}
-
-type Op = Record<string, unknown>
+/** What each item was when this device last sent or took it (a hash): the way to tell which side changed since */
+type Snapshot = Record<ItemKey, string>
 
 /** The parts of the browser's storage this uses (a test gives its own) */
 type KeyValues = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
@@ -70,8 +65,6 @@ interface Local {
 
 export interface OverlayInput {
   db: ChordlessDB
-  /** The personal library, which the songs of this space are in */
-  libraryId: string
   connection: WorkerConnection
   storage?: KeyValues
 }
@@ -156,22 +149,27 @@ async function take(
   return true
 }
 
-/** How the Worker names an item */
-const wire = (key: ItemKey, libraryId: string): Op => {
-  if (key === 'preferences') return { kind: 'preferences' }
-  if (key.startsWith('setlist:'))
-    return { kind: 'setlist', setlistId: key.slice('setlist:'.length) }
-  return { kind: 'song', libraryId, songUuid: key.slice('song:'.length) }
-}
-
-function remoteItems(data: ServerOverlays, libraryId: string): Map<ItemKey, Remote> {
-  const items = new Map<ItemKey, Remote>()
-  if (data.preferences) items.set('preferences', data.preferences)
-  for (const each of data.setlists) items.set(`setlist:${each.setlistId}`, each)
-  for (const each of data.songs)
-    if (each.libraryId === libraryId) items.set(`song:${each.songUuid}`, each)
+/** The document's items by key: `preferences`, `setlist:<id>` and `song:<uuid>` */
+function itemsOf(document: Document): Map<ItemKey, Record<string, unknown>> {
+  const items = new Map<ItemKey, Record<string, unknown>>()
+  if (Object.keys(document.settings).length) items.set('preferences', document.settings)
+  for (const [id, body] of Object.entries(document.setlists)) items.set(`setlist:${id}`, body)
+  for (const [id, body] of Object.entries(document.songs)) items.set(`song:${id}`, body)
   return items
 }
+
+/** Put an item in the document, or take it out (a document of nothing for the settings is no settings) */
+function place(document: Document, key: ItemKey, body: Record<string, unknown> | null) {
+  if (key === 'preferences') document.settings = (body ?? {}) as Record<string, string>
+  else {
+    const into = key.startsWith('setlist:') ? document.setlists : document.songs
+    const id = key.slice(key.indexOf(':') + 1)
+    if (body) into[id] = body
+    else delete into[id]
+  }
+}
+
+const hashOf = (body: Record<string, unknown>) => sha256Hex(JSON.stringify(body))
 
 /** What a sync did */
 export interface OverlaySyncReport {
@@ -179,76 +177,68 @@ export interface OverlaySyncReport {
   taken: number
 }
 
+/** The most times a sync goes again, when another device wrote first */
+const ATTEMPTS = 3
+
 /** Sync what the person keeps for themselves for a moved Personal space (see the top) */
 export async function syncOverlays(input: OverlayInput): Promise<OverlaySyncReport> {
-  const { db, libraryId, connection, storage = localStorage } = input
-  const remote = remoteItems(
-    (await (
-      await callWorker({ path: '/api/account/overlays' }, connection)
-    ).json()) as ServerOverlays,
-    libraryId
-  )
-  const local = await collect(input)
+  const { db, connection, storage = localStorage } = input
   const seen = loadSnapshot(storage, db.spaceId)
   const report: OverlaySyncReport = { sent: 0, taken: 0 }
-  const sends: { key: ItemKey; op: Op; hash: string | null }[] = []
 
-  for (const key of new Set([...remote.keys(), ...local.keys(), ...Object.keys(seen)])) {
-    const there = remote.get(key)
-    const here = local.get(key)
-    const before = seen[key]
-    if (here && before?.hash !== here.hash) {
-      // changed here (or never sent): it goes over what is there
-      sends.push({
-        key,
-        hash: here.hash,
-        op: {
-          ...wire(key, libraryId),
-          op: 'put',
-          baseVersion: there?.version ?? null,
-          body: here.body,
-        },
-      })
-    } else if (!here && before && there) {
-      // kept here before, and now nothing: removed here
-      sends.push({
-        key,
-        hash: null,
-        op: { ...wire(key, libraryId), op: 'delete', baseVersion: there.version },
-      })
-    } else if (there && before?.version !== there.version) {
-      // changed elsewhere, and not here: take it
-      if (await take(input, key, there.body)) {
-        const taken = (await collect(input)).get(key)
-        seen[key] = { version: there.version, hash: taken?.hash ?? '' }
-        report.taken++
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    const remote = (await (
+      await callWorker({ path: '/api/account/overlays' }, connection)
+    ).json()) as Remote
+    const there = itemsOf(remote.body)
+    const local = await collect(input)
+    const document = structuredClone(remote.body)
+    const pushed: [ItemKey, string | null][] = []
+    let taken = 0
+
+    for (const key of new Set([...there.keys(), ...local.keys(), ...Object.keys(seen)])) {
+      const here = local.get(key)
+      const remoteBody = there.get(key)
+      const before = seen[key] ?? null
+      const remoteHash = remoteBody ? await hashOf(remoteBody) : null
+      if ((here?.hash ?? null) !== before) {
+        // changed here (or never sent): it goes over what is there, or takes it away
+        place(document, key, here?.body ?? null)
+        pushed.push([key, here?.hash ?? null])
+      } else if (remoteHash !== before) {
+        // changed elsewhere, and not here: take it (what the server stopped showing is kept here, and forgotten)
+        if (!remoteBody) delete seen[key]
+        else if (await take(input, key, remoteBody)) {
+          seen[key] = (await collect(input)).get(key)?.hash ?? ''
+          taken++
+        }
       }
-    } else if (!there && before) {
-      delete seen[key]
     }
-  }
 
-  for (let from = 0; from < sends.length; from += 100) {
-    const batch = sends.slice(from, from + 100)
-    const response = await callWorker(
-      {
-        method: 'POST',
-        path: '/api/account/overlays/batch',
-        body: { ops: batch.map(each => each.op) },
-      },
-      connection
-    )
-    const { results } = (await response.json()) as {
-      results: { status: string; version?: number }[]
+    if (!pushed.length) {
+      storage.setItem(snapshotKey(db.spaceId), JSON.stringify(seen))
+      return { ...report, taken: report.taken + taken }
     }
-    batch.forEach((each, index) => {
-      const result = results[index]
-      if (result?.status !== 'ok') return
-      report.sent++
-      if (each.hash === null) delete seen[each.key]
-      else seen[each.key] = { version: result.version as number, hash: each.hash }
-    })
+    try {
+      await callWorker(
+        {
+          method: 'PUT',
+          path: '/api/account/overlays',
+          body: { baseVersion: remote.version, body: document },
+        },
+        connection
+      )
+    } catch (error) {
+      // (another device wrote first: read what is there now, and go again)
+      if (error instanceof TeamError && error.status === 409) continue
+      throw error
+    }
+    for (const [key, hash] of pushed) {
+      if (hash === null) delete seen[key]
+      else seen[key] = hash
+    }
+    storage.setItem(snapshotKey(db.spaceId), JSON.stringify(seen))
+    return { sent: pushed.length, taken: report.taken + taken }
   }
-  storage.setItem(snapshotKey(db.spaceId), JSON.stringify(seen))
-  return report
+  throw new Error('The overlays keep changing on another device')
 }

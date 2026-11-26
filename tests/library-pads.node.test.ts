@@ -128,6 +128,43 @@ test('a library keeps its pad sets: members add, an admin replaces, nobody else 
     [[set, 'Warm']]
   )
 
+  // Another set, listed by name; and a library keeps only so many
+  await make('admin', 'Bright')
+  assert.deepEqual(
+    ((await (await send('admin', 'GET', church)).json()) as { name: string }[]).map(
+      each => each.name
+    ),
+    ['Bright', 'Warm']
+  )
+  sql
+    .prepare('UPDATE libraries SET pad_sets = ? WHERE library_id = ?')
+    .run(
+      JSON.stringify(
+        Array.from({ length: 200 }, (_, n) => ({ id: `x${n}`, name: `Set ${n}`, modifiedAt: T }))
+      ),
+      'lib-church-b'
+    )
+  assert.equal(
+    (await send('admin', 'POST', '/api/libraries/lib-church-b/pads', { name: 'One more' })).status,
+    404,
+    'not a member of that church'
+  )
+  sql
+    .prepare(
+      'INSERT INTO church_members (church_id, account_id, role, joined_at) VALUES (?, ?, ?, ?)'
+    )
+    .run('church-b', 'admin', 'admin', T)
+  assert.equal(
+    (await send('admin', 'POST', '/api/libraries/lib-church-b/pads', { name: 'One more' })).status,
+    400,
+    'as many as it may'
+  )
+  assert.equal(
+    (await send('admin', 'POST', '/api/libraries/lib-church-b/pads', { name: 'Set 7' })).status,
+    200,
+    'one it has is not another'
+  )
+
   // Any member adds a key, once: a reader cannot replace it, an admin can
   const file = `${church}/${set}/files/C`
   assert.equal((await send('reader', 'PUT', file, mp3, 'audio/mpeg')).status, 204)
@@ -224,7 +261,7 @@ test('a library keeps its pad sets: members add, an admin replaces, nobody else 
   assert.equal((await send('admin', 'POST', `${church}/${set}/trash`)).status, 204)
   assert.equal(objects.size, 0)
   assert.deepEqual(await (await send('admin', 'GET', `${church}/${set}/files`)).json(), [])
-  assert.equal(((await (await send('admin', 'GET', church)).json()) as unknown[]).length, 1)
+  assert.equal(((await (await send('admin', 'GET', church)).json()) as unknown[]).length, 2)
 
   // A person's own library is theirs, and they are its admin; the name is the library's, so another has its own set
   const mine = '/api/libraries/lib-mine/pads'
