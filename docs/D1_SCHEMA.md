@@ -29,7 +29,7 @@ Choices worth reviewing:
   device that does not have the song (decided in CENTRAL_STORAGE.md).
 - **Preferences are per key** (`account_prefs`) so two devices changing different settings do not
   overwrite each other; hardware settings hang off `account_devices`. **Overlays are per setlist**
-  (`setlist_overlays`), and only the owning account can read or write its rows, in a Team too.
+  (`account_overlays`, one document an account owns, from 0024), and only the owning account can read or write it, in a Team too.
 - **`teams.root_ref` and `team_refs` stay**, for the Drive folder that still holds songs and pads. The
   proposed `teams.storage` is only for the move and is not in the final shape.
 

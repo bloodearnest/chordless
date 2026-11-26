@@ -9,6 +9,10 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = false
 preview_urls = false
 
+# The daily cleanup of shares that have ended (worker/src/shares.ts: removeEndedShares); reads already refuse them
+[triggers]
+crons = ["17 3 * * *"]
+
 # Worker logs in the dashboard (Workers > chordless > Logs). The email handler logs only
 # errors, never the email's content.
 [observability.logs]

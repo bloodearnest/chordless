@@ -30,6 +30,7 @@ import {
 import { handleShareDownload, type ShareCache, shareFileId } from './share.ts'
 import { handleShareLive, shareLiveId } from './share-live.ts'
 import { withSharePreview } from './share-page.ts'
+import { handleShares, isSharePath } from './shares.ts'
 import type { TeamDeps } from './team-context.ts'
 import { handleTeamRoutes, isTeamPath } from './team-routes.ts'
 import { handleTeamSetlists, isTeamSetlistPath } from './team-setlists.ts'
@@ -115,6 +116,8 @@ async function route(
 
     // The signed-in person's own library and setlists (the personal space on the server)
     if (isPersonalSetlistPath(path)) return await handlePersonalSetlists(request, env)
+
+    if (isSharePath(path)) return await handleShares(request, env)
 
     if (isOverlayPath(path)) return await handleOverlays(request, env)
 

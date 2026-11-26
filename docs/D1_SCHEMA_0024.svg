@@ -1,0 +1,328 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1890" height="2429" viewBox="0 0 1890 2429" font-family="Helvetica, Arial, sans-serif"><rect width="1890" height="2429" fill="#fafbfc"/>
+<text x="30" y="34" font-size="21" font-weight="700" fill="#1b2733">Chordless D1 schema after 0024_fewer_tables.sql</text>
+<text x="30" y="52" font-size="12" fill="#5d6b78">Generated from the migrated database (24 migrations, 25 tables). ? = nullable, ◆ = primary key. Lines run from a foreign key to the row it names: green cascade, orange set null, red restrict. Parents are to the left.</text>
+<rect x="30" y="62" width="12" height="12" rx="2" fill="#d9822b"/><text x="48" y="73" font-size="12" font-weight="700" fill="#d9822b">Added or changed by migrations 0024 on · new: account_overlays · changed: libraries · dropped: account_preferences, library_pad_sets, setlist_overlays, song_overlays</text>
+<rect x="30" y="80" width="12" height="12" rx="2" fill="#c0392b"/><text x="48" y="91" font-size="12" font-weight="700" fill="#c0392b">Drive only, removed when Drive sync is retired · account_drive, space_pad_sets, space_people, space_setlist_songs, space_setlists, space_songs, team_credentials, team_refs</text>
+<path d="M620,139.5 C566,139.5 554,120 500,120" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#2e8b57"/>
+<path d="M620,302.5 C566,302.5 554,120 500,120" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#2e8b57"/>
+<path d="M620,439.5 C566,439.5 554,120 500,120" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#2e8b57"/>
+<path d="M620,589.5 C566,589.5 554,120 500,120" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#2e8b57"/>
+<path d="M620,722.5 C566,722.5 554,120 500,120" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#2e8b57"/>
+<path d="M620,707.5 C566,707.5 554,223 500,223" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="223" r="3" fill="#2e8b57"/>
+<path d="M1070,154.5 C1016,154.5 1004,1260 950,1260" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1260" r="3" fill="#2e8b57"/>
+<path d="M1070,139.5 C1016,139.5 554,120 500,120" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#2e8b57"/>
+<path d="M620,889.5 C566,889.5 554,120 500,120" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#2e8b57"/>
+<path d="M620,874.5 C566,874.5 554,223 500,223" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="223" r="3" fill="#2e8b57"/>
+<path d="M1070,246.5 C1016,246.5 1004,840 950,840" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="840" r="3" fill="#2e8b57"/>
+<path d="M620,1054.5 C566,1054.5 554,120 500,120" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#2e8b57"/>
+<path d="M1070,666.5 C1016,666.5 554,120 500,120" fill="none" stroke="#7a2a22" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#7a2a22"/>
+<path d="M1070,591.5 C1016,591.5 554,120 500,120" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#2e8b57"/>
+<path d="M1070,576.5 C1016,576.5 1004,1260 950,1260" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1260" r="3" fill="#2e8b57"/>
+<path d="M1520,169.5 C1466,169.5 554,120 500,120" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#2e8b57"/>
+<path d="M1520,154.5 C1466,154.5 1454,542 1400,542" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="1400" cy="542" r="3" fill="#2e8b57"/>
+<path d="M1070,889.5 C1016,889.5 1004,1260 950,1260" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1260" r="3" fill="#2e8b57"/>
+<path d="M1070,1022.5 C1016,1022.5 1004,1260 950,1260" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1260" r="3" fill="#2e8b57"/>
+<path d="M1520,332.5 C1466,332.5 1454,1181 1400,1181" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="1400" cy="1181" r="3" fill="#2e8b57"/>
+<path d="M1070,1200.5 C1016,1200.5 1004,1260 950,1260" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1260" r="3" fill="#2e8b57"/>
+<path d="M1070,1470.5 C1016,1470.5 1004,1260 950,1260" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1260" r="3" fill="#2e8b57"/>
+<path d="M1070,1738.5 C1016,1738.5 1004,1260 950,1260" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1260" r="3" fill="#2e8b57"/>
+<path d="M1070,1841.5 C1016,1841.5 1004,1260 950,1260" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1260" r="3" fill="#2e8b57"/>
+<path d="M1070,1993.5 C1016,1993.5 1004,1260 950,1260" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1260" r="3" fill="#2e8b57"/>
+<path d="M1070,2205.5 C1016,2205.5 554,120 500,120" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#2e8b57"/>
+<path d="M1070,2190.5 C1016,2190.5 1004,1260 950,1260" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1260" r="3" fill="#2e8b57"/>
+<path d="M1070,2342.5 C1016,2342.5 1004,1260 950,1260" fill="none" stroke="#2e8b57" stroke-width="1.3" opacity="0.7"/><circle cx="950" cy="1260" r="3" fill="#2e8b57"/>
+<path d="M620,1474.5 C566,1474.5 554,223 500,223" fill="none" stroke="#7a2a22" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="223" r="3" fill="#7a2a22"/>
+<path d="M620,1309.5 C566,1309.5 554,120 500,120" fill="none" stroke="#c27a1a" stroke-width="1.3" opacity="0.7"/><circle cx="500" cy="120" r="3" fill="#c27a1a"/>
+<rect x="620" y="108" width="330" height="122" rx="5" fill="#fff" stroke="#c0392b" stroke-width="1.6"/>
+<rect x="620" y="108" width="330" height="24" rx="5" fill="#c0392b"/><rect x="620" y="126" width="330" height="6" fill="#c0392b"/>
+<text x="628" y="124" font-size="13" font-weight="700" fill="#fff">account_drive (Drive only)</text><text x="942" y="124" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID</text>
+<text x="628" y="143" font-size="10.5" fill="#1b2733" font-weight="700">◆ account_id</text><text x="788" y="143" font-size="10" fill="#6b7885">text</text><text x="942" y="143" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="628" y="158" font-size="10.5" fill="#3a4753" font-weight="400">blob</text><text x="788" y="158" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="173" font-size="10.5" fill="#3a4753" font-weight="400">google_email</text><text x="788" y="173" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="188" font-size="10.5" fill="#3a4753" font-weight="400">scope</text><text x="788" y="188" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="203" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="788" y="203" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="218" font-size="10.5" fill="#3a4753" font-weight="400">updated_at</text><text x="788" y="218" font-size="10" fill="#6b7885">text</text>
+<rect x="620" y="256" width="330" height="96" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="620" y="256" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="620" y="274" width="330" height="6" fill="#3f6fb0"/>
+<text x="628" y="272" font-size="13" font-weight="700" fill="#fff">account_emails</text><text x="942" y="272" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 1 check</text>
+<text x="628" y="291" font-size="10.5" fill="#1b2733" font-weight="700">◆ email</text><text x="788" y="291" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="306" font-size="10.5" fill="#3a4753" font-weight="400">account_id</text><text x="788" y="306" font-size="10" fill="#6b7885">text</text><text x="942" y="306" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="628" y="321" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="788" y="321" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="341" font-size="9" fill="#8a96a2">idx account (account_id)</text>
+<rect x="620" y="378" width="330" height="154" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="620" y="378" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="620" y="396" width="330" height="6" fill="#3f6fb0"/>
+<text x="628" y="394" font-size="13" font-weight="700" fill="#fff">account_identities</text><text x="942" y="394" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID</text>
+<text x="628" y="413" font-size="10.5" fill="#1b2733" font-weight="700">◆ provider</text><text x="788" y="413" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="428" font-size="10.5" fill="#1b2733" font-weight="700">◆ sub</text><text x="788" y="428" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="443" font-size="10.5" fill="#3a4753" font-weight="400">account_id</text><text x="788" y="443" font-size="10" fill="#6b7885">text</text><text x="942" y="443" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="628" y="458" font-size="10.5" fill="#3a4753" font-weight="400">email</text><text x="788" y="458" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="473" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="788" y="473" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="488" font-size="10.5" fill="#3a4753" font-weight="400">last_seen_at</text><text x="788" y="488" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="508" font-size="9" fill="#8a96a2">idx email (email)</text>
+<text x="628" y="521" font-size="9" fill="#8a96a2">idx account (account_id)</text>
+<rect x="620" y="558" width="330" height="92" rx="5" fill="#fff" stroke="#d9822b" stroke-width="1.6"/>
+<rect x="620" y="558" width="330" height="24" rx="5" fill="#d9822b"/><rect x="620" y="576" width="330" height="6" fill="#d9822b"/>
+<text x="628" y="574" font-size="13" font-weight="700" fill="#fff">account_overlays (new)</text><text x="942" y="574" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 2 checks</text>
+<text x="628" y="593" font-size="10.5" fill="#a8590f" font-weight="700">◆ account_id</text><text x="788" y="593" font-size="10" fill="#a8590f">text</text><text x="942" y="593" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="628" y="608" font-size="10.5" fill="#a8590f" font-weight="700">body</text><text x="788" y="608" font-size="10" fill="#a8590f">text</text>
+<text x="628" y="623" font-size="10.5" fill="#a8590f" font-weight="700">version</text><text x="788" y="623" font-size="10" fill="#a8590f">integer</text>
+<text x="628" y="638" font-size="10.5" fill="#a8590f" font-weight="700">modified_at</text><text x="788" y="638" font-size="10" fill="#a8590f">text</text>
+<rect x="170" y="108" width="330" height="77" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="170" y="108" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="170" y="126" width="330" height="6" fill="#3f6fb0"/>
+<text x="178" y="124" font-size="13" font-weight="700" fill="#fff">accounts</text><text x="492" y="124" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID</text>
+<text x="178" y="143" font-size="10.5" fill="#1b2733" font-weight="700">◆ account_id</text><text x="338" y="143" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="158" font-size="10.5" fill="#3a4753" font-weight="400">name?</text><text x="338" y="158" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="173" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="338" y="173" font-size="10" fill="#6b7885">text</text>
+<rect x="620" y="676" width="330" height="126" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="620" y="676" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="620" y="694" width="330" height="6" fill="#3f6fb0"/>
+<text x="628" y="692" font-size="13" font-weight="700" fill="#fff">church_members</text><text x="942" y="692" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 2 checks</text>
+<text x="628" y="711" font-size="10.5" fill="#1b2733" font-weight="700">◆ church_id</text><text x="788" y="711" font-size="10" fill="#6b7885">text</text><text x="942" y="711" font-size="9.5" fill="#2e8b57" text-anchor="end">→ churches</text>
+<text x="628" y="726" font-size="10.5" fill="#1b2733" font-weight="700">◆ account_id</text><text x="788" y="726" font-size="10" fill="#6b7885">text</text><text x="942" y="726" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="628" y="741" font-size="10.5" fill="#3a4753" font-weight="400">role</text><text x="788" y="741" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="756" font-size="10.5" fill="#3a4753" font-weight="400">joined_at</text><text x="788" y="756" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="771" font-size="10.5" fill="#3a4753" font-weight="400">invited_as?</text><text x="788" y="771" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="791" font-size="9" fill="#8a96a2">idx account (account_id)</text>
+<rect x="170" y="211" width="330" height="201" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="170" y="211" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="170" y="229" width="330" height="6" fill="#3f6fb0"/>
+<text x="178" y="227" font-size="13" font-weight="700" fill="#fff">churches</text><text x="492" y="227" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 7 checks</text>
+<text x="178" y="246" font-size="10.5" fill="#1b2733" font-weight="700">◆ church_id</text><text x="338" y="246" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="261" font-size="10.5" fill="#3a4753" font-weight="400">name</text><text x="338" y="261" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="276" font-size="10.5" fill="#3a4753" font-weight="400">country</text><text x="338" y="276" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="291" font-size="10.5" fill="#3a4753" font-weight="400">city</text><text x="338" y="291" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="306" font-size="10.5" fill="#3a4753" font-weight="400">postcode?</text><text x="338" y="306" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="321" font-size="10.5" fill="#3a4753" font-weight="400">ccli_licence?</text><text x="338" y="321" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="336" font-size="10.5" fill="#3a4753" font-weight="400">licences</text><text x="338" y="336" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="351" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="338" y="351" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="366" font-size="10.5" fill="#3a4753" font-weight="400">updated_at</text><text x="338" y="366" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="381" font-size="10.5" fill="#3a4753" font-weight="400">ended_at?</text><text x="338" y="381" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="401" font-size="9" fill="#8a96a2">idx ccli_licence (ccli_licence) where…</text>
+<rect x="1070" y="108" width="330" height="81" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="1070" y="108" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1070" y="126" width="330" height="6" fill="#3f6fb0"/>
+<text x="1078" y="124" font-size="13" font-weight="700" fill="#fff">followed_teams</text><text x="1392" y="124" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID</text>
+<text x="1078" y="143" font-size="10.5" fill="#1b2733" font-weight="700">◆ account_id</text><text x="1238" y="143" font-size="10" fill="#6b7885">text</text><text x="1392" y="143" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="1078" y="158" font-size="10.5" fill="#1b2733" font-weight="700">◆ space_id</text><text x="1238" y="158" font-size="10" fill="#6b7885">text</text><text x="1392" y="158" font-size="9.5" fill="#2e8b57" text-anchor="end">→ teams</text>
+<text x="1078" y="178" font-size="9" fill="#8a96a2">idx team (space_id)</text>
+<rect x="620" y="828" width="330" height="154" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="620" y="828" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="620" y="846" width="330" height="6" fill="#3f6fb0"/>
+<text x="628" y="844" font-size="13" font-weight="700" fill="#fff">libraries (changed)</text><text x="942" y="844" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 4 checks</text>
+<text x="628" y="863" font-size="10.5" fill="#1b2733" font-weight="700">◆ library_id</text><text x="788" y="863" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="878" font-size="10.5" fill="#3a4753" font-weight="400">church_id?</text><text x="788" y="878" font-size="10" fill="#6b7885">text</text><text x="942" y="878" font-size="9.5" fill="#2e8b57" text-anchor="end">→ churches</text>
+<text x="628" y="893" font-size="10.5" fill="#3a4753" font-weight="400">account_id?</text><text x="788" y="893" font-size="10" fill="#6b7885">text</text><text x="942" y="893" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="628" y="908" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="788" y="908" font-size="10" fill="#6b7885">text</text>
+<rect x="622" y="912" width="326" height="15" fill="#fff1dc"/><text x="628" y="923" font-size="10.5" fill="#a8590f" font-weight="700">pad_sets</text><text x="788" y="923" font-size="10" fill="#a8590f">text</text>
+<rect x="622" y="927" width="326" height="15" fill="#fff1dc"/><text x="628" y="938" font-size="10.5" fill="#a8590f" font-weight="700">pad_sets_version</text><text x="788" y="938" font-size="10" fill="#a8590f">integer</text>
+<text x="628" y="958" font-size="9" fill="#8a96a2">idx unique account (account_id) where…</text>
+<text x="628" y="971" font-size="9" fill="#8a96a2">idx unique church (church_id) where…</text>
+<rect x="1070" y="215" width="330" height="289" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="1070" y="215" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1070" y="233" width="330" height="6" fill="#3f6fb0"/>
+<text x="1078" y="231" font-size="13" font-weight="700" fill="#fff">library_songs</text><text x="1392" y="231" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT · 6 checks</text>
+<text x="1078" y="250" font-size="10.5" fill="#1b2733" font-weight="700">◆ library_id</text><text x="1238" y="250" font-size="10" fill="#6b7885">text</text><text x="1392" y="250" font-size="9.5" fill="#2e8b57" text-anchor="end">→ libraries</text>
+<text x="1078" y="265" font-size="10.5" fill="#1b2733" font-weight="700">◆ song_uuid</text><text x="1238" y="265" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="280" font-size="10.5" fill="#3a4753" font-weight="400">song_id</text><text x="1238" y="280" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="295" font-size="10.5" fill="#3a4753" font-weight="400">title</text><text x="1238" y="295" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="310" font-size="10.5" fill="#3a4753" font-weight="400">ccli?</text><text x="1238" y="310" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="325" font-size="10.5" fill="#3a4753" font-weight="400">song_key?</text><text x="1238" y="325" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="340" font-size="10.5" fill="#3a4753" font-weight="400">licence?</text><text x="1238" y="340" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="355" font-size="10.5" fill="#3a4753" font-weight="400">is_default</text><text x="1238" y="355" font-size="10" fill="#6b7885">integer</text>
+<text x="1078" y="370" font-size="10.5" fill="#3a4753" font-weight="400">variant_of?</text><text x="1238" y="370" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="385" font-size="10.5" fill="#3a4753" font-weight="400">variant_label</text><text x="1238" y="385" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="400" font-size="10.5" fill="#3a4753" font-weight="400">content_hash?</text><text x="1238" y="400" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="415" font-size="10.5" fill="#3a4753" font-weight="400">bundle_ref?</text><text x="1238" y="415" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="430" font-size="10.5" fill="#3a4753" font-weight="400">source_history</text><text x="1238" y="430" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="445" font-size="10.5" fill="#3a4753" font-weight="400">version</text><text x="1238" y="445" font-size="10" fill="#6b7885">integer</text>
+<text x="1078" y="460" font-size="10.5" fill="#3a4753" font-weight="400">modified_at</text><text x="1238" y="460" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="480" font-size="9" fill="#8a96a2">idx ccli (library_id, ccli)</text>
+<text x="1078" y="493" font-size="9" fill="#8a96a2">idx song_id (library_id, song_id)</text>
+<rect x="170" y="438" width="330" height="216" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="170" y="438" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="170" y="456" width="330" height="6" fill="#3f6fb0"/>
+<text x="178" y="454" font-size="13" font-weight="700" fill="#fff">login_codes</text><text x="492" y="454" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 3 checks</text>
+<text x="178" y="473" font-size="10.5" fill="#1b2733" font-weight="700">◆ address_hash</text><text x="338" y="473" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="488" font-size="10.5" fill="#3a4753" font-weight="400">code_hash</text><text x="338" y="488" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="503" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="338" y="503" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="518" font-size="10.5" fill="#3a4753" font-weight="400">expires_at</text><text x="338" y="518" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="533" font-size="10.5" fill="#3a4753" font-weight="400">attempts</text><text x="338" y="533" font-size="10" fill="#6b7885">integer</text>
+<text x="178" y="548" font-size="10.5" fill="#3a4753" font-weight="400">window_start</text><text x="338" y="548" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="563" font-size="10.5" fill="#3a4753" font-weight="400">sent</text><text x="338" y="563" font-size="10" fill="#6b7885">integer</text>
+<text x="178" y="578" font-size="10.5" fill="#3a4753" font-weight="400">link_hash</text><text x="338" y="578" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="593" font-size="10.5" fill="#3a4753" font-weight="400">address</text><text x="338" y="593" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="608" font-size="10.5" fill="#3a4753" font-weight="400">code</text><text x="338" y="608" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="623" font-size="10.5" fill="#3a4753" font-weight="400">next?</text><text x="338" y="623" font-size="10" fill="#6b7885">text</text>
+<text x="178" y="643" font-size="9" fill="#8a96a2">idx unique (link_hash)</text>
+<rect x="620" y="1008" width="330" height="214" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="620" y="1008" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="620" y="1026" width="330" height="6" fill="#3f6fb0"/>
+<text x="628" y="1024" font-size="13" font-weight="700" fill="#fff">sessions</text><text x="942" y="1024" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID</text>
+<text x="628" y="1043" font-size="10.5" fill="#1b2733" font-weight="700">◆ session_id</text><text x="788" y="1043" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1058" font-size="10.5" fill="#3a4753" font-weight="400">account_id</text><text x="788" y="1058" font-size="10" fill="#6b7885">text</text><text x="942" y="1058" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="628" y="1073" font-size="10.5" fill="#3a4753" font-weight="400">email</text><text x="788" y="1073" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1088" font-size="10.5" fill="#3a4753" font-weight="400">token_hash</text><text x="788" y="1088" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1103" font-size="10.5" fill="#3a4753" font-weight="400">previous_hash?</text><text x="788" y="1103" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1118" font-size="10.5" fill="#3a4753" font-weight="400">rotated_at?</text><text x="788" y="1118" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1133" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="788" y="1133" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1148" font-size="10.5" fill="#3a4753" font-weight="400">last_used_at</text><text x="788" y="1148" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1163" font-size="10.5" fill="#3a4753" font-weight="400">expires_at</text><text x="788" y="1163" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1178" font-size="10.5" fill="#3a4753" font-weight="400">revoked_at?</text><text x="788" y="1178" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1198" font-size="9" fill="#8a96a2">idx expires (expires_at)</text>
+<text x="628" y="1211" font-size="9" fill="#8a96a2">idx account (account_id)</text>
+<rect x="1070" y="530" width="330" height="302" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="1070" y="530" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1070" y="548" width="330" height="6" fill="#3f6fb0"/>
+<text x="1078" y="546" font-size="13" font-weight="700" fill="#fff">setlists</text><text x="1392" y="546" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT · 7 checks</text>
+<text x="1078" y="565" font-size="10.5" fill="#1b2733" font-weight="700">◆ setlist_id</text><text x="1238" y="565" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="580" font-size="10.5" fill="#3a4753" font-weight="400">space_id?</text><text x="1238" y="580" font-size="10" fill="#6b7885">text</text><text x="1392" y="580" font-size="9.5" fill="#2e8b57" text-anchor="end">→ teams</text>
+<text x="1078" y="595" font-size="10.5" fill="#3a4753" font-weight="400">account_id?</text><text x="1238" y="595" font-size="10" fill="#6b7885">text</text><text x="1392" y="595" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="1078" y="610" font-size="10.5" fill="#3a4753" font-weight="400">date</text><text x="1238" y="610" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="625" font-size="10.5" fill="#3a4753" font-weight="400">time</text><text x="1238" y="625" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="640" font-size="10.5" fill="#3a4753" font-weight="400">type</text><text x="1238" y="640" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="655" font-size="10.5" fill="#3a4753" font-weight="400">name</text><text x="1238" y="655" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="670" font-size="10.5" fill="#3a4753" font-weight="400">leader_id?</text><text x="1238" y="670" font-size="10" fill="#6b7885">text</text><text x="1392" y="670" font-size="9.5" fill="#7a2a22" text-anchor="end">→ accounts</text>
+<text x="1078" y="685" font-size="10.5" fill="#3a4753" font-weight="400">created_by?</text><text x="1238" y="685" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="700" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="1238" y="700" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="715" font-size="10.5" fill="#3a4753" font-weight="400">body</text><text x="1238" y="715" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="730" font-size="10.5" fill="#3a4753" font-weight="400">songs</text><text x="1238" y="730" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="745" font-size="10.5" fill="#3a4753" font-weight="400">version</text><text x="1238" y="745" font-size="10" fill="#6b7885">integer</text>
+<text x="1078" y="760" font-size="10.5" fill="#3a4753" font-weight="400">modified_at</text><text x="1238" y="760" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="775" font-size="10.5" fill="#3a4753" font-weight="400">leader_name?</text><text x="1238" y="775" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="795" font-size="9" fill="#8a96a2">idx leader (leader_id)</text>
+<text x="1078" y="808" font-size="9" fill="#8a96a2">idx account_date (account_id, date)</text>
+<text x="1078" y="821" font-size="9" fill="#8a96a2">idx team_date (space_id, date)</text>
+<rect x="1520" y="108" width="330" height="167" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="1520" y="108" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1520" y="126" width="330" height="6" fill="#3f6fb0"/>
+<text x="1528" y="124" font-size="13" font-weight="700" fill="#fff">shares</text><text x="1842" y="124" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 1 check</text>
+<text x="1528" y="143" font-size="10.5" fill="#1b2733" font-weight="700">◆ share_id</text><text x="1688" y="143" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="158" font-size="10.5" fill="#3a4753" font-weight="400">setlist_id</text><text x="1688" y="158" font-size="10" fill="#6b7885">text</text><text x="1842" y="158" font-size="9.5" fill="#2e8b57" text-anchor="end">→ setlists</text>
+<text x="1528" y="173" font-size="10.5" fill="#3a4753" font-weight="400">created_by</text><text x="1688" y="173" font-size="10" fill="#6b7885">text</text><text x="1842" y="173" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="1528" y="188" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="1688" y="188" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="203" font-size="10.5" fill="#3a4753" font-weight="400">expires_at</text><text x="1688" y="203" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="218" font-size="10.5" fill="#3a4753" font-weight="400">stopped_at?</text><text x="1688" y="218" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="238" font-size="9" fill="#8a96a2">idx expires (expires_at)</text>
+<text x="1528" y="251" font-size="9" fill="#8a96a2">idx created_by (created_by)</text>
+<text x="1528" y="264" font-size="9" fill="#8a96a2">idx unique live_setlist (setlist_id) where…</text>
+<rect x="1070" y="858" width="330" height="107" rx="5" fill="#fff" stroke="#c0392b" stroke-width="1.6"/>
+<rect x="1070" y="858" width="330" height="24" rx="5" fill="#c0392b"/><rect x="1070" y="876" width="330" height="6" fill="#c0392b"/>
+<text x="1078" y="874" font-size="13" font-weight="700" fill="#fff">space_pad_sets (Drive only)</text><text x="1392" y="874" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT · 1 check</text>
+<text x="1078" y="893" font-size="10.5" fill="#1b2733" font-weight="700">◆ space_id</text><text x="1238" y="893" font-size="10" fill="#6b7885">text</text><text x="1392" y="893" font-size="9.5" fill="#2e8b57" text-anchor="end">→ teams</text>
+<text x="1078" y="908" font-size="10.5" fill="#1b2733" font-weight="700">◆ pad_set_id</text><text x="1238" y="908" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="923" font-size="10.5" fill="#3a4753" font-weight="400">name</text><text x="1238" y="923" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="938" font-size="10.5" fill="#3a4753" font-weight="400">version</text><text x="1238" y="938" font-size="10" fill="#6b7885">integer</text>
+<text x="1078" y="953" font-size="10.5" fill="#3a4753" font-weight="400">modified_at</text><text x="1238" y="953" font-size="10" fill="#6b7885">text</text>
+<rect x="1070" y="991" width="330" height="152" rx="5" fill="#fff" stroke="#c0392b" stroke-width="1.6"/>
+<rect x="1070" y="991" width="330" height="24" rx="5" fill="#c0392b"/><rect x="1070" y="1009" width="330" height="6" fill="#c0392b"/>
+<text x="1078" y="1007" font-size="13" font-weight="700" fill="#fff">space_people (Drive only)</text><text x="1392" y="1007" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT · 2 checks</text>
+<text x="1078" y="1026" font-size="10.5" fill="#1b2733" font-weight="700">◆ space_id</text><text x="1238" y="1026" font-size="10" fill="#6b7885">text</text><text x="1392" y="1026" font-size="9.5" fill="#2e8b57" text-anchor="end">→ teams</text>
+<text x="1078" y="1041" font-size="10.5" fill="#1b2733" font-weight="700">◆ person_id</text><text x="1238" y="1041" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1056" font-size="10.5" fill="#3a4753" font-weight="400">name</text><text x="1238" y="1056" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1071" font-size="10.5" fill="#3a4753" font-weight="400">emails</text><text x="1238" y="1071" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1086" font-size="10.5" fill="#3a4753" font-weight="400">team_member?</text><text x="1238" y="1086" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1101" font-size="10.5" fill="#3a4753" font-weight="400">merged_into?</text><text x="1238" y="1101" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1116" font-size="10.5" fill="#3a4753" font-weight="400">version</text><text x="1238" y="1116" font-size="10" fill="#6b7885">integer</text>
+<text x="1078" y="1131" font-size="10.5" fill="#3a4753" font-weight="400">modified_at</text><text x="1238" y="1131" font-size="10" fill="#6b7885">text</text>
+<rect x="1520" y="301" width="330" height="197" rx="5" fill="#fff" stroke="#c0392b" stroke-width="1.6"/>
+<rect x="1520" y="301" width="330" height="24" rx="5" fill="#c0392b"/><rect x="1520" y="319" width="330" height="6" fill="#c0392b"/>
+<text x="1528" y="317" font-size="13" font-weight="700" fill="#fff">space_setlist_songs (Drive only)</text><text x="1842" y="317" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 3 checks</text>
+<text x="1528" y="336" font-size="10.5" fill="#1b2733" font-weight="700">◆ setlist_id</text><text x="1688" y="336" font-size="10" fill="#6b7885">text</text><text x="1842" y="336" font-size="9.5" fill="#2e8b57" text-anchor="end">→ space_setlists</text>
+<text x="1528" y="351" font-size="10.5" fill="#1b2733" font-weight="700">◆ position</text><text x="1688" y="351" font-size="10" fill="#6b7885">integer</text>
+<text x="1528" y="366" font-size="10.5" fill="#3a4753" font-weight="400">song_uuid</text><text x="1688" y="366" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="381" font-size="10.5" fill="#3a4753" font-weight="400">song_id</text><text x="1688" y="381" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="396" font-size="10.5" fill="#3a4753" font-weight="400">title</text><text x="1688" y="396" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="411" font-size="10.5" fill="#3a4753" font-weight="400">ccli?</text><text x="1688" y="411" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="426" font-size="10.5" fill="#3a4753" font-weight="400">song_key?</text><text x="1688" y="426" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="441" font-size="10.5" fill="#3a4753" font-weight="400">tempo?</text><text x="1688" y="441" font-size="10" fill="#6b7885">integer</text>
+<text x="1528" y="456" font-size="10.5" fill="#3a4753" font-weight="400">notes</text><text x="1688" y="456" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="471" font-size="10.5" fill="#3a4753" font-weight="400">annotations</text><text x="1688" y="471" font-size="10" fill="#6b7885">text</text>
+<text x="1528" y="486" font-size="10.5" fill="#3a4753" font-weight="400">extra</text><text x="1688" y="486" font-size="10" fill="#6b7885">text</text>
+<rect x="1070" y="1169" width="330" height="244" rx="5" fill="#fff" stroke="#c0392b" stroke-width="1.6"/>
+<rect x="1070" y="1169" width="330" height="24" rx="5" fill="#c0392b"/><rect x="1070" y="1187" width="330" height="6" fill="#c0392b"/>
+<text x="1078" y="1185" font-size="13" font-weight="700" fill="#fff">space_setlists (Drive only)</text><text x="1392" y="1185" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT · 3 checks</text>
+<text x="1078" y="1204" font-size="10.5" fill="#1b2733" font-weight="700">◆ space_id</text><text x="1238" y="1204" font-size="10" fill="#6b7885">text</text><text x="1392" y="1204" font-size="9.5" fill="#2e8b57" text-anchor="end">→ teams</text>
+<text x="1078" y="1219" font-size="10.5" fill="#1b2733" font-weight="700">◆ setlist_id</text><text x="1238" y="1219" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1234" font-size="10.5" fill="#3a4753" font-weight="400">date</text><text x="1238" y="1234" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1249" font-size="10.5" fill="#3a4753" font-weight="400">time</text><text x="1238" y="1249" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1264" font-size="10.5" fill="#3a4753" font-weight="400">type</text><text x="1238" y="1264" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1279" font-size="10.5" fill="#3a4753" font-weight="400">name</text><text x="1238" y="1279" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1294" font-size="10.5" fill="#3a4753" font-weight="400">leader_id?</text><text x="1238" y="1294" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1309" font-size="10.5" fill="#3a4753" font-weight="400">created_by?</text><text x="1238" y="1309" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1324" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="1238" y="1324" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1339" font-size="10.5" fill="#3a4753" font-weight="400">body</text><text x="1238" y="1339" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1354" font-size="10.5" fill="#3a4753" font-weight="400">version</text><text x="1238" y="1354" font-size="10" fill="#6b7885">integer</text>
+<text x="1078" y="1369" font-size="10.5" fill="#3a4753" font-weight="400">modified_at</text><text x="1238" y="1369" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1389" font-size="9" fill="#8a96a2">idx date (space_id, date)</text>
+<text x="1078" y="1402" font-size="9" fill="#8a96a2">idx unique (setlist_id)</text>
+<rect x="1070" y="1439" width="330" height="242" rx="5" fill="#fff" stroke="#c0392b" stroke-width="1.6"/>
+<rect x="1070" y="1439" width="330" height="24" rx="5" fill="#c0392b"/><rect x="1070" y="1457" width="330" height="6" fill="#c0392b"/>
+<text x="1078" y="1455" font-size="13" font-weight="700" fill="#fff">space_songs (Drive only)</text><text x="1392" y="1455" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT · 2 checks</text>
+<text x="1078" y="1474" font-size="10.5" fill="#1b2733" font-weight="700">◆ space_id</text><text x="1238" y="1474" font-size="10" fill="#6b7885">text</text><text x="1392" y="1474" font-size="9.5" fill="#2e8b57" text-anchor="end">→ teams</text>
+<text x="1078" y="1489" font-size="10.5" fill="#1b2733" font-weight="700">◆ song_uuid</text><text x="1238" y="1489" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1504" font-size="10.5" fill="#3a4753" font-weight="400">song_id</text><text x="1238" y="1504" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1519" font-size="10.5" fill="#3a4753" font-weight="400">title</text><text x="1238" y="1519" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1534" font-size="10.5" fill="#3a4753" font-weight="400">ccli?</text><text x="1238" y="1534" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1549" font-size="10.5" fill="#3a4753" font-weight="400">song_key?</text><text x="1238" y="1549" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1564" font-size="10.5" fill="#3a4753" font-weight="400">licence?</text><text x="1238" y="1564" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1579" font-size="10.5" fill="#3a4753" font-weight="400">is_default</text><text x="1238" y="1579" font-size="10" fill="#6b7885">integer</text>
+<text x="1078" y="1594" font-size="10.5" fill="#3a4753" font-weight="400">variant_of?</text><text x="1238" y="1594" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1609" font-size="10.5" fill="#3a4753" font-weight="400">variant_label</text><text x="1238" y="1609" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1624" font-size="10.5" fill="#3a4753" font-weight="400">content_hash?</text><text x="1238" y="1624" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1639" font-size="10.5" fill="#3a4753" font-weight="400">file_ref?</text><text x="1238" y="1639" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1654" font-size="10.5" fill="#3a4753" font-weight="400">version</text><text x="1238" y="1654" font-size="10" fill="#6b7885">integer</text>
+<text x="1078" y="1669" font-size="10.5" fill="#3a4753" font-weight="400">modified_at</text><text x="1238" y="1669" font-size="10" fill="#6b7885">text</text>
+<rect x="1070" y="1707" width="330" height="62" rx="5" fill="#fff" stroke="#c0392b" stroke-width="1.6"/>
+<rect x="1070" y="1707" width="330" height="24" rx="5" fill="#c0392b"/><rect x="1070" y="1725" width="330" height="6" fill="#c0392b"/>
+<text x="1078" y="1723" font-size="13" font-weight="700" fill="#fff">team_credentials (Drive only)</text><text x="1392" y="1723" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT</text>
+<text x="1078" y="1742" font-size="10.5" fill="#1b2733" font-weight="700">◆ space_id</text><text x="1238" y="1742" font-size="10" fill="#6b7885">text</text><text x="1392" y="1742" font-size="9.5" fill="#2e8b57" text-anchor="end">→ teams</text>
+<text x="1078" y="1757" font-size="10.5" fill="#3a4753" font-weight="400">blob</text><text x="1238" y="1757" font-size="10" fill="#6b7885">text</text>
+<rect x="1070" y="1795" width="330" height="141" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="1070" y="1795" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1070" y="1813" width="330" height="6" fill="#3f6fb0"/>
+<text x="1078" y="1811" font-size="13" font-weight="700" fill="#fff">team_events</text><text x="1392" y="1811" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT</text>
+<text x="1078" y="1830" font-size="10.5" fill="#1b2733" font-weight="700">◆ id</text><text x="1238" y="1830" font-size="10" fill="#6b7885">integer</text>
+<text x="1078" y="1845" font-size="10.5" fill="#3a4753" font-weight="400">space_id</text><text x="1238" y="1845" font-size="10" fill="#6b7885">text</text><text x="1392" y="1845" font-size="9.5" fill="#2e8b57" text-anchor="end">→ teams</text>
+<text x="1078" y="1860" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="1238" y="1860" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1875" font-size="10.5" fill="#3a4753" font-weight="400">kind</text><text x="1238" y="1875" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1890" font-size="10.5" fill="#3a4753" font-weight="400">by_email?</text><text x="1238" y="1890" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1905" font-size="10.5" fill="#3a4753" font-weight="400">detail?</text><text x="1238" y="1905" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="1925" font-size="9" fill="#8a96a2">idx space (space_id, id)</text>
+<rect x="1070" y="1962" width="330" height="171" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="1070" y="1962" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1070" y="1980" width="330" height="6" fill="#3f6fb0"/>
+<text x="1078" y="1978" font-size="13" font-weight="700" fill="#fff">team_invites</text><text x="1392" y="1978" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 2 checks</text>
+<text x="1078" y="1997" font-size="10.5" fill="#1b2733" font-weight="700">◆ space_id</text><text x="1238" y="1997" font-size="10" fill="#6b7885">text</text><text x="1392" y="1997" font-size="9.5" fill="#2e8b57" text-anchor="end">→ teams</text>
+<text x="1078" y="2012" font-size="10.5" fill="#1b2733" font-weight="700">◆ id</text><text x="1238" y="2012" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="2027" font-size="10.5" fill="#3a4753" font-weight="400">email</text><text x="1238" y="2027" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="2042" font-size="10.5" fill="#3a4753" font-weight="400">role</text><text x="1238" y="2042" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="2057" font-size="10.5" fill="#3a4753" font-weight="400">created_by</text><text x="1238" y="2057" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="2072" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="1238" y="2072" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="2087" font-size="10.5" fill="#3a4753" font-weight="400">expires_at</text><text x="1238" y="2087" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="2102" font-size="10.5" fill="#3a4753" font-weight="400">emailed_at?</text><text x="1238" y="2102" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="2122" font-size="9" fill="#8a96a2">idx email (email, created_at)</text>
+<rect x="1070" y="2159" width="330" height="126" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="1070" y="2159" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="1070" y="2177" width="330" height="6" fill="#3f6fb0"/>
+<text x="1078" y="2175" font-size="13" font-weight="700" fill="#fff">team_members</text><text x="1392" y="2175" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID · 2 checks</text>
+<text x="1078" y="2194" font-size="10.5" fill="#1b2733" font-weight="700">◆ space_id</text><text x="1238" y="2194" font-size="10" fill="#6b7885">text</text><text x="1392" y="2194" font-size="9.5" fill="#2e8b57" text-anchor="end">→ teams</text>
+<text x="1078" y="2209" font-size="10.5" fill="#1b2733" font-weight="700">◆ account_id</text><text x="1238" y="2209" font-size="10" fill="#6b7885">text</text><text x="1392" y="2209" font-size="9.5" fill="#2e8b57" text-anchor="end">→ accounts</text>
+<text x="1078" y="2224" font-size="10.5" fill="#3a4753" font-weight="400">role</text><text x="1238" y="2224" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="2239" font-size="10.5" fill="#3a4753" font-weight="400">invited_as?</text><text x="1238" y="2239" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="2254" font-size="10.5" fill="#3a4753" font-weight="400">joined_at</text><text x="1238" y="2254" font-size="10" fill="#6b7885">text</text>
+<text x="1078" y="2274" font-size="9" fill="#8a96a2">idx account (account_id)</text>
+<rect x="1070" y="2311" width="330" height="62" rx="5" fill="#fff" stroke="#c0392b" stroke-width="1.6"/>
+<rect x="1070" y="2311" width="330" height="24" rx="5" fill="#c0392b"/><rect x="1070" y="2329" width="330" height="6" fill="#c0392b"/>
+<text x="1078" y="2327" font-size="13" font-weight="700" fill="#fff">team_refs (Drive only)</text><text x="1392" y="2327" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT, WITHOUT ROWID</text>
+<text x="1078" y="2346" font-size="10.5" fill="#1b2733" font-weight="700">◆ space_id</text><text x="1238" y="2346" font-size="10" fill="#6b7885">text</text><text x="1392" y="2346" font-size="9.5" fill="#2e8b57" text-anchor="end">→ teams</text>
+<text x="1078" y="2361" font-size="10.5" fill="#1b2733" font-weight="700">◆ ref</text><text x="1238" y="2361" font-size="10" fill="#6b7885">text</text>
+<rect x="620" y="1248" width="330" height="300" rx="5" fill="#fff" stroke="#c9d1d9" stroke-width="1"/>
+<rect x="620" y="1248" width="330" height="24" rx="5" fill="#3f6fb0"/><rect x="620" y="1266" width="330" height="6" fill="#3f6fb0"/>
+<text x="628" y="1264" font-size="13" font-weight="700" fill="#fff">teams</text><text x="942" y="1264" font-size="9.5" fill="#fff" fill-opacity="0.8" text-anchor="end">STRICT · 6 checks</text>
+<text x="628" y="1283" font-size="10.5" fill="#1b2733" font-weight="700">◆ space_id</text><text x="788" y="1283" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1298" font-size="10.5" fill="#3a4753" font-weight="400">name</text><text x="788" y="1298" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1313" font-size="10.5" fill="#3a4753" font-weight="400">owner_account_id?</text><text x="788" y="1313" font-size="10" fill="#6b7885">text</text><text x="942" y="1313" font-size="9.5" fill="#c27a1a" text-anchor="end">→ accounts</text>
+<text x="628" y="1328" font-size="10.5" fill="#3a4753" font-weight="400">owner_email</text><text x="788" y="1328" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1343" font-size="10.5" fill="#3a4753" font-weight="400">owner_provider</text><text x="788" y="1343" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1358" font-size="10.5" fill="#3a4753" font-weight="400">owner_sub</text><text x="788" y="1358" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1373" font-size="10.5" fill="#3a4753" font-weight="400">ccli_licence?</text><text x="788" y="1373" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1388" font-size="10.5" fill="#3a4753" font-weight="400">root_ref?</text><text x="788" y="1388" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1403" font-size="10.5" fill="#3a4753" font-weight="400">credential</text><text x="788" y="1403" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1418" font-size="10.5" fill="#3a4753" font-weight="400">created_at</text><text x="788" y="1418" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1433" font-size="10.5" fill="#3a4753" font-weight="400">updated_at</text><text x="788" y="1433" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1448" font-size="10.5" fill="#3a4753" font-weight="400">ended_at?</text><text x="788" y="1448" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1463" font-size="10.5" fill="#3a4753" font-weight="400">storage</text><text x="788" y="1463" font-size="10" fill="#6b7885">text</text>
+<text x="628" y="1478" font-size="10.5" fill="#3a4753" font-weight="400">church_id?</text><text x="788" y="1478" font-size="10" fill="#6b7885">text</text><text x="942" y="1478" font-size="9.5" fill="#7a2a22" text-anchor="end">→ churches</text>
+<text x="628" y="1498" font-size="9" fill="#8a96a2">idx church (church_id)</text>
+<text x="628" y="1511" font-size="9" fill="#8a96a2">idx ccli_licence (ccli_licence)</text>
+<text x="628" y="1524" font-size="9" fill="#8a96a2">idx owner_email (owner_email)</text>
+<text x="628" y="1537" font-size="9" fill="#8a96a2">idx owner_account (owner_account_id)</text>
+</svg>
