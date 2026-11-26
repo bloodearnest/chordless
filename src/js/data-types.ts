@@ -325,6 +325,8 @@ export interface ReceivedShare {
   etag: string
   /** YYYY-MM-DD */
   expires: string
+  /** When a link on Chordless (`sh_…`, no key) stops working, to the second: known offline, so the copy goes when it passes */
+  expiresAt?: string
   /** The sharer's setlist id: this setlist, if the user later joins its space */
   setlistId?: string
   /** The leader's name as the sharer sent it: the receiver has no people list to find them in */

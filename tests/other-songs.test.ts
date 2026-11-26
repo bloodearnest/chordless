@@ -2,14 +2,12 @@ import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import {
   addToLibrary,
-  getSharedSongs,
-  getSongFromAnywhere,
   getSongsElsewhere,
   withSongsFromElsewhere,
   withSpaceName,
 } from '../src/js/other-songs.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
-import { addChart, getLibrarySongs } from '../src/js/song-utils.ts'
+import { addChart, getLibrarySongs, getSongWithContent } from '../src/js/song-utils.ts'
 import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
 import { must } from './must.ts'
 import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
@@ -26,27 +24,56 @@ const ADD = { variantLabel: 'Test', importSource: 'test', makeDefault: 'first' }
 describe('Songs from the other databases', () => {
   const libraryId = `org-${crypto.randomUUID()}`
   let library: ChordlessDB
+  /** The database of another space, the songs of which the library can see and copy */
+  let elsewhere: ChordlessDB
+  let space: { id: string; name: string }
+  /** What was received in shares: it stays inside them */
   let shared: ChordlessDB
 
   beforeEach(async () => {
     library = new ChordlessDB(libraryId)
     await library.init()
+    space = await createSpace(`Elsewhere ${crypto.randomUUID().slice(0, 8)}`)
+    elsewhere = new ChordlessDB(space.id)
+    await elsewhere.init()
     shared = new ChordlessDB(SHARED_DB_ID)
     await shared.init()
   })
 
   afterEach(async () => {
     library.db?.close()
+    elsewhere.db?.close()
     shared.db?.close()
     await deleteDatabase(libraryId)
+    await deleteDatabase(space.id)
     await deleteDatabase(SHARED_DB_ID)
+    await deleteSpace(space.id)
   })
 
-  it('lists the shared database songs, marked with where they are from', async () => {
-    await addChart(shared, BETA, ADD)
-    const songs = await getSongsElsewhere(libraryId)
+  const fromElsewhere = async () =>
+    (await getSongsElsewhere(libraryId)).filter(song => song.source?.dbId === space.id)
+
+  it('lists the songs of another space, marked with where they are from', async () => {
+    await addChart(elsewhere, BETA, ADD)
+    const songs = await fromElsewhere()
     expect(songs.map(song => song.title)).to.deep.equal(['Beta'])
-    expect(songs[0].source).to.deep.equal({ dbId: SHARED_DB_ID, label: 'Shared with me' })
+    expect(songs[0].source).to.deep.equal({ dbId: space.id, label: space.name })
+  })
+
+  it('keeps what was received in a share inside the share: not listed, not found, and not copied', async () => {
+    const received = await addChart(shared, BETA, ADD)
+    expect((await getSongsElsewhere(libraryId)).map(song => song.title)).to.not.include('Beta')
+    // (even handed the song, the copy is refused, and nothing is added)
+    const song = {
+      ...(await getSongWithContent(received.uuid, shared)),
+      source: { dbId: SHARED_DB_ID, label: 'Shared with me' },
+    }
+    let refused = ''
+    await addToLibrary(song, library).catch(error => {
+      refused = String(error.message)
+    })
+    expect(refused).to.contain('stays in that setlist')
+    expect(await library.getAllSongs()).to.have.length(0)
   })
 
   it('does not copy a song into or out of a church library', async () => {
@@ -56,12 +83,12 @@ describe('Songs from the other databases', () => {
     await churchDb.init()
     try {
       await addChart(churchDb, ALPHA, ADD)
-      await addChart(shared, BETA, ADD)
+      await addChart(elsewhere, BETA, ADD)
       expect(await getSongsElsewhere(church.id)).to.deep.equal([])
       expect(
         (await getSongsElsewhere(libraryId)).some(song => song.source?.dbId === church.id)
       ).to.equal(false)
-      const source = must((await getSharedSongs())[0])
+      const source = must((await fromElsewhere())[0])
       let failed = false
       await addToLibrary(source, churchDb).catch(() => {
         failed = true
@@ -73,37 +100,21 @@ describe('Songs from the other databases', () => {
     }
   })
 
-  it('has nothing from elsewhere, and makes no database, when there is none', async () => {
+  it('has nothing from elsewhere, and makes no shared database, when there is none', async () => {
     shared.db?.close()
     await deleteDatabase(SHARED_DB_ID)
-    expect(await getSongsElsewhere(libraryId)).to.deep.equal([])
+    expect(await fromElsewhere()).to.deep.equal([])
     expect((await indexedDB.databases()).map(database => database.name)).to.not.include(
       SHARED_DB_ID
     )
   })
 
-  it('lists the songs received in shared setlists alone, marked as from Shared with me', async () => {
-    await addChart(library, ALPHA, ADD)
-    await addChart(shared, BETA, ADD)
-    const songs = await getSharedSongs()
-    expect(songs.map(song => song.title)).to.deep.equal(['Beta'])
-    expect(songs[0].source).to.deep.equal({ dbId: SHARED_DB_ID, label: 'Shared with me' })
-  })
-
-  it('lists no shared songs where nothing was ever shared', async () => {
-    await deleteDatabase(SHARED_DB_ID)
-    expect(await getSharedSongs()).to.deep.equal([])
-  })
-
   it('searches the library and the others together, the library winning for a song it has', async () => {
     await addChart(library, ALPHA, ADD)
-    await addChart(shared, ALPHA_EDITED, ADD)
-    await addChart(shared, BETA, ADD)
+    await addChart(elsewhere, ALPHA_EDITED, ADD)
+    await addChart(elsewhere, BETA, ADD)
 
-    const merged = withSongsFromElsewhere(
-      await getLibrarySongs(library),
-      await getSongsElsewhere(libraryId)
-    )
+    const merged = withSongsFromElsewhere(await getLibrarySongs(library), await fromElsewhere())
     expect(merged.map(song => `${song.title}${song.source ? ' (elsewhere)' : ''}`)).to.deep.equal([
       'Alpha',
       'Beta (elsewhere)',
@@ -119,29 +130,15 @@ describe('Songs from the other databases', () => {
     expect(withSpaceName(own, 1, 'Gateway', 'g1').map(song => song.spaceId)).to.deep.equal(['g1'])
   })
 
-  it('finds a song by uuid in the library, else in another database', async () => {
-    const mine = await addChart(library, ALPHA, ADD)
-    const theirs = await addChart(shared, BETA, ADD)
-    expect((await getSongFromAnywhere(mine.uuid, library)).source).to.equal(undefined)
-    const found = await getSongFromAnywhere(theirs.uuid, library)
-    expect(found.title).to.equal('Beta')
-    expect(found.source?.dbId).to.equal(SHARED_DB_ID)
-    let failed = false
-    await getSongFromAnywhere('nobody', library).catch(() => {
-      failed = true
-    })
-    expect(failed).to.equal(true)
-  })
-
   it('adds a song to the library as a copy, and leaves the original where it is', async () => {
-    await addChart(shared, BETA, ADD)
-    const [song] = await getSongsElsewhere(libraryId)
+    await addChart(elsewhere, BETA, ADD)
+    const [song] = await fromElsewhere()
     const added = await addToLibrary(song, library)
     expect(added.title).to.equal('Beta')
     expect(added.source).to.equal(undefined)
     expect(added.chordpro).to.equal(BETA)
     expect(must(await library.getSong(added.uuid)).isDefault).to.equal(true)
-    expect(await shared.getAllSongs()).to.have.length(1)
+    expect(await elsewhere.getAllSongs()).to.have.length(1)
 
     // The library has it now: adding again is the same song
     expect((await addToLibrary(song, library)).uuid).to.equal(added.uuid)
@@ -149,13 +146,13 @@ describe('Songs from the other databases', () => {
   })
 
   it('keeps where the song came from, and when, rather than saying it was copied', async () => {
-    const original = await addChart(shared, BETA, { ...ADD, importSource: 'songselect' })
-    await shared.saveSong({
+    const original = await addChart(elsewhere, BETA, { ...ADD, importSource: 'songselect' })
+    await elsewhere.saveSong({
       ...original,
       importDate: '2026-05-04T16:24:37.261Z',
       importUser: 'ann',
     })
-    const [song] = await getSongsElsewhere(libraryId)
+    const [song] = await fromElsewhere()
     const added = await addToLibrary(song, library)
     const record = must(await library.getSong(added.uuid))
     expect(record.importSource).to.equal('songselect')
@@ -165,8 +162,8 @@ describe('Songs from the other databases', () => {
 
   it('adds a different chart of a song the library has as a variant, not the default', async () => {
     const mine = await addChart(library, ALPHA, ADD)
-    await addChart(shared, ALPHA_EDITED, ADD)
-    const [song] = await getSongsElsewhere(libraryId)
+    await addChart(elsewhere, ALPHA_EDITED, ADD)
+    const [song] = await fromElsewhere()
     const added = await addToLibrary(song, library)
     expect(added.uuid).to.not.equal(mine.uuid)
     const all = await library.getAllSongs()

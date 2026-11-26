@@ -1,6 +1,6 @@
 /**
- * Songs in this device's other databases: what was received in shared setlists ("Shared with
- * me"), and the songs of the other spaces on the device. They can be found and read
+ * Songs in this device's other databases: the songs of the other spaces on the device (what was received in a share is not here: it
+ * stays inside the share). They can be found and read
  * from the current space's library, and added to it (copied; nothing is moved or
  * deleted, and what is in another database stays there).
  */
@@ -13,15 +13,10 @@ import { getSpaceById, listSpaces } from './space.ts'
 import { t } from './text.ts'
 import { UserError } from './utils/errors.ts'
 
-const SHARED_LABEL = 'Shared with me'
-
-/** The databases other than the current space's that may hold songs, shared first */
+/** The databases other than the current space's that may hold songs (what was received in a share is not one: it stays in its share) */
 async function otherSources(currentDbId: string): Promise<SongSource[]> {
   const sources: SongSource[] = []
   if ((await getSpaceById(currentDbId))?.team?.churchId) return sources
-  if (currentDbId !== SHARED_DB_ID && (await databaseExists(SHARED_DB_ID))) {
-    sources.push({ dbId: SHARED_DB_ID, label: SHARED_LABEL })
-  }
   for (const space of await listSpaces()) {
     if (space.id === currentDbId || space.team?.churchId) continue
     if (await databaseExists(space.id)) {
@@ -71,21 +66,6 @@ export async function getSongsElsewhere(currentDbId: string): Promise<SongWithCo
   return [...found.values()]
 }
 
-/** The songs received in shared setlists, marked as from "Shared with me" (none where there are no shared setlists) */
-export async function getSharedSongs(): Promise<SongWithContent[]> {
-  const source: SongSource = { dbId: SHARED_DB_ID, label: SHARED_LABEL }
-  try {
-    if (!(await databaseExists(SHARED_DB_ID))) return []
-    const songs = await withSource(SHARED_DB_ID, db => getLibrarySongs(db))
-    return songs.map(song => ({ ...song, source }))
-  } catch (error) {
-    /* v8 ignore start -- the library works without them (the same as getSongsElsewhere's) */
-    console.error('[Songs] Could not read the songs shared with this device:', error)
-    return []
-  }
-}
-/* v8 ignore stop */
-
 /**
  * The songs of a space marked with its name, where the device has more than one space (with one,
  * saying which each is in is noise): the library lists them with songs of other spaces
@@ -117,21 +97,6 @@ export function withSongsFromElsewhere(
   )
 }
 
-/** The song with this uuid from the current space's database or, failing that, another */
-export async function getSongFromAnywhere(
-  uuid: string,
-  currentDb: ChordlessDB
-): Promise<SongWithContent> {
-  if (await currentDb.getSong(uuid)) return getSongWithContent(uuid, currentDb)
-  for (const source of await otherSources(currentDb.dbName)) {
-    const song = await withSource(source.dbId, async db =>
-      (await db.getSong(uuid)) ? { ...(await getSongWithContent(uuid, db)), source } : null
-    )
-    if (song) return song
-  }
-  throw new Error(`Song not found: ${uuid}`)
-}
-
 /**
  * Add a song from another database to the space's library: a copy of its chart, which
  * is the same song if the library has that chart already, and a variant if it has the song in
@@ -142,6 +107,8 @@ export async function addToLibrary(
   song: SongWithContent,
   library: ChordlessDB
 ): Promise<SongWithContent> {
+  // (a chart received in a share stays inside the share: it is read there, and no one's to copy)
+  if (song.source?.dbId === SHARED_DB_ID) throw new UserError(t('share-no-song-copy'))
   if (
     song.source &&
     ((await getSpaceById(library.spaceId))?.team?.churchId ||
@@ -149,7 +116,7 @@ export async function addToLibrary(
   )
     throw new UserError(t('church-no-song-copy'))
   const record = await addChart(library, song.chordpro, {
-    variantLabel: song.source?.dbId === SHARED_DB_ID ? 'Shared' : 'Copied',
+    variantLabel: 'Copied',
     importSource: song.importSource,
     importDate: song.importDate,
     importUser: song.importUser,

@@ -382,14 +382,20 @@ describe('the library view', () => {
 
   describe('the spaces filter', () => {
     let shared: ChordlessDB
+    let otherId = ''
     const KEY = 'library-places-left-out'
     beforeEach(async () => {
       localStorage.removeItem(KEY)
-      shared = new (await import('../src/js/db.ts')).ChordlessDB(SHARED_DB_ID)
+      // (a second space of the device is the second place)
+      const other = await createSpace(`Other ${crypto.randomUUID().slice(0, 8)}`)
+      otherId = other.id
+      shared = new (await import('../src/js/db.ts')).ChordlessDB(otherId)
       await shared.init()
     })
-    afterEach(() => {
+    afterEach(async () => {
       shared.db?.close()
+      await deleteDatabase(otherId)
+      await deleteSpace(otherId)
       localStorage.removeItem(KEY)
     })
     const bar = () => view.querySelector('library-space-filter')
@@ -407,16 +413,16 @@ describe('the library view', () => {
       await addChart(shared, BETA, ADD)
       await open()
       expect(titles()).to.have.length(2)
-      expect(chip(SHARED_DB_ID).getAttribute('aria-pressed')).to.equal('true')
+      expect(chip(otherId).getAttribute('aria-pressed')).to.equal('true')
 
-      chip(SHARED_DB_ID).click()
+      chip(otherId).click()
       await view.updateComplete
-      await waitUntil(() => chip(SHARED_DB_ID).getAttribute('aria-pressed') === 'false')
-      expect(chip(SHARED_DB_ID).getAttribute('aria-pressed')).to.equal('false')
+      await waitUntil(() => chip(otherId).getAttribute('aria-pressed') === 'false')
+      expect(chip(otherId).getAttribute('aria-pressed')).to.equal('false')
       expect(titles()).to.have.length(1)
       expect(titles()[0]).to.contain('Alpha Song')
 
-      chip(SHARED_DB_ID).click()
+      chip(otherId).click()
       await view.updateComplete
       await waitUntil(() => titles().length === 2)
       expect(titles()).to.have.length(2)
@@ -427,13 +433,13 @@ describe('the library view', () => {
       await addChart(db, ALPHA, ADD)
       await addChart(shared, BETA, ADD)
       await open()
-      chip(SHARED_DB_ID).click()
+      chip(otherId).click()
       await view.updateComplete
-      expect(JSON.parse(localStorage.getItem(KEY) as string)).to.deep.equal([SHARED_DB_ID])
+      expect(JSON.parse(localStorage.getItem(KEY) as string)).to.deep.equal([otherId])
       view.remove()
       await open()
       expect(titles()).to.have.length(1)
-      expect(chip(SHARED_DB_ID).getAttribute('aria-pressed')).to.equal('false')
+      expect(chip(otherId).getAttribute('aria-pressed')).to.equal('false')
     })
 
     it('says no songs match when every place is off, and still searches the rest', async () => {
@@ -445,79 +451,6 @@ describe('the library view', () => {
       await waitUntil(() => titles().length === 1)
       expect(titles()).to.have.length(1)
       expect(titles()[0]).to.contain('Beta Song')
-    })
-  })
-
-  describe('a song of another database', () => {
-    let shared: ChordlessDB
-    beforeEach(async () => {
-      shared = new (await import('../src/js/db.ts')).ChordlessDB(SHARED_DB_ID)
-      await shared.init()
-    })
-    afterEach(() => shared.db?.close())
-
-    it('is shown with where it is from, and cannot be edited', async () => {
-      const song = await addChart(shared, BETA, ADD)
-      await open({ name: 'songs', songUuid: song.uuid })
-      expect(view.querySelector('#library-song-source')?.textContent).to.contain(
-        'From Shared with me'
-      )
-      view
-        .querySelector<HTMLElement>('#library-app-header')
-        ?.dispatchEvent(new CustomEvent('app-header:edit-mode-toggle'))
-      expect(document.body.classList.contains('edit-mode')).to.equal(false)
-    })
-
-    it('has no info, as it is not the library’s', async () => {
-      const song = await addChart(shared, BETA, ADD)
-      await open({ name: 'songs', songUuid: song.uuid })
-      const dialog = must(view.querySelector('song-info-dialog')) as HTMLElement & { show: unknown }
-      let shown = 0
-      dialog.show = async () => {
-        shown++
-      }
-      must(view.querySelector('#library-app-header')).dispatchEvent(
-        new CustomEvent('app-header:info-click')
-      )
-      await nothingFor(50)
-      expect(shown).to.equal(0)
-    })
-
-    it('is copied into the library, and opened there', async () => {
-      const song = await addChart(shared, BETA, ADD)
-      await open({ name: 'songs', songUuid: song.uuid })
-      view.querySelector<HTMLButtonElement>('#add-to-library')?.click()
-      await waitUntil(() => visited.length > 0, 'the copy is opened')
-      expect(visited).to.have.length(1)
-      expect(visited[0].replace).to.equal(true)
-      expect(visited[0].url).to.match(/^\/songs\/.+/)
-      expect((await db.getAllSongs()).map(each => each.title)).to.deep.equal(['Beta Song'])
-    })
-
-    it('is still offered copying in a view-only space', async () => {
-      const song = await addChart(shared, BETA, ADD)
-      await setSpaceReadOnly(spaceId, true)
-      await open({ name: 'songs', songUuid: song.uuid })
-      expect(view.querySelector('#add-to-library')).to.not.equal(null)
-    })
-
-    it('stays where it is when it cannot be copied', async () => {
-      const song = await addChart(shared, BETA, ADD)
-      await open({ name: 'songs', songUuid: song.uuid })
-      const real = Object.getPrototypeOf(db).saveSong
-      let tried = false
-      Object.getPrototypeOf(db).saveSong = () => {
-        tried = true
-        return Promise.reject(new Error('disk full'))
-      }
-      try {
-        view.querySelector<HTMLButtonElement>('#add-to-library')?.click()
-        await waitUntil(() => tried, 'the song to be copied')
-        await nothingFor(50)
-      } finally {
-        Object.getPrototypeOf(db).saveSong = real
-      }
-      expect(visited).to.deep.equal([])
     })
   })
 

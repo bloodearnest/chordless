@@ -10,7 +10,7 @@
 
 import { Task } from '@lit/task'
 import type { PropertyValues } from 'lit'
-import { html, nothing } from 'lit'
+import { html } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import type { AppHeader } from '../../components/app-header.ts'
 import { t } from '../text.ts'
@@ -35,19 +35,13 @@ import type {
 } from '../../components/song-section.ts'
 import '../../components/song-section.ts'
 import '../../components/status-message.ts'
-import { findSong, openDefaultSpace, withSpace } from '../all-spaces.ts'
+import { findSong, withSpace } from '../all-spaces.ts'
 import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../data-types.ts'
 import { watchData } from '../data-watcher.ts'
 import { type ChordlessDB, openSpace } from '../db.ts'
 import { filterByPlace, loadLeftOut, placesOf, saveLeftOut } from '../library-spaces.ts'
 import { goTo } from '../navigation.ts'
-import {
-  addToLibrary,
-  getSharedSongs,
-  getSongFromAnywhere,
-  withSongsFromElsewhere,
-  withSpaceName,
-} from '../other-songs.ts'
+import { withSongsFromElsewhere, withSpaceName } from '../other-songs.ts'
 import { getDevicePitchUp, PitchControlsEvent, PitchPreferenceEvent } from '../preferences.ts'
 import { buildUrl, type Route } from '../router.ts'
 import { attachCues, scoreWithKey, shownSheet, showScore } from '../score-shown.ts'
@@ -69,14 +63,12 @@ export class LibraryView extends PageView {
     ...PageView.properties,
     _search: { state: true },
     _heading: { state: true },
-    _source: { state: true },
     _leftOut: { state: true },
   }
 
   declare _search: string
   declare _heading: string
   /** Where the open song is from, if not this space's library */
-  declare _source: string
   /** The ids of the spaces whose songs are left out of the list */
   declare _leftOut: string[]
 
@@ -97,7 +89,6 @@ export class LibraryView extends PageView {
     super()
     this._search = ''
     this._heading = t('menu-library')
-    this._source = ''
     this._leftOut = loadLeftOut()
     // Songs, their charts or the setlists using them were written (by the page, a sync, another
     // tab): the list is as it is now (the old one stays until then)
@@ -127,7 +118,7 @@ export class LibraryView extends PageView {
           )
         )
       ).flat()
-      const songs = withSongsFromElsewhere(own, await getSharedSongs())
+      const songs = withSongsFromElsewhere(own, [])
       this.#spaceNames = new Map(spaces.map(space => [space.id, space.name]))
       warmSearch(songs)
       return songs
@@ -138,17 +129,10 @@ export class LibraryView extends PageView {
   /** The names of the spaces, for the filter bar (kept as the list is loaded) */
   #spaceNames: ReadonlyMap<string, string> = new Map()
 
-  /**
-   * The database a song is in: its own space's. A song received in a shared setlist is in none:
-   * it is the default space's library that adds it (the library it is copied into)
-   */
+  /** The database a song is in: its own space's */
   async #dbFor(song: SongWithContent): Promise<ChordlessDB> {
-    return song.spaceId && !song.source ? openSpace(song.spaceId) : this.#libraryDB()
-  }
-
-  /** The default space's database (or the first one that can be written to) */
-  async #libraryDB(): Promise<ChordlessDB> {
-    return openDefaultSpace()
+    // (every song the library shows is listed with its space)
+    return openSpace(song.spaceId as string)
   }
 
   // ==================== Lifecycle ====================
@@ -300,9 +284,8 @@ export class LibraryView extends PageView {
     this.#openUuid = uuid
     try {
       const inSpace = await findSong(uuid)
-      const song = inSpace
-        ? { ...inSpace.song, spaceId: inSpace.space.id }
-        : await getSongFromAnywhere(uuid, await this.#libraryDB())
+      if (!inSpace) throw new Error(`Song not found: ${uuid}`)
+      const song = { ...inSpace.song, spaceId: inSpace.space.id }
       if (sync !== this.#syncing) return
       await this.#viewSong(song)
     } catch (error) {
@@ -375,9 +358,6 @@ export class LibraryView extends PageView {
   async #viewSong(song: SongWithContent): Promise<void> {
     this.#song = song
     this.#melodyOn = Boolean(this.#route.melody)
-    this._source = song.source?.label ?? ''
-    // Not the library's: nothing here changes it
-    if (song.source) this.#setEditMode(false)
     if (!song.chordpro) {
       console.error('Song has no ChordPro content!', song)
       throw new Error('Song has no ChordPro content')
@@ -416,7 +396,6 @@ export class LibraryView extends PageView {
       header.melodyUnavailable = false
       header.melodyMode = false
     }
-    this._source = ''
   }
 
   /** Render a (possibly transposed) chart into the song view, and set its sections up */
@@ -453,9 +432,7 @@ export class LibraryView extends PageView {
   }
 
   #toggleEditMode(): void {
-    if (this.#song?.source) {
-      this.#setEditMode(false)
-    } else if (this.#editMode) {
+    if (this.#editMode) {
       this.#setEditMode(false)
       this.#saveSong()
     } else {
@@ -627,17 +604,6 @@ export class LibraryView extends PageView {
   }
 
   /** Copy the open song, from another database, into this space's library, and open that */
-  async #addToLibrary(): Promise<void> {
-    // (the button is there only for a song from another database)
-    const song = this.#song as SongWithContent
-    try {
-      const added = await addToLibrary(song, await this.#libraryDB())
-      await goTo(buildUrl({ name: 'songs', songUuid: added.uuid }), { replace: true })
-    } catch (error) {
-      console.error('Could not add the song to the library:', error)
-    }
-  }
-
   /** The versions of a song changed (the list follows the writes): and the song may be gone, so back to the list */
   #versionsChanged(event: SongVersionsChangedEvent): void {
     if (event.songDeleted) void goTo(buildUrl({ name: 'songs' }), { replace: true })
@@ -654,7 +620,7 @@ export class LibraryView extends PageView {
   }
 
   async #showInfo(): Promise<void> {
-    if (!this.#parsed || !this.#song || this.#song.source) return
+    if (!this.#parsed || !this.#song) return
     const dialog = this.#infoDialog.value as SongInfoDialog
     dialog.db = await this.#dbFor(this.#song)
     await dialog.show(this.#song.id, { title: this.#parsed.metadata.title })
@@ -755,16 +721,6 @@ export class LibraryView extends PageView {
 
           <!-- The song (slides in from the right) -->
           <div id="library-song-view" class="library-song-view" ${ref(this.#songView)}>
-            ${
-              this._source
-                ? html`<div class="song-source" id="library-song-source">
-                  <span>${t('library-source-from', { source: this._source })}</span>
-                  <button type="button" id="add-to-library" @click=${() => this.#addToLibrary()}>
-                        ${t('library-add')}
-                      </button>
-                </div>`
-                : nothing
-            }
             <div
               id="library-song-content"
               class="library-song-content"

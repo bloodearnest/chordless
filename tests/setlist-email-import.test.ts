@@ -15,7 +15,6 @@ import { offerLink, takeLink } from '../src/js/incoming-link.ts'
 import { NEW_PERSON } from '../src/js/leaders.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import { personFor } from '../src/js/people.ts'
-import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
 import { addChart, createSong } from '../src/js/song-utils.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { makeEntry, makeImportedSong, makeSetlist } from './builders.ts'
@@ -76,7 +75,6 @@ describe('setlist-email-import', () => {
     takeLink('/import-setlist')
     window.history.replaceState(null, '', startUrl)
     db.db?.close()
-    await deleteDatabase(SHARED_DB_ID)
     await deleteSpace(spaceId)
     if (before.id) await setCurrentSpace(before.id, before.name)
   })
@@ -625,7 +623,8 @@ describe('setlist-email-import', () => {
     })
 
     it('has a song of another database copied into the library with it', async () => {
-      const shared = new (await import('../src/js/db.ts')).ChordlessDB(SHARED_DB_ID)
+      const other = await createSpace(`Other ${crypto.randomUUID().slice(0, 8)}`)
+      const shared = new (await import('../src/js/db.ts')).ChordlessDB(other.id)
       await shared.init()
       await addChart(shared, chart('Shared Only Song', '7654321'), {
         variantLabel: 'Shared',
@@ -633,11 +632,16 @@ describe('setlist-email-import', () => {
         makeDefault: 'first',
       })
       shared.db?.close()
-      await review(email({ songs: [makeImportedSong('Shared Only Song', { ccli: '7654321' })] }))
-      expect(text()).to.contain('copied into your library')
-      button(/Create setlist/)?.click()
-      await waitUntil(() => visited.length === 1, 'the page to go to the setlist')
-      expect((await db.getAllSongs()).map(song => song.title)).to.include('Shared Only Song')
+      try {
+        await review(email({ songs: [makeImportedSong('Shared Only Song', { ccli: '7654321' })] }))
+        expect(text()).to.contain('copied into your library')
+        button(/Create setlist/)?.click()
+        await waitUntil(() => visited.length === 1, 'the page to go to the setlist')
+        expect((await db.getAllSongs()).map(song => song.title)).to.include('Shared Only Song')
+      } finally {
+        await deleteDatabase(other.id)
+        await deleteSpace(other.id)
+      }
     })
   })
 
