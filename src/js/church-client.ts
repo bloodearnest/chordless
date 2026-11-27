@@ -67,6 +67,9 @@ export const churchClient = {
   members: (id: string) => call<ChurchMember[]>(`${church(id)}/members`),
   addTeam: (id: string, name: string) =>
     call<{ id: string }>(`${church(id)}/teams`, 'POST', { name }),
+  /** Move a team that is on Google Drive into the church (an admin of both; docs/CUTOVER.md) */
+  adopt: (id: string, teamId: string) =>
+    call<{ teamId: string; churchId: string }>(`${team(id, teamId)}/adopt`, 'POST'),
   archiveTeam: (id: string, teamId: string) => call<void>(team(id, teamId), 'DELETE'),
   restoreTeam: (id: string, teamId: string) => call<void>(team(id, teamId), 'PUT'),
   follow: (id: string, teamId: string, following: boolean) =>

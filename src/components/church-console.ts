@@ -9,6 +9,7 @@ import {
   churchClient,
 } from '../js/church-client.ts'
 import { isAuthenticated } from '../js/google-auth.ts'
+import { teamApi } from '../js/team-client.ts'
 import type { MemberRole } from '../js/team-roles.ts'
 import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
@@ -29,6 +30,7 @@ export class ChurchConsole extends LitElement {
     _churches: { state: true },
     _selected: { state: true },
     _teams: { state: true },
+    _driveTeams: { state: true },
     _members: { state: true },
     _loading: { state: true },
     _signedIn: { state: true },
@@ -39,6 +41,8 @@ export class ChurchConsole extends LitElement {
   declare _churches: ChurchInfo[]
   declare _selected: string
   declare _teams: ChurchTeam[]
+  /** Teams of this person's that are still on Google Drive, which they may move into the church */
+  declare _driveTeams: { spaceId: string; name: string; role: string }[]
   declare _members: ChurchMember[]
   declare _loading: boolean
   declare _signedIn: boolean
@@ -47,6 +51,9 @@ export class ChurchConsole extends LitElement {
   declare _joined: boolean
   _confirm: Ref<AppModal> = createRef()
   api = churchClient
+  /** The teams the person is in that are still on Google Drive (a test gives its own) */
+  driveTeams: () => Promise<{ spaceId: string; name: string; role: string }[]> = () =>
+    teamApi.list()
   authenticated = isAuthenticated
   copyText = (text: string) => navigator.clipboard.writeText(text)
   static override styles = [
@@ -66,6 +73,7 @@ export class ChurchConsole extends LitElement {
     this._churches = []
     this._selected = ''
     this._teams = []
+    this._driveTeams = []
     this._members = []
     this._loading = true
     this._signedIn = false
@@ -103,13 +111,19 @@ export class ChurchConsole extends LitElement {
   async loadSelected() {
     if (!this._selected) {
       this._teams = []
+      this._driveTeams = []
       this._members = []
       return
     }
     const id = this._selected
     const [teams, members] = await Promise.all([this.api.teams(id), this.api.members(id)])
+    // (only an owner or admin of a Drive team may move it; a Worker that cannot say leaves the list empty)
+    const drive = (await this.driveTeams().catch(() => [])).filter(
+      each => each.role === 'owner' || each.role === 'admin'
+    )
     if (this._selected === id) {
       this._teams = teams
+      this._driveTeams = drive
       this._members = members
     }
   }
@@ -188,6 +202,19 @@ export class ChurchConsole extends LitElement {
   async archive(church: ChurchInfo, team: ChurchTeam) {
     if (!(await this.confirm(t('church-console-confirm-archive', { name: team.name })))) return
     await this.run(() => this.api.archiveTeam(church.id, team.id))
+  }
+  /** Move a team that is on Google Drive into the church, after asking: its members join the church, and each device follows */
+  async adopt(church: ChurchInfo, team: { spaceId: string; name: string }) {
+    if (
+      !(await this.confirm(
+        t('church-console-confirm-adopt', { team: team.name, church: church.name })
+      ))
+    )
+      return
+    await this.run(async () => {
+      await this.api.adopt(church.id, team.spaceId)
+      toast(t('church-console-adopted', { team: team.name }))
+    })
   }
   async removeMember(church: ChurchInfo, member: ChurchMember) {
     if (
@@ -278,6 +305,7 @@ export class ChurchConsole extends LitElement {
         <section class="panel"><h2>${t('church-console-teams')}</h2>${this._teams.map(team => html`<div class="row"><span>${team.name}</span>${!team.archivedAt ? html`<label><input type="checkbox" .checked=${Boolean(team.followed)} @change=${(event: Event) => void this.run(() => this.api.follow(church.id, team.id, (event.currentTarget as HTMLInputElement).checked))}>${t('church-console-follow')}</label>` : nothing}${admin ? html`<button class="btn" ?disabled=${this._busy} @click=${() => (team.archivedAt ? this.run(() => this.api.restoreTeam(church.id, team.id)) : this.archive(church, team))}>${t(team.archivedAt ? 'church-console-restore' : 'church-console-archive')}</button>` : nothing}</div>`)}
         ${admin ? html`<form @submit=${(event: Event) => this.addTeam(event, church)}><label>${t('church-console-team-name')}<input name="team" required></label><button class="btn" ?disabled=${this._busy}>${t('church-console-team-add')}</button></form>` : nothing}</section>
         <section class="panel"><h2>${t('church-console-members')}</h2>${this._members.map(member => html`<div class="row"><span>${member.name ?? member.id}</span>${admin ? html`<select aria-label=${t('church-console-role')} @change=${(event: Event) => this.changeRole(church, member, event)}>${this.roles(member.role)}</select><button class="btn" @click=${() => this.removeMember(church, member)}>${t('church-console-remove')}</button>` : html`<span>${t(roleText[member.role])}</span>`}</div>`)}</section>
+        ${admin && this._driveTeams.length ? html`<section class="panel" id="drive-teams"><h2>${t('church-console-drive-teams')}</h2><p>${t('church-console-drive-text')}</p>${this._driveTeams.map(drive => html`<div class="row"><span>${drive.name}</span><button class="btn" ?disabled=${this._busy} @click=${() => this.adopt(church, drive)}>${t('church-console-adopt', { church: church.name })}</button></div>`)}</section>` : nothing}
         ${admin && this._teams.some(team => !team.archivedAt) ? html`<section class="panel"><h2>${t('church-console-invite')}</h2><form @submit=${(event: Event) => this.invite(event, church)}><label>${t('church-console-email')}<input name="email" type="email" required></label><label>${t('church-console-role')}<select name="role">${this.roles('reader')}</select></label><label>${t('church-console-invite-team')}<select name="team">${this._teams.filter(team => !team.archivedAt).map(team => html`<option value=${team.id}>${team.name}</option>`)}</select></label><button class="btn" ?disabled=${this._busy}>${t('church-console-invite-create')}</button></form>${this._invite ? html`<input readonly .value=${this._invite}><button class="btn" @click=${this.copyInvite}>${t('church-console-invite-copy')}</button>` : nothing}</section>` : nothing}`
           : nothing
       }

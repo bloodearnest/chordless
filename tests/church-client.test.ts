@@ -51,6 +51,8 @@ it('sends church administration calls with the signed-in session', async () => {
     await churchClient.setRole('c', 'a', 'writer')
     await churchClient.removeMember('c', 'a')
     await churchClient.invite('c', 't', 'a@example.com', 'reader')
+    await churchClient.adopt('c', 't')
+    expect(calls.at(-1)).to.deep.include({ path: '/api/churches/c/teams/t/adopt', method: 'POST' })
     await churchClient.join('t', 'secret')
     expect(
       calls.find(call => call.path.endsWith('/members/a') && call.method === 'PUT')?.body

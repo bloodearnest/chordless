@@ -135,7 +135,9 @@ export async function syncSpaceDataFor(
   }
   const personal = !space.team
   const teamId = space.team?.id ?? space.id
-  let creating = controllers.get(spaceId)
+  // (a team that has become a church's is synced another way: a controller made for it before is not the one for it now)
+  const mode = `${spaceId}:${space.team?.churchId ?? (space.server ? 'server' : '')}`
+  let creating = controllers.get(mode)
   if (!creating) {
     creating = (async () => {
       const db = await openSpace(spaceId, 'sync')
@@ -167,8 +169,8 @@ export async function syncSpaceDataFor(
           }),
       })
     })()
-    controllers.set(spaceId, creating)
-    void creating.catch(() => controllers.delete(spaceId))
+    controllers.set(mode, creating)
+    void creating.catch(() => controllers.delete(mode))
   }
   const sync = await creating
   // (the songs go first: a setlist is refused for a song the library does not have)
