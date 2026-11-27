@@ -207,7 +207,41 @@ export async function syncPersonalLibrarySongs(
   await syncLibrarySongsAt(`/api/libraries/${encodeURIComponent(libraryId)}/songs`, db, connection)
 }
 
+/** The syncs of each library that are running or waiting, newest last: one goes at a time (see `syncLibrarySongsAt`) */
+const running = new Map<string, Promise<unknown>>()
+
+/**
+ * One sync of a library's songs at a time. A move to the server sends a hundred songs one after another, which takes a
+ * minute, and the app syncs by itself (a tick, a return to the page, a button) in that time: a second sync that lists
+ * the library while the first is part way sends the songs the first has not reached yet, and the first then finds them
+ * already there and is refused (409). The second waits for the first, then finds nothing to do. Another tab waits too,
+ * where the browser has Web Locks.
+ */
 async function syncLibrarySongsAt(
+  root: string,
+  db: ChordlessDB,
+  connection: WorkerConnection
+): Promise<void> {
+  const previous = running.get(root) ?? Promise.resolve()
+  const turn = previous
+    .catch(() => {})
+    /* v8 ignore next 7 -- Web Locks is the browser's, for a second tab; Node has none, and the queue above is what the tests hold */
+    .then(() =>
+      navigator.locks
+        ? navigator.locks.request(`chordless-library-songs-${root}`, () =>
+            syncLibrarySongsNow(root, db, connection)
+          )
+        : syncLibrarySongsNow(root, db, connection)
+    )
+  running.set(root, turn)
+  try {
+    await turn
+  } finally {
+    if (running.get(root) === turn) running.delete(root)
+  }
+}
+
+async function syncLibrarySongsNow(
   root: string,
   db: ChordlessDB,
   connection: WorkerConnection
