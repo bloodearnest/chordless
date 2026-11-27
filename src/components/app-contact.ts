@@ -164,6 +164,12 @@ export class AppContact extends LitElement {
             </button>
           </div>
         </div>
+
+        <div class="panel">
+          <h3>${t('speed-test-link-heading')}</h3>
+          <p>${t('speed-test-link-text')}</p>
+          <a id="contact-speed-test" class="btn" href="/speed-test">${t('speed-test-link')}</a>
+        </div>
       </div>
     `
   }

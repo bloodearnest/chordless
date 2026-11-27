@@ -67,6 +67,7 @@ test.describe('Moving between views', () => {
     ['/songs', 'library-view', 'Song Library - Chordless'],
     ['/about', 'about-view', 'About - Chordless'],
     ['/contact', 'contact-view', 'Contact - Chordless'],
+    ['/speed-test', 'speed-test-view', 'Speed test - Chordless'],
   ]) {
     test(`${path} opens ${tag}, titled ${title}`, { tag: '@logic' }, async ({ page }) => {
       await openApp(page, path)

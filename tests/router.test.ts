@@ -55,6 +55,7 @@ describe('matchRoute', () => {
     ['/sign-in', { name: 'sign-in' }],
     ['/sign-in/abc_DEF-123', { name: 'sign-in', linkId: 'abc_DEF-123' }],
     ['/media', { name: 'media' }],
+    ['/speed-test', { name: 'speed-test' }],
 
     // The library list, searched
     ['/songs?q=grace', { name: 'songs', search: 'grace' }],
@@ -136,6 +137,7 @@ describe('buildUrl', () => {
     ],
     [{ name: 'new-team-space' }, '/account/new'],
     [{ name: 'media' }, '/media'],
+    [{ name: 'speed-test' }, '/speed-test'],
     [{ name: 'setlist', setlistId: 'abc', songIndex: -1 }, '/setlist/abc'],
     [{ name: 'setlist', setlistId: 'abc', songIndex: 4 }, '/setlist/abc/song/4'],
     [{ name: 'setlist', setlistId: 'a b', songIndex: -1 }, '/setlist/a%20b'], // ids are encoded

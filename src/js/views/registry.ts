@@ -104,6 +104,11 @@ export const views: Record<string, ViewEntry> = {
     () => import('./contact-view.ts'),
     () => t('title-contact')
   ),
+  'speed-test': view(
+    'speed-test-view',
+    () => import('./speed-test-view.ts'),
+    () => t('title-speed-test')
+  ),
   join: view(
     'join-view',
     () => import('./join-view.ts'),

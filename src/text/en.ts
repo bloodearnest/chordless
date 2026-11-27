@@ -1848,6 +1848,7 @@ title-import-setlist = Import a Setlist - Chordless
 title-library = Song Library - Chordless
 title-about = About - Chordless
 title-contact = Contact - Chordless
+title-speed-test = Speed test - Chordless
 title-join = Join a team space - Chordless
 title-media = Media player - Chordless
 title-new-team = New team space - Chordless
@@ -2153,6 +2154,45 @@ contact-details-heading = What goes with it
 contact-details-text = So we do not have to ask. It is added under your message, and says nothing about your songs.
 contact-write = Write the email
 contact-copy = Copy the details
+
+## Speed test
+
+# The heading of the page, and of the link to it on the Contact page.
+speed-test-page = Speed test
+speed-test-heading = Is Chordless slow on this device?
+speed-test-intro = This draws made-up songs three different ways and times each one, which shows where the time goes. It takes about a minute. Keep this page open and the screen on, and do not run it during a service: the page is busy while it runs.
+# <privacy> is a link to the privacy page, where the reports are turned off.
+speed-test-private-on = When it finishes, the timings are sent to us with the app's anonymous usage reports, under your Support ID. The songs are made up, so nothing of yours is in them. You can turn the reports off on the <privacy>privacy page</privacy>, and nothing is sent.
+# <privacy> is a link to the privacy page, where the reports are turned on.
+speed-test-private-off = Usage reports are off, so nothing is sent from here. The songs are made up, so nothing of yours is in the results: you read them, and send them to us if you choose. You can turn the reports on at the <privacy>privacy page</privacy>.
+speed-test-low-power-label = Is Low Power Mode on? (A page cannot tell: it is in Settings, under Battery, and slows the screen down.)
+speed-test-low-power-unknown = I do not know
+speed-test-low-power-on = Yes, it is on
+speed-test-low-power-off = No, it is off
+speed-test-note-label = Anything else we should know? (The battery is low, a lot of apps are open, which setlist feels slow.) This is not in the usage reports: it is only in the results you copy or email.
+speed-test-start = Start the test
+speed-test-again = Run it again
+speed-test-stop = Stop
+speed-test-starting = Getting ready
+# { $done } is the timing under way, of { $total }. { $what } is what is being drawn: a message below.
+speed-test-progress = Timing { $done } of { $total }: { $what }
+# { $count } is how many songs.
+speed-test-what-real = { $count } songs, as Chordless draws them
+speed-test-what-lyrics = { $count } songs with no chords
+speed-test-what-plain = { $count } songs as plain elements
+# { $reason } is what went wrong, as the browser says it.
+speed-test-failed = The test could not finish: { $reason }
+speed-test-done-heading = The results
+# Shown above the results when the timings were sent as usage reports.
+speed-test-sent = The timings were sent to us, as anonymous usage reports under your Support ID. You do not have to send anything else.
+# Shown above the results when usage reports are off.
+speed-test-not-sent = Usage reports are off, so nothing was sent. To send these to us, copy them or write the email.
+speed-test-done-text = They have your Support ID and your device's details in them, and nothing about your songs. You can send them to us with a message if you like.
+speed-test-copy = Copy the results
+speed-test-write = Write the email
+speed-test-link-heading = Is it slow?
+speed-test-link-text = The speed test times how long songs take to draw on this device, and makes a report you can send us. It takes about a minute.
+speed-test-link = Run the speed test
 
 usage-toggle = Send anonymous usage reports from this device
 # <code> is the number. { $id } is the support ID.
