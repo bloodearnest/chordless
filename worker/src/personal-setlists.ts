@@ -16,6 +16,7 @@ import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
 import { isRecord, jsonResponse, Refusal, readJson, refusing } from './http.ts'
 import { authenticate, SESSION_PROVIDER, sessionProvider } from './identity.ts'
+import { changedSetlists, notifySetlistShares } from './share-notify.ts'
 import { Invalid, parseSetlist } from './space-data.ts'
 import { fromRow, type SetlistRow } from './team-setlists.ts'
 
@@ -159,6 +160,7 @@ export function handlePersonalSetlists(request: Request, env: Env): Promise<Resp
       if (!Array.isArray(body.ops) || body.ops.length > 100) throw new Refusal(400, 'Invalid batch')
       const results: SpaceOpResult[] = []
       for (const op of body.ops) results.push(await apply(db, account, op))
+      await notifySetlistShares(env, changedSetlists(body.ops, results))
       return jsonResponse({ results })
     }
     throw new Refusal(404, 'Not found')
