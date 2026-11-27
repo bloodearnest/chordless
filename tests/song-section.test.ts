@@ -35,6 +35,12 @@ describe('song-section', () => {
     )
   })
 
+  it('does not blur what is behind the show controls: they are opaque, so there is nothing to see, and a blur on every section is slow to draw in WebKit', async () => {
+    await setUp({ editMode: false })
+    const pill = section.shadowRoot.querySelector('.hide-pill')
+    expect(getComputedStyle(pill).backdropFilter).to.equal('none')
+  })
+
   it('shows no note when there is none', async () => {
     await setUp()
     expect(section.shadowRoot.querySelector('.section-note')).to.equal(null)

@@ -68,6 +68,9 @@ describe('app-speed-test', () => {
     expect(report(element)).to.contain('Chordless speed test')
     expect(report(element)).to.match(/Support ID: [0-9a-f]{8}\n/)
     expect(report(element)).to.contain('1 songs: first painted after')
+    // (the theme it was drawn in is said, in the report and in the timings)
+    expect(report(element)).to.match(/theme: (light|dark|unknown)\n/)
+    expect(sent()[0]?.attributes['chordless.speedtest.theme']).to.match(/^(light|dark|unknown)$/)
     // ...and the test is over: nothing is left drawn, and it offers to run again
     expect(part(element, '.stage')?.children).to.have.length(0)
     expect(part(element, '#speed-test-start')?.textContent).to.contain('Run it again')

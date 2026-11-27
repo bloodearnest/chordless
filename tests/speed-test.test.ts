@@ -8,7 +8,7 @@ import {
   summariseFrames,
   timeDrawing,
 } from '../src/js/speed-test/measure.ts'
-import { speedTestReport } from '../src/js/speed-test/report.ts'
+import { deviceFacts, speedTestReport } from '../src/js/speed-test/report.ts'
 import { type Progress, type RunResult, runSpeedTest } from '../src/js/speed-test/runner.ts'
 import { VARIANTS } from '../src/js/speed-test/variants.ts'
 import type { DeviceDetails } from '../src/js/telemetry/device.ts'
@@ -343,7 +343,7 @@ describe('speedTestReport', () => {
     online: true,
     userAgent: 'Mozilla/5.0 (Macintosh)',
   }
-  const facts = { cores: 6, reducedMotion: false, serviceWorker: true }
+  const facts = { cores: 6, reducedMotion: false, serviceWorker: true, theme: 'dark' as const }
   const when = new Date('2026-11-27T21:30:00Z')
   const result = (overrides: Partial<RunResult> = {}): RunResult => ({
     variant: 'real',
@@ -379,7 +379,7 @@ describe('speedTestReport', () => {
     expect(report).to.contain('Support ID: 6144007e')
     expect(report).to.contain('Version: 7d3c35fbfb62')
     expect(report).to.contain('Device: tablet, coarse pointer, 5 touch points')
-    expect(report).to.contain('Cores: 6, reduced motion: off, service worker: yes')
+    expect(report).to.contain('Cores: 6, reduced motion: off, service worker: yes, theme: dark')
     expect(report).to.contain('Low Power Mode: not said')
     expect(report).to.contain('Run: 2026-11-27T21:30:00.000Z, taking 48 s')
   })
@@ -511,5 +511,28 @@ describe('the plain way of drawing a section with no label', () => {
     plain?.draw(root, [{ ...chart, sections: [{ ...chart.sections[0], label: null }] }])
     expect(root.querySelector('.section-title')?.textContent).to.equal('')
     expect(root.querySelectorAll('.chord-line')).to.have.length(6)
+  })
+})
+
+describe('deviceFacts', () => {
+  afterEach(() => {
+    document.documentElement.style.removeProperty('color-scheme')
+  })
+
+  it('says the theme the page is drawn in, as the theme manager sets it on the root', () => {
+    document.documentElement.style.colorScheme = 'light'
+    expect(deviceFacts().theme).to.equal('light')
+    document.documentElement.style.colorScheme = 'dark'
+    expect(deviceFacts().theme).to.equal('dark')
+  })
+
+  it('says it is not known when the root has no theme', () => {
+    document.documentElement.style.removeProperty('color-scheme')
+    expect(deviceFacts().theme).to.equal('unknown')
+  })
+
+  it('has the device’s own cores and reduced motion', () => {
+    expect(deviceFacts().cores).to.equal(navigator.hardwareConcurrency)
+    expect(deviceFacts().reducedMotion).to.be.a('boolean')
   })
 })
