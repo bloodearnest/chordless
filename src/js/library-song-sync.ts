@@ -202,9 +202,47 @@ export async function syncLibrarySongs(
 export async function syncPersonalLibrarySongs(
   libraryId: string,
   db: ChordlessDB,
-  connection: WorkerConnection
+  connection: WorkerConnection,
+  options: SongSyncOptions = {}
 ): Promise<void> {
-  await syncLibrarySongsAt(`/api/libraries/${encodeURIComponent(libraryId)}/songs`, db, connection)
+  await syncLibrarySongsAt(
+    `/api/libraries/${encodeURIComponent(libraryId)}/songs`,
+    db,
+    connection,
+    options
+  )
+}
+
+export interface SongSyncOptions {
+  /** Told how many of the songs to send have been sent, as they go (a move shows it) */
+  progress?: (sent: number, total: number) => void
+}
+
+/** How many songs are sent at once: a move sends a hundred, and one at a time took a minute */
+const UPLOADS_AT_ONCE = 4
+
+/** Run `work` on each item, up to `limit` at once; the first failure stops it taking more and is what is thrown */
+async function inParallel<T>(
+  items: T[],
+  limit: number,
+  work: (item: T) => Promise<void>
+): Promise<void> {
+  let next = 0
+  let failure: unknown
+  let failed = false
+  const worker = async () => {
+    while (!failed && next < items.length) {
+      const item = items[next++]
+      try {
+        await work(item)
+      } catch (error) {
+        if (!failed) failure = error
+        failed = true
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  if (failed) throw failure
 }
 
 /** The syncs of each library that are running or waiting, newest last: one goes at a time (see `syncLibrarySongsAt`) */
@@ -220,7 +258,8 @@ const running = new Map<string, Promise<unknown>>()
 async function syncLibrarySongsAt(
   root: string,
   db: ChordlessDB,
-  connection: WorkerConnection
+  connection: WorkerConnection,
+  options: SongSyncOptions = {}
 ): Promise<void> {
   const previous = running.get(root) ?? Promise.resolve()
   const turn = previous
@@ -229,9 +268,9 @@ async function syncLibrarySongsAt(
     .then(() =>
       navigator.locks
         ? navigator.locks.request(`chordless-library-songs-${root}`, () =>
-            syncLibrarySongsNow(root, db, connection)
+            syncLibrarySongsNow(root, db, connection, options)
           )
-        : syncLibrarySongsNow(root, db, connection)
+        : syncLibrarySongsNow(root, db, connection, options)
     )
   running.set(root, turn)
   try {
@@ -244,7 +283,8 @@ async function syncLibrarySongsAt(
 async function syncLibrarySongsNow(
   root: string,
   db: ChordlessDB,
-  connection: WorkerConnection
+  connection: WorkerConnection,
+  { progress }: SongSyncOptions
 ): Promise<void> {
   const response = await callWorker({ path: root }, connection)
   const index = (await response.json()) as SongIndex
@@ -350,12 +390,18 @@ async function syncLibrarySongsNow(
     }
   }
 
+  const toSend: [SongRecord, SongBundle][] = []
   for (const [id, song] of local) {
     if (remote.has(id)) continue
     const bundle = await localBundle(db, song)
-    if (!bundle) continue
-    await upload(root, db, song, bundle, null, connection)
+    if (bundle) toSend.push([song, bundle])
   }
+  let sent = 0
+  progress?.(sent, toSend.length)
+  await inParallel(toSend, UPLOADS_AT_ONCE, async ([song, bundle]) => {
+    await upload(root, db, song, bundle, null, connection)
+    progress?.(++sent, toSend.length)
+  })
   if (conflict) throw new LibrarySongSyncConflict()
 }
 

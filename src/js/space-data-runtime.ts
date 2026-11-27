@@ -117,7 +117,12 @@ const failures = new Map<string, string>()
 /** Manual syncs may name any space. Automatic ticks still follow the current space until step 5. */
 export async function syncSpaceDataFor(
   spaceId: string,
-  options: { all?: boolean; retryRefused?: boolean } = {}
+  options: {
+    all?: boolean
+    retryRefused?: boolean
+    /** Told how many songs have been sent, as a move sends them */
+    progress?: (sent: number, total: number) => void
+  } = {}
 ): Promise<void> {
   if (!navigator.onLine) return
   const space = await getSpaceById(spaceId)
@@ -171,7 +176,8 @@ export async function syncSpaceDataFor(
     await syncPersonalLibrarySongs(
       space.server.libraryId,
       await openSpace(spaceId, 'sync'),
-      connection
+      connection,
+      { progress: options.progress }
     )
   } else if (space.team?.churchId) {
     await syncLibrarySongs(teamId, await openSpace(spaceId, 'sync'), connection)
@@ -195,7 +201,11 @@ async function syncOverlaysOf(spaceId: string, connection: WorkerConnection): Pr
  * Move a Personal space to the server, once and for good (space-move.ts): its songs and setlists are sent, and Drive is not
  * synced again. A space that is not a Personal one still on Drive does not move.
  */
-export async function moveSpaceToServerNow(spaceId: string, combine = false): Promise<void> {
+export async function moveSpaceToServerNow(
+  spaceId: string,
+  combine = false,
+  progress?: (sent: number, total: number) => void
+): Promise<void> {
   const space = await getSpaceById(spaceId)
   if (!space || space.team || space.server)
     throw new Error('Only a Personal space on Drive can move')
@@ -212,7 +222,7 @@ export async function moveSpaceToServerNow(spaceId: string, combine = false): Pr
       mark: async (libraryId, movedAt) => {
         await updateSpace(spaceId, { server: { libraryId, movedAt } })
       },
-      sync: () => syncSpaceDataFor(spaceId, { all: true }),
+      sync: () => syncSpaceDataFor(spaceId, { all: true, progress }),
       now: () => new Date().toISOString(),
     },
     combine

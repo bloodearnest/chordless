@@ -653,7 +653,9 @@ action-move-to-server = Move to Chordless
 space-move-heading = Move { $name } to Chordless?
 space-move-message = Its songs and setlists will be stored on Chordless, and synced between your devices from then on. It will not sync with Google Drive again, and this cannot be undone. Its files in Google Drive stay where they are until you delete them. Pad audio is not moved: add your pads again when you need them.
 # Shown on the card while a space is being moved.
-space-move-starting = Moving to Chordless…
+space-move-starting = Moving to Chordless… stay on this page until it is done.
+# { $sent } of { $total } songs have been sent to Chordless.
+space-move-progress = Moving to Chordless… { $sent } of { $total } songs sent. Stay on this page until it is done.
 # The account already has songs or setlists on Chordless: nothing has been moved yet, and this asks whether to combine.
 # { $name } is the name of the space.
 space-combine-heading = Combine { $name } with your Chordless account?
