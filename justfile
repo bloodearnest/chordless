@@ -134,6 +134,14 @@ db-backup:
     mkdir -p .backups
     npx wrangler d1 export chordless-teams --remote --output ".backups/chordless-teams-$(date -u +%Y%m%dT%H%M%SZ).sql"
 
+# A copy of everything Chordless holds on the server, on this computer (docs/BACKUP.md): the database as SQL, and every
+# object in the R2 bucket (song charts, PDFs, pads), kept by key and never deleted from the copy. Read-only on the server.
+# Ends by checking it is whole. The bucket needs a Cloudflare token (CLOUDFLARE_API_TOKEN, or the file .cloudflare-token),
+# the database `wrangler login` or a token with D1 (as `just db-backup`).
+# .backups/ is git-ignored: it holds people's addresses and charts, so it is never committed or uploaded.
+backup:
+    node scripts/backup.ts
+
 # The same, for trying live sync (docs/LIVE_SYNC.md): the Worker is its own process (wrangler dev), as the
 # Vite plugin cannot pass WebSockets to it. Slower to start and heavier; `just serve` is for everything else
 serve-live:
