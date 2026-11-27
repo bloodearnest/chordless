@@ -74,6 +74,8 @@ export interface AppRouterOptions {
   rememberLimit?: number
   /** where to keep them across a reload (default sessionStorage; null for nowhere) */
   storage?: Storage | null
+  /** reload the page (a test gives its own) */
+  reload?: () => void
 }
 
 const ignore = () => undefined
@@ -81,6 +83,22 @@ const ignore = () => undefined
 const newKey = () => crypto.randomUUID()
 
 const STORAGE_KEY = 'chordless:view-states'
+
+/** When the page last reloaded itself for a view's code that was gone (sessionStorage) */
+const STALE_RELOAD_KEY = 'chordless:stale-reload'
+/** A second failure inside this time is not mended by another reload: the error view is shown */
+const STALE_RELOAD_GAP_MS = 60 * 1000
+
+/**
+ * Whether an error is a module that could not be fetched: the browser's three wordings
+ * (Chrome, Firefox, Safari), and Vite's own for a preload.
+ */
+export function isModuleFetchError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /dynamically imported module|Importing a module script failed|Unable to preload CSS/i.test(
+    message
+  )
+}
 
 /**
  * The title of a page, as the document is given it. In an installed app's window the browser
@@ -127,6 +145,7 @@ export class AppRouter {
   #viewStates = new Map<string, ViewState>()
   #rememberLimit: number
   #storage: Storage | null
+  #reload: () => void
   #shownKey: string | null = null
 
   constructor({
@@ -137,7 +156,11 @@ export class AppRouter {
     errorView = defaultErrorView,
     rememberLimit = 50,
     storage = sessionStorageIfAvailable(),
+    /* v8 ignore next 2 -- reloading the page would end the test run: tests give their own */
+    // biome-ignore lint/plugin: the page's own files are an old version's, and are gone
+    reload = () => location.reload(),
   }: AppRouterOptions) {
+    this.#reload = reload
     this.#rememberLimit = rememberLimit
     this.#storage = storage
     this.#loadStates()
@@ -311,6 +334,9 @@ export class AppRouter {
         view = await entry.load(route)
       } catch (error) {
         console.error(`[AppRouter] Failed to load the ${route.name} view:`, error)
+        // A page left open across a new version asks for files that version replaced: a reload
+        // gets the new ones (once, so a network that is down is not a loop)
+        if (isModuleFetchError(error) && this.#reloadForNewVersion()) return
         view = this.#errorView(route, error)
       }
       // A newer navigation started while this view loaded
@@ -341,6 +367,19 @@ export class AppRouter {
     if (!keep) this.#announceView(view, previous)
     provideRoute(route)
     document.dispatchEvent(new RouteChangeEvent(route, previous))
+  }
+
+  /** Reload, unless that was just done for the same reason. True if it is reloading. */
+  #reloadForNewVersion(): boolean {
+    try {
+      const last = Number(this.#storage?.getItem(STALE_RELOAD_KEY) ?? 0)
+      if (Date.now() - last < STALE_RELOAD_GAP_MS) return false
+      this.#storage?.setItem(STALE_RELOAD_KEY, String(Date.now()))
+    } catch {
+      return false
+    }
+    this.#reload()
+    return true
   }
 
   /** Set the document title from the shown view's own title, else its entry's, else the page's */

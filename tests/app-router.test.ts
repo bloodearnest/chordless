@@ -512,6 +512,50 @@ describe('AppRouter', () => {
       expect(outlet.firstElementChild.textContent).to.equal('songs: offline')
     })
 
+    describe('a view whose code is gone (a new version replaced it)', () => {
+      const gone = () =>
+        Promise.reject(new TypeError('Failed to fetch dynamically imported module: /assets/x.js'))
+      const quietly = async run => {
+        const original = console.error
+        console.error = () => undefined
+        try {
+          await run()
+        } finally {
+          console.error = original
+        }
+      }
+
+      it('reloads the page once, and then shows the error view', async () => {
+        const storage = new Map()
+        let reloads = 0
+        const mem = {
+          getItem: key => storage.get(key) ?? null,
+          setItem: (key, value) => storage.set(key, value),
+        }
+        makeRouter({ storage: mem, reload: () => reloads++ })
+        window.history.replaceState(null, '', '/account')
+        await router.start()
+        views.songs.load = gone
+        await quietly(async () => {
+          await router.navigate('/songs')
+          expect(reloads).to.equal(1)
+          await router.navigate('/songs')
+        })
+        expect(reloads).to.equal(1)
+        expect(outlet.firstElementChild.getAttribute('role')).to.equal('alert')
+      })
+
+      it('does not reload for another kind of failure', async () => {
+        let reloads = 0
+        makeRouter({ reload: () => reloads++ })
+        window.history.replaceState(null, '', '/account')
+        await router.start()
+        views.songs.load = () => Promise.reject(new Error('offline'))
+        await quietly(() => router.navigate('/songs'))
+        expect(reloads).to.equal(0)
+      })
+    })
+
     it('drops a view that loaded after a newer navigation started', async () => {
       slowSongs()
       const slow = router.navigate('/songs')
