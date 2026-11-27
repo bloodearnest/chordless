@@ -661,6 +661,8 @@ space-move-progress = Moving to Chordless… { $sent } of { $total } songs sent.
 space-combine-heading = Combine { $name } with your Chordless account?
 space-combine-message = Your Chordless account already has songs or setlists. Moving this space will add its songs and setlists to them; nothing already on your account is removed. A song or setlist that is on both, such as one moved from another of your devices, is kept once, and a change made to it on both is settled the way any other change on two devices is. A song that was imported twice may show twice. This cannot be undone.
 action-combine-with-server = Combine and move
+# The move stopped part way (the connection dropped, or the phone was locked) after the space was marked as on Chordless: nothing is lost, and a sync sends what is left.
+space-move-interrupted = The move was interrupted. Nothing is lost: press Sync to finish it, and stay on this page until it is done.
 # { $reason } is what went wrong.
 space-move-failed = Could not move the space: { $reason }
 space-move-failed-plain = Could not move the space.

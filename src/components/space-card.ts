@@ -3,6 +3,7 @@ import { createRef, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { formatSyncTime, lastSyncOf, recordSync } from '../js/last-sync.ts'
+import { getSpaceById } from '../js/space.ts'
 import { trashMovedSpaceDriveFiles } from '../js/space-deletion.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { ServerHasDataError } from '../js/space-move.ts'
@@ -13,6 +14,7 @@ import { AdoptFolderError } from '../js/sync-manager.ts'
 import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
 import { errorMessage, failedWith } from '../js/utils/errors.ts'
+import { wakeLock } from '../js/wake-lock.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles, spinnerStyles } from './shared-styles.ts'
@@ -192,6 +194,9 @@ export class SpaceCard extends LitElement {
   ) => Promise<void> = async (spaceId, combine, progress) =>
     (await import('../js/space-data-runtime.ts')).moveSpaceToServerNow(spaceId, combine, progress)
 
+  /** Keeps the screen on while a move runs, as it does for a setlist that is open (a test gives its own) */
+  keepAwake: { hold(): void; letGo(): void } = wakeLock
+
   /** Put the Drive files a moved space left in the Drive bin (a test gives its own) */
   trashDriveFiles: (space: Space) => Promise<void> = trashMovedSpaceDriveFiles
 
@@ -239,6 +244,8 @@ export class SpaceCard extends LitElement {
     this._syncing = true
     this._error = ''
     this._progress = t('space-move-starting')
+    // (a locked screen freezes the page, and the move waits until it is unlocked)
+    this.keepAwake.hold()
     try {
       try {
         await this.moveSpace(id, false, this._moveProgress)
@@ -260,12 +267,19 @@ export class SpaceCard extends LitElement {
       void this._loadSummary()
     } catch (error) {
       console.error('[SpaceCard] Move failed:', error)
-      this._error = failedWith(
-        error,
-        t('space-move-failed', { reason: errorMessage(error) }),
-        t('space-move-failed-plain')
-      )
+      if ((await getSpaceById(id))?.server) {
+        // (the space was marked as moved before its data went: what is left goes at the next sync, which is a button away)
+        this._error = t('space-move-interrupted')
+        this.dispatchEvent(new SpaceSyncedEvent())
+      } else {
+        this._error = failedWith(
+          error,
+          t('space-move-failed', { reason: errorMessage(error) }),
+          t('space-move-failed-plain')
+        )
+      }
     } finally {
+      this.keepAwake.letGo()
       this._syncing = false
       this._progress = ''
     }

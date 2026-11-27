@@ -466,6 +466,48 @@ describe('space-card', () => {
       expect(told).to.equal(1)
     })
 
+    it('keeps the screen on while it moves, and lets go however it ends', async () => {
+      const el = await card('signed-in')
+      const log: string[] = []
+      el.keepAwake = { hold: () => log.push('hold'), letGo: () => log.push('let go') }
+      // moved
+      el.moveSpace = async () => {}
+      must(button(el, 'move-to-server')).click()
+      await confirmWith(el, true)
+      await waitUntil(() => log.length === 2, 'the move', { timeout: 3000 })
+      expect(log).to.deep.equal(['hold', 'let go'])
+      // failed
+      log.length = 0
+      await waitUntil(() => !el._syncing, undefined, { timeout: 3000 })
+      el.moveSpace = async () => {
+        throw new UserError('offline')
+      }
+      must(button(el, 'move-to-server')).click()
+      await confirmWith(el, true)
+      await waitUntil(() => log.length === 2, 'the failed move', { timeout: 3000 })
+      expect(log).to.deep.equal(['hold', 'let go'])
+    })
+
+    it('says the move was interrupted, not that it failed, when the space was already marked as moved', async () => {
+      const el = await card('signed-in')
+      let told = 0
+      el.addEventListener(SpaceSyncedEvent.type, () => told++)
+      el.moveSpace = async () => {
+        // (the marking comes first in a move, and the data after: the connection dropped between)
+        await updateSpace(space.id, {
+          server: { libraryId: 'library', movedAt: '2026-11-26T00:00:00.000Z' },
+        })
+        throw new TypeError('Failed to fetch')
+      }
+      must(button(el, 'move-to-server')).click()
+      await confirmWith(el, true)
+      await waitUntil(() => el._error, 'the message', { timeout: 3000 })
+      expect(text(el)).to.contain('The move was interrupted')
+      expect(text(el)).to.contain('press Sync')
+      expect(text(el)).to.not.contain('Could not move')
+      expect(told).to.equal(1)
+    })
+
     it('says how many songs have been sent as they go, and to stay on the page', async () => {
       const el = await card('signed-in')
       let finish: () => void = () => {}
