@@ -545,6 +545,28 @@ describe('AppRouter', () => {
         expect(outlet.firstElementChild.getAttribute('role')).to.equal('alert')
       })
 
+      it('does not reload when the page cannot remember it did (it could loop)', async () => {
+        let reloads = 0
+        const broken = {
+          getItem: () => {
+            throw new Error('blocked')
+          },
+          setItem: () => undefined,
+        }
+        makeRouter({ storage: broken, reload: () => reloads++ })
+        window.history.replaceState(null, '', '/account')
+        await router.start()
+        views.songs.load = gone
+        await quietly(() => router.navigate('/songs'))
+        expect(reloads).to.equal(0)
+      })
+
+      it('knows the wording of a failure that is not an Error', async () => {
+        const { isModuleFetchError } = await import('../src/js/app-router.ts')
+        expect(isModuleFetchError('Importing a module script failed.')).to.equal(true)
+        expect(isModuleFetchError('offline')).to.equal(false)
+      })
+
       it('does not reload for another kind of failure', async () => {
         let reloads = 0
         makeRouter({ reload: () => reloads++ })
