@@ -82,7 +82,14 @@ test('a person has a library and setlists of their own, and nobody else sees the
 
   // Signed in, and on the server
   assert.equal((await send(null, 'GET', '/api/account/setlists')).status, 401)
-  assert.equal((await send('me', 'GET', '/api/account/library')).status, 404)
+  // What the account holds, without making a library: nothing, then (below) what has been put there
+  assert.deepEqual(await (await send('me', 'GET', '/api/account/library')).json(), {
+    libraryId: null,
+    songs: 0,
+    setlists: 0,
+  })
+  assert.equal(sql.prepare('SELECT count(*) AS n FROM libraries').get()?.n, 0, 'asking makes none')
+  assert.equal((await send(null, 'GET', '/api/account/library')).status, 401)
   assert.equal((await send('me', 'DELETE', '/api/account/setlists')).status, 404)
   assert.equal((await send('me', 'GET', '/api/other')).status, 404, 'a path that is not its own')
   assert.equal((await send('me', 'GET', '/api/account/setlists/batch')).status, 404)
@@ -138,6 +145,16 @@ test('a person has a library and setlists of their own, and nobody else sees the
 
   // A setlist is made, changed from the version it was, and refused when it was changed meanwhile
   assert.deepEqual(await batch('me', put(null)), [{ status: 'ok', version: 1 }])
+  assert.deepEqual(await (await send('me', 'GET', '/api/account/library')).json(), {
+    libraryId: made.libraryId,
+    songs: 0,
+    setlists: 1,
+  })
+  assert.deepEqual(
+    await (await send('you', 'GET', '/api/account/library')).json(),
+    { libraryId: yours.libraryId, songs: 0, setlists: 0 },
+    'only what is the account’s own'
+  )
   assert.deepEqual(await batch('me', put(1, record({ name: 'Evening' }))), [
     { status: 'ok', version: 2 },
   ])

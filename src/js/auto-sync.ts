@@ -15,6 +15,7 @@ import { lastSyncOf, recordSync } from './last-sync.ts'
 import { getLive } from './live.ts'
 import { getCurrentSpace, getCurrentSpaceFull } from './space.ts'
 import { isTeamMember, storageFor } from './storage/space-storage.ts'
+import { switchCurrentSpaceIfMoved } from './switch-to-chordless.ts'
 import { createSyncOrchestrator, type SyncTrigger } from './sync-orchestrator.ts'
 import { t } from './text.ts'
 
@@ -288,7 +289,11 @@ export class AutoSync {
 
 /* v8 ignore start -- wiring to the real clock, network and sync: the Playwright tests run the app */
 async function currentState(): Promise<SyncState> {
-  const space = await getCurrentSpaceFull()
+  let space = await getCurrentSpaceFull()
+  // An account that has moved to Chordless on another device moves this one at its next sync (docs/CENTRAL_STORAGE.md, step 5)
+  if (!space.team && !space.server && (await switchCurrentSpaceIfMoved(space))) {
+    space = await getCurrentSpaceFull()
+  }
   // (a space that has moved to the server is never synced with Drive again, though its folder is still known)
   if (!space.rootRef || space.server) return 'unavailable'
   const signIn = await getSignInState()
