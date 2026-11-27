@@ -214,6 +214,21 @@ export function handleLibrarySongs(request: Request, env: Env): Promise<Response
         return jsonResponse({ error: 'Song changed elsewhere', current: song(current) }, 409)
       if (!current && base !== null)
         return jsonResponse({ error: 'Song no longer exists', current: null }, 409)
+      // A chart that is in a church's library already, under another id, is not added again: the one that is there is told back, and
+      // the sender takes it in place of its own (docs/CENTRAL_STORAGE.md, step 8: two teams' libraries become one). A person's own
+      // library keeps what it is given
+      const church = permitted.account_id === null
+      const twinOf = () =>
+        db
+          .prepare(
+            'SELECT * FROM library_songs WHERE library_id = ? AND content_hash = ? AND song_uuid <> ? ORDER BY modified_at, song_uuid LIMIT 1'
+          )
+          .bind(libraryId, hash, songId)
+          .first<SongRow>()
+      if (!current && church) {
+        const twin = await twinOf()
+        if (twin) return jsonResponse({ song: song(twin), mergedInto: twin.song_uuid }, 200)
+      }
       const sameMetadata =
         current &&
         current.song_id === meta.songId &&
@@ -264,7 +279,8 @@ export function handleLibrarySongs(request: Request, env: Env): Promise<Response
             .run()
         : await db
             .prepare(`INSERT INTO library_songs (library_id, song_uuid, song_id, title, ccli, song_key, licence, is_default, variant_of, variant_label, content_hash, bundle_ref, version, modified_at)
-            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE EXISTS (SELECT 1 FROM libraries l WHERE l.library_id = ? AND ${role})`)
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE EXISTS (SELECT 1 FROM libraries l WHERE l.library_id = ? AND ${role})
+            AND (? = 0 OR NOT EXISTS (SELECT 1 FROM library_songs t WHERE t.library_id = ? AND t.content_hash = ? AND t.song_uuid <> ?))`)
             .bind(
               libraryId,
               songId,
@@ -280,7 +296,11 @@ export function handleLibrarySongs(request: Request, env: Env): Promise<Response
               key,
               now,
               libraryId,
-              ...auth
+              ...auth,
+              church ? 1 : 0,
+              libraryId,
+              hash,
+              songId
             )
             .run()
       if (!result.meta.changes) {
@@ -290,6 +310,9 @@ export function handleLibrarySongs(request: Request, env: Env): Promise<Response
           .first<SongRow>()
         if (fresh)
           return jsonResponse({ error: 'Song changed elsewhere', current: song(fresh) }, 409)
+        // (another sender put the same chart there between the look and the write)
+        const twin = church ? await twinOf() : null
+        if (twin) return jsonResponse({ song: song(twin), mergedInto: twin.song_uuid }, 200)
         throw new Refusal(403, 'Access changed')
       }
       const saved = await db

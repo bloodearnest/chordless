@@ -284,7 +284,8 @@ async function syncLibrarySongsNow(
   root: string,
   db: ChordlessDB,
   connection: WorkerConnection,
-  { progress }: SongSyncOptions
+  { progress }: SongSyncOptions,
+  second = false
 ): Promise<void> {
   const response = await callWorker({ path: root }, connection)
   const index = (await response.json()) as SongIndex
@@ -397,12 +398,15 @@ async function syncLibrarySongsNow(
     if (bundle) toSend.push([song, bundle])
   }
   let sent = 0
+  let merged = false
   progress?.(sent, toSend.length)
   await inParallel(toSend, UPLOADS_AT_ONCE, async ([song, bundle]) => {
-    await upload(root, db, song, bundle, null, connection)
+    if (await upload(root, db, song, bundle, null, connection)) merged = true
     progress?.(++sent, toSend.length)
   })
   if (conflict) throw new LibrarySongSyncConflict()
+  // (songs that were the church's already are downloaded in place of this device's own, once more through)
+  if (merged && !second) await syncLibrarySongsNow(root, db, connection, {}, true)
 }
 
 async function upload(
@@ -412,7 +416,7 @@ async function upload(
   bundle: SongBundle,
   baseVersion: number | null,
   connection: WorkerConnection
-): Promise<void> {
+): Promise<boolean> {
   const id = snapshot.uuid
   try {
     const response = await callWorker(
@@ -423,7 +427,13 @@ async function upload(
       },
       connection
     )
-    const saved = (await response.json()) as { song: SpaceSong }
+    const saved = (await response.json()) as { song: SpaceSong; mergedInto?: string }
+    // The church's library has this chart already, under another id (two Drive teams that kept the same songs): the song that is
+    // there is the one, so this device's setlists name it, and its own copy goes (the next pass brings the one there)
+    if (saved.mergedInto && saved.mergedInto !== id) {
+      await remapSong(db, id, saved.mergedInto)
+      return true
+    }
     const current = await db.getSong(id)
     if (current) {
       // Only acknowledge the sent version. Changes made while R2 was writing remain dirty for the next tick.
@@ -436,9 +446,22 @@ async function upload(
         await metadataHash(metadata(snapshot))
       )
     }
+    return false
   } catch (error) {
-    if (error instanceof TeamError && error.status === 403) return
+    if (error instanceof TeamError && error.status === 403) return false
     if (error instanceof TeamError && error.status === 409) throw new LibrarySongSyncConflict()
     throw error
   }
+}
+
+/** Point every setlist of this device that names a song at another song of the same chart, and drop the song it had */
+export async function remapSong(db: ChordlessDB, from: string, to: string): Promise<void> {
+  for (const setlist of await db.getAllSetlists()) {
+    if (!setlist.songs.some(entry => entry.songUuid === from)) continue
+    await db.updateSetlist(setlist.id, stored => {
+      for (const entry of stored.songs) if (entry.songUuid === from) entry.songUuid = to
+    })
+  }
+  // (nothing is remembered as deleted: it was never the church's)
+  await db.deleteSong(from, { remember: false })
 }
