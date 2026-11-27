@@ -381,10 +381,13 @@ export class AppRouter {
 
   /** Reload soon, unless that was just done for the same reason */
   #reloadForNewVersion(): void {
+    // (a page that cannot remember that it reloaded could do it for ever)
+    const storage = this.#storage
+    if (!storage) return
     try {
-      const last = Number(this.#storage?.getItem(STALE_RELOAD_KEY) ?? 0)
+      const last = Number(storage.getItem(STALE_RELOAD_KEY) ?? 0)
       if (Date.now() - last < STALE_RELOAD_GAP_MS) return
-      this.#storage?.setItem(STALE_RELOAD_KEY, String(Date.now()))
+      storage.setItem(STALE_RELOAD_KEY, String(Date.now()))
     } catch {
       return
     }

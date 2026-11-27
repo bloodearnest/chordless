@@ -541,7 +541,8 @@ describe('AppRouter', () => {
           expect(reloads).to.equal(0)
           await new Promise(resolve => setTimeout(resolve, 20))
           expect(reloads).to.equal(1)
-          await router.navigate('/songs')
+          views.account.load = gone
+          await router.navigate('/account')
           await new Promise(resolve => setTimeout(resolve, 20))
         })
         expect(reloads).to.equal(1)
@@ -557,6 +558,17 @@ describe('AppRouter', () => {
           setItem: () => undefined,
         }
         makeRouter({ storage: broken, reload: () => reloads++, reloadDelayMs: 0 })
+        window.history.replaceState(null, '', '/account')
+        await router.start()
+        views.songs.load = gone
+        await quietly(() => router.navigate('/songs'))
+        await new Promise(resolve => setTimeout(resolve, 20))
+        expect(reloads).to.equal(0)
+      })
+
+      it('does not reload when the page has no storage to remember it in', async () => {
+        let reloads = 0
+        makeRouter({ storage: null, reload: () => reloads++, reloadDelayMs: 0 })
         window.history.replaceState(null, '', '/account')
         await router.start()
         views.songs.load = gone
