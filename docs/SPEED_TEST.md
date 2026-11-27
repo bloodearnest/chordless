@@ -48,8 +48,8 @@ no frames, and the numbers are wrong: the report says so.
 ## What it says
 
 `js/speed-test/report.ts` makes plain text: the Contact page's details (the Support ID, the version,
-the device, the browser, the user agent: `js/contact.ts`), then the cores, reduced motion and whether
-there is a service worker, when it ran and for how long, what the person wrote about the device
+the device, the browser, the user agent: `js/contact.ts`), then the cores, reduced motion, whether
+there is a service worker and the theme, when it ran and for how long, what the person wrote about the device
 (a box for anything else, and a choice for Low Power Mode, which a page cannot see), and a line for each timing.
 The wording of the report is in code, as the Contact page's is: it is for us to read. A line is
 for a timing, so a report that stopped early is shorter.
@@ -73,7 +73,8 @@ by its spans), `.variant`, `.songs`, `.order` (its place in the run: a device th
 later), `.build_ms`, `.first_paint_ms`, `.settled_ms` (both left off if no frame came), `.elements`,
 `.shadow_roots`, `.components`, `.scroll_frames`, `.scroll_long_frames`, `.scroll_worst_ms`,
 `.scroll_median_ms`, `.scroll_p95_ms`, `.hidden`, `.stopped`, `.total_ms`, `.cores`,
-`.reduced_motion`, `.controlled` (a service worker has the page), `.low_power` (`on`, `off` or
+`.reduced_motion`, `.controlled` (a service worker has the page), `.theme` (`light`, `dark` or
+`unknown`: the theme the page was drawn in), `.low_power` (`on`, `off` or
 `unknown`: what the person said, as a page cannot see it), `.outcome` and `.report_version`. The
 browser, OS, screen, pixel ratio, display mode and device id are on every span already
 (`baseline.ts`). A test that cannot finish is one span with `.outcome` `error`, and the error's class
@@ -103,6 +104,38 @@ every span, as it is for every report.
 | `src/js/speed-test/telemetry.ts` | the spans sent to Honeycomb |
 | `src/components/app-speed-test.ts`, `src/js/views/speed-test-view.ts` | the page |
 | `tests/speed-test.test.ts`, `tests/speed-test-telemetry.test.ts`, `tests/app-speed-test.test.ts` | tests (small sizes: a setlist of one or two songs) |
+
+## What it found
+
+The first run on the iPad that made this (iPadOS 17, Safari, the installed app, Low Power Mode on, 4
+cores, 27 November 2026), settled time and the scroll's median frame:
+
+| Songs | Real | Lyrics (no chords) | Plain |
+| --- | --- | --- | --- |
+| 5 | 694 ms | 639 ms | 128 ms |
+| 16 | 3283 ms, 647 ms a frame | 3014 ms, 82 ms a frame | 187 ms, 33 ms a frame |
+| 32 | 12111 ms, 205 ms a frame | 12086 ms, 189 ms a frame | 549 ms, 33 ms a frame |
+
+(33 ms a frame is the 30 fps cap of Low Power Mode.) The real 16-song figure is what the same
+device's own reports gave for a real setlist of that size (3.6 to 3.8 s), so the test is a fair
+stand-in. What it says:
+
+- It is not the amount of text: the plain page has as many elements as the real one and is 17 times
+  faster to draw at 16 songs, and scrolls at the device's cap.
+- Drawing does not depend on the chords: the components with no chords are as slow as with them,
+  with a twentieth of the components. What is left is the song and section components.
+- The time grows faster than the setlist: lyrics only took 0.64, 3.0 and 12.1 s at 5, 16 and 32 songs.
+- Scrolling does depend on the chords (647 ms a frame with them, 82 without, at 16 songs).
+- The same test on an Android phone in Chrome showed none of this (a steady 17 ms a frame), so it is
+  the WebKit engine on a slow device.
+
+Each section's show/hide control (`.hide-pill`) had a `backdrop-filter: blur(4px)`: one for every
+labelled section, hidden outside edit mode, and drawn over an opaque background in both themes, so it
+showed nothing. A backdrop blur is a costly layer in WebKit, and it matches the first three points
+(it is on every section and absent from the plain page). It was removed. **That it was the cost is
+a hypothesis**: rerun the test on the iPad, with Low Power Mode as it was, and compare `real` at 16
+songs with the table above. The chord highlight (a tint behind each chord) was suspected for the
+scrolling, and the person said turning it off made no noticeable difference, so it was left alone.
 
 ## Reading a report
 

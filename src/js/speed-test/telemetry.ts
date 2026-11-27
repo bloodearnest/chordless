@@ -59,6 +59,7 @@ function resultAttributes(
     [`${PREFIX}reduced_motion`]: run.facts.reducedMotion,
     [`${PREFIX}controlled`]: run.facts.serviceWorker,
     [`${PREFIX}low_power`]: run.lowPower,
+    [`${PREFIX}theme`]: run.facts.theme,
   }
 }
 
@@ -83,6 +84,7 @@ export function recordSpeedTestFailure(error: unknown, run: SpeedTestRun): boole
     [`${PREFIX}report_version`]: REPORT_VERSION,
     [`${PREFIX}cores`]: run.facts.cores,
     [`${PREFIX}low_power`]: run.lowPower,
+    [`${PREFIX}theme`]: run.facts.theme,
     'chordless.error': true,
     [`${PREFIX}error`]: error instanceof Error ? error.name : 'Error',
     [`${PREFIX}error_message`]: error instanceof Error ? error.message : String(error),

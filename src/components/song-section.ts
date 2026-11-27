@@ -369,8 +369,8 @@ export class SongSection extends LitElement {
       overflow: hidden;
       background: var(--bg-tertiary, rgba(255, 255, 255, 0.9));
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-      -webkit-backdrop-filter: blur(4px);
-      backdrop-filter: blur(4px);
+      /* (no backdrop blur: the background is opaque, so there is nothing behind it to see, and one on every
+         section is slow to draw and scroll in WebKit: docs/SPEED_TEST.md, "What it found") */
     }
 
     /* Equal widths on larger screens */

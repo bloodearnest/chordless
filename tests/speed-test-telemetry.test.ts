@@ -58,7 +58,7 @@ const outcome = (results: RunResult[], overrides: Partial<SpeedTestOutcome> = {}
 const run: SpeedTestRun = {
   id: 'run-1',
   lowPower: 'on',
-  facts: { cores: 6, reducedMotion: false, serviceWorker: true },
+  facts: { cores: 6, reducedMotion: false, serviceWorker: true, theme: 'light' },
 }
 
 const spans = () => exporter.getFinishedSpans()
@@ -100,6 +100,7 @@ describe('sending a speed test', () => {
       'chordless.speedtest.reduced_motion': false,
       'chordless.speedtest.controlled': true,
       'chordless.speedtest.low_power': 'on',
+      'chordless.speedtest.theme': 'light',
     })
     // (the second is the same shape, for what it timed: the place in the run says which came when)
     expect(second?.attributes).to.include({
@@ -164,6 +165,7 @@ describe('sending that a speed test could not finish', () => {
       'chordless.error': true,
       'chordless.speedtest.error': 'TypeError',
       'chordless.speedtest.error_message': 'x is not a function',
+      'chordless.speedtest.theme': 'light',
     })
   })
 

@@ -28,6 +28,13 @@ export interface SpeedTestFacts {
   reducedMotion: boolean
   /** The page is under a service worker, as an installed or offline-ready app is */
   serviceWorker: boolean
+  /** The theme the page was drawn in (a light page and a dark one are not drawn alike) */
+  theme: 'light' | 'dark' | 'unknown'
+}
+
+/** The theme from the root's `color-scheme`, which the theme manager sets to the one in use */
+function themeOf(colorScheme: string): SpeedTestFacts['theme'] {
+  return colorScheme === 'light' || colorScheme === 'dark' ? colorScheme : 'unknown'
 }
 
 /** What this device says of itself that the speed test is read against */
@@ -36,6 +43,7 @@ export function deviceFacts(): SpeedTestFacts {
     cores: navigator.hardwareConcurrency,
     reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     serviceWorker: navigator.serviceWorker?.controller != null,
+    theme: themeOf(getComputedStyle(document.documentElement).colorScheme),
   }
 }
 
@@ -74,7 +82,7 @@ export function speedTestReport({
   const lines = [
     `Chordless speed test (report version ${REPORT_VERSION})`,
     supportDetails(info),
-    `Cores: ${facts.cores || 'not said'}, reduced motion: ${facts.reducedMotion ? 'on' : 'off'}, service worker: ${facts.serviceWorker ? 'yes' : 'no'}`,
+    `Cores: ${facts.cores || 'not said'}, reduced motion: ${facts.reducedMotion ? 'on' : 'off'}, service worker: ${facts.serviceWorker ? 'yes' : 'no'}, theme: ${facts.theme}`,
     `Low Power Mode: ${lowPower === 'unknown' ? 'not said' : lowPower}`,
     `Run: ${when.toISOString()}, taking ${Math.round(outcome.durationMs / 1000)} s`,
   ]
