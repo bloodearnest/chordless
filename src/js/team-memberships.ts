@@ -20,6 +20,7 @@ import {
   setCurrentSpace,
   updateSpace,
 } from './space.ts'
+import { seedTeamAdoption, sendAdopted } from './team-adoption.ts'
 import { teamApi } from './team-client.ts'
 import type { TeamRole } from './team-roles.ts'
 import { createLocalTeamSpace, syncTeamSpace, withMembershipLock } from './team-spaces.ts'
@@ -33,6 +34,10 @@ interface CheckOptions {
   includeDeclined?: boolean
   list?: () => Promise<MyTeam[]>
   syncSpace?: (space: Space) => Promise<void>
+  /** Queue a team's setlists to go to its church (a test gives its own) */
+  adopt?: (spaceId: string, churchId: string) => Promise<void>
+  /** Send what the device holds of an adopted team (a test gives its own) */
+  send?: (spaceId: string) => Promise<void>
 }
 
 /** A team the Worker says the person is in */
@@ -125,6 +130,7 @@ export async function addMissingTeamSpaces(options: CheckOptions = {}): Promise<
     return report
   }
   const adds: Space[] = []
+  const adopted: string[] = []
   await withMembershipLock(async () => {
     const here = await listSpaces()
     const known = new Map(here.flatMap(space => (space.team ? [[space.team.id, space]] : [])))
@@ -133,6 +139,18 @@ export async function addMissingTeamSpaces(options: CheckOptions = {}): Promise<
       const space = known.get(team.spaceId)
       if (space?.team) {
         if (team.churchId) {
+          // A team that was on Drive and is now a church's: this device's setlists are queued to go up before anything is taken
+          // down, and its songs go with the first sync (step 8); a failure leaves it as it was, and the next check tries again
+          if (!space.team.churchId) {
+            try {
+              /* v8 ignore next -- the real one needs the device's database and the Worker: its rule is tested in team-adoption.test.ts */
+              await (options.adopt ?? seedTeamAdoption)(space.id, team.churchId)
+              adopted.push(space.id)
+            } catch (error) {
+              console.warn(`[TeamMemberships] Could not move ${space.name} into its church:`, error)
+              continue
+            }
+          }
           await updateSpace(space.id, {
             team: {
               id: team.spaceId,
@@ -175,6 +193,11 @@ export async function addMissingTeamSpaces(options: CheckOptions = {}): Promise<
       console.warn(`[TeamMemberships] The first sync of ${space.name} did not finish:`, error)
     }
   }
+  /* v8 ignore next 4 -- the real one needs the Worker and a session */
+  for (const id of adopted)
+    void (options.send ?? sendAdopted)(id).catch(error =>
+      console.warn('[TeamMemberships] Could not send an adopted team:', error)
+    )
   report.added = adds
   const first = adds.find(space => !space.team?.churchId || space.team.followed)
   if (first && !hasCurrentSpace()) {

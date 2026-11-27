@@ -155,9 +155,27 @@ test('church setlists enforce membership, library ownership and versions', async
     'invalid'
   )
   assert.equal((await batch('admin', put(null, { ...record, date: 'bad' }))).status, 'invalid')
-  // A team's leader is a person: a name in words is for a personal setlist
+  // A team's leader is a person or, for one who has no account (a Drive team moving into its church), a name in words: never both
   const named = { ...record, leaderName: 'Sam' }
-  assert.equal((await batch('admin', put(null, named))).status, 'invalid')
+  assert.equal((await batch('admin', put(null, named))).status, 'invalid', 'a person and a name')
+  const moved = {
+    ...put(null, {
+      ...record,
+      setlistId: 'moved',
+      leaderId: null,
+      leaderName: 'Sam',
+    } as unknown as typeof record),
+    id: 'moved',
+  }
+  assert.equal((await batch('admin', moved)).status, 'ok')
+  assert.equal(
+    (
+      sql.prepare("SELECT leader_name AS n FROM setlists WHERE setlist_id = 'moved'").get() as {
+        n: string
+      }
+    ).n,
+    'Sam'
+  )
   assert.equal(
     (await batch('admin', { ...put(1), id: 'absent', record: { ...record, setlistId: 'absent' } }))
       .status,

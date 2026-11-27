@@ -192,10 +192,11 @@ export async function applyTeamSetlist(
     if (error instanceof Invalid) return { status: 'invalid', error: error.message }
     throw error
   }
-  // A team's leader is chosen from the church's people: a name in words can be there (kept from before), but is
-  // never made here. A new setlist has none, and an update leaves one alone (choosing a leader replaces it)
-  if (base === null && record.leaderName)
-    return { status: 'invalid', error: 'The leader of a team setlist is a person' }
+  // A team's leader is chosen from the church's people, but a name in words can be there: it is what a leader with no account
+  // becomes when a Drive team moves into its church (docs/CENTRAL_STORAGE.md, step 8), and what an update leaves alone
+  // (choosing a leader replaces it). It is never beside a person
+  if (record.leaderId && record.leaderName)
+    return { status: 'invalid', error: 'The leader is a person or a name, not both' }
   const songs = JSON.stringify(record.songs)
   const values = [
     record.date,
@@ -217,12 +218,14 @@ export async function applyTeamSetlist(
     const result =
       base === null
         ? await db
-            .prepare(`INSERT INTO setlists (space_id, setlist_id, date, time, type, name, leader_id, created_by, created_at, body, songs, version, modified_at)
-          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE ${eligible} AND ${sameLibrary} AND ${leader}`)
+            .prepare(`INSERT INTO setlists (space_id, setlist_id, date, time, type, name, leader_id, leader_name, created_by, created_at, body, songs, version, modified_at)
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE ${eligible} AND ${sameLibrary} AND ${leader}`)
             .bind(
               team,
               op.id,
-              ...values,
+              ...values.slice(0, 5),
+              record.leaderName ?? null,
+              ...values.slice(5),
               now,
               team,
               access.church,

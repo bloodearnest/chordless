@@ -645,6 +645,8 @@ space-sync-sign-in = Sign in to sync
 space-drive-off = Google Drive is not connected, so this space does not sync between your devices.
 space-drive-reconnect = Google Drive needs reconnecting to sync.
 space-drive-on = Google Drive: { $email }
+# { $name } is a team that has become part of your church on Chordless: this device sends its songs and setlists to it, and stops using Google Drive for it.
+team-adopted = { $name } is now part of your church on Chordless. This device is sending its songs and setlists, and will not use Google Drive for it again.
 # Toasts, when your Personal space was moved to Chordless on another device and this device follows it by itself.
 space-switching = Your Personal space has moved to Chordless on another device. Switching this device too…
 space-switched = This device now uses Chordless for your Personal space, like your other device.
@@ -2259,6 +2261,14 @@ church-console-create = Create church
 church-console-save = Save changes
 church-console-select = Choose a church
 church-console-teams = Teams
+church-console-drive-teams = Teams on Google Drive
+church-console-drive-text = A team that is still kept in Google Drive can be moved into this church. Its members join the church, and its songs and setlists move from Google Drive to Chordless as each person opens the app, so everyone needs the latest version first.
+# { $church } is the name of the church the team would be moved into.
+church-console-adopt = Move into { $church }
+# { $team } is the team, { $church } the church. Asked before the move.
+church-console-confirm-adopt = Move { $team } into { $church }? Its members become members of the church, and its songs and setlists move from Google Drive to Chordless on each device as it opens the app. Everyone needs the latest version first, and Google Drive is not used for this team again.
+# { $team } is the team that was moved into the church.
+church-console-adopted = { $team } has moved into the church. Each device follows when its app opens.
 church-console-team-name = New team name
 church-console-team-add = Add team
 church-console-archive = Archive

@@ -50,6 +50,95 @@ function submit(form: HTMLFormElement) {
   form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
 }
 
+describe('moving a team on Google Drive into the church', () => {
+  it('offers an admin the teams they own or administer on Drive, and moves one after asking', async () => {
+    const { element, churches, teams, members } = setup()
+    churches.push({
+      id: 'church',
+      name: 'St Mary',
+      country: 'GB',
+      city: 'York',
+      postcode: null,
+      ccliLicence: null,
+      licences: {},
+      role: 'admin',
+    })
+    teams.push({ id: 'team', name: 'Own team', archivedAt: null, followed: 1 })
+    members.push({ id: 'admin', name: 'Pat', role: 'admin', joinedAt: '2026-11-22' })
+    const moved: [string, string][] = []
+    element.driveTeams = async () => [
+      { spaceId: 'drive-a', name: 'Morning', role: 'owner' },
+      { spaceId: 'drive-b', name: 'Evening', role: 'writer' },
+      { spaceId: 'drive-c', name: 'Band', role: 'admin' },
+    ]
+    element.api = {
+      ...element.api,
+      adopt: async (church, team) => {
+        moved.push([church, team])
+        return { teamId: team, churchId: church }
+      },
+    }
+    await ready(element)
+    const panel = must(element.shadowRoot?.querySelector('#drive-teams'))
+    expect([...panel.querySelectorAll('.row span')].map(each => each.textContent)).to.deep.equal([
+      'Morning',
+      'Band',
+    ])
+    // declined: nothing moves
+    const buttons = [...panel.querySelectorAll<HTMLButtonElement>('button')]
+    buttons[0].click()
+    const modal = must(element._confirm.value)
+    await waitUntil(() => modal.open, 'the question')
+    must(modal.shadowRoot?.querySelector<HTMLElement>('.modal-btn-cancel')).click()
+    await element.updateComplete
+    expect(moved).to.deep.equal([])
+    // confirmed: the church adopts it
+    buttons[1].click()
+    await waitUntil(() => modal.open, 'the question again')
+    expect(modal.message).to.contain('Band').and.to.contain('St Mary')
+    must(modal.shadowRoot?.querySelector<HTMLElement>('.modal-btn-confirm')).click()
+    await waitUntil(() => moved.length === 1, 'the move')
+    expect(moved).to.deep.equal([['church', 'drive-c']])
+  })
+
+  it('shows nothing for a member who is not an admin, or when the Worker cannot say which teams are on Drive', async () => {
+    const { element, churches, teams, members } = setup()
+    churches.push({
+      id: 'church',
+      name: 'St Mary',
+      country: 'GB',
+      city: 'York',
+      postcode: null,
+      ccliLicence: null,
+      licences: {},
+      role: 'writer',
+    })
+    teams.push({ id: 'team', name: 'Own team', archivedAt: null, followed: 1 })
+    members.push({ id: 'me', name: 'Pat', role: 'writer', joinedAt: '2026-11-22' })
+    element.driveTeams = async () => [{ spaceId: 'drive-a', name: 'Morning', role: 'owner' }]
+    await ready(element)
+    expect(element.shadowRoot?.querySelector('#drive-teams')).to.equal(null)
+    const second = setup()
+    second.churches.push({
+      id: 'church',
+      name: 'St Mary',
+      country: 'GB',
+      city: 'York',
+      postcode: null,
+      ccliLicence: null,
+      licences: {},
+      role: 'admin',
+    })
+    second.teams.push({ id: 'team', name: 'Own team', archivedAt: null, followed: 1 })
+    second.members.push({ id: 'me', name: 'Pat', role: 'admin', joinedAt: '2026-11-22' })
+    second.element.driveTeams = async () => {
+      throw new Error('offline')
+    }
+    await ready(second.element)
+    expect(second.element.shadowRoot?.querySelector('#drive-teams')).to.equal(null)
+  })
+})
+
 describe('church administration', () => {
   it('creates a church, shows its first team and invites someone to it', async () => {
     const { element, churches, teams } = setup()

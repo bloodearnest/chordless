@@ -4,7 +4,7 @@
  * purpose is not put back by itself, and nothing is done when the Worker cannot be asked. The
  * Worker's answer and the first sync are given by the test.
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { churchClient } from '../src/js/church-client.ts'
 import type { Space } from '../src/js/data-types.ts'
 import {
@@ -99,6 +99,77 @@ describe('teams on another device', () => {
     expect(must(await getSpaceById(id)).team).to.include({ churchId: 'church', followed: false })
     await check([{ ...member, followed: true, role: 'reader' }])
     expect(must(await getSpaceById(id)).readOnly).to.equal(true)
+  })
+
+  it('moves a Drive team’s setlists up before it becomes a church’s on this device, once, and sends them', async () => {
+    const drive = team('writer')
+    const { added } = await check([drive])
+    const space = must(added[0])
+    expect(must(await getSpaceById(space.id)).team).to.deep.equal({
+      id: drive.spaceId,
+      role: 'writer',
+    })
+    const adopted: [string, string][] = []
+    const sent: string[] = []
+    const options = {
+      list: async () => [{ ...drive, churchId: 'church', followed: true }],
+      syncSpace,
+      adopt: async (spaceId: string, churchId: string) => void adopted.push([spaceId, churchId]),
+      send: async (spaceId: string) => void sent.push(spaceId),
+    }
+    await addMissingTeamSpaces(options)
+    expect(adopted).to.deep.equal([[space.id, 'church']])
+    expect(sent).to.deep.equal([space.id])
+    expect(must(await getSpaceById(space.id)).team).to.include({
+      churchId: 'church',
+      followed: true,
+    })
+    // (a team already a church's is not moved again)
+    await addMissingTeamSpaces(options)
+    expect(adopted).to.have.length(1)
+    expect(sent).to.have.length(1)
+  })
+
+  it('leaves a Drive team as it was, and tries again at the next check, when its setlists could not be queued', async () => {
+    const drive = team('writer')
+    const { added } = await check([drive])
+    const space = must(added[0])
+    let fail = true
+    const sent: string[] = []
+    const options = {
+      list: async () => [{ ...drive, churchId: 'church', followed: true }],
+      syncSpace,
+      adopt: async () => {
+        if (fail) throw new Error('database busy')
+      },
+      send: async (spaceId: string) => void sent.push(spaceId),
+    }
+    await addMissingTeamSpaces(options)
+    expect(must(await getSpaceById(space.id)).team?.churchId).to.equal(undefined)
+    expect(sent).to.deep.equal([])
+    fail = false
+    await addMissingTeamSpaces(options)
+    expect(must(await getSpaceById(space.id)).team?.churchId).to.equal('church')
+    expect(sent).to.deep.equal([space.id])
+  })
+
+  it('carries on, and says so in the log, when what an adopted team holds cannot be sent yet', async () => {
+    const drive = team('writer')
+    const { added } = await check([drive])
+    const space = must(added[0])
+    let tried = 0
+    await addMissingTeamSpaces({
+      list: async () => [{ ...drive, churchId: 'church', followed: true }],
+      syncSpace,
+      adopt: async () => {},
+      send: async () => {
+        tried++
+        throw new Error('offline')
+      },
+    })
+    await waitUntil(() => tried === 1, 'the attempt', { timeout: 3000 })
+    // (the team is the church's all the same: the ordinary syncs send it at their next tick)
+    expect(must(await getSpaceById(space.id)).team?.churchId).to.equal('church')
   })
 
   it('loads church-wide roles and account follow choices', async () => {

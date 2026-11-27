@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { handleChurch } from '../worker/src/church.ts'
 import type { Env } from '../worker/src/env.ts'
 import { signAccessToken } from '../worker/src/session-tokens.ts'
+import { handleTeamRoutes } from '../worker/src/team-routes.ts'
 import { spacesOf, TeamSpaceState } from '../worker/src/team-state.ts'
 import { d1Db } from './d1-db.ts'
 
@@ -346,4 +347,216 @@ test('a role removed during a settings request cannot write', async () => {
   )
   assert.equal(response.status, 403)
   assert.equal(sql.prepare("SELECT name FROM churches WHERE church_id = 'c'").get()?.name, 'Church')
+})
+
+test('an existing Drive team is adopted by a church: members carried over by role, one change, and only by someone who owns both', async () => {
+  const { db, sql } = d1Db()
+  const env = {
+    DB: db,
+    SESSION_SIGNING_KEY: key(),
+    GOOGLE_CLIENT_ID: 'test',
+    GOOGLE_CLIENT_SECRET: 'test',
+    JWE_ENCRYPTION_KEY: key(),
+    ASSETS: { fetch: async () => new Response() },
+  } satisfies Env
+  const T = '2026-11-27T10:00:00.000Z'
+  const run = (text: string, ...values: (string | null)[]) => sql.prepare(text).run(...values)
+  for (const id of ['owner', 'admin2', 'writer1', 'writer2', 'reader1', 'stranger', 'other-admin'])
+    run('INSERT INTO accounts (account_id, created_at) VALUES (?, ?)', id, T)
+  const team = (id: string, owner: string) =>
+    run(
+      `INSERT INTO teams (space_id, name, owner_account_id, owner_email, owner_provider, owner_sub, created_at, updated_at) VALUES (?, ?, ?, ?, 'google', 's', ?, ?)`,
+      id,
+      id,
+      owner,
+      `${owner}@example.com`,
+      T,
+      T
+    )
+  team('team-alpha', 'owner')
+  team('team-bravo', 'owner')
+  for (const [account, role] of [
+    ['admin2', 'admin'],
+    ['writer1', 'writer'],
+    ['writer2', 'writer'],
+    ['reader1', 'reader'],
+  ])
+    run(
+      'INSERT INTO team_members (space_id, account_id, role, joined_at) VALUES (?, ?, ?, ?)',
+      'team-alpha',
+      account,
+      role,
+      T
+    )
+  // (the second team has people who are in the first too, and the owner is not on either list)
+  for (const [account, role] of [
+    ['writer1', 'admin'],
+    ['writer2', 'reader'],
+  ])
+    run(
+      'INSERT INTO team_members (space_id, account_id, role, joined_at) VALUES (?, ?, ?, ?)',
+      'team-bravo',
+      account,
+      role,
+      T
+    )
+  const call = async (who: string, method: string, path: string) =>
+    handleChurch(
+      new Request(`https://chordless.test${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${await signAccessToken({ accountId: who, sessionId: 's', email: `${who}@example.com` }, env)}`,
+          'Content-Type': 'application/json',
+        },
+      }),
+      env
+    )
+  const made = await call('owner', 'POST', '/api/churches')
+  assert.equal(made.status, 400, 'a church needs its details')
+  const church = (
+    (await (
+      await handleChurch(
+        new Request('https://chordless.test/api/churches', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${await signAccessToken({ accountId: 'owner', sessionId: 's', email: 'owner@example.com' }, env)}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: 'St Mary', country: 'GB', city: 'York' }),
+        }),
+        env
+      )
+    ).json()) as { id: string }
+  ).id
+  const adopt = (who: string, team: string, id = church) =>
+    call(who, 'POST', `/api/churches/${id}/teams/${team}/adopt`)
+  const roles = () =>
+    Object.fromEntries(
+      (
+        sql
+          .prepare('SELECT account_id, role FROM church_members WHERE church_id = ?')
+          .all(church) as { account_id: string; role: string }[]
+      ).map(row => [row.account_id, row.role])
+    )
+
+  // Not by someone outside the church, not for a team that is not theirs, not for one that is not there, and not by GET
+  assert.equal((await adopt('stranger', 'team-alpha')).status, 404, 'not in the church')
+  sql
+    .prepare(
+      "INSERT INTO church_members (church_id, account_id, role, joined_at) VALUES (?, 'other-admin', 'admin', ?)"
+    )
+    .run(church, T)
+  assert.equal(
+    (await adopt('other-admin', 'team-alpha')).status,
+    404,
+    'a church admin who is not of the team'
+  )
+  assert.equal((await adopt('owner', 'no-such-team')).status, 404)
+  assert.equal(
+    (await call('owner', 'GET', `/api/churches/${church}/teams/team-alpha/adopt`)).status,
+    404
+  )
+  assert.equal(
+    sql
+      .prepare(
+        "SELECT count(*) AS n FROM teams WHERE church_id IS NOT NULL AND space_id LIKE 'team-%'"
+      )
+      .get()?.n,
+    0,
+    'nothing changed'
+  )
+
+  // The first team: its members come across with their roles, and the team is the church's, with its id
+  const first = (await (await adopt('owner', 'team-alpha')).json()) as {
+    teamId: string
+    churchId: string
+    members: number
+  }
+  assert.deepEqual(
+    { ...first, members: undefined },
+    { teamId: 'team-alpha', churchId: church, members: undefined }
+  )
+  assert.deepEqual(roles(), {
+    owner: 'admin',
+    admin2: 'admin',
+    writer1: 'writer',
+    writer2: 'writer',
+    reader1: 'reader',
+    'other-admin': 'admin',
+  })
+  assert.equal(
+    sql.prepare("SELECT church_id AS c FROM teams WHERE space_id = 'team-alpha'").get()?.c,
+    church
+  )
+  assert.equal(
+    sql.prepare("SELECT church_id AS c FROM teams WHERE space_id = 'team-bravo'").get()?.c,
+    null,
+    'the other team is as it was'
+  )
+
+  // Again: nothing changes. The second team: people in both keep the higher role, and nobody is lowered
+  assert.equal(
+    ((await (await adopt('owner', 'team-alpha')).json()) as { already?: boolean }).already,
+    true
+  )
+  assert.equal((await adopt('owner', 'team-bravo')).status, 200)
+  assert.deepEqual(roles(), {
+    owner: 'admin',
+    admin2: 'admin',
+    writer1: 'admin',
+    writer2: 'writer',
+    reader1: 'reader',
+    'other-admin': 'admin',
+  })
+  // (the church was made with a team of its own, and has the two that were adopted besides)
+  assert.equal(sql.prepare('SELECT count(*) AS n FROM teams WHERE church_id = ?').get(church)?.n, 3)
+
+  // A team of another church is not taken: the other church's admin is told so
+  const rival = (
+    (await (
+      await handleChurch(
+        new Request('https://chordless.test/api/churches', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${await signAccessToken({ accountId: 'owner', sessionId: 's', email: 'owner@example.com' }, env)}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: 'St Paul', country: 'GB', city: 'Leeds' }),
+        }),
+        env
+      )
+    ).json()) as { id: string }
+  ).id
+  assert.equal((await adopt('owner', 'team-alpha', rival)).status, 409)
+  assert.equal(
+    sql.prepare("SELECT church_id AS c FROM teams WHERE space_id = 'team-alpha'").get()?.c,
+    church
+  )
+
+  // An older app that still asks the Drive routes for it is told to update, if it is a member of the church, and not otherwise
+  const old = async (who: string, team: string) =>
+    handleTeamRoutes(
+      new Request(`https://chordless.test/api/space/${team}/files`, {
+        headers: {
+          Authorization: `Bearer ${await signAccessToken({ accountId: who, sessionId: 's', email: `${who}@example.com` }, env)}`,
+        },
+      }),
+      env
+    )
+  const told = await old('writer1', 'team-alpha')
+  assert.equal(told.status, 410)
+  assert.match(((await told.json()) as { error: string }).error, /update the app/)
+  assert.equal(
+    (await old('stranger', 'team-alpha')).status,
+    403,
+    'someone outside the church is told nothing of it'
+  )
+  assert.equal((await old('writer1', 'no-such-team')).status, 403)
+
+  // The Drive team routes no longer see it (their listing is of teams with no church)
+  const seen = await spacesOf(db, { provider: 'chordless', sub: 'owner' })
+  assert.deepEqual(
+    seen.map(each => each.spaceId ?? (each as { id?: string }).id),
+    []
+  )
 })

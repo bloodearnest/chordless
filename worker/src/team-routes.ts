@@ -6,6 +6,7 @@
 import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
 import { jsonResponse } from './http.ts'
+import type { Identity } from './identity.ts'
 import { handleAllSpaceData, handleSpaceData, isSpaceDataRoute } from './space-data.ts'
 import {
   handleCreateSpace,
@@ -19,6 +20,7 @@ import {
 import { handleTeamRequest, refusal, teamSpacePath } from './team-api.ts'
 import { createAdminContext, createTeamContext, type TeamDeps } from './team-context.ts'
 import { handleLive, livePathSpace } from './team-live.ts'
+import { accountOf } from './team-state.ts'
 
 /** Whether a path is one of these routes */
 export function isTeamPath(path: string): boolean {
@@ -86,7 +88,16 @@ export async function handleTeamRoutes(
     const identity = await admin.identify(request)
     if (!identity) return refusal('unauthenticated')
     const role = await admin.room(team.spaceId).roleOf(identity)
-    if (!role) return refusal('not-a-member')
+    if (!role) {
+      // A team that has become a church's (step 8) is not a Drive team any more: a member of the church whose app is older is told to
+      // update, not that the team is not theirs, and nothing they send is taken
+      if (await movedToChurch(env.DB as D1Db, team.spaceId, identity))
+        return jsonResponse(
+          { error: 'This team has moved to its church on Chordless: update the app to carry on' },
+          410
+        )
+      return refusal('not-a-member')
+    }
 
     if (isAdminRoute(team.rest)) return handleSpaceAdmin(request, team, admin, { identity, role })
     if (isSpaceDataRoute(team.rest)) {
@@ -108,4 +119,18 @@ export async function handleTeamRoutes(
   const headers = new Headers(answer.headers)
   headers.set('Cache-Control', 'no-store')
   return new Response(answer.body, { status: answer.status, headers })
+}
+
+/** Whether the team is a church's, and the person is a member of that church */
+async function movedToChurch(db: D1Db, team: string, identity: Identity): Promise<boolean> {
+  const account = await accountOf(db, identity, false)
+  if (!account) return false
+  return Boolean(
+    await db
+      .prepare(
+        'SELECT 1 AS moved FROM teams t JOIN church_members m ON m.church_id = t.church_id WHERE t.space_id = ? AND m.account_id = ?'
+      )
+      .bind(team, account)
+      .first()
+  )
 }

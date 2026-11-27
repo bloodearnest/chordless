@@ -1,4 +1,7 @@
-/** Church creation and settings. Existing Drive-backed spaces are not switched here. */
+/**
+ * Church creation and settings, and the one-off move of an existing Drive-backed team into a church (`adoptTeam`,
+ * docs/CENTRAL_STORAGE.md, step 8).
+ */
 import { toBase64Url } from '../../src/js/base64url.ts'
 import { ulid } from '../../src/js/ulid.ts'
 import { sha256Hex } from '../../src/js/utils/bytes.ts'
@@ -11,7 +14,7 @@ export const CHURCHES_PATH = '/api/churches'
 export const isChurchPath = (path: string) =>
   path === CHURCHES_PATH ||
   path === '/api/church-invites/join' ||
-  /^\/api\/churches\/[A-Za-z0-9_-]+\/teams\/[A-Za-z0-9_-]+\/(?:invites|follow)$/.test(path) ||
+  /^\/api\/churches\/[A-Za-z0-9_-]+\/teams\/[A-Za-z0-9_-]+\/(?:invites|follow|adopt)$/.test(path) ||
   /^\/api\/churches\/[A-Za-z0-9_-]+(?:\/(?:members|teams)(?:\/[A-Za-z0-9_-]+)?)?$/.test(path)
 
 function field(value: unknown, name: string, optional = false): string | null {
@@ -50,6 +53,8 @@ export function handleChurch(request: Request, env: Env): Promise<Response> {
     if (resource === 'members') return manageMembers(request, db, id, memberId, identity.sub)
     if (resource === 'teams' && subresource === 'follow')
       return followTeam(request, db, id, memberId, identity.sub)
+    if (resource === 'teams' && subresource === 'adopt')
+      return adoptTeam(request, db, id, memberId, identity)
     if (resource === 'teams' && subresource === 'invites')
       return createInvite(request, db, id, memberId, identity)
     if (resource === 'teams') return manageTeams(request, db, id, memberId, identity)
@@ -289,6 +294,74 @@ async function manageTeams(
     return new Response(null, { status: 204 })
   }
   throw new Refusal(404, 'Not found')
+}
+
+/**
+ * Move an existing Drive-backed team into a church (step 8): its members become the church's members (the higher role where a
+ * person is in both), and the team becomes one of the church's teams, keeping its id, so its setlist URLs and the devices'
+ * spaces carry on. One change, all or none. It only changes who the server says the team belongs to: what the team holds
+ * is sent by its members' devices (a device that learns its team is a church's moves its songs and setlists up), and Drive
+ * is left as it is. Asking again for a team that is already the church's changes nothing.
+ *
+ * By someone who is an admin of the church and of the team (or its owner): the church is theirs, and so is the team.
+ */
+async function adoptTeam(
+  request: Request,
+  db: D1Db,
+  church: string,
+  team: string | undefined,
+  actor: Identity
+): Promise<Response> {
+  if (request.method !== 'POST' || !team) throw new Refusal(404, 'Not found')
+  const admin = await db
+    .prepare(
+      "SELECT 1 AS yes FROM church_members m JOIN churches c ON c.church_id = m.church_id WHERE m.church_id = ? AND m.account_id = ? AND m.role = 'admin' AND c.ended_at IS NULL"
+    )
+    .bind(church, actor.sub)
+    .first()
+  if (!admin) throw new Refusal(404, 'No such church')
+  const row = await db
+    .prepare(
+      `SELECT t.church_id AS church, (t.owner_account_id = ? OR EXISTS (
+         SELECT 1 FROM team_members m WHERE m.space_id = t.space_id AND m.account_id = ? AND m.role = 'admin')) AS mine
+       FROM teams t WHERE t.space_id = ? AND t.ended_at IS NULL`
+    )
+    .bind(actor.sub, actor.sub, team)
+    .first<{ church: string | null; mine: number }>()
+  // (a team that is not the person's is not described to them)
+  if (!row || !row.mine) throw new Refusal(404, 'No such team')
+  if (row.church === church) return jsonResponse({ teamId: team, churchId: church, already: true })
+  if (row.church) throw new Refusal(409, 'This team already belongs to another church')
+  const now = new Date().toISOString()
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO church_members (church_id, account_id, role, joined_at)
+         SELECT ?, m.account_id, m.role, ? FROM team_members m WHERE m.space_id = ?
+         ON CONFLICT (church_id, account_id) DO UPDATE SET role = CASE
+           WHEN excluded.role = 'admin' OR church_members.role = 'admin' THEN 'admin'
+           WHEN excluded.role = 'writer' OR church_members.role = 'writer' THEN 'writer'
+           ELSE 'reader' END`
+      )
+      .bind(church, now, team),
+    // (the owner is a member of the church, whatever the team's list says)
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO church_members (church_id, account_id, role, joined_at)
+         SELECT ?, t.owner_account_id, 'admin', ? FROM teams t WHERE t.space_id = ? AND t.owner_account_id IS NOT NULL`
+      )
+      .bind(church, now, team),
+    db
+      .prepare(
+        'UPDATE teams SET church_id = ?, updated_at = ? WHERE space_id = ? AND church_id IS NULL AND ended_at IS NULL'
+      )
+      .bind(church, now, team),
+  ])
+  const members = await db
+    .prepare('SELECT count(*) AS n FROM church_members WHERE church_id = ?')
+    .bind(church)
+    .first<{ n: number }>()
+  return jsonResponse({ teamId: team, churchId: church, members: (members as { n: number }).n })
 }
 
 /** Create a one-use invite for a church team; the secret itself is never stored. */

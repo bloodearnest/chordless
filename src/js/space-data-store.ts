@@ -191,15 +191,18 @@ export class SpaceDataStore {
    * (nothing here is sent by the first read, and a read replaces what the server does not have, unless it is queued). It also
    * starts the probe, so that edits made while it goes are queued too.
    */
-  async seedPersonalMove(): Promise<void> {
+  async seedPersonalMove(
+    change: (record: SpaceSetlist) => SpaceSetlist = record => record
+  ): Promise<void> {
     const tx = this.#tx('readwrite')
     const data = tx.objectStore('space_data')
     const state: SpaceDataState = (await requestResult(data.get('state'))) ?? emptyState()
     data.put({ ...state, probing: true, writableKinds: this.#writeKinds })
     const outbox = tx.objectStore('space_outbox')
     for (const current of await requestResult(tx.objectStore(SPACE_STORES.setlist).getAll())) {
-      const record = sharedRecord('setlist', current) as SpaceSetlist | null
-      if (!record) continue
+      const shared = sharedRecord('setlist', current) as SpaceSetlist | null
+      if (!shared) continue
+      const record = change(shared)
       for (const waiting of await requestResult<SpaceOutboxRecord[]>(
         outbox.index('record').getAll(['setlist', record.setlistId])
       ))
