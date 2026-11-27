@@ -137,6 +137,16 @@ a hypothesis**: rerun the test on the iPad, with Low Power Mode as it was, and c
 songs with the table above. The chord highlight (a tint behind each chord) was suspected for the
 scrolling, and the person said turning it off made no noticeable difference, so it was left alone.
 
+The removal did not change the test's numbers (16 songs, real: 3283 ms before and 3313 ms after, a
+median scroll frame of 647 and 663 ms), so the blur was **not** the cost as the test measures it; the
+person did say scrolling in a real setlist was much better afterwards, which the test (it scrolls the
+whole page, not one song in a setlist) cannot confirm. What is left is the cost of drawing every
+song at once, which grows faster than the setlist.
+
+Tapping a song from the overview slid the row across every song before it (`behavior: 'smooth'`, and
+the row's own `scroll-behavior`), drawing each as it went: a very jerky slide on that iPad. A move
+to a neighbour is still slid to; a longer one is a jump (`js/setlist/scroll-distance.ts`).
+
 ## Reading a report
 
 On a device that is slow, look first at `real` against `plain` at the same size, then `real` against
