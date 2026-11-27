@@ -60,14 +60,30 @@ export function adoptedRecord(
 }
 
 /* v8 ignore start -- wiring to the device's database and the Worker: the rule above is what the tests hold */
-/** Queue a team space's setlists to be created in its church, with their leaders mapped; the space's own sync sends them */
+/**
+ * Send a team space's songs to its church, then queue its setlists to be created there, with their leaders mapped; the space's
+ * own sync sends them. The songs go first: a chart the church's library has already, from the other team, is the one that stays
+ * (the Worker says so, and this device's setlists are pointed at it), so the setlists queued after name the songs that are there.
+ */
 export async function seedTeamAdoption(spaceId: string, churchId: string): Promise<void> {
-  const [{ openSpace }, { SpaceDataStore }, { churchClient }] = await Promise.all([
+  const [
+    { openSpace },
+    { SpaceDataStore },
+    { churchClient },
+    { getSpaceById },
+    { syncLibrarySongs },
+    { workerConnection },
+  ] = await Promise.all([
     import('./db.ts'),
     import('./space-data-store.ts'),
     import('./church-client.ts'),
+    import('./space.ts'),
+    import('./library-song-sync.ts'),
+    import('./storage/space-storage.ts'),
   ])
   const db = await openSpace(spaceId, 'sync')
+  const team = (await getSpaceById(spaceId))?.team
+  if (team) await syncLibrarySongs(team.id, db, workerConnection())
   const map = leaderMapper(await db.getAllPeople(), await churchClient.members(churchId))
   await new SpaceDataStore(db, {
     readKinds: ['setlist', 'person'],

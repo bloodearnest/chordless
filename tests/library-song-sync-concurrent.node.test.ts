@@ -219,3 +219,119 @@ test('a library with nothing to send says so, and sends nothing', async () => {
   assert.deepEqual(told, [[0, 0]])
   assert.equal(stats.sent.length, 0)
 })
+
+test('a song the church already has, under another id, is taken in place of this device’s own, and its setlists follow', async () => {
+  // The church's library holds the chart as `team-a-holy`; this device (the other team's) has the same chart as `team-b-holy`
+  const chordpro = '{title: Holy}\n{key: G}\n[G]Holy, holy'
+  const bundle = { format: 1 as const, chordpro, musicxml: null }
+  const contentHash = await sha256Hex(JSON.stringify(bundle))
+  const canonical = {
+    songUuid: 'team-a-holy',
+    songId: 'title-holy',
+    title: 'Holy',
+    ccli: null,
+    key: 'G',
+    licence: null,
+    isDefault: true,
+    variantOf: null,
+    variantLabel: '',
+    contentHash,
+    fileRef: null,
+    version: 1,
+    modifiedAt: '2026-11-27T00:00:00.000Z',
+  }
+  const songs = new Map<string, SongRecord>([
+    [
+      'team-b-holy',
+      { ...song(1), uuid: 'team-b-holy', id: 'title-holy', title: 'Holy' } as SongRecord,
+    ],
+  ])
+  const chordpros = new Map<string, { id: string; content: string; contentHash: string }>([
+    ['c1', { id: 'c1', content: chordpro, contentHash: 'x' }],
+  ])
+  const setlists = [
+    {
+      id: 'S1',
+      songs: [
+        { songUuid: 'team-b-holy', songId: 'title-holy' },
+        { songUuid: 'other', songId: 'title-other' },
+      ],
+    },
+    { id: 'S2', songs: [{ songUuid: 'unrelated', songId: 'title-unrelated' }] },
+  ]
+  const deleted: [string, unknown][] = []
+  const edited: string[] = []
+  const db = {
+    async getAllSongs() {
+      return [...songs.values()].map(each => ({ ...each }))
+    },
+    async getSong(id: string) {
+      return songs.has(id) ? { ...(songs.get(id) as SongRecord) } : undefined
+    },
+    async getChordPro(id: string) {
+      return chordpros.get(id === 'chart-1' ? 'c1' : id) ?? chordpros.get('c1')
+    },
+    async getScore() {
+      return undefined
+    },
+    async updateSong(id: string, change: (value: SongRecord) => unknown) {
+      const draft = { ...(songs.get(id) as SongRecord) }
+      change(draft)
+      songs.set(id, draft)
+      return draft
+    },
+    async getAllSetlists() {
+      return setlists
+    },
+    async updateSetlist(id: string, change: (value: (typeof setlists)[number]) => unknown) {
+      edited.push(id)
+      change(setlists.find(each => each.id === id) as (typeof setlists)[number])
+    },
+    async deleteSong(id: string, options: unknown) {
+      deleted.push([id, options])
+      songs.delete(id)
+    },
+    async saveLibraryBundle(
+      record: SongRecord,
+      chart: { id: string; content: string; contentHash: string }
+    ) {
+      songs.set(record.uuid, { ...record })
+      chordpros.set(chart.id, chart)
+    },
+  } as unknown as ChordlessDB
+  let putTo = ''
+  const connection: WorkerConnection = {
+    token: async () => 't',
+    origin: 'https://example.test',
+    async fetch(input, init) {
+      const path = new URL(String(input)).pathname
+      if (init?.method === 'PUT') {
+        putTo = decodeURIComponent(path.split('/').at(-1) as string)
+        return Response.json({ song: canonical, mergedInto: 'team-a-holy' })
+      }
+      if (path.endsWith('/team-a-holy/bundle')) return Response.json({ song: canonical, bundle })
+      return Response.json({ songs: [canonical] })
+    },
+  }
+  // (the library lists the song it has; this device's own is not on it, so it is sent, and the Worker says it is there already)
+  await syncPersonalLibrarySongs('lib-merge', db, connection)
+  assert.equal(putTo, 'team-b-holy')
+  assert.deepEqual(
+    setlists[0].songs.map(entry => entry.songUuid),
+    ['team-a-holy', 'other'],
+    'the setlist names the song that is there'
+  )
+  assert.deepEqual(
+    setlists[1].songs.map(entry => entry.songUuid),
+    ['unrelated'],
+    'another setlist is left as it is'
+  )
+  assert.deepEqual(edited, ['S1'], 'only a setlist that named the song was changed')
+  assert.deepEqual(
+    deleted,
+    [['team-b-holy', { remember: false }]],
+    'its own copy goes, and is not remembered as deleted'
+  )
+  assert.ok(songs.has('team-a-holy'), 'the one that is there was brought in by the pass after')
+  assert.equal(songs.has('team-b-holy'), false)
+})

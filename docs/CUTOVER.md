@@ -18,8 +18,14 @@ once. (The design is docs/CENTRAL_STORAGE.md, step 8, and docs/CHURCH_TEAM_DESIG
 4. An app that is not updated, asking the Drive routes for an adopted team, is told **"This team has moved to its church on
    Chordless: update the app to carry on"**, and nothing it sends is taken.
 
-Not done by the move, on purpose: duplicate songs (a chart that is in both teams' libraries under two ids) are not merged,
-pads are not carried (they are uploaded again to the church's library), the existing Drive share links end (make new ones), and
+**Identical songs are merged as they arrive.** Both teams kept the same songs, each under its own ids. When a device sends a song
+the church's library already has (the same chart, under another id), the Worker does not add it again: it says which song is
+there (`mergedInto`), and the device points its setlists at that song, drops its own copy, and takes the one that is there. Whichever
+team's device sends first decides which id stays, and two sending at once are settled by the database, so it does not matter which
+team is adopted first or whether devices follow together. A chart that differs, even by a word, is a different song and is kept as
+it is (a variant); merging those is for a person to do.
+
+Not done by the move, on purpose: pads are not carried (they are uploaded again to the church's library), the existing Drive share links end (make new ones), and
 a member's private annotations and capo stay on their device until church-team overlays sync.
 
 ## Before
@@ -51,4 +57,5 @@ a member's private annotations and capo stay on their device until church-team o
 On a local Worker with a D1 and R2 of its own, with two browser "devices": a church adopted two Drive-style teams; the owner's and
 a member's devices, with overlapping songs and setlists (and a song and a setlist only the member's device had), each followed by
 itself. The server ended with the union (three songs, none twice; three setlists with their ids), leaders linked to accounts or
-kept as a name, and both devices held everything.
+kept as a name, and both devices held everything. Then one device with both teams, the same three charts under different ids in each,
+adopted team A and then team B: the church library held three songs, not six, and both teams' setlists named them.
