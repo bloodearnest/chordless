@@ -512,6 +512,89 @@ describe('AppRouter', () => {
       expect(outlet.firstElementChild.textContent).to.equal('songs: offline')
     })
 
+    describe('a view whose code is gone (a new version replaced it)', () => {
+      const gone = () =>
+        Promise.reject(new TypeError('Failed to fetch dynamically imported module: /assets/x.js'))
+      const quietly = async run => {
+        const original = console.error
+        console.error = () => undefined
+        try {
+          await run()
+        } finally {
+          console.error = original
+        }
+      }
+
+      it('reloads the page once, and then shows the error view', async () => {
+        const storage = new Map()
+        let reloads = 0
+        const mem = {
+          getItem: key => storage.get(key) ?? null,
+          setItem: (key, value) => storage.set(key, value),
+        }
+        makeRouter({ storage: mem, reload: () => reloads++, reloadDelayMs: 0 })
+        window.history.replaceState(null, '', '/account')
+        await router.start()
+        views.songs.load = gone
+        await quietly(async () => {
+          await router.navigate('/songs')
+          expect(reloads).to.equal(0)
+          await new Promise(resolve => setTimeout(resolve, 20))
+          expect(reloads).to.equal(1)
+          views.account.load = gone
+          await router.navigate('/account')
+          await new Promise(resolve => setTimeout(resolve, 20))
+        })
+        expect(reloads).to.equal(1)
+        expect(outlet.firstElementChild.getAttribute('role')).to.equal('alert')
+      })
+
+      it('does not reload when the page cannot remember it did (it could loop)', async () => {
+        let reloads = 0
+        const broken = {
+          getItem: () => {
+            throw new Error('blocked')
+          },
+          setItem: () => undefined,
+        }
+        makeRouter({ storage: broken, reload: () => reloads++, reloadDelayMs: 0 })
+        window.history.replaceState(null, '', '/account')
+        await router.start()
+        views.songs.load = gone
+        await quietly(() => router.navigate('/songs'))
+        await new Promise(resolve => setTimeout(resolve, 20))
+        expect(reloads).to.equal(0)
+      })
+
+      it('does not reload when the page has no storage to remember it in', async () => {
+        let reloads = 0
+        makeRouter({ storage: null, reload: () => reloads++, reloadDelayMs: 0 })
+        window.history.replaceState(null, '', '/account')
+        await router.start()
+        views.songs.load = gone
+        await quietly(() => router.navigate('/songs'))
+        await new Promise(resolve => setTimeout(resolve, 20))
+        expect(reloads).to.equal(0)
+      })
+
+      it('knows the wording of a failure that is not an Error', async () => {
+        const { isModuleFetchError } = await import('../src/js/app-router.ts')
+        expect(isModuleFetchError('Importing a module script failed.')).to.equal(true)
+        expect(isModuleFetchError('offline')).to.equal(false)
+      })
+
+      it('does not reload for another kind of failure', async () => {
+        let reloads = 0
+        makeRouter({ reload: () => reloads++, reloadDelayMs: 0 })
+        window.history.replaceState(null, '', '/account')
+        await router.start()
+        views.songs.load = () => Promise.reject(new Error('offline'))
+        await quietly(() => router.navigate('/songs'))
+        await new Promise(resolve => setTimeout(resolve, 20))
+        expect(reloads).to.equal(0)
+      })
+    })
+
     it('drops a view that loaded after a newer navigation started', async () => {
       slowSongs()
       const slow = router.navigate('/songs')
