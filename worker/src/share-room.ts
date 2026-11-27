@@ -35,6 +35,11 @@ export class ShareRoom extends DurableObject<Env> {
    * one later is refused, so a recipient cannot send for them
    */
   async fetch(request: Request): Promise<Response> {
+    // The Worker's own word, when what the share shows has changed (share-notify.ts): a device only ever opens a socket
+    if (request.method === 'POST') {
+      for (const socket of this.ctx.getWebSockets()) socket.send(CHANGED)
+      return new Response(null, { status: 204 })
+    }
     if (request.headers.get('Upgrade') !== 'websocket') {
       return new Response('Expected a live socket', { status: 426 })
     }

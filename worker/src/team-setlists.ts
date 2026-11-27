@@ -5,6 +5,7 @@ import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
 import { isRecord, jsonResponse, Refusal, readJson, refusing } from './http.ts'
 import { authenticate, SESSION_PROVIDER, sessionProvider } from './identity.ts'
+import { changedSetlists, notifySetlistShares } from './share-notify.ts'
 import { Invalid, parseSetlist } from './space-data.ts'
 
 const PATH = /^\/api\/teams\/([A-Za-z0-9_-]+)\/(data|batch)$/
@@ -138,6 +139,7 @@ export function handleTeamSetlists(request: Request, env: Env): Promise<Response
       const results: SpaceOpResult[] = []
       for (const op of body.ops)
         results.push(await applyTeamSetlist(db, team, access, identity.sub, op))
+      await notifySetlistShares(env, changedSetlists(body.ops, results))
       return jsonResponse({ results })
     }
     throw new Refusal(404, 'Not found')

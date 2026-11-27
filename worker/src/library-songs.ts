@@ -4,6 +4,7 @@ import type { D1Db } from './d1.ts'
 import type { Env, SongBucket } from './env.ts'
 import { isRecord, jsonResponse, Refusal, readJson, refusing } from './http.ts'
 import { authenticate, SESSION_PROVIDER, sessionProvider } from './identity.ts'
+import { notifySongShares } from './share-notify.ts'
 
 const PATH =
   /^\/api\/(libraries|teams)\/([A-Za-z0-9_-]{1,64})\/(?:library\/)?songs(?:\/([A-Za-z0-9_-]{1,64})(?:\/(bundle))?)?$/
@@ -297,6 +298,7 @@ export function handleLibrarySongs(request: Request, env: Env): Promise<Response
         .first<SongRow>()
       /* v8 ignore next -- a successful conditional D1 write must be readable in the same database */
       if (!saved) throw new Refusal(503, 'Song could not be saved')
+      await notifySongShares(env, songId)
       return jsonResponse({ song: song(saved) }, current ? 200 : 201)
     }
     throw new Refusal(404, 'Not found')
