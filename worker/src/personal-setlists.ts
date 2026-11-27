@@ -6,6 +6,7 @@
  * every song must be in the person's own library, and the leader is nobody or the person.
  *
  *   PUT  /api/account/library          makes the personal library if there is none, and says its id
+ *   GET  /api/account/library          what the account holds: { libraryId or null, songs, setlists } (makes nothing)
  *   GET  /api/account/setlists         every one of them
  *   POST /api/account/setlists/batch   { ops: [{ kind: 'setlist', op: 'put' | 'delete', id, baseVersion, record }] }
  */
@@ -140,6 +141,18 @@ export function handlePersonalSetlists(request: Request, env: Env): Promise<Resp
         .bind(account)
         .first<{ library_id: string }>()
       return jsonResponse({ libraryId: library?.library_id })
+    }
+    if (resource === 'library' && request.method === 'GET') {
+      // What the account has on the server, without making a library: a device with a Personal space still on Drive asks, to learn
+      // that another device has moved it (docs/CENTRAL_STORAGE.md, step 5)
+      const held = await db
+        .prepare(`SELECT l.library_id AS libraryId,
+          (SELECT count(*) FROM library_songs s WHERE s.library_id = l.library_id) AS songs,
+          (SELECT count(*) FROM setlists t WHERE t.account_id = l.account_id) AS setlists
+          FROM libraries l WHERE l.account_id = ?`)
+        .bind(account)
+        .first<{ libraryId: string; songs: number; setlists: number }>()
+      return jsonResponse(held ?? { libraryId: null, songs: 0, setlists: 0 })
     }
     if (resource === 'setlists' && !batch && request.method === 'GET') {
       const { results } = await db
