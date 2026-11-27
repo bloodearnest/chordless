@@ -184,9 +184,13 @@ export class SpaceCard extends LitElement {
   _confirmModal = createRef<AppModal>()
 
   /** Move the space to the server (a test gives its own: the real one is of the device and the Worker) */
-  /* v8 ignore next 2 -- the real move needs the Worker and a session: its parts are tested in space-move.test.ts */
-  moveSpace: (spaceId: string, combine?: boolean) => Promise<void> = async (spaceId, combine) =>
-    (await import('../js/space-data-runtime.ts')).moveSpaceToServerNow(spaceId, combine)
+  /* v8 ignore next 7 -- the real move needs the Worker and a session: its parts are tested in space-move.test.ts */
+  moveSpace: (
+    spaceId: string,
+    combine?: boolean,
+    progress?: (sent: number, total: number) => void
+  ) => Promise<void> = async (spaceId, combine, progress) =>
+    (await import('../js/space-data-runtime.ts')).moveSpaceToServerNow(spaceId, combine, progress)
 
   /** Put the Drive files a moved space left in the Drive bin (a test gives its own) */
   trashDriveFiles: (space: Space) => Promise<void> = trashMovedSpaceDriveFiles
@@ -216,6 +220,11 @@ export class SpaceCard extends LitElement {
     return Boolean(this.space.server && this.space.rootRef && this.signIn === 'signed-in')
   }
 
+  /** What a move says as songs are sent: how many of how many */
+  _moveProgress = (sent: number, total: number): void => {
+    this._progress = total ? t('space-move-progress', { sent, total }) : t('space-move-starting')
+  }
+
   async _move(): Promise<void> {
     if (this._syncing) return
     const { id, name } = this.space
@@ -232,7 +241,7 @@ export class SpaceCard extends LitElement {
     this._progress = t('space-move-starting')
     try {
       try {
-        await this.moveSpace(id)
+        await this.moveSpace(id, false, this._moveProgress)
       } catch (error) {
         // the account has data of its own: nothing was changed, so ask whether to combine the two
         if (!(error instanceof ServerHasDataError)) throw error
@@ -244,7 +253,7 @@ export class SpaceCard extends LitElement {
           ))
         )
           return
-        await this.moveSpace(id, true)
+        await this.moveSpace(id, true, this._moveProgress)
       }
       this._syncedAt = recordSync(id)
       this.dispatchEvent(new SpaceSyncedEvent())

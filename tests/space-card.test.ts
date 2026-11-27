@@ -466,6 +466,31 @@ describe('space-card', () => {
       expect(told).to.equal(1)
     })
 
+    it('says how many songs have been sent as they go, and to stay on the page', async () => {
+      const el = await card('signed-in')
+      let finish: () => void = () => {}
+      let tell: (sent: number, total: number) => void = () => {}
+      el.moveSpace = (_id, _combine, progress) => {
+        tell = progress ?? (() => {})
+        return new Promise<void>(resolve => {
+          finish = resolve
+        })
+      }
+      must(button(el, 'move-to-server')).click()
+      await confirmWith(el, true)
+      await waitUntil(() => el._syncing, 'the move', { timeout: 3000 })
+      await el.updateComplete
+      expect(text(el)).to.contain('stay on this page')
+      tell(3, 97)
+      await el.updateComplete
+      expect(text(el)).to.contain('3 of 97 songs sent')
+      tell(0, 0)
+      await el.updateComplete
+      expect(text(el)).to.not.contain('songs sent')
+      finish()
+      await waitUntil(() => !el._syncing, undefined, { timeout: 3000 })
+    })
+
     it('asks whether to combine when the account already has data, and moves with it if so', async function () {
       this.timeout(8000)
       const el = await card('signed-in')
@@ -486,7 +511,7 @@ describe('space-card', () => {
       await waitUntil(() => calls.length === 2 && !el._syncing, 'the combined move', {
         timeout: 3000,
       })
-      expect(calls).to.deep.equal([undefined, true])
+      expect(calls).to.deep.equal([false, true])
       expect(el._error).to.equal('')
     })
 
@@ -507,7 +532,7 @@ describe('space-card', () => {
       )
       await confirmWith(el, false)
       await waitUntil(() => !el._syncing, undefined, { timeout: 3000 })
-      expect(calls).to.deep.equal([undefined])
+      expect(calls).to.deep.equal([false])
       expect(el._error).to.equal('')
       expect(button(el, 'move-to-server')?.disabled).to.equal(false)
     })

@@ -135,3 +135,87 @@ test('a sync that fails does not stop the next one from running', async () => {
   await second
   assert.equal(calls, 2)
 })
+
+/** A library of `count` songs on the device, and a server that takes them, recording how many PUTs were in flight at once */
+function fixture(count: number, refuse: (id: string) => boolean = () => false) {
+  const songs = new Map<string, SongRecord>(
+    Array.from({ length: count }, (_, n) => [`u${n}`, song(n)])
+  )
+  const db = {
+    async getAllSongs() {
+      return [...songs.values()].map(each => ({ ...each }))
+    },
+    async getSong(id: string) {
+      return songs.has(id) ? { ...(songs.get(id) as SongRecord) } : undefined
+    },
+    async getChordPro(id: string) {
+      return { id, content: `{title: ${id}}`, contentHash: id }
+    },
+    async getScore() {
+      return undefined
+    },
+    async updateSong(id: string, change: (value: SongRecord) => unknown) {
+      const draft = { ...(songs.get(id) as SongRecord) }
+      change(draft)
+      songs.set(id, draft)
+      return draft
+    },
+  } as unknown as ChordlessDB
+  const stats = { inFlight: 0, peak: 0, sent: [] as string[] }
+  const connection: WorkerConnection = {
+    token: async () => 't',
+    origin: 'https://example.test',
+    async fetch(input, init) {
+      if (init?.method !== 'PUT') return Response.json({ songs: [] })
+      const id = decodeURIComponent(new URL(String(input)).pathname.split('/').at(-1) as string)
+      stats.inFlight++
+      stats.peak = Math.max(stats.peak, stats.inFlight)
+      await later()
+      await later()
+      stats.inFlight--
+      if (refuse(id)) return Response.json({ error: 'Song changed elsewhere' }, { status: 409 })
+      stats.sent.push(id)
+      return Response.json(
+        { song: { songUuid: id, version: 1, contentHash: 'h' } },
+        { status: 201 }
+      )
+    },
+  }
+  return { db, connection, stats }
+}
+
+test('songs are sent several at a time, no more than four, and each is told as it goes', async () => {
+  const { db, connection, stats } = fixture(20)
+  const told: [number, number][] = []
+  await syncPersonalLibrarySongs('lib3', db, connection, {
+    progress: (sent, total) => told.push([sent, total]),
+  })
+  assert.equal(stats.sent.length, 20)
+  assert.ok(stats.peak > 1 && stats.peak <= 4, `at once: ${stats.peak}`)
+  assert.deepEqual(told[0], [0, 20], 'it says how many there are before it starts')
+  assert.deepEqual(told.at(-1), [20, 20])
+  assert.deepEqual(
+    told.map(([sent]) => sent),
+    Array.from({ length: 21 }, (_, n) => n),
+    'one more each time'
+  )
+})
+
+test('a song that is refused stops the sending of the rest, and is what the sync fails with', async () => {
+  const { db, connection, stats } = fixture(40, id => id === 'u5')
+  await assert.rejects(
+    syncPersonalLibrarySongs('lib4', db, connection),
+    /changed on another device/
+  )
+  assert.ok(stats.sent.length < 39, `the rest were not all sent: ${stats.sent.length}`)
+})
+
+test('a library with nothing to send says so, and sends nothing', async () => {
+  const { db, connection, stats } = fixture(0)
+  const told: [number, number][] = []
+  await syncPersonalLibrarySongs('lib5', db, connection, {
+    progress: (sent, total) => told.push([sent, total]),
+  })
+  assert.deepEqual(told, [[0, 0]])
+  assert.equal(stats.sent.length, 0)
+})
