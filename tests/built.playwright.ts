@@ -17,6 +17,7 @@ const VIEWS = [
   ['/import-setlist', 'import-setlist-view'],
   ['/about', 'about-view'],
   ['/contact', 'contact-view'],
+  ['/speed-test', 'speed-test-view'],
   ['/join', 'join-view'],
   ['/sign-in', 'sign-in-view'],
   ['/account/space/none', 'space-view'],

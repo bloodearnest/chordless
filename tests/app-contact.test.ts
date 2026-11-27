@@ -56,6 +56,12 @@ describe('app-contact', () => {
     expect(decodeURIComponent(link.href)).to.contain(CONTACT_ADDRESS)
   })
 
+  it('links to the speed test, for a device that is slow', async () => {
+    const element = await open()
+    const link = element.shadowRoot?.querySelector<HTMLAnchorElement>('#contact-speed-test')
+    expect(link?.getAttribute('href')).to.equal('/speed-test')
+  })
+
   it('gives the version that is running, once it is known', async () => {
     const real = appUpdate.runningVersion
     appUpdate.runningVersion = async () => ({ version: 'abc123', released: '' })

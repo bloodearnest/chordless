@@ -95,3 +95,16 @@ describe('the contact page', () => {
     element.remove()
   })
 })
+
+describe('the speed test page', () => {
+  it('has the speed test, and is titled', async () => {
+    const element = await views['speed-test'].load({ name: 'speed-test' } as Route)
+    document.body.append(element)
+    await (element as unknown as { updateComplete: Promise<unknown> }).updateComplete
+    expect(element.querySelector('app-speed-test')).to.not.equal(null)
+    expect(views['speed-test'].title?.({ name: 'speed-test' } as Route)).to.equal(
+      'Speed test - Chordless'
+    )
+    element.remove()
+  })
+})

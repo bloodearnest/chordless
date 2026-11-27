@@ -20,7 +20,7 @@ URLs are paths; the router doesn't use `#hashes` (a lint rule forbids them).
 | `/account/space/<id>` (one space: its people, licence, storage and data: docs/ACCOUNT.md) | `space` with `spaceId` | `space-view.ts` |
 | `/sign-in/<id>` (the link in the sign-in email; bare `/sign-in` is the form to ask for one: docs/SPACES.md) | `sign-in` with `linkId` | `sign-in-view.ts` |
 | `/s/<id>`, `/s/<id>/song/<n>` (a received share, read-only: docs/SHARING.md) | `share` | `share-view.ts` |
-| `/account` (Account and Teams, docs/ACCOUNT.md; `/storage` opens it too), `/account/new`, `/media`, `/about`, `/contact`, `/preferences`, `/import-song`, `/import-setlist` | by name | `*-view.ts` |
+| `/account` (Account and Teams, docs/ACCOUNT.md; `/storage` opens it too), `/account/new`, `/media`, `/about`, `/contact`, `/speed-test` (times made-up songs on this device: docs/SPEED_TEST.md), `/preferences`, `/import-song`, `/import-setlist` | by name | `*-view.ts` |
 | anything else | `not-found` | `not-found-view.ts` |
 
 - `js/router.ts` is pure: `matchRoute(url)`, `buildUrl(route)`, and `historyAction(from, to,
