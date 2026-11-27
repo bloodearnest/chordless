@@ -388,6 +388,24 @@ describe('setlist-share', () => {
       })
     })
 
+    it('says nothing of how to share until it knows what kind of space it is, then offers the link', async () => {
+      const setlist = createSetlist({ date: '2099-10-11' })
+      const el = document.createElement('setlist-share') as SetlistShare
+      el.setlist = setlist
+      document.body.append(el)
+      try {
+        await el.updateComplete
+        // (the first render comes before the question to the database is answered)
+        expect(el._knowsSpace).to.equal(false)
+        expect(el.shadowRoot?.querySelector('#share-checking')).to.not.equal(null)
+        await waitUntil(() => el._knowsSpace, 'the space to be known', { timeout: 3000 })
+        await el.updateComplete
+        expect(el.shadowRoot?.querySelector('#share-checking')).to.equal(null)
+      } finally {
+        el.remove()
+      }
+    })
+
     it('makes the link, saves it on the setlist, and says so', async () => {
       const { el, setlist } = await show()
       const seen = changes(el)

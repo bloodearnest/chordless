@@ -75,6 +75,7 @@ export class SetlistShare extends LitElement {
     _mode: { state: true },
     _available: { state: true },
     _moved: { state: true },
+    _knowsSpace: { state: true },
     _server: { state: true },
     _busy: { state: true },
     _error: { state: true },
@@ -212,6 +213,8 @@ export class SetlistShare extends LitElement {
   declare _available: boolean
   /** The setlist's space has moved to Chordless's server: its links are of Drive, which it has left (until step 6 of docs/CENTRAL_STORAGE.md) */
   declare _moved: boolean
+  /** Whether it is known yet if the space is stored on Chordless (until then the dialog does not say which way to share) */
+  declare _knowsSpace: boolean
   declare _busy: boolean
   declare _server: ServerShare | null | undefined
   declare _error: string
@@ -230,6 +233,7 @@ export class SetlistShare extends LitElement {
     this._mode = 'link'
     this._available = false
     this._moved = false
+    this._knowsSpace = false
     this._server = undefined
     this._busy = false
     this._error = ''
@@ -237,13 +241,15 @@ export class SetlistShare extends LitElement {
   }
 
   override willUpdate(changed: Map<string, unknown>): void {
-    if (changed.has('db')) {
-      const spaceId = this.db?.spaceId ?? getCurrentSpace().id
-      void getSpaceById(spaceId).then(space => {
-        this._moved = Boolean(space?.server)
-      })
-    }
+    if (changed.has('db')) void this._askSpace()
     if (changed.has('_moved') || changed.has('setlist')) void this._loadServer()
+  }
+
+  /** Whether the setlist's space is stored on Chordless: the dialog says nothing of how to share until it is known */
+  async _askSpace() {
+    const space = await getSpaceById(this.db?.spaceId ?? getCurrentSpace().id)
+    this._moved = Boolean(space?.server)
+    this._knowsSpace = true
   }
 
   /** The Worker, for a space stored on Chordless (a test gives its own: the real one needs a session) */
@@ -276,6 +282,8 @@ export class SetlistShare extends LitElement {
 
   override async connectedCallback() {
     super.connectedCallback()
+    // (a page gives the database after this; a dialog that is not given one is of the current space)
+    if (!this.db) void this._askSpace()
     // (a failed check is no access: it does not throw)
     this._available = await isSyncAvailable()
   }
@@ -562,6 +570,8 @@ export class SetlistShare extends LitElement {
 
   /** What the modal shows */
   _renderPanel(share: Setlist['share']) {
+    if (!this._knowsSpace && !share)
+      return html`<section><p class="note" id="share-checking">${t('share-checking')}</p></section>`
     if (this._moved) {
       // (a link made before the move, to the Drive file, is still copied and stopped as it was, until the files are deleted)
       return html`
