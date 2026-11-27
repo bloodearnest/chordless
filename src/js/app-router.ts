@@ -76,6 +76,8 @@ export interface AppRouterOptions {
   storage?: Storage | null
   /** reload the page (a test gives its own) */
   reload?: () => void
+  /** how long a page that cannot load a view waits before reloading itself */
+  reloadDelayMs?: number
 }
 
 const ignore = () => undefined
@@ -88,6 +90,11 @@ const STORAGE_KEY = 'chordless:view-states'
 const STALE_RELOAD_KEY = 'chordless:stale-reload'
 /** A second failure inside this time is not mended by another reload: the error view is shown */
 const STALE_RELOAD_GAP_MS = 60 * 1000
+/**
+ * A page that is being left (a new navigation replacing it) can fail to fetch a view's code too, and
+ * a reload then would interrupt that navigation. The page leaving is gone by the time this has passed.
+ */
+const STALE_RELOAD_DELAY_MS = 500
 
 /**
  * Whether an error is a module that could not be fetched: the browser's three wordings
@@ -146,6 +153,7 @@ export class AppRouter {
   #rememberLimit: number
   #storage: Storage | null
   #reload: () => void
+  #reloadDelayMs: number
   #shownKey: string | null = null
 
   constructor({
@@ -159,8 +167,10 @@ export class AppRouter {
     /* v8 ignore next 2 -- reloading the page would end the test run: tests give their own */
     // biome-ignore lint/plugin: the page's own files are an old version's, and are gone
     reload = () => location.reload(),
+    reloadDelayMs = STALE_RELOAD_DELAY_MS,
   }: AppRouterOptions) {
     this.#reload = reload
+    this.#reloadDelayMs = reloadDelayMs
     this.#rememberLimit = rememberLimit
     this.#storage = storage
     this.#loadStates()
@@ -334,10 +344,10 @@ export class AppRouter {
         view = await entry.load(route)
       } catch (error) {
         console.error(`[AppRouter] Failed to load the ${route.name} view:`, error)
-        // A page left open across a new version asks for files that version replaced: a reload
-        // gets the new ones (once, so a network that is down is not a loop)
-        if (isModuleFetchError(error) && this.#reloadForNewVersion()) return
         view = this.#errorView(route, error)
+        // A page left open across a new version asks for files that version replaced: a reload
+        // gets the new ones (once, so a network that is down is not a loop). The error shows meanwhile.
+        if (isModuleFetchError(error)) this.#reloadForNewVersion()
       }
       // A newer navigation started while this view loaded
       if (navigation !== this.#navigation) return
@@ -369,17 +379,16 @@ export class AppRouter {
     document.dispatchEvent(new RouteChangeEvent(route, previous))
   }
 
-  /** Reload, unless that was just done for the same reason. True if it is reloading. */
-  #reloadForNewVersion(): boolean {
+  /** Reload soon, unless that was just done for the same reason */
+  #reloadForNewVersion(): void {
     try {
       const last = Number(this.#storage?.getItem(STALE_RELOAD_KEY) ?? 0)
-      if (Date.now() - last < STALE_RELOAD_GAP_MS) return false
+      if (Date.now() - last < STALE_RELOAD_GAP_MS) return
       this.#storage?.setItem(STALE_RELOAD_KEY, String(Date.now()))
     } catch {
-      return false
+      return
     }
-    this.#reload()
-    return true
+    setTimeout(this.#reload, this.#reloadDelayMs)
   }
 
   /** Set the document title from the shown view's own title, else its entry's, else the page's */
