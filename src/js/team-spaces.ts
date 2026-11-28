@@ -1,75 +1,12 @@
 /**
- * Sharing a space with a team, and joining one: what changes on this device
- * (docs/SPACES.md, "Setting up and joining a team space"). The Worker does the rest
- * (team-client.ts); the space's files are synced as any space's, by whichever backend
- * `storageFor` gives it.
+ * A team on this device, and syncing it (docs/CHURCH_TEAM_DESIGN.md): a team is a church's, and its files are Chordless's.
  */
 
-import { cleanLicence } from './ccli-licence.ts'
 import type { Space } from './data-types.ts'
-import { ChordlessDB } from './db.ts'
-import { isAuthenticated } from './google-auth.ts'
 import { createSpace, getSpaceById, listSpaces, updateSpace } from './space.ts'
-import { storageFor } from './storage/space-storage.ts'
-import type { TeamStorage } from './storage/team-storage.ts'
-import type { ProgressCallback } from './sync/session.ts'
 import { trackSync } from './sync-status.ts'
-import { teamApi } from './team-client.ts'
 import type { TeamRole } from './team-roles.ts'
 import { t } from './text.ts'
-import { UserError } from './utils/errors.ts'
-
-/** What making a team space needs from Drive: a folder inside the one the person picked */
-export interface TeamFolders {
-  createTeamFolder(parentId: string, name: string): Promise<string>
-}
-
-/**
- * Make a team space (docs/SPACES.md, "Creating a team space"): a new folder named for the team
- * inside the parent the person picked, registered with the Worker, and a space of its own on this
- * device for it. A personal space is never turned into one. The Worker is told last but one and
- * the device last, so a failure leaves nothing here that has to be cleaned up; a folder made
- * and not registered is left in Drive for the person to delete.
- */
-export function createTeamSpace(
-  name: string,
-  parentId: string,
-  folders: TeamFolders,
-  options: { ccliLicence?: string } = {}
-): Promise<Space> {
-  return withMembershipLock(() => makeTeamSpace(name, parentId, folders, options))
-}
-
-async function makeTeamSpace(
-  name: string,
-  parentId: string,
-  folders: TeamFolders,
-  options: { ccliLicence?: string }
-): Promise<Space> {
-  const teamName = name.trim()
-  if (!teamName) throw new UserError(t('team-needs-name'))
-  if (!(await isAuthenticated())) throw new UserError(t('team-sign-in-first'))
-
-  const ccliLicence = cleanLicence(options.ccliLicence)
-  const rootRef = await folders.createTeamFolder(parentId, teamFolderName(teamName))
-  // (the Worker keeps the number with the team; this device keeps a copy to show)
-  const { spaceId, role } = await teamApi.createSpace({
-    rootRef,
-    name: teamName,
-    ...(ccliLicence ? { ccliLicence } : {}),
-  })
-  const space = await createSpace(await freeName(teamName))
-  return updateSpace(space.id, {
-    rootRef,
-    team: { id: spaceId, role },
-    ...(ccliLicence ? { ccliLicence } : {}),
-  })
-}
-
-/** The Drive folder's name: it says what it is, as it sits beside folders that are not Chordless's */
-function teamFolderName(teamName: string): string {
-  return `${teamName} Chordless`
-}
 
 /**
  * Run something that makes or finds team spaces on this device with nothing else doing so: joining,
@@ -88,18 +25,6 @@ async function freeName(wanted: string): Promise<string> {
     name = n === 1 ? `${wanted} (team)` : `${wanted} (team ${n})`
   }
   return name
-}
-
-/**
- * Join a team space with an invite's code. This device gets a space of its own for it, named as
- * the team calls it, whose files come through the Worker; nothing is synced yet.
- */
-export function joinSpace(
-  teamId: string,
-  code: string,
-  backend: Pick<TeamStorage, 'inspectRoot'>
-): Promise<Space> {
-  return withMembershipLock(() => joinTeamSpace(teamId, code, backend))
 }
 
 /**
@@ -124,22 +49,6 @@ export async function createLocalTeamSpace(team: {
       ...(team.churchId ? { churchId: team.churchId, followed: team.followed } : {}),
     },
     readOnly: team.role === 'reader',
-  })
-}
-
-async function joinTeamSpace(
-  teamId: string,
-  code: string,
-  backend: Pick<TeamStorage, 'inspectRoot'>
-): Promise<Space> {
-  const { spaceId, role } = await teamApi.join(teamId, code)
-  // (they are in the space now: if the Worker cannot say what it is called yet, it is just "Team")
-  const root = await backend.inspectRoot(spaceId).catch(() => null)
-  const space = await createSpace(await freeName(root?.name || 'Team'))
-  return updateSpace(space.id, {
-    rootRef: spaceId,
-    team: { id: spaceId, role },
-    readOnly: role === 'reader',
   })
 }
 
@@ -200,40 +109,20 @@ export function inviteSendLinks(
 }
 
 /**
- * Bring a team space's files into step with the team's: the first sync of a space just made or
- * joined, so the songs and setlists are on this device (for a member) or in the team's folder (for
- * the owner) before anyone is told it is ready. The space is not the one in use yet, so its own
- * database is given to the sync: left to itself the sync works on the space in use. It can be long
- * (every file comes through the Worker), so the sync's progress goes to `onProgress`.
+ * Bring a team's setlists into step with its church's: the first sync of a team just joined, so they are on this device before
+ * anyone is told it is ready. The team is not the one in use yet, so its own database is given to the sync. A team the Worker
+ * says has moved into its church (this device was away) is learnt of, and synced as the church's.
  */
-export async function syncTeamSpace(space: Space, onProgress?: ProgressCallback): Promise<void> {
-  if (space.team?.churchId) {
-    const { syncSpaceDataFor } = await import('./space-data-runtime.ts')
-    return syncSpaceDataFor(space.id, { all: true })
-  }
-  const { SyncManager } = await import('./sync-manager.ts')
-  const db = new ChordlessDB(space.id)
-  await db.init()
+export async function syncTeamSpace(space: Space): Promise<void> {
+  const { syncSpaceDataFor } = await import('./space-data-runtime.ts')
   try {
-    const manager = await SyncManager.open(space.name, space.id, { db, storage: storageFor(space) })
-    await manager.init()
-    await trackSync(space.id, report =>
-      manager.sync(progress => {
-        report(progress)
-        onProgress?.(progress)
-      })
-    )
-    /* v8 ignore start -- needs a Drive sync the Worker refuses: the decision is `learnOfMove`, tested on its own */
+    await trackSync(space.id, () => syncSpaceDataFor(space.id, { all: true }))
+    /* v8 ignore start -- needs a Worker that refuses the old route: the decision is `learnOfMove`, tested on its own */
   } catch (error) {
-    // The team moved into its church while this device was away, and the device has not heard: it learns that now, and syncs the
-    // team as the church's (the person has the latest app: waiting for it to ask by itself would be a failure for nothing)
     const church = await learnOfMove(space, error)
     if (!church) throw error
-    db.db?.close()
-    return syncTeamSpace(church, onProgress)
+    return syncTeamSpace(church)
     /* v8 ignore stop */
-  } finally {
-    db.db?.close()
   }
 }
 

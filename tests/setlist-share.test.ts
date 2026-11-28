@@ -5,6 +5,7 @@ import {
   SetlistShareChangeEvent,
 } from '../src/components/setlist-share.ts'
 import { type ChordlessDB, createSetlist, getCurrentDB } from '../src/js/db.ts'
+import { createTeamFolder } from '../src/js/drive-api.ts'
 import { generateShareKey, setlistCode } from '../src/js/share-crypto.ts'
 import {
   createSpace,
@@ -67,7 +68,7 @@ describe('setlist-share', () => {
     expect(el.shadowRoot?.querySelector('button[aria-label="Copy link"]')).to.not.equal(null)
   })
 
-  it('has Update now and Stop sharing in its modal, and opens with show()', async () => {
+  it('has Stop sharing in its modal, and opens with show()', async () => {
     drive = installFakeDrive()
     const el = await fixture<SetlistShare>(
       html`<setlist-share .setlist=${shared()}></setlist-share>`
@@ -78,7 +79,7 @@ describe('setlist-share', () => {
     await el.updateComplete
     expect(modal.open).to.equal(true)
     expect(modal.querySelector('input')).to.not.equal(null)
-    expect(modal.textContent).to.include('Update now')
+    expect(modal.textContent).to.not.include('Update now')
     expect(modal.textContent).to.include('Stop sharing')
     expect(modal.querySelectorAll('button[aria-label="Copy link"]')).to.have.length(1)
   })
@@ -132,26 +133,16 @@ describe('setlist-share', () => {
     })
   })
 
-  it('offers to make a link to someone signed in to Google', async () => {
-    drive = installFakeDrive()
+  it('says to move the space to Chordless, when it has not, rather than offering a link', async () => {
     const setlist = createSetlist({ date: '2026-10-11' })
     const el = await fixture<SetlistShare>(
       html`<setlist-share .setlist=${setlist}></setlist-share>`
     )
     await new Promise(resolve => setTimeout(resolve, 50))
     await el.updateComplete
-    expect(text(el)).to.include('Create share link')
+    expect(text(el)).to.include('Move this space to Chordless')
+    expect(text(el)).to.not.include('Create share link')
     expect(el.shadowRoot?.querySelector('input')).to.equal(null)
-  })
-
-  it('says to sign in when there is no Google connection', async () => {
-    const setlist = createSetlist({ date: '2026-10-11' })
-    const el = await fixture<SetlistShare>(
-      html`<setlist-share .setlist=${setlist}></setlist-share>`
-    )
-    await new Promise(resolve => setTimeout(resolve, 50))
-    await el.updateComplete
-    expect(text(el)).to.include('Connect Google Drive')
   })
 
   describe('making, updating and stopping a share', () => {
@@ -424,33 +415,6 @@ describe('setlist-share', () => {
       }
     })
 
-    it('makes the link, saves it on the setlist, and says so', async () => {
-      const { el, setlist } = await show()
-      const seen = changes(el)
-      await press(el, /Create share link/)
-      expect(seen).to.have.length(1)
-      expect(setlist.share?.fileId).to.be.a('string')
-      expect((await db.getSetlist(setlist.id))?.share?.fileId).to.equal(setlist.share?.fileId)
-      expect(el.shadowRoot?.querySelector('input')).to.not.equal(null)
-      expect(drive?.listFiles().length).to.equal(1)
-    })
-
-    it('says why it could not make the link', async () => {
-      const { el } = await show()
-      drive?.failRequests({ method: 'POST', path: /upload/, status: 500, times: 10 })
-      await press(el, /Create share link/)
-      expect(text(el)).to.include("Couldn't do that")
-      expect(el._busy).to.equal(false)
-    })
-
-    it('says to connect when it is offline', async () => {
-      const { el } = await show()
-      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true })
-      drive?.failRequests({ method: 'POST', path: /upload/, status: 500, times: 10 })
-      await press(el, /Create share link/)
-      expect(text(el)).to.include("You're offline")
-    })
-
     it('does nothing with no setlist or database, or while it is busy', async () => {
       const el = await fixture<SetlistShare>(html`<setlist-share></setlist-share>`)
       let ran = 0
@@ -465,39 +429,13 @@ describe('setlist-share', () => {
       expect(ran).to.equal(0)
     })
 
-    it('updates a share that is made, when asked', async () => {
-      const { el, setlist } = await show()
-      await press(el, /Create share link/)
-      const seen = changes(el)
-      await press(el, /Update now/)
-      expect(seen).to.have.length(1)
-      expect(setlist.share).to.not.equal(null)
-    })
-
-    it('saves the share again when the setlist has changed since', async () => {
-      const { el, setlist } = await show()
-      await press(el, /Create share link/)
-      const hash = must(setlist.share).bundleHash
-      setlist.name = 'Changed since it was shared'
-      await db.saveSetlist(setlist)
-      await press(el, /Update now/)
-      expect(must(setlist.share).bundleHash).to.not.equal(hash)
-      expect(must(await db.getSetlist(setlist.id)).share?.bundleHash).to.equal(
-        must(setlist.share).bundleHash
-      )
-    })
-
-    it('has nothing to update without a share', async () => {
-      const { el } = await show()
-      must(el._stopModal.value).ask = async () => true
-      await el._update()
-      await el._stop()
-      expect(el._error).to.equal('')
-    })
-
-    it('stops sharing when it is told to, and not when it is not', async () => {
-      const { el, setlist } = await show()
-      await press(el, /Create share link/)
+    it('stops an old Drive link when it is told to, and not when it is not', async () => {
+      const file = await createTeamFolder('root', 'An old share')
+      const setlist = {
+        ...createSetlist({ date: '2099-10-11' }),
+        share: { ...shared().share, fileId: file },
+      }
+      const { el } = await show(setlist)
       const modal = must(el._stopModal.value)
       modal.ask = async () => false
       await press(el, /Stop sharing/)
@@ -508,11 +446,11 @@ describe('setlist-share', () => {
       expect(setlist.share).to.equal(null)
       expect(seen).to.have.length(1)
       expect((await db.getSetlist(setlist.id))?.share).to.equal(null)
+      expect(must(drive?.files.get(file)).trashed).to.equal(true)
     })
 
     it('copies the link, and shows it has', async () => {
-      const { el } = await show()
-      await press(el, /Create share link/)
+      const { el } = await show({ ...createSetlist({ date: '2099-10-11' }), share: shared().share })
       const realMs = SetlistShare.copiedMs
       SetlistShare.copiedMs = 30
       restoreAfter = () => {
@@ -532,8 +470,7 @@ describe('setlist-share', () => {
     })
 
     it('selects the link for the user when it cannot copy it', async () => {
-      const { el } = await show()
-      await press(el, /Create share link/)
+      const { el } = await show({ ...createSetlist({ date: '2099-10-11' }), share: shared().share })
       Object.defineProperty(navigator, 'clipboard', {
         value: {
           writeText: async () => {
@@ -547,8 +484,7 @@ describe('setlist-share', () => {
     })
 
     it('sends the link with the share sheet, and does not mind it being cancelled', async () => {
-      const { el } = await show()
-      await press(el, /Create share link/)
+      const { el } = await show({ ...createSetlist({ date: '2099-10-11' }), share: shared().share })
       const sent: Array<{ url: string }> = []
       const had = Object.getOwnPropertyDescriptor(navigator, 'share')
       Object.defineProperty(navigator, 'share', {

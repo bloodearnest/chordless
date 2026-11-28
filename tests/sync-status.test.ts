@@ -201,6 +201,9 @@ describe('empty-space', () => {
 
   it('offers to fetch a space that has not been, and says why when that fails', async () => {
     const el = await show(team({ name: 'Band' }))
+    el.fetchSpace = async () => {
+      throw new Error('offline')
+    }
     expect(el.shadowRoot?.querySelector('status-message')?.getAttribute('detail')).to.contain(
       'online and signed in'
     )

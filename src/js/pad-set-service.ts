@@ -4,8 +4,7 @@ import { wantsPads } from './media-player-loader.ts'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.ts'
 import { listSpaces, onChordless } from './space.ts'
 import { SpaceDataStore } from './space-data-store.ts'
-import { driveStorage } from './storage/browser-drive.ts'
-import { isTeamMember, serverPadsFor, storageFor } from './storage/space-storage.ts'
+import { serverPadsFor } from './storage/space-storage.ts'
 import type { PadStorage } from './storage/types.ts'
 import { t } from './text.ts'
 import { UserError } from './utils/errors.ts'
@@ -83,18 +82,11 @@ export function setPadSources(sources?: PadSource[] | null) {
 }
 
 /**
- * A space's pads: in a library on the server if it is on Chordless (a moved Personal space's own, or a church team's
- * church's), else in its folder, straight in Drive for a personal space's and a team's owner, through the Worker for anyone
- * else. A space not in Drive yet has no folder, so none.
+ * A space's pads: in a library on the server (a moved Personal space's own, or a church team's church's). A Personal space
+ * not moved yet has none: it moves at its next sync, and Drive is not read for them.
  */
 function spaceSource(space: Space): PadSource | null {
-  const storage = onChordless(space)
-    ? serverPadsFor(space)
-    : space.team && isTeamMember(space)
-      ? storageFor(space).padsIn(space.team.id)
-      : space.rootRef
-        ? driveStorage.padsIn(space.rootRef)
-        : null
+  const storage = onChordless(space) ? serverPadsFor(space) : null
   return storage && { spaceId: space.id, name: space.name, team: Boolean(space.team), storage }
 }
 

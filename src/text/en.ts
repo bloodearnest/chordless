@@ -15,7 +15,6 @@ action-cancel = Cancel
 action-try-again = Try again
 action-reload = Reload
 action-check-for-updates = Check for updates
-action-open-account = Open Account and Teams
 
 ## Setlists
 
@@ -93,13 +92,10 @@ toast-space-fetch-failed = Couldn't get { $space }'s songs and setlists.
 -folder-gone-safe = Your songs and setlists are safe on this device.
 
 # The folder a space is linked to in Google Drive is in the Drive trash. { $name } is the folder's name.
-folder-gone-trashed = This space's Google Drive folder "{ $name }" is in the Drive trash. { -folder-gone-safe } Restore it from the trash, or start over in Drive to upload them to a new folder.
 
 # It was linked by an older version of the app, which Drive no longer lets see it.
-folder-gone-other-app = This space was synced by an earlier version of Chordless's Google app, which cannot see its Drive folder. { -folder-gone-safe } Start over in Drive to upload them again.
 
 # Drive cannot find it: it was deleted, or the person is signed in with another Google account.
-folder-gone-missing = This space's Google Drive folder can't be found: it was deleted, or belongs to another Google account than the one you are signed in with. { -folder-gone-safe } Sign in with the right account, or start over in Drive to upload them again.
 
 ## The data on this device
 
@@ -542,12 +538,7 @@ space-sync-starting = Starting…
 # { $reason } is what went wrong.
 space-sync-failed = Sync failed: { $reason }
 # { $name } is the name of a folder in the person's Google Drive.
-adopt-folder-error = There is no Drive folder called "Personal", but there is one called "{ $name }".
-adopt-folder-heading = Use the folder you already have?
 # { $name } is the name of a folder in the person's Google Drive.
-adopt-folder-message = Your Drive has one Chordless folder, "{ $name }", and none called "Personal". Is that where your Personal songs and setlists are kept? If so, Chordless will use it as it is: nothing in it is renamed, moved or deleted.
-adopt-folder-use = Use "{ $name }"
-adopt-folder-new = Make a new folder
 space-sync-sign-in = Sign in to sync
 space-drive-off = Google Drive is not connected, so this space does not sync between your devices.
 space-drive-reconnect = Google Drive needs reconnecting to sync.
@@ -1663,8 +1654,6 @@ pads-missing-keys = Missing keys in pad set: { $keys }
 pads-gone = That pad set is no longer where it was kept.
 pads-encrypted = Encrypted ZIP archives are not supported.
 
-team-needs-name = A team space needs a name
-team-sign-in-first = Sign in first
 de-error-admin = Only an admin can delete a Team everywhere
 
 export-not-zip = That file is not a Chordless export: it is not a ZIP file
@@ -1675,14 +1664,9 @@ export-not-export = That file is not a Chordless export
 export-too-new = That export was made by a newer Chordless: update the app to import it
 
 # A reset that was stopped: { $count } changes, the first of them in { $shown } ("song Amazing Grace, setlist 12 Oct").
-unsynced-error = { $count } local change(s) aren't in Drive yet, so nothing was reset: { $shown }
 # The same, when there are more than are named: { $more } of them.
-unsynced-error-more = { $count } local change(s) aren't in Drive yet, so nothing was reset: { $shown } and { $more } more
 # { $count } songs and setlists are in another folder than { $folder }.
-folder-mismatch-error = { $count } setlist(s)/song(s) on this device are stored in a different Google Drive folder than "{ $folder }", the one this space now syncs with. Nothing was synced, to avoid uploading them again as duplicates.
-sync-list-failed = Couldn't list your Drive files, so nothing was changed. Try again.
 # { $name } is the folder the space looks for.
-sync-no-folder = There is no Google Drive folder called "{ $name }" that this app can see, so nothing was changed. Sync it from the device that has the data first.
 
 pads-set-missing-key = Pad set "{ $name }" is missing key: { $key }
 pads-set-missing-files = Pad set "{ $name }" is missing files for: { $keys }
@@ -1809,7 +1793,7 @@ share-checking = Checking whether it is shared…
 share-server-point-3 = It always shows the setlist as it is now, and is deleted two weeks after the setlist date.
 # { $date } is when the link stops working.
 share-server-ends = Ends after { $date }. It always shows the setlist as it is now.
-share-sign-in = Connect Google Drive on the <account>Account and Teams page</account> to share this setlist by link.
+share-sign-in = Move this space to Chordless on the <account>Account and Teams page</account> to share this setlist by link.
 share-link-text = Make a link to this setlist for people outside your Chordless space, whether or not they use Chordless.
 share-link-point-1 = They need no account or install, and can keep it on their phone.
 share-link-point-2 = They can read it, but not change it.
@@ -1824,9 +1808,7 @@ share-whatsapp = WhatsApp
 share-gmail = Email (Gmail)
 share-qr = QR code for the share link
 # { $date } is the day after which the link stops working.
-share-ends = Ends after { $date }. It updates by itself when you sync; "Update now" does it straight away.
-share-update = Update now
-share-working = Working…
+share-ends = Ends after { $date }. This link was made in Google Drive and no longer updates: stop it, and make a new one.
 
 # The first lines of the song list a person pastes into a message.
 songlist-heading = Songs for { $date }

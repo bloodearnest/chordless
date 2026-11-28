@@ -4,7 +4,7 @@ import { ChordlessDB } from '../src/js/db.ts'
 import type { Score } from '../src/js/score.ts'
 import { writeMusicXml } from '../src/js/score-musicxml.ts'
 import { scoreRecord } from '../src/js/score-record.ts'
-import { addSong } from './drive-harness.ts'
+import { addSong } from './device-harness.ts'
 import { oldDatabase, SCHEMA_V14 } from './old-database.ts'
 import { deleteDatabase } from './test-helpers.ts'
 

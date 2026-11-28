@@ -15,7 +15,6 @@ import type {
 import { leaderName } from './leaders.ts'
 import { queueSpaceChange, SpaceDataStore } from './space-data-store.ts'
 import type { SpaceRecordKind } from './space-data-types.ts'
-import { PERSON_SYNC_FIELDS } from './sync/person-hash.ts'
 import { setAmbient } from './telemetry/context.ts'
 import { recordSpan } from './telemetry/telemetry.ts'
 import { t } from './text.ts'
@@ -605,26 +604,13 @@ export class ChordlessDB {
     return requestResult(tx.objectStore('people').get(id))
   }
 
-  /**
-   * Save people, each as given (a person already stored is replaced). A page's copy of a person
-   * that was not in storage yet has no link to its file: if a sync sent it meanwhile, the link
-   * is kept (as saveSetlist does), or the next sync would send the person again as a second file.
-   */
+  /** Save people, each as given (a person already stored is replaced) */
   async savePeople(people: Person[]): Promise<void> {
     if (people.length === 0) return
     const tx = this.#transaction(['people'], 'readwrite')
     const store = tx.objectStore('people')
     for (const person of people) {
       const stored = cloneForStorage(person) as Person
-      if (this.origin === 'local' && !stored.fileRef) {
-        const current = (await requestResult(store.get(stored.id))) as Person | undefined
-        if (current?.fileRef) {
-          for (const field of PERSON_SYNC_FIELDS) {
-            if (current[field] !== undefined)
-              (stored as unknown as Record<string, unknown>)[field] = current[field]
-          }
-        }
-      }
       await this.#queue(tx, 'person', stored.id, stored)
       store.put(stored)
     }
@@ -632,31 +618,6 @@ export class ChordlessDB {
     this.#changed(
       'person',
       people.map(person => person.id)
-    )
-  }
-
-  /**
-   * Record that people were sent to storage: what each keeps of its file is put on the person as
-   * stored now, not on the copy that was sent, so an edit saved while it was being sent is not
-   * undone (it is a change the next sync sends).
-   */
-  async savePeopleSent(sent: Person[]): Promise<void> {
-    if (sent.length === 0) return
-    const tx = this.#transaction(['people'], 'readwrite')
-    const store = tx.objectStore('people')
-    for (const person of sent) {
-      const current = (await requestResult(store.get(person.id))) as Person | undefined
-      if (!current) continue
-      const updated = { ...current }
-      for (const field of PERSON_SYNC_FIELDS) {
-        if (person[field] !== undefined) (updated as Record<string, unknown>)[field] = person[field]
-      }
-      store.put(cloneForStorage(updated))
-    }
-    await transactionDone(tx)
-    this.#changed(
-      'person',
-      sent.map(person => person.id)
     )
   }
 
@@ -916,13 +877,6 @@ export class ChordlessDB {
     const store = tx.objectStore('chordpro')
     const request = store.get(id)
     return requestResult(request)
-  }
-
-  /** The charts with these ids, in this order (undefined for one that is not there), in one transaction */
-  async getChordPros(ids: string[]): Promise<(ChordProRecord | undefined)[]> {
-    const tx = this.#transaction(['chordpro'], 'readonly')
-    const store = tx.objectStore('chordpro')
-    return Promise.all(ids.map(id => requestResult(store.get(id))))
   }
 
   // Local state operations (per-setlist, per-user)

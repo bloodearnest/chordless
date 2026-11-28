@@ -11,8 +11,6 @@
  *     - setlists/
  *       - [date-leader-type-name].json
  *   - pads/
- *
- * Song and setlist file names and appProperties come from drive-metadata.js.
  */
 
 import type {
@@ -23,7 +21,9 @@ import type {
   DriveFileWrite,
   SpaceMember,
 } from './data-types.ts'
-import { APP_VERSION } from './drive-metadata.ts'
+
+/** The app's version, written on the files it makes in Drive */
+const APP_VERSION = '1.0.0'
 
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3'
 const UPLOAD_API_BASE = 'https://www.googleapis.com/upload/drive/v3'

@@ -8,9 +8,7 @@ import { trashMovedSpaceDriveFiles } from '../js/space-deletion.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { ServerHasDataError } from '../js/space-move.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
-import { syncSpaceAfterAdoptionAnswer, syncSpaceNow } from '../js/space-sync.ts'
-import { isTeamMember } from '../js/storage/space-storage.ts'
-import { AdoptFolderError } from '../js/sync-manager.ts'
+import { syncSpaceNow } from '../js/space-sync.ts'
 import { t } from '../js/text.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
 import { errorMessage, failedWith } from '../js/utils/errors.ts'
@@ -155,14 +153,11 @@ export class SpaceCard extends LitElement {
     return !this.space.team
   }
 
-  /** Whether syncing can be done now: a team's member needs only a sign-in, everyone else Drive too */
+  /** Whether syncing can be done now: a space on Chordless, for someone signed in (one still on Drive moves first: Move) */
   get _canSync(): boolean {
-    if (onChordless(this.space)) return this.signIn === 'signed-in' || this.signIn === 'no-drive'
-    if (this.signIn === 'signed-in') return true
-    return this.signIn === 'no-drive' && isTeamMember(this.space)
+    return onChordless(this.space) && (this.signIn === 'signed-in' || this.signIn === 'no-drive')
   }
 
-  _adoptModal = createRef<AppModal>()
   _confirmModal = createRef<AppModal>()
 
   /** Move the space to the server (a test gives its own: the real one is of the device and the Worker) */
@@ -173,6 +168,9 @@ export class SpaceCard extends LitElement {
     progress?: (sent: number, total: number) => void
   ) => Promise<void> = async (spaceId, combine, progress) =>
     (await import('../js/space-data-runtime.ts')).moveSpaceToServerNow(spaceId, combine, progress)
+
+  /** Sync the space with Chordless (a test gives its own: the real one needs the account and the Worker) */
+  syncSpace: (space: Space) => Promise<string> = syncSpaceNow
 
   /** Keeps the screen on while a move runs, as it does for a setlist that is open (a test gives its own) */
   keepAwake: { hold(): void; letGo(): void } = wakeLock
@@ -290,38 +288,13 @@ export class SpaceCard extends LitElement {
     }
   }
 
-  /** Ask whether the folder an AdoptFolderError names should be used; true to use it */
-  async _askToAdopt(folder: { name: string }): Promise<boolean> {
-    const modal = this._adoptModal.value as AppModal
-    modal.heading = t('adopt-folder-heading')
-    modal.message = t('adopt-folder-message', { name: folder.name })
-    modal.confirmLabel = t('adopt-folder-use', { name: folder.name })
-    modal.cancelLabel = t('adopt-folder-new')
-    await this.updateComplete
-    await modal.updateComplete
-    return modal.ask()
-  }
-
   async _sync(): Promise<void> {
     if (this._syncing) return
     this._syncing = true
     this._error = ''
     this._progress = t('space-sync-starting')
-    const onProgress = (progress: { message: string }) => {
-      this._progress = progress.message
-    }
     try {
-      try {
-        this._syncedAt = await syncSpaceNow(this.space, onProgress)
-      } catch (error) {
-        if (!(error instanceof AdoptFolderError)) throw error
-        const use = await this._askToAdopt(error.folder)
-        this._syncedAt = await syncSpaceAfterAdoptionAnswer(
-          this.space,
-          use ? error.folder.ref : null,
-          onProgress
-        )
-      }
+      this._syncedAt = await this.syncSpace(this.space)
       this.dispatchEvent(new SpaceSyncedEvent())
       void this._loadSummary()
     } catch (error) {
@@ -438,7 +411,6 @@ export class SpaceCard extends LitElement {
           }
         </div>
       </div>
-      <app-modal ${ref(this._adoptModal)} type="confirm" size="small"></app-modal>
       <app-modal ${ref(this._confirmModal)} type="confirm" size="small"></app-modal>
     `
   }

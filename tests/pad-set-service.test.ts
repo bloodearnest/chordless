@@ -22,12 +22,10 @@ import {
 } from '../src/js/pad-set-service.ts'
 import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
 import { SpaceDataStore } from '../src/js/space-data-store.ts'
-import { TeamStorage } from '../src/js/storage/team-storage.ts'
 import type { PadStorage } from '../src/js/storage/types.ts'
 import { makePadSet } from './builders.ts'
 import { MemoryStorage, PERSONAL_PADS, padSources } from './memory-storage.ts'
 import { must } from './must.ts'
-import { makeTeamRig, ORIGIN } from './team-context.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip, type ZipEntry } from './zip.ts'
 
@@ -763,25 +761,19 @@ describe('pad sets', () => {
       expect(await cachedBytes(chosen, 'C')).to.deep.equal(audioOf('C'))
     })
 
-    it('finds the team spaces on this device: the owner’s in its folder, a member’s through the Worker', async () => {
+    it('has no pads for a space still on Drive: it moves to Chordless first', async () => {
       setPadSources(null)
       const owned = await createSpace(`Owned ${crypto.randomUUID().slice(0, 8)}`)
       const joined = await createSpace(`Joined ${crypto.randomUUID().slice(0, 8)}`)
-      const unlinked = await createSpace(`Unlinked ${crypto.randomUUID().slice(0, 8)}`)
       const personal = await createSpace(`Personal ${crypto.randomUUID().slice(0, 8)}`)
       try {
         await updateSpace(owned.id, { rootRef: 'team-folder', team: { id: 't1', role: 'owner' } })
         await updateSpace(joined.id, { rootRef: 't2', team: { id: 't2', role: 'reader' } })
-        // (an owner's space not linked to its folder yet has nowhere for pads)
-        await updateSpace(unlinked.id, { team: { id: 't3', role: 'owner' } })
-        // (and a personal space's are in its own folder, once it has one)
         await updateSpace(personal.id, { rootRef: 'personal-folder' })
         const names = (await listPadDestinations()).map(each => each.name)
-        expect(names).to.include.members([personal.name, owned.name, joined.name])
-        expect(names).to.not.include(unlinked.name)
-        expect(names.indexOf(personal.name)).to.be.below(names.indexOf(owned.name))
+        for (const space of [owned, joined, personal]) expect(names).to.not.include(space.name)
       } finally {
-        for (const space of [owned, joined, unlinked, personal]) await deleteSpace(space.id)
+        for (const space of [owned, joined, personal]) await deleteSpace(space.id)
       }
     })
 
@@ -829,22 +821,6 @@ describe('pad sets', () => {
       withTeam()
       expect(await messageOf(upload(await zipOf(), 'Ours', undefined, 'gone'))).to.match(
         /not available/
-      )
-    })
-
-    it('tells a team member to give a set that is there another name, over the Worker', async () => {
-      const rig = await makeTeamRig()
-      rig.roles.set('reader-token', 'reader')
-      const member = new TeamStorage({
-        token: async () => 'reader-token',
-        origin: ORIGIN,
-        fetch: rig.fetch,
-      })
-      withTeam(member.padsIn('space-1'))
-      const first = await upload(await zipOf(), 'Ours', undefined, 'team-1')
-      expect(first.spaceId).to.equal('team-1')
-      expect(await messageOf(upload(await zipOf(), 'Ours', undefined, 'team-1'))).to.match(
-        /already a pad set called “Ours” here: give yours another name/
       )
     })
   })

@@ -13,10 +13,9 @@ import {
 } from '../js/server-share.ts'
 import { type ListedSong, songListHtml, songListText } from '../js/setlist/song-list-text.ts'
 import { shareUrl } from '../js/share-crypto.ts'
-import { createShare, refreshShare, stopShare } from '../js/share-manager.ts'
+import { stopShare } from '../js/share-manager.ts'
 import { getCurrentSpace, getSpaceById, onChordless } from '../js/space.ts'
 import { workerConnection } from '../js/storage/space-storage.ts'
-import { createSyncManager, isSyncAvailable } from '../js/sync-manager.ts'
 import { t } from '../js/text.ts'
 import { formatSetlistDate, setlistTitle } from '../js/utils/date-utils.ts'
 import { errorMessage, failedWith } from '../js/utils/errors.ts'
@@ -29,13 +28,6 @@ import { buttonStyles } from './shared-styles.ts'
 const APP_URL = 'https://chordless.app'
 
 /** The setlist was shared, updated or stopped: its `share` has changed */
-/** The space a setlist's database is of (the share goes to its folder, not the current space's) */
-async function spaceOf(db: { spaceId: string }): Promise<{ id: string | null; name: string }> {
-  const space = await getSpaceById(db.spaceId)
-  /* v8 ignore next -- the setlist's database is a space's, which is kept */
-  return space ? { id: space.id, name: space.name } : getCurrentSpace()
-}
-
 export class SetlistShareChangeEvent extends Event {
   static readonly type = 'setlist-share:change'
   constructor() {
@@ -73,7 +65,6 @@ export class SetlistShare extends LitElement {
     leader: { type: String },
     linkable: { type: Boolean },
     _mode: { state: true },
-    _available: { state: true },
     _moved: { state: true },
     _knowsSpace: { state: true },
     _server: { state: true },
@@ -210,7 +201,6 @@ export class SetlistShare extends LitElement {
   /** The setlist can be shared by link (not for a read-only space) */
   declare linkable: boolean
   declare _mode: 'link' | 'list'
-  declare _available: boolean
   /** The setlist's space is on Chordless (moved, or a church's team): its links are the Worker's, not Drive's */
   declare _moved: boolean
   /** Whether it is known yet if the space is stored on Chordless (until then the dialog does not say which way to share) */
@@ -231,7 +221,6 @@ export class SetlistShare extends LitElement {
     this.leader = ''
     this.linkable = true
     this._mode = 'link'
-    this._available = false
     this._moved = false
     this._knowsSpace = false
     this._server = undefined
@@ -284,8 +273,6 @@ export class SetlistShare extends LitElement {
     super.connectedCallback()
     // (a page gives the database after this; a dialog that is not given one is of the current space)
     if (!this.db) void this._askSpace()
-    // (a failed check is no access: it does not throw)
-    this._available = await isSyncAvailable()
   }
 
   /** Make the link, or bring an existing share up to date, and save it on the setlist */
@@ -312,47 +299,9 @@ export class SetlistShare extends LitElement {
 
   _create() {
     return this._run(async (setlist, db) => {
-      if (this._moved) {
-        // (the Worker reads the setlist itself, so it must have the setlist as it is)
-        await this.syncFirst(db.spaceId)
-        this._server = await createServerShare(this.connection(), setlist.id)
-        this.dispatchEvent(new SetlistShareChangeEvent())
-        return
-      }
-      const { id, name } = await spaceOf(db)
-      const manager = await createSyncManager(name, id)
-      const share = await createShare(setlist, {
-        db,
-        spaceId: id,
-        space: manager.space, // (init found or made its folder)
-      })
-      setlist.share = share
-      // (on the setlist as it is stored now: making the share took a while)
-      await db.updateSetlist(setlist.id, stored => {
-        stored.share = share
-      })
-      this.requestUpdate()
-      this.dispatchEvent(new SetlistShareChangeEvent())
-    })
-  }
-
-  /** Make the shared copy match the setlist now, rather than at the next sync */
-  _update() {
-    return this._run(async (setlist, db) => {
-      if (!setlist.share) return
-      const { id, name } = await spaceOf(db)
-      const manager = await createSyncManager(name, id)
-      const share = await refreshShare(
-        { ...setlist, share: setlist.share },
-        { db, spaceId: id, space: manager.space }
-      )
-      if (share !== setlist.share) {
-        setlist.share = share
-        await db.updateSetlist(setlist.id, stored => {
-          stored.share = share
-        })
-      }
-      this.requestUpdate()
+      // (the Worker reads the setlist itself, so it must have the setlist as it is)
+      await this.syncFirst(db.spaceId)
+      this._server = await createServerShare(this.connection(), setlist.id)
       this.dispatchEvent(new SetlistShareChangeEvent())
     })
   }
@@ -367,9 +316,7 @@ export class SetlistShare extends LitElement {
         return
       }
       if (!setlist.share) return
-      const { id, name } = await spaceOf(db)
-      const manager = await createSyncManager(name, id)
-      await stopShare(setlist.share, manager.space)
+      await stopShare(setlist.share)
       setlist.share = null
       await db.updateSetlist(setlist.id, stored => {
         stored.share = null
@@ -592,7 +539,7 @@ export class SetlistShare extends LitElement {
         </section>
       `
     }
-    if (!share && !this._available) {
+    if (!share) {
       return html`
         <section>
           <p class="note">
@@ -603,7 +550,7 @@ export class SetlistShare extends LitElement {
     }
     return html`
       <section>
-        ${share ? this._renderShared(formatSetlistDate(share.expires, 'long'), false) : this._renderNotShared()}
+        ${this._renderShared(formatSetlistDate(share.expires, 'long'), false)}
         ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
       </section>
     `
@@ -650,13 +597,6 @@ export class SetlistShare extends LitElement {
         ${onServer ? t('share-server-ends', { date: ends }) : t('share-ends', { date: ends })}
       </p>
       <div class="actions center">
-        ${
-          onServer || this._moved
-            ? nothing
-            : html`<button class="btn" ?disabled=${this._busy} @click=${this._update}>
-                ${this._busy ? t('share-working') : t('share-update')}
-              </button>`
-        }
         <button class="btn danger" ?disabled=${this._busy} @click=${this._stop}>${t('confirm-share-stop-button')}</button>
       </div>
     `

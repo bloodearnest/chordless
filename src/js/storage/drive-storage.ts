@@ -49,7 +49,7 @@ async function inGroups<T, R>(items: T[], work: (item: T) => Promise<R>): Promis
 /**
  * Whether a file belongs to the songs collection: a chart (plain text) or a song's score, which is a
  * MusicXML file and says what it is by its properties (`type: 'score'`, or `'melody'` before the
- * rename: drive-metadata.ts). A listing that took only text would never show a score to a pull, and
+ * rename). A listing that took only text would never show a score to a pull, and
  * a device would never get back one that it lost.
  */
 function isSongsFile(file: Pick<DriveFile, 'mimeType' | 'appProperties'>): boolean {
@@ -479,7 +479,5 @@ export function createDriveStorage(api: DriveApi): StorageBackend {
     },
 
     space: rootRef => new DriveSpace(api, rootRef),
-
-    writeRefusals: () => api.countWriteRefusals(),
   }
 }

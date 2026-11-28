@@ -5,7 +5,7 @@ import { hashText } from '../src/js/song-utils.ts'
 import { createExport, readExport, type SpaceExport } from '../src/js/space-export.ts'
 import { planReset, resetToExport } from '../src/js/space-restore.ts'
 import { makeEntry } from './builders.ts'
-import { addSong, useSyncRig } from './drive-harness.ts'
+import { addSong, useDevices } from './device-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -18,10 +18,9 @@ const LETTERS = '{title: Alpha}\n{key: G}\n[G]Alpha [C]line'
 const BETA = '{title: Beta}\n{key: D}\n[D]Beta line'
 
 describe('Reset from import (resetToExport)', () => {
-  const rig = useSyncRig()
-  const { makeDevice, addSetlist, syncDevice } = rig
+  const { makeDevice, addSetlist } = useDevices()
 
-  /** A device with a synced library: Alpha (as numbers) and Beta, and a setlist with both */
+  /** A device with a library: Alpha (as numbers) and Beta, and a setlist with both */
   async function library() {
     const phone = await makeDevice('phone')
     await addSong(phone, { uuid: 'alpha', title: 'Alpha', content: NUMBERS })
@@ -33,7 +32,6 @@ describe('Reset from import (resetToExport)', () => {
         makeEntry({ songId: 'title-beta', songUuid: 'beta', key: 'D', order: 1 }),
       ],
     })
-    await syncDevice(phone)
     return { phone, setlist }
   }
 
@@ -77,24 +75,6 @@ describe('Reset from import (resetToExport)', () => {
     expect(after.fileRef, 'the link to its file in Drive').to.equal(before.fileRef)
     expect(must(await phone.db.getChordPro(after.chordproFileId)).content).to.equal(LETTERS)
     expect(after.contentHash).to.equal(hashText(LETTERS))
-  })
-
-  it('sends the replaced chart as an update of the same Drive file, and another device gets it', async () => {
-    const { phone } = await library()
-    const filesBefore = rig.storage.list(() => true).length
-    await resetToExport(withChart(await fileOf(phone), 'alpha', LETTERS), phone.db)
-
-    await syncDevice(phone)
-
-    const files = rig.storage.list(() => true)
-    expect(files, 'no file is added').to.have.length(filesBefore)
-    expect(files.some(file => file.content.includes('[G]Alpha [C]line'))).to.equal(true)
-    expect(files.some(file => file.content.includes('[1]Alpha'))).to.equal(false)
-
-    const tablet = await makeDevice('tablet')
-    await syncDevice(tablet)
-    const song = must(await tablet.db.getSong('alpha'))
-    expect(must(await tablet.db.getChordPro(song.chordproFileId)).content).to.equal(LETTERS)
   })
 
   it('leaves what is the same alone', async () => {
@@ -157,10 +137,6 @@ describe('Reset from import (resetToExport)', () => {
     expect(after.fileRef).to.equal(before.fileRef)
     expect(after.syncedContentHash).to.equal(before.syncedContentHash)
     expect(after.share).to.deep.equal(before.share)
-
-    await syncDevice(phone)
-    expect(rig.driveSetlist(setlist.id).name).to.equal('Sunday (fixed)')
-    expect(rig.driveSetlistFiles()).to.have.length(1)
   })
 
   it('brings back a setlist deleted here that the file has', async () => {

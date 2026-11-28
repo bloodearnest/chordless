@@ -254,10 +254,6 @@ function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<Aut
           })
           if (!stored.success) throw new Error(stored.error || 'Failed to save the sign-in')
 
-          // A new sign-in may be a different account, with different access to the folder
-          followUp(
-            import('./space-access.ts').then(({ refreshSpaceAccess }) => refreshSpaceAccess())
-          )
           // ...and may be in teams this device has not set up
           followUp(
             import('./team-memberships.ts').then(({ checkTeamMemberships }) =>
