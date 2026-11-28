@@ -191,6 +191,20 @@ test('a signed-in person creates a church and its library, and only admins chang
     404
   )
   assert.equal((await call('reader', 'GET', `/api/churches/${id}/members`)).status, 200)
+  // an address is shown to an admin, for a person with no name, and to no one else
+  sql
+    .prepare('INSERT INTO account_emails (email, account_id, created_at) VALUES (?, ?, ?)')
+    .run('reader@example.com', 'reader', new Date().toISOString())
+  const listed = async (who: string) =>
+    (await (await call(who, 'GET', `/api/churches/${id}/members`)).json()) as {
+      id: string
+      email: string | null
+    }[]
+  assert.equal(
+    (await listed('admin')).find(member => member.id === 'reader')?.email,
+    'reader@example.com'
+  )
+  assert.equal((await listed('reader')).find(member => member.id === 'reader')?.email, null)
   assert.equal((await call('reader', 'GET', `/api/churches/${id}/teams`)).status, 200)
   assert.equal(
     (await call('reader', 'PUT', `/api/churches/${id}/teams/${teams[0].id}/follow`)).status,

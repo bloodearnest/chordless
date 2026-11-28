@@ -32,12 +32,23 @@ const DECLINED_KEY = 'declined-team-spaces'
 /** What a check can be given (a test gives its own list of teams and first sync) */
 interface CheckOptions {
   includeDeclined?: boolean
-  list?: () => Promise<MyTeam[]>
+  list?: () => Promise<MyTeam[] | Listed>
+  /** Take a space off this device (a test gives its own) */
+  remove?: (space: Space) => Promise<void>
   syncSpace?: (space: Space) => Promise<void>
   /** Queue a team's setlists to go to its church (a test gives its own) */
   adopt?: (spaceId: string, churchId: string) => Promise<void>
   /** Send what the device holds of an adopted team (a test gives its own) */
   send?: (spaceId: string) => Promise<void>
+}
+
+/**
+ * The teams found, and whether the churches' own lists were read (so a team of a church that is not in them is gone, and not
+ * just not heard of because the Worker could not be reached)
+ */
+export interface Listed {
+  teams: MyTeam[]
+  churchesListed: boolean
 }
 
 /** A team the Worker says the person is in */
@@ -68,11 +79,17 @@ export async function churchTeams(): Promise<MyTeam[]> {
   return teams.flat()
 }
 
-async function allTeams(): Promise<MyTeam[]> {
+async function allTeams(): Promise<Listed> {
   const results = await Promise.allSettled([teamApi.list(), churchTeams()])
   const found = results.flatMap(result => (result.status === 'fulfilled' ? result.value : []))
   if (results.every(result => result.status === 'rejected')) throw new Error('Could not load teams')
-  return found
+  return { teams: found, churchesListed: results[1].status === 'fulfilled' }
+}
+
+/** A space taken off the device because its team was deleted from its church */
+async function removeGoneSpace(space: Space): Promise<void> {
+  const { removeSpaceFromDevice } = await import('./space-deletion.ts')
+  await removeSpaceFromDevice(space)
 }
 
 /** The ids of the teams taken off this device on purpose */
@@ -122,8 +139,11 @@ export interface MembershipReport {
 export async function addMissingTeamSpaces(options: CheckOptions = {}): Promise<MembershipReport> {
   const report: MembershipReport = { added: [], declined: [] }
   let mine: MyTeam[]
+  let churchesListed = false
   try {
-    mine = await (options.list ?? allTeams)()
+    const listed = await (options.list ?? allTeams)()
+    mine = Array.isArray(listed) ? listed : listed.teams
+    churchesListed = !Array.isArray(listed) && listed.churchesListed
   } catch (error) {
     // Not signed in, offline, or the Worker is down: nothing to learn
     console.warn('[TeamMemberships] Could not ask which teams there are:', error)
@@ -135,6 +155,19 @@ export async function addMissingTeamSpaces(options: CheckOptions = {}): Promise<
     const here = await listSpaces()
     const known = new Map(here.flatMap(space => (space.team ? [[space.team.id, space]] : [])))
     const declined = new Set(declinedTeams())
+    // A church's team that the church no longer has (an admin deleted it) is not kept here: there is nothing for it to sync with
+    if (churchesListed) {
+      const listedIds = new Set(mine.map(team => team.spaceId))
+      for (const space of here) {
+        if (!space.team?.churchId || listedIds.has(space.team.id)) continue
+        try {
+          await (options.remove ?? removeGoneSpace)(space)
+          known.delete(space.team.id)
+        } catch (error) {
+          console.warn(`[TeamMemberships] Could not take ${space.name} off this device:`, error)
+        }
+      }
+    }
     for (const team of mine) {
       const space = known.get(team.spaceId)
       if (space?.team) {

@@ -30,6 +30,8 @@ export interface ChurchTeam {
 export interface ChurchMember {
   id: string
   name: string | null
+  /** An address, for an admin looking at a member with no name */
+  email?: string | null
   role: MemberRole
   joinedAt: string
 }
