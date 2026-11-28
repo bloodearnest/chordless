@@ -42,9 +42,10 @@ const exporter = new InMemorySpanExporter()
 
 /**
  * A fetch's span ends once the instrumentation has read its copy of the body, a moment after the call
- * is answered: so these two wait for that, and a test reads what ended
+ * is answered: so these two wait for that, and a test reads what ended. (One timer tick was not enough on a
+ * busy machine, such as a CI runner: a span then ended in the next test, or after its own was read.)
  */
-const settle = () => new Promise(resolve => setTimeout(resolve, 0))
+const settle = () => new Promise(resolve => setTimeout(resolve, 30))
 const timedFetch = (...args: Parameters<typeof timedFetchNow>) => {
   const call = timedFetchNow(...args)
   return (async (input, init) => {
@@ -86,7 +87,9 @@ beforeEach(() => {
   setAmbient({ accountId: undefined, sessionId: undefined, teamPseudoId: undefined })
 })
 
-afterEach(() => {
+afterEach(async () => {
+  // (a span still to end would land in the next test's exporter)
+  await settle()
   fetchSpans.disable()
   globalThis.fetch = realFetch
   trace.disable()
@@ -647,7 +650,8 @@ describe('timedFetch', () => {
   })
 
   it('makes spans for only the first calls of a sync, and counts them all', async () => {
-    const fetcher = timedFetch('drive')
+    // (the one that does not wait after each call: 250 waits are too long)
+    const fetcher = timedFetchNow('drive')
     await traced(
       'chordless.sync.run',
       {},
@@ -655,6 +659,9 @@ describe('timedFetch', () => {
         for (let i = 0; i < 250; i++) await fetcher(DRIVE)
       },
       { trackCalls: true }
+    )
+    await expectEventually(
+      () => finished().filter(span => span.kind === SpanKind.CLIENT).length === 200
     )
     expect(finished().filter(span => span.kind === SpanKind.CLIENT)).to.have.length(200)
     expect(
