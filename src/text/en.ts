@@ -723,6 +723,7 @@ space-copy-drive-heading = Google Drive
 space-copy-team-text = Replace this device's songs and setlists with the Team's copy. Sync is on the space's card.
 # The Manage Data page of a Personal space that has moved to Chordless, where there is no Google Drive copy to restore from.
 space-copy-server-heading = Chordless
+space-copy-church-text = This team belongs to your church on Chordless, and syncs from its card on the Account and Teams page. It no longer syncs with Google Drive. An admin deletes a team on the churches page.
 space-copy-server-text = This space is stored on Chordless, and syncs from its card on the Account and Teams page. It no longer syncs with Google Drive.
 space-copy-drive-text = Replace this device's songs and setlists with the copy stored on Google Drive.
 # <connect> is a link to the Account and Teams page.

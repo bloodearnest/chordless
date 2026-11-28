@@ -171,6 +171,9 @@ export class SpaceManager extends LitElement {
     const kind = spaceKind(space)
     const role = spaceRole(space)
     const summary = this._summary
+    // Held by the server: a Personal space that moved, or a team that is a church's now. Neither has a Drive copy to restore
+    // from, and neither is deleted everywhere from here (a church's team is deleted by its admin, on the churches page)
+    const onChordless = Boolean(space.server || space.team?.churchId)
     return html`
       <div class="content">
         <div class="head">
@@ -191,10 +194,10 @@ export class SpaceManager extends LitElement {
         }
 
         ${
-          space.server
+          onChordless
             ? html`<div class="panel" id="server-panel">
                 <h3>${t('space-copy-server-heading')}</h3>
-                <p>${t('space-copy-server-text')}</p>
+                <p>${t(space.team?.churchId ? 'space-copy-church-text' : 'space-copy-server-text')}</p>
               </div>`
             : html`        <div class="panel">
           <h3>${isTeamMember(space) ? t('space-copy-team-heading') : t('space-copy-drive-heading')}</h3>
@@ -238,7 +241,10 @@ export class SpaceManager extends LitElement {
           ${this._error ? html`<p class="error" role="alert">${t('space-delete-failed', { reason: this._error })}</p>` : nothing}
         </div>
 
-        <div class="panel danger-zone">
+        ${
+          space.team?.churchId
+            ? nothing
+            : html`<div class="panel danger-zone">
           <h3>${t('space-delete-everywhere-heading')}</h3>
           <p>
             ${rich(
@@ -256,7 +262,8 @@ export class SpaceManager extends LitElement {
             @space-delete-everywhere:deleted=${(event: SpaceDeletedEvent) =>
               this.dispatchEvent(new SpaceGoneEvent(event.wasCurrent))}
           ></space-delete-everywhere>
-        </div>
+        </div>`
+        }
       </div>
       <app-modal
         ${ref(this._deleteModal)}
