@@ -26,6 +26,7 @@ import {
   createTeamSpace,
   inviteLink,
   joinSpace,
+  learnOfMove,
   leaveSpace,
   stopSharing,
 } from '../src/js/team-spaces.ts'
@@ -206,6 +207,37 @@ describe('team spaces on this device', () => {
         'DELETE /api/space/s',
       ])
       expect(requests[1].body).to.deep.equal({ role: 'writer', email: 'b@example.com' })
+    })
+  })
+
+  describe('a team that moved into its church while the device was away', () => {
+    const moved = new TeamError(
+      'This team has moved to its church on Chordless: update the app to carry on',
+      410
+    )
+
+    it('is learned of when the Worker says so, and the space is then the church’s', async () => {
+      const drive = await space('Moving', { team: { id: 'space-mmmm1111', role: 'writer' } })
+      let asked = 0
+      const church = await learnOfMove(drive, moved, async () => {
+        asked++
+        await updateSpace(drive.id, {
+          team: { id: 'space-mmmm1111', role: 'writer', churchId: 'c' },
+        })
+      })
+      expect(asked).to.equal(1)
+      expect(church?.team?.churchId).to.equal('c')
+    })
+
+    it('is not taken for another failure, and is left as it was if the check did not make it the church’s', async () => {
+      const drive = await space('Staying', { team: { id: 'space-mmmm2222', role: 'writer' } })
+      let asked = 0
+      const check = async () => void asked++
+      expect(await learnOfMove(drive, new Error('offline'), check)).to.equal(null)
+      expect(await learnOfMove(drive, 'a string', check)).to.equal(null)
+      expect(asked).to.equal(0)
+      expect(await learnOfMove(drive, moved, check)).to.equal(null)
+      expect(asked).to.equal(1)
     })
   })
 
