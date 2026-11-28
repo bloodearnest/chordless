@@ -206,22 +206,32 @@ test('a signed-in person creates a church and its library, and only admins chang
   )
   assert.equal((await listed('reader')).find(member => member.id === 'reader')?.email, null)
   assert.equal((await call('reader', 'GET', `/api/churches/${id}/teams`)).status, 200)
+  // a person does not choose their teams: only an admin puts someone on one, or takes them off, and only a member of the church
+  const people = `/api/churches/${id}/teams/${teams[0].id}/people`
+  assert.equal((await call('reader', 'PUT', `${people}/reader`)).status, 404)
+  assert.equal((await call('stranger', 'PUT', `${people}/reader`)).status, 404)
   assert.equal(
-    (await call('reader', 'PUT', `/api/churches/${id}/teams/${teams[0].id}/follow`)).status,
-    204
-  )
-  assert.equal(
-    (await call('reader', 'DELETE', `/api/churches/${id}/teams/${teams[0].id}/follow`)).status,
-    204
-  )
-  assert.equal(
-    (await call('stranger', 'PUT', `/api/churches/${id}/teams/${teams[0].id}/follow`)).status,
+    (await call('admin', 'PUT', `/api/churches/${id}/teams/missing/people/reader`)).status,
     404
   )
-  assert.equal(
-    (await call('reader', 'PUT', `/api/churches/${id}/teams/missing/follow`)).status,
-    404
-  )
+  assert.equal((await call('admin', 'PUT', `${people}/outsider`)).status, 404, 'not of the church')
+  assert.equal((await call('admin', 'PUT', `${people}/reader`)).status, 204)
+  assert.equal((await call('admin', 'PUT', `${people}/reader`)).status, 204, 'again')
+  const shown = async (who: string) =>
+    (
+      (await (await call(who, 'GET', `/api/churches/${id}/teams`)).json()) as {
+        id: string
+        followed: number
+        people?: string[]
+      }[]
+    ).filter(team => team.id === teams[0].id)
+  assert.ok((await shown('admin'))[0].people?.includes('reader'), 'an admin is told who is on it')
+  assert.equal((await shown('reader'))[0].people, undefined, 'and no one else')
+  assert.equal((await shown('reader'))[0].followed, 1, 'it is the reader’s')
+  assert.equal((await shown('admin'))[0].followed, 1, 'every team is an admin’s')
+  assert.equal((await call('admin', 'DELETE', `${people}/reader`)).status, 204)
+  assert.equal((await shown('reader'))[0].followed, 0, 'and now it is not')
+  assert.equal((await call('admin', 'GET', people)).status, 404)
   assert.equal(
     (await call('admin', 'PUT', `/api/churches/${id}/members/missing`, { role: 'reader' })).status,
     404

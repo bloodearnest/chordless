@@ -216,7 +216,7 @@ describe('church administration', () => {
     )
   })
 
-  it('keeps a reader able to follow teams without exposing administration controls', async () => {
+  it('shows a reader their teams and no administration controls, and no way to join one', async () => {
     const { element, churches, teams } = setup()
     churches.push({
       id: 'c',
@@ -228,22 +228,54 @@ describe('church administration', () => {
       licences: {},
       role: 'reader',
     })
-    teams.push({ id: 't', name: 'Morning', archivedAt: null, followed: 0 })
-    let followed = false
-    element.api = {
-      ...element.api,
-      follow: async (_church, _team, value) => {
-        followed = value
-      },
-    }
+    teams.push({ id: 't', name: 'Morning', archivedAt: null, followed: 1 })
     await ready(element)
     expect(element.shadowRoot?.textContent).not.to.contain('Add team')
-    const checkbox = must(
-      element.shadowRoot?.querySelector<HTMLInputElement>('input[type="checkbox"]')
+    expect(element.shadowRoot?.querySelector('input[type="checkbox"]')).to.equal(null)
+    expect(element.shadowRoot?.querySelector('.team-people')).to.equal(null)
+  })
+
+  it('lets an admin put a member of the church on a team, and take them off', async () => {
+    const { element, churches, teams, members } = setup()
+    churches.push({
+      id: 'c',
+      name: 'Church',
+      country: 'GB',
+      city: 'York',
+      postcode: null,
+      ccliLicence: null,
+      licences: {},
+      role: 'admin',
+    })
+    teams.push({ id: 't', name: 'Morning', archivedAt: null, followed: 1, people: ['a'] })
+    members.push(
+      { id: 'a', name: 'Pat', role: 'admin', joinedAt: '2026-11-22' },
+      { id: 'b', name: null, email: 'b@example.com', role: 'writer', joinedAt: '2026-11-22' }
     )
-    checkbox.checked = true
-    checkbox.dispatchEvent(new Event('change'))
-    await waitUntil(() => followed, 'team to be followed')
+    const done: string[] = []
+    element.api = {
+      ...element.api,
+      addToTeam: async (_church, _team, account) => void done.push(`add ${account}`),
+      removeFromTeam: async (_church, _team, account) => void done.push(`remove ${account}`),
+    }
+    await ready(element)
+    const row = must(element.shadowRoot?.querySelector('.team-people'))
+    expect(row.textContent).to.contain('Pat')
+    expect(row.textContent).to.contain('b@example.com')
+    must(
+      Array.from(row.querySelectorAll('button')).find(
+        button => button.textContent?.trim() === 'Remove'
+      )
+    ).click()
+    await waitUntil(() => done.length === 1 && !element._busy)
+    const select = must(row.querySelector('select'))
+    select.value = 'b'
+    select.dispatchEvent(new Event('change'))
+    await waitUntil(() => done.length === 2)
+    // (choosing nothing does nothing)
+    select.value = ''
+    select.dispatchEvent(new Event('change'))
+    expect(done).to.deep.equal(['remove a', 'add b'])
   })
 
   it('manages church settings, roles, teams and an invitation', async () => {

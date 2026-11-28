@@ -2312,19 +2312,21 @@ church-console-adopt = Move into { $church }
 # { $team } is the team, { $church } the church. Asked before the move.
 church-console-confirm-adopt = Move { $team } into { $church }? Its members become members of the church, and its songs and setlists move from Google Drive to Chordless on each device as it opens the app. Everyone needs the latest version first, and Google Drive is not used for this team again.
 # { $team } is the team that was moved into the church.
-church-console-adopted = { $team } has moved into the church. Each device follows when its app opens.
+church-console-adopted = { $team } has moved into the church. Each device sets it up when its app opens.
 church-console-team-name = New team name
 church-console-team-add = Add team
 church-console-archive = Archive
 church-console-restore = Restore
 church-console-delete = Delete
-church-console-follow = Show on my home page
+church-console-team-people = People on this team
+church-console-team-person-add = Add a person…
+church-console-team-person-remove = Remove
 church-console-members = Members
 church-console-remove = Remove
 church-console-invite = Invite someone
 church-console-email = Email address
 church-console-role = Role
-church-console-invite-team = Team to follow
+church-console-invite-team = Team
 church-console-invite-create = Create invitation
 church-console-invite-copy = Copy invitation link
 church-console-invite-copied = Invitation link copied.
