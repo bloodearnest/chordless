@@ -56,6 +56,21 @@
     "branches": 6,
     "functions": 0
   },
+  "src/js/space-access.ts": {
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/js/sync-manager.ts": {
+    "lines": 2,
+    "branches": 1,
+    "functions": 1
+  },
+  "src/js/sync-orchestrator.ts": {
+    "lines": 21,
+    "branches": 0,
+    "functions": 2
+  },
   "src/js/sync/pull.ts": {
     "lines": 0,
     "branches": 2,

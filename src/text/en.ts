@@ -17,14 +17,8 @@ action-reload = Reload
 action-check-for-updates = Check for updates
 action-open-account = Open Account and Teams
 
-
 ## Setlists
 
-# A setlist could not be deleted.
-toast-connect-drive-failed = Couldn't connect Google Drive.
-toast-drive-disconnected = Google Drive is disconnected.
-toast-drive-disconnected-kept = Google Drive is disconnected from your account. A Team you own is still kept in your Drive, so Google's access for Chordless was left in place.
-toast-drive-disconnect-failed = Couldn't disconnect Google Drive.
 toast-setlist-delete-failed = Couldn't delete the setlist.
 
 # A setlist was deleted; the message offers Undo. { $title } is its name.
@@ -59,7 +53,6 @@ toast-setlist-song-remove-failed = Couldn't remove the song from the setlist.
 
 toast-setlist-create-failed = Couldn't create the setlist.
 
-
 ## Songs
 
 toast-range-save-failed = Couldn't save the melody range.
@@ -74,7 +67,6 @@ toast-version-merge-failed = Couldn't merge the songs.
 toast-version-default-failed = Couldn't make it the default.
 toast-version-delete-failed = Couldn't delete the version.
 toast-song-delete-failed = Couldn't delete the song.
-
 
 ## People and teams
 
@@ -95,7 +87,6 @@ toast-teams-added-many = Added { $count } teams you are in: { $names }.
 # A space's songs and setlists could not be fetched. { $space } is its name.
 toast-space-fetch-failed = Couldn't get { $space }'s songs and setlists.
 
-
 ## Google sign-in and Drive
 
 # Said after the sentence for what happened to the folder, in each of the messages below.
@@ -109,7 +100,6 @@ folder-gone-other-app = This space was synced by an earlier version of Chordless
 
 # Drive cannot find it: it was deleted, or the person is signed in with another Google account.
 folder-gone-missing = This space's Google Drive folder can't be found: it was deleted, or belongs to another Google account than the one you are signed in with. { -folder-gone-safe } Sign in with the right account, or start over in Drive to upload them again.
-
 
 ## The data on this device
 
@@ -128,12 +118,10 @@ toast-db-updated-elsewhere = Chordless was updated in another window. Reload thi
 # Another window of the app has the data open, and so the update here cannot finish.
 toast-db-other-windows = Close the other Chordless windows to finish updating.
 
-
 ## Help (the page for each page of the app: Menu > Help)
 
 # The text of each page of help is these messages, by page, section and item; the pictures that go
 # with them are named in js/help-content.ts. A text may link inside the app: [Preferences](/preferences).
-
 
 ### The setlist overview
 
@@ -258,7 +246,6 @@ help-library-edit-mode-each-section-of-the-show-text = Choose what that section 
 help-library-edit-mode-each-section-of-the-collapse-label = Collapse
 help-library-edit-mode-each-section-of-the-collapse-text = Fold the section up to a single line, and open it again.
 
-
 ## Questions before something is changed
 ## (each has a heading, the message, and the label of the button that does it; Cancel is the other)
 
@@ -297,22 +284,9 @@ confirm-logout-heading = Log out of Google?
 confirm-logout-button = Log Out
 confirm-logout-message = This signs you out on this device only. Other devices stay signed in. Your songs stay on this device, and in any Team space.
 
-
 confirm-share-stop-heading = Stop sharing?
 confirm-share-stop-button = Stop sharing
 confirm-share-stop-message = Anyone with the link will lose access, and their copy is removed the next time they open it. You can make a new link later.
-
-confirm-drive-reset-heading = Reset from Google Drive?
-confirm-drive-reset-button = Reset
-confirm-drive-reset-message = This replaces this device's setlists and songs with the copy in Google Drive. Anything removed from Drive is removed here too. If this device has changes that aren't in Drive yet, nothing is changed.
-
-confirm-drive-start-over-heading = Start over in Google Drive?
-confirm-drive-start-over-button = Start over
-confirm-drive-start-over-message = Everything on this device is kept, and uploaded again to a new Drive folder. Share links to this space's setlists stop working: make them again. If you can still see the old folder in Drive, it is left alone: delete it by hand when you are sure.
-
-confirm-drive-replace-heading = Replace this device's copy?
-confirm-drive-replace-button = Replace
-confirm-drive-replace-message = For when another device has already synced this space with this version of the app. This device's setlists and songs are replaced with the folder of this name in Google Drive, and anything only on this device is lost. If there is no such folder, nothing is changed.
 
 # { $space } is the space.
 
@@ -326,28 +300,10 @@ confirm-space-delete-message = Delete "{ $space }" from this device? Its songs a
 confirm-space-delete-team = You stay in the Team: to get it back on this device, ask for a new invite link.
 confirm-space-delete-final = This can't be undone.
 
-confirm-team-stop-heading = Stop sharing this Team?
-confirm-team-stop-button = Stop sharing
-confirm-team-stop-message = Everyone else loses access, and Chordless forgets the sign-in it kept for this Team. The folder and its files stay in your Drive, and on every device that has them.
-
-# { $space } is the Team.
-confirm-team-leave-heading = Leave { $space }?
-confirm-team-leave-button = Leave
-confirm-team-leave-message = You lose access to the Team, and it is removed from this device. The team keeps its songs and setlists, and an admin can invite you again.
-
 # { $email } is the member being removed.
 confirm-team-remove-heading = Remove { $email }?
 confirm-team-remove-button = Remove
 confirm-team-remove-message = They lose access to this Team. What is already on their device stays there, but it no longer syncs.
-
-confirm-move-setlists-heading = Move the setlists?
-confirm-move-setlists-button = Move them
-# { $count } is how many, and { $source } the space they are in now.
-confirm-move-setlists-message =
-    { $count ->
-        [one] { $count } setlist will move
-       *[other] { $count } setlists will move
-    } out of { $source } into the team space. They will no longer be in { $source }, only in the team's. Those saved to Google Drive go to its Drive trash, where they can be restored from.
 
 confirm-person-merge-heading = Merge?
 confirm-person-merge-button = Merge
@@ -358,7 +314,6 @@ confirm-person-delete-heading = Delete?
 confirm-person-delete-button = Delete
 confirm-person-delete-message = Delete { $person }? They lead no setlists. They are removed from the Leader menu.
 
-
 ## What a page says while it loads, when it has nothing to show, and when it could not
 
 status-loading = Loading…
@@ -366,26 +321,14 @@ status-checking = Checking…
 
 ## Joining a team with an invite link (src/components/team-join.ts)
 
-# The heading once the invite is known. { $team } is the team's name, { $role } the role with its article
-# ("a team member", "a worship leader", "an admin").
-join-welcome-heading = You are invited to join { $team } as { $role }.
-
-# The same, when the invite could not be looked up (the device is offline, or too many tries).
-join-welcome-unknown = You have been invited to join a team on Chordless.
-
 # Above the sign-in button when the invite was sent to a Gmail or Google Workspace address, which is then the
 # account to use. { $email } is that address.
-
-# For an invite that makes someone an admin: it only works with the address it was sent to. { $email } is that address.
-join-sign-in-intro = Sign in to join. Chordless asks only who you are.
-join-admin-exact = This invite makes you an admin, so it can only be used with the address it was sent to: { $email }. Sign in with that address.
 
 # Above the sign-in button on an Android phone, which has a Google account on it. { $email } is the address the invite was sent to.
 
 # Above the sign-in button for someone who has said they have a Google account. { $email } is the address the invite was sent to.
 
 # The same, when the address the invite was sent to is not known.
-
 
 # The question for someone who may not have a Google account, on a device that does not say.
 
@@ -398,12 +341,6 @@ invite-emailed = We have emailed the invite to { $email }. The link is here too,
 invite-not-emailed = The invite could not be emailed, so send the link to { $email } yourself. It is shown once.
 
 ## A Team's list of people
-
-membership-heading = Your place in the Team
-membership-owner = You are the owner of this Team.
-membership-member = You are { $role } in this Team.
-membership-stop = Stop sharing
-membership-leave = Leave this Team
 
 people-heading = Members ({ $count })
 people-invites-heading = Invites ({ $count })
@@ -509,18 +446,6 @@ email-link-failed = That link has been used or has run out. Ask for a new one.
 email-link-none = To sign in, enter your email address and we will email you a link and a code.
 email-code-error-failed = Signing in did not work. Try again in a moment.
 
-# For a page opened inside another app's own browser. { $app } is the app's name.
-join-in-app-heading = Open this page in your browser
-join-in-app-body = You are looking at this inside { $app }, whose built-in browser often stops Google sign-in from working. Open this page in Chrome or Safari instead.
-join-copy-link = Copy link
-join-link-copied = Link copied
-join-continue-here = Continue here anyway
-
-# Before joining with an account that is not the address the invite was sent to. { $invited } and { $email } are addresses.
-join-as-other = This invite was sent to { $invited }, and you are signed in as { $email }. You can join with this account. It will be the one the team knows you by, and { $invited } is noted as yours too.
-
-join-not-valid = This invite is not valid. It may have been used, withdrawn or have run out: ask the person who sent it for a new one.
-
 status-setlists-loading = Loading setlists...
 status-setlists-failed = Error loading setlists. Please check the console.
 status-setlist-loading = Loading setlist...
@@ -554,9 +479,6 @@ status-space-no-setlists-detail = Create the first with the + at the top.
 action-get-them-now = Get them now
 action-getting-them = Getting them…
 
-space-sync-sign-in-hint = Sign in on the Account and Teams page to sync.
-
-
 ## Signing in
 
 account-signed-out-name = Not signed in
@@ -564,7 +486,6 @@ account-signed-out-text =
     Your songs and setlists stay on this device. Signing in lets you access Team data that is shared with you.
 
     If you sign in with a Google account your personal data is synced between your devices. Otherwise, just team data is.
-
 
 ## Lead sheets, and the pads that play under a song
 
@@ -577,12 +498,10 @@ leadsheet-show = Show the lead sheet
 pad-error-load = Could not load pad sound for this key
 pad-error-none = No pad set yet: upload one in Storage
 
-
 ## About
 
 about-update-none-label = No updates here
 about-update-none-detail = This browser isn't keeping the app's files, so every visit loads the latest.
-
 
 ## Who someone is in a Team (these are also in sentences: "as a worship leader")
 
@@ -596,7 +515,6 @@ role-owner-with-article = an owner
 role-admin-with-article = an admin
 role-writer-with-article = a worship leader
 role-reader-with-article = a team member
-
 
 ## What a space is called (the page says Personal and Team, never "space")
 
@@ -633,7 +551,6 @@ adopt-folder-new = Make a new folder
 space-sync-sign-in = Sign in to sync
 space-drive-off = Google Drive is not connected, so this space does not sync between your devices.
 space-drive-reconnect = Google Drive needs reconnecting to sync.
-space-drive-on = Google Drive: { $email }
 # { $name } is a team that has become part of your church on Chordless: this device sends its songs and setlists to it, and stops using Google Drive for it.
 team-adopted = { $name } is now part of your church on Chordless. This device is sending its songs and setlists, and will not use Google Drive for it again.
 # Toasts, when your Personal space was moved to Chordless on another device and this device follows it by itself.
@@ -674,12 +591,6 @@ space-drive-delete-confirm = Delete files
 # { $reason } is what went wrong.
 space-drive-delete-failed = Could not delete the files: { $reason }
 space-drive-delete-failed-plain = Could not delete the files.
-action-connect-drive = Connect Google Drive
-action-reconnect-drive = Reconnect Google Drive
-action-disconnect-drive = Disconnect Google Drive
-confirm-drive-disconnect-heading = Disconnect Google Drive?
-confirm-drive-disconnect-button = Disconnect
-confirm-drive-disconnect-message = Your Personal space stays on your devices and in your Google Drive, and you stay signed in. Syncing stops on all of your devices until you connect Google Drive again.
 
 # How long ago a sync was, for "Synced { $when }" and "Last synced: { $when }". { $count } is the number.
 sync-time-now = Just now
@@ -709,15 +620,6 @@ action-make-default = Make default
 # A page for a space that is not on this device (an old link, say).
 space-missing = This device has no such Personal space or Team. It may have been deleted.
 
-# On the page of one space: the panel for what it syncs with, and its parts.
-space-copy-team-heading = Team copy
-space-copy-drive-heading = Google Drive
-space-copy-team-text = Replace this device's songs and setlists with the Team's copy. Sync is on the space's card.
-# The Manage Data page of a Personal space that has moved to Chordless, where there is no Google Drive copy to restore from.
-space-copy-drive-text = Replace this device's songs and setlists with the copy stored on Google Drive.
-# <connect> is a link to the Account and Teams page.
-space-drive-not-connected = You are signed in, but Google Drive is not connected, so this space is not syncing. <connect>Connect Google Drive</connect> on the Account and Teams page.
-
 space-export-heading = Export and import
 space-export-text = Export this space's songs and setlists as a zip file. This can be used as a backup, or imported into another device if you do not have sync enabled. On import, it will only add what is missing.
 space-export-text-team = Export this Team's songs and setlists as a zip file, and import an export into it, on this device or another: it needs no Google account, and an import only adds what is missing.
@@ -727,12 +629,6 @@ space-delete-text = Remove this space and its songs and setlists from this devic
 space-delete-text-team = Remove this Team and its songs and setlists from this device. Its folder in Google Drive stays.
 space-delete-button = Delete…
 space-delete-failed = Failed to delete it: { $reason }
-
-space-delete-everywhere-heading = Delete everywhere
-# <em> is the word that is stressed.
-space-delete-everywhere-text = Delete this space from this device <em>and</em> from Google Drive, whose trash keeps its folder for thirty days. It asks for a backup first.
-space-delete-everywhere-text-team = Delete this Team from this device <em>and</em> from Google Drive, whose trash keeps its folder for thirty days. It asks for a backup first.
-
 
 ## The Account and Teams page
 
@@ -744,7 +640,6 @@ account-churches-heading = Churches and organisations
 account-churches-hint = Register your organisation or church to share songs and setlists with its teams.
 account-teams-heading = Join or create a Team
 account-join-hint = To join a Team, open the invite link its admin sent you.
-account-create-team = Create a new Team
 account-teams-look = Look for my teams
 account-teams-looking = Looking…
 account-teams-look-hint = Teams you are in on another device are added by themselves; this looks now, and brings back any you took off this device.
@@ -784,25 +679,7 @@ storage-media-cache = Media Data (e.g. Pads)
 storage-unreadable = Unable to read local storage details.
 storage-footnote = Data stored on this device only.
 
-
 ## Syncing a space with Google Drive (the panel on a space's page)
-
-drive-sync-unavailable = ⚠️ Drive Sync Unavailable
-# <connect> is a link to the Account and Teams page.
-drive-sync-unavailable-text = You need to <connect>connect with Google Drive</connect> to enable sync.
-drive-sync-reset = ⤓ Reset from Google Drive
-drive-sync-start-over = ↻ Start over in Drive
-drive-sync-replace = ⤓ Replace with the copy in Drive
-drive-sync-last = Last synced: { $when }
-drive-sync-folder-missing = Drive folder not found
-drive-sync-ready = Ready
-drive-sync-failed-status = Failed
-drive-sync-progress-label = Sync progress
-drive-sync-starting-reset = Starting reset...
-drive-sync-starting-over = Starting over in Drive...
-drive-sync-replacing = Replacing from Drive...
-drive-sync-failed = Failed: { $reason }
-
 
 ## Preferences
 
@@ -896,7 +773,6 @@ wake-power-battery = On battery: the time limit applies.
 wake-power-unknown = This device can't say whether it is on mains power, so the time limit always applies.
 wake-ask-again = Ask again
 
-
 ## About (the version, updates, offline use, install and storage)
 
 about-version-heading = Version
@@ -978,7 +854,6 @@ about-launch-database = IndexedDB
 about-launch-unknown = Can't tell
 about-launch-unknown-detail = This browser would not let the app keep a note between launches.
 
-
 ## The menu
 
 menu-label = Navigation menu
@@ -993,7 +868,6 @@ menu-account = Account and Teams
 menu-media-player = Media Player
 menu-import = Import Songs
 menu-about = About
-
 
 ## Highlight colours, fonts, theme and text size (Preferences > Accessibility and Appearance)
 
@@ -1057,7 +931,6 @@ scale-normal = Normal 100%
 scale-large = Large 125%
 scale-largest = Largest 150%
 
-
 ## The media player's settings
 
 mps-heading = 🎵 Media Player Settings
@@ -1083,7 +956,6 @@ mps-padset-choose = Choose a pad set
 mps-padset-none-yet = No pad sets yet
 mps-padset-upload = Upload a new pad set…
 mps-padset-preparing = Preparing pad set…
-
 
 ## The first time (the questions on first use, the welcome card, and why to install)
 
@@ -1126,7 +998,6 @@ why-install-feel = <strong>Feels like any other app you use.</strong> It has its
 why-install-ios = On an iPhone or iPad the installed app keeps its own data, separate from Safari's, so you sign in again in it.
 why-install-not-needed = Chordless works offline, checks for updates and can keep the screen awake in a browser tab too. Installing isn't needed for those.
 
-
 ## Importing songs from SongSelect (the bookmarklet, and how to install it)
 
 # <strong> is the question that starts it.
@@ -1165,7 +1036,6 @@ bookmarklet-code-label = Bookmarklet code
 bookmarklet-copy = 📋 Copy Code
 bookmarklet-copied = ✅ Copied. Paste it as the new bookmark's URL.
 bookmarklet-copy-failed = Copying was blocked: the code is selected, copy it from there.
-
 
 ## Importing songs (the page for files, pasted text and the bookmarklet, and what it says of each song)
 
@@ -1285,7 +1155,6 @@ import-go-library = Go to the Library
 import-nothing-one = Nothing to save: it is in the library
 import-nothing-many = Nothing to save: they are all in the library
 
-
 ## What to do with a song the library has (the choices when a song coming in is already there)
 
 # What came of each song, in the list of them (and counted: "3 new; 2 updated"). Lower case: it follows the song's name.
@@ -1339,7 +1208,6 @@ import-bulk-apply = Import all with these choices
 # Where a song came from, beside it. { $user } is who imported it.
 origin-imported-by = Imported by { $user }
 origin-unknown = Importer unknown
-
 
 ## Importing a setlist from an email (the page that opens from the link Chordless replies with)
 
@@ -1427,7 +1295,6 @@ email-import-unlisted = Charts attached but not in the list
 email-import-unlisted-label = Songs attached but not listed
 email-import-add = Add { $title }
 
-
 ## The header, the pickers for key, capo, instrument and tuning, and a song's settings
 
 menu-label-update = Navigation menu, update ready
@@ -1465,7 +1332,6 @@ settings-pad-missing = Not on this device
 settings-reset = Reset
 settings-reset-label = Reset song
 
-
 ## The media player
 
 player-settings-heading = Media Player Settings
@@ -1493,7 +1359,6 @@ player-volume-pad = Pad Volume
 player-volume-click = Click Volume
 player-toggle-click = Toggle click on/off
 player-toggle-pads = Toggle pads on/off
-
 
 ## A setlist's details (the form, and what the dialog says of a setlist)
 
@@ -1539,7 +1404,6 @@ info-venue = Venue
 info-songs = Songs
 info-created = Created
 info-modified = Last Modified
-
 
 ## A song's details (the dialog on a song, and how long ago it was played)
 
@@ -1625,43 +1489,7 @@ when-years-ago =
        *[other] { $count } years ago
     }
 
-
 ## Deleting a Team or space everywhere
-
-de-only-admin = Only an admin can delete a Team everywhere.
-de-button = Delete everywhere…
-de-sign-in = Connect Google Drive to reach its folder.
-# { $space } is the name of the space.
-de-heading = Delete "{ $space }" everywhere?
-de-what-team = This ends sharing for everyone in the Team, and deletes it from Google Drive.
-de-what-personal = This deletes it from this device and from Google Drive.
-# Added after one of the two above, with a space, when it is known what the space holds.
-de-holds =
-    It holds { $songs ->
-        [one] 1 song
-       *[other] { $songs } songs
-    } and { $setlists ->
-        [one] 1 setlist
-       *[other] { $setlists } setlists
-    } here.
-de-item-trash = Its folder in Google Drive, with everything in it, goes to the Drive trash. You can restore it from there for thirty days.
-de-item-team = Its members can no longer sync it, and nobody can join it with an invitation. Each device keeps its own copy until it is deleted there.
-de-item-personal = Your other devices stop syncing it: they will say its Drive folder is gone.
-de-item-device = This device's copy is deleted. It cannot be undone.
-# <strong> is the number and name of the step.
-de-step-backup = <strong>1. Keep a backup.</strong>
-de-backup-text = The backup is an export file with its songs and setlists as they are on this device: sync first if others have changed it. It does not have the audio pads.
-de-backup-button = Download a backup
-de-backup-again = Download it again
-# { $file } is the name of the file, { $size } its size ("1.2 MB").
-de-backup-done = ✓ { $file } ({ $size }) was handed to your browser.
-de-backup-needed = Needed before you can delete.
-de-backup-failed = The backup could not be made: { $reason }
-# { $space } is the name of the space the person types.
-de-step-name = <strong>2. Type the name,</strong> { $space }, to confirm.
-de-deleting = Deleting…
-de-do-delete = Delete everywhere
-
 
 ## Exporting a space, and importing an export (a zip file of its songs and setlists)
 
@@ -1719,114 +1547,16 @@ export-reset-done = Reset { $where } from the export: { $songsReplaced } charts 
 export-reset-kept = { $songs } charts and { $setlists } setlists that are not in the file were kept
 export-reset-sync = Sync sends the changes to Drive.
 
-
 ## Making a Team (the page that makes a Team space, and what it asks)
-
-wizard-heading = New team space
-wizard-sign-in-text = A team space keeps its songs and setlists in a folder in your Google Drive, so Chordless needs to be signed in and to have Google Drive connected to make it.
-wizard-connect-drive = 📁 Connect Google Drive
-wizard-intro = A new space for your team, separate from your personal space. Everyone you invite keeps its songs and setlists in step.
-wizard-name = Team name
-wizard-name-example = St Mary's Music
-wizard-licence = CCLI licence number (optional)
-wizard-licence-text = Your church's Church Copyright Licence number, kept for your records. It is not checked, and you can leave it blank for now.
-wizard-folder = Where to keep it in Google Drive
-wizard-folder-choose = 📁 Choose a folder…
-wizard-folder-change = 📁 Choose a different folder
-wizard-folder-text = A shared drive is best: the files stay with the team if you leave, and everyone can see them in Drive. A folder in your own Drive works too. Chordless makes a folder inside the one you choose, named for the team, with “Chordless” after it.
-wizard-create = Create team space
-wizard-creating = Creating…
-# What it is doing, while the space is made.
-wizard-stage-making = Making the space…
-wizard-stage-bringing = Bringing your songs and setlists across…
-wizard-stage-saving = Saving to Google Drive…
-
-# Bringing songs and setlists from a space of the person's own.
-wizard-bring = Bring across
-wizard-from-label = From
-# { $source } is the name of the space they come from.
-wizard-from = From { $source }
-# { $amount } is how many, and how big ("12, 1.2 MB").
-wizard-songs = Songs ({ $amount }), copied
-wizard-setlists = Setlists ({ $amount }), with the songs they use
-wizard-mode-label = What happens to the setlists
-wizard-move = Move them: they leave { $source }
-wizard-copy = Keep a copy in { $source }
-
-# When the space is made. { $name } is its name.
-wizard-ready = { $name } is ready
-wizard-ready-text = It is a new space with its own folder in Google Drive.
-wizard-open = Open { $name }
-# What came across, after the sentence above, with a space: the things that did, as a list ("2 songs and 1 setlist").
-wizard-came = { $list } came across.
-wizard-came-songs =
-    { $count ->
-        [one] 1 song
-       *[other] { $count } songs
-    }
-wizard-came-setlists =
-    { $count ->
-        [one] 1 setlist
-       *[other] { $count } setlists
-    }
-wizard-came-nothing = Nothing new came across.
-wizard-bring-failed = Couldn't bring your songs across: { $reason }
-wizard-save-failed = Couldn’t save it to Google Drive yet, so the team can’t get it: { $reason }
-
 
 ## Inviting people to a Team that was just made
 
-invite-heading = Invite your team
-invite-text-leaders = These people lead setlists you brought across. Tick who to invite and what they may do, or add an email address.
-invite-text = Add the email address of the Google account each person will sign in with.
-# After one of the two above, with a space.
-invite-text-links = You get a link for each, to send yourself: it works once, for a week, and only for that account.
-invite-roles = A worship leader can edit songs and setlists, a team member can see them, and an admin can also look after the people.
-# { $email } is the person.
-invite-role-label = Role of { $email }
-# { $names } is a list of people with no email address.
-invite-name-only = No email address, so they can't be invited from here: { $names }.
-invite-email-example = name@example.com
-invite-another-label = Another email address
-invite-making = Making invites…
-invite-make =
-    { $count ->
-        [one] Make 1 invite
-       *[other] Make { $count } invites
-    }
-invite-invites-heading = Invites
-invite-invites-text = Each is emailed to that person. The links are shown once, in case you want to send one another way.
-invite-link-label = Invite link for { $email }
-invite-copy = Copy the link
-invite-copied = ✓ Copied
-action-add = Add
-
-
 ## A Team's CCLI licence number
-
-licence-heading = CCLI licence number
-licence-text = Your church's Church Copyright Licence number. Chordless keeps it with the team, as a record of who is using it, and may be asked for it by CCLI. It is not checked.
-licence-label = Licence number
-licence-admin-only = Only an admin can change it.
-licence-saved = Saved
-licence-history-label = Changes to the licence number
-# After "{ date }: { who } ": what they did.
-licence-changed = changed it from { $from } to { $to }
-licence-set = set it to { $to }
-licence-cleared = cleared it (was { $from })
-
 
 ## Where a Team's files are reached from
 
-storage-team-heading = Team storage
 storage-copy = Copy
 storage-copied = Copied
-storage-service-account = This Team reaches its files with Chordless’s own account, a Content manager of your shared drive, so it does not depend on your Google Drive connection.
-storage-go-back = Use my Google Drive instead
-storage-own-sign-in = This Team reaches its files with your Google Drive, so its syncing stops if you leave or your Google Drive connection stops working.
-storage-switch-text = If the Team’s folder is in a Google shared drive, Chordless can reach it with an account of its own instead. Add this address to the shared drive as a Content manager, then check it:
-storage-switch = Check and switch
-
 
 ## The pages: their headings, the titles of the browser's tabs, and the notes round them
 
@@ -1846,14 +1576,12 @@ title-contact = Contact - Chordless
 title-speed-test = Speed test - Chordless
 title-join = Join a team space - Chordless
 title-media = Media player - Chordless
-title-new-team = New team space - Chordless
 
 page-loading = Loading...
 page-not-found = Not found
 page-not-found-heading = Page not found
 page-not-found-link = Go to the setlists
 page-import-setlist = Import a Setlist
-page-join = Join a team space
 page-sign-in = Sign in
 page-space = Space
 page-media = Media player
@@ -1890,7 +1618,6 @@ toast-dismiss = Dismiss
 modal-close = Close
 progress-label = Progress
 
-
 ## A setlist that was shared by a link (what a person sees who opens one)
 
 share-what = What is Chordless?
@@ -1920,25 +1647,11 @@ share-offline = You're offline
 error-something = Something went wrong
 
 people-failed = Couldn't make that change to the people.
-de-delete-failed = Couldn't delete it.
-join-failed = Couldn't join the team space.
-wizard-connect-failed = Couldn't connect to Google.
-wizard-folder-failed = Couldn't choose the folder.
-wizard-create-failed = Couldn't make the team space.
-drive-sync-reset-failed = Couldn't reset from Google Drive.
-drive-sync-start-over-failed = Couldn't start over in Google Drive.
-drive-sync-replace-failed = Couldn't replace this device's copy.
-licence-load-failed = Couldn't read the licence number.
-licence-save-failed = Couldn't save the licence number.
 name-save-failed = Couldn't save your name.
-storage-load-failed = Couldn't check how this Team's files are reached.
-storage-switch-failed = Couldn't switch how this Team's files are reached.
-membership-failed = Couldn't make that change to the Team.
 pads-select-failed = Couldn't use that pad set.
 pads-upload-failed = Failed to upload pad set.
 pads-select-zip = Please select a ZIP file to upload.
 export-read-failed = Couldn't read that file.
-
 
 ## Errors that are written for the person who reads them (thrown as a UserError)
 
@@ -1973,16 +1686,12 @@ sync-no-folder = There is no Google Drive folder called "{ $name }" that this ap
 
 pads-set-missing-key = Pad set "{ $name }" is missing key: { $key }
 pads-set-missing-files = Pad set "{ $name }" is missing files for: { $keys }
-join-sync-failed = Couldn't get the team's songs and setlists.
-
 
 ## The same, when the reason is not for the person to read (it is kept for the console and the reports)
 
 account-logout-failed-plain = Logging out failed.
 account-name-save-failed-plain = Saving your name failed.
 account-signin-failed-plain = Signing in failed.
-de-backup-failed-plain = The backup could not be made.
-drive-sync-failed-plain = Failed.
 email-import-create-failed-plain = Could not create the setlist.
 email-import-link-failed-plain = Could not read that link.
 export-check-failed-plain = Could not check the space.
@@ -1998,14 +1707,11 @@ space-sync-failed-plain = Sync failed.
 welcome-sample-failed-plain = Could not add the sample setlist.
 
 account-teams-look-failed-plain = Could not look for your teams.
-wizard-bring-failed-plain = Couldn't bring your songs across.
-wizard-save-failed-plain = Couldn’t save it to Google Drive yet, so the team can’t get it.
 import-songselect-failed-plain = Import from SongSelect failed.
 # { $reason } is what went wrong.
 share-failed = Couldn't do that: { $reason }
 share-failed-plain = Couldn't do that.
 share-offline-note = You're offline: connect to the internet to share.
-
 
 ## Songs and charts: a song's versions, a song on a card, annotations and a section's controls
 
@@ -2082,7 +1788,6 @@ section-melody-has = The lead sheet has the melody for this part
 section-expand = Expand section
 section-collapse = Collapse section
 
-
 ## Sharing a setlist (a link, or the list of its songs), and what is sent with them
 
 # { $title } is the setlist's name and date.
@@ -2137,7 +1842,6 @@ invite-message-open = Open the link and sign in with your email address or a Goo
 invite-message-admin = Open the link and sign in with { $email }: this invite only works with that address. The link works once, for a week.
 
     Then sign in with the Google account { $email }; the link works once, for a week.
-
 
 ## Contact, and the usage reports
 
@@ -2196,7 +1900,6 @@ usage-reset = Reset
 # <contact> is a link to the Contact page.
 usage-text = If you ask for help, this is how your reports are found. Reset makes a new one. <contact>Contact us</contact> adds it for you.
 
-
 ## Uploading a set of pad sounds
 
 padup-name = Pad set name
@@ -2210,30 +1913,7 @@ padup-uploading-label = Uploading pad set
 padup-uploading = Uploading…
 padup-upload = Upload pad set
 
-
 ## Joining a Team with an invite link (the rest of the page), a space's people, the tabs, the library's filter and a space's page
-
-join-signed-in = You are signed in.
-# <who> is the address they are signed in with.
-join-signed-in-as = You are signed in as <who>{ $email }</who>.
-join-adds = Joining adds the team's songs and setlists to this device, and keeps them in step with the team's.
-join-button = Join the team space
-join-different-account = Use a different account
-join-bad-link = This link doesn't work
-join-bad-link-text = It is missing part of the invite, which can happen if it was cut short. Ask the person who sent it to send it again.
-join-invalid = This invite doesn't work
-join-joining = Joining…
-join-getting = Getting the team's songs and setlists…
-join-getting-label = Getting the team's songs and setlists
-# { $name } is the Team, { $role } what they are in it ("a worship leader").
-join-joined = You have joined { $name }
-join-joined-text = The space is on this device, and you are in it as { $role }.
-join-not-synced = The team's songs and setlists have not come across yet. Open the space and sync to try again.
-join-synced = The team's songs and setlists are here.
-join-failed-heading = Couldn't join
-# When the Worker says the invite was for another Google account. { $email } is the one they are signed in with.
-join-wrong-account-not = This invite was sent to a different Google account, not { $email }. Sign in with the address it was sent to.
-join-wrong-account = This invite was sent to a different Google account. Sign in with the address it was sent to.
 
 people-reading = Reading…
 people-not-here = This space is not on this device.
@@ -2267,8 +1947,6 @@ add-song-add-failed = Couldn't add the song.
 google-script-offline = Couldn't load Google sign-in. Are you offline?
 google-in-use = That Google account is already used by another Chordless account.
 google-sign-in-expired = Chordless's access to your Google Drive has expired. Reconnect Google Drive.
-picker-offline = Couldn't load Google's folder picker. Are you offline?
-picker-team-title = Choose where to keep the Team's songs
 setlist-not-found = That setlist is not on this device.
 
 # D1 space data sync
