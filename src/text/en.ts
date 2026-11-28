@@ -651,6 +651,9 @@ team-adopted = { $name } is now part of your church on Chordless. This device is
 space-switching = Your Personal space has moved to Chordless on another device. Switching this device too…
 space-switched = This device now uses Chordless for your Personal space, like your other device.
 space-switch-failed = Could not switch this device to Chordless. It will try again.
+# Toasts, when a Personal space still kept in Google Drive moves to Chordless by itself, as Drive is no longer used to keep spaces.
+space-leaving-drive = Your Personal space is moving from Google Drive to Chordless. Keep this page open for a minute…
+space-left-drive = Your Personal space is now kept on Chordless. Its Google Drive files are left as they were.
 # The card of a Personal space that has been moved to Chordless: where it syncs now.
 space-server-on = Stored on Chordless
 # The card of a Personal space that has not been moved: the button that starts it, and the question it asks first.

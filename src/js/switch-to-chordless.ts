@@ -1,10 +1,11 @@
 /**
- * A Personal space on a device that is still on Drive, when the account has moved to Chordless on another device
- * (docs/CENTRAL_STORAGE.md, step 5): the device switches too, by itself, at its next sync. An account has one Personal
- * space and one personal library, so a device that is signed in to Chordless, with a Personal space not yet moved, and an
- * account that already holds songs or setlists, has been left behind. It moves as a person would press Move and answer yes
- * to combining (what the device has goes up, and what the server has comes down: `space-move.ts`), and Drive is never
- * synced again. Two people use this, so there is no question to ask, only a note to say it was done.
+ * A Personal space on a device that is still on Drive moves to Chordless by itself, at its next sync, once its person is
+ * signed in to Chordless (docs/CENTRAL_STORAGE.md, steps 5 and 10): Google Drive is no longer where spaces are kept.
+ * One linked to a Drive folder moves for that alone (`drive`). One that never was moves when the account already holds
+ * songs or setlists (`followed`): another device of the account has moved, and an account has one Personal space and one
+ * personal library, so this one has been left behind. It moves as a person would press Move and answer yes to combining
+ * (what the device has goes up, and what the server has comes down: `space-move.ts`), and Drive is never synced again.
+ * There is no question to ask, only a note to say why, before and after.
  */
 import type { Space } from './data-types.ts'
 import { callWorker, type WorkerConnection } from './worker-call.ts'
@@ -25,14 +26,17 @@ export async function accountHolds(connection: WorkerConnection): Promise<Accoun
   ).json()) as AccountHolds
 }
 
+/** Why a space moves: it is linked to a Drive folder, which is no longer used; or another device of the account moved */
+export type SwitchReason = 'drive' | 'followed'
+
 export interface SwitchDeps {
   now(): number
   holds(): Promise<AccountHolds>
   /** Move the space to the server, combining with what is there (space-move.ts) */
   move(spaceId: string): Promise<void>
   /** Said before the move starts, and after it is done */
-  switching(): void
-  switched(): void
+  switching(why: SwitchReason): void
+  switched(why: SwitchReason): void
 }
 
 /** When each space was last asked about, and the switches running now (one at a time for a space) */
@@ -46,12 +50,12 @@ export function forgetAsked(): void {
 }
 
 /**
- * Switch the space to Chordless if the account has moved. True if it did. Not a Team's space, and not one already moved;
- * the Worker is asked at most once in `CHECK_EVERY_MS`, however often the space syncs. A failure is thrown, and asked
- * about again at the next sync.
+ * Switch the space to Chordless if it is linked to Drive, or the account has moved. True if it did. Not a Team's space,
+ * and not one already moved; the Worker is asked at most once in `CHECK_EVERY_MS`, however often the space syncs. A
+ * failure is thrown, and asked about again at the next sync.
  */
 export function switchIfAccountMoved(
-  space: Pick<Space, 'id' | 'team' | 'server'>,
+  space: Pick<Space, 'id' | 'team' | 'server' | 'rootRef'>,
   deps: SwitchDeps
 ): Promise<boolean> {
   if (space.team || space.server) return Promise.resolve(false)
@@ -61,11 +65,15 @@ export function switchIfAccountMoved(
   if (last !== undefined && deps.now() - last < CHECK_EVERY_MS) return Promise.resolve(false)
   asked.set(space.id, deps.now())
   const run = (async () => {
-    const held = await deps.holds()
-    if (held.songs + held.setlists === 0) return false
-    deps.switching()
+    let why: SwitchReason = 'drive'
+    if (!space.rootRef) {
+      const held = await deps.holds()
+      if (held.songs + held.setlists === 0) return false
+      why = 'followed'
+    }
+    deps.switching(why)
     await deps.move(space.id)
-    deps.switched()
+    deps.switched(why)
     return true
   })()
   running.set(space.id, run)
@@ -99,8 +107,8 @@ export async function switchCurrentSpaceIfMoved(space: Space): Promise<boolean> 
       now: () => Date.now(),
       holds: () => accountHolds(connection),
       move: async id => (await import('./space-data-runtime.ts')).moveSpaceToServerNow(id, true),
-      switching: () => toast(t('space-switching')),
-      switched: () => toast(t('space-switched')),
+      switching: why => toast(t(why === 'drive' ? 'space-leaving-drive' : 'space-switching')),
+      switched: why => toast(t(why === 'drive' ? 'space-left-drive' : 'space-switched')),
     })
   } catch (error) {
     console.warn('[Switch] Could not switch this device to Chordless:', error)

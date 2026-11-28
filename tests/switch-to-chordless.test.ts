@@ -25,8 +25,8 @@ describe('a device follows an account that moved to Chordless', () => {
       log.push(`move ${id}`)
       if (failMove) throw new Error('offline')
     },
-    switching: () => log.push('switching'),
-    switched: () => log.push('switched'),
+    switching: why => log.push(why === 'drive' ? 'switching from drive' : 'switching'),
+    switched: why => log.push(why === 'drive' ? 'switched from drive' : 'switched'),
   })
   const personal = { id: 'p', team: undefined, server: undefined }
 
@@ -57,6 +57,12 @@ describe('a device follows an account that moved to Chordless', () => {
     forgetAsked()
     expect(await switchIfAccountMoved(personal, deps())).to.equal(false)
     expect(log).to.deep.equal(['asked', 'asked'])
+  })
+
+  it('moves a Personal space linked to a Drive folder by itself, without asking, and says it is leaving Drive', async () => {
+    holds = { libraryId: null, songs: 0, setlists: 0 }
+    expect(await switchIfAccountMoved({ ...personal, rootRef: 'folder' }, deps())).to.equal(true)
+    expect(log).to.deep.equal(['switching from drive', 'move p', 'switched from drive'])
   })
 
   it('leaves a Team’s space, and a space that has moved, alone, and does not ask', async () => {
