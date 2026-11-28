@@ -11,6 +11,7 @@ import {
 import { countryChoices, countryName, guessCountry } from '../js/countries.ts'
 import { isAuthenticated } from '../js/google-auth.ts'
 import { teamApi } from '../js/team-client.ts'
+import { checkTeamMemberships } from '../js/team-memberships.ts'
 import type { MemberRole } from '../js/team-roles.ts'
 import { t } from '../js/text.ts'
 import { toast } from '../js/toast.ts'
@@ -128,6 +129,8 @@ export class ChurchConsole extends LitElement {
       this._members = members
     }
   }
+  /** Set this device up for the teams the person is in (a test gives its own) */
+  checkTeams: typeof checkTeamMemberships = checkTeamMemberships
   async run(work: () => Promise<void>) {
     if (this._busy) return
     this._busy = true
@@ -135,6 +138,8 @@ export class ChurchConsole extends LitElement {
       await work()
       await this.refresh()
       window.dispatchEvent(new ChurchTeamsChangedEvent())
+      // what was just made or changed reaches this device now, as part of the action, not at some later background check
+      await this.checkTeams({ force: true })
     } catch (error) {
       this.fail(error)
     } finally {

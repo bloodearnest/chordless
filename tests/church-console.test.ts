@@ -14,9 +14,14 @@ function setup() {
   const churches: ChurchInfo[] = []
   const teams: ChurchTeam[] = []
   const members: ChurchMember[] = []
+  const checked: boolean[] = []
   const element = document.createElement('church-console')
   elements.push(element)
   element.authenticated = async () => true
+  element.checkTeams = async options => {
+    checked.push(Boolean(options?.force))
+    return { added: [], declined: [] }
+  }
   element.api = {
     ...element.api,
     list: async () => [...churches],
@@ -35,7 +40,7 @@ function setup() {
     invite: async () => ({ code: 'secret', expiresAt: '2026-12-01' }),
   }
   document.body.append(element)
-  return { element, churches, teams, members }
+  return { element, churches, teams, members, checked }
 }
 
 async function ready(element: ChurchConsole) {
@@ -379,6 +384,23 @@ describe('church administration', () => {
     await waitUntil(() => deleted.length === 1)
     expect(deleted).to.deep.equal(['old'])
     expect(asked).to.contain('cannot be undone')
+  })
+
+  it('sets this device up for a team as part of making it, not at a later check', async () => {
+    const { element, churches, checked } = setup()
+    churches.push({
+      id: 'c',
+      name: 'Church',
+      country: 'GB',
+      city: 'York',
+      postcode: null,
+      ccliLicence: null,
+      licences: {},
+      role: 'admin',
+    })
+    await ready(element)
+    await element.run(async () => {})
+    expect(checked).to.deep.equal([true])
   })
 
   it('does not offer a reader to delete an archived team', async () => {
