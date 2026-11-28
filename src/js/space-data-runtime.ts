@@ -93,6 +93,62 @@ export class SpaceDataAutoSync {
   }
 }
 
+/** How many automatic attempts in a row fail to reach the server before it is worth telling the person */
+export const NETWORK_FAILURES_BEFORE_TOAST = 3
+/**
+ * ... over at least this long: a phone's page coming back from the background has no network for a moment, and
+ * what that starts (the resume, an online event, an edit) can fail three times in as many seconds
+ */
+export const NETWORK_FAILURES_SPAN_MS = 2 * 60 * 1000
+
+/** The browser's wording for a request that did not get to the server (Chrome, Safari, Firefox) */
+export function isNetworkFailure(error: unknown): boolean {
+  return (
+    error instanceof TypeError &&
+    /failed to fetch|load failed|networkerror|network request/i.test(error.message)
+  )
+}
+
+/**
+ * Which failures of the automatic sync are told to the person. The changes are on the device either
+ * way, and the next tick, coming back online or opening the app tries again, so a request that did
+ * not reach the server (a wifi that is waking, a page going to the background) is told only if it
+ * keeps happening. Anything else is told at once, once for each reason until a sync works.
+ */
+export class BackgroundSyncFailures {
+  #unreachable = new Map<string, { count: number; since: number }>()
+  #told = new Map<string, string>()
+  readonly #now: () => number
+
+  constructor(now: () => number = Date.now) {
+    this.#now = now
+  }
+
+  /** The reason to tell the person of, or null to say nothing now */
+  failed(spaceId: string, error: unknown): string | null {
+    if (isNetworkFailure(error)) {
+      const now = this.#now()
+      const streak = this.#unreachable.get(spaceId) ?? { count: 0, since: now }
+      streak.count++
+      this.#unreachable.set(spaceId, streak)
+      if (
+        streak.count < NETWORK_FAILURES_BEFORE_TOAST ||
+        now - streak.since < NETWORK_FAILURES_SPAN_MS
+      )
+        return null
+    }
+    const reason = errorMessage(error)
+    if (this.#told.get(spaceId) === reason) return null
+    this.#told.set(spaceId, reason)
+    return reason
+  }
+
+  succeeded(spaceId: string): void {
+    this.#unreachable.delete(spaceId)
+    this.#told.delete(spaceId)
+  }
+}
+
 /* v8 ignore start -- wiring to the real account, database, Web Locks, window and clock; the lifecycle is tested above */
 /** What a Personal space on the server holds there: its setlists (its songs are the library's) */
 const PERSONAL: { readKinds: SpaceRecordKind[]; writeKinds: SpaceRecordKind[] } = {
@@ -112,7 +168,7 @@ function leadersOf(db: ChordlessDB): LeaderNames {
   }
 }
 const controllers = new Map<string, Promise<SpaceDataSync>>()
-const failures = new Map<string, string>()
+const failures = new BackgroundSyncFailures()
 
 /** Manual syncs may name any space. Automatic ticks still follow the current space until step 5. */
 export async function syncSpaceDataFor(
@@ -185,7 +241,7 @@ export async function syncSpaceDataFor(
     await syncLibrarySongs(teamId, await openSpace(spaceId, 'sync'), connection)
   }
   await sync.sync(options)
-  failures.delete(spaceId)
+  failures.succeeded(spaceId)
   if (space.server) await syncOverlaysOf(spaceId, connection)
 }
 
@@ -240,9 +296,8 @@ export async function syncCurrentSpaceData(): Promise<void> {
 function send(spaceId = getCurrentSpace().id ?? undefined): void {
   if (!spaceId) return
   void syncSpaceDataFor(spaceId).catch(error => {
-    const reason = errorMessage(error)
-    if (failures.get(spaceId) === reason) return
-    failures.set(spaceId, reason)
+    const reason = failures.failed(spaceId, error)
+    if (reason === null) return
     toast(t('space-data-refused'), {
       kind: 'error',
       details: reason,
