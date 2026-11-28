@@ -52,8 +52,11 @@ the library once, into the one database.
 
 ## What changes for the rest of the app
 
-- **Current space and default space go.** The home page and the library already show everything. A new setlist asks
-  which team (or Personal), and starts at the one last chosen. A song belongs to its library, a setlist to its library and team.
+- **The current space goes; the default stays.** The home page and the library already show everything, so nothing is
+  "switched to". The default is the person's choice of where new things go (a new setlist, an import, an added song): the
+  Personal Space, or one team of a church (its library, for songs). It is kept as `{ library, team? }`, in place of a
+  space id, and a library or team that has gone falls back to the Personal Space. A song belongs to its library, a
+  setlist to its library and team.
 - `/setlist/<id>` finds the setlist in whichever library database has it (there are a few).
 - Every team of a church syncs, not only the ones followed (today an unfollowed team is not synced by itself at all).
   Following goes, as agreed for the home page, which gets a team filter in the UI rework.
@@ -88,7 +91,7 @@ so first (one PR, before this one):
 
 1. Drive out of the sync (above).
 2. The new databases and the move, behind the database API the app uses now (`ChordlessDB`), so the pages change little.
-3. The app on libraries and teams: current space, default space and following go; `spaceId` becomes `libraryId` or
+3. The app on libraries and teams: the current space and following go, the default names a library and team; `spaceId` becomes `libraryId` or
    `teamId`; the code's "space" names go.
 4. The D1 schema: `space_id` becomes `team_id`, and the unused `space_*` tables are dropped (a diagram first).
 5. A later version deletes the old databases.
