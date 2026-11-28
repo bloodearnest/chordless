@@ -4,6 +4,7 @@ import {
   loadSetlistLocalState,
   loadSongCapo,
   type SongRef,
+  sameSong,
   saveSetlistLocalState,
 } from '../setlist/local-state.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
@@ -159,10 +160,7 @@ export class SetlistSong implements SongModel {
   async _keepCapo(capo: number | undefined): Promise<void> {
     const stored = (await this._db.getSetlist(this._setlistId))?.songs ?? []
     // (the songs as the page has them, if the setlist has moved on: the capo is for this song)
-    const here = stored.findIndex(
-      entry =>
-        entry.songId === this._songEntry.songId && entry.songUuid === this._songEntry.songUuid
-    )
+    const here = stored.findIndex(entry => sameSong(entry, this._songEntry))
     const songs: SongRef[] = here >= 0 ? stored : [this._songEntry]
     const index = Math.max(here, 0)
     const state = loadSetlistLocalState(this._setlistId, songs)
@@ -178,17 +176,14 @@ export class SetlistSong implements SongModel {
       // (the setlist as it is stored now: a sync may have saved it since this song was loaded)
       const saved = await this._db.updateSetlist(this._setlistId, setlist => {
         const entry = setlist.songs[this._songIndex]
-        if (
-          !entry ||
-          entry.songId !== this._songEntry.songId ||
-          entry.songUuid !== this._songEntry.songUuid
-        ) {
-          return NO_CHANGE
-        }
+        if (!sameSong(entry, this._songEntry)) return NO_CHANGE
         if (key !== null) entry.key = key
         if (tempo !== null) entry.tempo = tempo
       })
-      if (saved?.songs[this._songIndex]) {
+      const stored = saved?.songs[this._songIndex]
+      if (stored) {
+        // (an older entry is given its song's uuid when saved: what is kept for it goes by that from now)
+        this._songEntry.songUuid ??= stored.songUuid
         if (key !== null) this._songEntry.key = key
         if (tempo !== null) this._songEntry.tempo = tempo
       }

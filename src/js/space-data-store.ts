@@ -1,6 +1,6 @@
 /** Atomic server data application, queued changes and acknowledgements for space-data sync. */
 import { announceDataChange } from './data-changes.ts'
-import type { Setlist, SongRecord, SpaceOutboxRecord } from './data-types.ts'
+import type { Setlist, SongIndexRecord, SongRecord, SpaceOutboxRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { mergeSpaceRecord } from './space-data-merge.ts'
 import {
@@ -151,6 +151,40 @@ function validRecord(kind: SpaceRecordKind, record: SpaceRecord): boolean {
   return typeof (record as SpacePadSet).name === 'string'
 }
 
+/**
+ * A setlist waiting to be sent whose songs were named by id alone (an older entry: its record has the id where the uuid
+ * goes) names each song the library holds by its uuid, the default variant's, as saving it does now. The server refuses a
+ * setlist with a song it does not know, so one refused for this is sent again; a song not held here stays as it is.
+ */
+async function withSongUuids(
+  tx: IDBTransaction,
+  entry: SpaceOutboxRecord
+): Promise<SpaceOutboxRecord> {
+  if (entry.change.kind !== 'setlist' || entry.change.op !== 'put') return entry
+  const record = entry.change.record as SpaceSetlist
+  if (!record.songs.some(song => song.songUuid === song.songId)) return entry
+  const index = tx.objectStore('song_index').index('songId')
+  let changed = false
+  const songs: SpaceSetlist['songs'] = []
+  for (const song of record.songs) {
+    if (song.songUuid !== song.songId) {
+      songs.push(song)
+      continue
+    }
+    const variants: SongIndexRecord[] = await requestResult(index.getAll(song.songId))
+    const held = variants.find(variant => variant.isDefault) ?? variants[0]
+    if (!held) {
+      songs.push(song)
+      continue
+    }
+    changed = true
+    songs.push({ ...song, songUuid: held.songUuid })
+  }
+  if (!changed) return entry
+  const { refusal: _refusal, ...rest } = entry
+  return { ...rest, change: { ...entry.change, record: { ...record, songs } } }
+}
+
 export class SpaceDataStore {
   constructor(
     db: ChordlessDB,
@@ -225,9 +259,16 @@ export class SpaceDataStore {
   }
 
   async pending(): Promise<SpaceOutboxRecord[]> {
-    const pending: SpaceOutboxRecord[] = await requestResult(
-      this.#tx('readonly').objectStore('space_outbox').getAll()
-    )
+    const tx = this.#tx('readwrite')
+    const outbox = tx.objectStore('space_outbox')
+    const pending: SpaceOutboxRecord[] = await requestResult(outbox.getAll())
+    for (const [i, entry] of pending.entries()) {
+      const repaired = await withSongUuids(tx, entry)
+      if (repaired === entry) continue
+      outbox.put(repaired)
+      pending[i] = repaired
+    }
+    await transactionDone(tx)
     return this.#writeKinds
       ? pending.filter(entry => this.#writeKinds?.includes(entry.change.kind))
       : pending

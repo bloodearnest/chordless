@@ -204,6 +204,24 @@ describe('device space data', () => {
     )
   })
 
+  it('names an entry that has only the song id by its default variant, which the server needs', async () => {
+    await open()
+    await db.saveSongsBatch([
+      makeSong({ uuid: 'variant', isDefault: false }),
+      makeSong({ uuid: 'default', title: 'Default arrangement' }),
+    ])
+    const saved = await db.saveSetlist(
+      makeSetlist({
+        songs: [
+          makeEntry({ songUuid: undefined }),
+          makeEntry({ songId: 'title-absent', songUuid: undefined, title: 'Absent' }),
+        ],
+      })
+    )
+    expect(saved.songs[0]).to.include({ songUuid: 'default', title: 'Default arrangement' })
+    expect(saved.songs[1].songUuid).to.equal(undefined)
+  })
+
   it('forgets index file links with the content links, retaining metadata and revisions', async () => {
     await open()
     await db.saveSongsBatch([

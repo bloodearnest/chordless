@@ -7,12 +7,14 @@ import {
   loadSetlistTuning,
   loadSongCapo,
   loadSongPitches,
+  sameSong,
   saveSetlistAnnotations,
   saveSetlistLocalState,
   saveSetlistPitch,
   saveSetlistTuning,
   saveSongPitch,
 } from '../src/js/setlist/local-state.ts'
+import { makeAnnotation } from './builders.ts'
 
 const songs = [
   { songId: 'a', songUuid: 'ua' },
@@ -86,6 +88,52 @@ describe('what a setlist keeps on this device', () => {
       sectionState: { 1: { 0: hidden } },
       capoValues: { 0: 2 },
     })
+  })
+
+  it('follows a song whose entry named it by id alone, when the entry is given its uuid', () => {
+    const before = [{ songId: 'a' }, { songId: 'b', songUuid: 'ub' }]
+    const after = [{ songId: 'a', songUuid: 'ua' }, before[1]]
+    const note = makeAnnotation('n1')
+    saveSetlistLocalState(
+      's1',
+      { sectionState: { 0: { 1: hidden } }, capoValues: { 0: 3 } },
+      before
+    )
+    saveSongPitch('s1', before[0], 'eb', before)
+    saveSetlistAnnotations('s1', before[0], [note], before)
+    // (read before the next save, from where it was kept)
+    expect(loadSetlistLocalState('s1', after)).to.deep.equal({
+      sectionState: { 0: { 1: hidden } },
+      capoValues: { 0: 3 },
+    })
+    expect(loadSongCapo('s1', after[0], 0)).to.equal(3)
+    expect(loadSongPitches('s1', after)).to.deep.equal({ 0: 'eb' })
+    expect(loadSetlistAnnotations('s1', after[0])).to.deep.equal([note])
+    // (and moved at it, so that what is cleared stays cleared)
+    saveSetlistLocalState('s1', { sectionState: {}, capoValues: {} }, after)
+    expect(loadSetlistLocalState('s1', after)).to.deep.equal({ sectionState: {}, capoValues: {} })
+    expect(loadSongCapo('s1', after[0], 0)).to.equal(undefined)
+    expect(loadSetlistAnnotations('s1', after[0])).to.deep.equal([note])
+    const kept = JSON.parse(localStorage.getItem('state-s1') ?? '{}')
+    expect(Object.keys(kept.pitches)).to.deep.equal(['ua'])
+    expect(Object.keys(kept.annotations)).to.deep.equal(['ua'])
+  })
+
+  it('leaves what is kept by id while a song of the setlist still goes by it', () => {
+    const songs = [{ songId: 'a' }, { songId: 'a', songUuid: 'ua' }]
+    saveSetlistLocalState('s1', { sectionState: {}, capoValues: { 0: 2 } }, [{ songId: 'a' }])
+    saveSetlistLocalState('s1', { sectionState: {}, capoValues: { 0: 2, 1: 4 } }, songs)
+    expect(loadSetlistLocalState('s1', songs).capoValues).to.deep.equal({ 0: 2, 1: 4 })
+  })
+
+  it('takes an entry with no uuid to be the same song as one with it, never another song', () => {
+    expect(sameSong({ songId: 'a' }, { songId: 'a', songUuid: 'ua' })).to.equal(true)
+    expect(sameSong({ songId: 'a', songUuid: 'ua' }, { songId: 'a' })).to.equal(true)
+    expect(sameSong({ songId: 'a', songUuid: 'ua' }, { songId: 'a', songUuid: 'other' })).to.equal(
+      false
+    )
+    expect(sameSong({ songId: 'a' }, { songId: 'b' })).to.equal(false)
+    expect(sameSong(undefined, { songId: 'a' })).to.equal(false)
   })
 
   it('is nothing when what was kept cannot be read', () => {

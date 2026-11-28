@@ -46,8 +46,47 @@ interface StoredState {
 
 const keyFor = (setlistId: string | null) => `state-${setlistId}`
 
+/**
+ * Whether two entries of a setlist are the same song. An older entry named the song by its id alone, and is given the
+ * uuid when it is saved (db.ts, `fillEntryMetadata`), so a copy taken before then, with no uuid, is the same song.
+ */
+export function sameSong(a: SongRef | undefined, b: SongRef): boolean {
+  return a?.songId === b.songId && (a.songUuid === b.songUuid || !a.songUuid || !b.songUuid)
+}
+
 /** The song a record of state is kept under */
 const songKey = (song: SongRef) => song.songUuid || song.songId
+
+/**
+ * What is kept for a song: under its uuid, or under its id if it was kept while its entry named the song by id alone (an
+ * older entry is given the uuid when it is saved, and what was kept moves to it at the next save: `byUuid`)
+ */
+function keptFor<T>(record: Record<string, T> | undefined, song: SongRef): T | undefined {
+  const value = record?.[songKey(song)]
+  return value !== undefined || !song.songUuid ? value : record?.[song.songId]
+}
+
+/** What was kept under the id of a song that now has its uuid, moved to the uuid (unless a song of the setlist still goes by the id) */
+function byUuid(saved: StoredState, songs: SongRef[]): StoredState {
+  const stored = structuredClone(saved)
+  const byId = new Set(songs.filter(song => !song.songUuid).map(song => song.songId))
+  for (const record of [
+    stored.sections,
+    stored.capos,
+    stored.pitches,
+    stored.annotations,
+    stored.notes,
+  ] as (Record<string, unknown> | undefined)[]) {
+    if (!record) continue
+    for (const song of songs) {
+      const uuid = song.songUuid
+      if (!uuid || byId.has(song.songId) || record[song.songId] === undefined) continue
+      if (record[uuid] === undefined) record[uuid] = record[song.songId]
+      delete record[song.songId]
+    }
+  }
+  return stored
+}
 
 function readSaved(setlistId: string | null): Record<string, unknown> {
   try {
@@ -74,7 +113,7 @@ function byPlace(saved: Record<string, unknown>): SetlistLocalState {
 
 /** What was kept, by song, as it is in the stored form (what was kept by place is taken to be where the songs are now) */
 function bySong(saved: Record<string, unknown>, songs: SongRef[]): StoredState {
-  if (saved.v === 2) return saved as unknown as StoredState
+  if (saved.v === 2) return byUuid(saved as unknown as StoredState, songs)
   const old = byPlace(saved)
   const stored: StoredState = { v: 2, sections: {}, capos: {} }
   songs.forEach((song, index) => {
@@ -108,7 +147,7 @@ export function loadSetlistLocalState(
 export function loadSongCapo(setlistId: string | null, song: SongRef, index: number): unknown {
   const saved = readSaved(setlistId)
   return saved.v === 2
-    ? (saved as unknown as StoredState).capos?.[songKey(song)]
+    ? keptFor((saved as unknown as StoredState).capos, song)
     : byPlace(saved).capoValues[index]
 }
 
@@ -168,7 +207,7 @@ export function loadSongPitches(
   const kept = saved.v === 2 ? (saved as unknown as StoredState).pitches : undefined
   const pitches: Record<number, PitchId> = {}
   songs.forEach((song, index) => {
-    const pitch = kept?.[songKey(song)]
+    const pitch = keptFor(kept, song)
     if (pitch !== undefined) pitches[index] = normalizePitch(pitch)
   })
   return pitches
@@ -198,7 +237,7 @@ export function loadSetlistAnnotations(setlistId: string | null, song: SongRef):
   const saved = readSaved(setlistId)
   if (saved.v !== 2) return []
   const stored = saved as unknown as StoredState
-  return (stored.annotations ?? stored.notes)?.[songKey(song)] ?? []
+  return keptFor(stored.annotations ?? stored.notes, song) ?? []
 }
 
 /**
