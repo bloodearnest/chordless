@@ -135,7 +135,6 @@ describe('space-manager', () => {
       team: { id: 'space-hhhh8888', role: 'admin', churchId: 'church' },
     })
     const el = await page(team.id)
-    expect(has(el, '#server-panel')).to.equal(false)
     expect(has(el, 'drive-sync-panel')).to.equal(false)
     expect(has(el, 'space-delete-everywhere')).to.equal(false)
     // (it can still be exported, and taken off this device)
@@ -143,21 +142,19 @@ describe('space-manager', () => {
     expect(has(el, '#delete')).to.equal(true)
   })
 
-  it('says a space that has moved to Chordless is stored there, and offers no Google Drive copy to restore from', async () => {
+  it('offers a space that has moved to Chordless no Google Drive copy to restore from, and says nothing of where it is', async () => {
     const moved = await space('Moved', {
       server: { libraryId: 'library', movedAt: '2026-11-25T10:00:00.000Z' },
       rootRef: 'old-folder',
     })
     const el = await page(moved.id)
-    expect(has(el, '#server-panel')).to.equal(true)
-    expect(text(el)).to.contain('stored on Chordless')
+    expect(text(el)).not.to.contain('stored on Chordless')
     expect(has(el, 'drive-sync-panel')).to.equal(false)
     expect(text(el)).not.to.contain('Replace this device')
     // (what it holds can still be exported, and it can still be deleted from the device)
     expect(has(el, 'space-export-panel')).to.equal(true)
     expect(has(el, '#delete')).to.equal(true)
     const drive = await page((await space('On Drive')).id)
-    expect(has(drive, '#server-panel')).to.equal(false)
     expect(has(drive, 'drive-sync-panel')).to.equal(true)
   })
 
