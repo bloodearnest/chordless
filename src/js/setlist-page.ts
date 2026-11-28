@@ -32,7 +32,6 @@ import {
 import { findSetlistSpace } from './all-spaces.ts'
 import { canShareAnnotations, withAnnotations } from './annotations/store.ts'
 import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
-import { hasUnsentChanges } from './auto-sync.ts'
 import { DataChangeEvent, touches } from './data-changes.ts'
 import type {
   Setlist,
@@ -96,6 +95,7 @@ import { controlsSetlist } from './setlist-control.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
 import { songSelectLink } from './songselect-link.ts'
 import { getCurrentSpaceFull, getSpaceById, listSpaces, syncsBack } from './space.ts'
+import { hasUnsentChanges } from './space-data-runtime.ts'
 import { transferSetlists } from './space-transfer.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'

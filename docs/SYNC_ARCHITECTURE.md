@@ -1,5 +1,10 @@
 # Sync Architecture
 
+**Status (2026-11-28): being retired.** This is the Google Drive sync. Every space is moving to Chordless
+(docs/CENTRAL_STORAGE.md, step 10): a church's team and a moved Personal space sync with the Worker
+(`space-data-runtime.ts`), and the sync that ran by itself while the app was open (`auto-sync.ts`, Part 2) has
+been removed. The rest goes next; what is below is how Drive's sync worked.
+
 How Chordless syncs setlists and songs with Google Drive: what exists today, and
 the designs for what's next.
 

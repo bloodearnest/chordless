@@ -82,8 +82,9 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
   with the file id, and only for 48 h, and a ping carries nothing: the cost of a squat is that the
   recipients wait for the tick.
 - A share room takes 500 sockets, then answers 503.
-- **The sharer** says `changed` when the share's file has been uploaded (see "The client"). A
-  personal space can do this too: the room needs no account.
+- **The sharer** said `changed` when the share's file had been uploaded. A link made on Chordless
+  (`/s/sh_…`) is told by the Worker itself when what it shows changes (`share-notify.ts`), so no device
+  sends; an old Drive link is no longer updated, and its room has listeners only.
 - **A recipient** live on the link fetches the share again, as it is now: `GET
   /api/share/<id>?fresh=1`. The edge cache keeps Drive quiet for a congregation (one request a
   minute per file); `fresh` skips it and asks Drive, but with **collapsed forwarding**: while Drive is
@@ -96,10 +97,10 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
 
 ## The client (`src/js`)
 
-- **`AutoSync`** (`auto-sync.ts`) gains `syncSoon()`, which syncs now (and once more after a sync
-  that was running, which may have read before the change), and `SyncPushedEvent`, sent on `window`
-  when a finished sync carried changes made on this device. A failed or skipped sync leaves the
-  change to the next one. That is what the channel waits for before it tells the others.
+- **The sync** (`space-data-runtime.ts`, the Chordless sync, since Drive's was removed) gives
+  `syncCurrentSpaceData()`, which syncs the space in use now, and `SyncPushedEvent`, sent on `window`
+  when a sync sent changes made on this device. A failed sync leaves the change to the next one. That
+  is what the channel waits for before it tells the others.
 - **`LiveChannel`** (`live-channel.ts`): one socket, with a new token for each connection (which also
   handles the hour-long ID token), backoff from 1 s up to 30 s, and the ping. It is told to retry at
   once when the device comes back online or the app is shown.
@@ -107,17 +108,10 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
   moving about while live keeps the channels. `liveTargets` says which are wanted, from the live
   record's URL and the space in use:
   - `/setlist/<id>` in a team space: the space's channel.
-  - the same setlist if it is shared: also the share's room, as its sender (not from a space the user
-    can only read, which pushes nothing).
   - `/s/<fileId>` (received by link): the share's room, as a listener.
   - anything else, or nothing live: none.
 
-  A **sharer** also publishes the share itself, apart from the sync: 300 ms after an edit to the
-  setlist (a burst is one upload; under the sync lock, so not alongside a sync) it brings the share up
-  to date as a sync would, and the sync's wait after an edit is 400 ms while live (`LIVE_NUDGE_MS`; 2 s
-  otherwise). The room is told by the upload itself (`ShareUpdatedEvent`, sent by `refreshShare`
-  whoever calls it: this, the sync's share step or the share dialog), so a sync that gets there first
-  does not leave the recipients waiting for its push. A team space's room is told after a
+  A team space's room is told after a
   `SyncPushedEvent` (a reader does not: only writers send); on a
   `changed` it syncs, or fetches the share, at once and again after each of `FOLLOW_UPS_MS`; and on every
   (re)connect it does so once, to catch up on what it missed. A **recipient of a share** also fetches it
@@ -160,7 +154,7 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
   first secret is its sender's and another is refused.
 - `share-proxy.node.test.ts`: `?fresh=1`.
 - Browser unit tests: `live-channel.test.ts` (backoff, ping, dead socket), `live-sync.test.ts` (which
-  channels, what each does), `auto-sync.test.ts` (`syncSoon`, `SyncPushedEvent`),
+  channels, what each does),
   `share-receiver.test.ts` (`reloadShare`), `setlist-page-edges.test.ts` (the dot).
 - `just test-live-share` (`tests/drive/live-share.drive.node.test.ts`, not in CI): a share file in the
   test account's real Drive, the real Worker, real WebSockets. A recipient is told of an update (a few

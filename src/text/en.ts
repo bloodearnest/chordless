@@ -13,7 +13,6 @@ action-undo = Undo
 action-confirm = Confirm
 action-cancel = Cancel
 action-try-again = Try again
-action-reconnect = Reconnect
 action-reload = Reload
 action-check-for-updates = Check for updates
 action-open-account = Open Account and Teams
@@ -98,16 +97,6 @@ toast-space-fetch-failed = Couldn't get { $space }'s songs and setlists.
 
 
 ## Google sign-in and Drive
-
-toast-signin-expired = Google Drive needs reconnecting, so your changes are not syncing.
-
-# Behind "Details" on the message above, when this device has never synced.
-toast-signin-expired-details = Reconnect with Google to carry on. Changes made here are kept on this device and will be sent then.
-
-# The same, when it has; { $when } is the date and time of the last sync.
-toast-signin-expired-details-last = Reconnect with Google to carry on. Changes made here are kept on this device and will be sent then. Last synced { $when }.
-
-toast-reconnect-failed = Couldn't reconnect with Google.
 
 # Said after the sentence for what happened to the folder, in each of the messages below.
 -folder-gone-safe = Your songs and setlists are safe on this device.
