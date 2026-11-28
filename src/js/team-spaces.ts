@@ -278,7 +278,39 @@ export async function syncTeamSpace(space: Space, onProgress?: ProgressCallback)
         onProgress?.(progress)
       })
     )
+    /* v8 ignore start -- needs a Drive sync the Worker refuses: the decision is `learnOfMove`, tested on its own */
+  } catch (error) {
+    // The team moved into its church while this device was away, and the device has not heard: it learns that now, and syncs the
+    // team as the church's (the person has the latest app: waiting for it to ask by itself would be a failure for nothing)
+    const church = await learnOfMove(space, error)
+    if (!church) throw error
+    db.db?.close()
+    return syncTeamSpace(church, onProgress)
+    /* v8 ignore stop */
   } finally {
     db.db?.close()
   }
 }
+
+/** What the Worker says of a team that is a church's now, asked for as a Drive team */
+const MOVED_TO_CHURCH = /moved to its church/i
+
+/**
+ * The space as a church's team, if `error` is the Worker saying the team moved into its church: the device asks which teams there
+ * are (which sets the space up as the church's, and sends what it holds), then reads the space again. Null for any other error, or
+ * if it is still not the church's.
+ */
+export async function learnOfMove(
+  space: Space,
+  error: unknown,
+  /* v8 ignore next 2 -- the real check needs the Worker; a test gives its own */
+  check: () => Promise<unknown> = async () =>
+    (await import('./team-memberships.ts')).checkTeamMemberships({ force: true })
+): Promise<Space | null> {
+  if (!MOVED_TO_CHURCH.test(errorText(error))) return null
+  await check()
+  const now = await getSpaceById(space.id)
+  return now?.team?.churchId ? now : null
+}
+
+const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
