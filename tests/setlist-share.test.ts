@@ -257,6 +257,24 @@ describe('setlist-share', () => {
       const labels = (el: SetlistShare) =>
         [...(el.shadowRoot?.querySelectorAll('button') ?? [])].map(b => b.textContent?.trim())
 
+      it("shares a church team's setlist through the Worker too, never Drive", async () => {
+        const server = worker()
+        await updateSpace(spaceId, { team: { id: 'team', role: 'writer', churchId: 'church' } })
+        const setlist = createSetlist({ date: '2099-10-11' })
+        await db.saveSetlist(setlist)
+        const el = await fixture<SetlistShare>(html`<setlist-share></setlist-share>`)
+        el.connection = () => ({
+          token: async () => 'token',
+          origin: location.origin,
+          fetch: server.fetch,
+        })
+        el.db = db
+        el.setlist = setlist
+        await waitUntil(() => server.state.calls.length > 0, 'the check', { timeout: 3000 })
+        expect(server.state.calls[0]).to.match(/^GET \/api\/shares\?setlistId=/)
+        await updateSpace(spaceId, { team: undefined })
+      })
+
       it('asks the Worker whether it is shared, and offers to make a link when it is not', async () => {
         const server = worker()
         const { el } = await showMoved(server)

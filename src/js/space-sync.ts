@@ -4,6 +4,7 @@
  */
 import type { Space } from './data-types.ts'
 import { recordSync } from './last-sync.ts'
+import { onChordless } from './space.ts'
 import {
   type BroadcastCallback,
   createSyncOrchestrator,
@@ -19,9 +20,9 @@ export async function syncSpaceNow(
   space: Space,
   onProgress: BroadcastCallback | null
 ): Promise<string> {
-  // A space that has moved to the server: it is there it syncs, and never with Drive again
+  // A space on Chordless (a moved Personal space, a church's team): it is there it syncs, and never with Drive
   /* v8 ignore next 5 -- wiring to the server sync of the space, which the Playwright tests run */
-  if (space.server) {
+  if (onChordless(space)) {
     const { syncSpaceDataFor } = await import('./space-data-runtime.ts')
     await syncSpaceDataFor(space.id, { all: true })
     return recordSync(space.id)

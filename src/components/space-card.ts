@@ -3,7 +3,7 @@ import { createRef, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { formatSyncTime, lastSyncOf, recordSync } from '../js/last-sync.ts'
-import { getSpaceById } from '../js/space.ts'
+import { getSpaceById, onChordless } from '../js/space.ts'
 import { trashMovedSpaceDriveFiles } from '../js/space-deletion.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { ServerHasDataError } from '../js/space-move.ts'
@@ -177,7 +177,7 @@ export class SpaceCard extends LitElement {
 
   /** Whether syncing can be done now: a team's member needs only a sign-in, everyone else Drive too */
   get _canSync(): boolean {
-    if (this.space.server) return this.signIn === 'signed-in' || this.signIn === 'no-drive'
+    if (onChordless(this.space)) return this.signIn === 'signed-in' || this.signIn === 'no-drive'
     if (this.signIn === 'signed-in') return true
     return this.signIn === 'no-drive' && isTeamMember(this.space)
   }
