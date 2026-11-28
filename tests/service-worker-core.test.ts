@@ -168,11 +168,20 @@ describe('the service worker', () => {
 
   describe('messages', () => {
     /** Send a message with a port, and the reply on it (null if it never replies) */
-    function send(message: unknown, withPort = true): Promise<Record<string, unknown> | null> {
+    /**
+     * Send a message, and the reply, or null if none comes. A reply that does come may wait on IndexedDB (the auth
+     * blob), which takes more than a moment on a busy machine, so it is waited for; only a message that should have no
+     * reply is given up on quickly (`expectNone`)
+     */
+    function send(
+      message: unknown,
+      withPort = true,
+      expectNone = false
+    ): Promise<Record<string, unknown> | null> {
       const channel = new MessageChannel()
       const reply = new Promise<Record<string, unknown> | null>(resolve => {
         channel.port1.onmessage = event => resolve(event.data)
-        setTimeout(() => resolve(null), 150)
+        setTimeout(() => resolve(null), expectNone ? 150 : 3000)
       })
       scope.listeners.message({
         data: message,
@@ -194,7 +203,7 @@ describe('the service worker', () => {
     })
 
     it('skips waiting when asked', async () => {
-      await send({ type: 'SKIP_WAITING' })
+      await send({ type: 'SKIP_WAITING' }, true, true)
       expect(scope.log).to.deep.equal(['skipWaiting'])
     })
 
@@ -305,9 +314,9 @@ describe('the service worker', () => {
     })
 
     it('answers nothing to a message without a port, or of a kind it does not know', async () => {
-      expect(await send({ type: 'GET_VERSION' }, false)).to.equal(null)
-      expect(await send({ type: 'NO_SUCH_THING', messageId: 'x' })).to.equal(null)
-      expect(await send(null)).to.equal(null)
+      expect(await send({ type: 'GET_VERSION' }, false, true)).to.equal(null)
+      expect(await send({ type: 'NO_SUCH_THING', messageId: 'x' }, true, true)).to.equal(null)
+      expect(await send(null, true, true)).to.equal(null)
     })
   })
 
