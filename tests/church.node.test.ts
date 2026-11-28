@@ -527,6 +527,18 @@ test('an existing Drive team is adopted by a church: members carried over by rol
     null,
     'the other team is as it was'
   )
+  // its people follow it (and no one follows the team that has not moved)
+  const followers = (id: string) =>
+    (
+      sql
+        .prepare('SELECT account_id AS a FROM followed_teams WHERE space_id = ? ORDER BY 1')
+        .all(id) as { a: string }[]
+    ).map(row => row.a)
+  assert.deepEqual(
+    followers('team-alpha'),
+    ['admin2', 'owner', 'reader1', 'writer1', 'writer2'].sort()
+  )
+  assert.deepEqual(followers('team-bravo'), [])
 
   // Again: nothing changes. The second team: people in both keep the higher role, and nobody is lowered
   assert.equal(

@@ -372,6 +372,14 @@ async function adoptTeam(
         'UPDATE teams SET church_id = ?, updated_at = ? WHERE space_id = ? AND church_id IS NULL AND ended_at IS NULL'
       )
       .bind(church, now, team),
+    // The team's people follow it, as they did: a church team that is not followed is not on their home page
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO followed_teams (account_id, space_id)
+         SELECT m.account_id, m.space_id FROM team_members m WHERE m.space_id = ?
+         UNION SELECT t.owner_account_id, t.space_id FROM teams t WHERE t.space_id = ? AND t.owner_account_id IS NOT NULL`
+      )
+      .bind(team, team),
   ])
   const members = await db
     .prepare('SELECT count(*) AS n FROM church_members WHERE church_id = ?')

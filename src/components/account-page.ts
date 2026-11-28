@@ -28,6 +28,10 @@ import { SpaceGoneEvent } from './space-manager.ts'
 import './space-manager.ts'
 import './storage-summary.ts'
 
+/** A team shown among a person's teams: a church's team they do not follow is theirs to reach, but not one of their teams */
+const isShownTeam = (space: Space): boolean =>
+  Boolean(space.team) && !(space.team?.churchId && space.team.followed === false)
+
 /**
  * Account and Teams (docs/ACCOUNT.md): who is signed in, then the Personal space and the Teams on
  * this device, each with its size, when it last synced, and switch and sync; everything else for a
@@ -283,21 +287,19 @@ export class AccountPage extends LitElement {
       <div class="content">
         <account-card></account-card>
         ${
-          this._spaces.some(space => space.team)
+          this._spaces.some(isShownTeam)
             ? html`<section class="section" id="team-spaces">
           <h2>${t('account-teams-spaces-heading')}</h2>
           <div class="spaces">
-            ${this._spaces
-              .filter(space => space.team)
-              .map(
-                space => html`<space-card
+            ${this._spaces.filter(isShownTeam).map(
+              space => html`<space-card
                 .space=${space}
                 .signIn=${this._signIn}
                 .driveEmail=${this._driveEmail}
                 ?isDefault=${space.id === this._defaultId}
                 ?several=${this._spaces.length > 1}
               ></space-card>`
-              )}
+            )}
           </div>
         </section>`
             : nothing

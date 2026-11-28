@@ -100,6 +100,33 @@ describe('account-page', () => {
     const root = must(el.shadowRoot)
     const sections = () => Array.from(root.querySelectorAll('section')).map(section => section.id)
     expect(root.querySelector('#team-spaces space-card')).to.not.equal(null)
+    // (a church's team that is not followed is not one of the person's teams)
+    el._spaces = [
+      own,
+      {
+        ...own,
+        id: 'church-a-1',
+        name: 'Followed',
+        team: { id: 't-2', role: 'writer', churchId: 'c', followed: true },
+      },
+      {
+        ...own,
+        id: 'church-b-1',
+        name: 'Not followed',
+        team: { id: 't-3', role: 'writer', churchId: 'c', followed: false },
+      },
+    ]
+    await el.updateComplete
+    expect(
+      Array.from(root.querySelectorAll<SpaceCard>('#team-spaces space-card')).map(
+        card => card.space.name
+      )
+    ).to.deep.equal(['Followed'])
+    el._spaces = [
+      own,
+      { ...own, id: 'team-space-1', name: 'Morning', team: { id: 't-1', role: 'writer' } },
+    ]
+    await el.updateComplete
     expect(root.querySelector('#personal-spaces .hint')?.textContent).to.contain('wedding')
     expect(sections().slice(0, 2)).to.deep.equal(['team-spaces', 'personal-spaces'])
     expect(root.querySelector('#churches-section')).to.equal(null)
