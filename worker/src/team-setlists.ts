@@ -279,5 +279,25 @@ export async function applyTeamSetlist(
   if (existing && (base === null || existing.version !== base))
     return { status: 'conflict', current: existing }
   if (!existing && base !== null) return { status: 'missing' }
-  return { status: 'invalid', error: 'The leader or song is not in this church, or access changed' }
+  // Which it was, said in words that name it: "6 setlists could not be sent" is no help to someone who has to fix one
+  const wanted = [...new Set(record.songs.map(song => song.songUuid))]
+  const { results: held } = await db
+    .prepare(
+      `SELECT song_uuid FROM library_songs WHERE library_id = ? AND song_uuid IN (SELECT value FROM json_each(?))`
+    )
+    .bind(access.library, JSON.stringify(wanted))
+    .all<{ song_uuid: string }>()
+  const have = new Set(held.map(row => row.song_uuid))
+  const missing = wanted.filter(uuid => !have.has(uuid))
+  const title = record.name
+  if (missing.length)
+    return {
+      status: 'invalid',
+      error: `The setlist ${title} has ${missing.length === 1 ? 'a song' : `${missing.length} songs`} that the church library does not have yet (${missing.slice(0, 3).join(', ')}${missing.length > 3 ? ', …' : ''})`,
+    }
+  // (what is left is the leader: a setlist with none cannot fail but by a membership changing in between, and then this is near enough)
+  return {
+    status: 'invalid',
+    error: `The leader of the setlist ${title} is not a worship leader or admin of this church`,
+  }
 }
