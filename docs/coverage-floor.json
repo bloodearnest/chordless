@@ -1,4 +1,9 @@
 {
+  "src/components/setlist-share.ts": {
+    "lines": 1,
+    "branches": 4,
+    "functions": 0
+  },
   "src/js/app.ts": {
     "lines": 0,
     "branches": 0,
@@ -10,6 +15,21 @@
     "branches": 0,
     "functions": 0,
     "unloaded": 0
+  },
+  "src/js/db.ts": {
+    "lines": 7,
+    "branches": 0,
+    "functions": 0
+  },
+  "src/js/drive-api.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 1
+  },
+  "src/js/drive-client.ts": {
+    "lines": 4,
+    "branches": 1,
+    "functions": 0
   },
   "src/js/score-musicxml-read.ts": {
     "lines": 0,
@@ -56,24 +76,24 @@
     "branches": 6,
     "functions": 0
   },
-  "src/js/space-access.ts": {
+  "src/js/storage/drive-storage.ts": {
+    "lines": 2,
+    "branches": 2,
+    "functions": 0
+  },
+  "src/js/storage/space-storage.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 1
+  },
+  "src/js/sync/person-hash.ts": {
     "lines": 0,
     "branches": 1,
     "functions": 0
   },
-  "src/js/sync-manager.ts": {
-    "lines": 2,
+  "src/js/team-spaces.ts": {
+    "lines": 1,
     "branches": 1,
-    "functions": 1
-  },
-  "src/js/sync-orchestrator.ts": {
-    "lines": 21,
-    "branches": 0,
-    "functions": 2
-  },
-  "src/js/sync/pull.ts": {
-    "lines": 0,
-    "branches": 2,
     "functions": 0
   },
   "src/js/telemetry/start.ts": {
@@ -92,6 +112,11 @@
     "branches": 0,
     "functions": 0,
     "unloaded": 16
+  },
+  "src/js/worker-call.ts": {
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
   },
   "src/js/xml.ts": {
     "lines": 0,

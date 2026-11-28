@@ -46,9 +46,9 @@ they must be able to. Overly restrictive is an antipattern here.
   front of every change.
 - Features that depend on how a group works (a leader pushing changes over a live session,
   `docs/LIVE_SYNC.md`) are opt-in: they add to what a lone user can do and never take it away.
-- Read-only (a reader of the Drive folder, or someone with a share link) should only stop writing
-  back to sync, never local edits: a last-minute key change must work for them too. (Built for a
-  reader of the Drive folder; a received share's page is still read-only, see the TODO.)
+- Read-only (a reader on a church team, or someone with a share link) should only stop writing
+  back to sync, never local edits: a last-minute key change must work for them too. (A received
+  share's page is still read-only, see the TODO.)
 
 ### Live use and messages
 
@@ -67,9 +67,10 @@ they must be able to. Overly restrictive is an antipattern here.
 ## Churches, spaces and copyright
 
 Chordless may store song charts, lyrics, MusicXML, source PDFs and pad audio in its own R2 storage,
-scoped to a church or personal library. The current app still uses the user's Drive until the R2
-backend and migration are built (`docs/CENTRAL_STORAGE.md`). Do not claim that content has moved
-before it has. Keep access private and authorize it against the relevant church or personal account;
+scoped to a church or personal library. The app no longer syncs with the user's Drive: a church's
+teams are Chordless's, and a Personal space still linked to a Drive folder moves to Chordless at its
+next sync (`docs/CENTRAL_STORAGE.md`). Source PDFs were never in Drive, so they are not moved with it.
+Do not claim that content has moved before it has. Keep access private and authorize it against the relevant church or personal account;
 an object key is not authorization. Anonymous shares are deliberately public to a holder of an
 unguessable, expiring link, served through the Worker. Never send whole charts or PDFs to telemetry.
 
@@ -87,7 +88,7 @@ names and IDs must remain compatible during migration (`docs/CHURCH_TEAM_DESIGN.
 - we are using newer css techniques to do the transition to avoid FOUC and other things.
 - we are using lit for components
 - we are using service worker
-- we are using google auth and gdrive api for remote storage
+- we are using google sign-in; the songs, setlists and people are kept by Chordless itself (the Worker, D1 and R2), and the device keeps its own copy
 - we are using cloudflare workers as out deployment, and wrangler locally
 
 ## Development Standards
@@ -95,7 +96,7 @@ names and IDs must remain compatible during migration (`docs/CHURCH_TEAM_DESIGN.
 - Use `just format lint test` to verify all changes (and `just ci` before a pull request: `docs/CI.md`). This runs formatting, linting (Biome, `tsc -b` over the tsconfig.*.json projects, knip for unused files, exports and dependencies, and a dry-run deploy of `wrangler.toml` that fails on warnings: `scripts/lint-wrangler.sh`), and all three test suites: node tests, browser unit tests (Web Test Runner) and Playwright tests.
 - Never install or fetch npm packages yourself: no `npx <package>` that is not already installed, no `npm install -g`, no `npx @biomejs/biome` (it pulls whatever version is newest, not the pinned one, and has reformatted files and reported errors CI does not). Go through the tooling: `just` recipes, and the `node_modules/.bin` the lockfile installed (`npm ci`, in the checkout you are working in; a git worktree needs its own). If a tool is missing, install the project's dependencies; if a package is needed, add it with `npm install` as a reviewed change to `package.json` and the lockfile.
 - **Before adding or changing a table, column or index in `migrations/`, read `docs/SCHEMA_RULES.md`**: `STRICT` tables, declared foreign keys, no `''` for "not set", `WITHOUT ROWID` only for small rows, ULIDs for new ids, one table per kind of record, and how a migration is written and tested. A test fails a table that is not `STRICT` or a `*_id` column with no foreign key.
-- How the tests are organised, and how to write them: `docs/TESTING.md`. The interface between the sync engine and wherever files are kept (Drive now, the Worker's team service next): `docs/STORAGE_API.md`. How navigation works (the app is a single page): `docs/ROUTING.md`. Other design and architecture docs are in `docs/` too (`docs/SPACES.md` for spaces, `docs/SHARING.md` for share links, `docs/ANNOTATIONS.md` for typed notes on a chart, `docs/PERSONAL_LAYER.md` for who changes a setlist and what each person keeps for themselves, `docs/SYNC_ARCHITECTURE.md` for sync, `docs/MIGRATIONS.md` for changing the shape of stored data (the database on a device, and Drive: roll forward only), `docs/AGENT_VMS.md` for running an agent in an Incus VM away from the developer's computer, `docs/OBSERVABILITY.md` for traces to Honeycomb (what is traced, the session and identity model, the Worker's telemetry route), `docs/ENVIRONMENTS.md` for dev and prod (two Google Cloud projects), `docs/CCLI.md` for what CCLI's and SongSelect's terms mean for the app and the licence number, `docs/LEAD_SHEETS.md` for lead sheets kept as MusicXML, `docs/CENTRAL_STORAGE.md` for the design (not built) of keeping setlists, people and later preferences in D1, with songs on the device, `docs/COPY.md` for the words the app says, which live in `src/text/en.ts` and are asked for with `t('name')`: never write user-facing text into code or a template).
+- How the tests are organised, and how to write them: `docs/TESTING.md`. The interface between the Worker's Drive code and wherever files are kept: `docs/STORAGE_API.md`. How navigation works (the app is a single page): `docs/ROUTING.md`. Other design and architecture docs are in `docs/` too (`docs/SPACES.md` for spaces, `docs/SHARING.md` for share links, `docs/ANNOTATIONS.md` for typed notes on a chart, `docs/PERSONAL_LAYER.md` for who changes a setlist and what each person keeps for themselves, `docs/SYNC_ARCHITECTURE.md` for sync, `docs/MIGRATIONS.md` for changing the shape of stored data (the database on a device, and Drive: roll forward only), `docs/AGENT_VMS.md` for running an agent in an Incus VM away from the developer's computer, `docs/OBSERVABILITY.md` for traces to Honeycomb (what is traced, the session and identity model, the Worker's telemetry route), `docs/ENVIRONMENTS.md` for dev and prod (two Google Cloud projects), `docs/CCLI.md` for what CCLI's and SongSelect's terms mean for the app and the licence number, `docs/LEAD_SHEETS.md` for lead sheets kept as MusicXML, `docs/CENTRAL_STORAGE.md` for the design (not built) of keeping setlists, people and later preferences in D1, with songs on the device, `docs/COPY.md` for the words the app says, which live in `src/text/en.ts` and are asked for with `t('name')`: never write user-facing text into code or a template).
 - TypeScript (erasable syntax only: no enums or parameter properties, so Node and esbuild can strip the types) and Lit, built and served with Vite (with `@cloudflare/vite-plugin`, which runs the Worker next to it). There is no build in dev: Vite serves the modules as they are. Production is `vite build`. Keep it that thin: no frameworks, no transpiling beyond what the browser floor needs. Dependencies are npm packages, imported by name and bundled by Vite
 - Infrastructure that rarely changes is Terraform in `infra/` (`infra/README.md`): the Cloudflare zone side (Email Routing, the Worker's custom domain, DNS, TLS settings) and the Google Cloud project (APIs, API keys, service account). Deploys, and everything in `wrangler.toml`, stay wrangler's: do not move the Worker, its assets, bindings or secrets into Terraform. `gcloud` and `terraform` come from `mise.toml`
 - The service worker is built as a classic script with the whole app precached (`vite-plugins/service-worker.ts`); see `docs/BUILD.md`

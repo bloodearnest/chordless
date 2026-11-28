@@ -202,18 +202,10 @@ funnel:
 help-images:
     npx playwright test --config=playwright.help-images.config.ts
 
-# The real-Drive suite (docs/DRIVE_TESTS.md): random histories of several devices syncing through a
-# real Google Drive folder, to find what the in-memory fake cannot. Not part of `just test`. Needs
-# the test account's credentials in .drive-test.env. Which histories: DRIVE_SEEDS=1-5 DRIVE_STEPS=30
-# DRIVE_DEVICES=3 DRIVE_MODES=owner,concurrent just test-drive
+# The real-Drive suite (docs/DRIVE_TESTS.md): checks the test account's credentials reach a real Google
+# Drive. Not part of `just test`. Needs the test account's credentials in .drive-test.env
 test-drive *args:
     node --env-file-if-exists=.drive-test.env node_modules/.bin/web-test-runner --config web-test-runner.drive.config.js {{args}}
-
-# Live sync of a share against the test account's real Drive and the real Worker (docs/LIVE_SYNC.md,
-# docs/DRIVE_TESTS.md): a recipient is told of an update and fetches it, and how long that took. Needs
-# .drive-test.env and, for the Drive key, .dev.vars. Not part of `just test` or CI
-test-live-share:
-    node --env-file-if-exists=.drive-test.env --env-file-if-exists=.dev.vars --test tests/drive/live-share.drive.node.test.ts
 
 # Live sync in two real browsers (docs/LIVE_SYNC.md): one signed in as the test Google account, one
 # with no account, on `just serve-live`'s server, with a real Drive. Needs .drive-test.env and .dev.vars.

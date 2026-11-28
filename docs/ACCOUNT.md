@@ -29,7 +29,7 @@ keeps the scopes apart: the account first, then one card per space, then the dev
 | `space-people.ts` | **Leaders**: who leads a space's setlists (a section of the space page) |
 | `people-list.ts`, `person-rows.ts` | The one list of a space's people: a Team's members, invites and visiting leaders, or a Personal space's leaders (the first section of the space page) |
 | `team-membership-panel.ts`, `team-licence-panel.ts`, `team-storage-panel.ts` | A Team's place for the person (stop sharing, leave), its CCLI licence number and its storage (sections of the space page) |
-| `drive-sync-panel.ts`, `space-export-panel.ts`, `space-delete-everywhere.ts` | The panels of the Data modal. Each takes the space it is given, and a sync manager made for a space works on that space, not the one in use (`sync-manager.ts`) |
+| `space-export-panel.ts` | The panel of the Data modal (export and import). It takes the space it is given |
 | `storage-summary.ts` | The device |
 | `team-space-wizard.ts` (`/account/new`), `team-join.ts` (`/join`) | Making a Team, and joining one: docs/SPACES.md |
 | `media-page.ts` (`/media`) | The media player and the pad sets |
