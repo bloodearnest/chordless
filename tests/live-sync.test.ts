@@ -1,6 +1,4 @@
 import { expect } from '@open-wc/testing'
-import { SyncPushedEvent } from '../src/js/auto-sync.ts'
-import { type DataChange, DataChangeEvent } from '../src/js/data-changes.ts'
 import { LiveChangeEvent, type LiveState } from '../src/js/live.ts'
 import type { LiveChannelEvents, LiveStatus } from '../src/js/live-channel.ts'
 import { FOLLOW_UPS_MS } from '../src/js/live-protocol.ts'
@@ -12,12 +10,11 @@ import {
   type LiveWorld,
   livePath,
   liveTargets,
-  PUBLISH_DEBOUNCE_MS,
   SHARE_POLL_MS,
 } from '../src/js/live-sync.ts'
 import { getLiveSyncStatus, LiveSyncStatusEvent } from '../src/js/live-sync-status.ts'
-import { ShareUpdatedEvent } from '../src/js/share-manager.ts'
 import { SpaceChangeEvent } from '../src/js/space.ts'
+import { SyncPushedEvent } from '../src/js/space-data-runtime.ts'
 
 const { describe, it } = window
 
@@ -30,21 +27,14 @@ const team = (over: Partial<LiveSpace> = {}): LiveSpace => ({
 })
 const kinds = (targets: LiveTarget[]) => targets.map(target => target.key)
 
-/** Where the channels come from: what is live, the space in use, and the setlist's share */
+/** Where the channels come from: what is live, and the space in use */
 function world(over: Partial<LiveWorld> = {}) {
-  const kept: { setlistId: string; secret: string }[] = []
   const w: LiveWorld = {
     live: () => live('/setlist/abc'),
     space: async () => team(),
-    readOnly: async () => false,
-    share: async () => null,
-    keepLiveSecret: async (setlistId, secret) => {
-      kept.push({ setlistId, secret })
-    },
-    newSecret: () => 'a-new-secret',
     ...over,
   }
-  return { w, kept }
+  return { w }
 }
 
 describe('Which channels a device needs', () => {
@@ -101,45 +91,6 @@ describe('Which channels a device needs', () => {
       { kind: 'share-recipient', key: 'receive:file id12345', fileId: 'file id12345' },
     ])
   })
-
-  it('adds the share’s room, as its sender, when the setlist is shared: for a team’s and for a personal space’s', async () => {
-    const share = async () => ({ fileId: 'file-1234567', liveSecret: 'the-secret' })
-    const sender: LiveTarget = {
-      kind: 'share-sender',
-      key: 'send:file-1234567',
-      fileId: 'file-1234567',
-      secret: 'the-secret',
-      setlistId: 'abc',
-    }
-    expect(kinds(await liveTargets(world({ share }).w))).to.deep.equal([
-      'team:team-1',
-      'send:file-1234567',
-    ])
-    expect(await liveTargets(world({ share, space: async () => null }).w)).to.deep.equal([sender])
-  })
-
-  it('makes the sender’s secret the first time, and keeps it on the setlist', async () => {
-    const { w, kept } = world({ share: async () => ({ fileId: 'file-1234567' }) })
-    const [, sender] = await liveTargets(w)
-    expect(sender).to.include({ kind: 'share-sender', secret: 'a-new-secret' })
-    expect(kept).to.deep.equal([{ setlistId: 'abc', secret: 'a-new-secret' }])
-  })
-
-  it('does not keep a secret it already has', async () => {
-    const { w, kept } = world({
-      share: async () => ({ fileId: 'f'.repeat(12), liveSecret: 'old' }),
-    })
-    await liveTargets(w)
-    expect(kept).to.deep.equal([])
-  })
-
-  it('does not send for a share from a space the user can only read: a sync would not update it', async () => {
-    const { w } = world({
-      readOnly: async () => true,
-      share: async () => ({ fileId: 'file-1234567', liveSecret: 'x' }),
-    })
-    expect(kinds(await liveTargets(w))).to.deep.equal(['team:team-1'])
-  })
 })
 
 /** A channel the test drives */
@@ -177,13 +128,6 @@ const teamTarget = (over: Partial<Extract<LiveTarget, { kind: 'team' }>> = {}): 
   canWrite: true,
   ...over,
 })
-const sender: LiveTarget = {
-  kind: 'share-sender',
-  key: 'send:f1',
-  fileId: 'f1',
-  secret: 's',
-  setlistId: 'sl1',
-}
 const recipient: LiveTarget = { kind: 'share-recipient', key: 'receive:f2', fileId: 'f2' }
 
 /** A manager on a world the test controls */
@@ -195,10 +139,6 @@ function rig(initial: LiveTarget[] = [teamTarget()]) {
     visible: true,
     syncs: 0,
     reloads: [] as string[],
-    published: [] as string[],
-    /** What publishing a share says: whether it uploaded a new one */
-    publishes: true,
-    publishFails: false,
     channels: [] as FakeChannel[],
     timers: [] as { ms: number; fn: () => void; cancelled: boolean }[],
     polls: [] as { ms: number; fn: () => void; stopped: boolean }[],
@@ -221,12 +161,6 @@ function rig(initial: LiveTarget[] = [teamTarget()]) {
     },
     reloadShare: async fileId => {
       state.reloads.push(fileId)
-    },
-    publishShare: async setlistId => {
-      state.published.push(setlistId)
-      if (state.publishFails) throw new Error('Drive said no')
-      // (an upload is announced, as share-manager.ts does, by whoever makes it)
-      if (state.publishes) win.dispatchEvent(new ShareUpdatedEvent('f1'))
     },
     visible: () => state.visible,
     later: (ms, fn) => {
@@ -251,12 +185,12 @@ function rig(initial: LiveTarget[] = [teamTarget()]) {
 
 describe('Live sync', () => {
   it('joins the channels of what is live', async () => {
-    const { sync, state, settle } = rig([teamTarget(), sender])
+    const { sync, state, settle } = rig([teamTarget(), recipient])
     sync.start()
     await settle()
     expect(state.channels.map(channel => channel.target.key)).to.deep.equal([
       'team:team-1',
-      'send:f1',
+      'receive:f2',
     ])
     expect(state.channels.every(channel => channel.started)).to.equal(true)
     sync.stop()
@@ -386,159 +320,6 @@ describe('Live sync', () => {
   })
 
   describe('with a share', () => {
-    it('tells the recipients the moment the share is uploaded, whoever uploaded it', async () => {
-      const { sync, win, settle, state } = rig([sender])
-      sync.start()
-      await settle()
-      win.dispatchEvent(new ShareUpdatedEvent('f1'))
-      expect(state.channels[0].notified).to.equal(1)
-      sync.stop()
-    })
-
-    it('does not tell them of another share, or wait for the sync that follows', async () => {
-      const { sync, win, settle, state } = rig([sender])
-      sync.start()
-      await settle()
-      win.dispatchEvent(new ShareUpdatedEvent('another'))
-      win.dispatchEvent(new SyncPushedEvent())
-      expect(state.channels[0].notified).to.equal(0)
-      sync.stop()
-    })
-
-    describe('publishing the share at once, as the setlist is edited', () => {
-      const edited = (ids: string[] | null = ['sl1'], extra: Partial<DataChange> = {}) =>
-        new DataChangeEvent({
-          spaceId: 's',
-          kind: 'setlist',
-          ids,
-          origin: 'local',
-          remote: false,
-          ...extra,
-        })
-      /** The waits for the edits to stop that are still wanted, run */
-      const settleEdits = async (state: ReturnType<typeof rig>['state']) => {
-        for (const timer of state.timers.filter(
-          t => !t.cancelled && t.ms === PUBLISH_DEBOUNCE_MS
-        )) {
-          timer.cancelled = true
-          timer.fn()
-        }
-        await new Promise(resolve => setTimeout(resolve, 0))
-      }
-
-      it('brings the share up to date after the edits stop, and tells the room when it uploaded', async () => {
-        const { sync, state, win, settle } = rig([sender])
-        sync.start()
-        await settle()
-
-        win.dispatchEvent(edited())
-        expect(state.published, 'not before the edits stop').to.deep.equal([])
-        await settleEdits(state)
-
-        expect(state.published).to.deep.equal(['sl1'])
-        expect(state.channels[0].notified).to.equal(1)
-        sync.stop()
-      })
-
-      it('is one upload for a burst of edits', async () => {
-        const { sync, state, win, settle } = rig([sender])
-        sync.start()
-        await settle()
-        win.dispatchEvent(edited())
-        win.dispatchEvent(edited())
-        win.dispatchEvent(edited())
-        await settleEdits(state)
-        expect(state.published).to.deep.equal(['sl1'])
-        sync.stop()
-      })
-
-      it('says nothing when the share was already up to date (the save of its own upload comes back here)', async () => {
-        const { sync, state, win, settle } = rig([sender])
-        sync.start()
-        await settle()
-        state.publishes = false
-        win.dispatchEvent(edited())
-        await settleEdits(state)
-        expect(state.published).to.deep.equal(['sl1'])
-        expect(state.channels[0].notified).to.equal(0)
-        sync.stop()
-      })
-
-      it('is for edits made here to that setlist only: not a sync’s, another tab’s or another setlist’s', async () => {
-        const { sync, state, win, settle } = rig([sender])
-        sync.start()
-        await settle()
-        win.dispatchEvent(edited(['sl1'], { origin: 'sync' }))
-        win.dispatchEvent(edited(['sl1'], { remote: true }))
-        win.dispatchEvent(edited(['another']))
-        win.dispatchEvent(
-          new DataChangeEvent({
-            spaceId: 's',
-            kind: 'song',
-            ids: ['sl1'],
-            origin: 'local',
-            remote: false,
-          })
-        )
-        await settleEdits(state)
-        expect(state.published).to.deep.equal([])
-
-        win.dispatchEvent(edited(null))
-        await settleEdits(state)
-        expect(state.published, 'a change to every setlist is to this one').to.deep.equal(['sl1'])
-        sync.stop()
-      })
-
-      it('carries on when the upload fails: the sync’s share step will try again', async () => {
-        const { sync, state, win, settle } = rig([sender])
-        sync.start()
-        await settle()
-        state.publishFails = true
-        const warn = console.warn
-        console.warn = () => {}
-        try {
-          win.dispatchEvent(edited())
-          await settleEdits(state)
-        } finally {
-          console.warn = warn
-        }
-        expect(state.channels[0].notified).to.equal(0)
-        sync.stop()
-      })
-
-      it('is not done for a team space’s channel, or after live ends', async () => {
-        const team = rig([teamTarget()])
-        team.sync.start()
-        await team.settle()
-        team.win.dispatchEvent(edited())
-        await settleEdits(team.state)
-        expect(team.state.published).to.deep.equal([])
-        team.sync.stop()
-
-        const { sync, state, win, settle } = rig([sender])
-        sync.start()
-        await settle()
-        win.dispatchEvent(edited())
-        state.targets = []
-        win.dispatchEvent(new LiveChangeEvent(null))
-        await settle()
-        await settleEdits(state)
-        expect(state.published, 'the wait was called off').to.deep.equal([])
-        sync.stop()
-      })
-    })
-
-    it('does not fetch anything for a "changed" a sender hears: its own sync has the setlist', async () => {
-      const { sync, state, settle, channel } = rig([sender])
-      sync.start()
-      await settle()
-      channel().events.changed()
-      channel().events.connected()
-      expect(state.syncs).to.equal(0)
-      expect(state.reloads).to.deep.equal([])
-      sync.stop()
-    })
-
     it('fetches the share again when told it changed, and once more after, and when it comes up', async () => {
       const { sync, state, settle, channel } = rig([recipient])
       sync.start()
@@ -585,8 +366,8 @@ describe('Live sync', () => {
       sync.stop()
     })
 
-    it('has no poll for a team space (the sync’s tick is its fallback) or for the sharer', async () => {
-      const { sync, state, settle } = rig([teamTarget(), sender])
+    it('has no poll for a team space: the sync’s tick is its fallback', async () => {
+      const { sync, state, settle } = rig([teamTarget()])
       sync.start()
       await settle()
       expect(state.polls).to.have.length(0)
@@ -601,71 +382,6 @@ describe('Live sync', () => {
       expect(state.channels[0].notified).to.equal(0)
       sync.stop()
     })
-
-    it('has a channel for the team and one for the share, each doing its own', async () => {
-      const { sync, state, win, settle } = rig([teamTarget(), sender])
-      sync.start()
-      await settle()
-      win.dispatchEvent(new SyncPushedEvent())
-      expect(
-        state.channels.map(channel => channel.notified),
-        'the push is the team’s'
-      ).to.deep.equal([1, 0])
-      win.dispatchEvent(new ShareUpdatedEvent('f1'))
-      expect(
-        state.channels.map(channel => channel.notified),
-        'the upload is the share’s'
-      ).to.deep.equal([1, 1])
-      sync.stop()
-    })
-  })
-
-  it('joins a share’s room when the setlist is shared while live, and leaves it when it is not', async () => {
-    const { sync, state, win, settle } = rig([teamTarget()])
-    sync.start()
-    await settle()
-    const saved = () =>
-      new DataChangeEvent({
-        spaceId: 's',
-        kind: 'setlist',
-        ids: ['abc'],
-        origin: 'local',
-        remote: false,
-      })
-
-    state.targets = [teamTarget(), sender]
-    win.dispatchEvent(saved())
-    await settle()
-    expect(state.channels.map(channel => channel.target.key)).to.deep.equal([
-      'team:team-1',
-      'send:f1',
-    ])
-    expect(state.channels[0].stopped, 'the team’s stays').to.equal(false)
-
-    state.targets = [teamTarget()]
-    win.dispatchEvent(saved())
-    await settle()
-    expect(state.channels[1].stopped).to.equal(true)
-    sync.stop()
-  })
-
-  it('does not work out the channels again for a change that is not a setlist’s', async () => {
-    const { sync, state, win, settle } = rig([])
-    sync.start()
-    await settle()
-    state.targets = [teamTarget()]
-    win.dispatchEvent(
-      new DataChangeEvent({
-        spaceId: 's',
-        kind: 'song',
-        ids: ['x'],
-        origin: 'local',
-        remote: false,
-      })
-    )
-    await settle()
-    expect(state.channels).to.have.length(0)
-    sync.stop()
   })
 
   it('tries the channels again when the device is back online or the app is shown', async () => {
@@ -684,7 +400,7 @@ describe('Live sync', () => {
 
   describe('the state shown', () => {
     it('is up only when every channel is, and none when there are none', async () => {
-      const { sync, state, win, settle } = rig([teamTarget(), sender])
+      const { sync, state, win, settle } = rig([teamTarget(), recipient])
       sync.start()
       await settle()
       const [first, second] = state.channels
@@ -738,7 +454,6 @@ describe('Live sync', () => {
       },
       syncSoon: async () => {},
       reloadShare: async () => {},
-      publishShare: async () => {},
       visible: () => true,
       later: () => () => {},
       every: () => () => {},

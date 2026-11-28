@@ -1,6 +1,5 @@
 /** Current-space wiring; account-wide polling and sockets remain step 5 of the D1 plan. */
 
-import { SyncPushedEvent } from './auto-sync.ts'
 import { DataChangeEvent } from './data-changes.ts'
 import { type ChordlessDB, openSpace } from './db.ts'
 import { getIdentityToken, isAuthenticated } from './google-auth.ts'
@@ -26,6 +25,33 @@ import { t } from './text.ts'
 import { toast } from './toast.ts'
 import { errorMessage } from './utils/errors.ts'
 import type { WorkerConnection } from './worker-call.ts'
+
+/**
+ * A sync that sent changes made here has finished (sent on window): what the live channel waits
+ * for before it tells the other devices (docs/LIVE_SYNC.md), so that they find the changes there
+ */
+export class SyncPushedEvent extends Event {
+  static readonly type = 'sync:pushed'
+  readonly teamId?: string
+  constructor(teamId?: string) {
+    super(SyncPushedEvent.type)
+    this.teamId = teamId
+  }
+}
+
+declare global {
+  interface WindowEventMap {
+    [SyncPushedEvent.type]: SyncPushedEvent
+  }
+}
+
+/** Spaces with edits that are queued and not yet sent, as far as this tab knows (for the session's reports) */
+const unsent = new Set<string>()
+
+/** Whether edits made here are waiting to be sent */
+export function hasUnsentChanges(): boolean {
+  return unsent.size > 0
+}
 
 export class SpaceDataAutoSync {
   readonly #deps: {
@@ -62,7 +88,11 @@ export class SpaceDataAutoSync {
   #resume = () => {
     if (this.#deps.visible()) this.#send()
   }
-  #queued = (event: Event) => this.#deps.run((event as SpaceOutboxChangedEvent).spaceId)
+  #queued = (event: Event) => {
+    const { spaceId } = event as SpaceOutboxChangedEvent
+    unsent.add(spaceId)
+    this.#deps.run(spaceId)
+  }
   #edited = (event: Event) => {
     const { change } = event as DataChangeEvent
     if (
@@ -182,6 +212,13 @@ export async function syncSpaceDataFor(
 ): Promise<void> {
   if (!navigator.onLine) return
   const space = await getSpaceById(spaceId)
+  // A Personal space still on this device alone or on Drive moves to Chordless first, if it is to (switch-to-chordless.ts):
+  // then it syncs here like any moved one (the move syncs it, all of it)
+  /* v8 ignore next 4 -- wiring to the real account and Worker: the rule is tested in switch-to-chordless.test.ts */
+  if (space && !space.team && !space.server) {
+    const { switchCurrentSpaceIfMoved } = await import('./switch-to-chordless.ts')
+    if (await switchCurrentSpaceIfMoved(space)) return
+  }
   // A Team's, or a Personal space's that has moved to the server (space.server)
   if (!(space?.team || space?.server) || !(await isAuthenticated())) return
   const connection = {
@@ -242,6 +279,7 @@ export async function syncSpaceDataFor(
   }
   await sync.sync(options)
   failures.succeeded(spaceId)
+  unsent.delete(spaceId)
   if (space.server) await syncOverlaysOf(spaceId, connection)
 }
 
