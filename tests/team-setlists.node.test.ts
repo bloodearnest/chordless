@@ -117,7 +117,7 @@ test('church setlists enforce membership, library ownership and versions', async
   const batch = async (who: string, op: unknown) =>
     (
       (await (await call(who, 'batch', { ops: [op] })).json()) as {
-        results: { status: string; current?: unknown }[]
+        results: { status: string; current?: unknown; error?: string }[]
       }
     ).results[0]
   assert.equal(
@@ -188,15 +188,38 @@ test('church setlists enforce membership, library ownership and versions', async
       .status,
     'invalid'
   )
-  assert.equal(
-    (await batch('writer', put(null, { ...record, songs: [{ ...song, songUuid: 'foreign' }] })))
-      .status,
-    'invalid'
+  const missingSong = await batch(
+    'writer',
+    put(null, {
+      ...record,
+      songs: [
+        { ...song, songUuid: 'foreign' },
+        { ...song, songUuid: 'other' },
+      ],
+    })
   )
-  assert.equal(
-    (await batch('writer', put(null, { ...record, leaderId: 'reader' }))).status,
-    'invalid'
+  assert.equal(missingSong.status, 'invalid')
+  // it says which: the setlist, and how many songs, and which
+  assert.match(missingSong.error ?? '', /2 songs.*foreign, other/)
+  const oneMissing = await batch(
+    'writer',
+    put(null, { ...record, songs: [{ ...song, songUuid: 'foreign' }] })
   )
+  assert.match(
+    oneMissing.error ?? '',
+    /a song that the church library does not have yet \(foreign\)/
+  )
+  const manyMissing = await batch(
+    'writer',
+    put(null, {
+      ...record,
+      songs: ['a', 'b', 'c', 'd'].map(songUuid => ({ ...song, songUuid })),
+    })
+  )
+  assert.match(manyMissing.error ?? '', /4 songs.*a, b, c, …/)
+  const badLeader = await batch('writer', put(null, { ...record, leaderId: 'reader' }))
+  assert.equal(badLeader.status, 'invalid')
+  assert.match(badLeader.error ?? '', /leader of the setlist .* is not a worship leader or admin/)
   assert.equal((await batch('writer', put(null))).status, 'ok')
   assert.equal((await batch('admin', put(null))).status, 'conflict')
   const response = await call('reader', 'data')
