@@ -87,6 +87,7 @@ import {
 } from './setlist/local-state.ts'
 import { OverviewController } from './setlist/overview-controller.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
+import { isJump } from './setlist/scroll-distance.ts'
 import { SectionController } from './setlist/section-controller.ts'
 import { SetlistHeader } from './setlist/setlist-header.ts'
 import { controlsSetlist } from './setlist-control.ts'
@@ -1109,7 +1110,8 @@ export class SetlistPage {
     // Scroll the container to bring the section into view
     const scrollLeft = section.offsetLeft
 
-    if (instant) {
+    // (a neighbour is slid to; anything further is jumped to, as sliding would draw every song it passes)
+    if (instant || isJump(container.scrollLeft, scrollLeft, container.clientWidth)) {
       // Jump immediately without animation
       container.scrollTo({ left: scrollLeft, behavior: 'instant' })
       // Re-enable observer immediately for instant scrolls

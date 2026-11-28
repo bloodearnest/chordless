@@ -122,6 +122,48 @@ describe('the setlist page: corners', () => {
     })
   })
 
+  it('slides to a neighbouring song, and jumps to one further away, rather than drawing every song on the way', async () => {
+    await rig.open(4)
+    // (laid out as the stylesheet does: a row, each song as wide as it)
+    const row = must($<HTMLElement>('.song-container'))
+    row.style.cssText =
+      'display: flex; position: relative; overflow-x: auto; width: 300px; height: 200px; scroll-behavior: auto'
+    for (const child of row.children) {
+      ;(child as HTMLElement).style.cssText = 'flex: 0 0 100%; min-width: 100%'
+    }
+    const song = (index: number) => must($<HTMLElement>(`#song-${index}`))
+
+    // From the overview to the last song: four widths away, so at once
+    rig.page.scrollToSection('song-3', 3)
+    expect(row.scrollLeft).to.equal(song(3).offsetLeft)
+    expect(row.scrollLeft).to.be.greaterThan(0)
+    expect(rig.page._isProgrammaticScroll).to.equal(false)
+    expect(rig.page.currentSongIndex).to.equal(3)
+
+    // Back to the overview is a jump too
+    rig.page.scrollToSection('overview', -1)
+    expect(row.scrollLeft).to.equal(0)
+    expect(rig.page._isProgrammaticScroll).to.equal(false)
+
+    // The song next to the overview is slid to
+    rig.page.scrollToSection('song-0', 0)
+    expect(rig.page._isProgrammaticScroll).to.equal(true)
+    await waitUntil(() => !rig.page._isProgrammaticScroll, 'the slide to be done', {
+      timeout: 1500,
+    })
+
+    // ...and from there, the next
+    rig.page.scrollToSection('song-1', 1)
+    expect(rig.page._isProgrammaticScroll).to.equal(true)
+    await waitUntil(() => !rig.page._isProgrammaticScroll, 'the slide to be done', {
+      timeout: 1500,
+    })
+    // ...but two on is a jump again
+    rig.page.scrollToSection('song-3', 3)
+    expect(rig.page._isProgrammaticScroll).to.equal(false)
+    expect(row.scrollLeft).to.equal(song(3).offsetLeft)
+  })
+
   it('keeps the overview’s cards draggable when it is drawn again while being edited', async () => {
     await rig.open(2)
     rig.page.overview.setEditMode(true)
