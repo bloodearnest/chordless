@@ -216,6 +216,55 @@ describe('watchLayout', () => {
     expect(row.scrollLeft).to.equal(200)
   })
 
+  it('checks once when asked, late, and says why', async () => {
+    build()
+    const watcher = watch()
+    watcher.checkSoon('open')
+    watcher.checkSoon('swipe')
+    await wait(25)
+    expect(reports()).to.have.length(0)
+    await wait(60)
+    expect(reports().map(span => span.attributes['chordless.layout.phase'])).to.deep.equal([
+      'open',
+      'swipe',
+    ])
+    expect(reports()[0]?.attributes['chordless.layout.ok']).to.equal(true)
+  })
+
+  it('puts back a row stopped between two songs when asked, as it does after a turn', async () => {
+    build()
+    const watcher = watch()
+    row.scrollLeft = 120
+    await wait(350) // (the scroll is over)
+    watcher.checkSoon('swipe')
+    await wait(60)
+    const [swipe] = reports()
+    expect(swipe?.attributes).to.include({
+      'chordless.layout.phase': 'swipe',
+      'chordless.layout.problems': 'off_snap',
+      'chordless.layout.healed': true,
+    })
+    expect(row.scrollLeft).to.equal(0)
+  })
+
+  it('does not check when it is stopped before a check that was asked for comes', async () => {
+    build()
+    const watcher = watch()
+    watcher.checkSoon('swipe')
+    abort.abort()
+    await wait(60)
+    expect(reports()).to.have.length(0)
+  })
+
+  it('does not check when asked after it has been stopped', async () => {
+    build()
+    const watcher = watch()
+    abort.abort()
+    watcher.checkSoon('open')
+    await wait(60)
+    expect(reports()).to.have.length(0)
+  })
+
   it('says nothing once stopped, and before the songs are there', async () => {
     build()
     watch()

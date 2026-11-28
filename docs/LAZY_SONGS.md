@@ -38,12 +38,41 @@ place in the row, and only the songs near the one in view have their chart in it
   has none, which is why the window exists too: `content-visibility` skips layout and paint, and the
   window also skips making the elements and rendering the components.
 
+## Taking songs away, and not changing a page that is moving
+
+The first version kept every song once it was drawn. The owner of the slow iPad saw it get slower on the
+later songs of a long setlist, and the text on a song being painted again as he scrolled back up to it:
+what a page that has drawn every song holds is memory, and WebKit drops and repaints the pieces of a
+page it has no room for. That is a likely reading, not a measured one: the leave span's totals fit it
+(a 3.5 s frame, after the first ten seconds, in a session that visited 13 songs) but cannot say where in
+the session; `chordless.perf.by_song`, below, can. So:
+
+- **A song far from the one in view is taken away** (`_undrawSong`), the furthest first, one a frame:
+  those further than `KEEP_RADIUS` (4) from it, which is two more than the ones drawn ahead
+  (`WINDOW_RADIUS`, 2), so that going back and forth does not draw a song again and again. Its place in
+  the row stays, empty, as one that was never drawn.
+- **Where it was scrolled to is kept** (`_scrollsWhenDrawn`, by the section's id) and put back when it is
+  drawn again, unless songs start at their top (Preferences), when there is nothing to put back. A page
+  that is restored (`captureViewState`) has these too. Moving a song in the setlist forgets them: they
+  are by place.
+- **A song shown as its lead sheet is not taken away:** drawing it again engraves the sheet again.
+- **Nothing is drawn or taken away while the page is being scrolled** (`_rowScrolling`, any `scroll`
+  in the page): the queues wait until it has stopped for `SCROLL_SETTLE_MS` (150 ms). A song made in a row
+  that is settling into a snap point, or in a page that is being scrolled to read, is what makes it stutter
+  (and the first swipe on the iPad stopped between two songs; the layout check below is for that).
+  The song that is about to be seen is the exception: it is drawn at once, as before.
+
+## The layout checks
+
+The row was seen stopped between two songs, and the header's round buttons squashed, on an iPad on
+iOS 17: browser laying out with a stale width (`docs/OBSERVABILITY.md`, `chordless.layout.check`). It
+was checked only after the screen was turned. The owner has seen it on devices with no turn, so the page
+also asks for a check **when it opens** and **after the first swipe**, late (when iOS has settled), where
+the check also puts a row stopped between two songs back on the nearest. `chordless.layout.phase` says
+which: `settled`, `late`, `open`, `swipe`.
+
 ## What it does not do
 
-- **It does not take songs away.** A song stays drawn once it is. After a service in which every song
-  was visited every song is drawn, as before. Taking the far ones away (past two more songs than the
-  window), with their scroll position kept, is the next step, to be made only if the reports say
-  that it matters (below).
 - **Browser find and screen readers cannot see a song that is not drawn.** A song is reached by the
   overview, the route or a swipe, each of which draws it.
 - **It does not make a song cheaper to draw.** The cost per song is still not understood
@@ -55,8 +84,13 @@ place in the row, and only the songs near the one in view have their chart in it
 (`chordless.setlist.songs` is how many there are). `chordless.setlist.first_paint_ms` and `.settled_ms`
 are now of what was drawn, not of the whole setlist, so they should stop growing with the setlist:
 `P50(chordless.setlist.settled_ms)` by `chordless.setlist.songs`, where `os.name` is `iPadOS`, before and
-after. `chordless.perf.long_frames` on the leave span says whether the rest of a service is smooth, and,
-if it gets worse towards the end of a long setlist, that songs ought to be taken away again.
+after.
+
+`chordless.perf.by_song` on the leave span is the frames on each song in turn (the overview is -1):
+`song:long frames/frames@songs drawn`, comma-joined, in the order they were seen, the last sixty. A
+setlist that slows towards its end shows as the long fraction rising along the list, and, with the
+count of songs drawn beside it, whether that follows how many are drawn. `chordless.perf.long_frames` is
+still the total.
 
 ## Risks that were looked for
 
