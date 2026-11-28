@@ -95,6 +95,16 @@ export class AccountPage extends LitElement {
         opacity: 0.75;
         margin: 0;
       }
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
       a.btn {
         text-decoration: none;
         align-self: flex-start;
@@ -272,31 +282,73 @@ export class AccountPage extends LitElement {
     return html`
       <div class="content">
         <account-card></account-card>
-        ${this._signIn === 'signed-in' ? html`<a class="btn" href="/account/churches">${t('church-console-open')}</a>` : nothing}
-        <h2>${t('account-spaces-heading')}</h2>
-        <div class="spaces">
-          ${this._spaces.map(
-            space => html`<space-card
-              .space=${space}
-              .signIn=${this._signIn}
-              .driveEmail=${this._driveEmail}
-              ?isDefault=${space.id === this._defaultId}
-              ?several=${this._spaces.length > 1}
-            ></space-card>`
-          )}
-        </div>
-        <p class="hint">${t('account-join-hint')}</p>
-        <a class="btn" id="create-team" href="/account/new">${t('account-create-team')}</a>
         ${
-          this._signIn === 'signed-in'
-            ? html`<button class="btn" id="look-for-teams" ?disabled=${this._looking} @click=${this._lookForTeams}>
-                ${this._looking ? t('account-teams-looking') : t('account-teams-look')}
-              </button>
-              <p class="hint" id="look-message" role="status">
-                ${this._lookMessage || t('account-teams-look-hint')}
-              </p>`
+          this._spaces.some(space => space.team)
+            ? html`<section class="section" id="team-spaces">
+          <h2>${t('account-teams-spaces-heading')}</h2>
+          <div class="spaces">
+            ${this._spaces
+              .filter(space => space.team)
+              .map(
+                space => html`<space-card
+                .space=${space}
+                .signIn=${this._signIn}
+                .driveEmail=${this._driveEmail}
+                ?isDefault=${space.id === this._defaultId}
+                ?several=${this._spaces.length > 1}
+              ></space-card>`
+              )}
+          </div>
+        </section>`
             : nothing
         }
+        <section class="section" id="personal-spaces">
+          <h2>${t('account-personal-heading')}</h2>
+          <p class="hint">${t('account-personal-hint')}</p>
+          <div class="spaces">
+            ${this._spaces
+              .filter(space => !space.team)
+              .map(
+                space => html`<space-card
+                .space=${space}
+                .signIn=${this._signIn}
+                .driveEmail=${this._driveEmail}
+                ?isDefault=${space.id === this._defaultId}
+                ?several=${this._spaces.length > 1}
+              ></space-card>`
+              )}
+          </div>
+        </section>
+        ${
+          this._signIn === 'signed-in' || this._signIn === 'no-drive'
+            ? html`<section class="section" id="churches-section">
+                <h2>${t('account-churches-heading')}</h2>
+                <p class="hint">${t('account-churches-hint')}</p>
+                <a class="btn" href="/account/churches">${t('church-console-open')}</a>
+              </section>`
+            : nothing
+        }
+        <section class="section">
+          <h2>${t('account-teams-heading')}</h2>
+          <p class="hint">${t('account-join-hint')}</p>
+          <div class="actions">
+            <a class="btn" id="create-team" href="/account/new">${t('account-create-team')}</a>
+            ${
+              this._signIn === 'signed-in'
+                ? html`<button class="btn" id="look-for-teams" ?disabled=${this._looking} @click=${this._lookForTeams}>
+                    ${this._looking ? t('account-teams-looking') : t('account-teams-look')}
+                  </button>`
+                : nothing
+            }
+          </div>
+          ${
+            this._signIn === 'signed-in'
+              ? html`<p class="hint" id="look-message" role="status">
+                  ${this._lookMessage || t('account-teams-look-hint')}
+                </p>`
+              : nothing
+          }
+        </section>
         <div class="panel">
           <h3>${t('account-device-heading')}</h3>
           <storage-summary></storage-summary>

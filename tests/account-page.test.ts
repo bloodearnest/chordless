@@ -80,13 +80,34 @@ describe('account-page', () => {
     await setCurrentSpace(first.id, first.name)
     const el = await page()
     expect(el.shadowRoot?.querySelector('account-card')).to.not.equal(null)
-    expect(el.shadowRoot?.querySelector('h2')?.textContent).to.equal('Personal and Team Spaces')
+    expect(el.shadowRoot?.querySelector('h2')?.textContent).to.equal('Personal space')
     expect(cards(el).map(card => card.space.id)).to.include.members([first.id, second.id])
     expect(el.shadowRoot?.querySelector('a#create-team')?.getAttribute('href')).to.equal(
       '/account/new'
     )
     expect(el.shadowRoot?.querySelector('storage-summary')).to.not.equal(null)
     expect(el.shadowRoot?.textContent).to.contain('invite link')
+  })
+
+  it('shows the teams first, then the personal space with what it is for, then churches once signed in', async () => {
+    const own = await space('Own')
+    const el = await page()
+    el._spaces = [
+      own,
+      { ...own, id: 'team-space-1', name: 'Morning', team: { id: 't-1', role: 'writer' } },
+    ]
+    await el.updateComplete
+    const root = must(el.shadowRoot)
+    const sections = () => Array.from(root.querySelectorAll('section')).map(section => section.id)
+    expect(root.querySelector('#team-spaces space-card')).to.not.equal(null)
+    expect(root.querySelector('#personal-spaces .hint')?.textContent).to.contain('wedding')
+    expect(sections().slice(0, 2)).to.deep.equal(['team-spaces', 'personal-spaces'])
+    expect(root.querySelector('#churches-section')).to.equal(null)
+    el.dispatchEvent(new AccountStateEvent('no-drive'))
+    await el.updateComplete
+    const church = root.querySelector<HTMLAnchorElement>('#churches-section a')
+    expect(church?.textContent).to.contain('Register an organisation or church')
+    expect(church?.getAttribute('href')).to.equal('/account/churches')
   })
 
   it('keeps the spaces in the order they were added, whichever is in use', async () => {
