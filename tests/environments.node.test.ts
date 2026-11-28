@@ -39,7 +39,7 @@ test('dev and prod keep their space folders in differently named folders in Driv
 })
 
 test('the page takes its project from the environment, and names none itself', () => {
-  for (const file of ['src/js/google-auth.ts', 'src/js/folder-picker.ts']) {
+  for (const file of ['src/js/google-auth.ts']) {
     const source = readFileSync(file, 'utf8')
     assert.doesNotMatch(source, /\d{9,}-[a-z0-9]+\.apps\.googleusercontent\.com/, file)
     assert.doesNotMatch(source, /['"]\d{12}['"]/, `${file} has a project number in it`)

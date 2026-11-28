@@ -5,7 +5,6 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import '../src/components/space-page.ts'
 import type { SpacePage } from '../src/components/space-page.ts'
-import { TeamLeftEvent, TeamSharingStoppedEvent } from '../src/components/team-membership-panel.ts'
 import type { Route } from '../src/js/router.ts'
 import {
   createSpace,
@@ -15,7 +14,6 @@ import {
   updateSpace,
 } from '../src/js/space.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
-import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -49,44 +47,30 @@ describe('space-page', () => {
 
   async function open(route: Route) {
     const el = await fixture<SpacePage>(html`<space-page .route=${route}></space-page>`)
-    const went: { url: string; fresh: boolean }[] = []
-    el.go = (url, options) => void went.push({ url, fresh: options?.fresh === true })
     await waitUntil(() => el._space || el._missing, 'the space to be read')
     await el.updateComplete
-    return { el, went }
+    return { el }
   }
   const text = (el: SpacePage) => (el.shadowRoot?.textContent ?? '').replace(/\s+/g, ' ')
 
-  it('shows a Personal space with who leads its setlists, and no Team sections', async () => {
+  it('shows a Personal space with who leads its setlists', async () => {
     const mine = await space('Band')
     const { el } = await open({ name: 'space', spaceId: mine.id })
     expect(el.shadowRoot?.querySelector('h2')?.textContent).to.contain(mine.name)
     expect(el.shadowRoot?.querySelector('a.back')?.getAttribute('href')).to.equal('/account')
     expect(el.shadowRoot?.querySelector('people-list')?.space?.id).to.equal(mine.id)
     expect(el.shadowRoot?.querySelector('space-manager')).to.equal(null) // (its data is on the Account page)
-    expect(el.shadowRoot?.querySelector('team-membership-panel')).to.equal(null)
-    expect(el.shadowRoot?.querySelector('team-licence-panel')).to.equal(null)
-    expect(el.shadowRoot?.querySelector('team-storage-panel')).to.equal(null)
   })
 
-  it('shows a Team with its kind and role, its people, licence and storage', async () => {
-    const team = await space('Choir', { id: `space-${crypto.randomUUID()}`, role: 'writer' })
-    const { el } = await open({ name: 'space', spaceId: team.id })
-    expect(text(el)).to.contain('Team')
-    expect(text(el)).to.contain('Worship leader')
-    expect(el.shadowRoot?.querySelector('people-list')?.space?.id).to.equal(team.id)
-    expect(el.shadowRoot?.querySelector('team-membership-panel')?.space?.id).to.equal(team.id)
-    expect(el.shadowRoot?.querySelector('team-licence-panel')).to.not.equal(null)
-    expect(el.shadowRoot?.querySelector('team-storage-panel')).to.not.equal(null)
-  })
-
-  it("sends a church's team to its church's page, with none of a Drive team's sections", async () => {
+  it("shows a team with its kind and role, and sends it to its church's page", async () => {
     const team = await space('Worship', {
       id: `space-${crypto.randomUUID()}`,
       role: 'writer',
       churchId: 'church',
     })
     const { el } = await open({ name: 'space', spaceId: team.id })
+    expect(text(el)).to.contain('Team')
+    expect(text(el)).to.contain('Worship leader')
     expect(text(el)).to.contain("on the church's page")
     expect(el.shadowRoot?.querySelector('#church-link')?.getAttribute('href')).to.equal(
       '/account/churches'
@@ -122,22 +106,6 @@ describe('space-page', () => {
     expect(el._space?.id).to.equal(two.id)
   })
 
-  it('becomes a Personal space again when the owner stops sharing', async () => {
-    const team = await space('Choir', { id: `space-${crypto.randomUUID()}`, role: 'owner' })
-    const { el } = await open({ name: 'space', spaceId: team.id })
-    expect(el.shadowRoot?.querySelector('team-membership-panel')).to.not.equal(null)
-    await updateSpace(team.id, { team: undefined })
-    must(el.shadowRoot?.querySelector('team-membership-panel')).dispatchEvent(
-      new TeamSharingStoppedEvent()
-    )
-    await waitUntil(
-      () => !el.shadowRoot?.querySelector('team-membership-panel'),
-      'the page to update'
-    )
-    expect(el.shadowRoot?.querySelector('team-licence-panel')).to.equal(null)
-    expect(el.shadowRoot?.querySelector('people-list')).to.not.equal(null)
-  })
-
   it('says so when the space is not on this device', async () => {
     const { el } = await open({ name: 'space', spaceId: 'no-such-space' })
     expect(text(el)).to.contain('not on this device')
@@ -155,20 +123,5 @@ describe('space-page', () => {
     el.route = undefined
     await waitUntil(() => el._missing, 'nothing to show')
     expect(text(el)).to.contain('not on this device')
-  })
-
-  it('goes back to the list when the person leaves the Team', async () => {
-    const team = await space('Choir', { id: `space-${crypto.randomUUID()}`, role: 'reader' })
-    const { el, went } = await open({ name: 'space', spaceId: team.id })
-    must(el.shadowRoot?.querySelector('team-membership-panel')).dispatchEvent(new TeamLeftEvent())
-    expect(went).to.deep.equal([{ url: '/account', fresh: false }])
-  })
-
-  it('stops listening when it is taken away', async () => {
-    const mine = await space('Band')
-    const { el, went } = await open({ name: 'space', spaceId: mine.id })
-    el.remove()
-    el.dispatchEvent(new TeamLeftEvent())
-    expect(went).to.deep.equal([])
   })
 })

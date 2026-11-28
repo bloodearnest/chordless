@@ -1,22 +1,17 @@
 import { css, html, LitElement, nothing } from 'lit'
 import type { Space } from '../js/data-types.ts'
-import { goTo } from '../js/navigation.ts'
 import type { Route } from '../js/router.ts'
 import { getSpaceById } from '../js/space.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { t } from '../js/text.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 import './people-list.ts'
-import './team-licence-panel.ts'
-import { TeamLeftEvent, TeamSharingStoppedEvent } from './team-membership-panel.ts'
-import './team-membership-panel.ts'
-import './team-storage-panel.ts'
 
 /**
- * Everything about one space, on a page of its own (docs/ACCOUNT.md, "The space page"): /account/space/<id>. It
- * is for the space's users ("Manage Users" on its card): a Team's people, licence number and storage, and who leads
- * its setlists, as sections one under the other. Its data (export, import, resetting from Drive, delete) is
- * "Manage Data", a dialogue on the Account page.
+ * Everything about one space, on a page of its own (docs/ACCOUNT.md, "The space page"): /account/space/<id>, "Manage
+ * Users" on its card. A Personal space's is who leads its setlists. A team's people, roles and licence are its church's,
+ * on the church's page, which it links to. Its data (export, import, delete) is "Manage Data", a dialogue on the
+ * Account page.
  */
 export class SpacePage extends LitElement {
   static override properties = {
@@ -29,9 +24,6 @@ export class SpacePage extends LitElement {
   declare _space: Space | null
   /** The space is not on this device (a link from another, or one deleted since) */
   declare _missing: boolean
-
-  /** Moves on to another page (a test gives its own) */
-  go: (url: string, options?: { fresh?: boolean }) => unknown = goTo
 
   constructor() {
     super()
@@ -82,28 +74,6 @@ export class SpacePage extends LitElement {
     this._missing = !space
   }
 
-  /** The person left the Team, which is gone from this device */
-  _onLeft = (): void => {
-    void this.go('/account')
-  }
-
-  /** The owner stopped sharing: it is a Personal space again, so read it again (and show it so) */
-  _onStopped = (): void => {
-    void this._load()
-  }
-
-  override connectedCallback(): void {
-    super.connectedCallback()
-    this.addEventListener(TeamLeftEvent.type, this._onLeft)
-    this.addEventListener(TeamSharingStoppedEvent.type, this._onStopped)
-  }
-
-  override disconnectedCallback(): void {
-    this.removeEventListener(TeamLeftEvent.type, this._onLeft)
-    this.removeEventListener(TeamSharingStoppedEvent.type, this._onStopped)
-    super.disconnectedCallback()
-  }
-
   override render() {
     const space = this._space
     if (this._missing) {
@@ -123,18 +93,11 @@ export class SpacePage extends LitElement {
         ${role ? html`<span class="label">${role}</span>` : nothing}
       </h2>
       ${
-        // (a church's team: its people, roles, licence and storage are the church's, kept on Chordless, not the team's in Drive)
-        space.team?.churchId
+        // (a team's people, roles and licence are its church's, kept on Chordless)
+        space.team
           ? html`<p id="church-team">${t('space-page-church')}</p>
               <a class="btn" id="church-link" href="/account/churches">${t('space-page-church-link')}</a>`
-          : html`<people-list .space=${space}></people-list>
-              ${
-                space.team
-                  ? html`<team-membership-panel .space=${space}></team-membership-panel>
-                    <team-licence-panel .space=${space}></team-licence-panel>
-                    <team-storage-panel .space=${space}></team-storage-panel>`
-                  : nothing
-              }`
+          : html`<people-list .space=${space}></people-list>`
       }
     </div>`
   }

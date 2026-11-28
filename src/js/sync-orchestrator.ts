@@ -8,12 +8,7 @@
 import { getSpaceById } from './space.ts'
 import { withSyncLock } from './sync-lock.ts'
 import type { SyncProgress } from './sync-manager.ts'
-import {
-  createSyncManager,
-  createUnlinkedSyncManager,
-  isSyncAvailable,
-  SyncManager,
-} from './sync-manager.ts'
+import { createSyncManager, createUnlinkedSyncManager, SyncManager } from './sync-manager.ts'
 import { trackSync } from './sync-status.ts'
 import { phase, traced } from './telemetry/telemetry.ts'
 import { errorMessage } from './utils/errors.ts'
@@ -320,8 +315,3 @@ export async function createSyncOrchestrator(
   await orchestrator.init()
   return orchestrator
 }
-
-/**
- * Check if sync is available (user authenticated)
- */
-export { isSyncAvailable }

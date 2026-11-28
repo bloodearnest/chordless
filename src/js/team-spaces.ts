@@ -6,11 +6,10 @@
  */
 
 import { cleanLicence } from './ccli-licence.ts'
-import type { Person, Setlist, Space } from './data-types.ts'
+import type { Space } from './data-types.ts'
 import { ChordlessDB } from './db.ts'
 import { isAuthenticated } from './google-auth.ts'
-import { resolvePerson } from './leaders.ts'
-import { createSpace, deleteSpace, getSpaceById, listSpaces, updateSpace } from './space.ts'
+import { createSpace, listSpaces, updateSpace } from './space.ts'
 import { storageFor } from './storage/space-storage.ts'
 import type { TeamStorage } from './storage/team-storage.ts'
 import type { ProgressCallback } from './sync/session.ts'
@@ -198,60 +197,6 @@ export function inviteSendLinks(
     whatsapp: `https://wa.me/?text=${encodeURIComponent(`${message}\n\n${url}`)}`,
     gmail: `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${message}\n\n${url}\n`)}`,
   }
-}
-
-/**
- * Reach a team space's folder with this person's own Google sign-in again, after team-managed
- * storage (or when Google no longer honours the sign-in the space holds): they are its owner
- */
-export async function returnToOwnSignIn(teamId: string): Promise<void> {
-  if (!(await isAuthenticated())) throw new UserError(t('team-sign-in-first'))
-  await teamApi.replaceCredential(teamId)
-}
-
-/** Stop sharing a space of this person's: the Worker forgets it, and it is theirs alone again */
-export async function stopSharing(spaceId: string): Promise<Space> {
-  const space = await getSpaceById(spaceId)
-  if (!space?.team) throw new Error('This space is not shared')
-  await teamApi.endSharing(space.team.id)
-  return updateSpace(spaceId, { team: undefined })
-}
-
-/**
- * Leave a team space this person joined. The Worker removes them, and the copy on this device
- * goes (it would never sync again): the caller starts the app afresh.
- */
-export async function leaveSpace(spaceId: string): Promise<void> {
-  const space = await getSpaceById(spaceId)
-  if (!space?.team) throw new Error('This space is not shared')
-  await teamApi.leave(space.team.id)
-  await deleteSpace(spaceId)
-}
-
-/** Someone a setlist names as its leader: who to suggest inviting */
-export interface Leader {
-  name: string
-  /** Their Google account, if the setlist has it (a leader typed in by name alone has none) */
-  email: string | null
-}
-
-/**
- * The people who lead these setlists, once each, for suggesting who to invite to a team space
- * (docs/SPACES.md, "Creating a team space"). Those with an email come first; `own` (the person
- * making the space) is left out, as are setlists with no leader.
- */
-export function leadersOf(setlists: Setlist[], people: Person[], own?: string | null): Leader[] {
-  const mine = own?.trim().toLowerCase()
-  const seen = new Set<string>()
-  const leaders: Leader[] = []
-  for (const setlist of setlists) {
-    const person = resolvePerson(people, setlist.leaderId)
-    if (!person || seen.has(person.id)) continue
-    seen.add(person.id)
-    if (mine && person.emails.includes(mine)) continue
-    leaders.push({ name: person.name, email: person.emails[0] ?? null })
-  }
-  return leaders.sort((a, b) => Number(Boolean(b.email)) - Number(Boolean(a.email)))
 }
 
 /**

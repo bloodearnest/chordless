@@ -97,7 +97,6 @@ describe('matchRoute', () => {
     ['/account#section', { name: 'account' }],
     // The page was called Storage: its old address still opens it
     ['/storage', { name: 'account' }],
-    ['/account/new', { name: 'new-team-space' }],
 
     // Not a route
     ['/nope', notFound('/nope')],
@@ -135,7 +134,6 @@ describe('buildUrl', () => {
       { name: 'join', teamId: 'space-aaaa1111', code: 'abc_DEF-123' },
       '/join/space-aaaa1111/abc_DEF-123',
     ],
-    [{ name: 'new-team-space' }, '/account/new'],
     [{ name: 'media' }, '/media'],
     [{ name: 'speed-test' }, '/speed-test'],
     [{ name: 'setlist', setlistId: 'abc', songIndex: -1 }, '/setlist/abc'],

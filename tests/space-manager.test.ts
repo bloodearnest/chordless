@@ -5,7 +5,6 @@
  */
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
-import { SpaceDeletedEvent } from '../src/components/space-delete-everywhere.ts'
 import { SpaceImportedEvent } from '../src/components/space-export-panel.ts'
 import { SpaceGoneEvent, type SpaceManager } from '../src/components/space-manager.ts'
 import '../src/components/space-manager.ts'
@@ -102,14 +101,15 @@ describe('space-manager', () => {
     expect(text(el)).to.contain('no such Personal space or Team')
   })
 
-  it('shows a Personal space: what it holds, sync, export and import, and delete; no people', async () => {
+  it('shows a Personal space: what it holds, export and import, and delete; no people and no Drive', async () => {
     const mine = await space('Mine')
     const other = await space('Other')
     await setCurrentSpace(other.id, other.name)
     const el = await page(mine.id)
     expect(labels(el)).to.deep.equal(['Personal'])
     expect(text(el)).to.match(/1 song · 0 setlists · about \d+ B/)
-    expect(has(el, 'drive-sync-panel')).to.equal(true)
+    expect(has(el, 'drive-sync-panel')).to.equal(false)
+    expect(text(el)).not.to.contain('Delete everywhere')
     expect(has(el, 'space-export-panel')).to.equal(true)
     expect(has(el, 'team-membership-panel')).to.equal(false)
     expect(text(el)).to.contain('Delete from this device')
@@ -130,69 +130,10 @@ describe('space-manager', () => {
     expect(has(el, 'team-membership-panel')).to.equal(false)
   })
 
-  it('offers a church’s team no Drive copy to restore from and no deleting it everywhere, and says nothing of it', async () => {
-    const team = await space('Church team', {
-      team: { id: 'space-hhhh8888', role: 'admin', churchId: 'church' },
-    })
-    const el = await page(team.id)
-    expect(has(el, 'drive-sync-panel')).to.equal(false)
-    expect(has(el, 'space-delete-everywhere')).to.equal(false)
-    // (it can still be exported, and taken off this device)
-    expect(has(el, 'space-export-panel')).to.equal(true)
-    expect(has(el, '#delete')).to.equal(true)
-  })
-
-  it('offers a space that has moved to Chordless no Google Drive copy to restore from, and says nothing of where it is', async () => {
-    const moved = await space('Moved', {
-      server: { libraryId: 'library', movedAt: '2026-11-25T10:00:00.000Z' },
-      rootRef: 'old-folder',
-    })
-    const el = await page(moved.id)
-    expect(text(el)).not.to.contain('stored on Chordless')
-    expect(has(el, 'drive-sync-panel')).to.equal(false)
-    expect(text(el)).not.to.contain('Replace this device')
-    // (what it holds can still be exported, and it can still be deleted from the device)
-    expect(has(el, 'space-export-panel')).to.equal(true)
-    expect(has(el, '#delete')).to.equal(true)
-    const drive = await page((await space('On Drive')).id)
-    expect(has(drive, 'drive-sync-panel')).to.equal(true)
-  })
-
   it('has no sync button of its own: that is on the card', async () => {
     const mine = await space('Mine')
     const el = await page(mine.id)
     expect(text(el)).to.not.contain('Sync with Drive')
-  })
-
-  it('offers a Team member the Team copy, which needs no Drive', async () => {
-    const team = await space('Team', { team: { id: 'space-hhhh8888', role: 'reader' } })
-    const el = await page(team.id)
-    expect(text(el)).to.contain('Team copy')
-  })
-
-  it('lets a Team member sync with a sign-in that has no Drive', async () => {
-    const team = await space('Team', { team: { id: 'space-jjjj1010', role: 'reader' } })
-    const el = await page(team.id)
-    el._signIn = 'no-drive'
-    await el.updateComplete
-    expect(
-      must(el.shadowRoot?.querySelector('drive-sync-panel')).hasAttribute('disabled')
-    ).to.equal(false)
-    expect(text(el)).to.not.contain('Sign in on the Account and Teams page')
-    const mine = await space('Mine')
-    const own = await page(mine.id)
-    own._signIn = 'no-drive'
-    await own.updateComplete
-    expect(
-      must(own.shadowRoot?.querySelector('drive-sync-panel')).hasAttribute('disabled')
-    ).to.equal(true)
-    expect(text(own)).to.contain('Google Drive is not connected')
-    expect(text(own)).to.not.contain('Sign in on the Account and Teams page to sync')
-    own._signIn = 'signed-in'
-    await own.updateComplete
-    expect(
-      must(own.shadowRoot?.querySelector('drive-sync-panel')).hasAttribute('disabled')
-    ).to.equal(false)
   })
 
   it('says one song and one setlist in the singular', async () => {
@@ -203,15 +144,6 @@ describe('space-manager', () => {
     db.db?.close()
     const el = await page(mine.id)
     expect(text(el)).to.match(/1 song · 1 setlist · about \d+ B/)
-  })
-
-  it('says to sign in to sync when no one is signed in', async () => {
-    const mine = await space('Mine')
-    const el = await page(mine.id)
-    expect(text(el)).to.contain('Sign in on the Account and Teams page to sync')
-    expect(
-      must(el.shadowRoot?.querySelector('drive-sync-panel')).hasAttribute('disabled')
-    ).to.equal(true)
   })
 
   it('does not offer pad sets in the export while the media player is off', async () => {
@@ -263,32 +195,6 @@ describe('space-manager', () => {
       await answer(el, 'Delete from this device?', true)
       await waitUntil(() => wasCurrent !== undefined)
       expect(wasCurrent).to.equal(false)
-    })
-  })
-
-  describe('deleting everywhere', () => {
-    it('is offered for a space, with what it does, and a Team’s writer is told it is for admins', async () => {
-      const mine = await space('Mine')
-      const el = await page(mine.id)
-      expect(has(el, 'space-delete-everywhere')).to.equal(true)
-      expect(text(el)).to.contain('Delete everywhere')
-      const team = await space('Team', { team: { id: 'space-jjjj1010', role: 'writer' } })
-      const teamEl = await page(team.id)
-      const panel = must(teamEl.shadowRoot?.querySelector('space-delete-everywhere'))
-      expect(panel.shadowRoot?.textContent).to.contain('Only an admin')
-    })
-
-    it('tells the page the space is gone, and whether it was the one in use, when it is done', async () => {
-      const mine = await space('Mine')
-      const el = await page(mine.id)
-      let wasCurrent: boolean | undefined
-      el.addEventListener(SpaceGoneEvent.type, event => {
-        wasCurrent = (event as SpaceGoneEvent).wasCurrent
-      })
-      must(el.shadowRoot?.querySelector('space-delete-everywhere')).dispatchEvent(
-        new SpaceDeletedEvent(true)
-      )
-      expect(wasCurrent).to.equal(true)
     })
   })
 

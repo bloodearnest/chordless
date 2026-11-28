@@ -1,17 +1,14 @@
 /**
- * A space's CCLI licence number (space-licence.ts, team-licence-panel.ts): a Team's is the
+ * A space's CCLI licence number (space-licence.ts): a Team's is the
  * Worker's, which this device copies; a personal space's is kept here alone. The Worker is a fetch
  * that answers from a table, and the service worker that keeps the sign-in a fake one.
  */
-import { expect, waitUntil } from '@open-wc/testing'
-import '../src/components/team-licence-panel.ts'
-import type { TeamLicencePanel } from '../src/components/team-licence-panel.ts'
+import { expect } from '@open-wc/testing'
 import type { Space } from '../src/js/data-types.ts'
 import { createSpace, deleteSpace, getSpaceById } from '../src/js/space.ts'
 import { mayEditLicence, noteLicence, readLicence, saveLicence } from '../src/js/space-licence.ts'
 import type { TeamRole } from '../src/js/team-roles.ts'
 import { type FakeAuthWorker, installFakeAuthWorker, sessionFor } from './fake-auth-worker.ts'
-import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -186,81 +183,6 @@ describe('a space’s CCLI licence number', () => {
       await noteLicence(mine, '471102')
       expect(await stored(mine)).to.equal(undefined)
       expect(calls).to.deep.equal([])
-    })
-  })
-
-  describe('the panel', () => {
-    let panel: TeamLicencePanel
-    const text = () => (panel.shadowRoot?.textContent ?? '').replace(/\s+/g, ' ')
-    const input = () => must(panel.shadowRoot?.querySelector<HTMLInputElement>('#licence'))
-    const open = async (team: Space) => {
-      panel = document.createElement('team-licence-panel')
-      panel.space = team
-      document.body.append(panel)
-      await waitUntil(() => panel._loaded, 'loaded', { timeout: 2000 })
-      await panel.updateComplete
-    }
-    afterEach(() => panel?.remove())
-
-    it('shows an admin the number, who set it and when, and saves a new one', async () => {
-      theirs = '471102'
-      await open(await space('admin'))
-      expect(input().value).to.equal('471102')
-      expect(text()).to.contain('ann@example.com set it to 471102')
-      input().value = '471103'
-      input().dispatchEvent(new Event('input'))
-      must(panel.shadowRoot?.querySelector<HTMLButtonElement>('#save-licence')).click()
-      await waitUntil(() => theirs === '471103', 'saved', { timeout: 2000 })
-      await waitUntil(() => text().includes('Saved'), 'said so', { timeout: 2000 })
-    })
-
-    it('words each change in the log: set, changed and cleared', async () => {
-      const at = '2026-11-11T10:00:00Z'
-      log = [
-        { at, by: 'ann@example.com', from: null, to: '1' },
-        { at, by: 'dan@example.com', from: '1', to: '2' },
-        { at, by: 'ann@example.com', from: '2', to: null },
-      ]
-      await open(await space('admin'))
-      expect(text()).to.contain('ann@example.com set it to 1')
-      expect(text()).to.contain('dan@example.com changed it from 1 to 2')
-      expect(text()).to.contain('ann@example.com cleared it (was 2)')
-    })
-
-    it('shows a personal space’s own number, with no log, and shows nothing without a space', async () => {
-      await open(await space(null, '555'))
-      expect(input().value).to.equal('555')
-      expect(panel.shadowRoot?.querySelector('.history')).to.equal(null)
-      const none = document.createElement('team-licence-panel')
-      document.body.append(none)
-      await none.updateComplete
-      expect(none.shadowRoot?.textContent?.trim()).to.equal('')
-      none.remove()
-      await panel.updateComplete
-    })
-
-    it('shows a writer a number already set, but not to change', async () => {
-      theirs = '471102'
-      await open(await space('writer'))
-      expect(input().disabled).to.equal(true)
-      expect(text()).to.contain('Only an admin can change it')
-      expect(panel.shadowRoot?.querySelector('#save-licence')).to.equal(null)
-    })
-
-    it('says what went wrong when the Worker refuses, and keeps what was typed', async () => {
-      await open(await space('writer'))
-      refuse = true
-      input().value = '222'
-      input().dispatchEvent(new Event('input'))
-      must(panel.shadowRoot?.querySelector<HTMLButtonElement>('#save-licence')).click()
-      await waitUntil(() => text().includes('Only an admin'), 'refusal shown', { timeout: 2000 })
-      expect(input().value).to.equal('222')
-    })
-
-    it('says so when the number cannot be read', async () => {
-      down = true
-      await open(await space('admin'))
-      expect(panel.shadowRoot?.querySelector('[role=alert]')).to.not.equal(null)
     })
   })
 })

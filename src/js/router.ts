@@ -10,9 +10,8 @@
  *   { name: 'home', shared: true }            /?shared: the home page of what was shared by link
  *   { name: 'songs', songUuid?: string, melody?: true }  /songs, /songs/<song uuid> (?melody: the song's melody sheet, not its lyrics)
  *   { name: 'songs', search: string }        /songs?q=<search>: the list, searched
- *   { name: 'preferences' | 'account' | 'import-song' | 'import-setlist' | 'about' | 'contact' | 'speed-test' | 'new-team-space' | 'media' }
+ *   { name: 'preferences' | 'account' | 'import-song' | 'import-setlist' | 'about' | 'contact' | 'speed-test' | 'media' }
  *                                             /account is Account and Teams (/storage still opens it);
- *                                             /account/new makes a team (team-space-wizard.ts)
  *                                             /join is a team space's invite link
  *   { name: 'space', spaceId }               /account/space/<id>: everything about one space (its people, licence,
  *                                             storage and data); the id is this device's own for it
@@ -39,7 +38,6 @@ export type PageName =
   | 'about'
   | 'contact'
   | 'speed-test'
-  | 'new-team-space'
   | 'media'
 
 export type Route =
@@ -66,7 +64,6 @@ const PAGES: Readonly<Record<string, PageName | 'songs' | 'join' | 'sign-in'>> =
   '/contact': 'contact',
   '/speed-test': 'speed-test',
   '/join': 'join',
-  '/account/new': 'new-team-space',
   '/media': 'media',
   '/sign-in': 'sign-in',
 }

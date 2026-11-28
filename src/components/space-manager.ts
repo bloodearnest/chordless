@@ -3,7 +3,6 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { loadMediaSettings } from '../js/media-settings.ts'
-import { rich } from '../js/rich-text.ts'
 import { getSpaceById } from '../js/space.ts'
 import { removeSpaceFromDevice } from '../js/space-deletion.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
@@ -14,10 +13,7 @@ import { formatBytes } from '../js/utils/bytes.ts'
 import { whatToSay } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
-import './drive-sync-panel.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
-import './space-delete-everywhere.ts'
-import type { SpaceDeletedEvent } from './space-delete-everywhere.ts'
 import './space-export-panel.ts'
 
 /**
@@ -123,12 +119,7 @@ export class SpaceManager extends LitElement {
     this._summary = space ? await summaryOf(space.id) : null
   }
 
-  /** Whether syncing can be done now: a team's member needs only a sign-in, everyone else Drive too */
-  get _canSync(): boolean {
-    if (this._signIn === 'signed-in') return true
-    return this._signIn === 'no-drive' && isTeamMember(this._space)
-  }
-
+  /** Signed in with Google Drive: an export can take the pad audio kept there */
   get _signedInWithDrive(): boolean {
     return this._signIn === 'signed-in'
   }
@@ -171,9 +162,6 @@ export class SpaceManager extends LitElement {
     const kind = spaceKind(space)
     const role = spaceRole(space)
     const summary = this._summary
-    // A space held by the server (a church's team, or a Personal space that moved) has no Drive copy to restore from; a church's
-    // team is not deleted everywhere from here either (its admin deletes it, on the churches page). Nothing is said of it:
-    // Chordless is the usual, so a panel announcing it would be noise
     return html`
       <div class="content">
         <div class="head">
@@ -191,29 +179,6 @@ export class SpaceManager extends LitElement {
               })}
             </p>`
             : nothing
-        }
-
-        ${
-          space.team?.churchId || space.server
-            ? nothing
-            : html`        <div class="panel">
-          <h3>${isTeamMember(space) ? t('space-copy-team-heading') : t('space-copy-drive-heading')}</h3>
-          <p>
-            ${isTeamMember(space) ? t('space-copy-team-text') : t('space-copy-drive-text')}
-          </p>
-          <drive-sync-panel .space=${space} ?disabled=${!this._canSync}></drive-sync-panel>
-          ${
-            this._canSync
-              ? nothing
-              : this._signIn === 'no-drive'
-                ? html`<p class="hint">
-                  ${rich('space-drive-not-connected', undefined, {
-                    connect: words => html`<a href="/account">${words}</a>`,
-                  })}
-                </p>`
-                : html`<p class="hint">${t('space-sync-sign-in-hint')}</p>`
-          }
-        </div>`
         }
 
         <div class="panel">
@@ -238,29 +203,6 @@ export class SpaceManager extends LitElement {
           ${this._error ? html`<p class="error" role="alert">${t('space-delete-failed', { reason: this._error })}</p>` : nothing}
         </div>
 
-        ${
-          space.team?.churchId
-            ? nothing
-            : html`<div class="panel danger-zone">
-          <h3>${t('space-delete-everywhere-heading')}</h3>
-          <p>
-            ${rich(
-              space.team ? 'space-delete-everywhere-text-team' : 'space-delete-everywhere-text',
-              undefined,
-              {
-                em: words => html`<em>${words}</em>`,
-              }
-            )}
-          </p>
-          <space-delete-everywhere
-            .space=${space}
-            .summary=${this._summary}
-            .signIn=${this._signIn}
-            @space-delete-everywhere:deleted=${(event: SpaceDeletedEvent) =>
-              this.dispatchEvent(new SpaceGoneEvent(event.wasCurrent))}
-          ></space-delete-everywhere>
-        </div>`
-        }
       </div>
       <app-modal
         ${ref(this._deleteModal)}
