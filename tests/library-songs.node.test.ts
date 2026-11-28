@@ -188,6 +188,17 @@ test('library song bundles are private, versioned and stored under their library
   )
   assert.equal(index.status, 200)
   assert.equal(index.headers.get('cache-control'), 'private, no-store')
+  // the songs are the church's, so a team being archived does not stop a device's songs syncing
+  sql.prepare("UPDATE teams SET ended_at = '2026-11-01' WHERE space_id = 'team-a'").run()
+  assert.equal(
+    (
+      await handleLibrarySongs(
+        await request('reader', 'GET', '/api/teams/team-a/library/songs'),
+        env
+      )
+    ).status,
+    200
+  )
   assert.equal(
     ((await index.json()) as { songs: { songUuid: string }[] }).songs[0]?.songUuid,
     'song-1'

@@ -141,7 +141,7 @@ export async function authorizeLibrary(
           await db
             .prepare(`SELECT l.library_id FROM teams t JOIN churches c ON c.church_id = t.church_id
           JOIN libraries l ON l.church_id = c.church_id JOIN church_members m ON m.church_id = c.church_id
-          WHERE t.space_id = ? AND t.ended_at IS NULL AND c.ended_at IS NULL AND m.account_id = ?`)
+          WHERE t.space_id = ? AND c.ended_at IS NULL AND m.account_id = ?`)
             .bind(scopeId, identity.sub)
             .first<{ library_id: string }>()
         )?.library_id
