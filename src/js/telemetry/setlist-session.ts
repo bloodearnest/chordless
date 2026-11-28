@@ -38,6 +38,8 @@ export interface SetlistOpened {
   settledMs?: number
   /** Elements in the page (the songs' shadow roots too), a measure of how much there is to lay out */
   domElements?: number
+  /** How many songs were drawn at first: the ones near the one in view, not all (docs/LAZY_SONGS.md) */
+  drawn?: number
 }
 
 /** The first seconds after opening, when the other songs are laid out behind the one in view */
@@ -109,6 +111,7 @@ export function startSetlistSession(opened: SetlistOpened): void {
     ...(opened.domElements === undefined
       ? {}
       : { 'chordless.setlist.dom_elements': opened.domElements }),
+    ...(opened.drawn === undefined ? {} : { 'chordless.setlist.drawn': opened.drawn }),
     'chordless.setlist.id': opened.setlistId,
     'chordless.setlist.date': opened.date,
     'chordless.setlist.songs': opened.songs,

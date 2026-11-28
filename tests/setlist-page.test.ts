@@ -98,6 +98,9 @@ describe('the setlist page', () => {
     await page.start()
     // The page finishes setting up (selectors, the observer of the song in view) in the next frame
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+    // The page draws only the songs near the one in view (docs/LAZY_SONGS.md). These tests are about
+    // what reaches every song, so every one is drawn
+    for (let index = 0; index < page.songs.length; index++) await page._drawSong(index)
     return setlist
   }
 

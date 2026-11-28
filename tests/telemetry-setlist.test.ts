@@ -88,6 +88,17 @@ describe('opening a setlist', () => {
     expect(unknown.attributes).to.not.have.property('chordless.setlist.scores')
   })
 
+  it('says how many songs were drawn at first (the ones near the one in view), when that is known', () => {
+    startSetlistSession(opened({ drawn: 5, songs: 16 }))
+    startSetlistSession(opened())
+    const [known, unknown] = named('chordless.setlist.open')
+    expect(known.attributes).to.include({
+      'chordless.setlist.drawn': 5,
+      'chordless.setlist.songs': 16,
+    })
+    expect(unknown.attributes).to.not.have.property('chordless.setlist.drawn')
+  })
+
   it('says what drawing the setlist cost, when that is known', () => {
     startSetlistSession(opened({ firstPaintMs: 210.6, settledMs: 840.2, domElements: 5123 }))
     startSetlistSession(opened())

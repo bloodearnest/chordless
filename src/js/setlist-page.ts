@@ -90,6 +90,7 @@ import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setli
 import { isJump } from './setlist/scroll-distance.ts'
 import { SectionController } from './setlist/section-controller.ts'
 import { SetlistHeader } from './setlist/setlist-header.ts'
+import { songsToDraw } from './setlist/song-window.ts'
 import { controlsSetlist } from './setlist-control.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
 import { songSelectLink } from './songselect-link.ts'
@@ -195,6 +196,13 @@ export class SetlistPage {
   _setlistDeleteHandler?: (event: SetlistInfoDeleteEvent) => void
   _setlistMoveHandler?: (event: SetlistInfoMoveEvent) => void
   _identifyHandler?: (event: SetlistDetailsIdentifyEvent) => void
+  /** Songs to draw next, nearest to the one in view first, one a frame (docs/LAZY_SONGS.md) */
+  _drawQueue: number[] = []
+  _drawFrame = 0
+  /** How many songs were drawn when the setlist was first shown, for the report of it opening */
+  _drawnAtOpen = 0
+  /** How far a song that was not drawn yet was scrolled, to put back when it is (by its section's id) */
+  _scrollsWhenDrawn = new Map<string, number>()
   _lastVisibleSection?: string | null
   _isProgrammaticScroll?: boolean
   _programmaticScrollTimeout?: ReturnType<typeof setTimeout>
@@ -348,15 +356,17 @@ export class SetlistPage {
   }
 
   /**
-   * What drawing the setlist took, which `openMs` leaves out: every song is in the page at once, and
-   * a browser without `content-visibility` (Safari before 18) lays all of them out. The first paint
-   * is when something could be seen; settled is when every song's display has rendered and the
-   * browser has painted after it. Nothing is measured when reports are off.
+   * What drawing the setlist took, which `openMs` leaves out: the songs near the one in view are
+   * drawn (docs/LAZY_SONGS.md; every song was, before, and a browser without `content-visibility`,
+   * Safari before 18, laid all of them out). The first paint is when something could be seen;
+   * settled is when the displays drawn by then have rendered and the browser has painted after
+   * it. Nothing is measured when reports are off.
    */
   async _timeDrawing(timeoutMs?: number): Promise<{
     firstPaintMs?: number
     settledMs?: number
     domElements?: number
+    drawn?: number
   }> {
     if (!getTelemetryPreference()) return {}
     const first = await afterPaint(timeoutMs)
@@ -373,6 +383,7 @@ export class SetlistPage {
       ...(first === null ? {} : { firstPaintMs: first - this._createdAt }),
       ...(settled === null ? {} : { settledMs: settled - this._createdAt }),
       domElements,
+      drawn: this._drawnAtOpen,
     }
   }
 
@@ -422,7 +433,12 @@ export class SetlistPage {
       // (songs start at their top, the one shown apart)
       if (getScrollToTopOnSwipe() && id !== this._lastVisibleSection) continue
       const section = this.root.querySelector<HTMLElement>(`#${id}`)
-      if (section) section.scrollTop = top
+      if (!section) continue
+      section.scrollTop = top
+      // (a song not drawn yet has nothing to scroll: put back when it is)
+      if (id.startsWith('song-') && !this._songDrawn(Number(id.slice(5)))) {
+        this._scrollsWhenDrawn.set(id, top)
+      }
     }
   }
 
@@ -468,6 +484,8 @@ export class SetlistPage {
     this._abort.abort()
     this.sectionObserver?.disconnect()
     clearTimeout(this._programmaticScrollTimeout)
+    cancelAnimationFrame(this._drawFrame)
+    this._drawQueue = []
 
     // A drag in progress, and the listeners for the next
     this.overview.dispose()
@@ -579,6 +597,10 @@ export class SetlistPage {
       container.textContent = ''
       const fragment = this.renderFullSetlist(songs)
       container.appendChild(fragment)
+      // (the song to show is drawn now, before it is scrolled to; the ones near it follow)
+      const shown = shouldShowSongDirectly ? songIndex : -1
+      this._drawnAtOpen = songsToDraw(shown, songs.length).length
+      void this._drawAround(shown)
       this.sections.applyAll(container)
 
       // If going directly to a song, scroll to it immediately (before layout/paint)
@@ -656,6 +678,86 @@ export class SetlistPage {
     this.navigateTo(-1, { replace: true })
   }
 
+  /** A song's chart, as the page has capo, tuning, pitch and annotations now */
+  _makeSongDisplay(song: RuntimeSong, index: number): SongDisplay {
+    const display = document.createElement('song-display')
+    display.parsed = song.parsed
+    display.songIndex = song.songIndex
+    display.capo = this._capoEnabled ? song.currentCapo || 0 : 0
+    display.tuning = this._tuningForDisplay()
+    display.pitch = this._pitchForDisplay(song)
+    display.annotations = this.annotations.chartAnnotations(index)
+    return display
+  }
+
+  /** Whether a song has its chart in the page yet (docs/LAZY_SONGS.md) */
+  _songDrawn(index: number): boolean {
+    return this.root.querySelector(`#song-${index} song-display`) !== null
+  }
+
+  /**
+   * Put a song's chart in its place in the row. The chart is in the page when this returns its
+   * promise (what has to wait for the chart to be drawn waits for that), and the song is drawn the
+   * same way as one drawn again after an edit: with the section states, and as its lead sheet
+   * if it is shown as one. Nothing if it is already drawn, or has no chart.
+   */
+  async _drawSong(index: number): Promise<void> {
+    const song = this.songs[index]
+    const section = this.root.querySelector<HTMLElement>(`#song-${index}`)
+    const content = section?.querySelector<HTMLElement>('.song-content')
+    if (!song?.parsed || !section || !content || this._songDrawn(index)) return
+    const display = this._makeSongDisplay(song, index)
+    content.appendChild(display)
+    if (song.missing) {
+      const note = document.createElement('p')
+      note.textContent = t('space-data-missing-song')
+      const link = document.createElement('a')
+      link.href = songSelectLink({ title: song.title, ccli: song.ccliNumber ?? null })
+      link.target = '_blank'
+      link.rel = 'noopener'
+      link.textContent = t('space-data-get-song')
+      content.append(note, link)
+    }
+    // Wait for Lit to render the shadow DOM contents
+    await display.updateComplete
+    if (this._disposed) return
+    await customElements.whenDefined('song-section')
+    this.sections.applyAll(section)
+    const top = this._scrollsWhenDrawn.get(section.id)
+    if (top !== undefined) {
+      this._scrollsWhenDrawn.delete(section.id)
+      section.scrollTop = top
+    }
+    if (this._melodyOn.has(index)) await this.applyMelodyMode(index)
+  }
+
+  /**
+   * Have the songs near song `index` (-1: the overview) drawn: that one at once, if it is not, as
+   * it is about to be seen, and the ones it will swipe to one to a frame after it, nearest first,
+   * so that no frame has to draw more than a song. What the last call left to do is dropped:
+   * the person has gone somewhere else. Songs far from the one in view are left as they are.
+   */
+  _drawAround(index: number): Promise<void> {
+    // (a page that has been left draws nothing: its elements are gone, or going)
+    if (this._disposed) return Promise.resolve()
+    const todo = songsToDraw(index, this.songs.length).filter(wanted => !this._songDrawn(wanted))
+    const urgent = todo[0] === index ? todo.shift() : undefined
+    this._drawQueue = todo
+    this._drawNext()
+    return urgent === undefined ? Promise.resolve() : this._drawSong(urgent)
+  }
+
+  _drawNext(): void {
+    cancelAnimationFrame(this._drawFrame)
+    if (this._drawQueue.length === 0) return
+    // (dispose() cancels the frame, and _drawAround does not ask for one after it)
+    this._drawFrame = requestAnimationFrame(() => {
+      const next = this._drawQueue.shift()
+      if (next !== undefined) void this._drawSong(next)
+      this._drawNext()
+    })
+  }
+
   renderFullSetlist(songs: RuntimeSong[]) {
     const fragment = document.createDocumentFragment()
 
@@ -673,32 +775,15 @@ export class SetlistPage {
     overview.appendChild(songContentWrapper)
     fragment.appendChild(overview)
 
-    // Render all songs
+    // A place in the row for every song, with the chart of those near the one in view
     songs.forEach((song, index) => {
       const songElement = document.createElement('div')
       songElement.classList.add('section')
       songElement.id = `song-${index}`
+      // (its chart is put in when it is near the one in view: _drawAround)
       if (song.parsed) {
-        const songDisplay = document.createElement('song-display')
-        songDisplay.parsed = song.parsed
-        songDisplay.songIndex = song.songIndex
-        songDisplay.capo = this._capoEnabled ? song.currentCapo || 0 : 0
-        songDisplay.tuning = this._tuningForDisplay()
-        songDisplay.pitch = this._pitchForDisplay(song)
-        songDisplay.annotations = this.annotations.chartAnnotations(index)
         const songContent = document.createElement('div')
         songContent.className = 'song-content'
-        songContent.appendChild(songDisplay)
-        if (song.missing) {
-          const note = document.createElement('p')
-          note.textContent = t('space-data-missing-song')
-          const link = document.createElement('a')
-          link.href = songSelectLink({ title: song.title, ccli: song.ccliNumber ?? null })
-          link.target = '_blank'
-          link.rel = 'noopener'
-          link.textContent = t('space-data-get-song')
-          songContent.append(note, link)
-        }
         songElement.appendChild(songContent)
       }
       fragment.appendChild(songElement)
@@ -1104,6 +1189,9 @@ export class SetlistPage {
 
     if (!section || !container) return
 
+    // The song is drawn before it is scrolled to, so no frame shows it empty
+    void this._drawAround(newIndex)
+
     // Disable observer during programmatic scroll
     this._isProgrammaticScroll = true
 
@@ -1178,6 +1266,7 @@ export class SetlistPage {
 
           if (sectionId === 'overview') {
             this.currentSongIndex = -1
+            void this._drawAround(-1)
             this.header.show(null, false) // animate=true for smooth transition
             this.dispatchSongChange(null)
             this._replaceHistoryForOverview()
@@ -1186,6 +1275,7 @@ export class SetlistPage {
             if (index >= 0 && index < this.songs.length) {
               this.overview.setEditMode(false)
               this.currentSongIndex = index
+              void this._drawAround(index)
               this.header.show(this.songs[index], false) // animate=true for smooth transition
               this.dispatchSongChange(this.songs[index])
               this._replaceHistoryForSong(index)
@@ -1710,6 +1800,8 @@ export class SetlistPage {
 
       // Re-apply section states with new indices
       this.sections.applyAll()
+      // (the songs near the one in view are others now)
+      void this._drawAround(this.currentSongIndex)
     }
 
     this.overview.refreshSongs()
@@ -1767,22 +1859,17 @@ export class SetlistPage {
     song.currentBPM = currentBPM
     this.overview.refreshSongs()
 
-    // Update DOM
+    // Update DOM (a song not drawn yet is drawn with the new text when it is: nothing to draw again)
+    const drawn = this._songDrawn(songIndex)
     const songSection = this.root.querySelector<HTMLElement>(`#song-${songIndex}`)
-    if (songSection) {
+    if (songSection && drawn) {
       const songContent = songSection.querySelector<HTMLElement>('.song-content')
       if (songContent) {
         // (a song shown as its lead sheet keeps it through being drawn again, in place of the lyrics:
         // the sheet is made again for the new key when it is ready)
         const sheet = this._melodyOn.has(songIndex) ? shownSheet(songContent) : null
         songContent.textContent = ''
-        const songDisplay = document.createElement('song-display')
-        songDisplay.parsed = song.parsed
-        songDisplay.songIndex = song.songIndex
-        songDisplay.capo = this._capoEnabled ? song.currentCapo || 0 : 0
-        songDisplay.tuning = this._tuningForDisplay()
-        songDisplay.pitch = this._pitchForDisplay(song)
-        songDisplay.annotations = this.annotations.chartAnnotations(songIndex)
+        const songDisplay = this._makeSongDisplay(song, songIndex)
         songContent.appendChild(songDisplay)
         if (sheet) keepSheet(songContent, songDisplay, sheet)
 
@@ -1799,7 +1886,7 @@ export class SetlistPage {
     }
 
     // The melody sheet, if the song is shown as one, is made again with the lyrics
-    await this.applyMelodyMode(songIndex)
+    if (drawn) await this.applyMelodyMode(songIndex)
 
     // Update header
     if (this.currentSongIndex === songIndex) {
@@ -1851,6 +1938,7 @@ export class SetlistPage {
   /** Make the song's section show what its mode says: the lyrics, or the melody sheet in the song's key */
   async applyMelodyMode(index: number): Promise<void> {
     const song = this.songs[index]
+    if (song && !this._songDrawn(index)) await this._drawSong(index)
     const content = this.root.querySelector<HTMLElement>(`#song-${index} .song-content`)
     if (!song || !content) return
     const melody = await this.melodyOf(song)
