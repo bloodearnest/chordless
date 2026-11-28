@@ -14,7 +14,7 @@ import {
 import { type ListedSong, songListHtml, songListText } from '../js/setlist/song-list-text.ts'
 import { shareUrl } from '../js/share-crypto.ts'
 import { createShare, refreshShare, stopShare } from '../js/share-manager.ts'
-import { getCurrentSpace, getSpaceById } from '../js/space.ts'
+import { getCurrentSpace, getSpaceById, onChordless } from '../js/space.ts'
 import { workerConnection } from '../js/storage/space-storage.ts'
 import { createSyncManager, isSyncAvailable } from '../js/sync-manager.ts'
 import { t } from '../js/text.ts'
@@ -211,7 +211,7 @@ export class SetlistShare extends LitElement {
   declare linkable: boolean
   declare _mode: 'link' | 'list'
   declare _available: boolean
-  /** The setlist's space has moved to Chordless's server: its links are of Drive, which it has left (until step 6 of docs/CENTRAL_STORAGE.md) */
+  /** The setlist's space is on Chordless (moved, or a church's team): its links are the Worker's, not Drive's */
   declare _moved: boolean
   /** Whether it is known yet if the space is stored on Chordless (until then the dialog does not say which way to share) */
   declare _knowsSpace: boolean
@@ -248,7 +248,7 @@ export class SetlistShare extends LitElement {
   /** Whether the setlist's space is stored on Chordless: the dialog says nothing of how to share until it is known */
   async _askSpace() {
     const space = await getSpaceById(this.db?.spaceId ?? getCurrentSpace().id)
-    this._moved = Boolean(space?.server)
+    this._moved = onChordless(space)
     this._knowsSpace = true
   }
 

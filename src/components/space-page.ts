@@ -53,6 +53,7 @@ export class SpacePage extends LitElement {
         margin: 0 auto;
       }
       a.back { text-decoration: none; align-self: flex-start; color: inherit; opacity: 0.8; }
+      a.btn { text-decoration: none; align-self: flex-start; }
       h2 { font-size: var(--font-ui); margin: 0; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
       .label {
         font-size: var(--font-ui-small);
@@ -121,13 +122,19 @@ export class SpacePage extends LitElement {
         ${kind ? html`<span class="label">${kind}</span>` : nothing}
         ${role ? html`<span class="label">${role}</span>` : nothing}
       </h2>
-      <people-list .space=${space}></people-list>
       ${
-        space.team
-          ? html`<team-membership-panel .space=${space}></team-membership-panel>
-            <team-licence-panel .space=${space}></team-licence-panel>
-            <team-storage-panel .space=${space}></team-storage-panel>`
-          : nothing
+        // (a church's team: its people, roles, licence and storage are the church's, kept on Chordless, not the team's in Drive)
+        space.team?.churchId
+          ? html`<p id="church-team">${t('space-page-church')}</p>
+              <a class="btn" id="church-link" href="/account/churches">${t('space-page-church-link')}</a>`
+          : html`<people-list .space=${space}></people-list>
+              ${
+                space.team
+                  ? html`<team-membership-panel .space=${space}></team-membership-panel>
+                    <team-licence-panel .space=${space}></team-licence-panel>
+                    <team-storage-panel .space=${space}></team-storage-panel>`
+                  : nothing
+              }`
       }
     </div>`
   }

@@ -13,7 +13,7 @@ import { DataChangeEvent } from './data-changes.ts'
 import { getSignInState } from './google-auth.ts'
 import { lastSyncOf, recordSync } from './last-sync.ts'
 import { getLive } from './live.ts'
-import { getCurrentSpace, getCurrentSpaceFull } from './space.ts'
+import { getCurrentSpace, getCurrentSpaceFull, onChordless } from './space.ts'
 import { isTeamMember, storageFor } from './storage/space-storage.ts'
 import { switchCurrentSpaceIfMoved } from './switch-to-chordless.ts'
 import { createSyncOrchestrator, type SyncTrigger } from './sync-orchestrator.ts'
@@ -294,8 +294,8 @@ async function currentState(): Promise<SyncState> {
   if (!space.team && !space.server && (await switchCurrentSpaceIfMoved(space))) {
     space = await getCurrentSpaceFull()
   }
-  // (a space that has moved to the server is never synced with Drive again, though its folder is still known)
-  if (!space.rootRef || space.server) return 'unavailable'
+  // (a space on Chordless, a moved Personal space or a church's team, is never synced with Drive, though a folder may be known)
+  if (!space.rootRef || onChordless(space)) return 'unavailable'
   const signIn = await getSignInState()
   if (signIn === 'expired') return 'expired'
   const canSync = signIn === 'signed-in' || (signIn === 'no-drive' && isTeamMember(space))

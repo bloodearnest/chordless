@@ -134,6 +134,14 @@ export function syncsBack(space?: Pick<Space, 'readOnly'>): boolean {
 }
 
 /** A space by its id, if this device has it (there is none for no id) */
+/**
+ * Whether the space is kept on Chordless, not in Google Drive: a Personal space that has moved (`server`), or a church's
+ * team (`team.churchId`). It syncs with the Worker, and never with Drive (docs/CENTRAL_STORAGE.md)
+ */
+export function onChordless(space: Pick<Space, 'server' | 'team'> | null | undefined): boolean {
+  return Boolean(space?.server || space?.team?.churchId)
+}
+
 export async function getSpaceById(spaceId: string | null): Promise<Space | undefined> {
   return spaceId ? (await getSpaceDB()).getSpace(spaceId) : undefined
 }
