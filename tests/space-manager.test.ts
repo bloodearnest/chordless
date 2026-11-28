@@ -130,13 +130,12 @@ describe('space-manager', () => {
     expect(has(el, 'team-membership-panel')).to.equal(false)
   })
 
-  it('says a team that is a church’s is stored on Chordless: no Drive copy to restore from, and no deleting it everywhere from here', async () => {
+  it('offers a church’s team no Drive copy to restore from and no deleting it everywhere, and says nothing of it', async () => {
     const team = await space('Church team', {
       team: { id: 'space-hhhh8888', role: 'admin', churchId: 'church' },
     })
     const el = await page(team.id)
-    expect(has(el, '#server-panel')).to.equal(true)
-    expect(text(el)).to.contain('belongs to your church')
+    expect(has(el, '#server-panel')).to.equal(false)
     expect(has(el, 'drive-sync-panel')).to.equal(false)
     expect(has(el, 'space-delete-everywhere')).to.equal(false)
     // (it can still be exported, and taken off this device)

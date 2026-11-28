@@ -171,9 +171,8 @@ export class SpaceManager extends LitElement {
     const kind = spaceKind(space)
     const role = spaceRole(space)
     const summary = this._summary
-    // Held by the server: a Personal space that moved, or a team that is a church's now. Neither has a Drive copy to restore
-    // from, and neither is deleted everywhere from here (a church's team is deleted by its admin, on the churches page)
-    const onChordless = Boolean(space.server || space.team?.churchId)
+    // A church's team is held by the server, and there are no Drive teams to speak of: it has no Drive copy to restore from, and
+    // it is not deleted everywhere from here (its admin deletes it, on the churches page). Nothing is said of it: that is usual
     return html`
       <div class="content">
         <div class="head">
@@ -194,12 +193,14 @@ export class SpaceManager extends LitElement {
         }
 
         ${
-          onChordless
-            ? html`<div class="panel" id="server-panel">
+          space.team?.churchId
+            ? nothing
+            : space.server
+              ? html`<div class="panel" id="server-panel">
                 <h3>${t('space-copy-server-heading')}</h3>
-                <p>${t(space.team?.churchId ? 'space-copy-church-text' : 'space-copy-server-text')}</p>
+                <p>${t('space-copy-server-text')}</p>
               </div>`
-            : html`        <div class="panel">
+              : html`        <div class="panel">
           <h3>${isTeamMember(space) ? t('space-copy-team-heading') : t('space-copy-drive-heading')}</h3>
           <p>
             ${isTeamMember(space) ? t('space-copy-team-text') : t('space-copy-drive-text')}
