@@ -95,6 +95,11 @@ export class SpaceDataAutoSync {
 
 /** How many automatic attempts in a row fail to reach the server before it is worth telling the person */
 export const NETWORK_FAILURES_BEFORE_TOAST = 3
+/**
+ * ... over at least this long: a phone's page coming back from the background has no network for a moment, and
+ * what that starts (the resume, an online event, an edit) can fail three times in as many seconds
+ */
+export const NETWORK_FAILURES_SPAN_MS = 2 * 60 * 1000
 
 /** The browser's wording for a request that did not get to the server (Chrome, Safari, Firefox) */
 export function isNetworkFailure(error: unknown): boolean {
@@ -111,15 +116,26 @@ export function isNetworkFailure(error: unknown): boolean {
  * keeps happening. Anything else is told at once, once for each reason until a sync works.
  */
 export class BackgroundSyncFailures {
-  #unreachable = new Map<string, number>()
+  #unreachable = new Map<string, { count: number; since: number }>()
   #told = new Map<string, string>()
+  readonly #now: () => number
+
+  constructor(now: () => number = Date.now) {
+    this.#now = now
+  }
 
   /** The reason to tell the person of, or null to say nothing now */
   failed(spaceId: string, error: unknown): string | null {
     if (isNetworkFailure(error)) {
-      const count = (this.#unreachable.get(spaceId) ?? 0) + 1
-      this.#unreachable.set(spaceId, count)
-      if (count < NETWORK_FAILURES_BEFORE_TOAST) return null
+      const now = this.#now()
+      const streak = this.#unreachable.get(spaceId) ?? { count: 0, since: now }
+      streak.count++
+      this.#unreachable.set(spaceId, streak)
+      if (
+        streak.count < NETWORK_FAILURES_BEFORE_TOAST ||
+        now - streak.since < NETWORK_FAILURES_SPAN_MS
+      )
+        return null
     }
     const reason = errorMessage(error)
     if (this.#told.get(spaceId) === reason) return null

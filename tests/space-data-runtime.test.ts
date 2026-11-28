@@ -4,6 +4,7 @@ import {
   BackgroundSyncFailures,
   isNetworkFailure,
   NETWORK_FAILURES_BEFORE_TOAST,
+  NETWORK_FAILURES_SPAN_MS,
   SpaceDataAutoSync,
 } from '../src/js/space-data-runtime.ts'
 import { SpaceOutboxChangedEvent } from '../src/js/space-data-store.ts'
@@ -102,10 +103,14 @@ describe('which background sync failures are told', () => {
     expect(isNetworkFailure(new TypeError('x is not a function'))).to.equal(false)
   })
 
-  it('tells of an unreachable server only when it keeps happening, and once', () => {
-    const failures = new BackgroundSyncFailures()
+  it('tells of an unreachable server only when it keeps happening for a while, and once', () => {
+    let now = 0
+    const failures = new BackgroundSyncFailures(() => now)
     for (let i = 1; i < NETWORK_FAILURES_BEFORE_TOAST; i++)
       expect(failures.failed('a', unreachable())).to.equal(null)
+    // (many failures in a moment, as a page waking up on a phone has: not yet)
+    expect(failures.failed('a', unreachable())).to.equal(null)
+    now = NETWORK_FAILURES_SPAN_MS
     expect(failures.failed('a', unreachable())).to.equal('Failed to fetch')
     expect(failures.failed('a', unreachable())).to.equal(null)
   })
