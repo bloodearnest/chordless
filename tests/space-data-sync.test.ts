@@ -11,6 +11,7 @@ import { mergeSpaceRecord } from '../src/js/space-data-merge.ts'
 import { type SpaceRecord, sharedRecord } from '../src/js/space-data-records.ts'
 import { SpaceDataStore } from '../src/js/space-data-store.ts'
 import type { SpaceData, SpaceOp, SpaceOpResult, SpaceSetlist } from '../src/js/space-data-types.ts'
+import { transactionDone } from '../src/js/utils/idb.ts'
 import { makeAnnotation, makeEntry, makeLocalState, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
 import { deleteDatabase } from './test-helpers.ts'
@@ -309,6 +310,32 @@ describe('D1 device data sync and outbox', () => {
       expect((await store.pending())[0].refusal).to.equal(undefined)
     })
   }
+
+  it('sends a setlist queued with only song ids under the songs the library holds, also one refused for it', async () => {
+    const { db, store } = await ready()
+    await db.saveSong(makeSong({ uuid: 'held-uuid', id: 'ccli-1' }))
+    const record = remote({
+      setlistId: 'old-setlist',
+      songs: [entry('ccli-1', 'G'), entry('placeholder-hash-1')],
+    })
+    const tx = must(db.db).transaction('space_outbox', 'readwrite')
+    tx.objectStore('space_outbox').put({
+      id: 'queued',
+      base: null,
+      change: { kind: 'setlist', id: 'old-setlist', op: 'put', baseVersion: null, record },
+      refusal: { status: 'invalid', reason: 'a song that the church library does not have yet' },
+    })
+    await transactionDone(tx)
+    const setlistOf = async () =>
+      must((await store.pending()).find(waiting => waiting.change.kind === 'setlist'))
+    const sent = await setlistOf()
+    const songs = (sent.change.record as SpaceSetlist).songs
+    expect(songs.map(song => song.songUuid)).to.deep.equal(['held-uuid', 'placeholder-hash-1'])
+    expect(songs[0]).to.include({ songId: 'ccli-1', key: 'G' })
+    expect(sent.refusal).to.equal(undefined)
+    // (kept so: the next look is the same, and a song not held is not asked about again)
+    expect(await setlistOf()).to.deep.equal(sent)
+  })
 
   it('does not retry or disclose a record whose id belongs to another space', async () => {
     const { db, store } = await ready()

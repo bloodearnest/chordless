@@ -1453,6 +1453,8 @@ async function fillEntryMetadata(tx: IDBTransaction, setlist: Setlist): Promise<
       song = variants.find(variant => variant.isDefault) ?? variants[0]
     }
     if (!song) continue
+    // An entry that names only the id is the song's default variant: name it, as the server needs
+    if (!entry.songUuid) entry.songUuid = song.songUuid
     entry.title = song.title
     entry.ccli = song.ccli
   }
