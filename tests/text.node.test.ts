@@ -71,10 +71,6 @@ test('says a message with its values in, and a plural by the count', () => {
     t('toast-teams-added-many', { count: 2, names: 'A, B' }),
     'Added 2 teams you are in: A, B.'
   )
-  assert.match(
-    t('folder-gone-trashed', { name: 'Chordless' }),
-    /^This space's Google Drive folder "Chordless" is in the Drive trash\. Your songs/
-  )
 })
 
 test('says the name of a message there is none of, and says so', () => {

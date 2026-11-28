@@ -220,9 +220,4 @@ export interface StorageBackend {
   space(rootRef: string): SpaceStorage
   /** The pad sets kept in a space's own folder */
   padsIn(rootRef: string): PadStorage
-  /**
-   * How many writes the backend has refused for lack of permission (not for a rate limit), since
-   * it was loaded. The sync asks after a push to find out whether the person can only read.
-   */
-  writeRefusals(): number
 }

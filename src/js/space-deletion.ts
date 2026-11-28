@@ -13,7 +13,6 @@ import type { Space } from './data-types.ts'
 import { trashFile } from './drive-api.ts'
 import { forgetSync } from './last-sync.ts'
 import { deleteSpace, getCurrentSpace, listSpaces, setCurrentSpace, updateSpace } from './space.ts'
-import { storageFor } from './storage/space-storage.ts'
 import { teamApi } from './team-client.ts'
 import { declineTeam } from './team-memberships.ts'
 import { atLeast } from './team-roles.ts'
@@ -27,11 +26,10 @@ export function mayDeleteEverywhere(space: Pick<Space, 'team'>): boolean {
 
 /**
  * Put a personal space's Drive folder in the trash. 'none' if there is no folder to trash: it was
- * never synced from here, and no folder of its name is in the account's Drive. A folder already in
- * the trash is fine.
+ * never synced from here. A folder already in the trash is fine.
  */
 async function trashPersonalFolder(space: Space): Promise<'trashed' | 'none'> {
-  const ref = space.rootRef ?? (await storageFor(space).findRootByName(space.name))?.ref
+  const ref = space.rootRef
   if (!ref) return 'none'
   await trashFile(ref)
   return 'trashed'

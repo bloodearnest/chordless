@@ -1,11 +1,13 @@
 import { expect } from '@open-wc/testing'
+import { driveApi } from '../src/js/drive-api.ts'
 import { ROOT_FOLDER_NAME } from '../src/js/drive-client.ts'
-import { driveStorage } from '../src/js/storage/browser-drive.ts'
-import { forgetKnownFolders } from '../src/js/storage/drive-storage.ts'
+import { createDriveStorage, forgetKnownFolders } from '../src/js/storage/drive-storage.ts'
 import { ChangeTokenLost } from '../src/js/storage/types.ts'
 import { type FakeDrive, installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
 import { describeStorage } from './storage-conformance.ts'
+
+const driveStorage = createDriveStorage(driveApi)
 
 const { afterEach, describe, it } = window
 

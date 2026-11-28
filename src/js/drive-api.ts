@@ -6,8 +6,6 @@ import { createDriveApi } from './drive-client.ts'
 import * as GoogleAuth from './google-auth.ts'
 import { timedFetch } from './telemetry/telemetry.ts'
 
-export { allDrivesUrl } from './drive-client.ts'
-
 // Where Drive access tokens come from. Tests replace this to run without the
 // service worker auth flow (see tests/fake-drive.js).
 type AccessTokenProvider = () => Promise<string>

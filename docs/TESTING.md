@@ -109,33 +109,14 @@ app's own modules, imported directly: there's no build step to test around.
   give records unique names or ids (see `unique()` in `song-utils.test.ts`). Migrations
   are tested by building a database at the old version by hand, then opening it with
   `ChordlessDB` (see `db.test.ts`).
-- **Sync** runs the real `sync-manager.ts` and `sync/*` against a **storage backend** (the storage
-  API, `docs/STORAGE_API.md`). Tests that are about what the engine does use `useSyncRig()` from
-  `drive-harness.ts`: a `MemoryStorage` (`memory-storage.ts`) for each test, and simulated
-  devices (`makeDevice`, each with its own database, syncing one space), teardown, and
-  `addSong`/`editSong`. Two devices syncing through one memory backend is how cross-device
-  behaviour is tested. The backend is reached into with `edit` (a change made elsewhere), `trash`,
-  `restore`, `remove`, `removeRoot`, `rekey` (a file replaced by a copy with another ref), `copyFile`,
-  `fail(op, ...)` (a call that fails, by name, with `times`, `skip`, `on` and `network`),
-  `readOnly`, `corruptWrites`, `clockOffsetMs`, and `writes()` / `clearCalls()` to look at what
-  a sync changed. Every backend must pass `storage-conformance.ts`, which runs on the memory
-  backend and on the Drive adapter, so the fake cannot drift from the real thing.
-  What goes over the wire to Drive is the other half: the Drive adapter
-  (`storage/drive-storage.ts`) and `drive-api.ts` run against **FakeDrive** (`fake-drive.ts`), an
-  in-memory fake of the parts of the Drive v3 API the app uses. It throws on anything it doesn't
-  model rather than guessing, and has its own tests (`fake-drive.test.ts`). The Drive-specific
-  tests (`storage-drive`, `drive-api-*`, the sync panel, the pad sets, the Account and Teams page) use it,
-  and `useFakeDriveRig()` is the same rig as `useSyncRig()` on top of it, with a check that
-  FakeDrive saw nothing it doesn't model. The tests are split by topic: `drive-sync` (setlists, metadata, conflicts, change
-  detection), `drive-sync-resilience` (errors partway, files gone), `drive-sync-space`
-  (spaces, members, read-only folders), `drive-sync-reset`, `drive-sync-songs`, and
-  `share-sync` (share links).
-  `drive-sync-random.test.ts` runs random histories of several devices (creating and editing
-  setlists, syncing, files trashed, restored or re-id'd, resets, failing storage calls) and
-  checks that Drive never holds a setlist twice, that devices end up matching Drive, and that
-  no edit is lost. Each mode is a file of its own (`drive-sync-random-<mode>.test.ts`), so they
-  run side by side; the suite is in `random-histories.ts`. A failure names its seed, which
-  replays the history; raise the constants at the top of `random-histories.ts` for a long hunt.
+- **Sync** with Chordless is tested in pieces: the outbox and the sync of a space (`space-data-*.test.ts`), what the Worker
+  answers (`*.node.test.ts`, which run the real Worker in workerd), and the whole in the browser (`*.playwright.ts`).
+  `device-harness.ts` gives simulated devices (`useDevices()`: `makeDevice`, each with its own database, and `addSetlist`,
+  `addSong`). The Drive that is left (signing in, deleting a moved space's files, the Worker's old share links) runs
+  against **FakeDrive** (`fake-drive.ts`), an in-memory fake of the parts of the Drive v3 API the app uses. It throws on
+  anything it doesn't model rather than guessing, and has its own tests (`fake-drive.test.ts`); `useFakeDriveRig()` installs
+  it for a test, with a check that it saw nothing it doesn't model. Pad sets run against a `MemoryStorage`
+  (`memory-storage.ts`), which `storage-conformance.ts` holds to the same behaviour as the Drive adapter.
 - **Routing** has pure functions (`router.test.ts`: URL to route and back, and how a move
   changes the history), and the runtime, tested with the real History API, shadow DOM and
   clicks (`app-router.test.ts`). Views are tested like components; `home-view.test.ts`

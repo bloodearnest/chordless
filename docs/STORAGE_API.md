@@ -8,9 +8,10 @@ interface is shaped so that it would not mean touching the engine.
 
 **Status (checked 2026-11-12):** built. The interface, the Drive adapter (`src/js/storage/drive-storage.ts`)
 and the in-memory backend (`tests/memory-storage.ts`) pass one conformance suite
-(`tests/storage-conformance.ts`). The sync engine (`sync-manager.ts`, `sync/*`) and the share links
-(`share-manager.ts`) work through the interface, and so do the pad sets (`pad-set-service.ts`); the engine and pad service tests run on the memory backend. Left:
-see "Still on drive-api.ts".
+(`tests/storage-conformance.ts`). The Drive sync engine that used the interface
+(`sync-manager.ts`, `sync/*`) is gone: every space syncs with Chordless (docs/SYNC_ARCHITECTURE.md). The interface and the
+Drive adapter stay for the Worker's own Drive code (a Drive team's routes, which answer "moved" for a church's team) and
+for the pad sets' tests. Left: see "Still on drive-api.ts".
 
 ## The shape
 
@@ -152,8 +153,6 @@ primitives are not enough.
 - **Share links** are Drive-specific on the Worker's side: `/api/share/<id>` reads a Drive file id
   with the sharing key, so a share link works only for Drive-backed spaces (team spaces included,
   as their refs are Drive ids) until that is generalised.
-- **Names**: `sync-manager.ts`, `SyncManager`, `driveStorage` and some messages still say Drive.
-  They are accurate while Drive is the only backend.
 - **`driveClientId`** on the space record is still Drive's (which Google client linked the folder).
 
 The Drive calls are `createDriveApi` (`drive-client.ts`), given a source of access tokens, so the browser

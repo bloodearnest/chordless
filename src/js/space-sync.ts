@@ -3,48 +3,21 @@
  * use (docs/ACCOUNT.md), and notes when it last synced.
  */
 import type { Space } from './data-types.ts'
+import { isAuthenticated } from './google-auth.ts'
 import { recordSync } from './last-sync.ts'
-import { onChordless } from './space.ts'
-import {
-  type BroadcastCallback,
-  createSyncOrchestrator,
-  SyncOrchestrator,
-} from './sync-orchestrator.ts'
+import { t } from './text.ts'
+import { UserError } from './utils/errors.ts'
 
 /**
- * Sync the space with wherever its files are kept.
+ * Sync the space with Chordless (a Personal space still linked to a Drive folder moves there first, and Drive is never
+ * synced again).
  * @returns when it finished (ISO time)
  * @throws the sync's error, for the caller to tell the person
  */
-export async function syncSpaceNow(
-  space: Space,
-  onProgress: BroadcastCallback | null
-): Promise<string> {
-  // A space on Chordless (a moved Personal space, a church's team): it is there it syncs, and never with Drive
-  /* v8 ignore next 5 -- wiring to the server sync of the space, which the Playwright tests run */
-  if (onChordless(space)) {
-    const { syncSpaceDataFor } = await import('./space-data-runtime.ts')
-    await syncSpaceDataFor(space.id, { all: true })
-    return recordSync(space.id)
-  }
-  const orchestrator = await createSyncOrchestrator(space.name, space.id)
-  // (the Sync button of a space's card)
-  await orchestrator.sync(onProgress, 'manual')
-  return recordSync(space.id)
-}
-
-/**
- * Answer an AdoptFolderError (a Personal space whose Drive folder has another name): use that
- * folder (`ref`), or with none make the space's own, and sync.
- * @returns when it finished (ISO time)
- */
-export async function syncSpaceAfterAdoptionAnswer(
-  space: Space,
-  ref: string | null,
-  onProgress: BroadcastCallback | null
-): Promise<string> {
-  const orchestrator = new SyncOrchestrator(space.name, space.id)
-  if (ref) await orchestrator.adoptFolder(ref, onProgress)
-  else await orchestrator.declineAdoption(onProgress)
+/* v8 ignore next 6 -- wiring to the server sync of the space, which the Playwright tests run */
+export async function syncSpaceNow(space: Space): Promise<string> {
+  if (!(await isAuthenticated())) throw new UserError(t('space-sync-sign-in'))
+  const { syncSpaceDataFor } = await import('./space-data-runtime.ts')
+  await syncSpaceDataFor(space.id, { all: true })
   return recordSync(space.id)
 }

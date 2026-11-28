@@ -12,20 +12,15 @@ import {
   deleteSpace,
   getCurrentSpace,
   getSpaceById,
-  listSpaces,
   setCurrentSpace,
   updateSpace,
 } from '../src/js/space.ts'
-import { driveStorage } from '../src/js/storage/browser-drive.ts'
-import { isTeamMember, storageFor } from '../src/js/storage/space-storage.ts'
-import { TeamStorage } from '../src/js/storage/team-storage.ts'
-import { createSyncManager, isSyncAvailable } from '../src/js/sync-manager.ts'
+import { isTeamMember } from '../src/js/storage/space-storage.ts'
 import { teamApi } from '../src/js/team-client.ts'
 import { outranks } from '../src/js/team-roles.ts'
-import { createTeamSpace, inviteLink, joinSpace, learnOfMove } from '../src/js/team-spaces.ts'
+import { inviteLink, learnOfMove } from '../src/js/team-spaces.ts'
 import { TeamError } from '../src/js/worker-call.ts'
 import { type FakeAuthWorker, installFakeAuthWorker, sessionFor } from './fake-auth-worker.ts'
-import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -234,189 +229,27 @@ describe('team spaces on this device', () => {
     })
   })
 
-  describe('which backend a space uses', () => {
-    it('is Drive for a space of one’s own, and for the owner of a team space', () => {
-      expect(storageFor(undefined)).to.equal(driveStorage)
-      expect(storageFor({})).to.equal(driveStorage)
-      expect(storageFor({ team: { id: 't', role: 'owner' } })).to.equal(driveStorage)
+  describe('a team’s member', () => {
+    it('is anyone in a team but its owner', () => {
+      expect(isTeamMember(undefined)).to.equal(false)
+      expect(isTeamMember({})).to.equal(false)
       expect(isTeamMember({ team: { id: 't', role: 'owner' } })).to.equal(false)
-    })
-
-    it('is Drive when there is no space to ask about', async () => {
-      expect(await getSpaceById(null)).to.equal(undefined)
-      expect(await getSpaceById('no-such-space')).to.equal(undefined)
-    })
-
-    it('is the Worker for anyone else in a team space', () => {
       for (const role of ['admin', 'writer', 'reader'] as const) {
-        const backend = storageFor({ team: { id: 't', role } })
-        expect(backend).to.be.instanceOf(TeamStorage)
         expect(isTeamMember({ team: { id: 't', role } })).to.equal(true)
       }
     })
 
-    it('reaches the Worker with the ID token, using the page’s fetch of the moment', async () => {
-      routes['GET /api/space/t/root'] = () =>
-        json({ ref: 't', name: 'Church', trashed: false, canWrite: true })
-      const root = await storageFor({ team: { id: 't', role: 'writer' } }).inspectRoot('t')
-      expect(root?.name).to.equal('Church')
-      expect(requests[0].headers.get('Authorization')).to.equal(`Bearer ${ID_TOKEN}`)
-    })
-
-    it('is what sync is created with, and what says it is available, for a member', async () => {
-      const mine = await space('Joined', {
-        rootRef: 'team-1',
-        team: { id: 'team-1', role: 'writer' },
-      })
-      await setCurrentSpace(mine.id, mine.name)
-      routes['GET /api/space/team-1/root'] = () =>
-        json({ ref: 'team-1', name: mine.name, trashed: false, canWrite: true })
-
-      expect(await isSyncAvailable()).to.equal(true)
-      const manager = await createSyncManager(mine.name, mine.id)
-      expect(manager.storage).to.be.instanceOf(TeamStorage)
-      expect(manager.rootRef).to.equal('team-1')
-      manager.db.db?.close()
-
-      // (with no space named, it is the current one's)
-      const current = await createSyncManager(mine.name, null)
-      expect(current.storage).to.be.instanceOf(TeamStorage)
-      current.db.db?.close()
+    it('has no space to ask about when there is none', async () => {
+      expect(await getSpaceById(null)).to.equal(undefined)
+      expect(await getSpaceById('no-such-space')).to.equal(undefined)
     })
   })
 
-  describe('creating a team space', () => {
-    const folders = () => {
-      const made: [string, string][] = []
-      return {
-        made,
-        createTeamFolder: async (parentId: string, name: string) => {
-          made.push([parentId, name])
-          return 'new-folder'
-        },
-      }
-    }
-
-    it('makes a folder in the picked parent, registers it, and keeps a space of its own for it', async () => {
-      routes['POST /api/spaces'] = () => json({ spaceId: 'space-bbbb2222', role: 'owner' })
-      const drive = folders()
-      const name = unique('St Mary’s')
-
-      const created = await createTeamSpace(`  ${name} `, 'picked-parent', drive)
-      made.push(created.id)
-      expect(drive.made).to.deep.equal([['picked-parent', `${name} Chordless`]])
-      expect(requests[0].body).to.deep.equal({ rootRef: 'new-folder', name })
-      expect(created.name).to.equal(name)
-      expect(created.rootRef).to.equal('new-folder')
-      expect(created.team).to.deep.equal({ id: 'space-bbbb2222', role: 'owner' })
-    })
-
-    it('keeps the CCLI licence number if given, tidied, and none if not', async () => {
-      routes['POST /api/spaces'] = () => json({ spaceId: 'space-eeee5555', role: 'owner' })
-      const withNumber = await createTeamSpace(unique('Licensed'), 'p', folders(), {
-        ccliLicence: ' CCLI Licence No: 123 4567 ',
-      })
-      made.push(withNumber.id)
-      expect(withNumber.ccliLicence).to.equal('1234567')
-      const without = await createTeamSpace(unique('Unlicensed'), 'p', folders(), {
-        ccliLicence: '  ',
-      })
-      made.push(without.id)
-      expect('ccliLicence' in without).to.equal(false)
-    })
-
-    it('tidies a licence number without judging it', () => {
-      expect(cleanLicence(undefined)).to.equal('')
-      expect(cleanLicence('#2345678')).to.equal('2345678')
-      expect(cleanLicence('CCLI 98 76 54')).to.equal('987654')
-      expect(cleanLicence('AB-12')).to.equal('AB-12')
-    })
-
-    it('does not touch the personal space, and renames only if the name is taken here', async () => {
-      routes['POST /api/spaces'] = () => json({ spaceId: 'space-cccc3333', role: 'owner' })
-      const mine = await space('Church')
-      const created = await createTeamSpace(mine.name, 'p', folders())
-      made.push(created.id)
-      expect(created.id).to.not.equal(mine.id)
-      expect(created.name).to.equal(`${mine.name} (team)`)
-      expect((await getSpaceById(mine.id))?.team).to.equal(undefined)
-    })
-
-    it('leaves no space here when the Worker refuses, and asks for a name and a sign-in', async () => {
-      const message = (work: Promise<unknown>) =>
-        work.then(
-          () => '',
-          error => (error as Error).message
-        )
-      routes['POST /api/spaces'] = () => json({ error: 'No' }, 403)
-      const before = (await listSpaces()).length
-      expect(await message(createTeamSpace(unique('Refused'), 'p', folders()))).to.equal('No')
-      expect((await listSpaces()).length).to.equal(before)
-
-      expect(await message(createTeamSpace('  ', 'p', folders()))).to.match(/needs a name/)
-      worker.stored = undefined
-      expect(await message(createTeamSpace('Church', 'p', folders()))).to.match(/Sign in/)
-    })
-  })
-
-  describe('joining a space', () => {
-    const backend = (name: string | null) => ({
-      inspectRoot: async () => (name ? { ref: 't', name, trashed: false, canWrite: true } : null),
-    })
-
-    it('makes a space of the team’s name, whose root is the team space, and no longer read-only for a writer', async () => {
-      routes['POST /api/spaces/join'] = () => json({ spaceId: 'space-bbbb2222', role: 'writer' })
-      const name = unique('Pat Church')
-      const joined = await joinSpace('space-bbbb2222', 'the-code', backend(name))
-      made.push(joined.id)
-
-      expect(requests[0].body).to.deep.equal({ spaceId: 'space-bbbb2222', code: 'the-code' })
-      expect(joined.name).to.equal(name)
-      expect(joined.rootRef).to.equal('space-bbbb2222')
-      expect(joined.team).to.deep.equal({ id: 'space-bbbb2222', role: 'writer' })
-      expect(joined.readOnly).to.equal(false)
-    })
-
-    it('makes a reader’s space read-only', async () => {
-      routes['POST /api/spaces/join'] = () => json({ spaceId: 'space-cccc3333', role: 'reader' })
-      const joined = await joinSpace('space-cccc3333', 'c', backend(unique('Readers')))
-      made.push(joined.id)
-      expect(joined.readOnly).to.equal(true)
-    })
-
-    it('does not take the name of a space already here', async () => {
-      routes['POST /api/spaces/join'] = () => json({ spaceId: 'space-dddd4444', role: 'writer' })
-      const taken = await space('Same Name')
-      const first = await joinSpace('space-dddd4444', 'c', backend(taken.name))
-      const second = await joinSpace('space-dddd4444', 'c', backend(taken.name))
-      made.push(first.id, second.id)
-      expect(first.name).to.equal(`${taken.name} (team)`)
-      expect(second.name).to.equal(`${taken.name} (team 2)`)
-    })
-
-    it('is a space called Team if the Worker cannot yet say what it is called', async () => {
-      routes['POST /api/spaces/join'] = () => json({ spaceId: 'space-eeee5555', role: 'writer' })
-      for (const root of [
-        backend(null),
-        { inspectRoot: async () => Promise.reject(new Error('409')) },
-      ]) {
-        const joined = await joinSpace('space-eeee5555', 'c', root)
-        made.push(joined.id)
-        expect(joined.name).to.match(/^Team/)
-      }
-      expect(
-        (await listSpaces()).filter(each => each.name.startsWith('Team')).length
-      ).to.be.at.least(2)
-    })
-
-    it('makes nothing when the invite is not good', async () => {
-      routes['POST /api/spaces/join'] = () => json({ error: 'This invite is not valid' }, 404)
-      const count = (await listSpaces()).length
-      const refused = await joinSpace('space-ffff6666', 'c', backend('x')).catch(error => error)
-      expect(refused).to.be.instanceOf(TeamError)
-      expect((await listSpaces()).length).to.equal(count)
-      must(refused)
-    })
+  it('tidies a licence number without judging it', () => {
+    expect(cleanLicence(undefined)).to.equal('')
+    expect(cleanLicence('#2345678')).to.equal('2345678')
+    expect(cleanLicence('CCLI 98 76 54')).to.equal('987654')
+    expect(cleanLicence('AB-12')).to.equal('AB-12')
   })
 
   describe('who acts on whom', () => {

@@ -20,10 +20,9 @@ import {
   removeSpaceFromDevice,
   trashMovedSpaceDriveFiles,
 } from '../src/js/space-deletion.ts'
-import { storageFor } from '../src/js/storage/space-storage.ts'
 import { teamApi } from '../src/js/team-client.ts'
 import type { TeamRole } from '../src/js/team-roles.ts'
-import { useFakeDriveRig } from './drive-harness.ts'
+import { useFakeDriveRig } from './device-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -108,14 +107,6 @@ describe('deleting a space', () => {
       const personal = await space('Mine', { rootRef: folder })
       await deleteSpaceEverywhere(personal)
       expect(trashed(folder)).to.equal(true)
-      expect(await gone(personal.id)).to.equal(true)
-    })
-
-    it('finds a personal space’s folder by its name when this device never linked it', async () => {
-      const personal = await space('Found by name')
-      const { ref } = await storageFor(personal).ensureRoot(personal.name, personal.id)
-      await deleteSpaceEverywhere(personal)
-      expect(trashed(ref)).to.equal(true)
       expect(await gone(personal.id)).to.equal(true)
     })
 

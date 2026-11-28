@@ -19,7 +19,6 @@ import { forgetSync, recordSync } from '../src/js/last-sync.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import { createSpace, deleteSpace, updateSpace } from '../src/js/space.ts'
 import { ServerHasDataError } from '../src/js/space-move.ts'
-import { syncSpaceNow } from '../src/js/space-sync.ts'
 import { UserError } from '../src/js/utils/errors.ts'
 import { makeSetlist } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
@@ -36,6 +35,7 @@ describe('space-card', () => {
   let uninstallWorker: () => void
   let space: Space
   const made: string[] = []
+  const server = { libraryId: 'library', movedAt: '2026-11-25T10:00:00.000Z' }
 
   beforeEach(async () => {
     drive = installFakeDrive()
@@ -197,7 +197,7 @@ describe('space-card', () => {
 
   it('has no Switch button: the space tabs switch', async () => {
     const el = await card('signed-in')
-    expect(order(el)).to.deep.equal(['sync', 'move-to-server', 'manage', 'manage-data'])
+    expect(order(el)).to.deep.equal(['move-to-server', 'manage', 'manage-data'])
   })
 
   it('says a Team is a Team, and what the person is in it', async () => {
@@ -227,16 +227,18 @@ describe('space-card', () => {
       expect(text(await card(null))).to.not.contain('sync')
     })
 
-    it('offers no Sync until it can', async () => {
-      for (const state of ['signed-out', 'expired', 'no-drive', null] as const) {
-        expect(button(await card(state), 'sync')).to.equal(null)
+    it('offers no Sync until it can: only a space on Chordless syncs, and one still on Drive moves first', async () => {
+      const moved = { ...space, server }
+      for (const state of ['signed-out', 'expired', null] as const) {
+        expect(button(await card(state, { space: moved }), 'sync')).to.equal(null)
       }
-      expect(button(await card('signed-in'), 'sync')).to.not.equal(null)
+      expect(button(await card('signed-in', { space: moved }), 'sync')).to.not.equal(null)
+      expect(button(await card('signed-in'), 'sync')).to.equal(null)
     })
 
     it('lets a Team’s member sync with no Drive: the Team’s files come through Chordless', async () => {
       const team = await make(`Team ${crypto.randomUUID().slice(0, 8)}`, {
-        team: { id: 't-2', role: 'reader' },
+        team: { id: 't-2', role: 'reader', churchId: 'church-1' },
       })
       const el = await card('no-drive', { space: team })
       expect(button(el, 'sync')).to.not.equal(null)
@@ -251,73 +253,40 @@ describe('space-card', () => {
   })
 
   describe('syncing', () => {
+    let moved: Space
+    beforeEach(() => {
+      moved = { ...space, server }
+    })
+
+    /** A card for a space on Chordless, whose sync is `syncSpace` */
+    async function movedCard(syncSpace: SpaceCard['syncSpace']) {
+      const el = await card('signed-in', { space: moved })
+      el.syncSpace = syncSpace
+      return el
+    }
+
     it('syncs that space, says when, and tells the page', async () => {
-      const el = await card('signed-in')
+      const synced: string[] = []
+      const el = await movedCard(async given => {
+        synced.push(given.id)
+        return recordSync(given.id)
+      })
       let told = 0
       el.addEventListener(SpaceSyncedEvent.type, () => told++)
       must(button(el, 'sync')).click()
       await waitUntil(() => text(el).includes('Synced Just now'), undefined, { timeout: 3000 })
-      expect(text(el)).to.contain('Synced Just now')
+      expect(synced).to.deep.equal([space.id])
       expect(told).to.equal(1)
-      const files = drive.listFiles(file => Boolean(file.appProperties.setlistId))
-      expect(files).to.have.length(1)
     })
 
     it('says what went wrong, and can be tried again', async () => {
-      const el = await card('signed-in')
-      drive.failRequests({ status: 500, times: 100 })
+      const el = await movedCard(async () => {
+        throw new Error('offline')
+      })
       must(button(el, 'sync')).click()
       await waitUntil(() => text(el).includes('Sync failed'), undefined, { timeout: 3000 })
       expect(text(el)).to.contain('Sync failed')
       expect(must(button(el, 'sync')).disabled).to.equal(false)
-    })
-
-    describe('a Personal space, when Drive has one other space’s folder', () => {
-      let old: Space
-      let personal: Space
-      beforeEach(async () => {
-        old = await make(`Old ${crypto.randomUUID().slice(0, 8)}`)
-        await syncSpaceNow(old, null)
-        personal = { ...space, name: 'Personal' }
-        localStorage.removeItem(`chordless:adopt-declined:${space.id}`)
-        localStorage.removeItem(`chordless:adopted-folder:${space.id}`)
-      })
-
-      async function answer(el: SpaceCard, confirm: boolean) {
-        const modal = must(el.shadowRoot?.querySelector<AppModal>('app-modal'))
-        await waitUntil(() => modal.open, 'the question', { timeout: 3000 })
-        expect(modal.message).to.contain(old.name)
-        await modal.updateComplete
-        must(
-          modal.shadowRoot?.querySelector<HTMLElement>(
-            confirm ? '.modal-btn-confirm' : '.modal-btn-cancel'
-          )
-        ).click()
-      }
-
-      it('asks whether to use that folder, and syncs into it when told yes, renaming nothing', async () => {
-        const el = await card('signed-in', { space: personal })
-        must(button(el, 'sync')).click()
-        await answer(el, true)
-        await waitUntil(() => text(el).includes('Synced Just now'), undefined, { timeout: 3000 })
-        const folders = [...drive.files.values()].filter(
-          file => file.appProperties?.resourceType === 'space'
-        )
-        expect(folders.map(folder => folder.name)).to.deep.equal([old.name])
-      })
-
-      it('makes a folder called Personal when told no', async () => {
-        const el = await card('signed-in', { space: personal })
-        must(button(el, 'sync')).click()
-        await answer(el, false)
-        await waitUntil(() => text(el).includes('Synced Just now'), undefined, { timeout: 3000 })
-        const folders = [...drive.files.values()].filter(
-          file => file.appProperties?.resourceType === 'space'
-        )
-        expect(folders.map(folder => folder.name).sort()).to.deep.equal(
-          [old.name, 'Personal'].sort()
-        )
-      })
     })
 
     it('does not start a second sync while one is going', async () => {
@@ -327,23 +296,26 @@ describe('space-card', () => {
       expect(el._progress).to.equal('')
     })
 
-    it('shows how far a sync has got', async () => {
-      const el = await card('signed-in')
+    it('says it is syncing while it does', async () => {
+      let finish = () => {}
+      const el = await movedCard(
+        () =>
+          new Promise<string>(resolve => {
+            finish = () => resolve(recordSync(space.id))
+          })
+      )
       must(button(el, 'sync')).click()
       await el.updateComplete
-      expect(text(el)).to.match(
-        /Starting…|Syncing|Scanning|Checking|Downloading|Uploading|Initializing/
-      )
+      expect(text(el)).to.contain('Starting…')
+      finish()
       await waitUntil(() => !el._syncing, undefined, { timeout: 3000 })
     })
   })
 
   describe('moving to Chordless', () => {
-    const server = { libraryId: 'library', movedAt: '2026-11-25T10:00:00.000Z' }
-
-    /** Answer the card's question to confirm (the second modal: the first is the Drive folder's) */
+    /** Answer the card's question to confirm */
     async function confirmWith(el: SpaceCard, answer: boolean) {
-      const modal = must(el.shadowRoot?.querySelectorAll<AppModal>('app-modal')[1])
+      const modal = must(el.shadowRoot?.querySelector<AppModal>('app-modal'))
       await waitUntil(() => modal.open, 'the question', { timeout: 3000 })
       await modal.updateComplete
       must(

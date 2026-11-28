@@ -6,7 +6,14 @@
  * (`recordSync`), which is how a space is told from one never fetched.
  */
 import { recordSync } from './last-sync.ts'
-import type { SyncProgress } from './sync/session.ts'
+
+/** How far a sync has got: a line to show, and counts when it knows them */
+export interface SyncProgress {
+  stage: 'starting' | 'scanning' | 'pulling' | 'pushing' | 'clearing' | 'complete' | 'error'
+  message: string
+  current?: number
+  total?: number
+}
 
 /** A space started or finished syncing, or said how far it has got (sent on window) */
 export class SyncStatusEvent extends Event {

@@ -12,7 +12,7 @@ import { maybeAskName } from './account-name.ts'
 import { listenForLaunches } from './launch.ts'
 import { startMediaPlayer } from './media-player-loader.ts'
 import { setRouter } from './navigation.ts'
-import { ensurePersonalSpace, SpaceChangeEvent } from './space.ts'
+import { ensurePersonalSpace } from './space.ts'
 import { views } from './views/registry.ts'
 
 const outlet = document.getElementById('view-outlet')
@@ -57,12 +57,6 @@ import('./storage-survival.ts').then(({ launchReport }) => launchReport()).catch
 import('./telemetry/start.ts').then(({ initTelemetry }) => initTelemetry())
 // Setlists shared by link are kept only until they end (their songs stay)
 import('./share-receiver.ts').then(({ tidySharedWithMe }) => tidySharedWithMe())
-// Whether the user can write to the space's Drive folder (a sync asks too)
-import('./space-access.ts').then(({ refreshSpaceAccess }) => {
-  void refreshSpaceAccess()
-  // ...and again for the space switched to
-  window.addEventListener(SpaceChangeEvent.type, () => void refreshSpaceAccess())
-})
 // The teams the person is in that this device has not set up (a second device, a new browser)
 import('./team-memberships.ts').then(({ watchTeamMemberships }) => watchTeamMemberships())
 void appUpdate.start()

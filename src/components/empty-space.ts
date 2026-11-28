@@ -41,9 +41,10 @@ export class EmptySpace extends LitElement {
   }
 
   /** Fetches the space's songs and setlists (a test gives its own) */
+  /* v8 ignore next 4 -- wiring to the server sync of the space, which the Playwright tests run */
   fetchSpace: (space: Space) => Promise<unknown> = async space => {
     const { syncSpaceNow } = await import('../js/space-sync.ts')
-    return syncSpaceNow(space, null)
+    return syncSpaceNow(space)
   }
 
   _onStatus = (event: SyncStatusEvent): void => {

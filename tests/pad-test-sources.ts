@@ -2,8 +2,12 @@
  * Pad sets kept in a space's folder in the fake Drive (tests/fake-drive.ts), through the app's own
  * Google Drive storage: for the tests that look at what is in Drive.
  */
+
+import { driveApi } from '../src/js/drive-api.ts'
 import type { PadSource } from '../src/js/pad-set-service.ts'
-import { driveStorage } from '../src/js/storage/browser-drive.ts'
+import { createDriveStorage } from '../src/js/storage/drive-storage.ts'
+
+const driveStorage = createDriveStorage(driveApi)
 
 /** The folder of the space the pads are kept in */
 export const DRIVE_PADS_ROOT = 'drive-pads-root'
