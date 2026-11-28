@@ -403,6 +403,30 @@ describe('church administration', () => {
     expect(checked).to.deep.equal([true])
   })
 
+  it('shows a member by name, else by address, else by id', async () => {
+    const { element, churches, members } = setup()
+    churches.push({
+      id: 'c',
+      name: 'Church',
+      country: 'GB',
+      city: 'York',
+      postcode: null,
+      ccliLicence: null,
+      licences: {},
+      role: 'admin',
+    })
+    members.push(
+      { id: 'a', name: 'Pat', role: 'admin', joinedAt: '2026-11-22' },
+      { id: 'b', name: null, email: 'b@example.com', role: 'writer', joinedAt: '2026-11-22' },
+      { id: 'c', name: null, role: 'reader', joinedAt: '2026-11-22' }
+    )
+    await ready(element)
+    const shown = Array.from(element.shadowRoot?.querySelectorAll('.row span') ?? []).map(each =>
+      each.textContent?.trim()
+    )
+    expect(shown).to.include.members(['Pat', 'b@example.com', 'c'])
+  })
+
   it('does not offer a reader to delete an archived team', async () => {
     const { element, churches, teams } = setup()
     churches.push({

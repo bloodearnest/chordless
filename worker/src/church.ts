@@ -187,11 +187,12 @@ async function manageMembers(
     .first<{ role: string }>()
   if (!actor) throw new Refusal(404, 'No such church')
   if (!target && request.method === 'GET') {
+    // An admin sees an address where a person has no name (so an account is not left as an id); others see names only
     const { results } = await db
       .prepare(
-        'SELECT m.account_id AS id, a.name, m.role, m.joined_at AS joinedAt FROM church_members m JOIN accounts a ON a.account_id = m.account_id WHERE m.church_id = ? ORDER BY a.name, m.account_id'
+        'SELECT m.account_id AS id, a.name, m.role, m.joined_at AS joinedAt, CASE WHEN ? THEN (SELECT min(e.email) FROM account_emails e WHERE e.account_id = m.account_id) END AS email FROM church_members m JOIN accounts a ON a.account_id = m.account_id WHERE m.church_id = ? ORDER BY a.name, m.account_id'
       )
-      .bind(church)
+      .bind(actor.role === 'admin' ? 1 : 0, church)
       .all()
     return jsonResponse(results)
   }

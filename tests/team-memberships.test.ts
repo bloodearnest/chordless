@@ -101,6 +101,40 @@ describe('teams on another device', () => {
     expect(must(await getSpaceById(id)).readOnly).to.equal(true)
   })
 
+  it('takes a church team off the device when the church no longer has it, but only when the church was read', async () => {
+    const kept = team('writer', { churchId: 'church', followed: true })
+    const gone = team('writer', { churchId: 'church', followed: true })
+    const { added } = await check([kept, gone])
+    expect(added).to.have.length(2)
+    const removed: string[] = []
+    const remove = async (space: Space) => void removed.push(space.team?.id ?? '')
+    // (not read: the Worker could not be reached, which says nothing of what is there)
+    await addMissingTeamSpaces({ list: async () => [kept], syncSpace, remove })
+    expect(removed).to.deep.equal([])
+    await addMissingTeamSpaces({
+      list: async () => ({ teams: [kept], churchesListed: true }),
+      syncSpace,
+      remove,
+    })
+    expect(removed).to.deep.equal([gone.spaceId])
+    // (a failure to remove it is told in the log, and the rest carries on)
+    await addMissingTeamSpaces({
+      list: async () => ({ teams: [kept], churchesListed: true }),
+      syncSpace,
+      remove: async () => {
+        throw new Error('no')
+      },
+    })
+    expect(await teamSpaces([gone.spaceId])).to.have.length(1)
+    // (and by default it is taken off this device, as deleting it from here is)
+    await addMissingTeamSpaces({
+      list: async () => ({ teams: [kept], churchesListed: true }),
+      syncSpace,
+    })
+    expect(await teamSpaces([gone.spaceId])).to.have.length(0)
+    expect(await teamSpaces([kept.spaceId])).to.have.length(1)
+  })
+
   it('moves a Drive team’s setlists up before it becomes a church’s on this device, once, and sends them', async () => {
     const drive = team('writer')
     const { added } = await check([drive])
