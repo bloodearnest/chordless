@@ -801,6 +801,30 @@ describe('pad sets', () => {
       }
     })
 
+    it("keeps a church's teams' pads in their church's library, listed once for the church", async () => {
+      setPadSources(null)
+      const first = await createSpace(`First ${crypto.randomUUID().slice(0, 8)}`)
+      const second = await createSpace(`Second ${crypto.randomUUID().slice(0, 8)}`)
+      const other = await createSpace(`Other ${crypto.randomUUID().slice(0, 8)}`)
+      try {
+        // (the folder they had in Drive is known, and not used)
+        const team = (id: string, churchId: string) => ({
+          rootRef: id,
+          team: { id, role: 'writer' as const, churchId },
+        })
+        await updateSpace(first.id, team('t-first', 'church-a'))
+        await updateSpace(second.id, team('t-second', 'church-a'))
+        await updateSpace(other.id, team('t-other', 'church-b'))
+        const destinations = await listPadDestinations()
+        const names = destinations.map(each => each.name)
+        expect(names).to.include.members([first.name, other.name])
+        expect(names).to.not.include(second.name)
+        expect(destinations.find(each => each.name === first.name)?.team).to.equal(true)
+      } finally {
+        for (const space of [first, second, other]) await deleteSpace(space.id)
+      }
+    })
+
     it('says so when the set’s space is not available', async () => {
       withTeam()
       expect(await messageOf(upload(await zipOf(), 'Ours', undefined, 'gone'))).to.match(

@@ -40,7 +40,7 @@ describe('space-page', () => {
 
   async function space(
     name: string,
-    team?: { id: string; role: 'owner' | 'admin' | 'writer' | 'reader' }
+    team?: { id: string; role: 'owner' | 'admin' | 'writer' | 'reader'; churchId?: string }
   ) {
     const created = await createSpace(`${name} ${crypto.randomUUID().slice(0, 8)}`)
     made.push(created.id)
@@ -78,6 +78,26 @@ describe('space-page', () => {
     expect(el.shadowRoot?.querySelector('team-membership-panel')?.space?.id).to.equal(team.id)
     expect(el.shadowRoot?.querySelector('team-licence-panel')).to.not.equal(null)
     expect(el.shadowRoot?.querySelector('team-storage-panel')).to.not.equal(null)
+  })
+
+  it("sends a church's team to its church's page, with none of a Drive team's sections", async () => {
+    const team = await space('Worship', {
+      id: `space-${crypto.randomUUID()}`,
+      role: 'writer',
+      churchId: 'church',
+    })
+    const { el } = await open({ name: 'space', spaceId: team.id })
+    expect(text(el)).to.contain("on the church's page")
+    expect(el.shadowRoot?.querySelector('#church-link')?.getAttribute('href')).to.equal(
+      '/account/churches'
+    )
+    for (const section of [
+      'people-list',
+      'team-membership-panel',
+      'team-licence-panel',
+      'team-storage-panel',
+    ])
+      expect(el.shadowRoot?.querySelector(section), section).to.equal(null)
   })
 
   it('says a space is view only when it is, and a space still called Personal needs no label', async () => {

@@ -36,7 +36,12 @@ export function storageFor(space: Pick<Space, 'team'> | null | undefined): Stora
   return isTeamMember(space) ? teamStorage() : driveStorage
 }
 
-/** The pad sets of a Personal space that has moved to Chordless: in its library on the server, not in Drive */
-export function serverPadsFor(space: Pick<Space, 'server'>): PadStorage | null {
-  return space.server ? new LibraryPads(workerConnection(), space.server.libraryId) : null
+/**
+ * The pad sets of a space on Chordless, in a library on the server, not in Drive: a moved Personal space's own library, or
+ * the library of a church team's church (the same for each of its teams)
+ */
+export function serverPadsFor(space: Pick<Space, 'server' | 'team'>): PadStorage | null {
+  if (space.server) return new LibraryPads(workerConnection(), { library: space.server.libraryId })
+  if (space.team?.churchId) return new LibraryPads(workerConnection(), { team: space.team.id })
+  return null
 }

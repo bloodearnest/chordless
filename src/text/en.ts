@@ -2260,6 +2260,9 @@ filter-spaces = Spaces:
 
 space-back = ← Account and Teams
 space-page-missing = That space is not on this device.
+# A church's team, on its page: its people, roles and licence are the church's, on the church's page (a link follows).
+space-page-church = This team belongs to its church. Its people, their roles and the CCLI licence are on the church's page.
+space-page-church-link = Open the church's page
 
 live-leave = Leave live
 live-take-over = Take over live here
