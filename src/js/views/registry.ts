@@ -119,9 +119,4 @@ export const views: Record<string, ViewEntry> = {
     () => import('./media-view.ts'),
     () => t('title-media')
   ),
-  'new-team-space': view(
-    'new-team-space-view',
-    () => import('./new-team-space-view.ts'),
-    () => t('title-new-team')
-  ),
 }

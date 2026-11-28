@@ -6,10 +6,8 @@ import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import {
   type SpaceCard,
-  SpaceConnectDriveEvent,
   SpaceDataEvent,
   SpaceDefaultEvent,
-  SpaceDisconnectDriveEvent,
   SpaceManageEvent,
   SpaceSyncedEvent,
 } from '../src/components/space-card.ts'
@@ -96,36 +94,6 @@ describe('space-card', () => {
     expect(text(el)).to.match(/1 song · 1 setlist · about \d+ B/)
   })
 
-  it('offers Connect Google Drive on a Personal space with none, and Reconnect when it has expired', async () => {
-    const own = await card('no-drive')
-    expect(text(own)).to.contain('Google Drive is not connected')
-    let asked = 0
-    own.addEventListener(SpaceConnectDriveEvent.type, () => asked++)
-    must(button(own, 'connect-drive')).click()
-    expect(asked).to.equal(1)
-    expect(button(own, 'sync')).to.equal(null)
-
-    const expired = await card('expired')
-    expect(text(expired)).to.contain('Google Drive needs reconnecting')
-    expired.addEventListener(SpaceConnectDriveEvent.type, () => asked++)
-    must(button(expired, 'reconnect-drive')).click()
-    expect(asked).to.equal(2)
-    expect(button(expired, 'connect-drive')).to.equal(null)
-  })
-
-  it('shows which Google Drive a Personal space syncs through, with a way to disconnect it', async () => {
-    const own = await card('signed-in')
-    expect(button(own, 'disconnect-drive')).to.not.equal(null)
-    expect(own.shadowRoot?.querySelector('#drive-line')).to.equal(null)
-    own.driveEmail = 'ann@gmail.example'
-    await own.updateComplete
-    expect(text(own)).to.contain('Google Drive: ann@gmail.example')
-    let asked = 0
-    own.addEventListener(SpaceDisconnectDriveEvent.type, () => asked++)
-    must(button(own, 'disconnect-drive')).click()
-    expect(asked).to.equal(1)
-  })
-
   it('says a Team’s expired sign-in as it always did, not as a Drive that needs reconnecting', async () => {
     const team = await make(`Team ${crypto.randomUUID().slice(0, 8)}`, {
       team: { id: 't-8', role: 'writer' },
@@ -141,8 +109,6 @@ describe('space-card', () => {
     })
     for (const state of ['no-drive', 'signed-in'] as const) {
       const theirs = await card(state, { space: team })
-      theirs.driveEmail = 'ann@gmail.example'
-      await theirs.updateComplete
       expect(button(theirs, 'connect-drive')).to.equal(null)
       expect(button(theirs, 'disconnect-drive')).to.equal(null)
       expect(text(theirs)).to.not.contain('Google Drive')
@@ -231,13 +197,7 @@ describe('space-card', () => {
 
   it('has no Switch button: the space tabs switch', async () => {
     const el = await card('signed-in')
-    expect(order(el)).to.deep.equal([
-      'sync',
-      'move-to-server',
-      'manage',
-      'manage-data',
-      'disconnect-drive',
-    ])
+    expect(order(el)).to.deep.equal(['sync', 'move-to-server', 'manage', 'manage-data'])
   })
 
   it('says a Team is a Team, and what the person is in it', async () => {

@@ -37,22 +37,6 @@ export class SpaceDefaultEvent extends Event {
   }
 }
 
-/** A person asked to connect (or reconnect) Google Drive, to sync a Personal space between their devices: the page does it */
-export class SpaceConnectDriveEvent extends Event {
-  static readonly type = 'space-card:connect-drive'
-  constructor() {
-    super(SpaceConnectDriveEvent.type, { bubbles: true, composed: true })
-  }
-}
-
-/** A person asked to disconnect Google Drive from the account, for every device: the page asks first, and does it */
-export class SpaceDisconnectDriveEvent extends Event {
-  static readonly type = 'space-card:disconnect-drive'
-  constructor() {
-    super(SpaceDisconnectDriveEvent.type, { bubbles: true, composed: true })
-  }
-}
-
 /** A person asked for this space's data (export, import, reset, delete): the page shows it in a dialogue */
 export class SpaceDataEvent extends Event {
   static readonly type = 'space-card:data'
@@ -85,7 +69,6 @@ export class SpaceCard extends LitElement {
     isDefault: { type: Boolean },
     several: { type: Boolean },
     signIn: { attribute: false },
-    driveEmail: { attribute: false },
     _summary: { state: true },
     _syncing: { state: true },
     _progress: { state: true },
@@ -101,8 +84,6 @@ export class SpaceCard extends LitElement {
   declare several: boolean
   /** How the person is signed in, or null while that is not known yet */
   declare signIn: SignInState | null
-  /** The Google account the account's Drive is connected as, when it is (a Personal space syncs through it) */
-  declare driveEmail: string | null
   declare _summary: SpaceSummary | null
   declare _syncing: boolean
   declare _progress: string
@@ -149,7 +130,6 @@ export class SpaceCard extends LitElement {
   constructor() {
     super()
     this.signIn = null
-    this.driveEmail = null
     this._summary = null
     this._syncing = false
     this._progress = ''
@@ -417,11 +397,6 @@ export class SpaceCard extends LitElement {
             : nothing
         }
         ${
-          this._isPersonal && !this.space.server && this.signIn === 'signed-in' && this.driveEmail
-            ? html`<p class="line" id="drive-line">${t('space-drive-on', { email: this.driveEmail })}</p>`
-            : nothing
-        }
-        ${
           this._canDeleteDriveFiles
             ? html`<p class="line" id="drive-left-line">${t('space-drive-left')}</p>`
             : nothing
@@ -448,20 +423,6 @@ export class SpaceCard extends LitElement {
                 </button>`
               : nothing
           }
-          ${
-            this._isPersonal && !this.space.server && this.signIn === 'no-drive'
-              ? html`<button class="btn primary" id="connect-drive" @click=${() => this.dispatchEvent(new SpaceConnectDriveEvent())}>
-                  ${t('action-connect-drive')}
-                </button>`
-              : nothing
-          }
-          ${
-            this._isPersonal && !this.space.server && this.signIn === 'expired'
-              ? html`<button class="btn primary" id="reconnect-drive" @click=${() => this.dispatchEvent(new SpaceConnectDriveEvent())}>
-                  ${t('action-reconnect-drive')}
-                </button>`
-              : nothing
-          }
           <button class="btn" id="manage" @click=${() => this.dispatchEvent(new SpaceManageEvent(space.id))}>
             ${t('action-manage-users')}
           </button>
@@ -473,13 +434,6 @@ export class SpaceCard extends LitElement {
               ? html`<button class="btn" id="make-default" @click=${() => this.dispatchEvent(new SpaceDefaultEvent(space.id))}>
                 ${t('action-make-default')}
               </button>`
-              : nothing
-          }
-          ${
-            this._isPersonal && !this.space.server && this.signIn === 'signed-in'
-              ? html`<button class="btn" id="disconnect-drive" @click=${() => this.dispatchEvent(new SpaceDisconnectDriveEvent())}>
-                  ${t('action-disconnect-drive')}
-                </button>`
               : nothing
           }
         </div>

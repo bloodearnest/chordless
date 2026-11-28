@@ -1,5 +1,13 @@
 # Account and Teams
 
+**Status (2026-11-28): the Drive screens are gone; this page is to be redone for churches.** Every team is a church's,
+kept on Chordless, and a Personal space moves there by itself (docs/CENTRAL_STORAGE.md, step 10), so these were removed:
+Create a new Team (`/account/new`, the wizard and its folder picker), the Drive team join page (`/join/<team>/<code>` now
+goes to the church's page, which takes the same invite), a team's membership, licence and storage panels (a team's page
+links to its church's page), Manage Data's Google Drive panel (reset, start over, replace) and Delete everywhere, and
+Connect, Reconnect and Disconnect Google Drive on the Personal card. What follows describes the page as it was; the
+redesign is to follow.
+
 The page at `/account` (`/storage`, its old address, still opens it): who is signed in, and the spaces
 on this device, a **Personal** space and any **Teams**, with what to do with each. Built 2026-10-22,
 and brought up to date 2026-11-12. The words people see are in docs/SPACES.md, "Naming": the UI says

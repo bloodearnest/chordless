@@ -170,6 +170,17 @@ describe('people-list', () => {
       expect(calls).to.deep.equal([])
     })
 
+    it('reads the people again when the same space becomes a team, or another one', async () => {
+      const personal = await createSpace(`Own ${crypto.randomUUID().slice(0, 8)}`)
+      made.push(personal.id)
+      await open(personal)
+      expect(calls.some(call => call.key.endsWith('/members'))).to.equal(false)
+      list._loaded = false
+      list.space = { ...personal, team: { id: TEAM, role: 'admin' } }
+      await until(() => list._loaded, 'the members to be read')
+      expect(calls.some(call => call.key === `GET /api/space/${TEAM}/members`)).to.equal(true)
+    })
+
     it('lists members by role, with people who only lead, then the invites in a table of their own', async () => {
       const shared = await space('owner')
       await withPeople(shared, [

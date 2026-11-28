@@ -3,21 +3,18 @@
  * use first, switching, and the link that makes a Team. The sign-in is the fake service worker's.
  */
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
-import { AccountLoadedEvent, AccountStateEvent } from '../src/components/account-card.ts'
+import { AccountStateEvent } from '../src/components/account-card.ts'
 import type { AccountPage } from '../src/components/account-page.ts'
 import '../src/components/account-page.ts'
 import type { AppModal } from '../src/components/app-modal.ts'
 import {
   type SpaceCard,
-  SpaceConnectDriveEvent,
   SpaceDataEvent,
   SpaceDefaultEvent,
-  SpaceDisconnectDriveEvent,
   SpaceManageEvent,
   SpaceSyncedEvent,
 } from '../src/components/space-card.ts'
 import { SpaceGoneEvent } from '../src/components/space-manager.ts'
-import { setAccountStorageKey } from '../src/js/account-info.ts'
 import { getDefaultSpaceId, setDefaultSpaceId } from '../src/js/default-space.ts'
 import type { SignInState } from '../src/js/google-auth.ts'
 import {
@@ -30,13 +27,7 @@ import {
 import { TeamSpacesAddedEvent } from '../src/js/team-memberships.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import {
-  clearToasts,
-  nextTimestamp,
-  nothingFor,
-  shownToast,
-  suppressConsoleLogs,
-} from './test-helpers.ts'
+import { nextTimestamp, nothingFor, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -74,7 +65,7 @@ describe('account-page', () => {
   const cards = (el: AccountPage) =>
     Array.from(el.shadowRoot?.querySelectorAll<SpaceCard>('space-card') ?? [])
 
-  it('shows the account, a card for each space, a link to make a Team, and the device', async () => {
+  it('shows the account, a card for each space, and the device', async () => {
     const first = await space('First')
     const second = await space('Second')
     await setCurrentSpace(first.id, first.name)
@@ -82,9 +73,8 @@ describe('account-page', () => {
     expect(el.shadowRoot?.querySelector('account-card')).to.not.equal(null)
     expect(el.shadowRoot?.querySelector('h2')?.textContent).to.equal('Personal space')
     expect(cards(el).map(card => card.space.id)).to.include.members([first.id, second.id])
-    expect(el.shadowRoot?.querySelector('a#create-team')?.getAttribute('href')).to.equal(
-      '/account/new'
-    )
+    // (a team is made by a church's admin, on the church's page: there is no Drive team to make here)
+    expect(el.shadowRoot?.querySelector('a#create-team')).to.equal(null)
     expect(el.shadowRoot?.querySelector('storage-summary')).to.not.equal(null)
     expect(el.shadowRoot?.textContent).to.contain('invite link')
   })
@@ -200,200 +190,6 @@ describe('account-page', () => {
     must(el.shadowRoot?.querySelector('space-card')).dispatchEvent(new SpaceSyncedEvent())
     await waitUntil(() => cards(el).some(card => card.space.name === renamed))
     expect(cards(el).some(card => card.space.name === renamed)).to.equal(true)
-  })
-
-  describe('connecting Google Drive to sync a Personal space', () => {
-    afterEach(() => clearToasts())
-
-    it('connects Drive when a card asks, as an email sign-in needs, and reads the sign-in again', async () => {
-      await space('First')
-      const el = await page()
-      el.shadowRoot
-        ?.querySelector('account-card')
-        ?.dispatchEvent(new AccountStateEvent('no-drive', true))
-      const asked: boolean[] = []
-      el.connectDrive = async emailOnly => void asked.push(emailOnly)
-      let refreshed = 0
-      const account = must(el.shadowRoot?.querySelector('account-card'))
-      account.refresh = async () => void refreshed++
-      must(cards(el)[0]).dispatchEvent(new SpaceConnectDriveEvent())
-      await waitUntil(() => refreshed === 1, 'the sign-in to be read again')
-      expect(asked).to.deep.equal([true])
-      expect(shownToast()).to.equal(null)
-    })
-
-    it('asks for Drive alone of an account that has Google already', async () => {
-      await space('First')
-      const el = await page()
-      el.shadowRoot
-        ?.querySelector('account-card')
-        ?.dispatchEvent(new AccountStateEvent('no-drive', false))
-      const asked: boolean[] = []
-      el.connectDrive = async emailOnly => void asked.push(emailOnly)
-      must(el.shadowRoot?.querySelector('account-card')).refresh = async () => {}
-      must(cards(el)[0]).dispatchEvent(new SpaceConnectDriveEvent())
-      await waitUntil(() => asked.length === 1)
-      expect(asked).to.deep.equal([false])
-    })
-
-    it('says so when Drive could not be connected, and reads the sign-in all the same', async () => {
-      await space('First')
-      const el = await page()
-      el.connectDrive = async () => {
-        throw new Error('That Google account is already used by another Chordless account')
-      }
-      let refreshed = 0
-      must(el.shadowRoot?.querySelector('account-card')).refresh = async () => void refreshed++
-      must(cards(el)[0]).dispatchEvent(new SpaceConnectDriveEvent())
-      await waitUntil(() => shownToast(), 'the message')
-      expect(shownToast()?.message).to.contain('connect Google Drive')
-      expect(shownToast()?.details).to.contain('already used')
-      expect(refreshed).to.equal(1)
-    })
-
-    it('starts Google’s sign-in by default, which says when the window gives nothing', async () => {
-      const real = (window as { google?: unknown }).google
-      ;(window as { google?: unknown }).google = {
-        accounts: {
-          oauth2: {
-            initCodeClient: (config: { callback: (response: object) => void }) => ({
-              requestCode: () => config.callback({ error: 'access_denied' }),
-            }),
-          },
-        },
-      }
-      try {
-        const el = await page()
-        for (const emailOnly of [true, false]) {
-          let message = ''
-          await el.connectDrive(emailOnly).catch(error => {
-            message = error.message
-          })
-          expect(message).to.equal('access_denied')
-        }
-      } finally {
-        ;(window as { google?: unknown }).google = real
-      }
-    })
-
-    it('starts from the Drive it last knew of, so the Personal card names it while the Worker is asked', async () => {
-      const key = 'chordless:account:test-account-page'
-      setAccountStorageKey(key)
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          name: null,
-          emails: [],
-          googleEmail: null,
-          drive: { email: 'kept@gmail.example' },
-        })
-      )
-      try {
-        await space('First')
-        const el = await page()
-        expect(cards(el)[0].driveEmail).to.equal('kept@gmail.example')
-      } finally {
-        localStorage.removeItem(key)
-        setAccountStorageKey('chordless:account')
-      }
-    })
-
-    it('shows the Drive the account syncs through on the Personal card', async () => {
-      await space('First')
-      const el = await page()
-      el.shadowRoot?.querySelector('account-card')?.dispatchEvent(
-        new AccountLoadedEvent({
-          name: null,
-          emails: [],
-          googleEmail: null,
-          drive: { email: 'ann@gmail.example' },
-        })
-      )
-      await el.updateComplete
-      expect(cards(el)[0].driveEmail).to.equal('ann@gmail.example')
-    })
-  })
-
-  describe('disconnecting Google Drive', () => {
-    afterEach(() => clearToasts())
-
-    const answer = async (el: AccountPage, confirm: boolean) => {
-      const modal = must(el.shadowRoot?.querySelector<AppModal>('app-modal[heading^="Disconnect"]'))
-      await waitUntil(() => modal.open, 'the question')
-      await modal.updateComplete
-      must(
-        modal.shadowRoot?.querySelector<HTMLElement>(
-          confirm ? '.modal-btn-confirm' : '.modal-btn-cancel'
-        )
-      ).click()
-    }
-
-    it('asks first, then disconnects for every device, and says so', async () => {
-      await space('First')
-      const el = await page()
-      let disconnected = 0
-      el.disconnectDrive = async () => {
-        disconnected++
-        return { revoked: true }
-      }
-      let refreshed = 0
-      must(el.shadowRoot?.querySelector('account-card')).refresh = async () => void refreshed++
-      must(cards(el)[0]).dispatchEvent(new SpaceDisconnectDriveEvent())
-      await answer(el, true)
-      await waitUntil(() => shownToast(), 'the message')
-      expect(shownToast()?.message).to.contain('Google Drive is disconnected.')
-      expect(disconnected).to.equal(1)
-      expect(refreshed).to.equal(1)
-    })
-
-    it('says when Google’s access was left in place for a Team the person owns', async () => {
-      await space('First')
-      const el = await page()
-      el.disconnectDrive = async () => ({ revoked: false })
-      must(el.shadowRoot?.querySelector('account-card')).refresh = async () => {}
-      must(cards(el)[0]).dispatchEvent(new SpaceDisconnectDriveEvent())
-      await answer(el, true)
-      await waitUntil(() => shownToast(), 'the message')
-      expect(shownToast()?.message).to.contain('left in place')
-    })
-
-    it('does nothing when it is not confirmed', async () => {
-      await space('First')
-      const el = await page()
-      let disconnected = 0
-      el.disconnectDrive = async () => {
-        disconnected++
-        return { revoked: true }
-      }
-      must(cards(el)[0]).dispatchEvent(new SpaceDisconnectDriveEvent())
-      await answer(el, false)
-      await nothingFor(50)
-      expect(disconnected).to.equal(0)
-      expect(shownToast()).to.equal(null)
-    })
-
-    it('says so when it could not be done', async () => {
-      await space('First')
-      const el = await page()
-      el.disconnectDrive = async () => {
-        throw new Error('Google did not revoke the access')
-      }
-      must(el.shadowRoot?.querySelector('account-card')).refresh = async () => {}
-      must(cards(el)[0]).dispatchEvent(new SpaceDisconnectDriveEvent())
-      await answer(el, true)
-      await waitUntil(() => shownToast(), 'the message')
-      expect(shownToast()?.message).to.contain('disconnect Google Drive')
-      expect(shownToast()?.details).to.contain('did not revoke')
-    })
-
-    it('is for someone who is signed in: by default it needs the session to ask the Worker', async () => {
-      const el = await page()
-      let failed = false
-      await el.disconnectDrive().catch(() => {
-        failed = true
-      })
-      expect(failed).to.equal(true)
-    })
   })
 
   describe('managing a space', () => {

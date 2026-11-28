@@ -343,11 +343,8 @@ test.describe('Account and Teams page', () => {
     await page.goto('/account')
     const cards = page.locator('space-card')
     await expect(cards).toHaveCount(2)
-    // The Team is made on its own page, from a link under the cards
-    await expect(page.getByRole('link', { name: 'Create a new Team' })).toHaveAttribute(
-      'href',
-      '/account/new'
-    )
+    // (a team is made on the church's page: there is no Drive team to make here)
+    await expect(page.getByRole('link', { name: 'Create a new Team' })).toHaveCount(0)
 
     const other = cards.filter({ hasText: 'Second Org' })
     await expect(other).toContainText('Personal') // what kind it is is a label beside its name
