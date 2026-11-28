@@ -37,9 +37,11 @@ no one, where a relay would still have worked.
 
 ## The protocol (`src/js/live-protocol.ts`)
 
-- A page opens a WebSocket to `/api/space/<id>/live` (a team space) or `/api/share/<fileId>/live`
-  (a share), asking for the subprotocols `chordless` and, after it, a proof of who it is: a team
-  member's Google ID token, or a share sender's secret. A browser cannot set `Authorization` on
+- A page opens a WebSocket to `/api/teams/<team>/live` (a church's team: any member of its church
+  may join, and its writers and admins send; `worker/src/church-team-live.ts`), `/api/space/<id>/live`
+  (a team still on Drive) or `/api/share/<fileId>/live` (a share), asking for the subprotocols
+  `chordless` and, after it, a proof of who it is: the person's Chordless session token (a Google ID
+  token, for a Drive team), or a share sender's secret. A browser cannot set `Authorization` on
   `new WebSocket`, and a URL gets logged, so the proof rides in `Sec-WebSocket-Protocol`, a request
   header. The Worker answers with `chordless` alone (the proof is never echoed). A recipient of a
   share asks for `chordless` only.

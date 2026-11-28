@@ -10,6 +10,7 @@ import {
   LiveSync,
   type LiveTarget,
   type LiveWorld,
+  livePath,
   liveTargets,
   PUBLISH_DEBOUNCE_MS,
   SHARE_POLL_MS,
@@ -56,6 +57,27 @@ describe('Which channels a device needs', () => {
     expect(targets).to.deep.equal([
       { kind: 'team', key: 'team:team-1', teamId: 'team-1', canWrite: true },
     ])
+  })
+
+  it("is a church's team's room, joined as the church's", async () => {
+    const [target] = await liveTargets(world({ space: async () => team({ church: true }) }).w)
+    expect(target).to.deep.equal({
+      kind: 'team',
+      key: 'team:team-1',
+      teamId: 'team-1',
+      canWrite: true,
+      church: true,
+    })
+    expect(livePath(target)).to.equal('/api/teams/team-1/live')
+  })
+
+  it("joins a Drive team's room and a share's at their own paths", () => {
+    expect(livePath({ kind: 'team', key: 'team:t 1', teamId: 't 1', canWrite: false })).to.equal(
+      '/api/space/t%201/live'
+    )
+    expect(livePath({ kind: 'share-recipient', key: 'receive:f', fileId: 'f' })).to.equal(
+      '/api/share/f/live'
+    )
   })
 
   it('is none for an own setlist in a space that is not a team’s, with no share', async () => {

@@ -39,7 +39,7 @@ export const PUBLISH_DEBOUNCE_MS = 300
 /** A channel this device joins while it is live, and what it is for */
 export type LiveTarget =
   /** The team space's: the devices of its members tell each other of changes, to sync at once */
-  | { kind: 'team'; key: string; teamId: string; canWrite: boolean }
+  | { kind: 'team'; key: string; teamId: string; canWrite: boolean; church?: boolean }
   /** A share's room, as its sharer: tell the recipients that the share was uploaded */
   | { kind: 'share-sender'; key: string; fileId: string; secret: string; setlistId: string }
   /** A share's room, as a recipient: fetch the share again when it is said to have been updated */
@@ -51,6 +51,8 @@ export interface LiveSpace {
   teamId: string
   /** Whether this person may tell the others (a reader only listens) */
   canWrite: boolean
+  /** A church's team: its room is joined as the church's (`/api/teams/<team>/live`), not the old Drive team's */
+  church?: boolean
   /** The user can only read the space's Drive folder, so nothing they edit is sent: nor is a share updated */
   readOnly: boolean
 }
@@ -95,6 +97,7 @@ export async function liveTargets(world: LiveWorld): Promise<LiveTarget[]> {
       key: `team:${space.teamId}`,
       teamId: space.teamId,
       canWrite: space.canWrite,
+      ...(space.church ? { church: true } : {}),
     })
   }
   // (a space that is not a team's has no channel, but its setlist can still be shared by link)
@@ -338,6 +341,13 @@ export class LiveSync {
   }
 }
 
+/** Where a channel's room is: a church team's as the church's, an old Drive team's as its space's, a share's as the share's */
+export function livePath(target: LiveTarget): string {
+  if (target.kind !== 'team') return `/api/share/${encodeURIComponent(target.fileId)}/live`
+  const team = encodeURIComponent(target.teamId)
+  return target.church ? `/api/teams/${team}/live` : `/api/space/${team}/live`
+}
+
 /* v8 ignore start -- wiring to the real socket, clock, database and sign-in: the Playwright tests run the app */
 const ownWorld: LiveWorld = {
   live: getLive,
@@ -347,6 +357,7 @@ const ownWorld: LiveWorld = {
     return {
       teamId: space.team.id,
       canWrite: atLeast(space.team.role, 'writer') && !space.readOnly,
+      church: Boolean(space.team.churchId),
       readOnly: Boolean(space.readOnly),
     }
   },
@@ -389,10 +400,7 @@ async function publishShare(setlistId: string): Promise<void> {
 }
 
 function realChannel(target: LiveTarget, events: LiveChannelEvents): LiveChannel {
-  const path =
-    target.kind === 'team'
-      ? `/api/space/${encodeURIComponent(target.teamId)}/live`
-      : `/api/share/${encodeURIComponent(target.fileId)}/live`
+  const path = livePath(target)
   return new LiveChannel(
     {
       open: protocols => {
