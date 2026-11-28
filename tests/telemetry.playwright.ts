@@ -153,11 +153,17 @@ test('a setlist session: opened, then left, with the same session id on both and
     })
     .toBe(2)
 
-  await expect
-    .poll(() => spans.filter(span => span.name === 'chordless.layout.check').length)
-    .toBe(2)
-  for (const check of spans.filter(span => span.name === 'chordless.layout.check')) {
+  // (three: the two after the turn, and the one the page asks for, late, when a setlist opens)
+  const checks = () => spans.filter(span => span.name === 'chordless.layout.check')
+  await expect.poll(() => checks().length).toBe(3)
+  const phaseOf = (check: (typeof spans)[number]) =>
+    (check.attributes['chordless.layout.phase'] as { stringValue: string }).stringValue
+  expect(checks().map(phaseOf).sort()).toEqual(['late', 'open', 'settled'])
+  for (const check of checks()) {
     expect(check.attributes['chordless.layout.ok']).toEqual({ boolValue: true })
+  }
+  // (the two after the turn read the window as it was turned to; the one at opening may be before it)
+  for (const check of checks().filter(check => phaseOf(check) !== 'open')) {
     expect(check.attributes['chordless.layout.inner_width']).toEqual({ intValue: 1366 })
   }
 
@@ -176,6 +182,11 @@ test('a setlist session: opened, then left, with the same session id on both and
   expect(leave?.attributes['chordless.perf.frames']).toEqual({ intValue: expect.any(Number) })
   expect(leave?.attributes['chordless.perf.open_long_frames']).toEqual({
     intValue: expect.any(Number),
+  })
+  // (how many songs were drawn at first, and the frames on each song in turn: the overview, then the song)
+  expect(open?.attributes['chordless.setlist.drawn']).toEqual({ intValue: 2 })
+  expect(leave?.attributes['chordless.perf.by_song']).toEqual({
+    stringValue: expect.stringMatching(/^-1:\d+\/\d+@\d+(,1:\d+\/\d+@\d+)?$/),
   })
   expect(leave?.attributes['chordless.setlist.songs_viewed']).toEqual({ intValue: 1 })
   expect(leave?.attributes['chordless.setlist.song_changes']).toEqual({ intValue: 1 })

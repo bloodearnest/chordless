@@ -71,7 +71,7 @@ import { AnnotationsController } from './setlist/annotations-controller.ts'
 import { enterEditMode, isEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
 import { autohideHeader } from './setlist/header-autohide.ts'
 import { listenForNavigationKeys } from './setlist/keyboard-navigation.ts'
-import { watchLayout } from './setlist/layout-check.ts'
+import { type LayoutWatcher, watchLayout } from './setlist/layout-check.ts'
 import {
   afterMove,
   clearSetlistLocalState,
@@ -90,7 +90,7 @@ import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setli
 import { isJump } from './setlist/scroll-distance.ts'
 import { SectionController } from './setlist/section-controller.ts'
 import { SetlistHeader } from './setlist/setlist-header.ts'
-import { songsToDraw } from './setlist/song-window.ts'
+import { KEEP_RADIUS, SCROLL_SETTLE_MS, songsToDraw, songsToDrop } from './setlist/song-window.ts'
 import { controlsSetlist } from './setlist-control.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
 import { songSelectLink } from './songselect-link.ts'
@@ -198,7 +198,16 @@ export class SetlistPage {
   _identifyHandler?: (event: SetlistDetailsIdentifyEvent) => void
   /** Songs to draw next, nearest to the one in view first, one a frame (docs/LAZY_SONGS.md) */
   _drawQueue: number[] = []
+  /** Songs to take away after them, the furthest first, one a frame */
+  _dropQueue: number[] = []
   _drawFrame = 0
+  _drawWait?: ReturnType<typeof setTimeout>
+  /** Until when the page is taken to be scrolling: songs are not drawn or taken away while it is */
+  _scrollingUntil = 0
+  /** How far from the one in view a song is kept (the tests make it small) */
+  _keepRadius = KEEP_RADIUS
+  _layout?: LayoutWatcher
+  _swipeChecked = false
   /** How many songs were drawn when the setlist was first shown, for the report of it opening */
   _drawnAtOpen = 0
   /** How far a song that was not drawn yet was scrolled, to put back when it is (by its section's id) */
@@ -328,7 +337,16 @@ export class SetlistPage {
 
     const { signal } = this._abort
     // (a screen turned can leave the layout wrong on an iPad: checked, reported and mended)
-    watchLayout({ root: this.root, container: () => this._songContainer(), signal })
+    this._layout = watchLayout({ root: this.root, container: () => this._songContainer(), signal })
+    // (the row has been seen stopped between two songs, and a button squashed, with no turn of the
+    // screen: so it is checked when the setlist is opened, and after the first swipe, as well)
+    this._layout.checkSoon('open')
+    // (what is drawn or taken away waits for the page to stop scrolling: capture, as scroll does not bubble)
+    window.addEventListener('scroll', () => this._rowScrolling(), {
+      signal,
+      capture: true,
+      passive: true,
+    })
     window.addEventListener('storage', this._onSectionDefaultsChanged, { signal })
     window.addEventListener(SectionDefaultsEvent.type, this._onSectionDefaultsChanged, { signal })
     window.addEventListener('storage', this._onCapoPreferenceChange, { signal })
@@ -413,7 +431,7 @@ export class SetlistPage {
   /** What song is in view, for the session's reports (docs/OBSERVABILITY.md) */
   _reportSong() {
     const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
-    songShown(song && { songId: song.songId, index: song.songIndex })
+    songShown(song && { songId: song.songId, index: song.songIndex }, this._drawnCount())
   }
 
   /** How far each song (and the overview) is scrolled, to put back if the user returns */
@@ -422,6 +440,8 @@ export class SetlistPage {
     for (const section of this.root.querySelectorAll<HTMLElement>('.section')) {
       if (section.scrollTop) scrolls[section.id] = section.scrollTop
     }
+    // (a song that is not drawn now has no scrolling, and its place is kept for when it is)
+    for (const [id, top] of this._scrollsWhenDrawn) scrolls[id] ??= top
     return Object.keys(scrolls).length > 0 ? { scrolls } : undefined
   }
 
@@ -485,7 +505,9 @@ export class SetlistPage {
     this.sectionObserver?.disconnect()
     clearTimeout(this._programmaticScrollTimeout)
     cancelAnimationFrame(this._drawFrame)
+    clearTimeout(this._drawWait)
     this._drawQueue = []
+    this._dropQueue = []
 
     // A drag in progress, and the listeners for the next
     this.overview.dispose()
@@ -731,31 +753,77 @@ export class SetlistPage {
     if (this._melodyOn.has(index)) await this.applyMelodyMode(index)
   }
 
+  /** How many songs are drawn now */
+  _drawnCount(): number {
+    return this.root.querySelectorAll('song-display').length
+  }
+
+  /**
+   * Take a song's chart out of the page, keeping its place in the row. Where it was scrolled to is kept,
+   * to put back if it is drawn again, unless songs start at their top. (A song drawn without limit
+   * was slow to scroll, and slower to the end of a long setlist.)
+   */
+  _undrawSong(index: number): void {
+    const section = this.root.querySelector<HTMLElement>(`#song-${index}`)
+    const content = section?.querySelector<HTMLElement>('.song-content')
+    if (!section || !content || !this._songDrawn(index)) return
+    if (section.scrollTop > 0 && !getScrollToTopOnSwipe()) {
+      this._scrollsWhenDrawn.set(section.id, section.scrollTop)
+    }
+    content.replaceChildren()
+  }
+
   /**
    * Have the songs near song `index` (-1: the overview) drawn: that one at once, if it is not, as
    * it is about to be seen, and the ones it will swipe to one to a frame after it, nearest first,
-   * so that no frame has to draw more than a song. What the last call left to do is dropped:
-   * the person has gone somewhere else. Songs far from the one in view are left as they are.
+   * so that no frame has to draw more than a song; and the ones far from it taken away, the furthest
+   * first, one a frame after those (`_keepRadius`: more than are drawn ahead, so that going back and
+   * forth does not draw a song again and again; not one shown as its lead sheet, which is engraved
+   * again at a cost). What the last call left to do is dropped: the person has gone somewhere else.
+   * None of it while the page is being scrolled (`_rowScrolling`).
    */
   _drawAround(index: number): Promise<void> {
     // (a page that has been left draws nothing: its elements are gone, or going)
     if (this._disposed) return Promise.resolve()
     const todo = songsToDraw(index, this.songs.length).filter(wanted => !this._songDrawn(wanted))
     const urgent = todo[0] === index ? todo.shift() : undefined
+    const drawn = this.songs.map((_, place) => place).filter(place => this._songDrawn(place))
     this._drawQueue = todo
+    this._dropQueue = songsToDrop(drawn, index, this._keepRadius).filter(
+      place => !this._melodyOn.has(place)
+    )
     this._drawNext()
     return urgent === undefined ? Promise.resolve() : this._drawSong(urgent)
   }
 
+  /** One thing from the queues a frame, once the page has stopped scrolling: the draws first, then the drops */
   _drawNext(): void {
     cancelAnimationFrame(this._drawFrame)
-    if (this._drawQueue.length === 0) return
-    // (dispose() cancels the frame, and _drawAround does not ask for one after it)
+    clearTimeout(this._drawWait)
+    if (this._drawQueue.length === 0 && this._dropQueue.length === 0) return
+    // (a page that is moving is not changed: a swipe that is settling, or text that is being scrolled
+    // to read, is not made to stutter by a song being made in it)
+    const wait = this._scrollingUntil - performance.now()
+    if (wait > 0) {
+      this._drawWait = setTimeout(() => this._drawNext(), wait)
+      return
+    }
+    // (dispose() cancels the frame and the wait, and _drawAround does not ask for one after it)
     this._drawFrame = requestAnimationFrame(() => {
       const next = this._drawQueue.shift()
       if (next !== undefined) void this._drawSong(next)
+      else {
+        const away = this._dropQueue.shift()
+        if (away !== undefined) this._undrawSong(away)
+      }
       this._drawNext()
     })
+  }
+
+  /** Something in the page scrolled: what is to be drawn or taken away waits until it has stopped for a moment */
+  _rowScrolling(): void {
+    this._scrollingUntil = performance.now() + SCROLL_SETTLE_MS
+    if (this._drawQueue.length > 0 || this._dropQueue.length > 0) this._drawNext()
   }
 
   renderFullSetlist(songs: RuntimeSong[]) {
@@ -1263,6 +1331,12 @@ export class SetlistPage {
 
           this._scrollToTopLater(this._lastVisibleSection)
           this._lastVisibleSection = sectionId
+
+          // (a swipe, not a move the page made: the first is checked, as it is where the row was seen split)
+          if (!this._swipeChecked) {
+            this._swipeChecked = true
+            this._layout?.checkSoon('swipe')
+          }
 
           if (sectionId === 'overview') {
             this.currentSongIndex = -1
@@ -1800,6 +1874,8 @@ export class SetlistPage {
 
       // Re-apply section states with new indices
       this.sections.applyAll()
+      // (the places have changed: where songs were scrolled to is by place)
+      this._scrollsWhenDrawn.clear()
       // (the songs near the one in view are others now)
       void this._drawAround(this.currentSongIndex)
     }

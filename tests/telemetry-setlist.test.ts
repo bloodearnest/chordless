@@ -163,6 +163,66 @@ describe('how smoothly it ran', () => {
     endSetlistSession()
     const [leave] = named('chordless.setlist.leave')
     expect(leave.attributes).to.not.have.property('chordless.perf.frames')
+    expect(leave.attributes).to.not.have.property('chordless.perf.by_song')
+  })
+
+  const twoFrames = () =>
+    new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
+  it('says how the frames were on each song in turn, and how many songs were drawn, so that a slowing setlist shows', async () => {
+    startSetlistSession(opened())
+    // (the overview first, then songs: each stretch is the frames since the last change)
+    await twoFrames()
+    songShown(song(0), 2)
+    await twoFrames()
+    songShown(song(1), 3)
+    await twoFrames()
+    songShown(null, 3)
+    await twoFrames()
+    endSetlistSession()
+    const [leave] = named('chordless.setlist.leave')
+    const stretches = String(leave.attributes['chordless.perf.by_song']).split(',')
+    // (the overview is -1: `song:long/frames@drawn`)
+    expect(stretches.map(stretch => stretch.split(':')[0])).to.deep.equal(['-1', '0', '1', '-1'])
+    for (const stretch of stretches) expect(stretch).to.match(/^-?\d+:\d+\/[1-9]\d*(@\d+)?$/)
+    expect(stretches[1]).to.match(/@2$/)
+    expect(stretches[2]).to.match(/@3$/)
+    // (the frames add up to the ones the session measured)
+    const frames = stretches.reduce(
+      (sum, stretch) => sum + Number(stretch.split('/')[1]?.split('@')[0]),
+      0
+    )
+    expect(frames).to.equal(leave.attributes['chordless.perf.frames'])
+  })
+
+  it('leaves the drawn count off a stretch when the page did not say, and does not count the overview as a change of song', async () => {
+    startSetlistSession(opened())
+    await twoFrames()
+    songShown(song(0))
+    await twoFrames()
+    songShown(null)
+    endSetlistSession()
+    const [leave] = named('chordless.setlist.leave')
+    for (const stretch of String(leave.attributes['chordless.perf.by_song']).split(',')) {
+      expect(stretch).to.not.include('@')
+    }
+    // (one change to a song: going to the overview is not one)
+    expect(leave.attributes['chordless.setlist.song_changes']).to.equal(1)
+  })
+
+  it('keeps the last sixty stretches of a long service', async function () {
+    this.timeout(10000)
+    startSetlistSession(opened())
+    // (a change a frame, alternating between two songs: each is a change, and a stretch of its own)
+    for (let change = 0; change < 75; change++) {
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      songShown(song(change % 2))
+    }
+    endSetlistSession()
+    const [leave] = named('chordless.setlist.leave')
+    const stretches = String(leave.attributes['chordless.perf.by_song']).split(',')
+    // (more than sixty were made: only the last sixty are kept)
+    expect(stretches).to.have.length(60)
   })
 })
 

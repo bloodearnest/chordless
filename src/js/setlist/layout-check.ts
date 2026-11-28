@@ -121,13 +121,34 @@ export interface LayoutWatch {
   delays?: readonly number[]
 }
 
-/** Check, report and mend the layout after the screen is turned or resized, until `signal` aborts */
-export function watchLayout({ root, container, signal, delays = SETTLE_MS }: LayoutWatch): void {
+/** Why a check was made, other than the screen being turned: the page was opened, the first swipe was made */
+export type LayoutCheckReason = 'open' | 'swipe'
+
+export interface LayoutWatcher {
+  /**
+   * Check once, late (when iOS has really settled), and say why. The row has been seen stopped between
+   * two songs, and a header button squashed, with no turn of the screen to be found (docs/OBSERVABILITY.md),
+   * so the page asks for one when it opens and after the first swipe as well.
+   */
+  checkSoon(reason: LayoutCheckReason): void
+}
+
+/**
+ * Check, report and mend the layout after the screen is turned or resized, and when asked
+ * (`checkSoon`), until `signal` aborts
+ */
+export function watchLayout({
+  root,
+  container,
+  signal,
+  delays = SETTLE_MS,
+}: LayoutWatch): LayoutWatcher {
   let timers: ReturnType<typeof setTimeout>[] = []
+  const asked: ReturnType<typeof setTimeout>[] = []
   let reports = 0
   /** When the row was last scrolling: a swipe in progress is not stopped between two songs */
   let scrolledAt = 0
-  const check = (phase: number) => {
+  const check = (phase: 'settled' | 'late' | LayoutCheckReason) => {
     if (signal.aborted) return
     const row = container()
     const before = readLayout(root, row)
@@ -141,7 +162,7 @@ export function watchLayout({ root, container, signal, delays = SETTLE_MS }: Lay
     const still = after ? layoutProblems(after) : problems
     if (++reports > MAX_REPORTS) return
     recordSpan('chordless.layout.check', {
-      'chordless.layout.phase': phase === 0 ? 'settled' : 'late',
+      'chordless.layout.phase': phase,
       'chordless.layout.ok': problems.length === 0,
       'chordless.layout.problems': problems.join(','),
       'chordless.layout.moving': moving,
@@ -161,7 +182,9 @@ export function watchLayout({ root, container, signal, delays = SETTLE_MS }: Lay
   }
   const resized = () => {
     for (const timer of timers) clearTimeout(timer)
-    timers = delays.map((ms, phase) => setTimeout(() => check(phase), ms))
+    timers = delays.map((ms, index) =>
+      setTimeout(() => check(index === 0 ? 'settled' : 'late'), ms)
+    )
   }
   const scrolled = () => {
     scrolledAt = performance.now()
@@ -171,6 +194,12 @@ export function watchLayout({ root, container, signal, delays = SETTLE_MS }: Lay
   // (scroll does not bubble: captured, it is seen from the row)
   window.addEventListener('scroll', scrolled, { signal, capture: true, passive: true })
   signal.addEventListener('abort', () => {
-    for (const timer of timers) clearTimeout(timer)
+    for (const timer of [...timers, ...asked]) clearTimeout(timer)
   })
+  return {
+    checkSoon(reason) {
+      if (signal.aborted) return
+      asked.push(setTimeout(() => check(reason), Math.max(0, ...delays)))
+    },
+  }
 }

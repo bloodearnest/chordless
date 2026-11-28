@@ -58,7 +58,16 @@ interface Session {
   frames: FrameMonitor
   /** The index of the song in view, -1 for the overview */
   index: number
+  /** What the frames were on each song, in order: `index:long/frames@songs drawn` (see `closeStretch`) */
+  stretches: string[]
+  /** Where the frames stood when the last stretch closed */
+  marked: { frames: number; long: number }
+  /** How many songs were drawn at the last change, which the page says */
+  live: number | undefined
 }
+
+/** At most this many stretches go in the report, the last ones: a long service has more songs than a span is for */
+const MAX_STRETCHES = 60
 
 let session: Session | null = null
 
@@ -91,6 +100,9 @@ export function startSetlistSession(opened: SetlistOpened): void {
     editEntries: 0,
     frames: new FrameMonitor(OPENING_MS),
     index: -1,
+    stretches: [],
+    marked: { frames: 0, long: 0 },
+    live: undefined,
   }
   session.frames.start()
   // (scroll does not bubble: captured, it is seen from any scroller)
@@ -128,16 +140,35 @@ export interface SongInView {
   index: number
 }
 
-/** The song in view changed (null: the overview, which is no song). Showing the same one again is not a change */
-export function songShown(song: SongInView | null): void {
-  if (!session) return
-  if (!song) {
-    session.index = -1
-    return
+/**
+ * The frames since the last change belong to the song that was in view (the overview is -1): say
+ * how many were long, of how many, and how many songs were drawn then. A page that slows towards
+ * the end of a long setlist shows in the order of these (a stretch with no frame measured is left out).
+ */
+function closeStretch(open: Session): void {
+  const { frames, long } = open.frames.total
+  const measured = frames - open.marked.frames
+  if (measured > 0) {
+    const live = open.live === undefined ? '' : `@${open.live}`
+    open.stretches.push(`${open.index}:${long - open.marked.long}/${measured}${live}`)
   }
-  if (song.index !== session.index) session.songChanges++
-  session.index = song.index
-  session.viewed.add(song.songId)
+  open.marked = { frames, long }
+}
+
+/**
+ * The song in view changed (null: the overview, which is no song). Showing the same one again is not
+ * a change. `drawn` is how many songs are drawn now, where the page says (docs/LAZY_SONGS.md).
+ */
+export function songShown(song: SongInView | null, drawn?: number): void {
+  if (!session) return
+  const index = song ? song.index : -1
+  if (index !== session.index) {
+    closeStretch(session)
+    if (song) session.songChanges++
+  }
+  if (drawn !== undefined) session.live = drawn
+  session.index = index
+  if (song) session.viewed.add(song.songId)
 }
 
 /** The song in view was put in another key */
@@ -166,6 +197,7 @@ export function endSetlistSession(left: 'page' | 'navigation' = 'navigation'): v
   if (!session) return
   const ended = session
   session = null
+  closeStretch(ended)
   const { opening, total } = ended.frames.stop()
   recordSpan('chordless.setlist.leave', {
     'chordless.setlist.id': ended.setlistId,
@@ -190,6 +222,10 @@ export function endSetlistSession(left: 'page' | 'navigation' = 'navigation'): v
           'chordless.perf.open_long_frames': opening.long,
           'chordless.perf.open_worst_frame_ms': Math.round(opening.worstMs),
         }),
+    // (in the order of the songs seen: where a long setlist begins to be slow)
+    ...(ended.stretches.length === 0
+      ? {}
+      : { 'chordless.perf.by_song': ended.stretches.slice(-MAX_STRETCHES).join(',') }),
   })
   setAmbient({ sessionId: undefined })
 }
