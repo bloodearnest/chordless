@@ -46,6 +46,7 @@ it('sends church administration calls with the signed-in session', async () => {
     await churchClient.addTeam('c', 'Morning')
     await churchClient.archiveTeam('c', 't')
     await churchClient.restoreTeam('c', 't')
+    await churchClient.deleteTeam('c', 't')
     await churchClient.follow('c', 't', true)
     await churchClient.follow('c', 't', false)
     await churchClient.setRole('c', 'a', 'writer')

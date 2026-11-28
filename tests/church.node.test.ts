@@ -69,7 +69,7 @@ test('a signed-in person creates a church and its library, and only admins chang
     archivedAt: string | null
   }[]
   assert.equal(teams.length, 1)
-  assert.equal(teams[0].name, 'St Mary')
+  assert.equal(teams[0].name, 'St Mary Worship Team')
   assert.deepEqual(await spacesOf(db, { provider: 'chordless', sub: 'admin' }), [])
   assert.equal(
     await new TeamSpaceState(db, teams[0].id).roleOf({ provider: 'chordless', sub: 'admin' }),
@@ -243,6 +243,19 @@ test('a signed-in person creates a church and its library, and only admins chang
     403
   )
   assert.equal((await call('admin', 'DELETE', `/api/churches/${id}/teams/other`)).status, 404)
+  // deleting for good: not by a reader, not a team that is in use, only an archived one, and it takes what it held with it
+  const doomed = `/api/churches/${id}/teams/${teams[0].id}?permanent`
+  assert.equal((await call('reader', 'DELETE', doomed)).status, 403)
+  assert.equal((await call('admin', 'DELETE', doomed)).status, 404)
+  assert.equal(
+    (await call('admin', 'DELETE', `/api/churches/${id}/teams/${teams[0].id}`)).status,
+    204
+  )
+  assert.equal((await call('admin', 'DELETE', doomed)).status, 204)
+  assert.equal(
+    sql.prepare('SELECT count(*) AS n FROM teams WHERE space_id = ?').get(teams[0].id)?.n,
+    0
+  )
   assert.equal(
     (await call('admin', 'PUT', `/api/churches/${id}/members/reader`, { role: 'owner' })).status,
     400
