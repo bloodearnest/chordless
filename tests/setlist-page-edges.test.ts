@@ -197,6 +197,9 @@ describe('the setlist page: corners', () => {
 
   it('keeps a song shown as its melody sheet shown as that song when it is moved or another is removed', async () => {
     await rig.open(4)
+    // (the songs here have no lead sheet, which drawing one that is shown as a sheet would find, a frame later,
+    // and take it out of the set: this is about the places in the set, not the sheets)
+    rig.page.applyMelodyMode = async () => {}
     const alpha = rig.page.songs[0]
     const charlie = rig.page.songs[2]
     rig.page._melodyOn = new Set([0, 2])
@@ -215,6 +218,7 @@ describe('the setlist page: corners', () => {
 
   it('moves the melody sheets between with a song that is moved up the list', async () => {
     await rig.open(4)
+    rig.page.applyMelodyMode = async () => {}
     // (the ones between move down a place)
     rig.page._melodyOn = new Set([0, 1, 2])
     await rig.page.moveSong(2, 0)

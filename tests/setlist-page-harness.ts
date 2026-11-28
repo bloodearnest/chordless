@@ -44,6 +44,7 @@ export function useSetlistPage() {
     /** Save a song (and its chart) to the library */
     saveSong,
     open,
+    drawAll,
     $,
     $$,
     flush,
@@ -80,7 +81,7 @@ export function useSetlistPage() {
   async function open(
     count = 3,
     overrides: Partial<Setlist> = {},
-    options: { songIndex?: number; readOnly?: boolean } = {}
+    options: { songIndex?: number; readOnly?: boolean; windowed?: boolean } = {}
   ) {
     const setlist = makeSetlist({
       id: `setlist-${crypto.randomUUID()}`,
@@ -105,7 +106,15 @@ export function useSetlistPage() {
     await flush()
     // (the page is not laid out as it is in a browser tab: what it says is in view is not so)
     rig.page.sectionObserver?.disconnect()
+    // The page draws only the songs near the one in view (docs/LAZY_SONGS.md). Most of these tests are
+    // about what reaches every song, so every one is drawn, unless a test asks for the page as it is
+    if (!options.windowed) await drawAll()
     return setlist
+  }
+
+  /** Draw every song of the page, as the page does for the ones near the one in view */
+  async function drawAll() {
+    for (let index = 0; index < rig.page.songs.length; index++) await rig.page._drawSong(index)
   }
 
   before(async () => {

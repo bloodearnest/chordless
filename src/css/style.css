@@ -1128,6 +1128,15 @@ body.edit-mode .key-selector:focus {
   -ms-overflow-style: none; /* IE and Edge */
 }
 
+/* A song that is off the screen is not laid out or painted, where the browser can (Safari before 18
+   cannot: there, only the songs near the one in view are drawn at all, docs/LAZY_SONGS.md). Its size is
+   the row's, so it needs no placeholder size. */
+@supports (content-visibility: auto) {
+  .section[id^='song-'] {
+    content-visibility: auto;
+  }
+}
+
 .section > * {
   padding-left: 0 !important;
   margin-left: 0 !important;
