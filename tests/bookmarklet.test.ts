@@ -56,15 +56,19 @@ describe('importFromSongSelect', () => {
    */
   function fakePage({
     download = { ok: true, payload: '{title: Test}\n{key: G}' } as
-      | { ok: boolean; payload?: string }
+      | { ok: boolean; payload?: string; status?: number }
       | Error,
     popupBlocked = false,
+    closable = true,
     leadSheet = 'none' as LeadSheet,
     details = 'none' as SongDetailsReply,
   } = {}) {
     const log: any[][] = []
     const listeners = new Set<(event: any) => void>()
-    const tab = { postMessage: (message, origin) => log.push(['post', message, origin]) }
+    const tab = {
+      postMessage: (message, origin) => log.push(['post', message, origin]),
+      close: closable ? () => log.push(['close']) : undefined,
+    }
     const page = {
       log,
       keySelector: { textContent: null, value: 'G' } as {
@@ -113,7 +117,7 @@ describe('importFromSongSelect', () => {
         if (download instanceof Error) throw download
         return {
           ok: download.ok,
-          status: 403,
+          status: download.status ?? 500,
           json: async () => ({ payload: download.payload }),
           arrayBuffer: async () => new ArrayBuffer(0),
         }
@@ -235,7 +239,7 @@ describe('importFromSongSelect', () => {
     await run(page)
     expect(must(page.log.at(-1))[1]).to.deep.equal({
       type: 'CHORDLESS_IMPORT_FAILED',
-      data: { message: 'SongSelect download failed: 403' },
+      data: { message: 'SongSelect download failed: 500' },
     })
   })
 
@@ -243,6 +247,36 @@ describe('importFromSongSelect', () => {
     const page = fakePage({ download: { ok: true, payload: '  ' } })
     await run(page)
     expect(must(page.log.at(-1))[1].type).to.equal('CHORDLESS_IMPORT_FAILED')
+  })
+
+  describe('when the person is not logged in to SongSelect', () => {
+    const LOGIN = 'Please log in to SongSelect, then try the Chordless bookmarklet again.'
+
+    async function runLoggedOut(download) {
+      const page = fakePage({ download })
+      const done = importFromSongSelect(CHORDLESS, page)
+      await done
+      return page
+    }
+
+    for (const [what, download] of [
+      ['a refused request', { ok: false, status: 401 }],
+      ['a forbidden request', { ok: false, status: 403 }],
+      ['the sentence SongSelect gives for it', { ok: true, payload: 'not authorized' }],
+    ] as const) {
+      it(`closes the Chordless tab and asks them to log in, on ${what}`, async () => {
+        const page = await runLoggedOut(download)
+        expect(page.log.map(entry => entry[0])).to.deep.equal(['open', 'fetch', 'close', 'alert'])
+        expect(page.log.at(-1)).to.deep.equal(['alert', LOGIN])
+        expect(page.listeners.size).to.equal(0)
+      })
+    }
+
+    it('still works when the tab cannot be closed from here', async () => {
+      const page = fakePage({ download: { ok: true, payload: 'Not Authorized' }, closable: false })
+      await importFromSongSelect(CHORDLESS, page)
+      expect(page.log.at(-1)).to.deep.equal(['alert', LOGIN])
+    })
   })
 
   it('tells Chordless when SongSelect has no ChordPro for the song, rather than importing its sentence', async () => {

@@ -14,6 +14,10 @@
  * CHORDLESS_IMPORT_FAILED if the download failed, or SongSelect has neither a ChordPro nor lyrics for the song (with
  * lyrics only, it posts the song's details for Chordless to make a chart of). A lead sheet that cannot be had never stops
  * the song: the import goes without it. See song-import.ts.
+ *
+ * If SongSelect says the person is not authorized (not logged in), the tab opened for Chordless is closed
+ * again and the person is told, on the SongSelect page, to log in: there is no import to show. (The tab is
+ * opened first because only the click may open one; whether they are logged in is not known until the download.)
  */
 /**
  * The parts of the SongSelect page's window the bookmarklet uses. The real window satisfies
@@ -27,7 +31,10 @@ export interface SongSelectPage {
   alert(message: string): void
   addEventListener(type: 'message', listener: (event: MessageEvent) => void): void
   removeEventListener(type: 'message', listener: (event: MessageEvent) => void): void
-  open(url: string, name: string): { postMessage(message: unknown, origin: string): void } | null
+  open(
+    url: string,
+    name: string
+  ): { postMessage(message: unknown, origin: string): void; close?(): void } | null
   fetch(
     url: string,
     init: RequestInit
@@ -83,11 +90,18 @@ export async function importFromSongSelect(
   }
 
   let message: unknown
+  // (SongSelect answers a person who is not logged in with a status, or with a sentence as the chart)
+  const isLoginProblem = (said: string) => /not\s+authori[sz]ed|log\s*in|sign\s*in/i.test(said)
+  let loginNeeded = false
   try {
     const response = await page.fetch(
       `https://songselect.ccli.com/api/GetSongChordPro?songNumber=${songNumber}${keyParameter}&style=Standard&columns=1`,
       { headers: { accept: '*/*', 'client-locale': 'en-GB' }, credentials: 'include' }
     )
+    if (response.status === 401 || response.status === 403) {
+      loginNeeded = true
+      throw new Error(`SongSelect download refused: ${response.status}`)
+    }
     if (!response.ok) throw new Error(`SongSelect download failed: ${response.status}`)
     let chordproText = (await response.json()).payload as string | undefined
     if (!chordproText?.trim()) throw new Error('Empty ChordPro file. Do you have access?')
@@ -97,6 +111,10 @@ export async function importFromSongSelect(
     let songDetails: { defaultKey?: string[]; lyrics?: unknown[] } | undefined
     if (!/\{\s*[a-z_]+\s*:/i.test(chordproText) && !/\[[A-G][^\]]*\]/.test(chordproText)) {
       const said = chordproText.trim().slice(0, 60)
+      if (isLoginProblem(said)) {
+        loginNeeded = true
+        throw new Error(`SongSelect said "${said}"`)
+      }
       try {
         const details = await page.fetch(
           `https://songselect.ccli.com/api/GetSongDetails?songNumber=${songNumber}&slug=${slug}`,
@@ -155,6 +173,13 @@ export async function importFromSongSelect(
       },
     }
   } catch (error) {
+    if (loginNeeded) {
+      // Nothing for Chordless to show: close the tab opened for it, and tell the person here
+      page.removeEventListener('message', onMessage)
+      tab.close?.()
+      page.alert('Please log in to SongSelect, then try the Chordless bookmarklet again.')
+      return
+    }
     // Tell the import page, so it doesn't wait for a song that isn't coming
     message = {
       type: 'CHORDLESS_IMPORT_FAILED',
