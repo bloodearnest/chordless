@@ -38,6 +38,13 @@ test('a signed-in person creates a church and its library, and only admins chang
   const data = { name: ' St Mary ', country: 'GB', city: 'York', licences: { extra: true } }
   assert.equal((await call(null, 'GET', '/api/churches')).status, 401)
   assert.equal((await call('admin', 'POST', '/api/churches', { ...data, city: '' })).status, 400)
+  // (the country is a two-letter ISO code: a name, a lower-case code or a code that is none is refused)
+  for (const country of ['England', 'gb', 'UK', 'GBR', 'ZZ', ''])
+    assert.equal(
+      (await call('admin', 'POST', '/api/churches', { ...data, country })).status,
+      400,
+      country
+    )
   assert.equal(
     (await call('admin', 'POST', '/api/churches', { ...data, postcode: null, ccliLicence: '' }))
       .status,
