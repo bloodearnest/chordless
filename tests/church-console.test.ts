@@ -14,9 +14,14 @@ function setup() {
   const churches: ChurchInfo[] = []
   const teams: ChurchTeam[] = []
   const members: ChurchMember[] = []
+  const checked: boolean[] = []
   const element = document.createElement('church-console')
   elements.push(element)
   element.authenticated = async () => true
+  element.checkTeams = async options => {
+    checked.push(Boolean(options?.force))
+    return { added: [], declined: [] }
+  }
   element.api = {
     ...element.api,
     list: async () => [...churches],
@@ -35,7 +40,7 @@ function setup() {
     invite: async () => ({ code: 'secret', expiresAt: '2026-12-01' }),
   }
   document.body.append(element)
-  return { element, churches, teams, members }
+  return { element, churches, teams, members, checked }
 }
 
 async function ready(element: ChurchConsole) {
@@ -268,6 +273,9 @@ describe('church administration', () => {
       restoreTeam: async () => {
         actions.push('restore')
       },
+      deleteTeam: async () => {
+        actions.push('delete')
+      },
       removeMember: async () => {
         actions.push('remove')
       },
@@ -287,6 +295,7 @@ describe('church administration', () => {
     element.save({ preventDefault() {}, currentTarget: settings } as unknown as Event, church)
     await waitUntil(() => !element._busy && actions.includes('save'))
     await element.archive(church, team)
+    await element.deleteTeam(church, team)
     await element.removeMember(church, member)
     const select = document.createElement('select')
     select.innerHTML = '<option value="admin">Admin</option><option value="reader">Reader</option>'
@@ -294,7 +303,7 @@ describe('church administration', () => {
     await element.changeRole(church, member, { currentTarget: select } as unknown as Event)
     element._invite = 'https://example.com'
     await element.copyInvite()
-    expect(actions).to.deep.equal(['save', 'archive', 'remove', 'role', 'copy'])
+    expect(actions).to.deep.equal(['save', 'archive', 'delete', 'remove', 'role', 'copy'])
   })
 
   it('accepts an invitation from the browser fragment', async () => {
@@ -332,6 +341,86 @@ describe('church administration', () => {
     await waitUntil(() => message !== '' && !element._busy)
     expect(message).to.match(/St Mary \(York, United Kingdom\)/)
     expect(churches).to.have.length(0)
+  })
+
+  it('offers to delete an archived team, and only an archived one, after asking', async () => {
+    const { element, churches, teams } = setup()
+    churches.push({
+      id: 'c',
+      name: 'Church',
+      country: 'GB',
+      city: 'York',
+      postcode: null,
+      ccliLicence: null,
+      licences: {},
+      role: 'admin',
+    })
+    teams.push({ id: 'live', name: 'Live', archivedAt: null, followed: 0 })
+    teams.push({ id: 'old', name: 'Old', archivedAt: '2026-11-01', followed: 0 })
+    const deleted: string[] = []
+    let asked = ''
+    element.api = { ...element.api, deleteTeam: async (_church, id) => void deleted.push(id) }
+    element.confirm = async message => {
+      asked = message
+      return true
+    }
+    await ready(element)
+    const rows = Array.from(element.shadowRoot?.querySelectorAll('.row') ?? [])
+    const buttons = (row: Element) =>
+      Array.from(row.querySelectorAll('button')).map(b => b.textContent?.trim())
+    expect(buttons(rows[0]).includes('Delete')).to.equal(false)
+    const row = rows.find(each => each.textContent?.includes('Old'))
+    const button = Array.from(must(row).querySelectorAll('button')).find(
+      b => b.textContent?.trim() === 'Delete'
+    )
+    element.confirm = async () => false
+    await element.deleteTeam(churches[0], teams[1])
+    expect(deleted).to.deep.equal([])
+    element.confirm = async message => {
+      asked = message
+      return true
+    }
+    must(button).click()
+    await waitUntil(() => deleted.length === 1)
+    expect(deleted).to.deep.equal(['old'])
+    expect(asked).to.contain('cannot be undone')
+  })
+
+  it('sets this device up for a team as part of making it, not at a later check', async () => {
+    const { element, churches, checked } = setup()
+    churches.push({
+      id: 'c',
+      name: 'Church',
+      country: 'GB',
+      city: 'York',
+      postcode: null,
+      ccliLicence: null,
+      licences: {},
+      role: 'admin',
+    })
+    await ready(element)
+    await element.run(async () => {})
+    expect(checked).to.deep.equal([true])
+  })
+
+  it('does not offer a reader to delete an archived team', async () => {
+    const { element, churches, teams } = setup()
+    churches.push({
+      id: 'c',
+      name: 'Church',
+      country: 'GB',
+      city: 'York',
+      postcode: null,
+      ccliLicence: null,
+      licences: {},
+      role: 'reader',
+    })
+    teams.push({ id: 'old', name: 'Old', archivedAt: '2026-11-01', followed: 0 })
+    await ready(element)
+    const labels = Array.from(element.shadowRoot?.querySelectorAll('.row button') ?? []).map(b =>
+      b.textContent?.trim()
+    )
+    expect(labels).to.not.include('Delete')
   })
 
   it('handles failures and cancelled changes without leaving the console busy', async () => {

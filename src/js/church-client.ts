@@ -71,6 +71,8 @@ export const churchClient = {
   adopt: (id: string, teamId: string) =>
     call<{ teamId: string; churchId: string }>(`${team(id, teamId)}/adopt`, 'POST'),
   archiveTeam: (id: string, teamId: string) => call<void>(team(id, teamId), 'DELETE'),
+  /** Delete an archived team for good, with what it holds */
+  deleteTeam: (id: string, teamId: string) => call<void>(`${team(id, teamId)}?permanent`, 'DELETE'),
   restoreTeam: (id: string, teamId: string) => call<void>(team(id, teamId), 'PUT'),
   follow: (id: string, teamId: string, following: boolean) =>
     call<void>(`${team(id, teamId)}/follow`, following ? 'PUT' : 'DELETE'),

@@ -147,7 +147,7 @@ export function handleChurch(request: Request, env: Env): Promise<Response> {
           )
           .bind(
             firstTeam,
-            name,
+            `${name} Worship Team`,
             identity.sub,
             identity.email.toLowerCase(),
             identity.provider,
@@ -234,7 +234,7 @@ async function manageMembers(
   return new Response(null, { status: 204 })
 }
 
-/** Teams of a church: everyone reads; admins create, archive and restore. */
+/** Teams of a church: everyone reads; admins create, archive, restore and (once archived) delete. */
 async function manageTeams(
   request: Request,
   db: D1Db,
@@ -284,6 +284,18 @@ async function manageTeams(
     /* v8 ignore next -- another request can remove the admin after the access check */
     if (!result.meta.changes) throw new Refusal(403, 'Only an admin can manage teams')
     return jsonResponse({ id }, 201)
+  }
+  if (target && request.method === 'DELETE' && new URL(request.url).searchParams.has('permanent')) {
+    // only a team that has been archived: archiving is the step that asks "are you sure" first, and it stops the team being used
+    // (what it holds goes with it: setlists, people and follows are deleted with the team, the church's songs stay)
+    const result = await db
+      .prepare(
+        "DELETE FROM teams WHERE space_id = ? AND church_id = ? AND ended_at IS NOT NULL AND EXISTS (SELECT 1 FROM church_members m JOIN churches c ON c.church_id = m.church_id WHERE m.church_id = ? AND m.account_id = ? AND m.role = 'admin' AND c.ended_at IS NULL)"
+      )
+      .bind(target, church, church, identity.sub)
+      .run()
+    if (!result.meta.changes) throw new Refusal(404, 'No such archived team')
+    return new Response(null, { status: 204 })
   }
   if (target && (request.method === 'DELETE' || request.method === 'PUT')) {
     const archived = request.method === 'DELETE' ? now : null
