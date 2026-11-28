@@ -2,6 +2,7 @@
 import { announceDataChange } from './data-changes.ts'
 import type { Setlist, SongIndexRecord, SongRecord, SpaceOutboxRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
+import { isPlaceholderEntry, placeholderSong } from './placeholder-entries.ts'
 import { mergeSpaceRecord } from './space-data-merge.ts'
 import {
   localRecord,
@@ -21,6 +22,7 @@ import type {
 } from './space-data-types.ts'
 import { ulid } from './ulid.ts'
 import { requestResult, transactionDone } from './utils/idb.ts'
+import { normalizeTitle } from './utils/title.ts'
 
 /** A committed outbox edit is ready to send, including file links written by the Drive sync. */
 export class SpaceOutboxChangedEvent extends Event {
@@ -151,10 +153,20 @@ function validRecord(kind: SpaceRecordKind, record: SpaceRecord): boolean {
   return typeof (record as SpacePadSet).name === 'string'
 }
 
+/** The song of this title in the library (its default variant), if there is one song of that title and not two */
+function songTitled(library: SongIndexRecord[], title: string): SongIndexRecord | undefined {
+  const wanted = normalizeTitle(title)
+  const matching = library.filter(song => normalizeTitle(song.title) === wanted)
+  if (new Set(matching.map(song => song.songId)).size !== 1) return undefined
+  return matching.find(song => song.isDefault) ?? matching[0]
+}
+
 /**
  * A setlist waiting to be sent whose songs were named by id alone (an older entry: its record has the id where the uuid
- * goes) names each song the library holds by its uuid, the default variant's, as saving it does now. The server refuses a
- * setlist with a song it does not know, so one refused for this is sent again; a song not held here stays as it is.
+ * goes) names each song the library holds by its uuid, the default variant's, as saving it does now. An entry the first
+ * folder import made for a file with no chart (placeholder-entries.ts) becomes the song of its file's title, once the
+ * library has one, and only one, of that title. The server refuses a setlist with a song it does not know, so one
+ * refused for this is sent again; a song not held here stays as it is.
  */
 async function withSongUuids(
   tx: IDBTransaction,
@@ -165,6 +177,8 @@ async function withSongUuids(
   if (!record.songs.some(song => song.songUuid === song.songId)) return entry
   const index = tx.objectStore('song_index').index('songId')
   let changed = false
+  /** Every song held here, read once if a placeholder needs it */
+  let library: SongIndexRecord[] | undefined
   const songs: SpaceSetlist['songs'] = []
   for (const song of record.songs) {
     if (song.songUuid !== song.songId) {
@@ -173,12 +187,29 @@ async function withSongUuids(
     }
     const variants: SongIndexRecord[] = await requestResult(index.getAll(song.songId))
     const held = variants.find(variant => variant.isDefault) ?? variants[0]
-    if (!held) {
+    if (held) {
+      changed = true
+      songs.push({ ...song, songUuid: held.songUuid })
+      continue
+    }
+    const named = isPlaceholderEntry(song) ? placeholderSong(song.notes) : null
+    library ??= await requestResult(tx.objectStore('song_index').getAll())
+    const found = named && songTitled(library, named.title)
+    if (!named || !found) {
       songs.push(song)
       continue
     }
     changed = true
-    songs.push({ ...song, songUuid: held.songUuid })
+    // (the notes were the import's, saying which file it was, not anyone's)
+    songs.push({
+      ...song,
+      songId: found.songId,
+      songUuid: found.songUuid,
+      title: found.title,
+      ccli: found.ccli,
+      key: song.key ?? named.key,
+      notes: '',
+    })
   }
   if (!changed) return entry
   const { refusal: _refusal, ...rest } = entry

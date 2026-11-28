@@ -337,6 +337,60 @@ describe('D1 device data sync and outbox', () => {
     expect(await setlistOf()).to.deep.equal(sent)
   })
 
+  it('sends an entry the folder import made for a file with no chart as the song of its title, once it is held', async () => {
+    const { db, store } = await ready()
+    await db.saveSongsBatch([
+      makeSong({
+        uuid: 'wonders',
+        id: 'ccli-5272938',
+        title: 'King Of Wonders',
+        ccliNumber: '5272938',
+      }),
+      makeSong({ uuid: 'hope-1', id: 'ccli-1', title: 'My Hope' }),
+      makeSong({ uuid: 'hope-2', id: 'ccli-2', title: 'My Hope' }),
+    ])
+    const placeholder = (hash: string, file: string, key: string | null = null) => ({
+      ...entry(`placeholder-hash-${hash}`),
+      key,
+      notes: `ChordPro inline: ${file}`,
+      annotations: [{ id: 'kept' }],
+    })
+    const record = remote({
+      setlistId: 'imported',
+      songs: [
+        placeholder('1', '7king-of-wonders-chords-E.txt'),
+        placeholder('2', '3King Of Wonders-chords-G.txt', 'A'),
+        placeholder('3', '4-My-Hope-D.txt'),
+        placeholder('4', 'in-your-presence-G.txt'),
+      ],
+    })
+    const tx = must(db.db).transaction('space_outbox', 'readwrite')
+    tx.objectStore('space_outbox').put({
+      id: 'queued',
+      base: null,
+      change: { kind: 'setlist', id: 'imported', op: 'put', baseVersion: null, record },
+      refusal: { status: 'invalid', reason: 'a song that the church library does not have yet' },
+    })
+    await transactionDone(tx)
+    const sent = must((await store.pending()).find(waiting => waiting.change.kind === 'setlist'))
+    const [first, second, mine, absent] = (sent.change.record as SpaceSetlist).songs
+    // (the key its file was named for, unless one was set since; the import's note goes)
+    expect(first).to.deep.include({
+      songId: 'ccli-5272938',
+      songUuid: 'wonders',
+      title: 'King Of Wonders',
+      ccli: '5272938',
+      key: 'E',
+      notes: '',
+      annotations: [{ id: 'kept' }],
+    })
+    expect(second).to.include({ songUuid: 'wonders', key: 'A' })
+    // (two songs of that title: it is not guessed; none: it waits)
+    expect(mine.songId).to.equal('placeholder-hash-3')
+    expect(absent.songId).to.equal('placeholder-hash-4')
+    expect(sent.refusal).to.equal(undefined)
+  })
+
   it('does not retry or disclose a record whose id belongs to another space', async () => {
     const { db, store } = await ready()
     await db.saveSetlist(makeSetlist())
