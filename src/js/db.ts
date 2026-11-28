@@ -1277,13 +1277,8 @@ export class ChordlessDB {
 }
 
 // Utility functions
-export function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^\w\s]/g, '') // Remove punctuation
-    .replace(/\s+/g, '') // Remove all whitespace
-    .trim()
-}
+// (kept in a module of its own, which the outbox store can use: it is imported by this one)
+export { normalizeTitle } from './utils/title.ts'
 
 /**
  * Parse tempo string into BPM number and note subdivision
