@@ -139,6 +139,44 @@ describe('moving a team on Google Drive into the church', () => {
   })
 })
 
+describe('the country of a church', () => {
+  it('is chosen from a list of countries, named in the person’s language, with a prompt first', async () => {
+    const { element } = setup()
+    await ready(element)
+    const select = must(
+      element.shadowRoot?.querySelector<HTMLSelectElement>('details form select[name="country"]')
+    )
+    const options = [...select.options]
+    expect(options).to.have.length(250)
+    expect(options[0].value).to.equal('')
+    expect(options[0].disabled).to.equal(true)
+    expect(options.find(option => option.value === 'GB')?.textContent).to.match(/United Kingdom/i)
+    expect(options.find(option => option.value === 'US')?.textContent).to.match(/United States/i)
+    // (the name is shown, the code is what is sent)
+    select.value = 'GB'
+    expect(select.value).to.equal('GB')
+  })
+
+  it('is the one the browser’s language names, and nothing chosen when it names none', async () => {
+    const languages = Object.getOwnPropertyDescriptor(Navigator.prototype, 'languages')
+    const asked = async (tags: string[]) => {
+      Object.defineProperty(navigator, 'languages', { configurable: true, value: tags })
+      const { element } = setup()
+      await ready(element)
+      return must(
+        element.shadowRoot?.querySelector<HTMLSelectElement>('details form select[name="country"]')
+      ).value
+    }
+    try {
+      expect(await asked(['en-GB', 'en'])).to.equal('GB')
+      expect(await asked(['en'])).to.equal('')
+    } finally {
+      Reflect.deleteProperty(navigator, 'languages')
+      if (languages) Object.defineProperty(Navigator.prototype, 'languages', languages)
+    }
+  })
+})
+
 describe('church administration', () => {
   it('creates a church, shows its first team and invites someone to it', async () => {
     const { element, churches, teams } = setup()
@@ -292,7 +330,7 @@ describe('church administration', () => {
     setInput(form, 'ccliLicence', '123')
     submit(form)
     await waitUntil(() => message !== '' && !element._busy)
-    expect(message).to.contain('St Mary (York, GB)')
+    expect(message).to.match(/St Mary \(York, United Kingdom\)/)
     expect(churches).to.have.length(0)
   })
 
@@ -374,7 +412,9 @@ describe('church administration', () => {
     element.invite({ preventDefault() {}, currentTarget: form } as unknown as Event, churches[0])
     await waitUntil(() => !element._busy)
     element.join()
-    const selector = must(element.shadowRoot?.querySelector<HTMLSelectElement>('select'))
+    const selector = must(
+      element.shadowRoot?.querySelector<HTMLSelectElement>('select:not([name])')
+    )
     selector.value = 'b'
     selector.dispatchEvent(new Event('change'))
     expect(element._selected).to.equal('b')

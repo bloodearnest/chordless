@@ -3,6 +3,7 @@
  * docs/CENTRAL_STORAGE.md, step 8).
  */
 import { toBase64Url } from '../../src/js/base64url.ts'
+import { isCountryCode } from '../../src/js/countries.ts'
 import { ulid } from '../../src/js/ulid.ts'
 import { sha256Hex } from '../../src/js/utils/bytes.ts'
 import type { D1Db } from './d1.ts'
@@ -91,7 +92,9 @@ export function handleChurch(request: Request, env: Env): Promise<Response> {
       }
       const body = await readJson(request)
       const name = field(body.name, 'name')
+      // (a two-letter country code: the form offers a list, and a church made before it kept words, which are saved again as a code)
       const country = field(body.country, 'country')
+      if (!isCountryCode(country)) throw new Refusal(400, 'Invalid country')
       const city = field(body.city, 'city')
       const postcode = field(body.postcode, 'postcode', true)
       const licence = field(body.ccliLicence, 'CCLI licence', true)

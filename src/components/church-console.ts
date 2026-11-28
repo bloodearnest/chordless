@@ -8,6 +8,7 @@ import {
   ChurchTeamsChangedEvent,
   churchClient,
 } from '../js/church-client.ts'
+import { countryChoices, countryName, guessCountry } from '../js/countries.ts'
 import { isAuthenticated } from '../js/google-auth.ts'
 import { teamApi } from '../js/team-client.ts'
 import type { MemberRole } from '../js/team-roles.ts'
@@ -171,7 +172,10 @@ export class ChurchConsole extends LitElement {
           !(await this.confirm(
             t('church-console-matches', {
               names: matches
-                .map(match => `${match.name} (${match.city}, ${match.country})`)
+                .map(
+                  match =>
+                    `${match.name} (${match.city}, ${countryName(match.country, navigator.language)})`
+                )
                 .join(', '),
             })
           ))
@@ -215,6 +219,15 @@ export class ChurchConsole extends LitElement {
       await this.api.adopt(church.id, team.spaceId)
       toast(t('church-console-adopted', { team: team.name }))
     })
+  }
+  /** Every country, by name in the person's language, with the chosen one (or, for a new church, the one their browser suggests) selected */
+  countryOptions(chosen: string) {
+    return html`<option value="" ?selected=${!chosen} disabled>${t('church-console-country-choose')}</option>${countryChoices(
+      navigator.language
+    ).map(
+      country =>
+        html`<option value=${country.code} ?selected=${country.code === chosen}>${country.name}</option>`
+    )}`
   }
   async removeMember(church: ChurchInfo, member: ChurchMember) {
     if (
@@ -265,7 +278,7 @@ export class ChurchConsole extends LitElement {
   }
   fields(church?: ChurchInfo) {
     return html`<label>${t('church-console-name')}<input name="name" required .value=${church?.name ?? ''}></label>
-      <label>${t('church-console-country')}<input name="country" required .value=${church?.country ?? ''}></label>
+      <label>${t('church-console-country')}<select name="country" required>${this.countryOptions(church?.country ?? guessCountry(navigator.languages) ?? '')}</select></label>
       <label>${t('church-console-city')}<input name="city" required .value=${church?.city ?? ''}></label>
       <label>${t('church-console-postcode')}<input name="postcode" .value=${church?.postcode ?? ''}></label>
       <label>${t('church-console-licence')}<input name="ccliLicence" .value=${church?.ccliLicence ?? ''}></label>`

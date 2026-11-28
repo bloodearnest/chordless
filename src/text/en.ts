@@ -2301,6 +2301,7 @@ church-console-create = Create church
 church-console-save = Save changes
 church-console-select = Choose a church
 church-console-teams = Teams
+church-console-country-choose = Choose a country
 church-console-drive-teams = Teams on Google Drive
 church-console-drive-text = A team that is still kept in Google Drive can be moved into this church. Its members join the church, and its songs and setlists move from Google Drive to Chordless as each person opens the app, so everyone needs the latest version first.
 # { $church } is the name of the church the team would be moved into.
