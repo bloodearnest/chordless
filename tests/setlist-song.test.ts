@@ -278,9 +278,10 @@ describe('SetlistSong', () => {
       song.setCapo(4)
       await song.save()
 
-      // (kept under the song, not its place in the setlist; this fixture has no uuid, so by its id)
+      // (kept under the song, not its place in the setlist: this fixture's entry names it by id alone, and is
+      // given the song's uuid when the setlist is saved, so by that)
       const state = JSON.parse(must(localStorage.getItem(`state-${setlist.id}`)))
-      expect(state.capos[setlist.songs[0].songId]).to.equal(4)
+      expect(state.capos[canonicalSong.uuid]).to.equal(4)
     })
   })
 

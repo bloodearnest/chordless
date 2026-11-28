@@ -80,6 +80,7 @@ import {
   loadSetlistTuning,
   loadSongPitches,
   renumberSongs,
+  sameSong,
   saveSetlistLocalState,
   saveSetlistPitch,
   saveSetlistTuning,
@@ -118,13 +119,6 @@ import { showStatusMessage } from './utils/status-message.ts'
 import type { ViewState } from './views/page-view.ts'
 
 // Configuration constants
-/** Whether two entries of a setlist are the same song (a page holds a copy, and the stored setlist may have moved on) */
-function sameEntry(
-  a: { songId: string; songUuid?: string } | undefined,
-  b: { songId: string; songUuid?: string }
-): boolean {
-  return a?.songId === b.songId && a?.songUuid === b.songUuid
-}
 
 const CONFIG = {
   // Scrolling
@@ -1733,7 +1727,7 @@ export class SetlistPage {
 
     // Reorder songs in the setlist, as it is stored
     const saved = await this.editSetlist(stored => {
-      if (!sameEntry(stored.songs[startIndex], moving)) return NO_CHANGE
+      if (!sameSong(stored.songs[startIndex], moving)) return NO_CHANGE
       stored.songs.splice(newIndex, 0, ...stored.songs.splice(startIndex, 1))
       stored.songs.forEach((song, index) => {
         song.order = index
@@ -2249,7 +2243,7 @@ export class SetlistPage {
     if (!shown || !this.mayChangeSong(this.songs[index])) return
     await this.editSetlist(stored => {
       const entry = stored.songs[index]
-      if (!entry || !sameEntry(entry, shown)) return NO_CHANGE
+      if (!entry || !sameSong(entry, shown)) return NO_CHANGE
       change(entry)
     })
     if (rerender && this.currentSetlistId) await this.renderSetlist(this.currentSetlistId)
@@ -2267,7 +2261,7 @@ export class SetlistPage {
 
       // Remove the song from the setlist as it is stored
       await this.editSetlist(stored => {
-        if (!sameEntry(stored.songs[index], shown)) return NO_CHANGE
+        if (!sameSong(stored.songs[index], shown)) return NO_CHANGE
         stored.songs.splice(index, 1)
         stored.songs.forEach((entry, i) => {
           entry.order = i
