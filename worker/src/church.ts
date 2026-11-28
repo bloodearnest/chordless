@@ -15,7 +15,8 @@ export const CHURCHES_PATH = '/api/churches'
 export const isChurchPath = (path: string) =>
   path === CHURCHES_PATH ||
   path === '/api/church-invites/join' ||
-  /^\/api\/churches\/[A-Za-z0-9_-]+\/teams\/[A-Za-z0-9_-]+\/(?:invites|follow|adopt)$/.test(path) ||
+  /^\/api\/churches\/[A-Za-z0-9_-]+\/teams\/[A-Za-z0-9_-]+\/(?:invites|adopt)$/.test(path) ||
+  /^\/api\/churches\/[A-Za-z0-9_-]+\/teams\/[A-Za-z0-9_-]+\/people\/[A-Za-z0-9_-]+$/.test(path) ||
   /^\/api\/churches\/[A-Za-z0-9_-]+(?:\/(?:members|teams)(?:\/[A-Za-z0-9_-]+)?)?$/.test(path)
 
 function field(value: unknown, name: string, optional = false): string | null {
@@ -38,7 +39,7 @@ export function handleChurch(request: Request, env: Env): Promise<Response> {
     const db = env.DB
     if (new URL(request.url).pathname === '/api/church-invites/join')
       return joinChurch(request, db, identity)
-    const [id, resource, memberId, subresource] = new URL(request.url).pathname
+    const [id, resource, memberId, subresource, personId] = new URL(request.url).pathname
       .slice(CHURCHES_PATH.length + 1)
       .split('/')
     if (id === 'matches' && request.method === 'GET') {
@@ -52,8 +53,8 @@ export function handleChurch(request: Request, env: Env): Promise<Response> {
       return jsonResponse(results)
     }
     if (resource === 'members') return manageMembers(request, db, id, memberId, identity.sub)
-    if (resource === 'teams' && subresource === 'follow')
-      return followTeam(request, db, id, memberId, identity.sub)
+    if (resource === 'teams' && subresource === 'people')
+      return teamPerson(request, db, id, memberId, personId, identity.sub)
     if (resource === 'teams' && subresource === 'adopt')
       return adoptTeam(request, db, id, memberId, identity)
     if (resource === 'teams' && subresource === 'invites')
@@ -253,11 +254,15 @@ async function manageTeams(
   if (!target && request.method === 'GET') {
     const { results } = await db
       .prepare(
-        'SELECT t.space_id AS id, t.name, t.ended_at AS archivedAt, EXISTS (SELECT 1 FROM followed_teams f WHERE f.space_id = t.space_id AND f.account_id = ?) AS followed FROM teams t WHERE t.church_id = ? ORDER BY t.name, t.space_id'
+        // `followed` is what the stored name is: whether the team is the person's, which it is for a team they are on, and for every
+        // team to an admin (who runs the church). Who is on a team is shown to an admin only.
+        'SELECT t.space_id AS id, t.name, t.ended_at AS archivedAt, (? OR EXISTS (SELECT 1 FROM followed_teams f WHERE f.space_id = t.space_id AND f.account_id = ?)) AS followed, CASE WHEN ? THEN (SELECT json_group_array(f.account_id) FROM followed_teams f WHERE f.space_id = t.space_id) END AS people FROM teams t WHERE t.church_id = ? ORDER BY t.name, t.space_id'
       )
-      .bind(identity.sub, church)
-      .all()
-    return jsonResponse(results)
+      .bind(actor.role === 'admin' ? 1 : 0, identity.sub, actor.role === 'admin' ? 1 : 0, church)
+      .all<{ people: string | null }>()
+    return jsonResponse(
+      results.map(row => ({ ...row, people: row.people ? JSON.parse(row.people) : undefined }))
+    )
   }
   if (actor.role !== 'admin') throw new Refusal(403, 'Only an admin can manage teams')
   const now = new Date().toISOString()
@@ -372,6 +377,14 @@ async function adoptTeam(
         'UPDATE teams SET church_id = ?, updated_at = ? WHERE space_id = ? AND church_id IS NULL AND ended_at IS NULL'
       )
       .bind(church, now, team),
+    // The team's people follow it, as they did: a church team that is not followed is not on their home page
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO followed_teams (account_id, space_id)
+         SELECT m.account_id, m.space_id FROM team_members m WHERE m.space_id = ?
+         UNION SELECT t.owner_account_id, t.space_id FROM teams t WHERE t.space_id = ? AND t.owner_account_id IS NOT NULL`
+      )
+      .bind(team, team),
   ])
   const members = await db
     .prepare('SELECT count(*) AS n FROM church_members WHERE church_id = ?')
@@ -476,34 +489,47 @@ async function joinChurch(request: Request, db: D1Db, identity: Identity): Promi
   return jsonResponse({ churchId: invite.church_id, teamId: team })
 }
 
-/** The signed-in person's account-wide homepage selection. */
-async function followTeam(
+/** An admin puts a member of the church on a team, or takes them off (a person does not choose their teams) */
+async function teamPerson(
   request: Request,
   db: D1Db,
   church: string,
   team: string | undefined,
-  account: string
+  person: string | undefined,
+  admin: string
 ): Promise<Response> {
-  if (!team || !['PUT', 'DELETE'].includes(request.method)) throw new Refusal(404, 'Not found')
+  if (!team || !person || !['PUT', 'DELETE'].includes(request.method))
+    throw new Refusal(404, 'Not found')
   const allowed = await db
     .prepare(
-      'SELECT 1 AS ok FROM teams t JOIN churches c ON c.church_id = t.church_id JOIN church_members m ON m.church_id = c.church_id WHERE t.space_id = ? AND t.church_id = ? AND t.ended_at IS NULL AND c.ended_at IS NULL AND m.account_id = ?'
+      "SELECT 1 AS ok FROM teams t JOIN churches c ON c.church_id = t.church_id JOIN church_members m ON m.church_id = c.church_id WHERE t.space_id = ? AND t.church_id = ? AND t.ended_at IS NULL AND c.ended_at IS NULL AND m.account_id = ? AND m.role = 'admin'"
     )
-    .bind(team, church, account)
+    .bind(team, church, admin)
     .first()
   if (!allowed) throw new Refusal(404, 'No such team')
   if (request.method === 'PUT') {
-    await db
+    const result = await db
       .prepare(
-        'INSERT OR IGNORE INTO followed_teams (account_id, space_id) SELECT ?, t.space_id FROM teams t JOIN churches c ON c.church_id = t.church_id JOIN church_members m ON m.church_id = c.church_id WHERE t.space_id = ? AND t.church_id = ? AND t.ended_at IS NULL AND c.ended_at IS NULL AND m.account_id = ?'
+        'INSERT OR IGNORE INTO followed_teams (account_id, space_id) SELECT m.account_id, ? FROM church_members m WHERE m.church_id = ? AND m.account_id = ?'
       )
-      .bind(account, team, church, account)
+      .bind(team, church, person)
       .run()
+    if (!result.meta.changes && !(await onTeam(db, team, person)))
+      throw new Refusal(404, 'No such member')
   } else {
     await db
       .prepare('DELETE FROM followed_teams WHERE account_id = ? AND space_id = ?')
-      .bind(account, team)
+      .bind(person, team)
       .run()
   }
   return new Response(null, { status: 204 })
+}
+
+async function onTeam(db: D1Db, team: string, person: string): Promise<boolean> {
+  return Boolean(
+    await db
+      .prepare('SELECT 1 AS ok FROM followed_teams WHERE space_id = ? AND account_id = ?')
+      .bind(team, person)
+      .first()
+  )
 }

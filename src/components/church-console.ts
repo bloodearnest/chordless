@@ -212,11 +212,34 @@ export class ChurchConsole extends LitElement {
     if (!(await this.confirm(t('church-console-confirm-archive', { name: team.name })))) return
     await this.run(() => this.api.archiveTeam(church.id, team.id))
   }
+  /** Who is on a team, for an admin to change: the people on it, each with a way off, and the others of the church to add */
+  teamPeople(church: ChurchInfo, team: ChurchTeam) {
+    const on = new Set(team.people ?? [])
+    const label = (member: ChurchMember) => member.name ?? member.email ?? member.id
+    const here = this._members.filter(member => on.has(member.id))
+    const others = this._members.filter(member => !on.has(member.id))
+    return html`<div class="row team-people">
+      <span>${t('church-console-team-people')}</span>
+      ${here.map(member => html`<span>${label(member)} <button class="btn" ?disabled=${this._busy} @click=${() => void this.run(() => this.api.removeFromTeam(church.id, team.id, member.id))}>${t('church-console-team-person-remove')}</button></span>`)}
+      ${
+        others.length
+          ? html`<select aria-label=${t('church-console-team-person-add')} @change=${(
+              event: Event
+            ) => {
+              const select = event.currentTarget as HTMLSelectElement
+              const account = select.value
+              select.value = ''
+              if (account) void this.run(() => this.api.addToTeam(church.id, team.id, account))
+            }}><option value="">${t('church-console-team-person-add')}</option>${others.map(member => html`<option value=${member.id}>${label(member)}</option>`)}</select>`
+          : nothing
+      }
+    </div>`
+  }
   async deleteTeam(church: ChurchInfo, team: ChurchTeam) {
     if (!(await this.confirm(t('church-console-confirm-delete', { name: team.name })))) return
     await this.run(() => this.api.deleteTeam(church.id, team.id))
   }
-  /** Move a team that is on Google Drive into the church, after asking: its members join the church, and each device follows */
+  /** Move a team that is on Google Drive into the church, after asking: its members join the church, and each device sets it up */
   async adopt(church: ChurchInfo, team: { spaceId: string; name: string }) {
     if (
       !(await this.confirm(
@@ -326,7 +349,7 @@ export class ChurchConsole extends LitElement {
         church
           ? html`<section class="panel"><h2>${church.name}</h2>${admin && !church.ccliLicence ? html`<p>${t('church-console-licence-missing')}</p>` : nothing}
         ${admin ? html`<form @submit=${(event: Event) => this.save(event, church)}>${this.fields(church)}<button class="btn" ?disabled=${this._busy}>${t('church-console-save')}</button></form>` : html`<p>${church.city}, ${church.country}</p>${church.ccliLicence ? html`<p>${t('church-console-licence')}: ${church.ccliLicence}</p>` : nothing}`}</section>
-        <section class="panel"><h2>${t('church-console-teams')}</h2>${this._teams.map(team => html`<div class="row"><span>${team.name}</span>${!team.archivedAt ? html`<label><input type="checkbox" .checked=${Boolean(team.followed)} @change=${(event: Event) => void this.run(() => this.api.follow(church.id, team.id, (event.currentTarget as HTMLInputElement).checked))}>${t('church-console-follow')}</label>` : nothing}${admin ? html`<button class="btn" ?disabled=${this._busy} @click=${() => (team.archivedAt ? this.run(() => this.api.restoreTeam(church.id, team.id)) : this.archive(church, team))}>${t(team.archivedAt ? 'church-console-restore' : 'church-console-archive')}</button>` : nothing}${admin && team.archivedAt ? html`<button class="btn" ?disabled=${this._busy} @click=${() => this.deleteTeam(church, team)}>${t('church-console-delete')}</button>` : nothing}</div>`)}
+        <section class="panel"><h2>${t('church-console-teams')}</h2>${this._teams.map(team => html`<div class="row"><span>${team.name}</span>${admin ? html`<button class="btn" ?disabled=${this._busy} @click=${() => (team.archivedAt ? this.run(() => this.api.restoreTeam(church.id, team.id)) : this.archive(church, team))}>${t(team.archivedAt ? 'church-console-restore' : 'church-console-archive')}</button>` : nothing}${admin && team.archivedAt ? html`<button class="btn" ?disabled=${this._busy} @click=${() => this.deleteTeam(church, team)}>${t('church-console-delete')}</button>` : nothing}</div>${admin && !team.archivedAt ? this.teamPeople(church, team) : nothing}`)}
         ${admin ? html`<form @submit=${(event: Event) => this.addTeam(event, church)}><label>${t('church-console-team-name')}<input name="team" required></label><button class="btn" ?disabled=${this._busy}>${t('church-console-team-add')}</button></form>` : nothing}</section>
         <section class="panel"><h2>${t('church-console-members')}</h2>${this._members.map(member => html`<div class="row"><span>${member.name ?? member.email ?? member.id}</span>${admin ? html`<select aria-label=${t('church-console-role')} @change=${(event: Event) => this.changeRole(church, member, event)}>${this.roles(member.role)}</select><button class="btn" @click=${() => this.removeMember(church, member)}>${t('church-console-remove')}</button>` : html`<span>${t(roleText[member.role])}</span>`}</div>`)}</section>
         ${admin && this._driveTeams.length ? html`<section class="panel" id="drive-teams"><h2>${t('church-console-drive-teams')}</h2><p>${t('church-console-drive-text')}</p>${this._driveTeams.map(drive => html`<div class="row"><span>${drive.name}</span><button class="btn" ?disabled=${this._busy} @click=${() => this.adopt(church, drive)}>${t('church-console-adopt', { church: church.name })}</button></div>`)}</section>` : nothing}

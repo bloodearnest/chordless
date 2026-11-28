@@ -101,6 +101,13 @@ describe('teams on another device', () => {
     expect(must(await getSpaceById(id)).readOnly).to.equal(true)
   })
 
+  it('does not set up a church team the person does not follow, until they do', async () => {
+    const other = team('writer', { churchId: 'church', followed: false })
+    expect((await check([other])).added).to.have.length(0)
+    expect(await teamSpaces([other.spaceId])).to.have.length(0)
+    expect((await check([{ ...other, followed: true }])).added).to.have.length(1)
+  })
+
   it('takes a church team off the device when the church no longer has it, but only when the church was read', async () => {
     const kept = team('writer', { churchId: 'church', followed: true })
     const gone = team('writer', { churchId: 'church', followed: true })

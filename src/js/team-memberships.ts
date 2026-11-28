@@ -213,6 +213,9 @@ export async function addMissingTeamSpaces(options: CheckOptions = {}): Promise<
         }
         acceptTeam(team.spaceId)
       }
+      // A church's team the person does not follow is not set up here (its songs and setlists are not fetched): all of a church's
+      // people may reach all its teams, but each is on a device for the teams they follow, and following one sets it up
+      if (team.churchId && !team.followed) continue
       // (an owner's device reaches the folder straight, so needs its id; without it there is no way in)
       if (team.role === 'owner' && !team.rootRef) continue
       adds.push(await createLocalTeamSpace(team))

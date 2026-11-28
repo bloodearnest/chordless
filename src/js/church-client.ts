@@ -3,7 +3,7 @@ import { getIdentityToken } from './google-auth.ts'
 import type { MemberRole } from './team-roles.ts'
 import { callWorker, type WorkerCall } from './worker-call.ts'
 
-/** Team membership or following choices may have changed. */
+/** Team membership may have changed. */
 export class ChurchTeamsChangedEvent extends Event {
   static readonly type = 'church-teams:changed'
   constructor() {
@@ -25,7 +25,10 @@ export interface ChurchTeam {
   id: string
   name: string
   archivedAt: string | null
+  /** Whether the team is the person's: one they are on, or any team to an admin (the stored name for it) */
   followed: number
+  /** The accounts on the team, shown to an admin */
+  people?: string[]
 }
 export interface ChurchMember {
   id: string
@@ -76,8 +79,11 @@ export const churchClient = {
   /** Delete an archived team for good, with what it holds */
   deleteTeam: (id: string, teamId: string) => call<void>(`${team(id, teamId)}?permanent`, 'DELETE'),
   restoreTeam: (id: string, teamId: string) => call<void>(team(id, teamId), 'PUT'),
-  follow: (id: string, teamId: string, following: boolean) =>
-    call<void>(`${team(id, teamId)}/follow`, following ? 'PUT' : 'DELETE'),
+  /** An admin puts a member of the church on a team, or takes them off it */
+  addToTeam: (id: string, teamId: string, account: string) =>
+    call<void>(`${team(id, teamId)}/people/${encodeURIComponent(account)}`, 'PUT'),
+  removeFromTeam: (id: string, teamId: string, account: string) =>
+    call<void>(`${team(id, teamId)}/people/${encodeURIComponent(account)}`, 'DELETE'),
   setRole: (id: string, account: string, role: MemberRole) =>
     call<void>(`${church(id)}/members/${encodeURIComponent(account)}`, 'PUT', { role }),
   removeMember: (id: string, account: string) =>
