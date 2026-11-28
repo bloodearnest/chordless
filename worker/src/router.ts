@@ -7,6 +7,7 @@
 import { ACCOUNT_PATH, handleAccount } from './account.ts'
 import { DRIVE_PATH, handleDrive } from './account-drive.ts'
 import { handleChurch, isChurchPath } from './church.ts'
+import { churchLivePath, handleChurchLive } from './church-team-live.ts'
 import {
   handleEmailLink,
   handleEmailLinkPeek,
@@ -122,6 +123,10 @@ async function route(
     if (isOverlayPath(path)) return await handleOverlays(request, env)
 
     if (isTeamSetlistPath(path)) return await handleTeamSetlists(request, env)
+
+    // A device joining a church team's live room (docs/LIVE_SYNC.md)
+    const liveTeam = churchLivePath(path)
+    if (liveTeam !== null) return await handleChurchLive(request, liveTeam, env)
 
     // Team spaces (docs/SPACES.md): making one, joining, its people, and its files
     if (isTeamPath(path)) return await handleTeamRoutes(request, env, team)

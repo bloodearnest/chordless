@@ -8,10 +8,11 @@
 /* v8 ignore start -- needs `cloudflare:workers`: only workerd has it (worker.node.test.ts runs it there, unmeasured) */
 import { DurableObject, type DurableObjectState } from 'cloudflare:workers'
 import { CHANGED, LIVE_PROTOCOL, PING, PONG } from '../../src/js/live-protocol.ts'
+import { roleIn } from './church-team-live.ts'
+import type { D1Db } from './d1.ts'
 import type { Env } from './env.ts'
 import { identityKey } from './identity.ts'
 import { judge, type LiveAttachment } from './live-relay.ts'
-import { TeamSpaceState } from './team-state.ts'
 
 export class TeamRoom extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -46,7 +47,7 @@ export class TeamRoom extends DurableObject<Env> {
     // (the role is the space's now, not the one the socket was opened with: a member who was
     // removed or demoted is refused at once, whether or not their socket has been closed yet)
     const who = ws.deserializeAttachment() as LiveAttachment
-    const role = this.env.DB ? await new TeamSpaceState(this.env.DB, who.spaceId).roleOf(who) : null
+    const role = this.env.DB ? await roleIn(this.env.DB as D1Db, who) : null
     const verdict = role ? judge(role, message) : { close: 1008, reason: 'Not a member' }
     if (verdict !== 'relay') {
       ws.close(verdict.close, verdict.reason)
