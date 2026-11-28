@@ -13,7 +13,10 @@ interface Seen {
   body: string
 }
 
-function pads(answer: (seen: Seen) => Response | Promise<Response>) {
+function pads(
+  answer: (seen: Seen) => Response | Promise<Response>,
+  of: { library: string } | { team: string } = { library: 'lib 1' }
+) {
   const seen: Seen[] = []
   const storage = new LibraryPads(
     {
@@ -32,7 +35,7 @@ function pads(answer: (seen: Seen) => Response | Promise<Response>) {
         return answer(one)
       }) as typeof fetch,
     },
-    'lib 1'
+    of
   )
   return { storage, seen }
 }
@@ -98,10 +101,22 @@ describe('a moved space’s pads, through the Worker', () => {
     expect(seen[0].path).to.equal('/api/libraries/lib%201/pads/files/SET1%3AC')
   })
 
-  it('is the pad store of a space that has moved, and of no other', () => {
+  it("is a church team's church's library, by the team's own path", async () => {
+    const { storage, seen } = pads(() => Response.json([]), { team: 'team 1' })
+    expect(await storage.listSets()).to.deep.equal([])
+    expect(seen.map(each => `${each.method} ${each.path}`)).to.deep.equal([
+      'GET /api/teams/team%201/library/pads',
+    ])
+  })
+
+  it('is the pad store of a space on Chordless (moved, or a church team), and of no other', () => {
     expect(serverPadsFor({})).to.equal(null)
+    expect(serverPadsFor({ team: { id: 'drive-team', role: 'writer' } })).to.equal(null)
     expect(
       serverPadsFor({ server: { libraryId: 'lib', movedAt: '2026-11-25T10:00:00.000Z' } })
+    ).to.be.instanceOf(LibraryPads)
+    expect(
+      serverPadsFor({ team: { id: 'team', role: 'writer', churchId: 'church' } })
     ).to.be.instanceOf(LibraryPads)
   })
 })

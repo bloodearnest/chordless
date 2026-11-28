@@ -10,9 +10,13 @@ export class LibraryPads implements PadStorage {
   #connection: WorkerConnection
   #base: string
 
-  constructor(connection: WorkerConnection, libraryId: string) {
+  /** A library's, by its id; or a church team's, by the team (its church's library: the Worker finds it) */
+  constructor(connection: WorkerConnection, of: { library: string } | { team: string }) {
     this.#connection = connection
-    this.#base = `/api/libraries/${encodeURIComponent(libraryId)}/pads`
+    this.#base =
+      'library' in of
+        ? `/api/libraries/${encodeURIComponent(of.library)}/pads`
+        : `/api/teams/${encodeURIComponent(of.team)}/library/pads`
   }
 
   listSets(): Promise<PadSetEntry[]> {

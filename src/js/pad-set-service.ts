@@ -2,7 +2,7 @@ import type { Space } from './data-types.ts'
 import { openSpace } from './db.ts'
 import { wantsPads } from './media-player-loader.ts'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.ts'
-import { listSpaces } from './space.ts'
+import { listSpaces, onChordless } from './space.ts'
 import { SpaceDataStore } from './space-data-store.ts'
 import { driveStorage } from './storage/browser-drive.ts'
 import { isTeamMember, serverPadsFor, storageFor } from './storage/space-storage.ts'
@@ -83,11 +83,12 @@ export function setPadSources(sources?: PadSource[] | null) {
 }
 
 /**
- * A space's pads: in its library on the server if it has moved there, else in its folder, straight in Drive for a personal space's and a team's owner,
- * through the Worker for anyone else. A space not in Drive yet has no folder, so none.
+ * A space's pads: in a library on the server if it is on Chordless (a moved Personal space's own, or a church team's
+ * church's), else in its folder, straight in Drive for a personal space's and a team's owner, through the Worker for anyone
+ * else. A space not in Drive yet has no folder, so none.
  */
 function spaceSource(space: Space): PadSource | null {
-  const storage = space.server
+  const storage = onChordless(space)
     ? serverPadsFor(space)
     : space.team && isTeamMember(space)
       ? storageFor(space).padsIn(space.team.id)
@@ -107,7 +108,12 @@ async function padSources(): Promise<PadSource[]> {
       return []
     }
   )
+  // (a church's teams share its library, and so its pads: listed once, for the first of its teams)
+  const churches = new Set<string>()
   const sources = spaces.flatMap(space => {
+    const church = space.team?.churchId
+    if (church && churches.has(church)) return []
+    if (church) churches.add(church)
     const source = spaceSource(space)
     return source ? [source] : []
   })
